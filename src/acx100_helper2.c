@@ -1582,30 +1582,6 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 		if ((pSuppRates[2+i] & ~0x80) > max_rate)
 			max_rate = pSuppRates[2+i] & ~0x80;
 	}
-	
-	/* FIXME  how we select the max txrate */
-	if ( priv->chip_type == CHIPTYPE_ACX111) {
-	    switch ( max_rate ) {
-		case 2:		priv->txrate_curr = RATE111_1;
-				break;
-				
-		case 4:		priv->txrate_curr = RATE111_2;
-				break;
-				
-		case 22:	priv->txrate_curr = RATE111_11;
-				break;
-				
-		case 44:	priv->txrate_curr = RATE111_22;
-				break;
-				
-		case 108:	priv->txrate_curr = RATE111_54;
-				break;
-				
-		default:  	priv->txrate_curr = RATE111_1;
-				break;
-	    }
-	}
-	acxlog(L_DEBUG, ".\n");
 
 	acxlog(L_STD | L_ASSOC,
 	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, BSSID %02X %02X %02X %02X %02X %02X, %s/%d%sMbps, Caps 0x%04x, SIR %d, SNR %d.\n",

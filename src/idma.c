@@ -462,6 +462,19 @@ fail:
 *
 *----------------------------------------------------------------*/
 
+/* NB: this table maps RATE111 bits to ACX100 tx descr constants */
+static u8 bitpos2rate100[] = {
+	ACX_TXRATE_1		,
+	ACX_TXRATE_2		,
+	ACX_TXRATE_5_5		,
+	0			,
+	0			,
+	ACX_TXRATE_11		,
+	0			,
+	0			,
+	ACX_TXRATE_22PBCC	,
+};
+
 void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 {
 	struct txhostdescriptor *header;
@@ -506,7 +519,15 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
 			tx_desc->u.r1.rate = ACX_TXRATE_2;	/* 2Mbps for MGMT pkt compatibility */
 		} else {
-			tx_desc->u.r1.rate = priv->txrate_curr;
+			int n = 0;
+			UINT16 t = priv->txrate_curr;
+			while(t>1) { t>>=1; n++; }
+			/* Now n == highest set bit number */
+			if(n>=sizeof(bitpos2rate100) || bitpos2rate100[n]==0) {
+				printk(KERN_ERR "acx100 driver BUG! n=%d, please report\n", n);
+				n = 0;
+			}
+			tx_desc->u.r1.rate = bitpos2rate100[n];
 		}
 		
 		if (1 == priv->preamble_flag)
@@ -664,37 +685,6 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 #endif
 }
 
-static UINT8 txrate_auto_table[] = { (UINT8)ACX_TXRATE_1, (UINT8)ACX_TXRATE_2,
-	(UINT8)ACX_TXRATE_5_5, (UINT8)ACX_TXRATE_11, (UINT8)ACX_TXRATE_22PBCC };
-
-static void acx100_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
-{
-	acxlog(L_DEBUG, "rate %d/%d, fallback %d/%d, stepup %d/%d\n", pTxDesc->u.r1.rate, priv->txrate_curr, priv->txrate_fallback_count, priv->txrate_fallback_threshold, priv->txrate_stepup_count, priv->txrate_stepup_threshold);
-	if ((pTxDesc->u.r1.rate < priv->txrate_curr) || (0x0 != (pTxDesc->error & 0x30))) {
-		if (++priv->txrate_fallback_count
-				> priv->txrate_fallback_threshold) {
-			if (priv->txrate_auto_idx > 0) {
-				priv->txrate_auto_idx--;
-				priv->txrate_curr = txrate_auto_table[priv->txrate_auto_idx];
-				acxlog(L_XFER, "falling back to Tx rate %d.\n", priv->txrate_curr);
-			}
-			priv->txrate_fallback_count = 0;
-		}
-	}
-	else
-	if (pTxDesc->u.r1.rate == priv->txrate_curr) {
-		if (++priv->txrate_stepup_count
-				> priv->txrate_stepup_threshold) {
-			if (priv->txrate_auto_idx < priv->txrate_auto_idx_max) {
-				priv->txrate_auto_idx++;
-				priv->txrate_curr = txrate_auto_table[priv->txrate_auto_idx];
-				acxlog(L_XFER, "stepping up to Tx rate %d.\n", priv->txrate_curr);
-			}
-			priv->txrate_stepup_count = 0;
-		}
-	}
-}
-
 /* Theory of operation:
 priv->txrate_cfg is a bitmask of allowed (configured) rates.
 It is set as a result of iwconfig rate N [auto] command.
@@ -710,17 +700,50 @@ outcome of last tx event.
 
 5.5 and 11Mbit rates with PBCC modulation are not supported.
 */
-static void acx111_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
+static UINT16
+acx100_to_111(UINT8 r) {
+	switch(r) {
+	case ACX_TXRATE_1:	return RATE111_1;
+	case ACX_TXRATE_2:	return RATE111_2;
+	case ACX_TXRATE_5_5:
+	case ACX_TXRATE_5_5PBCC:return RATE111_5;
+	case ACX_TXRATE_11:
+	case ACX_TXRATE_11PBCC:	return RATE111_11;
+	case ACX_TXRATE_22PBCC:	return RATE111_22;
+/*
+I suspect that these never happen on acx100
+Uncomment ONLY if you definitely saw them
+	case ACX_TXRATE_6_G:	return RATE111_6;
+	case ACX_TXRATE_9_G:	return RATE111_9;
+	case ACX_TXRATE_12_G:	return RATE111_12;
+	case ACX_TXRATE_18_G:	return RATE111_18;
+	case ACX_TXRATE_24_G:	return RATE111_24;
+	case ACX_TXRATE_36_G:	return RATE111_36;
+	case ACX_TXRATE_48_G:	return RATE111_48;
+	case ACX_TXRATE_54_G:	return RATE111_54;
+*/
+	default:
+		printk(KERN_DEBUG "Unexpected acx100 txrate of %d! Please report\n",r);
+		return RATE111_2;
+	}
+}
+
+static void
+acx_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
 	UINT16 rate;
 	/* TODO: performance hack: UINT16 txrate_curr = priv->txrate_curr; */
 	int slower_rate_was_used;
-	int n;
 
-	n=0;
-	rate = pTxDesc->u.r2.rate111 & 0x1fff;
-	while( (rate>>=1) != 0) n++;
-	rate = 1<<n;
-	/* rate has only one bit set now, corresponding to actual tx rate used */
+	if(CHIPTYPE_ACX100 == priv->chip_type) {
+		/* FIXME: guesswork. Someone please enlighten me about possible r1.rate values */
+		rate = acx100_to_111(pTxDesc->u.r1.rate);
+        } else {
+		int n = 0;
+		rate = pTxDesc->u.r2.rate111 & 0x1fff;
+		while( (rate>>=1) != 0) n++;
+		rate = 1<<n;
+		/* rate has only one bit set now, corresponding to actual tx rate used */
+	}
 
 	acxlog(L_DEBUG, "rate %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
 		rate, priv->txrate_curr, priv->txrate_cfg,
@@ -877,10 +900,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 			acx_handle_tx_error(priv, pTxDesc);
 
 		if (1 == priv->txrate_auto) {
-			if (CHIPTYPE_ACX100 == priv->chip_type)
-				acx100_handle_txrate_auto(priv, pTxDesc);
-			else
-				acx111_handle_txrate_auto(priv, pTxDesc);
+			acx_handle_txrate_auto(priv, pTxDesc);
 		}
 
 		ack_failures = pTxDesc->ack_failures;

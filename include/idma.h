@@ -168,7 +168,8 @@ typedef struct txdescriptor {
 #define RATE111_SHORTPRE	0x8000  /* short preamble */
 /* Special 'try everything' value */
 #define RATE111_ALL		0x1fff
-
+/* These bits denote acx100 compatible settings */
+#define RATE111_ACX100_COMPAT	0x0127
 
 /* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
      11b 11g 11a

@@ -315,7 +315,14 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	p += sprintf(p, "\n");
 	p += sprintf(p, "*** network status ***\n");
 	p += sprintf(p, "dev_state_mask: 0x%04x\n", priv->dev_state_mask);
-	p += sprintf(p, "status: %u (%s), macmode_wanted: %u, macmode_joined: %u, channel: %u, reg_dom_id: 0x%02X, reg_dom_chanmask: 0x%04x, txrate_curr: %d, txrate_auto: %d, txrate_cfg: %d, txrate_fallback_retries: %d, txrate_fallbacks: %d/%d, txrate_stepups: %d/%d, bss_table_count: %d\n",
+	p += sprintf(p, "status: %u (%s), "
+		"macmode_wanted: %u, macmode_joined: %u, channel: %u, "
+		"reg_dom_id: 0x%02X, reg_dom_chanmask: 0x%04x, "
+		"txrate_curr: %04x, txrate_auto: %d, txrate_cfg: %04x, "
+		"txrate_fallback_retries: %d, "
+		"txrate_fallbacks: %d/%d, "
+		"txrate_stepups: %d/%d, "
+		"bss_table_count: %d\n",
 		priv->status, acx100_get_status_name(priv->status),
 		priv->macmode_wanted, priv->macmode_joined, priv->channel,
 		priv->reg_dom_id, priv->reg_dom_chanmask,
@@ -2690,20 +2697,13 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->long_retry = 4; /* max. retries for long (RTS) packets */
 	priv->set_mask |= GETSET_RETRY;
 
-	priv->txrate_auto = (UINT8)0; /* FIXME: disable it by default, implementation not very good yet. */
+	priv->txrate_auto = 1;
 	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
-		priv->txrate_auto_idx = (UINT8)1; /* 2Mbps */
-		priv->txrate_cfg = (UINT8)ACX_TXRATE_11; /* Don't start with max. rate of 22Mbps, since very many APs only support up to 11Mbps */
-		if (1 == priv->txrate_auto)
-			priv->txrate_curr = (UINT8)ACX_TXRATE_2; /* 2Mbps, play it safe at the beginning */
-		else
-			priv->txrate_curr = priv->txrate_cfg;
+		priv->txrate_cfg = RATE111_ALL & RATE111_ACX100_COMPAT;
+		priv->txrate_curr = RATE111_ALL & RATE111_ACX100_COMPAT;
 	} else {
 		priv->txrate_cfg = RATE111_ALL;
-		if (1 == priv->txrate_auto)
-			priv->txrate_curr = RATE111_ALL; /* TODO: RATE111_1 + RATE111_2; */ /* 2Mbps, play it safe at the beginning */
-		else
-			priv->txrate_curr = priv->txrate_cfg;
+		priv->txrate_curr = RATE111_ALL;
 	}
 
 	/* # of retries to use when in auto rate mode.
