@@ -226,6 +226,7 @@ void acx100_get_info_state(wlandevice_t *priv)
 
 	priv->info_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 	priv->info_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
+	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
 
 /*----------------------------------------------------------------
@@ -269,6 +270,7 @@ void acx100_get_cmd_state(wlandevice_t *priv)
 
 	priv->cmd_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 	priv->cmd_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
+	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x\n", priv->cmd_type, priv->cmd_status);
 #endif
 
 }
@@ -414,7 +416,7 @@ static const char * const cmd_error_strings[] = {
 
 /*----------------------------------------------------------------
 * acx100_issue_cmd
-* Excecutes an command in the command mailbox 
+* Excecutes a command in the command mailbox 
 *
 * Arguments:
 *
@@ -446,7 +448,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		goto done;
 	}
 	
-	if (cmd!=ACX100_CMD_INTERROGATE) {
+	if (cmd != ACX100_CMD_INTERROGATE) {
 		acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
 		acx100_dump_bytes(pcmdparam, paramlen);
 	}
@@ -533,7 +535,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		goto done;
 	}
 
-	if (cmd_status != 1) {
+	if (1 != cmd_status) {
 		acxlog(L_STD | L_CTL, "%s failed: %s [%ld uSec] Cmd: %Xh, Result: %Xh\n",
 				__func__,
 				cmd_status <= 0x0f ?
@@ -546,8 +548,8 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		if (pcmdparam != NULL && paramlen != 0) {
 			if (cmd == ACX100_CMD_INTERROGATE) {
 				acx100_read_cmd_param(priv, pcmdparam, paramlen);
-        acxlog(L_DEBUG,"output pdr (len=%d):\n",paramlen);
-        acx100_dump_bytes(pcmdparam,paramlen);
+        			acxlog(L_DEBUG,"output pdr (len=%d):\n",paramlen);
+        			acx100_dump_bytes(pcmdparam, paramlen);
 			}
 		}
 		result = 1;
@@ -630,9 +632,9 @@ static short CtlLengthDot11[0x14] = {
 *----------------------------------------------------------------*/
 int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 {
-	((memmap_t *)pdr)->type = type;
+	((memmap_t *)pdr)->type = cpu_to_le16(type);
 	if (type < 0x1000) {
-		((memmap_t *)pdr)->length = CtlLength[type];
+		((memmap_t *)pdr)->length = cpu_to_le16(CtlLength[type]);
 		return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 			CtlLength[type] + 4, 5000);
 	} else {
@@ -661,8 +663,8 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 *----------------------------------------------------------------*/
 inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, short length)
 {
-	((memmap_t *)pdr)->type = type;
-	((memmap_t *)pdr)->length = length;
+	((memmap_t *)pdr)->type = cpu_to_le16(type);
+	((memmap_t *)pdr)->length = cpu_to_le16(length);
 	return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 		length + 4, 5000);
 }
@@ -686,13 +688,13 @@ inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, sh
 *----------------------------------------------------------------*/
 int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 {
-	((memmap_t *)pdr)->type = type;
+	((memmap_t *)pdr)->type = cpu_to_le16(type);
 	if (type < 0x1000) {
-		((memmap_t *)pdr)->length = CtlLength[type];
+		((memmap_t *)pdr)->length = cpu_to_le16(CtlLength[type]);
 		return acx100_issue_cmd(priv, ACX100_CMD_INTERROGATE, pdr,
 			CtlLength[type] + 4, 5000);
 	} else {
-		((memmap_t *)pdr)->length = CtlLengthDot11[type-0x1000];
+		((memmap_t *)pdr)->length = cpu_to_le16(CtlLengthDot11[type-0x1000]);
 		return acx100_issue_cmd(priv, ACX100_CMD_INTERROGATE, pdr,
 			CtlLengthDot11[type-0x1000] + 4, 5000);
 	}
@@ -722,7 +724,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_zero(mac_t * mac)
+inline int acx100_is_mac_address_zero(mac_t * mac)
 {
 	if ((mac->vala == 0) && (mac->valb == 0)) {
 		return 1;
@@ -747,7 +749,7 @@ int acx100_is_mac_address_zero(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_clear_mac_address(mac_t * m)
+inline void acx100_clear_mac_address(mac_t * m)
 {
 	m->vala = 0;
 	m->valb = 0;
@@ -770,7 +772,7 @@ void acx100_clear_mac_address(mac_t * m)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
+inline int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
 		return 0; /* no match */
@@ -795,7 +797,7 @@ int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from)
+inline void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from)
 {
 	memcpy(to, from, ETH_ALEN);
 }
@@ -817,7 +819,7 @@ void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx100_is_mac_address_group(mac_t * mac)
+inline UINT8 acx100_is_mac_address_group(mac_t * mac)
 {
 	return mac->vala & 1;
 }
@@ -839,7 +841,7 @@ UINT8 acx100_is_mac_address_group(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx100_is_mac_address_directed(mac_t * mac)
+inline UINT8 acx100_is_mac_address_directed(mac_t * mac)
 {
 	if (mac->vala & 1) {
 		return 0;
@@ -864,7 +866,7 @@ UINT8 acx100_is_mac_address_directed(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_set_mac_address_broadcast(UINT8 *address)
+inline void acx100_set_mac_address_broadcast(UINT8 *address)
 {
 	memset(address, 0xff, ETH_ALEN);
 }
@@ -886,10 +888,9 @@ void acx100_set_mac_address_broadcast(UINT8 *address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_broadcast(const UINT8 * const address)
+static const unsigned char bcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
 {
-	static const unsigned char bcast[ETH_ALEN] =
-		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	return !memcmp(address, bcast, ETH_ALEN);
 }
 
@@ -910,7 +911,7 @@ int acx100_is_mac_address_broadcast(const UINT8 * const address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_multicast(mac_t * mac)
+inline int acx100_is_mac_address_multicast(mac_t * mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))

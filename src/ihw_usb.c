@@ -68,18 +68,40 @@ extern void acx100usb_dump_bytes(void *,int);
 #include <ihw.h>
 #include <acx100.h>
 
-#define FILL_SETUP_PACKET(_pack,_rtype,_req,_val,_ind,_len)	(_pack)->bRequestType=_rtype; \
-								(_pack)->bRequest=_req; \
-								(_pack)->wValue=_val; \
-								(_pack)->wIndex=_ind; \
-								(_pack)->wLength=_len;	\
+/* try to make it compile for both 2.4.x and 2.6.x kernels */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
 
+static inline int submit_urb(struct urb *urb, int mem_flags) {
+	        return usb_submit_urb(urb, mem_flags);
+}
+
+#else
+
+/* 2.4.x kernels */
+#define USB_24	1
+
+static inline int submit_urb(struct urb *urb, int mem_flags) {
+	        return usb_submit_urb(urb);
+}
+
+#endif
+
+#define FILL_SETUP_PACKET(_pack,_rtype,_req,_val,_ind,_len) \
+								(_pack)[0]=_rtype; \
+								(_pack)[1]=_req; \
+								((unsigned short *)(_pack))[1]=_val; \
+								((unsigned short *)(_pack))[2]=_ind; \
+								((unsigned short *)(_pack))[3]=_len;
+
+#if USB_24
 static void acx100usb_control_complete(struct urb *);
+#else
+static void acx100usb_control_complete(struct urb *, struct pt_regs *);
+#endif
 
 int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
 	UINT16 len,*buf;
 	int i,result,skipridheader,blocklen,inpipe,outpipe,flags,acklen=sizeof(hw->usbin);
-
 	struct usb_device *usbdev;
 	FN_ENTER;
 	skipridheader=0;
@@ -87,9 +109,8 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	** get context from wlandevice
 	** ------------------------------------------------- */
 	usbdev=hw->usbdev;
-	acxlog(L_XFER,"hw=%X usbdev=%X cmd=%d paramlen=%d timeout=%d\n",hw,usbdev,cmd,paramlen,timeout);
 	/* ----------------------------------------------------
-	**
+	** check which kind of command was issued...
 	** ------------------------------------------------- */
 	if (cmd==ACX100_CMD_INTERROGATE) {
 		hw->usbout.rridreq.cmd=cmd;
@@ -99,7 +120,6 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 		blocklen=8;
 		switch (hw->usbout.rridreq.rid) {
 			case ACX100_RID_SCAN_STATUS:skipridheader=1;break;
-		default:
 		}
 		if (skipridheader) acklen=paramlen+4;
 		else acklen=paramlen+8;
@@ -135,20 +155,22 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	if (debug&L_DATA) acx100usb_dump_bytes(&(hw->usbout),blocklen);
 #endif
 	/* --------------------------------------
-	* fill setup packet and control urb
-	* ----------------------------------- */
-	FILL_SETUP_PACKET(&(hw->usb_setup),USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
-	usb_fill_control_urb(hw->ctrl_urb,usbdev,outpipe,&(hw->usb_setup),&(hw->usbout),blocklen,acx100usb_control_complete,hw);
+	** fill setup packet and control urb
+	** ----------------------------------- */
+	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
+	usb_fill_control_urb(hw->ctrl_urb,usbdev,outpipe,hw->usb_setup,&(hw->usbout),blocklen,acx100usb_control_complete,hw);
 	hw->ctrl_urb->timeout=timeout;
-	usb_submit_urb(hw->ctrl_urb);
+	/* lock will be released by Tx complete */
+	spin_lock(&(hw->usb_ctrl_lock));
+	submit_urb(hw->ctrl_urb, GFP_KERNEL);
 	/* ---------------------------------
-	* busy wait for request to complete
-	* TODO: get rid of the busywait
-	* ------------------------------ */
-	while (hw->ctrl_urb->status==-EINPROGRESS) {
-		mdelay(10);
-		/* busy-wait sucks */
-	}
+	** wait for request to complete...
+	** ------------------------------ */
+	spin_lock(&(hw->usb_ctrl_lock));
+	spin_unlock(&(hw->usb_ctrl_lock));
+	/* ---------------------------------
+	** check the result
+	** ------------------------------ */
 	result=hw->ctrl_urb->actual_length;
 	acxlog(L_XFER,"wrote=%d bytes (status=%d)\n",result,hw->ctrl_urb->status);
 	if (result<0) {
@@ -159,15 +181,20 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	** -------------------------------------- */
 	acxlog(L_XFER,"sending USB control msg (in) (acklen=%d)\n",acklen);
 	hw->usbin.rridresp.status=0; /* delete old status flag -> set to fail */
-	FILL_SETUP_PACKET(&(hw->usb_setup),USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
-	usb_fill_control_urb(hw->ctrl_urb,usbdev,inpipe,&(hw->usb_setup),&(hw->usbin),acklen,acx100usb_control_complete,hw);
+	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
+	usb_fill_control_urb(hw->ctrl_urb,usbdev,inpipe,hw->usb_setup,&(hw->usbin),acklen,acx100usb_control_complete,hw);
 	hw->ctrl_urb->timeout=timeout;
-	usb_submit_urb(hw->ctrl_urb);
-	while (hw->ctrl_urb->status==-EINPROGRESS) {
-		mdelay(10);
-		/* busy-wait sucks */
-	}
-	//result=usb_control_msg(usbdev,inpipe,ACX100_USB_UNKNOWN_REQ1,USB_TYPE_VENDOR|USB_DIR_IN,0,0,&(hw->usbin),acklen,timeout);
+	/* lock will be released by Tx complete */
+	spin_lock(&(hw->usb_ctrl_lock));
+	submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	/* ---------------------------------
+	** wait for request to complete...
+	** ------------------------------ */
+	spin_lock(&(hw->usb_ctrl_lock));
+	spin_unlock(&(hw->usb_ctrl_lock));
+	/* ---------------------------------
+	** check the result
+	** ------------------------------ */
 	result=hw->ctrl_urb->actual_length;
 	acxlog(L_XFER,"read=%d bytes\n",result);
 	if (result<0) {
@@ -195,9 +222,17 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	return(1);
 }
 
+#if USB_24
+static void acx100usb_control_complete(struct urb *urb)
+#else
+static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
+#endif
+{
+	wlandevice_t *priv=urb->context;
 
-static void acx100usb_control_complete(struct urb *urb) {
-	/* TODO: fill with life */
+	acxlog(L_DEBUG, "USB ctrl completed.\n");
+	/* release lock initiated by Tx operation */
+	spin_unlock(&(priv->usb_ctrl_lock));
 }
 
 /*****************************************************************************
@@ -213,7 +248,7 @@ static short CtlLength[0x14] = {
 	ACX100_RID_QUEUE_CONFIG_LEN,
 	ACX100_RID_BLOCK_SIZE_LEN,
 	ACX100_RID_MEMORY_CONFIG_OPTIONS_LEN,
-	0,
+	ACX100_RID_RATE_FALLBACK_LEN,
 	ACX100_RID_WEP_OPTIONS_LEN,
 	ACX100_RID_MEMORY_MAP_LEN, //	ACX100_RID_SSID_LEN,
 	ACX100_RID_SCAN_STATUS_LEN,
@@ -282,7 +317,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 		acxlog(L_STD,"WARNING: ENCOUNTERED ZEROLENGTH RID (%x)\n",type);
 	}
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
-  ((memmap_t *)pdr)->type=type;
+  ((memmap_t *)pdr)->type = cpu_to_le16(type);
   return(acx100_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
 }
 
@@ -304,7 +339,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 
 int acx100_configure_length(wlandevice_t *priv, void *pdr,short type,short len) {
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
-  ((memmap_t *)pdr)->type = type;
+  ((memmap_t *)pdr)->type = cpu_to_le16(type);
   return(acx100_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
 }
 
@@ -334,8 +369,8 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 	if (len==0) {
 		acxlog(L_STD,"WARNING: ENCOUNTERED ZEROLENGTH RID (%x)\n",type);
 	}
-  acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d pdr=%X\n",type,len,pdr);
-  ((memmap_t *)pdr)->type=type;
+  acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d pdr=%p\n",type,len,pdr);
+  ((memmap_t *)pdr)->type = cpu_to_le16(type);
   return(acx100_issue_cmd(priv,ACX100_CMD_INTERROGATE,pdr,len,5000));
 }
 
@@ -365,7 +400,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 *
 *----------------------------------------------------------------*/
 
-int acx100_is_mac_address_zero(mac_t * mac) {
+inline int acx100_is_mac_address_zero(mac_t * mac) {
   if ((mac->vala == 0) && (mac->valb == 0)) {
     return(1);
   }
@@ -390,7 +425,7 @@ int acx100_is_mac_address_zero(mac_t * mac) {
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_clear_mac_address(mac_t *m) {
+inline void acx100_clear_mac_address(mac_t *m) {
   m->vala = 0;
   m->valb = 0;
 }
@@ -413,7 +448,7 @@ void acx100_clear_mac_address(mac_t *m) {
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
+inline int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
 		return 0; /* no match */
@@ -439,7 +474,7 @@ int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_copy_mac_address(UINT8 * to, const UINT8 * const from)
+inline void acx100_copy_mac_address(UINT8 * to, const UINT8 * const from)
 {
 	memcpy(to, from, ETH_ALEN);
 }
@@ -461,7 +496,7 @@ void acx100_copy_mac_address(UINT8 * to, const UINT8 * const from)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx100_is_mac_address_group(mac_t * mac)
+inline UINT8 acx100_is_mac_address_group(mac_t * mac)
 {
 	return mac->vala & 1;
 }
@@ -508,7 +543,7 @@ UINT8 acx100_is_mac_address_directed(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_set_mac_address_broadcast(UINT8 *mac)
+inline void acx100_set_mac_address_broadcast(UINT8 *mac)
 {
 	memset(mac, 0xff, ETH_ALEN);
 }
@@ -530,9 +565,9 @@ void acx100_set_mac_address_broadcast(UINT8 *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_broadcast(const UINT8 * const address)
+static const unsigned char bcast[ETH_ALEN] ={ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
 {
-	static const unsigned char bcast[ETH_ALEN] ={ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	return !memcmp(address, bcast, ETH_ALEN);
 }
 
@@ -553,7 +588,7 @@ int acx100_is_mac_address_broadcast(const UINT8 * const address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_multicast(mac_t * mac)
+inline int acx100_is_mac_address_multicast(mac_t * mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))

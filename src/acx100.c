@@ -181,39 +181,8 @@ typedef struct device_id {
 char *name_acx100 = "ACX100";
 char *name_acx111 = "ACX111";
  
-static device_id_t device_ids[] =
-{
-	/*@-null@*/
-	{
-		{'G', 'l', 'o', 'b', 'a', 'l'},
-		NULL, 
-		NULL,
-	},
-	{
-		{(UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff},
-		"uninitialised",
-		"SpeedStream SS1021 or Gigafast WF721-AEX"
-	},
-	{
-		{(UINT8)0x80, (UINT8)0x81, (UINT8)0x82, (UINT8)0x83, (UINT8)0x84, (UINT8)0x85},
-		"non-standard",
-		"DrayTek Vigor 520"
-	},
-	{
-		{'?', '?', '?', '?', '?', '?'},
-		"non-standard",
-		"Level One WPC-0200"
-	},
-	{
-		{(UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00},
-		"empty",
-		"DWL-650+ variant"
-	}
-	/*@=null@*/
-};
-
 /*@-fullinitblock@*/
-static struct pci_device_id acx100_pci_id_tbl[] = {
+static const struct pci_device_id acx100_pci_id_tbl[] = {
 	{
 		.vendor = PCI_VENDOR_ID_TI,
 		.device = PCI_DEVICE_ID_TI_ACX100,
@@ -367,6 +336,7 @@ void acx100_display_hardware_details(wlandevice_t *priv)
 			radio_str = "Ralink";
 			break;
 		case RADIO_UNKNOWN_16:
+		case RADIO_UNKNOWN_17:
 			radio_str = "UNKNOWN, used e.g. in ACX111 cards, please report the radio type name!";
 			break;
 		default:
@@ -441,6 +411,71 @@ void acx100_device_chain_remove(struct net_device *dev)
 	}
 }
 
+void acx_show_card_eeprom_id(wlandevice_t *priv)
+{
+	unsigned char buffer[CARD_EEPROM_ID_SIZE];
+	UINT16 i;
+
+	const device_id_t device_ids[] =
+	{
+		/*@-null@*/
+		{
+			{'G', 'l', 'o', 'b', 'a', 'l'},
+			NULL, 
+			NULL,
+		},
+		{
+			{(UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff, (UINT8)0xff},
+			"uninitialised",
+			"SpeedStream SS1021 or Gigafast WF721-AEX"
+		},
+		{
+			{(UINT8)0x80, (UINT8)0x81, (UINT8)0x82, (UINT8)0x83, (UINT8)0x84, (UINT8)0x85},
+			"non-standard",
+			"DrayTek Vigor 520"
+		},
+		{
+			{'?', '?', '?', '?', '?', '?'},
+			"non-standard",
+			"Level One WPC-0200"
+		},
+		{
+			{(UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00, (UINT8)0x00},
+			"empty",
+			"DWL-650+ variant"
+		}
+		/*@=null@*/
+	};
+
+	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
+	/* use direct eeprom access */
+	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
+		if (0 == acx100_read_eeprom_offset(priv,
+					 (UINT16)(ACX100_EEPROM_ID_OFFSET + i),
+					 &buffer[i]))
+		{
+			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
+			break;
+		}
+	}
+	
+	for (i = 0; i < (UINT16)(sizeof(device_ids) / sizeof(struct device_id)); i++)
+	{
+		if (0 == memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE))
+		{
+			if (NULL != device_ids[i].descr) {
+				acxlog(L_STD, "%s: EEPROM card ID string check found %s card ID: this is a %s, no??\n", __func__, device_ids[i].descr, device_ids[i].type);
+			}
+			break;
+		}
+	}
+	if (i == (UINT16)(sizeof(device_ids) / sizeof(device_id_t)))
+	{
+		acxlog(L_STD,
+	       "%s: EEPROM card ID string check found unknown card: expected \"Global\", got \"%.*s\"! Please report!\n", __func__, CARD_EEPROM_ID_SIZE, buffer);
+	}
+}
+
 /*----------------------------------------------------------------
 * acx100_probe_pci
 *
@@ -479,6 +514,14 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	int result = -EIO;
 	int err;
 
+	UINT16 chip_type;
+
+	char *chip_name;
+	unsigned long mem_region1 = 0;
+	unsigned long mem_region1_size;
+	unsigned long mem_region2 = 0;
+	unsigned long mem_region2_size;
+
 	unsigned long phymem1;
 	unsigned long phymem2;
 	unsigned long mem1 = 0;
@@ -486,17 +529,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	wlandevice_t *priv = NULL;
 	struct net_device *dev = NULL;
-	unsigned char buffer[CARD_EEPROM_ID_SIZE];
-	unsigned int i;
-	UINT32 hardware_info;
+
 	char *devname_mask;
-	UINT16 chip_type;
-	unsigned long mem_region1 = 0;
-	unsigned long mem_region1_size;
-	unsigned long mem_region2 = 0;
-	unsigned long mem_region2_size;
+	UINT32 hardware_info;
 	char procbuf[80];
-	unsigned char ch; 
 
 	FN_ENTER;
 
@@ -505,11 +541,11 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Enable the PCI device */
 
-	if (pci_enable_device(pdev) != 0) {
+	if (0 != pci_enable_device(pdev)) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: pci_enable_device() failed\n",
 		       __func__, dev_info);
-		result = -EIO;
+		result = -ENODEV;
 		goto fail;
 	}
 
@@ -529,6 +565,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* acx100 and acx111 have different pci memory regions */
 	chip_type = (UINT16)id->driver_data;
 	if (chip_type == CHIPTYPE_ACX100) {
+		chip_name = name_acx100;
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region1_size  = PCI_ACX100_REGION1_SIZE;
 
@@ -537,6 +574,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	} else if (chip_type == CHIPTYPE_ACX111) {
 		acxlog(L_BINSTD, "%s: WARNING: ACX111 support is highly experimental!\n", __func__);
 
+		chip_name = name_acx111;
 		mem_region1 = PCI_ACX111_REGION1;
 		mem_region1_size  = PCI_ACX111_REGION1_SIZE;
 
@@ -569,7 +607,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	mem1 = (unsigned long) ioremap(phymem1, mem_region1_size);
-	if (mem1 == 0) {
+	if (0 == mem1) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
 		       __func__, dev_info);
@@ -578,7 +616,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	mem2 = (unsigned long) ioremap(phymem2, mem_region2_size);
-	if (mem2 == 0) {
+	if (0 == mem2) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
 		       __func__, dev_info);
@@ -588,14 +626,20 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
-	       "Found ACX100-based wireless network card, phymem1:0x%lx, phymem2:0x%lx, irq:%d, mem1:0x%lx, mem1_size:%ld, mem2:0x%lx, mem2_size:%ld compiled with wireless extensions v%d\n",
-	       phymem1, phymem2, pdev->irq,
+	       "Found %s-based wireless network card, irq:%d, phymem1:0x%lx, phymem2:0x%lx, mem1:0x%lx, mem1_size:%ld, mem2:0x%lx, mem2_size:%ld.\n",
+	       chip_name, pdev->irq, phymem1, phymem2,
 	       mem1, mem_region1_size,
-	       mem2, mem_region2_size,
-	       WIRELESS_EXT);
+	       mem2, mem_region2_size);
+
+	if (0 == pdev->irq) {
+		acxlog(L_BINSTD | L_IRQ | L_INIT, "%s: %s: Can't get IRQ %d\n",
+		       __func__, dev_info, 0);
+		result = -EIO;
+		goto fail;
+	}
 
 	acxlog(L_DEBUG, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
-	if ((priv = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
+	if (NULL == (priv = kmalloc(sizeof(wlandevice_t), GFP_KERNEL))) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: Memory allocation failure\n",
 		       __func__, dev_info);
@@ -605,27 +649,22 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(priv, 0, sizeof(wlandevice_t));
 
-	/* set the correct io resource list for the active chip */
 	priv->chip_type = chip_type;
+	priv->chip_name = chip_name;
+
+	/* set the correct io resource list for the active chip */
 	if (chip_type == CHIPTYPE_ACX100) {
-		acxlog(L_BINSTD, "%s: using acx100 io resource addresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		priv->io = acx100_get_io_register_array();
-		priv->chip_name = name_acx100;
 	} else if (chip_type == CHIPTYPE_ACX111) {
-		acxlog(L_BINSTD, "%s: using acx111 io resource addresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		priv->io = acx111_get_io_register_array();
-		priv->chip_name = name_acx111;
-	} else {
-		acxlog(L_BINSTD, "%s: unknown or bad chip??\n", __func__);
-		result = -EIO;
-		goto fail;
 	}
 	if (priv->io == NULL) {
 		acxlog(L_BINSTD, "%s: error getting io mappings.\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
-		
+	acxlog(L_BINSTD, "%s: using %s io resource addresses (size: %d)\n", __func__, priv->chip_name, IO_INDICES_SIZE);
+
 	spin_lock_init(&priv->lock);
 
 	acxlog(L_INIT, "hw_unavailable = 1\n");
@@ -640,35 +679,9 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	priv->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
-	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
-	/* use direct eeprom access */
-	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (0 == acx100_read_eeprom_offset(priv,
-					 (UINT16)(ACX100_EEPROM_ID_OFFSET + i),
-					 &buffer[i]))
-		{
-			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
-			break;
-		}
-	}
-	
-	for (i = 0; i < (unsigned int)(sizeof(device_ids) / sizeof(struct device_id)); i++)
-	{
-		if (0 == memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE))
-		{
-			if (NULL != device_ids[i].descr) {
-				acxlog(L_STD, "%s: EEPROM card ID string check found %s card ID: this is a %s, no??\n", __func__, device_ids[i].descr, device_ids[i].type);
-			}
-			break;
-		}
-	}
-	if (i == (unsigned int)(sizeof(device_ids) / sizeof(device_id_t)))
-	{
-		acxlog(L_STD,
-	       "%s: EEPROM card ID string check found unknown card: expected \"Global\", got \"%.*s\"! Please report!\n", __func__, CARD_EEPROM_ID_SIZE, buffer);
-	}
+	acx_show_card_eeprom_id(priv);
 
-	if ((dev = kmalloc(sizeof(netdevice_t), GFP_ATOMIC)) == NULL) {
+	if (NULL == (dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL))) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: Failed to alloc netdev\n", __func__);
 		result = -EIO;
@@ -690,14 +703,6 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* register new dev in linked list */
 	acx100_device_chain_add(dev);
 
-	if (0 == pdev->irq) {
-		acxlog(L_BINSTD | L_IRQ | L_INIT,
-		       "%s: %s: Can't get IRQ %d\n",
-		       __func__, dev_info, 0);
-		result = -EIO;
-		goto fail;
-	}
-
 	dev->irq = pdev->irq;
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
 
@@ -715,6 +720,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		result = -EIO;
 		goto fail;
 	}
+	acxlog(L_STD, "acx100: allocated net device %s, driver compiled against wireless extensions v%d and Linux %s\n", dev->name, WIRELESS_EXT, UTS_RELEASE);
 
 	/* now that device init was successful, fill remaining fields... */
 	dev->open = &acx100_open;
@@ -797,13 +803,13 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 /* fail_registered:
 	unregister_netdev(dev); */
 fail:
+	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
+
 	/* remove new failed dev from linked list */
 	acx100_device_chain_remove(dev);
 
 	if (NULL != dev)
 		kfree(dev);
-
-	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
 
 	if (NULL != priv)
 	{
@@ -863,6 +869,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 {
 	struct net_device *dev;
 	wlandevice_t *priv;
+	UINT16 chip_type;
 
 	FN_ENTER;
 
@@ -899,12 +906,18 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 		kfree(dev);
 #endif
 
+	chip_type = priv->chip_type;
+	
 	iounmap((void *) priv->iobase);
 	iounmap((void *) priv->iobase2);
 
+	if (NULL != priv->io)
+		kfree(priv->io);
+	kfree(priv);
+
 	/* finally, clean up PCI bus state */
 
-	if(priv->chip_type == CHIPTYPE_ACX100) {
+	if(chip_type == CHIPTYPE_ACX100) {
 
 		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION1),
 				   pci_resource_len(pdev, PCI_ACX100_REGION1));
@@ -912,7 +925,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION2),
 				   pci_resource_len(pdev, PCI_ACX100_REGION2));
 	}
-	if(priv->chip_type == CHIPTYPE_ACX111) {
+	if(chip_type == CHIPTYPE_ACX111) {
 
 		release_mem_region(pci_resource_start(pdev, PCI_ACX111_REGION1),
 				   pci_resource_len(pdev, PCI_ACX111_REGION1));
@@ -925,13 +938,6 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	pci_set_power_state(pdev, 3);
 
 	pci_set_drvdata(pdev, NULL);
-
-	if (NULL != priv)
-	{
-		if (NULL != priv->io)
-			kfree(priv->io);
-		kfree(priv);
-	}
 
 	FN_EXIT(0, 0);
 }
@@ -1304,7 +1310,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	if (0 != netif_queue_stopped(dev)) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
 		txresult = 1;
-		goto end;
+		goto fail;
 	}
 
 	if (ISTATUS_4_ASSOCIATED != priv->status) {
@@ -1313,7 +1319,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		dev_kfree_skb(skb);
 		priv->stats.tx_errors++;
 		txresult = 0;
-		goto end;
+		goto fail;
 	}
 
 #if 0
@@ -1354,14 +1360,14 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	if ((tx_desc = acx100_get_tx_desc(priv)) == NULL){
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
-		goto end;
+		goto fail;
 	}
 
 	acx100_ether_to_txdesc(priv, tx_desc, skb);
-	dev_kfree_skb(skb);
-
 	acx100_dma_tx_data(priv, tx_desc);
 	dev->trans_start = jiffies;
+
+	dev_kfree_skb(skb);
 
 /*	if (txresult == 1){
 		return 1;
@@ -1377,7 +1383,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	priv->stats.tx_packets++;
 	priv->stats.tx_bytes += templen;
 
-end:
+fail:
 	acx100_unlock(priv, &flags);
 
 	FN_EXIT(1, txresult);
@@ -1468,7 +1474,7 @@ static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
-	FN_EXIT(1, (int)&priv->stats);
+	FN_EXIT(1, (int)&priv->wstats);
 	return &priv->wstats;
 }
 
@@ -1588,7 +1594,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	FN_ENTER;
 
 	irqtype = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_CLEAR]);
-	if (irqtype == 0xffff)
+	if (0xffff == irqtype)
 	{
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
@@ -1629,6 +1635,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
         }
 #endif
 
+        /* do most important IRQ types first */
 	if (0 != (irqtype & 0x8)) {
 		acx100_process_rx_desc(priv);
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8);
@@ -1647,72 +1654,79 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		  }
 #endif
 	}
-	if (0 != (irqtype & HOST_INT_SCAN_COMPLETE) /* 0x2000 */ ) {
-		/* V1_3CHANGE: dbg msg only in V1 */
-		acxlog(L_IRQ,
-		       "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
-
-		if (priv->status == ISTATUS_5_UNKNOWN) {
-			acx100_set_status(priv, priv->unknown0x2350);
-			priv->unknown0x2350 = 0;
-		} else if (priv->status == ISTATUS_1_SCANNING) {
-
-			/* FIXME: this shouldn't be done in IRQ context !!! */
-			acx100_complete_dot11_scan(priv);
+	/* group all further IRQ types to improve performance */
+	if (0 != (irqtype & 0x00f5)) {
+		if (0 != (irqtype & 0x1)) {
+			(void)printk("Got Rx Data IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1);
 		}
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
+		if (0 != (irqtype & 0x4)) {
+			(void)printk("Got Tx Xfer IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4);
+		}
+		if (0 != (irqtype & 0x10)) {
+			(void)printk("Got DTIM IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x10);
+		}
+		if (0 != (irqtype & 0x20)) {
+			(void)printk("Got Beacon IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x20);
+		}
+		if (0 != (irqtype & HOST_INT_TIMER) /* 0x40 */ ) {
+			acx100_timer((unsigned long)priv);
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TIMER);
+		}
+		if (0 != (irqtype & 0x80)) {
+			(void)printk("Got Key Not Found IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x80);
+		}
 	}
-	if (0 != (irqtype & HOST_INT_TIMER) /* 0x40 */ ) {
-		acx100_timer((unsigned long)priv);
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TIMER);
+	if (0 != (irqtype & 0x0f00)) {
+		if (0 != (irqtype & 0x100)) {
+			(void)printk("Got IV ICV Failure IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x100);
+		}
+		if (0 != (irqtype & 0x200)) {
+			(void)printk("Got Command Complete IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
+		}
+		if (0 != (irqtype & 0x400)) {
+			acx100_handle_info_irq(priv);
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x400);
+		}
+		if (0 != (irqtype & 0x800)) {
+			(void)printk("Got Overflow IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x800);
+		}
 	}
-	if (0 != (irqtype & 0x1)) {
-		(void)printk("Got Rx Data IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1);
-	}
-	if (0 != (irqtype & 0x4)) {
-		(void)printk("Got Tx Xfer IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4);
-	}
-	if (0 != (irqtype & 0x10)) {
-		(void)printk("Got DTIM IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x10);
-	}
-	if (0 != (irqtype & 0x20)) {
-		(void)printk("Got Beacon IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x20);
-	}
-	if (0 != (irqtype & 0x80)) {
-		(void)printk("Got Key Not Found IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x80);
-	}
-	if (0 != (irqtype & 0x100)) {
-		(void)printk("Got IV ICV Failure IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x100);
-	}
-	if (0 != (irqtype & 0x200)) {
-		(void)printk("Got Command Complete IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
-	}
-	if (0 != (irqtype & 0x400)) {
-		acx100_handle_info_irq(priv);
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x400);
-	}
-	if (0 != (irqtype & 0x800)) {
-		(void)printk("Got Overflow IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x800);
-	}
-	if (0 != (irqtype & 0x1000)) {
-		(void)printk("Got Process Error IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1000);
-	}
-	if (0 != (irqtype & 0x4000)) {
-		(void)printk("Got FCS Threshold IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4000);
-	}
-	if (0 != (irqtype & 0x8000)) {
-		(void)printk("Got Unknown IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8000);
+	if (0 != (irqtype & 0xf000)) {
+		if (0 != (irqtype & 0x1000)) {
+			(void)printk("Got Process Error IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1000);
+		}
+		if (0 != (irqtype & HOST_INT_SCAN_COMPLETE) /* 0x2000 */ ) {
+			/* V1_3CHANGE: dbg msg only in V1 */
+			acxlog(L_IRQ,
+			       "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
+	
+			if (priv->status == ISTATUS_5_UNKNOWN) {
+				acx100_set_status(priv, priv->unknown0x2350);
+				priv->unknown0x2350 = 0;
+			} else if (priv->status == ISTATUS_1_SCANNING) {
+	
+				/* FIXME: this shouldn't be done in IRQ context !!! */
+				acx100_complete_dot11_scan(priv);
+			}
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
+		}
+		if (0 != (irqtype & 0x4000)) {
+			(void)printk("Got FCS Threshold IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4000);
+		}
+		if (0 != (irqtype & 0x8000)) {
+			(void)printk("Got Unknown IRQ\n");
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8000);
+		}
 	}
 //	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], irqtype);
 #if IRQ_ITERATE

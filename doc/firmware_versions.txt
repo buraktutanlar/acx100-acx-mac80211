@@ -2,6 +2,13 @@
   Combined firmware (includes support for some radio types).
   Nothing known so far.
 
+1.5.2, 040312:
+  Reported to not work currently.
+
+1.8.3, 040312:
+  Card works almost excellent (one kick is needed).
+  Tx error 0x20 like in 1.9.x firmware versions.
+
 1.9.3.e:
   Works relatively ok, but some Tx error 0x20 issues suspected,
   and periodic transfer stalls sometimes (or is it a driver issue?).

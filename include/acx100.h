@@ -196,6 +196,7 @@ extern int acx100_debug_func_indent;
 #define RADIO_RFMD_11		0x11
 #define RADIO_RALINK_15		0x15
 #define RADIO_UNKNOWN_16	0x16	/* used in ACX111 cards */
+#define RADIO_UNKNOWN_17	0x17	/* most likely *sometimes* used in ACX111 cards */
 
 /*--- IRQ Constants ----------------------------------------------------------*/
 #define HOST_INT_TIMER			0x40
@@ -2371,6 +2372,7 @@ typedef struct bss_info {
 #define ACX_MODE_1_UNUSED	1
 #define ACX_MODE_2_MANAGED_STA	2
 #define ACX_MODE_3_MANAGED_AP	3
+#define ACX_MODE_FF_AUTO	0xff	/* pseudo mode - not ACX100 related! (accept both Ad-Hoc and Managed stations for association) */
 
 
 
@@ -2406,11 +2408,13 @@ typedef struct wlandevice {
 	acx100_usbout_t		bulkout;
 	int			usb_txoffset;
 	int			usb_txsize;
+	int			usb_max_bulkout;
+	spinlock_t		usb_ctrl_lock;
+	spinlock_t		usb_tx_lock;
 	struct	urb		*ctrl_urb;
 	struct	urb		*bulkrx_urb;
 	struct	urb		*bulktx_urb;
-	struct	usb_ctrlrequest	usb_setup;
-	/* struct usb_ctrlrequest usb_setup; is needed for irq-save control messages */
+	unsigned char	usb_setup[8];
 #endif
 
 	/*** Management timer ***/
@@ -2450,22 +2454,29 @@ typedef struct wlandevice {
 	UINT32		get_mask;		/* mask of settings to fetch from the card */
 	UINT32		set_mask;		/* mask of settings to write to the card */
 
+	/*** scanning ***/
+	UINT16		scan_count;		/* number of times to do channel scan */
+	UINT8		scan_mode;		/* 0 == active, 1 == passive, 2 == background */
+	UINT16		scan_duration;
+	UINT16		scan_probe_delay;
+			
 	/*** Wireless network settings ***/
 	UINT8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over when it makes sense only */
 	UINT8		address[WLAN_ADDR_LEN];
 	UINT8		bssid[WLAN_ADDR_LEN];
 	UINT8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
-	UINT16		macmode;		/* This is the mode we're currently in */
-	UINT16		mode;			/* That's the MAC mode we want */
+	UINT16		macmode_wanted;		/* That's the MAC mode we want (iwconfig) */
+	UINT16		macmode_chosen;		/* That's the MAC mode we chose after browsing the station list */
+	UINT16		macmode_joined;		/* This is the MAC mode we're currently in */
 	UINT8		essid_active;		/* specific ESSID active, or select any? */
 	UINT8		essid_len;		/* to avoid dozens of strlen() */
 	char		essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
 	char		essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
 	char		nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16		channel;		/* V3POS 22f0, V1POS b8 */
-	UINT8		bitrateval;		/* V3POS b8, V1POS ba */
-	UINT8		bitrate_auto;		/* whether to auto adjust bit rates */
-	UINT8		rate_fallback_retries;
+	UINT8		txrate_val;		/* V3POS b8, V1POS ba */
+	UINT8		txrate_auto;		/* whether to auto adjust Tx rates */
+	UINT8		txrate_fallback_retries;
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */

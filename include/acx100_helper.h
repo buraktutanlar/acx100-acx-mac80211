@@ -178,12 +178,16 @@ typedef struct beacon {
 //  UINT16 vala;
 } beacon_t;
 
+#define ACX_SCAN_ACTIVE		0
+#define ACX_SCAN_PASSIVE	1
+#define ACX_SCAN_BACKGROUND	2
+
 typedef struct scan {
-	UINT16 count; /* number of scans to do */
+	UINT16 count; /* number of scans to do, 0xffff == continuous */
 	UINT16 start_chan;
-	UINT16 flags;
+	UINT16 flags; /* channel list mask; 0x8000 == all channels? */
 	UINT8 max_rate; /* max. probe rate */
-	UINT8 options;
+	UINT8 options; /* scan mode: 0 == active, 1 == passive, 2 == background */
 	UINT16 chan_duration;
 	UINT16 max_probe_delay;
 } scan_t;			/* length 0xc */
@@ -209,7 +213,7 @@ typedef struct joinbss {
 	UINT8 dtim_interval;
 	UINT8 rates_basic;
 	UINT8 rates_supported;
-	UINT8 rate_tx;
+	UINT8 txrate_val;
 	UINT8 preamble_type;
 	UINT8 macmode;
 	UINT8 channel;

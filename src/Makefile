@@ -26,7 +26,7 @@ export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_32BIT_IO
 # Renaming can happen gradually over time.
 pci_objs = acx100.o acx100_conv.o acx100_helper.o acx100_helper2.o acx100_ioctl.o acx80211frm.o idma.o ihw.o ioregister.o
 
-usb_objs = acx_usb_80211frm.o acx_usb_conv.o acx_usb_helper.o acx_usb_helper2.o acx_usb_idma.o acx_usb_main.o acx_usb_ihw.o acx_usb_ioctl.o acx_usb_main.o 
+usb_objs = acx_usb_80211frm.o acx_usb_conv.o acx_usb_helper.o acx_usb_helper2.o acx_usb_idma.o acx_usb_ihw.o acx_usb_ioctl.o acx_usb_main.o 
 
 ifeq ($(PATCHLEVEL),) # PATCHLEVEL only set if acting as "kbuild 2.6 makefile"
 
@@ -43,7 +43,7 @@ endif
 ifdef KERN26
 #MODULES = acx_pci.ko acx_usb.ko
 MODULES = acx_pci.ko # sorry, no USB 2.6 compile yet
-CLEAN_EXTRA = *.mod.c
+CLEAN_EXTRA = *.mod *.mod.c *.mod.o
 
 ifeq ($(KERNEL_BUILD),$(KERNEL_OUTPUT))
 TMPOUT =
@@ -69,6 +69,8 @@ modules:
 	$(LN) -f -s acx100_helper.c acx_usb_helper.c
 	$(LN) -f -s acx100_helper2.c acx_usb_helper2.c
 	$(LN) -f -s idma.c acx_usb_idma.c
+	$(LN) -f -s ihw_usb.c acx_usb_ihw.c
+	$(LN) -f -s acx100_ioctl.c acx_usb_ioctl.c
 	$(LN) -f -s acx100_usb.c acx_usb_main.c
 	if test -n "$(ACX100_SRC)"; then \
 	cd -; \

@@ -19,13 +19,21 @@ wireless card manufacturers, so please never choose to do that.
 There are many commercial products very much worth buying; but this is
 certainly not one of those...
 
---- CARD COMPATIBILITY (aka "OUCH!!") ---
+Also, please take note that I learnt that TI is using and supporting
+Linux for at least TNETW1230 driver SDKs and Linux QoS management (only
+commercially available, I suppose?).
+However somehow they're too elitist to actually pass (parts of) that Linux
+infrastructure back to the desperate end users looking for proper
+TNETW1xxx driver support. Returning such completely improperly supported WLAN
+hardware to the shop and mentioning unacceptable terms suddenly doesn't sound
+like such a chore any more...
+
+--- CARD COMPATIBILITY (aka "the real dirt") ---
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB and Compact Flash implementations,
-which are both extremely rare -- successful firmware loading support
-for USB is in the driver now and receiving works, but transmitting doesn't
-- feel free to work on this support).
+which are both extremely rare -- unstable USB support exists for 2.4.x,
+and 2.6.x support is not quite functional at all yet).
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
@@ -35,7 +43,7 @@ Note that any Texas Instruments chips OTHER than the ACX100 (which is
 also known as TNETW1100) are not supported by this driver (yet).
 These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
 (ACX111).
-Initial ACX111 support is in the driver, but it's still a bit far from working,
+Initial ACX111 support is in the driver, but it's still not quite working yet,
 due to many changes compared to the ACX100.
 
 Also, due to confusion about similar card naming (for further information, see
@@ -61,14 +69,14 @@ DWL-G650+ (ACX111: dito)
 Netgear WG311 "v2" (ACX111, as opposed to v1, which is Atheros!)
 
 When looking at the DWL-G650 mess, I could puke again...
-Again, the cards mentioned in the listing above will NOT work with this driver,
-in most cases you will need to be able to find a different Linux driver
+Again, the cards mentioned in the listing above will NOT work with this driver
+(yet?), in most cases you will need to be able to find a different Linux driver
 supporting your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
---- STATUS AS OF 031101 ---
+--- STATUS AS OF 040330 ---
 
-Currently this driver still is a relatively experimental release only.
+Currently this driver still is a bit experimental.
 We're still not totally sure about the status of WEP support.
 Many situations should work, but it might still not work properly
 or fail sometimes.
@@ -79,12 +87,15 @@ then turn it off. We will attempt to clean this up as soon as possible.
 Furthermore, associating with some access points might still be problematic
 due to strict 802.11 compliance checks in their firmware.
 
-HostAP support has not been implemented yet, but it's definitely possible.
+Master mode support (aka HostAP) has not really been implemented yet,
+but at least it can be configured now.
 
 The non-standard 4x mode (aka "44Mbps") is NOT supported yet and will need
 several driver changes.
 
 Many other things haven't been tested (properly) yet.
+
+Further testing versions can be downloaded from http://lisas.de/~andi/acx100/
 
 A working FreeBSD driver that's derived from our driver can be found at
 http://wlan.kewl.org and cvs.kewl.org (thanks, guys, for the cool work!).
@@ -95,6 +106,11 @@ http://standards.ieee.org/getieee802/
 
 What to do or have (we will NOT remind you later about any requirements,
 since this seeks to list all requirements in full):
+* x86 box preferrably (other architectures such as Powerbooks may work since
+  they have been tested from time to time, but please report IMMEDIATELY if
+  they have any trouble, I'm very interested in that!)
+* most likely a Bus Master capable PCI slot for PCI card versions, slave
+  PCI slot won't work (FIXME: is that true?)
 * relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
 	with CONFIG_NET_RADIO enabled ("Wireless LAN")
 	and CONFIG_NET_WIRELESS, for wireless extensions (iwconfig etc.).
@@ -109,6 +125,7 @@ since this seeks to list all requirements in full):
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
 * the Linux hotplug package is required for automatic setup of CardBus cards
+  and for proper ACX100 USB cards operation
 
 What to NOT do:
 * believe that this has much to do with PCMCIA. The ACX100 cards are
@@ -229,7 +246,7 @@ The fast way:
   /lib/modules/`uname -r`/build/include/linux/version.h
 
 The slow way:
-  Type "make config" in the main directory to cause some configuration
+  Type "make config.mk" in the main directory to cause some configuration
   settings to be checked.
   Then you type "make driver". This will compile a driver for
   Linux 2.4.x (for 2.5 / 2.6 see below)
@@ -295,17 +312,24 @@ directory).
 If instead you want to build the module "in-tree" (i.e. not in a separate
 acx100 module directory!), you'll have to:
 
+Either:
+run "make inject" to add the driver to an existing Linux 2.6.x source tree.
+or (this may be outdated):
+
 1. Create a directory drivers/net/wireless/acx100 in your 2.6 source tree.
 2. Copy the files
       - src/Makefile
       - src/*.c
       - include/*.h
    from the acx100 sources into drivers/net/wireless/acx100 in your 2.6 tree.
-3. Add a line reading "obj-m += acx100/" to the bottom of
+3. uncomment line "#EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI" in Makefile you just copied. (line 142)
+4. Add a line reading "obj-m += acx100/" to the bottom of
    drivers/net/wireless/Makefile .
-4. Then build your kernel as usual, the acx100 driver will be built as module
+5. Then build your kernel as usual, the acx100 driver will be built as module
    (acx_pci.ko). Make sure you have the required 2.6 module userspace
    package (module-init-tools) and enjoy ;-)
+
+Other 2.6.x kernel patches can be found at http://luca.pca.it/projects/acx100/
 
 --- USAGE HINTS ---
 
@@ -423,6 +447,14 @@ bootup manages to fix it. So simply try swapping the sound/network
 module init sequence.
 Also, using an SB Live! with ACX100 may result in crashes and data corruption.
 
+-- Wireless config failure --
+
+If you get log messages like
+Buffer for request 8B0B too small (0<564)
+or other strange/erratic wireless config behaviour, then make damn sure that
+your wireless-tools version is correct! There are tons of possibilities
+for version conflicts!
+
 -- Network failure --
 First, make absolutely sure you're using correct settings for
 association to the wireless network!
@@ -468,6 +500,9 @@ we'll be able to calibrate our driver soon to show dBm values :-\
 Also try other channel values to reduce interference by cordless phones,
 microwaves etc.
 
+If you keep getting Tx errors, also try setting other values for
+"iwconfig sens" (e.g. 92).
+
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
@@ -477,7 +512,11 @@ ACX100 CardBus led to IRQ loss and thus an accumulation of busy ring
 buffers. But of course we're quite certain several traffic lockups
 are NOT related to temperature...
 Especially, don't use hdparm -u1, since it may lockup/delay driver IRQ
-operation for some yet unknown reason
+operation for some yet unknown reason.
+
+Some connection problems might also be caused by the Access Point using a
+problematic antenna configuration setting (e.g. "internal" instead of
+"external" or so).
 
 If you still have trouble getting a connection, or if the connection is
 problematic, then try

@@ -120,8 +120,49 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 	
 	memcpy(header->data, &rxdesc->data->buf, WLAN_HDR_A3_LEN);
 	memcpy(payload->data, &rxdesc->data->val0x24, 
-		rxdesc->data->status - WLAN_HDR_A3_LEN);
+		rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */ - WLAN_HDR_A3_LEN);
 
+}
+
+/*----------------------------------------------------------------
+* acx100_stt_findproto
+*
+* Searches the 802.1h Selective Translation Table for a given 
+* protocol.
+*
+* Arguments:
+*	prottype	protocol number (in host order) to search for.
+*
+* Returns:
+*	1 - if the table is empty or a match is found.
+*	0 - if the table is non-empty and a match is not found.
+*
+* Side effects:
+*
+* Call context:
+*	May be called in interrupt or non-interrupt context
+*
+* STATUS:
+*
+* Comment:
+*	Based largely on p80211conv.c of the linux-wlan-ng project
+*
+*----------------------------------------------------------------*/
+
+inline int acx100_stt_findproto(unsigned int proto)
+{
+	/* Always return found for now.  This is the behavior used by the */
+	/*  Zoom Win95 driver when 802.1h mode is selected */
+	/* TODO: If necessary, add an actual search we'll probably
+		 need this to match the CMAC's way of doing things.
+		 Need to do some testing to confirm.
+	*/
+
+	if (proto == 0x80f3)  /* APPLETALK */
+		return 1;
+
+	return 0;	
+//	return ((prottype == ETH_P_AARP) || (prottype == ETH_P_IPX));
 }
 
 /*----------------------------------------------------------------
@@ -172,14 +213,14 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	FN_ENTER;
 
-	payload = tx_desc->host_desc + 1;
-	header = tx_desc->host_desc;
-	e_hdr = (wlan_ethhdr_t *)skb->data;
-
 	if (0 == skb->len) {
 		acxlog(L_DEBUG, "zero-length skb!\n");
 		return 1;
 	}
+
+	payload = tx_desc->host_desc + 1;
+	header = tx_desc->host_desc;
+	e_hdr = (wlan_ethhdr_t *)skb->data;
 
 	/* step 1: classify ether frame, DIX or 802.3? */
 	proto = ntohs(e_hdr->type);
@@ -234,8 +275,8 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	fc = host2ieee16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA) |
 			 WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DATAONLY));
 
-	acxlog(L_DEBUG, "MODE: %d\n", priv->macmode);
-	switch (priv->macmode) {
+	acxlog(L_DEBUG, "MODE: %d\n", priv->macmode_joined);
+	switch (priv->macmode_joined) {
 	case ACX_MODE_0_IBSS_ADHOC:
 	case ACX_MODE_1_UNUSED:
 		a1 = e_hdr->daddr;
@@ -337,7 +378,7 @@ fail:
 
 	FN_ENTER;
 
-	payload_length = (rx_desc->data->status & 0xfff) - WLAN_HDR_A3_LEN;
+	payload_length = (rx_desc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - WLAN_HDR_A3_LEN;
 	payload_offset = WLAN_HDR_A3_LEN;
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
@@ -561,45 +602,3 @@ fail:
 	FN_EXIT(0, 0);
 	return skb;
 }
-/*----------------------------------------------------------------
-* acx100_stt_findproto
-*
-* Searches the 802.1h Selective Translation Table for a given 
-* protocol.
-*
-* Arguments:
-*	prottype	protocol number (in host order) to search for.
-*
-* Returns:
-*	1 - if the table is empty or a match is found.
-*	0 - if the table is non-empty and a match is not found.
-*
-* Side effects:
-*
-* Call context:
-*	May be called in interrupt or non-interrupt context
-*
-* STATUS:
-*
-* Comment:
-*	Based largely on p80211conv.c of the linux-wlan-ng project
-*
-*----------------------------------------------------------------*/
-
-int acx100_stt_findproto(unsigned int proto)
-{
-	/* Always return found for now.  This is the behavior used by the */
-	/*  Zoom Win95 driver when 802.1h mode is selected */
-	/* TODO: If necessary, add an actual search we'll probably
-		 need this to match the CMAC's way of doing things.
-		 Need to do some testing to confirm.
-	*/
-
-	if (proto == 0x80f3)  /* APPLETALK */
-		return 1;
-
-	return 0;	
-//	return ((prottype == ETH_P_AARP) || (prottype == ETH_P_IPX));
-}
-
-

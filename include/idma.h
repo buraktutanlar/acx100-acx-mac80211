@@ -61,10 +61,15 @@ char *acx100_get_packet_type_string(UINT16 fc);
 #define ACX100_RXBUF_HDRSIZE 12
 
 typedef struct rxbuffer {
-	UINT32	status;		/* 0x0 MAC stat */
-	UINT16	stat;		/* 0x4 PHY stat */
-	UINT8	level;		/* 0x6 PHY stat */
-	UINT8	snr;		/* 0x7  PHY stat */
+	/* UINT32	status;	*/	/* 0x0 MAC stat */
+	UINT16	mac_cnt_rcvd;	/* 0x0 */
+	UINT8	mac_cnt_mblks;	/* 0x2 */
+	UINT8	mac_status;	/* 0x3 */
+	/* UINT16	stat; */		/* 0x4 PHY stat */
+	UINT8	phy_stat_baseband;	/* 0x4 bit 0x80: used LNA (Low-Noise Amplifier) */
+	UINT8	phy_plcp_signal;	/* 0x5 */
+	UINT8	phy_level;		/* 0x6 PHY stat */
+	UINT8	phy_snr;		/* 0x7  PHY stat */
 	UINT32	time;		/* 0x8  timestamp */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8	val0x24[0x922];
@@ -110,18 +115,19 @@ typedef struct txdescriptor {
 	UINT32	tx_time;
 	UINT16	total_length;
 	UINT16	Reserved;
-	UINT32	val0x14;		/* following 16 bytes not change when axc100 owns the descriptor */
-	UINT32	val0x18;
-	struct	txhostdescriptor *host_desc;
-	UINT32	val0x20;
-	UINT8	Ctl;
-	UINT8	Ctl2;
-	UINT8	error;
-	UINT8	AckFailures;
-	UINT16	val0x28;
-	UINT8	rate;
-	UINT8	queue_ctrl;
-	UINT32	queue_info;
+	UINT32	val0x14;		/* the following 16 bytes do not change when acx100 owns the descriptor */
+	UINT32	val0x18;			/* 0x18 */
+	struct	txhostdescriptor *host_desc;	/* 0x1c */
+	UINT32	val0x20;			/* 0x20 */
+	UINT8	Ctl;				/* 0x24 */
+	UINT8	Ctl2;				/* 0x25 */
+	UINT8	error;				/* 0x26 */
+	UINT8	ack_failures;			/* 0x27 */
+	UINT8	rts_failures;			/* 0x28 */
+	UINT8	rts_ok;				/* 0x29 */
+	UINT8	rate;				/* 0x2a */
+	UINT8	queue_ctrl;			/* 0x2b */
+	UINT32	queue_info;			/* 0x2c */
 } txdesc_t;			/* size : 48 = 0x30 */
 
 typedef struct txhostdescriptor {
@@ -132,11 +138,11 @@ typedef struct txhostdescriptor {
 	UINT16	length;
 	struct	txhostdescriptor *desc_phy_next;	
 /* You can use this area as you want */
-	struct	txhostdescriptor *pNext;
-	UINT32	Flags;
-	struct	txhostdescriptor *desc_phy;
-	struct	txdescriptor *val0x1c;
-	UINT32	val0x20;
+	struct	txhostdescriptor *pNext;	/* 0x10 */
+	UINT32	Flags;				/* 0x14 */
+	struct	txhostdescriptor *desc_phy;	/* 0x18 */
+	struct	txdescriptor *val0x1c;		/* 0x1c */
+	UINT32	val0x20;			/* 0x20 */
 	UINT8	*data;
 	UINT16	val0x28;
 	UINT8	rate;
@@ -144,17 +150,17 @@ typedef struct txhostdescriptor {
 } txhostdesc_t;			/* size: 0x2c */
 
 typedef struct rxdescriptor {
-	UINT32	pNextDesc;
-	UINT32	HostMemPtr;
-	UINT32	ACXMemPtr;
-	UINT32	rx_time;
-	UINT16	total_length;
-	UINT16	WEP_length;
-	UINT32	val0x14;
-	UINT32	val0x18;
-	UINT32	val0x1c;
-	UINT32	val0x20;
-	struct	rxbuffer *val0x24;
+	UINT32	pNextDesc;			/* 0x00 */
+	UINT32	HostMemPtr;			/* 0x04 */
+	UINT32	ACXMemPtr;			/* 0x08 */
+	UINT32	rx_time;			/* 0x0c */
+	UINT16	total_length;			/* 0x10 */
+	UINT16	WEP_length;			/* 0x12 */
+	UINT32	WEP_ofs;			/* 0x14 */
+	UINT32	val0x18;			/* 0x18 */
+	UINT32	val0x1c;			/* 0x1c */
+	UINT32	val0x20;			/* 0x20 */
+	struct	rxbuffer *val0x24;		/* 0x24 */
 	UINT8	Ctl;
 	UINT8	rate;
 	UINT8	error;
@@ -173,14 +179,14 @@ typedef struct rxhostdescriptor {
 	struct	rxhostdescriptor *desc_phy_next;
 	struct	rxhostdescriptor *pNext;
 	UINT32	Status;
-/* You can use this area as you want*/
+/* You can use this area as you want */
 	struct	rxhostdescriptor *desc_phy;
 	UINT32	val0x1c;
 	UINT32	val0x20;
 	struct	rxbuffer *data;
 	UINT8	val0x28;
 	UINT8	val0x29;
-	UINT8	val0x2a;	/* rate */
+	UINT8	rate;
 	UINT8	val0x2b;
 } rxhostdesc_t;			/* size 44 = 0x2c */
 

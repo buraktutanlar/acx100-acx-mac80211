@@ -210,7 +210,7 @@ static inline int acx100_ioctl_commit(struct net_device *dev,
 static inline int acx100_ioctl_get_name(struct net_device *dev, struct iw_request_info *info, char *cwrq, char *extra)
 {
 	const char * const protocol_name = "IEEE 802.11b+";
-	acxlog(L_IOCTL, "Get Name => %s\n", protocol_name);
+	acxlog(L_IOCTL, "Get Name ==> %s\n", protocol_name);
 	strcpy(cwrq, protocol_name);
 	return 0;
 }
@@ -242,7 +242,7 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set Frequency <= %i (%i)\n", fwrq->m, fwrq->e);
+	acxlog(L_IOCTL, "Set Frequency <== %i (%i)\n", fwrq->m, fwrq->e);
 
 	if (fwrq->e == 0 && fwrq->m <= 1000) {
 		/* Setting by channel number */
@@ -273,12 +273,14 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 	priv->channel = (UINT16)channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
-	if (priv->macmode == ACX_MODE_3_MANAGED_AP) {
+	if (ACX_MODE_3_MANAGED_AP == priv->macmode_wanted) {
 		/* hmm, AP mode? So simply set channel... */
 		acxlog(L_IOCTL, "Changing to channel %d\n", priv->channel);
 		priv->set_mask |= GETSET_TX|GETSET_RX;
-	} else if (priv->macmode == ACX_MODE_2_MANAGED_STA
-		|| priv->macmode == ACX_MODE_0_IBSS_ADHOC) {
+	}
+	else
+	if ((ACX_MODE_2_MANAGED_STA == priv->macmode_wanted)
+	 || (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted)) {
 		/* trigger scanning... */
 		priv->set_mask |= GETSET_CHANNEL;
 	}
@@ -322,24 +324,29 @@ static inline int acx100_ioctl_set_mode(struct net_device *dev, struct iw_reques
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set Mode <= %i\n", *uwrq);
+	acxlog(L_IOCTL, "Set Mode <== %i\n", *uwrq);
 
 	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
-	if (*uwrq == IW_MODE_ADHOC)
-		priv->mode = ACX_MODE_0_IBSS_ADHOC;
-	else if (*uwrq == IW_MODE_INFRA)
-		priv->mode = ACX_MODE_2_MANAGED_STA;
-	else if (*uwrq == IW_MODE_MASTER) {
-		priv->mode = ACX_MODE_3_MANAGED_AP;
-		priv->macmode = priv->mode; /* Master (AP) is just sitting there and waiting for others to connect, so the MAC mode we're currently "in" is AP, right? */
-		/* FIXME: we also have to set the BSSID to the card's MAC address somewhere, right? */
-	} else {
-		result = -EOPNOTSUPP;
-		goto end_unlock;
+	switch(*uwrq) {
+		case IW_MODE_AUTO:
+			priv->macmode_wanted = ACX_MODE_FF_AUTO;
+			break;
+		case IW_MODE_ADHOC:
+			priv->macmode_wanted = ACX_MODE_0_IBSS_ADHOC;
+			break;
+		case IW_MODE_INFRA:
+			priv->macmode_wanted = ACX_MODE_2_MANAGED_STA;
+			break;
+		case IW_MODE_MASTER:
+			priv->macmode_wanted = ACX_MODE_3_MANAGED_AP;
+			break;
+		default:
+			result = -EOPNOTSUPP;
+			goto end_unlock;
 	}
 
 	priv->set_mask |= GETSET_MODE;
@@ -356,28 +363,48 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	acxlog(L_IOCTL, "Get Mode => %d\n", priv->macmode);
+	acxlog(L_IOCTL, "Get Mode ==> %d\n", priv->macmode_joined);
 
+#if SHOW_SPECIFIC_MACMODE_JOINED
 	if (priv->status != ISTATUS_4_ASSOCIATED)
-	/* if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) */
+#endif
 	{ /* connection not up yet, so for now indicate the mode we want,
 	     not the one we are in */
-		if (priv->mode == ACX_MODE_0_IBSS_ADHOC)
-			*uwrq = IW_MODE_ADHOC;
-		else if (priv->mode == ACX_MODE_2_MANAGED_STA)
-			*uwrq = IW_MODE_INFRA;
-		else if (priv->mode == ACX_MODE_3_MANAGED_AP)
-			*uwrq = IW_MODE_MASTER;
+		switch (priv->macmode_wanted) {
+			case ACX_MODE_FF_AUTO:
+				*uwrq = IW_MODE_AUTO;
+				break;
+			case ACX_MODE_0_IBSS_ADHOC:
+				*uwrq = IW_MODE_ADHOC;
+				break;
+			case ACX_MODE_2_MANAGED_STA:
+				*uwrq = IW_MODE_INFRA;
+				break;
+			case ACX_MODE_3_MANAGED_AP:
+				*uwrq = IW_MODE_MASTER;
+				break;
+			default:
+				return -EOPNOTSUPP;
+		}
 	}
+#if SHOW_SPECIFIC_MACMODE_JOINED
 	else
 	{
-		if (priv->macmode == ACX_MODE_0_IBSS_ADHOC)
-			*uwrq = IW_MODE_ADHOC;
-		else if (priv->macmode == ACX_MODE_2_MANAGED_STA)
-			*uwrq = IW_MODE_INFRA;
-		else if (priv->macmode == ACX_MODE_3_MANAGED_AP)
-			*uwrq = IW_MODE_MASTER;
+		switch (priv->macmode_joined) {
+			case ACX_MODE_0_IBSS_ADHOC:
+				*uwrq = IW_MODE_ADHOC;
+				break;
+			case ACX_MODE_2_MANAGED_STA:
+				*uwrq = IW_MODE_INFRA;
+				break;
+			case ACX_MODE_3_MANAGED_AP:
+				*uwrq = IW_MODE_MASTER;
+				break;
+			default:
+				return -EOPNOTSUPP;
+		}
 	}
+#endif
 	return 0;
 }
 
@@ -385,34 +412,33 @@ static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	acxlog(L_IOCTL, "Set Sensitivity => %d\n", vwrq->value);
+	acxlog(L_IOCTL, "Set Sensitivity <== %d\n", vwrq->value);
 
-	if (RADIO_RFMD_11 != priv->radio_type) {
+	if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
+		priv->sensitivity = (0 == vwrq->disabled) ? 0 : vwrq->value;
+		priv->set_mask |= GETSET_SENSITIVITY;
+		return -EINPROGRESS;
+	} else {
 		printk("ERROR: don't know how to set sensitivity for this radio type, please try to add that!\n");
 		return -EINVAL;
 	}
-	priv->sensitivity = (0 == vwrq->disabled) ? 0 : vwrq->value;
-	priv->set_mask |= GETSET_SENSITIVITY;
-	
-	return -EINPROGRESS;
 }
 
 static inline int acx100_ioctl_get_sens(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	if (RADIO_RFMD_11 != priv->radio_type) {
+	if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
+		acxlog(L_IOCTL, "Get Sensitivity ==> %d\n", priv->sensitivity);
+
+		vwrq->value = priv->sensitivity;
+		vwrq->disabled = (vwrq->value == 0);
+		vwrq->fixed = 1;
+		return 0;
+	} else {
 		printk("ERROR: don't know how to get sensitivity for this radio type, please try to add that!\n");
 		return -EINVAL;
 	}
-	
-	acxlog(L_IOCTL, "Get Sensitivity <= %d\n", priv->sensitivity);
-
-	vwrq->value = priv->sensitivity;
-	vwrq->disabled = (vwrq->value == 0);
-	vwrq->fixed = 1;
-
-	return 0;
 }
 
 /*------------------------------------------------------------------------------
@@ -455,7 +481,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
                ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
 
-	if (priv->macmode != ACX_MODE_2_MANAGED_STA) {
+	if (priv->macmode_joined != ACX_MODE_2_MANAGED_STA) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -535,7 +561,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	FN_ENTER;
 
 	/* in Master mode of course we don't have an AP list... */
-	if (ACX_MODE_3_MANAGED_AP == priv->macmode)
+	if (ACX_MODE_3_MANAGED_AP == priv->macmode_joined)
 	{
 		result = -EOPNOTSUPP;
 		goto end;
@@ -742,7 +768,7 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set ESSID <= %s, length %d, flags 0x%04x\n", dwrq->pointer, len, dwrq->flags);
+	acxlog(L_IOCTL, "Set ESSID <== %s, length %d, flags 0x%04x\n", dwrq->pointer, len, dwrq->flags);
 
 	if (len <= 0) {
 		result = -EINVAL;
@@ -787,7 +813,7 @@ static inline int acx100_ioctl_get_essid(struct net_device *dev, struct iw_reque
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	acxlog(L_IOCTL, "Get ESSID => %s\n", priv->essid);
+	acxlog(L_IOCTL, "Get ESSID ==> %s\n", priv->essid);
 
 	dwrq->flags = priv->essid_active;
 	if ((UINT8)0 != priv->essid_active)
@@ -822,7 +848,7 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	unsigned long flags;
 	int err;
-	unsigned char bitrateval;
+	unsigned char txrate_val;
 	int result = -EINVAL;
 
 	FN_ENTER;
@@ -840,23 +866,23 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		switch (vwrq->value) {
 
 		case 1000000:	/* 1Mbps */
-			bitrateval = 10;
+			txrate_val = 10;
 			break;
 
 		case 2000000:	/* 2Mbps */
-			bitrateval = 20;
+			txrate_val = 20;
 			break;
 
 		case 5500000:	/* 5.5Mbps */
-			bitrateval = 55;
+			txrate_val = 55;
 			break;
 
 		case 11000000:	/* 11Mbps */
-			bitrateval = 110;
+			txrate_val = 110;
 			break;
 
 		case 22000000:	/* 22Mbps */
-			bitrateval = 220;
+			txrate_val = 220;
 			break;
 
 #if BITRATE_AUTO
@@ -864,7 +890,7 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 			/* -1 is used to set highest available rate in
 			 * case of iwconfig calls without rate given
 			 * (iwconfig wlan0 rate auto etc.) */
-			bitrateval = 110; /* FIXME: should be 220 instead, but since rate fallback doesn't actually work yet, we shouldn't use a rate not supported by many APs */
+			txrate_val = 110; /* FIXME: should be 220 instead, but since rate fallback doesn't actually work yet, we shouldn't use a rate not supported by many APs */
 			break;
 #endif
 		default:
@@ -877,31 +903,31 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		switch (vwrq->value) {
 
 		case 0:
-			bitrateval = 10;
+			txrate_val = 10;
 			break;
 
 		case 1:
-			bitrateval = 20;
+			txrate_val = 20;
 			break;
 
 		case 2:
-			bitrateval = 55;
+			txrate_val = 55;
 			break;
 
 		case 3:
-			bitrateval = 183;
+			txrate_val = 183;
 			break;
 
 		case 4:
-			bitrateval = 110;
+			txrate_val = 110;
 			break;
 
 		case 5:
-			bitrateval = 238;
+			txrate_val = 238;
 			break;
 
 		case 6:
-			bitrateval = 220;
+			txrate_val = 220;
 			break;
 
 		default:
@@ -919,17 +945,17 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		goto end;
 	}
 
-	priv->bitrateval = bitrateval;
+	priv->txrate_val = txrate_val;
 #if BITRATE_AUTO
-	priv->bitrate_auto = (UINT8)(vwrq->fixed == (__u8)0);
+	priv->txrate_auto = (UINT8)(vwrq->fixed == (__u8)0);
 #endif
 	
 	acx100_unlock(priv, &flags);
 
 #if BITRATE_AUTO
-	acxlog(L_IOCTL, "Tx rate = %d, auto rate %d\n", priv->bitrateval, priv->bitrate_auto);
+	acxlog(L_IOCTL, "Tx rate = %d, auto rate %d\n", priv->txrate_val, priv->txrate_auto);
 #else
-	acxlog(L_IOCTL, "Tx rate = %d\n", priv->bitrateval);
+	acxlog(L_IOCTL, "Tx rate = %d\n", priv->txrate_val);
 #endif
 
 	result = 0;
@@ -958,12 +984,12 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	/* FIXME: maybe bitrateval is the value we *wanted*, but not the
+	/* FIXME: maybe txrate_val is the value we *wanted*, but not the
 	 * value it actually chose automatically. Needs verification and
 	 * perhaps fixing. */
-	vwrq->value = priv->bitrateval * 100000;
+	vwrq->value = priv->txrate_val * 100000;
 #if BITRATE_AUTO
-	vwrq->fixed = (__u8)(priv->bitrate_auto == (UINT8)0);
+	vwrq->fixed = (__u8)(priv->txrate_auto == (UINT8)0);
 #else
 	vwrq->fixed = 1;
 #endif
@@ -1131,8 +1157,8 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	if (priv->mode == ACX_MODE_0_IBSS_ADHOC) {
-		/* ok, let's pretend it's supported, but print a
+	if (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted) {
+		/* ok, let's assume it's supported, but print a
 		 * warning message
 		 * FIXME: should be removed once it's definitely working. */
 		acxlog(L_STD, "Warning: WEP support might not be supported in Ad-Hoc mode yet!\n");
@@ -1266,7 +1292,7 @@ static inline int acx100_ioctl_get_txpow(struct net_device *dev, struct iw_reque
 	vwrq->fixed = (__u8)0;
 	vwrq->value = priv->tx_level_dbm;
 
-	acxlog(L_IOCTL, "Get transmit power => %d dBm\n", priv->tx_level_dbm);
+	acxlog(L_IOCTL, "Get Tx power ==> %d dBm\n", priv->tx_level_dbm);
 
 	return 0;
 }
@@ -1296,7 +1322,7 @@ static inline int acx100_ioctl_set_txpow(struct net_device *dev, struct iw_reque
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set Tx power <= %d, disabled %d, flags 0x%04x\n", vwrq->value, vwrq->disabled, vwrq->flags);
+	acxlog(L_IOCTL, "Set Tx power <== %d, disabled %d, flags 0x%04x\n", vwrq->value, vwrq->disabled, vwrq->flags);
 	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
@@ -1366,7 +1392,7 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		range->min_rts = 0;
 		range->max_rts = 2312;
 		/* range->min_frag = 256;
-		 * range->max_frag = 2312; FIXME
+		 * range->max_frag = 2312;
 		 */
 
 		range->encoding_size[0] = 5;
@@ -2093,7 +2119,9 @@ static inline int acx100_ioctl_wlansniff(struct net_device *dev, struct iw_reque
 	}
 
 	priv->monitor = parms[0];
-	(void)printk("setting monitor to: 0x%02X\n", priv->monitor);
+	/* not using printk() here, since it distorts kismet display
+	 * when printk messages activated */
+	acxlog(L_IOCTL, "setting monitor to: 0x%02X\n", priv->monitor);
 
 	switch (parms[0])
 	{
@@ -2718,7 +2746,7 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 #endif
 
 #if THIS_LEADS_TO_CRASHES
-	if (priv->mode != ACX_MODE_2_MANAGED_STA && reinit == 1) {
+	if (priv->macmode_wanted != ACX_MODE_2_MANAGED_STA && reinit == 1) {
 		if (result = acx100_lock(priv, &flags))
 			return result;
 

@@ -83,4 +83,6 @@ SSID		Service Set Identifier
 			in plain text from a packet it does not supply
 			any security to the network
 TIM		Traffic Indication Map
+TU		Time Unit
+			One TU is 1024 microseconds long.
 WEP		Wired Equivalent Privacy

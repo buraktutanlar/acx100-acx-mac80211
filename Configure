@@ -120,8 +120,8 @@ then
 	$ECHO "Kernel configuration found, performing sanity checks"
 	configcheck PCMCIA
 	configcheck CARDBUS
-	configcheck NET_WIRELESS
 	configcheck NET_RADIO
+	configcheck NET_WIRELESS
 	configcheck PCI
 	configcheck MODULES
 	configcheck SMP

@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+# Script to copy acx driver tree into 2.6.x kernel tree
+# (c) 2004 Carter Smithhart
+
 use strict;
 
 my $error=0;
@@ -8,23 +11,23 @@ $error = 1 if (@ARGV != 1);
 
 if ($error)
 {
-   print "$0: <acx100_root_dir>";
+   print "$0: <acx_root_dir>";
    exit;
 }
 
 my $from_dir = shift @ARGV;
 
 my $kdir = "/usr/src/linux/drivers/net/wireless";
-my $acx100_dir = "$kdir/acx100";
+my $acx_dir = "$kdir/acx";
 if (! -e $kdir)
 {
    die "$kdir doesn't exist!";
 }
 
-if (!-e $acx100_dir)
+if (!-e $acx_dir)
 {
-  print "Making $acx100_dir\n";
-  print `mkdir $acx100_dir`;
+  print "Making $acx_dir\n";
+  print `mkdir $acx_dir`;
 }
 
 if (!-e "$from_dir/src")
@@ -36,10 +39,10 @@ if (!-e "$from_dir/include")
    print "$from_dir/include doesn't exist!";
 }
 
-print "Copying files to $acx100_dir\n";
-print `cp $from_dir/src/Makefile2.6 $acx100_dir/Makefile`;
-print `cp $from_dir/src/*.c $acx100_dir`;
-print `cp $from_dir/include/*.h $acx100_dir`;
+print "Copying files to $acx_dir\n";
+print `cp $from_dir/src/Makefile2.6 $acx_dir/Makefile`;
+print `cp $from_dir/src/*.c $acx_dir`;
+print `cp $from_dir/include/*.h $acx_dir`;
 
 my $kmakefile = "$kdir/Makefile";
 
@@ -50,7 +53,7 @@ close IN;
 my $found = 0;
 foreach my $line (@lines)
 {
-  if ($line =~ /acx100/)
+  if ($line =~ /acx/)
   {
     $found=1;
     last;
@@ -60,7 +63,7 @@ if (!$found)
 {
   print "Doing it.\n";
   open OUT, ">>$kmakefile" or die "cannot open $kmakefile for write";
-  print OUT "obj-\$(CONFIG_ACX100) += acx100/";
+  print OUT "obj-\$(CONFIG_ACX) += acx/";
   close OUT;
 }
 else
@@ -77,7 +80,7 @@ close IN;
 my $found = 0;
 foreach my $line (@lines)
 {
-  if ($line =~ /ACX100/)
+  if ($line =~ /ACX/) # FIXME: check too relaxed?
   {
     $found=1;
     last;
@@ -88,7 +91,7 @@ if (!$found)
   print "Doing it.\n";
   open OUT, ">$kconfig" or die "cannot open $kconfig for write";
   my $line = join("", @lines);
-  $line =~ s|endmenu|config ACX100\n\ttristate "ACX100 Cardbus"\n\tdepends on NET_RADIO && NET_WIRELESS && !SMP\n\tdefault n\n\nendmenu\n|;
+  $line =~ s|endmenu|config ACX\n\ttristate "ACX100/ACX111 (TNETW1xxx) CardBus/PCI (ACX111 not finished)"\n\tdepends on NET_RADIO && NET_WIRELESS && !SMP\n\tdefault n\n\nendmenu\n|;
   print OUT $line;
   close OUT;
 }

@@ -1,7 +1,7 @@
-CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI -DACX_DEBUG=1
+CFLAGS += -Idrivers/net/wireless/acx -DWLAN_HOSTIF=WLAN_PCI -DACX_DEBUG=1
 
-acx100_pci-objs := acx100.o acx100_helper.o acx100_helper2.o \
+acx_pci-objs := acx100.o acx100_helper.o acx100_helper2.o \
                    ihw.o idma.o acx80211frm.o acx100_ioctl.o \
 		   acx100_conv.o ioregister.o
 
-obj-m += acx100_pci.o
+obj-m += acx_pci.o
