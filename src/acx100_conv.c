@@ -105,7 +105,8 @@ static UINT8 oui_8021h[] = { 0x00, 0x00, 0xf8 };
 *----------------------------------------------------------------*/
 
 void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
-				struct txdescriptor *txdesc){
+				struct txdescriptor *txdesc)
+{
 	struct txhostdescriptor *payload;
 	struct txhostdescriptor *header;
 	
@@ -147,8 +148,8 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 *
 *----------------------------------------------------------------*/
 
-int acx100_ether_to_txdesc(wlandevice_t * wlandev,
-			 struct txdescriptor * tx_desc,
+int acx100_ether_to_txdesc(wlandevice_t *priv,
+			 struct txdescriptor *tx_desc,
 			 struct sk_buff *skb)
 {
 	UINT16 proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
@@ -234,24 +235,24 @@ int acx100_ether_to_txdesc(wlandevice_t * wlandev,
 	fc = host2ieee16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA) |
 			 WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DATAONLY));
 
-	acxlog(L_DEBUG, "MODE: %d\n", wlandev->macmode);
-	switch (wlandev->macmode) {
+	acxlog(L_DEBUG, "MODE: %d\n", priv->macmode);
+	switch (priv->macmode) {
 	case WLAN_MACMODE_NONE:		/* 0 */
 	case WLAN_MACMODE_IBSS_STA:	/* 1 */
 		a1 = e_hdr->daddr;
-		a2 = wlandev->netdev->dev_addr;
-		a3 = wlandev->bssid;
+		a2 = priv->netdev->dev_addr;
+		a3 = priv->bssid;
 		break;
 	case WLAN_MACMODE_ESS_STA:	/* 2 */
 		fc |= host2ieee16(WLAN_SET_FC_TODS(1));
-		a1 = wlandev->bssid;
-		a2 = wlandev->netdev->dev_addr;
+		a1 = priv->bssid;
+		a2 = priv->netdev->dev_addr;
 		a3 = e_hdr->daddr;
 		break;
 	case WLAN_MACMODE_ESS_AP:	/* 3 */
 		fc |= host2ieee16(WLAN_SET_FC_FROMDS(1));
 		a1 = e_hdr->daddr;
-		a2 = wlandev->bssid;
+		a2 = priv->bssid;
 		a3 = e_hdr->saddr;
 		break;
 	default:			/* fall through */
@@ -261,7 +262,7 @@ int acx100_ether_to_txdesc(wlandevice_t * wlandev,
 	memcpy(w_hdr->a3.a2, a2, WLAN_ADDR_LEN);
 	memcpy(w_hdr->a3.a3, a3, WLAN_ADDR_LEN);
 
-	if (wlandev->wep_enabled)
+	if (priv->wep_enabled)
 		fc |= host2ieee16(WLAN_SET_FC_ISWEP(1));
 		
 	w_hdr->a3.fc = fc;
@@ -315,8 +316,8 @@ int acx100_ether_to_txdesc(wlandevice_t * wlandev,
 *
 *----------------------------------------------------------------*/
 
-struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t * wlandev, struct
-		rxhostdescriptor * rx_desc)
+struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
+		rxhostdescriptor *rx_desc)
 {
 	UINT8 *daddr = NULL;
 	UINT8 *saddr = NULL;
@@ -341,7 +342,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t * wlandev, struct
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
 	
 	/* check if additional header is included */
-	if (wlandev->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
+	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
 		w_hdr = (p80211_hdr_t*)(((UINT8*)w_hdr) + WLAN_CRC_LEN);
 		payload_length -= WLAN_CRC_LEN;
@@ -542,7 +543,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t * wlandev, struct
 		memcpy(skb->data + WLAN_ETHHDR_LEN, e_llc, payload_length);
 	}
 
-//	skb->protocol = eth_type_trans(skb, wlandev->netdev);
+//	skb->protocol = eth_type_trans(skb, priv->netdev);
 	
 	/* the "<6>" output is from the KERN_INFO channel value */
 // Can be used to debug conversion process
@@ -566,7 +567,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t * wlandev, struct
 * protocol.
 *
 * Arguments:
-*	prottype	protocl number (in host order) to search for.
+*	prottype	protocol number (in host order) to search for.
 *
 * Returns:
 *	1 - if the table is empty or a match is found.

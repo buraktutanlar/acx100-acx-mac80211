@@ -105,9 +105,9 @@ void acx100_dump_bytes(void *,int);
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT32 acx100_read_reg32(wlandevice_t *wlandev, UINT offset)
+inline UINT32 acx100_read_reg32(wlandevice_t *priv, UINT offset)
 {
-	return readl(wlandev->iobase + offset);
+	return readl(priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -127,9 +127,9 @@ inline UINT32 acx100_read_reg32(wlandevice_t *wlandev, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT16 acx100_read_reg16(wlandevice_t *wlandev, UINT offset)
+inline UINT16 acx100_read_reg16(wlandevice_t *priv, UINT offset)
 {
-	return readw(wlandev->iobase + offset);
+	return readw(priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -149,9 +149,9 @@ inline UINT16 acx100_read_reg16(wlandevice_t *wlandev, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx100_read_reg8(wlandevice_t *wlandev, UINT offset)
+inline UINT8 acx100_read_reg8(wlandevice_t *priv, UINT offset)
 {
-	return readb(wlandev->iobase + offset);
+	return readb(priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -171,9 +171,9 @@ inline UINT8 acx100_read_reg8(wlandevice_t *wlandev, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg32(wlandevice_t *wlandev, UINT offset, UINT valb)
+inline void acx100_write_reg32(wlandevice_t *priv, UINT offset, UINT valb)
 {
-	writel(valb, wlandev->iobase + offset);
+	writel(valb, priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -193,9 +193,9 @@ inline void acx100_write_reg32(wlandevice_t *wlandev, UINT offset, UINT valb)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg16(wlandevice_t *wlandev, UINT offset, UINT16 valb)
+inline void acx100_write_reg16(wlandevice_t *priv, UINT offset, UINT16 valb)
 {
-	writew(valb, wlandev->iobase + offset);
+	writew(valb, priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -215,9 +215,9 @@ inline void acx100_write_reg16(wlandevice_t *wlandev, UINT offset, UINT16 valb)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg8(wlandevice_t *wlandev, UINT offset, UINT valb)
+inline void acx100_write_reg8(wlandevice_t *priv, UINT offset, UINT valb)
 {
-	writeb(valb, wlandev->iobase + offset);
+	writeb(valb, priv->iobase + offset);
 }
 
 /*****************************************************************************
@@ -226,25 +226,25 @@ inline void acx100_write_reg8(wlandevice_t *wlandev, UINT offset, UINT valb)
  *
  ****************************************************************************/
 
-void acx100_get_info_state(wlandevice_t *wlandev)
+void acx100_get_info_state(wlandevice_t *priv)
 {
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
 
 #if ACX_32BIT_IO
-	acx100_write_reg32(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg32(wlandev, wlandev->io[IO_ACX_INFO_MAILBOX_OFFS]));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
 #else 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_INFO_MAILBOX_OFFS]));
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_INFO_MAILBOX_OFFS] + 0x2)); 
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
+		acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS] + 0x2)); 
 #endif
 
-	wlandev->info_type = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA]);
-	wlandev->info_status = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA] + 0x2);
+	priv->info_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+	priv->info_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
 }
 
 /*----------------------------------------------------------------
@@ -264,30 +264,30 @@ void acx100_get_info_state(wlandevice_t *wlandev)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_get_cmd_state(wlandevice_t * wlandev)
+void acx100_get_cmd_state(wlandevice_t *priv)
 {
 	UINT32 value;
 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1); /* why auto increment ?? */
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1); /* why auto increment ?? */
 
 #if ACX_32BIT_IO
-	acx100_write_reg32(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg32(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 
-	value = acx100_read_reg32(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA]);
-	wlandev->cmd_type = (UINT16)value;
-	wlandev->cmd_status = (UINT16)(value >> 16);
+	value = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+	priv->cmd_type = (UINT16)value;
+	priv->cmd_status = (UINT16)(value >> 16);
 #else 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
 
-	wlandev->cmd_type = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA]);
-	wlandev->cmd_status = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA] + 0x2);
+	priv->cmd_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+	priv->cmd_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
 #endif
 
 }
@@ -309,25 +309,25 @@ void acx100_get_cmd_state(wlandevice_t * wlandev)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_write_cmd_type(wlandevice_t * wlandev, UINT16 vala)
+void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala)
 {
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
 
 #if ACX_32BIT_IO
-	acx100_write_reg32(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg32(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 #else 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
 #endif
 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA], vala);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA] + 0x2, 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA], vala);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2, 0x0);
 }
 
 /*----------------------------------------------------------------
@@ -347,25 +347,25 @@ void acx100_write_cmd_type(wlandevice_t * wlandev, UINT16 vala)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_write_cmd_status(wlandevice_t * wlandev, UINT vala)
+void acx100_write_cmd_status(wlandevice_t *priv, UINT vala)
 {
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
 
 #if ACX_32BIT_IO
-	acx100_write_reg32(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg32(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 #else 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(wlandev, wlandev->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
+		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
 #endif
 
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA], 0x0);
-	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_SLV_MEM_DATA] + 0x2, vala);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA], 0x0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2, vala);
 }
 
 /*----------------------------------------------------------------
@@ -385,9 +385,9 @@ void acx100_write_cmd_status(wlandevice_t * wlandev, UINT vala)
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
+static inline void acx100_write_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
 {
-	memcpy((UINT32 *) hw->CommandParameters, cmd, len);
+	memcpy((UINT32 *) priv->CommandParameters, cmd, len);
 }
 
 /*----------------------------------------------------------------
@@ -407,9 +407,9 @@ static inline void acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx100_read_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
+static inline void acx100_read_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
 {
-	memcpy(cmd, (UINT *) hw->CommandParameters, len);
+	memcpy(cmd, (UINT *) priv->CommandParameters, len);
 }
 
 static const char * const cmd_error_strings[] = {
@@ -448,7 +448,7 @@ static const char * const cmd_error_strings[] = {
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
+int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 			void *pcmdparam, int paramlen, UINT32 timeout)
 {
 	int counter;
@@ -471,14 +471,14 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 
 	/*** wait for ACX100 to become idle for our command submission ***/
 	for (counter = 2000; counter > 0; counter--) {
-		/* FIXME: auwtsh, busy waiting.
+		/* Auwtsh, busy-waiting!
 		 * Hmm, yeah, but this function is probably supposed to be
 		 * finished ASAP, so it's probably not such a terribly good
-		 * idea to schedule away instead of busy wait.
+		 * idea to schedule away instead of busy-wait.
 		 * Maybe let's just keep it as is. */
-		acx100_get_cmd_state(hw);
+		acx100_get_cmd_state(priv);
 		/* Test for IDLE state */
-		if (!hw->cmd_status) 
+		if (!priv->cmd_status) 
 			break;
 	}
 
@@ -486,7 +486,7 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	if (counter == 0) {
 		/* uh oh, cmd status still set, now we're in trouble */
 		acxlog((L_BINDEBUG | L_CTL),
-		       "Trying to issue a command to the ACX100 but the Command Register is not IDLE (%xh)\n", hw->cmd_status);
+		       "Trying to issue a command to the ACX100 but the Command Register is not IDLE (%xh)\n", priv->cmd_status);
 		goto done;
 	}
 
@@ -494,17 +494,17 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	if (pcmdparam != NULL && paramlen != 0) {
 		/* if it's an INTERROGATE command, just pass the length
 		 * of parameters to read, as data */
-		acx100_write_cmd_param(hw, pcmdparam,
+		acx100_write_cmd_param(priv, pcmdparam,
 			(cmd == ACX100_CMD_INTERROGATE) ? 0x4 : paramlen);
 	}
 
 	/*** now write the actual command type ***/
-	hw->cmd_type = cmd;
-	acx100_write_cmd_type(hw, cmd);
+	priv->cmd_type = cmd;
+	acx100_write_cmd_type(priv, cmd);
 	
 	/*** execute command ***/
-	acx100_write_reg16(hw, hw->io[IO_ACX_INT_TRIG],
-			  acx100_read_reg16(hw, hw->io[IO_ACX_INT_TRIG]) | 0x01);
+	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG],
+			  acx100_read_reg16(priv, priv->io[IO_ACX_INT_TRIG]) | 0x01);
 
 	/*** wait for IRQ to occur, then ACK it? ***/
 	if (timeout > 120000) {
@@ -518,9 +518,9 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 			 * In theory, yes, but the timeout can be HUGE,
 			 * so better schedule away sometimes */
 			if ((irqtype =
-			     acx100_read_reg16(hw, hw->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
+			     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
 
-				acx100_write_reg16(hw, hw->io[IO_ACX_IRQ_ACK], 0x200);
+				acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
 				break;
 			} 
 
@@ -532,12 +532,12 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	}
 
 	/*** Save state for debugging ***/
-	acx100_get_cmd_state(hw);
-	cmd_status = hw->cmd_status;
+	acx100_get_cmd_state(priv);
+	cmd_status = priv->cmd_status;
 	
 	/*** Put the card in IDLE state ***/
-	hw->cmd_status = 0;
-	acx100_write_cmd_status(hw, 0);
+	priv->cmd_status = 0;
+	acx100_write_cmd_status(priv, 0);
 
 	if ((irqtype | 0xfdff) == 0xfdff) {
 		acxlog(L_CTL,
@@ -558,7 +558,7 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 		/*** read in result parameters if needed ***/
 		if (pcmdparam != NULL && paramlen != 0) {
 			if (cmd == ACX100_CMD_INTERROGATE) {
-				acx100_read_cmd_param(hw, pcmdparam, paramlen);
+				acx100_read_cmd_param(priv, pcmdparam, paramlen);
         acxlog(L_DEBUG,"output pdr (len=%d):\n",paramlen);
         acx100_dump_bytes(pcmdparam,paramlen);
 			}
@@ -641,16 +641,16 @@ static short CtlLengthDot11[0x14] = {
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_configure(wlandevice_t * hw, void * pdr, short type)
+int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 {
 	((memmap_t *)pdr)->type = type;
 	if (type < 0x1000) {
 		((memmap_t *)pdr)->length = CtlLength[type];
-		return acx100_issue_cmd(hw, ACX100_CMD_CONFIGURE, pdr, 
+		return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 			CtlLength[type] + 4, 5000);
 	} else {
 		((memmap_t *)pdr)->length = CtlLengthDot11[type-0x1000];
-		return acx100_issue_cmd(hw, ACX100_CMD_CONFIGURE, pdr, 
+		return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 			CtlLengthDot11[type-0x1000] + 4, 5000);
 	}
 }
@@ -672,11 +672,11 @@ int acx100_configure(wlandevice_t * hw, void * pdr, short type)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx100_configure_length(wlandevice_t * hw, void * pdr, short type, short length)
+inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, short length)
 {
 	((memmap_t *)pdr)->type = type;
 	((memmap_t *)pdr)->length = length;
-	return acx100_issue_cmd(hw, ACX100_CMD_CONFIGURE, pdr, 
+	return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 		length + 4, 5000);
 }
 
@@ -697,16 +697,16 @@ inline int acx100_configure_length(wlandevice_t * hw, void * pdr, short type, sh
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_interrogate(wlandevice_t * hw, void * pdr, short type)
+int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 {
 	((memmap_t *)pdr)->type = type;
 	if (type < 0x1000) {
 		((memmap_t *)pdr)->length = CtlLength[type];
-		return acx100_issue_cmd(hw, ACX100_CMD_INTERROGATE, pdr,
+		return acx100_issue_cmd(priv, ACX100_CMD_INTERROGATE, pdr,
 			CtlLength[type] + 4, 5000);
 	} else {
 		((memmap_t *)pdr)->length = CtlLengthDot11[type-0x1000];
-		return acx100_issue_cmd(hw, ACX100_CMD_INTERROGATE, pdr,
+		return acx100_issue_cmd(priv, ACX100_CMD_INTERROGATE, pdr,
 			CtlLengthDot11[type-0x1000] + 4, 5000);
 	}
 }
@@ -974,14 +974,14 @@ void acx100_log_mac_address(int level, UINT8 * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_power_led(wlandevice_t *wlandev, int enable)
+void acx100_power_led(wlandevice_t *priv, int enable)
 {
 	if (enable)
-		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE], 
-			acx100_read_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE]) & ~0x0800);
+		acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 
+			acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) & ~0x0800);
 	else
-		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE], 
-			acx100_read_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE]) | 0x0800);
+		acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 
+			acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) | 0x0800);
 }
 
 

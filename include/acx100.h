@@ -2258,7 +2258,7 @@ typedef struct key_struct {
 
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
-	struct wlandevice *wlandev;
+	struct wlandevice *priv;
 
 	UINT val0x4;		//spacing
 
@@ -2598,47 +2598,47 @@ typedef struct wlandevice {
  * the kernel from linking or module from loading if they are not inlined. */
 
 #ifdef BROKEN_LOCKING
-extern inline int acx100_lock(wlandevice_t *wlandev, unsigned long *flags)
+extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	local_irq_save(*flags);
-	if (!spin_trylock(&wlandev->lock)) {
+	if (!spin_trylock(&priv->lock)) {
 		printk("ARGH! Lock already taken in %s\n", __func__);
 		local_irq_restore(*flags);
 		return -EFAULT;
 	} else {
 		printk("Lock given out in %s\n", __func__);
 	}
-	if (wlandev->hw_unavailable) {
+	if (priv->hw_unavailable) {
 		printk(KERN_WARNING
 		       "acx100_lock() called with hw_unavailable (dev=%p)\n",
-		       wlandev->netdev);
-		spin_unlock_irqrestore(&wlandev->lock, *flags);
+		       priv->netdev);
+		spin_unlock_irqrestore(&priv->lock, *flags);
 		return -EBUSY;
 	}
 	return 0;
 }
 
-extern inline void acx100_unlock(wlandevice_t *wlandev, unsigned long *flags)
+extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* printk(KERN_WARNING "unlock\n"); */
-	spin_unlock_irqrestore(&wlandev->lock, *flags);
+	spin_unlock_irqrestore(&priv->lock, *flags);
 	/* printk(KERN_WARNING "/unlock\n"); */
 }
 
 #else /* BROKEN_LOCKING */
 
-extern inline int acx100_lock(wlandevice_t *wlandev, unsigned long *flags)
+extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
-	(void)*wlandev;
+	(void)*priv;
 	(void)*flags;
 	return 0;
 }
 
-extern inline void acx100_unlock(wlandevice_t *wlandev, unsigned long *flags)
+extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
-	(void)*wlandev;
+	(void)*priv;
 	(void)*flags;
 }
 #endif /* BROKEN_LOCKING */

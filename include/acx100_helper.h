@@ -385,46 +385,46 @@ typedef struct {
 } radioinit_t;
 
 void acx100_schedule(UINT32 timeout);
-int acx100_reset_dev(netdevice_t * hw);
-void acx100_join_bssid(wlandevice_t * hw);
-int acx100_init_mac(netdevice_t * hw);
-int acx100_set_defaults(wlandevice_t * hw);
-void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id);
-int acx100_set_probe_response_template(wlandevice_t * hw);
-int acx100_set_beacon_template(wlandevice_t * wlandev);
-void acx100_set_timer(wlandevice_t * hw, UINT32 time);
-void acx100_update_capabilities(wlandevice_t * hw);
-unsigned int acx100_read_eeprom_offset(wlandevice_t * wlandev, UINT16 addr,
+int acx100_reset_dev(netdevice_t *priv);
+void acx100_join_bssid(wlandevice_t *priv);
+int acx100_init_mac(netdevice_t *priv);
+int acx100_set_defaults(wlandevice_t *priv);
+void acx100_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
+int acx100_set_probe_response_template(wlandevice_t *priv);
+int acx100_set_beacon_template(wlandevice_t *priv);
+void acx100_set_timer(wlandevice_t *priv, UINT32 time);
+void acx100_update_capabilities(wlandevice_t *priv);
+unsigned int acx100_read_eeprom_offset(wlandevice_t *priv, UINT16 addr,
 					unsigned char *charbuf);
-void acx100_start(wlandevice_t * hw);
-void acx100_reset_mac(wlandevice_t * wlandev);
-firmware_image_t *acx100_read_fw( const char *file );
-int acx100_upload_fw(wlandevice_t * wlandev);
-int acx100_write_fw(wlandevice_t * wlandev, const firmware_image_t * apfw_image, UINT32 offset);
-int acx100_validate_fw(wlandevice_t * wlandev, const firmware_image_t * apfw_mage, UINT32 offset );
-int acx100_verify_init(wlandevice_t * wlandev);
-int acx100_read_eeprom_area(wlandevice_t * wlandev);
-void acx100_init_mboxes(wlandevice_t * hw);
-int acx100_init_wep(wlandevice_t * wlandev, memmap_t * pt);
-int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * pt);
-int acx100_init_max_probe_request_template(wlandevice_t * hw);
-int acx100_init_max_null_data_template(wlandevice_t * hw);
-int acx100_init_max_beacon_template(wlandevice_t * wlandev);
-int acx100_init_max_tim_template(wlandevice_t * hw);
-int acx100_init_max_probe_response_template(wlandevice_t * hw);
-int acx100_set_tim_template(wlandevice_t * acx);
-int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *wlandev,
+void acx100_start(wlandevice_t *priv);
+void acx100_reset_mac(wlandevice_t *priv);
+firmware_image_t *acx100_read_fw( const char *file);
+int acx100_upload_fw(wlandevice_t *priv);
+int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 offset);
+int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset );
+int acx100_verify_init(wlandevice_t *priv);
+int acx100_read_eeprom_area(wlandevice_t *priv);
+void acx100_init_mboxes(wlandevice_t *priv);
+int acx100_init_wep(wlandevice_t *priv, memmap_t *pt);
+int acx100_init_packet_templates(wlandevice_t *priv, memmap_t *pt);
+int acx100_init_max_probe_request_template(wlandevice_t *priv);
+int acx100_init_max_null_data_template(wlandevice_t *priv);
+int acx100_init_max_beacon_template(wlandevice_t *priv);
+int acx100_init_max_tim_template(wlandevice_t *priv);
+int acx100_init_max_probe_response_template(wlandevice_t *priv);
+int acx100_set_tim_template(wlandevice_t *priv);
+int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 						   struct acxp80211_beacon_prb_resp *bcn);
-void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, int set_all);
+void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all);
 int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd);
-void acx100_set_probe_request_template(wlandevice_t * skb);
-void acx100_scan_chan(wlandevice_t *wlandev);
-void acx100_scan_chan_p(wlandevice_t *wlandev, struct scan *s);
-int acx100_set_rxconfig(wlandevice_t *hw);
-int acx100_load_radio(wlandevice_t * hw);
+void acx100_set_probe_request_template(wlandevice_t *priv);
+void acx100_scan_chan(wlandevice_t *priv);
+void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);
+int acx100_set_rxconfig(wlandevice_t *priv);
+int acx100_load_radio(wlandevice_t *priv);
 int acx100_read_proc(char *page, char **start, off_t offset, int count,
 		     int *eof, void *data);
 int acx100_read_proc_diag(char *page, char **start, off_t offset, int count,
 		     int *eof, void *data);
-int acx100_proc_output(char *buf, wlandevice_t * hw);
-int acx100_proc_diag_output(char *buf, wlandevice_t * hw);
+int acx100_proc_output(char *buf, wlandevice_t *priv);
+int acx100_proc_diag_output(char *buf, wlandevice_t *priv);

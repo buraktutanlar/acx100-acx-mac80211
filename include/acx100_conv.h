@@ -94,9 +94,9 @@ struct rxhostdescriptor;
  * Function Declarations                                                      *
  *============================================================================*/
 
-int acx100_ether_to_txdesc(struct wlandevice *wlandev,
+int acx100_ether_to_txdesc(struct wlandevice *priv,
 			   struct txdescriptor *txdesc, struct sk_buff *skb);
-struct sk_buff *acx100_rxdesc_to_ether(struct wlandevice *wlandev,
+struct sk_buff *acx100_rxdesc_to_ether(struct wlandevice *priv,
 				       struct rxhostdescriptor *rxdesc);
 void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 			     struct txdescriptor *txdesc);

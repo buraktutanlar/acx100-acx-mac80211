@@ -48,25 +48,25 @@ typedef struct mac {
 	UINT16 valb;
 } mac_t;
 
-UINT32 acx100_read_reg32(wlandevice_t *wlandev, UINT valb);
-void acx100_write_reg32(wlandevice_t *wlandev, UINT vala, UINT valb);
-UINT16 acx100_read_reg16(wlandevice_t *wlandev, UINT valb);
-void acx100_write_reg16(wlandevice_t *wlandev, UINT vala, UINT16 valb);
-UINT8 acx100_read_reg8(wlandevice_t *wlandev, UINT valb);
-void acx100_write_reg8(wlandevice_t *wlandev, UINT vala, UINT valb);
+UINT32 acx100_read_reg32(wlandevice_t *priv, UINT valb);
+void acx100_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
+UINT16 acx100_read_reg16(wlandevice_t *priv, UINT valb);
+void acx100_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
+UINT8 acx100_read_reg8(wlandevice_t *priv, UINT valb);
+void acx100_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
 
-void acx100_get_info_state(wlandevice_t *wlandev);
-void acx100_get_cmd_state(wlandevice_t *wlandev);
-void acx100_write_cmd_type(wlandevice_t *wlandev, UINT16 vala);
-void acx100_write_cmd_status(wlandevice_t *wlandev, UINT vala);
+void acx100_get_info_state(wlandevice_t *priv);
+void acx100_get_cmd_state(wlandevice_t *priv);
+void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala);
+void acx100_write_cmd_status(wlandevice_t *priv, UINT vala);
 
-int acx100_issue_cmd(wlandevice_t *wlandev, UINT command, void *hw,
+int acx100_issue_cmd(wlandevice_t *priv, UINT command, void *hw,
 		     int valb, UINT32 valc);
 
-int acx100_configure(wlandevice_t *wlandev, void *pdr, short type);
-int acx100_configure_length(wlandevice_t *wlandev, void *pdr, short type,
+int acx100_configure(wlandevice_t *priv, void *pdr, short type);
+int acx100_configure_length(wlandevice_t *priv, void *pdr, short type,
 			    short length);
-int acx100_interrogate(wlandevice_t *hw, void *pdr, short type);
+int acx100_interrogate(wlandevice_t *priv, void *pdr, short type);
 
 int acx100_is_mac_address_zero(mac_t *mac);
 void acx100_clear_mac_address(mac_t *mac);
@@ -79,4 +79,4 @@ int acx100_is_mac_address_broadcast(const UINT8 * const address);
 int acx100_is_mac_address_multicast(mac_t *mac);
 void acx100_log_mac_address(int level, UINT8 *mac);
 
-void acx100_power_led(wlandevice_t *wlandev, int enable);
+void acx100_power_led(wlandevice_t *priv, int enable);

@@ -201,45 +201,45 @@ typedef struct TxData {
 } TxData;			/* size: 2400 */
 
 void acx100_client_sta_list_init(void);
-int acx100_rx_ieee802_11_frame(wlandevice_t *wlandev, rxhostdescriptor_t *desc);
-int acx100_process_disassoc(wlan_fr_disassoc_t * req, wlandevice_t * hw);
-int acx100_process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw);
-int acx100_process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw);
-int acx100_process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw);
-int acx100_process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw);
-int acx100_process_authen(wlan_fr_authen_t * req, wlandevice_t * hw);
+int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
+int acx100_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
+int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
+int acx100_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv);
+int acx100_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv);
+int acx100_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
 
-int acx100_process_deauthen(wlan_fr_deauthen_t * req, wlandevice_t * hw);
-void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
-			  acxp80211_hdr_t * hdr);
+int acx100_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
+			  acxp80211_hdr_t *hdr);
 #if (POWER_SAVE_80211 == 0)
-void ActivatePowerSaveMode(wlandevice_t * hw, int vala);
+void ActivatePowerSaveMode(wlandevice_t *priv, int vala);
 #endif
 void acx100_timer(unsigned long a);
-void acx100_complete_dot11_scan(wlandevice_t * wlandev);
+void acx100_complete_dot11_scan(wlandevice_t *priv);
 char *acx100_get_status_name(int status);
-void acx100_set_status(wlandevice_t *hw, int status);
-void acx100_ibssid_gen(wlandevice_t * wlandev, unsigned char *p_out);
+void acx100_set_status(wlandevice_t *priv, int status);
+void acx100_ibssid_gen(wlandevice_t *priv, unsigned char *p_out);
 
-extern void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *wlandev);
+extern void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 void acx100_gen_challenge(challenge_text_t *);
 void acx100_get_random(UINT8 *, UINT32);
 
-int acx100_transmit_authen4(wlan_fr_authen_t * arg_0, wlandevice_t * wlandev);
-int acx100_transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * wlandev);
-int acx100_transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
-		      wlandevice_t * wlandev);
-int acx100_transmit_authen1(wlandevice_t * wlandev);
-int acx100_transmit_assoc_req(wlandevice_t * wlandev);
-UINT32 acx100_transmit_disassoc(client_t * arg_0, wlandevice_t * wlandev);
-int acx100_transmit_deauthen(char *a, client_t * arg_4, wlandevice_t * hw,
+int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
+		      wlandevice_t *priv);
+int acx100_transmit_authen1(wlandevice_t *priv);
+int acx100_transmit_assoc_req(wlandevice_t *priv);
+UINT32 acx100_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
+int acx100_transmit_deauthen(char *a, client_t *arg_4, wlandevice_t *priv,
 		      int valb);
-UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t * arg_0,
-			  wlandevice_t * wlandev);
-UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t * arg_0,
-			    wlandevice_t * wlandev);
+UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
+			  wlandevice_t *priv);
+UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
+			    wlandevice_t *priv);
 
-client_t *acx100_sta_list_alloc(UINT8 * address);
-client_t *acx100_sta_list_add(UINT8 * address);
+client_t *acx100_sta_list_alloc(UINT8 *address);
+client_t *acx100_sta_list_add(UINT8 *address);
 client_t *acx100_get_sta_list(char *address);
