@@ -1,4 +1,4 @@
-/* src/ihw.c - low level control functions
+  /* src/ihw.c - low level control functions
  *
  * --------------------------------------------------------------------
  *
@@ -90,7 +90,8 @@ static void acx100usb_control_complete(struct urb *urb)
 /* 2.4.x kernels */
 #define USB_24	1
 
-static inline int submit_urb(struct urb *urb, int mem_flags) {
+static inline int submit_urb(struct urb *urb, int mem_flags)
+{
 	        return usb_submit_urb(urb);
 }
 
@@ -111,6 +112,10 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 
 #endif
 
+/* FIXME: is 2.4.22 really the first version to do it properly? Didn't test it... */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 4, 22)
+#define dump_stack() /* <= 2.4.22 doesn't know about the generic dump_stack() */
+#endif
 
 
 /*****************************************************************************
@@ -137,7 +142,7 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT32 acx_read_reg32(wlandevice_t *priv, UINT offset)
+inline u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32
 	return readl(priv->iobase + offset);
@@ -164,7 +169,7 @@ inline UINT32 acx_read_reg32(wlandevice_t *priv, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT16 acx_read_reg16(wlandevice_t *priv, UINT offset)
+inline u16 acx_read_reg16(wlandevice_t *priv, unsigned int offset)
 {
 	return readw(priv->iobase + offset);
 }
@@ -186,7 +191,7 @@ inline UINT16 acx_read_reg16(wlandevice_t *priv, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_read_reg8(wlandevice_t *priv, UINT offset)
+inline u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset)
 {
 	return readb(priv->iobase + offset);
 }
@@ -208,7 +213,7 @@ inline UINT8 acx_read_reg8(wlandevice_t *priv, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx_write_reg32(wlandevice_t *priv, UINT offset, UINT val)
+inline void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
 {
 #if ACX_IO_WIDTH == 32
 	writel(val, priv->iobase + offset);
@@ -235,7 +240,7 @@ inline void acx_write_reg32(wlandevice_t *priv, UINT offset, UINT val)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx_write_reg16(wlandevice_t *priv, UINT offset, UINT16 val)
+inline void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val)
 {
 	writew(val, priv->iobase + offset);
 }
@@ -257,7 +262,7 @@ inline void acx_write_reg16(wlandevice_t *priv, UINT offset, UINT16 val)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx_write_reg8(wlandevice_t *priv, UINT offset, UINT val)
+inline void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
 {
 	writeb(val, priv->iobase + offset);
 }
@@ -292,7 +297,7 @@ more bytes may follow
 
 void acx_get_info_state(wlandevice_t *priv)
 {
-	UINT32 value;
+	u32 value;
 
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1);
@@ -302,8 +307,8 @@ void acx_get_info_state(wlandevice_t *priv)
 
 	value = acx_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 
-	priv->info_type = (UINT16)value;
-	priv->info_status = (UINT16)(value >> 16);
+	priv->info_type = (u16)value;
+	priv->info_status = (u16)(value >> 16);
 
 	/* inform hw that we have read this info message */
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
@@ -351,7 +356,7 @@ static const char * cmd_error_strings[] = {
 *----------------------------------------------------------------*/
 void acx_get_cmd_state(wlandevice_t *priv)
 {
-	UINT32 value;
+	u32 value;
 
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
@@ -361,8 +366,8 @@ void acx_get_cmd_state(wlandevice_t *priv)
 
 	value = acx_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 
-	priv->cmd_type = (UINT16)value;
-	priv->cmd_status = (UINT16)(value >> 16);
+	priv->cmd_type = (u16)value;
+	priv->cmd_status = (u16)(value >> 16);
 
 	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x [%s]\n", priv->cmd_type, priv->cmd_status, priv->cmd_status <= 0x10 ? cmd_error_strings[priv->cmd_status] : "UNKNOWN REASON" );
 }
@@ -384,7 +389,7 @@ void acx_get_cmd_state(wlandevice_t *priv)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status)
+void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_status)
 {
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
@@ -414,7 +419,7 @@ void acx_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status)
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx_write_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd, int len)
+static inline void acx_write_cmd_param(wlandevice_t *priv, const acx_ie_generic_t *cmd, unsigned int len)
 {
 	memcpy(priv->CommandParameters, cmd, len);
 }
@@ -436,7 +441,7 @@ static inline void acx_write_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx_read_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd, int len)
+static inline void acx_read_cmd_param(const wlandevice_t *priv, acx_ie_generic_t *cmd, unsigned int len)
 {
 	memcpy(cmd, priv->CommandParameters, len);
 }
@@ -461,13 +466,13 @@ static inline void acx_read_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd,
 *
 *----------------------------------------------------------------*/
 #if (WLAN_HOSTIF!=WLAN_USB)
-int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
-			/*@null@*/ void *pcmdparam, int paramlen, UINT32 timeout)
+int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
+			/*@null@*/ void *pcmdparam, unsigned int paramlen, u32 timeout)
 {
-	int counter;
+	unsigned int counter;
 	int result = NOT_OK;
-	UINT16 irqtype = 0;
-	UINT16 cmd_status;
+	u16 irqtype = 0;
+	u16 cmd_status;
 
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
@@ -555,7 +560,8 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 			break;
 		}
 
-		if (unlikely(counter % 15000 == 7500))
+		/* reschedule after some time has been spent in this loop */
+		if (unlikely(counter % 16384 == 8192))
 		{
 			acx_schedule(HZ / 100);
 		}
@@ -612,14 +618,14 @@ done:
 	return result;
 }
 #else
-int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
+int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int paramlen,u32 timeout) {
 	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->ctrlin);
 	int ucode,delcount;
 	struct usb_device *usbdev;
 
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
-	acxlog(L_CTL,"paramlen=%d type=%d\n",paramlen,(pdr)?((acx_ie_generic_t *)pdr)->type:-1);
+	acxlog(L_CTL,"paramlen=%d type=%d\n",paramlen,(pdr)?le16_to_cpu(((acx_ie_generic_t *)pdr)->type):-1);
 	skipridheader=0;
 	/* ----------------------------------------------------
 	** get context from wlandevice
@@ -628,27 +634,27 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	/* ----------------------------------------------------
 	** check which kind of command was issued...
 	** ------------------------------------------------- */
-	priv->ctrlout.cmd=cmd;
-	priv->ctrlout.status=0;
+	priv->ctrlout.cmd=cpu_to_le16(cmd);
+	priv->ctrlout.status=cpu_to_le16(0);
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
 		/* -----------------------------------------------------
 		** setup interrogation command...
 		** -------------------------------------------------- */
 		priv->ctrlout.u.rridreq.rid=((acx_ie_generic_t *)pdr)->type;
-		priv->ctrlout.u.rridreq.frmlen=paramlen-4;  /* -4 bytes because we do not need the USB header in the frame length */
+		priv->ctrlout.u.rridreq.frmlen=cpu_to_le16(paramlen-4);  /* -4 bytes because we do not need the USB header in the frame length */
 		blocklen=8;
-		switch (priv->ctrlout.u.rridreq.rid) {
+		switch (le16_to_cpu(priv->ctrlout.u.rridreq.rid)) {
 			case ACX1xx_IE_SCAN_STATUS:skipridheader=1;break;
 		}
 		if (skipridheader) acklen=paramlen;
 		else acklen=4+paramlen; /* acklen -> expected length of ACK from USB device */
-		acxlog(L_CTL,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",priv->ctrlout.cmd,priv->ctrlout.status,priv->ctrlout.u.rridreq.rid,priv->ctrlout.u.rridreq.frmlen);
+		acxlog(L_CTL,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",le16_to_cpu(priv->ctrlout.cmd),le16_to_cpu(priv->ctrlout.status),le16_to_cpu(priv->ctrlout.u.rridreq.rid),le16_to_cpu(priv->ctrlout.u.rridreq.frmlen));
 	} else if (cmd==ACX1xx_CMD_CONFIGURE) {
 		/* -------------------------------------------------
 		** setup configure command...
 		** --------------------------------------------- */
 		priv->ctrlout.u.wridreq.rid=((acx_ie_generic_t *)pdr)->type;
-		priv->ctrlout.u.wridreq.frmlen=paramlen;
+		priv->ctrlout.u.wridreq.frmlen=cpu_to_le16(paramlen);
 		memcpy(priv->ctrlout.u.wridreq.data,&(((acx_ie_generic_t *)pdr)->m),paramlen);
 		blocklen=paramlen+8;	/* length of parameters + header */
 	} else if ((cmd==ACX1xx_CMD_ENABLE_RX)||(cmd==ACX1xx_CMD_ENABLE_TX)||(cmd==ACX1xx_CMD_SLEEP)) {
@@ -738,21 +744,21 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 		FN_EXIT(0,result);
 		return(NOT_OK);
 	}
-	if (priv->ctrlin.status!=1) {
-		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %d\n",priv->ctrlin.status);
+	if (le16_to_cpu(priv->ctrlin.status)!=1) {
+		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %d\n",le16_to_cpu(priv->ctrlin.status));
 	}
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
 		if ((pdr)&&(paramlen>0)) {
 			if (skipridheader) {
 				memcpy(pdr,&(priv->ctrlin.u.rmemresp.data),paramlen-4);
-				acxlog(L_CTL,"response frame: cmd=%d status=%d\n",priv->ctrlin.cmd,priv->ctrlin.status);
+				acxlog(L_CTL,"response frame: cmd=%d status=%d\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status));
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen-4);
 				if (debug&L_DATA) 
 				    acx_dump_bytes(pdr,paramlen-4);
 			}
 			else {
 				memcpy(pdr,&(priv->ctrlin.u.rridresp.rid),paramlen);
-				acxlog(L_CTL,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->ctrlin.cmd,priv->ctrlin.status,priv->ctrlin.u.rridresp.rid,priv->ctrlin.u.rridresp.frmlen);
+				acxlog(L_CTL,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status),le16_to_cpu(priv->ctrlin.u.rridresp.rid),le16_to_cpu(priv->ctrlin.u.rridresp.frmlen));
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
 				if (debug&L_DATA)
 				    acx_dump_bytes(pdr,paramlen);
@@ -771,7 +777,7 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
  *
  ****************************************************************************/
 
-static const UINT16 CtlLength[0x17] = {
+static const u16 CtlLength[0x17] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
 	ACX1xx_IE_POWER_MGMT_LEN,
@@ -797,7 +803,7 @@ static const UINT16 CtlLength[0x17] = {
 	ACX111_IE_KEY_CHOOSE_LEN,
 };
 
-static const UINT16 CtlLengthDot11[0x14] = {
+static const u16 CtlLengthDot11[0x14] = {
 	0,
 	ACX1xx_IE_DOT11_STATION_ID_LEN,
 	0,
@@ -840,7 +846,7 @@ static const UINT16 CtlLengthDot11[0x14] = {
 *----------------------------------------------------------------*/
 int acx_configure(wlandevice_t *priv, void *pdr, short type)
 {
-	UINT16 len, offs = 0;
+	u16 len, offs = 0;
 
 	/* TODO implement and check other acx111 commands */
 	if(priv->chip_type == CHIPTYPE_ACX111 &&
@@ -924,7 +930,7 @@ inline int acx_configure_length(wlandevice_t *priv, void *pdr, short type, short
 *----------------------------------------------------------------*/
 int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 {
-	UINT16 len;
+	u16 len;
 
 	if (type<0x1000)
 		len=CtlLength[type];
@@ -968,7 +974,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_zero(const mac_t *mac)
+inline unsigned int acx_is_mac_address_zero(const mac_t *mac)
 {
 	if ((mac->vala == 0) && (mac->valb == 0)) {
 		return OK;
@@ -993,9 +999,9 @@ inline int acx_is_mac_address_zero(const mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_equal(const UINT8 *one, const UINT8 *two)
+inline unsigned int acx_is_mac_address_equal(const u8 *one, const u8 *two)
 {
-	return memcmp(one, two, ETH_ALEN);
+	return (unsigned int)memcmp(one, two, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -1015,7 +1021,7 @@ inline int acx_is_mac_address_equal(const UINT8 *one, const UINT8 *two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_is_mac_address_group(const mac_t *mac)
+inline unsigned int acx_is_mac_address_group(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return OK;
@@ -1040,7 +1046,7 @@ inline UINT8 acx_is_mac_address_group(const mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_is_mac_address_directed(const mac_t *mac)
+inline unsigned int acx_is_mac_address_directed(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return NOT_OK;
@@ -1065,9 +1071,9 @@ inline UINT8 acx_is_mac_address_directed(const mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_broadcast(const UINT8 *address)
+inline unsigned int acx_is_mac_address_broadcast(const u8 *address)
 {
-	unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	static const unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 	if (OK == acx_is_mac_address_equal(address, bcast_addr))
 		return OK;
@@ -1096,7 +1102,7 @@ inline int acx_is_mac_address_broadcast(const UINT8 *address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_multicast(const mac_t *mac)
+inline unsigned int acx_is_mac_address_multicast(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
@@ -1124,7 +1130,7 @@ inline int acx_is_mac_address_multicast(const mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
+void acx_log_mac_address(int level, const u8 *mac, const char* tail)
 {
 	if (!(debug & level))
 		return;
@@ -1152,10 +1158,10 @@ void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_power_led(wlandevice_t *priv, UINT8 enable)
+void acx_power_led(wlandevice_t *priv, u8 enable)
 {
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT16 gpio_pled =
+	u16 gpio_pled =
 		(CHIPTYPE_ACX111 == priv->chip_type) ? 0x0040 : 0x0800;
 	static int rate_limit = 0;
 

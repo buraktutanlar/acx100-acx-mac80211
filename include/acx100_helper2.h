@@ -40,7 +40,7 @@
 
 typedef struct acx_frame {
 	char val0x0[0x26];
-	UINT16 val0x26;
+	u16 val0x26;
 	acx_addr3_t fr;
 } acx_frame_t;
 
@@ -65,84 +65,84 @@ typedef struct rxbuffer rxbuffer_t;
 #define MAX_NUMBER_OF_SITE 31
 
 typedef struct ssid {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT8 inf[32] ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 inf[32] ACX_PACKED;
 } ssid_t;
 
 typedef struct rates {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT8 sup_rates[8] ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 sup_rates[8] ACX_PACKED;
 } rates_t;
 
 typedef struct fhps {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT16 dwell_time ACX_PACKED;
-	UINT8 hop_set ACX_PACKED;
-	UINT8 hop_pattern ACX_PACKED;
-	UINT8 hop_index ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u16 dwell_time ACX_PACKED;
+	u8 hop_set ACX_PACKED;
+	u8 hop_pattern ACX_PACKED;
+	u8 hop_index ACX_PACKED;
 } fhps_t;
 
 typedef struct dsps {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT8 curr_channel ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 curr_channel ACX_PACKED;
 } dsps_t;
 
 typedef struct cfps {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT8 cfp_count ACX_PACKED;
-	UINT8 cfp_period ACX_PACKED;
-	UINT16 cfp_max_dur ACX_PACKED;
-	UINT16 cfp_dur_rem ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 cfp_count ACX_PACKED;
+	u8 cfp_period ACX_PACKED;
+	u16 cfp_max_dur ACX_PACKED;
+	u16 cfp_dur_rem ACX_PACKED;
 } cfps_t;
 
 typedef struct challenge_text {
-	UINT8 element_ID ACX_PACKED;
-	UINT8 length ACX_PACKED;
-	UINT8 text[253] ACX_PACKED;
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 text[253] ACX_PACKED;
 } challenge_text_t;
 
 
 
 typedef struct auth_frame_body {
-	UINT16 auth_alg ACX_PACKED;
-	UINT16 auth_seq ACX_PACKED;
-	UINT16 status ACX_PACKED;
+	u16 auth_alg ACX_PACKED;
+	u16 auth_seq ACX_PACKED;
+	u16 status ACX_PACKED;
 	challenge_text_t challenge ACX_PACKED;
 } auth_frame_body_t;
 
 typedef struct assocresp_frame_body {
-	UINT16 cap_info ACX_PACKED;
-	UINT16 status ACX_PACKED;
-	UINT16 aid ACX_PACKED;
+	u16 cap_info ACX_PACKED;
+	u16 status ACX_PACKED;
+	u16 aid ACX_PACKED;
 	rates_t rates ACX_PACKED;
 } assocresp_frame_body_t;
 
 typedef struct reassocreq_frame_body {
-	UINT16 cap_info ACX_PACKED;
-	UINT16 listen_int ACX_PACKED;
-	UINT8 current_ap[6] ACX_PACKED;
+	u16 cap_info ACX_PACKED;
+	u16 listen_int ACX_PACKED;
+	u8 current_ap[6] ACX_PACKED;
 	ssid_t ssid ACX_PACKED;
 	rates_t rates ACX_PACKED;
 } reassocreq_frame_body_t;
 
 typedef struct reassocresp_frame_body {
-	UINT16 cap_info ACX_PACKED;
-	UINT16 status ACX_PACKED;
-	UINT16 aid ACX_PACKED;
+	u16 cap_info ACX_PACKED;
+	u16 status ACX_PACKED;
+	u16 aid ACX_PACKED;
 	rates_t rates ACX_PACKED;
 } reassocresp_frame_body_t;
 
 typedef struct deauthen_frame_body {
-	UINT16 reason ACX_PACKED;
+	u16 reason ACX_PACKED;
 } deauthen_frame_body_t;
 
 typedef struct disassoc_frame_body {
-	UINT16 reason ACX_PACKED;
+	u16 reason ACX_PACKED;
 } disassoc_frame_body_t;
 
 typedef struct probereq_frame_body {
@@ -151,9 +151,9 @@ typedef struct probereq_frame_body {
 } probereq_frame_body_t;
 
 typedef struct proberesp_frame_body {
-	UINT8 timestamp[8] ACX_PACKED;
-	UINT16 beacon_int ACX_PACKED;
-	UINT16 cap_info ACX_PACKED;
+	u8 timestamp[8] ACX_PACKED;
+	u16 beacon_int ACX_PACKED;
+	u16 cap_info ACX_PACKED;
 	ssid_t ssid ACX_PACKED;
 	rates_t rates ACX_PACKED;
 	fhps_t fhps ACX_PACKED;
@@ -162,12 +162,12 @@ typedef struct proberesp_frame_body {
 } proberesp_frame_body_t;
 
 typedef struct TxData {
-	UINT16 frame_control ACX_PACKED;	/* 0x0 */
-	UINT16 duration_id ACX_PACKED;	/* 0x2 */
-	UINT8 da[ETH_ALEN] ACX_PACKED;	/* 0x4 */
-	UINT8 sa[ETH_ALEN] ACX_PACKED;	/* 0xa */
-	UINT8 bssid[ETH_ALEN] ACX_PACKED;	/* 0x10 */
-	UINT16 sequence_control ACX_PACKED;	/* 0x16 */
+	u16 frame_control ACX_PACKED;	/* 0x0 */
+	u16 duration_id ACX_PACKED;	/* 0x2 */
+	u8 da[ETH_ALEN] ACX_PACKED;	/* 0x4 */
+	u8 sa[ETH_ALEN] ACX_PACKED;	/* 0xa */
+	u8 bssid[ETH_ALEN] ACX_PACKED;	/* 0x10 */
+	u16 sequence_control ACX_PACKED;	/* 0x16 */
 	union {
 		auth_frame_body_t auth ACX_PACKED;
 		deauthen_frame_body_t deauthen ACX_PACKED;
@@ -185,10 +185,10 @@ typedef struct TxData {
 } TxData;			/* size: 2400 */
 
 void acx_sta_list_init(wlandevice_t *priv);
-const char *acx_get_status_name(UINT16 status);
-void acx_set_status(wlandevice_t *priv, UINT16 status);
+const char *acx_get_status_name(u16 status);
+void acx_set_status(wlandevice_t *priv, u16 status);
 int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
-UINT32 acx_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
+u32 acx_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
 void acx_timer(unsigned long a);
 void acx_complete_dot11_scan(wlandevice_t *priv);
 #endif /* __ACX_ACX100_HELPER2_H */

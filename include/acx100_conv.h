@@ -66,22 +66,22 @@
 
 /* local ether header type */
 typedef struct wlan_ethhdr {
-	UINT8 daddr[WLAN_ETHADDR_LEN] ACX_PACKED;
-	UINT8 saddr[WLAN_ETHADDR_LEN] ACX_PACKED;
-	UINT16 type ACX_PACKED;
+	u8 daddr[WLAN_ETHADDR_LEN] ACX_PACKED;
+	u8 saddr[WLAN_ETHADDR_LEN] ACX_PACKED;
+	u16 type ACX_PACKED;
 } wlan_ethhdr_t;
 
 /* local llc header type */
 typedef struct wlan_llc {
-	UINT8 dsap ACX_PACKED;
-	UINT8 ssap ACX_PACKED;
-	UINT8 ctl ACX_PACKED;
+	u8 dsap ACX_PACKED;
+	u8 ssap ACX_PACKED;
+	u8 ctl ACX_PACKED;
 } wlan_llc_t;
 
 /* local snap header type */
 typedef struct wlan_snap {
-	UINT8 oui[WLAN_IEEE_OUI_LEN] ACX_PACKED;
-	UINT16 type ACX_PACKED;
+	u8 oui[WLAN_IEEE_OUI_LEN] ACX_PACKED;
+	u16 type ACX_PACKED;
 } wlan_snap_t;
 
 /* FIXME: Circular include trick */
@@ -94,10 +94,10 @@ struct rxhostdescriptor;
  *============================================================================*/
 
 int acx_ether_to_txdesc(struct wlandevice *priv,
-			   struct txdescriptor *txdesc, struct sk_buff *skb);
+			   struct txdescriptor *txdesc, const struct sk_buff *skb);
 /*@null@*/ struct sk_buff *acx_rxdesc_to_ether(struct wlandevice *priv,
-				       struct rxhostdescriptor *rxdesc);
-void acx_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
+				       const struct rxhostdescriptor *rxdesc);
+void acx_rxdesc_to_txdesc(const struct rxhostdescriptor *rxhostdesc,
 			     struct txdescriptor *txdesc);
 
 #endif /* __ACX_ACX100_CONV_H */

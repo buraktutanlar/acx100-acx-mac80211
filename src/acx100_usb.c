@@ -158,8 +158,8 @@ static inline void usb_set_intfdata(struct usb_interface *intf, void *data) {}
 
 char *firmware_dir;
 
-/* int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD; */
-int debug = L_STD; 
+/* unsigned int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD; */
+unsigned int debug = L_STD; 
 
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
@@ -169,7 +169,7 @@ MODULE_DESCRIPTION("TI ACX100 WLAN USB Driver");
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 #ifdef ACX_DEBUG
-module_param(debug, int, 0);
+module_param(debug, uint, 0);
 #endif
 module_param(firmware_dir, charp, 0);
 #else
@@ -228,7 +228,7 @@ static int acx100usb_open(struct net_device *);
 static int acx100usb_stop(struct net_device *);
 static int acx100usb_start_xmit(struct sk_buff *,struct net_device *);
 static void acx100usb_set_rx_mode(struct net_device *);
-static void init_network_device(struct net_device *);
+static int init_network_device(struct net_device *);
 static int acx100usb_boot(struct usb_device *);
 void acx100usb_tx_data(wlandevice_t *,struct txdescriptor *);
 static void acx100usb_prepare_tx(wlandevice_t *,struct txdescriptor *);
@@ -405,6 +405,12 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 	struct usb_endpoint_descriptor *epdesc;
 	struct usb_interface_descriptor *ifdesc;
 	int i,j,numep;
+#if USB_24
+	void *res = NULL;
+#else
+	int res = 0;
+#endif
+
 	FN_ENTER;
 	/* ---------------------------------------------
 	** First check if this is the "unbooted" hardware
@@ -422,10 +428,11 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		** --------------------------------------------- */
 		acxlog(L_INIT, "Finished booting, returning from probe().\n");
 #if USB_24
-		return NULL;
+		res = NULL;
 #else
-		return 0; /* is that ok?? */
+		res = 0; /* is that ok?? */
 #endif
+		goto end;
 	}
 	if ((usbdev->descriptor.idVendor==ACX100_VENDOR_ID)&&(usbdev->descriptor.idProduct==ACX100_PRODUCT_ID_BOOTED)) {
 		/* ---------------------------------------------
@@ -434,11 +441,12 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		priv = kmalloc(sizeof(struct wlandevice),GFP_KERNEL);
 		if (!priv) {
 			printk(KERN_WARNING SHORTNAME ": could not allocate %d bytes memory for device driver context, giving up.\n",sizeof(struct wlandevice));
-			return OUTOFMEM;
+			res = OUTOFMEM;
+			goto end;
 		}
 		memset(priv,0,sizeof(wlandevice_t));
 		priv->chip_type = CHIPTYPE_ACX100;
-		priv->radio_type = RADIO_RFMD_11; /* FIXME: correct? FIXME: should be read from register (via firmware) using standard ACX code */
+		priv->radio_type = RADIO_MAXIM_0D; /* FIXME: should be read from register (via firmware) using standard ACX code */
 		priv->usbdev=usbdev;
 		/* ---------------------------------------------
 		** Initialize the device context and also check
@@ -486,7 +494,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		** ------------------------------------------ */
 		txbufsize=sizeof(acx100_usb_txfrm_t);
 		rxbufsize=sizeof(acx100_usbin_t);
-		rxbufsize&=0xFFFFFFC0; /* make it a multiply of 6ty fucking 4 ! */
+		rxbufsize&=~0x3f; /* make it a multiply of 6ty fucking 4 ! */
 		priv->rxtruncsize=0;
 		priv->rxtruncation=0;
 		printk(KERN_INFO SHORTNAME "txbufsize=%d rxbufsize=%d\n",txbufsize,rxbufsize);
@@ -506,7 +514,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		if ((dev = kmalloc(sizeof(struct net_device),GFP_ATOMIC))==NULL) {
 			printk(KERN_WARNING SHORTNAME ": failed to alloc netdev\n");
 			kfree(priv);
-			return OUTOFMEM;
+			res = OUTOFMEM;
+			goto end;
 		}
 		/* ---------------------------------------------
 		** Setup network device
@@ -523,7 +532,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 			printk(KERN_WARNING SHORTNAME ": failed to allocate URB\n");
 			kfree(dev);
 			kfree(priv);
-			return OUTOFMEM;
+			res = OUTOFMEM;
+			goto end;
 		}
 		/* ---------------------------------------------
 		** Setup URBs for bulk-in messages
@@ -536,7 +546,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 				usb_free_urb(priv->ctrl_urb);
 				kfree(dev);
 				kfree(priv);
-				return OUTOFMEM;
+				res = OUTOFMEM;
+				goto end;
 			}
 			priv->bulkrx_urbs[i]->status=0;
 		}
@@ -552,7 +563,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 				for (i=0;i<ACX100_USB_NUM_BULK_URBS;i++) usb_free_urb(priv->bulkrx_urbs[i]);
 				kfree(dev);
 				kfree(priv);
-				return OUTOFMEM;
+				res = OUTOFMEM;
+				goto end;
 			}
 			priv->bulktx_urbs[i]->status=0;
 		}
@@ -570,7 +582,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 				usb_free_urb(priv->bulktx_urbs[i]);
 			}
 			kfree(priv);
-			return OUTOFMEM;
+			res = OUTOFMEM;
+			goto end;
 		}
 #if USB_24 == 0
 		usb_set_intfdata(intf, priv);
@@ -590,25 +603,30 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 				usb_free_urb(priv->bulktx_urbs[i]);
 			}	
 			kfree(priv);
-			return OUTOFMEM;
+			res = OUTOFMEM;
+			goto end;
 		}
 		/* --------------------------------------
 		** Everything went OK, we are happy now
 		** ----------------------------------- */
 #if USB_24
-		return priv;
+		res = priv;
 #else
-		return 0;
+		res = 0;
 #endif
+		goto end;
 	}
 	/* --------------------------------------
 	** no device we could handle, return NULL
 	** -------------------------------------- */
 #if USB_24
-	return NULL;
+	res = NULL;
 #else
-	return -EIO;
+	res = -EIO;
 #endif
+end:
+	FN_EXIT(1, (int)res);
+	return res;
 }
 
 
@@ -723,9 +741,9 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 static int acx100usb_boot(struct usb_device *usbdev)
 {
 	unsigned int offset=8,len,inpipe,outpipe;
-	UINT32 size;
+	u32 size;
 	int result;
-	UINT16 *csptr;
+	u16 *csptr;
 	char filename[128],*firmware,*usbbuf;
 	FN_ENTER;
 	usbbuf = kmalloc(ACX100_USB_RWMEM_MAXLEN,GFP_KERNEL);
@@ -759,10 +777,10 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	while (offset<size) {
 		if ((size-offset)>=(ACX100_USB_RWMEM_MAXLEN)) len=ACX100_USB_RWMEM_MAXLEN;
 		else len=size-offset;
-		acxlog(L_INIT,"uploading firmware (%d bytes, offset=%d size=%d)\n",len,offset,size);
+		acxlog(L_INIT,"uploading firmware (%d bytes, offset=%d)\n",len,offset);
 		result=0;
 		memcpy(usbbuf,firmware+offset,len);
-		result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,(UINT16)(size-8),0,usbbuf,len,3000);
+		result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,(u16)(size-8),0,usbbuf,len,3000);
 		offset+=len;
 		if (result<0) {
 #ifdef ACX_DEBUG
@@ -779,7 +797,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	** finally, send the checksum and reboot
 	** the device...
 	** -------------------------------------- */
-	csptr=(UINT16 *)firmware;
+	csptr=(u16 *)firmware;
 	result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,csptr[0],csptr[1],NULL,0,3000); /* this triggers the reboot ? */
 	if (result<0) {
 		printk(KERN_ERR SHORTNAME "error %d during tx of checksum, aborting\n",result);
@@ -795,7 +813,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		return(result);
 	}
 	vfree(firmware);
-	if (((UINT16 *)usbbuf)[0]!=0x10) {
+	if (((u16 *)usbbuf)[0]!=0x10) {
 		kfree(usbbuf);
 		printk(KERN_ERR SHORTNAME "invalid checksum?\n");
 		return(-EINVAL);
@@ -819,7 +837,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 **  Basic setup of a network device for use with the WLAN device.
 ** ------------------------------------------------------------------------- */
 
-static void init_network_device(struct net_device *dev) {
+static int init_network_device(struct net_device *dev) {
 	int result=0;
 	wlandevice_t *priv;
 	/* --------------------------------------
@@ -852,9 +870,10 @@ static void init_network_device(struct net_device *dev) {
 	dev->watchdog_timeo = 4 * HZ;        /* 400 */
 #endif
 	result=acx_init_mac(dev, 1);
-	if (!result) {
+	if (OK == result) {
 	  SET_MODULE_OWNER(dev);
 	}
+	return result;
 }
 
 
@@ -886,6 +905,8 @@ static int acx100usb_open(struct net_device *dev)
 	** put the ACX100 out of sleep mode
 	** ------------------------------ */
 	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
+
+	acx_init_task_scheduler(priv);
 
 	init_timer(&(priv->mgmt_timer));
 	priv->mgmt_timer.function=acx_timer;
@@ -927,6 +948,7 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
 	netdevice_t *dev = priv->netdev;
 	struct sk_buff *skb;
+
 	FN_ENTER;
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) {
 		if ((skb = acx_rxdesc_to_ether(priv, rxdesc))) {
@@ -1241,11 +1263,12 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	int bufindex,txsize,ucode,size;
 	unsigned long flags;
 	acx100_usb_txfrm_t *buf;
-	UINT8 *addr;
+	const u8 *addr;
 	struct usb_device *usbdev;
 	unsigned int outpipe;
 	struct txhostdescriptor *header,*payload;
 	TIWLAN_DC *ticontext;
+
 	FN_ENTER;
 	priv->currentdesc = desc;
 	ticontext=&(priv->dc);
@@ -1268,13 +1291,13 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	}
 	priv->bulktx_states[bufindex]=1;
 	priv->usb_free_tx--;
-	acxlog(L_DEBUG,"using buf #%d (free=%d) len=%d\n",bufindex,priv->usb_free_tx,header->length+payload->length);
+	acxlog(L_DEBUG,"using buf #%d (free=%d) len=%d\n",bufindex,priv->usb_free_tx,le16_to_cpu(header->length)+le16_to_cpu(payload->length));
 	/* ----------------------------------------------
 	** concatenate header and payload into USB buffer
 	** ------------------------------------------- */
-	acxlog(L_XFER,"tx_data: headerlen=%d  payloadlen=%d\n",header->length,payload->length);
+	acxlog(L_XFER,"tx_data: headerlen=%d  payloadlen=%d\n",le16_to_cpu(header->length),le16_to_cpu(payload->length));
 	buf=&(priv->bulkouts[bufindex].txfrm);
-	size=header->length + payload->length;
+	size=le16_to_cpu(header->length) + le16_to_cpu(payload->length);
 	if (size>txbufsize) {
 		printk(KERN_WARNING SHORTNAME "error, USB buffer smaller than total data to send (%d vs. %d) -> frame dropped\n",size,txbufsize);
 		priv->bulktx_states[bufindex]=0;
@@ -1282,12 +1305,12 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 		spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
 		return;
 	}
-	memcpy(&(buf->data),header->data,header->length);
-	memcpy(((char *)&(buf->data))+header->length,payload->data,payload->length);
+	memcpy(&(buf->data),header->data,le16_to_cpu(header->length));
+	memcpy(((char *)&(buf->data))+le16_to_cpu(header->length),payload->data,le16_to_cpu(payload->length));
 	/* ----------------------------------------------
 	** fill the USB transfer header
 	** ------------------------------------------- */
-	buf->hdr.desc=ACX100_USB_TX_DESC;
+	buf->hdr.desc=cpu_to_le16(ACX100_USB_TX_DESC);
 	buf->hdr.MPDUlen=cpu_to_le16(size);
 	buf->hdr.ctrl1=0;
 	buf->hdr.ctrl2=0;
@@ -1298,7 +1321,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.txRate=desc->u.r1.rate;
 	buf->hdr.index=1;
 	buf->hdr.dataLength=cpu_to_le16(size|((buf->hdr.txRate)<<24));
-	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t *)header->data)->a3.fc)==WLAN_FTYPE_DATA) {
+	if (WLAN_GET_FC_FTYPE(ieee2host16(((p80211_hdr_t *)header->data)->a3.fc))==WLAN_FTYPE_DATA) {
 		SET_BIT(buf->hdr.hostData, (ACX100_USB_TXHI_ISDATA<<16));
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
@@ -1515,6 +1538,7 @@ static int acx100usb_stop(struct net_device *dev)
 	if (!acx_queue_stopped(dev)) {
 		acx_stop_queue(dev, "on iface stop");
 	}
+	acx_flush_task_scheduler();
 	/* --------------------------------
 	** mark the device as DOWN
 	** ----------------------------- */
@@ -1601,7 +1625,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** if the device is otherwise locked,
 	** bail-out...
 	** ----------------------------------- */
-	if (acx_lock(priv, &flags))
+	if (0 != acx_lock(priv, &flags))
 		return 1;
 	/* --------------------------------------
 	** if the queue is halted, there is no point
@@ -1640,7 +1664,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	acx_stop_queue(dev, "during Tx");
 #endif
 #if UNUSED
-	if (acx_lock(priv,&flags)) ...
+	if (0 != acx_lock(priv,&flags)) ...
 
 	memset(pb, 0, sizeof(wlan_pb_t) /*0x14*4 */ );
 

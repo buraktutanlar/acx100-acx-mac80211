@@ -48,6 +48,6 @@
 
 /* functions */
 
-void acx_select_io_register_set(wlandevice_t *priv, UINT16 chip_type);
+void acx_select_io_register_set(wlandevice_t *priv, u16 chip_type);
 
 #endif /* __ACX_IOREGISTER_H */

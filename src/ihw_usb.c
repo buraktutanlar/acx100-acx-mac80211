@@ -99,7 +99,7 @@ static void acx100usb_control_complete(struct urb *);
 static void acx100usb_control_complete(struct urb *, struct pt_regs *);
 #endif
 
-int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
+int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,int paramlen,u32 timeout) {
 	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->usbin);
 	int ucode;
 	struct usb_device *usbdev;
@@ -306,7 +306,7 @@ static short CtlLengthDot11[0x14] = {
 
 int acx_configure(wlandevice_t *priv, void *pdr, short type)
 {
-  UINT16 len;
+  u16 len;
   /* ----------------------------------------------------
   ** check if ACX100 control command or if 802.11 command
   ** ------------------------------------------------- */
@@ -359,7 +359,7 @@ int acx_configure_length(wlandevice_t *priv, void *pdr,short type,short len) {
 
 int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 {
-  UINT16 len;
+  u16 len;
   /* ----------------------------------------------------
   ** check if ACX100 control command or if 802.11 command
   ** ------------------------------------------------- */
@@ -425,7 +425,7 @@ inline int acx_is_mac_address_zero(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
+inline int acx_is_mac_address_equal(u8 *one, u8 *two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
 		return NOT_OK; /* no match */
@@ -451,7 +451,7 @@ inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_is_mac_address_group(mac_t *mac)
+inline u8 acx_is_mac_address_group(mac_t *mac)
 {
 	return mac->vala & 1;
 }
@@ -473,7 +473,7 @@ inline UINT8 acx_is_mac_address_group(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx_is_mac_address_directed(mac_t *mac)
+u8 acx_is_mac_address_directed(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return 0;
@@ -499,7 +499,7 @@ UINT8 acx_is_mac_address_directed(mac_t *mac)
 *
 *----------------------------------------------------------------*/
 static const unsigned char bcast[ETH_ALEN] ={ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-inline int acx_is_mac_address_broadcast(const UINT8 * const address)
+inline int acx_is_mac_address_broadcast(const u8 * const address)
 {
 	return !memcmp(address, bcast, ETH_ALEN);
 }
@@ -550,7 +550,7 @@ inline int acx_is_mac_address_multicast(mac_t *mac)
 *
 *----------------------------------------------------------------*/
 
-void acx_log_mac_address(int level, UINT8 * mac, const char* tail) {
+void acx_log_mac_address(int level, u8 * mac, const char* tail) {
 	if (debug & level) {
 		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
@@ -577,7 +577,7 @@ void acx_log_mac_address(int level, UINT8 * mac, const char* tail) {
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_power_led(wlandevice_t *priv, UINT8 enable) {
+void acx_power_led(wlandevice_t *priv, u8 enable) {
   /*
   if (enable)
     acx_write_reg16(priv, 0x290, acx_read_reg16(priv, 0x290) & ~0x0800);

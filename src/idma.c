@@ -89,8 +89,8 @@
 
 #define MINFREE_TX 3
 
-static char *acx_get_packet_type_string(UINT16 fc);
-void acx_dump_bytes(void *, int);
+static const char *acx_get_packet_type_string(u16 fc);
+void acx_dump_bytes(const void *, int);
 #if (WLAN_HOSTIF==WLAN_USB)
 extern void acx100usb_tx_data(wlandevice_t *,void *);
 #endif
@@ -104,7 +104,7 @@ static inline void *acx_alloc_coherent(struct pci_dev *hwdev, size_t size, dma_a
 		static int warn_count = 0;
 
 		if (warn_count++ < 1)
-			acxlog(0xffff, "WARNING: using old PCI-specific DMA allocation, may fail, out-of-mem!! Upgrade kernel if it does...\n");
+			acxlog(0xffff, "WARNING: using old PCI-specific DMA allocation, may fail with out-of-mem!! Upgrade kernel if it does...\n");
 		return pci_alloc_consistent(hwdev, size, dma_handle);
 	}
 #endif
@@ -197,7 +197,7 @@ static void acx_free_desc_queues(TIWLAN_DC *pDc)
 *----------------------------------------------------------------*/
 
 /* NB: this table maps RATE111 bits to ACX100 tx descr constants */
-static const UINT8 bitpos2rate100[] = {
+static const u8 bitpos2rate100[] = {
 	RATE100_1	,
 	RATE100_2	,
 	RATE100_5	,
@@ -215,6 +215,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	struct txrate_ctrl *txrate;
 	struct txhostdescriptor *header;
 	struct txhostdescriptor *payload;
+	u8 Ctl_8, Ctl2_8;
 #if (WLAN_HOSTIF!=WLAN_USB)
 	unsigned long flags;
 #endif
@@ -228,6 +229,12 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	/* need to protect access to Ctl field */
 	spin_lock_irqsave(&priv->dc.tx_lock, flags);
 #endif
+	/* modify flag status in separate variable to be able to write it back
+	 * in one big swoop later (also in order to have less device memory
+	 * accesses) */
+	Ctl_8 = tx_desc->Ctl_8;
+	Ctl2_8 = tx_desc->Ctl2_8;
+	
 	/* DON'T simply set Ctl field to 0 here globally,
 	 * it needs to maintain a consistent flag status (those are state flags!!),
 	 * otherwise it may lead to severe disruption. Only set or reset particular
@@ -240,15 +247,15 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	 * with acx100, so we should find out proper flag management soon
 	 * instead of doing such crude hacks */
 	if (CHIPTYPE_ACX111 == priv->chip_type) {
-		tx_desc->Ctl_8 = 0;
+		Ctl_8 = 0;
 	}
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
 	if (tx_desc->total_length > priv->rts_threshold)
-		tx_desc->Ctl2_8 = DESC_CTL2_RTS;
+		Ctl2_8 = DESC_CTL2_RTS;
 	else
-		tx_desc->Ctl2_8 = 0;
+		Ctl2_8 = 0;
 
 	/* TODO: we really need ASSOCIATED_TO_AP/_TO_IBSS */
 	if(priv->status == ISTATUS_4_ASSOCIATED
@@ -265,33 +272,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
  
 	tx_desc->fixed_size.s.txc = txrate; /* used in tx cleanup routine for auto rate and accounting */
  
-	if (CHIPTYPE_ACX100 == priv->chip_type) {
-		/* FIXME: this expensive calculation part should be stored
-		 * in advance whenever rate config changes! */
-
-		/* set rate */
-		int n = 0;
-		UINT16 t = txrate->cur;
-		while(t>1) { t>>=1; n++; }
-		/* Now n == highest set bit number */
-		if(n>=sizeof(bitpos2rate100) || bitpos2rate100[n]==0) {
-			printk(KERN_ERR "acx_dma_tx_data: driver BUG! n=%d. please report\n", n);
-			n = 0;
-		}
-
-		n = bitpos2rate100[n];
-		if(txrate->pbcc511) {
-			if(n==RATE100_5 || n==RATE100_11)
-				n |= RATE100_PBCC511;
-		}
-		tx_desc->u.r1.rate = n;
- 
-		if(peer->shortpre && (txrate->cur != RATE111_1))
-			SET_BIT(tx_desc->Ctl_8, ACX100_CTL_PREAMBLE); /* set Short Preamble */
-
-		/* set autodma and reclaim and 1st mpdu */
-		SET_BIT(tx_desc->Ctl_8, ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG);
-	} else { /* ACX111 */
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
 		if (txrate->do_auto)
 			tx_desc->u.r2.rate111 = txrate->cur;
 		else
@@ -299,7 +280,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			/* need to limit our currently selected rate set
 			 * to the highest rate */
 			int n = 0;
-			UINT16 t = txrate->cur;
+			u16 t = txrate->cur;
 			while(t>1) { t>>=1; n++; }
 			while(n>0) { t<<=1; n--; }
 			/* now we isolated the highest bit */
@@ -327,6 +308,32 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		}
 		
 		header->length += payload->length;
+	} else { /* ACX100 */
+		/* FIXME: this expensive calculation part should be stored
+		 * in advance whenever rate config changes! */
+
+		/* set rate */
+		int n = 0;
+		u16 t = txrate->cur;
+		while(t>1) { t>>=1; n++; }
+		/* Now n == highest set bit number */
+		if(n>=sizeof(bitpos2rate100) || bitpos2rate100[n]==0) {
+			printk(KERN_ERR "acx_dma_tx_data: driver BUG! n=%d. please report\n", n);
+			n = 0;
+		}
+
+		n = bitpos2rate100[n];
+		if(txrate->pbcc511) {
+			if(n==RATE100_5 || n==RATE100_11)
+				n |= RATE100_PBCC511;
+		}
+		tx_desc->u.r1.rate = n;
+ 
+		if(peer->shortpre && (txrate->cur != RATE111_1))
+			SET_BIT(Ctl_8, ACX100_CTL_PREAMBLE); /* set Short Preamble */
+
+		/* set autodma and reclaim and 1st mpdu */
+		SET_BIT(Ctl_8, ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG);
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -334,55 +341,65 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	wmb(); /* make sure everything else is written */
 	CLEAR_BIT(header->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 	CLEAR_BIT(payload->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
-	CLEAR_BIT(tx_desc->Ctl_8, ACX100_CTL_OWN);
+	CLEAR_BIT(Ctl_8, ACX100_CTL_OWN);
+
+	/* write back modified flags */
+	tx_desc->Ctl2_8 = Ctl2_8;
+	tx_desc->Ctl_8 = Ctl_8;
+
 	spin_unlock_irqrestore(&priv->dc.tx_lock, flags);
 
 	tx_desc->tx_time = cpu_to_le32(jiffies);
 	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_TXPRC);
 #else
+	/* write back modified flags */
+	tx_desc->Ctl2_8 = Ctl2_8;
+	tx_desc->Ctl_8 = Ctl_8;
+
 	tx_desc->tx_time = cpu_to_le32(jiffies);
 	acx100usb_tx_data(priv, tx_desc);
 #endif
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
 	 * Do separate logs for acx100/111 to have human-readable rates */
-	if (CHIPTYPE_ACX100 == priv->chip_type)
-		acxlog(L_XFER | L_DATA,
-			"tx: pkt (%s): len %i (%i/%i) mode %d rate %03d%s status %d\n",
-			acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
-			tx_desc->total_length,
-			header->length,
-			payload->length,
-			priv->macmode_joined,
-			tx_desc->u.r1.rate,
-			(tx_desc->Ctl_8 & ACX100_CTL_PREAMBLE) ? "(SPr)" : "",
-			priv->status);
-	else
-		acxlog(L_XFER | L_DATA,
-			"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x%s status %d\n",
-			acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
-			tx_desc->total_length,
-			header->length,
-			payload->length,
-			priv->macmode_joined,
-			tx_desc->u.r2.rate111,
-			(tx_desc->u.r2.rate111 & RATE111_SHORTPRE) ? "(SPr)" : "",
-			priv->status);
+	if (unlikely(debug & (L_XFER | L_DATA))) {
+		if (CHIPTYPE_ACX111 == priv->chip_type)
+			acxlog(L_XFER | L_DATA,
+				"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x%s status %d\n",
+				acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
+				tx_desc->total_length,
+				header->length,
+				payload->length,
+				priv->macmode_joined,
+				tx_desc->u.r2.rate111,
+				(tx_desc->u.r2.rate111 & RATE111_SHORTPRE) ? "(SPr)" : "",
+				priv->status);
+		else
+			acxlog(L_XFER | L_DATA,
+				"tx: pkt (%s): len %i (%i/%i) mode %d rate %03d%s status %d\n",
+				acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
+				tx_desc->total_length,
+				header->length,
+				payload->length,
+				priv->macmode_joined,
+				tx_desc->u.r1.rate,
+				(Ctl_8 & ACX100_CTL_PREAMBLE) ? "(SPr)" : "",
+				priv->status);
 
-	if (unlikely(debug & L_DATA))
-	{
-		acxlog(L_DATA, "tx: 802.11 header[%d]: ", header->length);
-		acx_dump_bytes(header->data, header->length);
-		acxlog(L_DATA, "tx: 802.11 payload[%d]: ", payload->length);
-		acx_dump_bytes(payload->data, payload->length);
+		if (debug & L_DATA) {
+			acxlog(L_DATA, "tx: 802.11 header[%d]: ", header->length);
+			acx_dump_bytes(header->data, header->length);
+			acxlog(L_DATA, "tx: 802.11 payload[%d]: ", payload->length);
+			acx_dump_bytes(payload->data, payload->length);
+		}
 	}
 	FN_EXIT(0, OK);
 }
 
-static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
+static void acx_handle_tx_error(wlandevice_t *priv, const txdesc_t *pTxDesc)
 {
-	char *err = "unknown error";
-	static UINT16 retry_errors = 0;
+	const char *err = "unknown error";
+	static unsigned int retry_errors = 0;
 
 	/* hmm, should we handle this as a mask
 	 * of *several* bits?
@@ -438,16 +455,13 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			 * DISABLE_TX and DISABLE_RX in order to perhaps
 			 * have more impact. */
 			if (++retry_errors % 4 == 0) {
-#if (WLAN_HOSTIF!=WLAN_USB)
 				if (retry_errors < 20)
 					printk(KERN_WARNING "several excessive Tx retry errors occurred, attempting to recalibrate the radio!! This radio drift *might* be due to increasing card temperature, so you may want to verify proper card temperature, since recalibration might delay card over-temperature failure until it's too late (final fatal card damage). Just a (over?)cautious warning...\n");
 				else
 				if (retry_errors == 20)
 					printk(KERN_WARNING "several radio recalibrations occurred, DISABLING notification message.\n");
 
-				SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-				acx_schedule_after_interrupt_task(priv);
-#endif
+				acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 			}
 			break;
 		case 0x40:
@@ -459,11 +473,14 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.misc++;
 			break;
 	}
-	acxlog(L_STD, "tx: error occurred (0x%02X)!! (%s)\n", pTxDesc->error, err);
 	priv->stats.tx_errors++;
+	if (priv->stats.tx_errors <= 20)
+		acxlog(L_STD, "tx: error 0x%02X! (%s)\n", pTxDesc->error, err);
+	else
+		acxlog(L_STD, "tx: error 0x%02X!\n", pTxDesc->error);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	/* TODO critical!! is this block valid? */
+	/* TODO FIXME critical!! is this block valid? */
 	/* let card know there is work to do */
 	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_TXPRC);
 #endif
@@ -502,8 +519,8 @@ In theory you can implement it, but so far it is considered not worth doing.
 */
 
 /* maps acx100 tx descr rate field to acx111 one */
-static UINT16
-rate100to111(UINT8 r)
+static u16
+rate100to111(u8 r)
 {
 	switch(r) {
 	case RATE100_1:	return RATE111_1;
@@ -520,9 +537,9 @@ rate100to111(UINT8 r)
 }
 
 static void
-do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 sent_rate, UINT8 error)
+do_handle_txrate_auto(struct txrate_ctrl *txrate, u16 sent_rate, u8 error)
 {
-	UINT16 cur = txrate->cur;
+	u16 cur = txrate->cur;
 	int slower_rate_was_used;
 
 	acxlog(L_DEBUG, "tx: rate mask %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
@@ -580,15 +597,15 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 sent_rate, UINT8 error)
 static void
 acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, txdesc_t *pTxDesc)
 {
-	UINT16 rate;
+	u16 rate;
  
-	if(CHIPTYPE_ACX100 == priv->chip_type) {
-		rate = rate100to111(pTxDesc->u.r1.rate);
-	 } else {
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
 		int n = 0;
 		rate = pTxDesc->u.r2.rate111 & 0x1fff;
 		while(rate>1) { rate>>=1; n++; }
 		rate = 1<<n;
+	 } else {
+		rate = rate100to111(pTxDesc->u.r1.rate);
 	}
 	/* rate has only one bit set now, corresponding to tx rate 
 	** which was used by hardware to tx this particular packet */
@@ -614,22 +631,19 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, txdesc_t *pT
 *
 *----------------------------------------------------------------*/
 
-static inline void acx_log_txbuffer(TIWLAN_DC *pDc)
+static inline void acx_log_txbuffer(const TIWLAN_DC *pDc)
 {
 	unsigned int i;
-	txdesc_t *pTxDesc;
+	const txdesc_t *pTxDesc;
 
 	FN_ENTER;
-	if (debug & L_DEBUG) /* we don't want this to be in L_BUFT, too */
+	/* no locks here, since it's entirely non-critical code */
+	pTxDesc = pDc->pTxDescQPool;
+	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
-		/* no locks here, since it's entirely non-critical code */
-		pTxDesc = pDc->pTxDescQPool;
-		for (i = 0; i < pDc->tx_pool_count; i++)
-		{
-			if ((pTxDesc->Ctl_8 & DESC_CTL_DONE) == DESC_CTL_DONE)
-				acxlog(L_DEBUG, "tx: buf %d done\n", i);
-			pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
-		}
+		if ((pTxDesc->Ctl_8 & DESC_CTL_DONE) == DESC_CTL_DONE)
+			acxlog(L_DEBUG, "tx: buf %d done\n", i);
+		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
 	FN_EXIT(0, OK);
 }
@@ -672,15 +686,15 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 {
 	TIWLAN_DC *pDc = &priv->dc;
 	txdesc_t *pTxDesc;
-	UINT finger, watch;
-	UINT8 ack_failures, rts_failures, rts_ok; /* keep old desc status */
-	UINT16 r111;
-	UINT16 num_cleaned = 0;
-	UINT16 num_processed = 0;
+	unsigned int finger, watch;
+	u8 ack_failures, rts_failures, rts_ok; /* keep old desc status */
+	u16 r111;
+	unsigned int num_cleaned = 0, num_processed = 0;
 
 	FN_ENTER;
 
-	acx_log_txbuffer(pDc);
+	if (debug & L_DEBUG)
+		acx_log_txbuffer(pDc);
 	acxlog(L_BUFT, "tx: cleaning up bufs from %d\n", pDc->tx_tail);
 
 #define OLD_LOCKING 1
@@ -788,7 +802,7 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 {
 	TIWLAN_DC *pDc = &priv->dc;
 	txdesc_t *pTxDesc;
-	UINT i;
+	unsigned int i;
 
 	FN_ENTER;
 
@@ -831,7 +845,7 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 *
 *----------------------------------------------------------------*/
 
-static void acx_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
+static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
 {
 	unsigned int packet_len = le16_to_cpu(buf->mac_cnt_rcvd) & 0xfff;
 	p80211msg_lnxind_wlansniffrm_t *msg;
@@ -971,10 +985,10 @@ static void acx_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 /*
  * Calculate level like the feb 2003 windows driver seems to do
  */
-UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
+u8 acx_signal_to_winlevel(u8 rawlevel)
 {
-	/* UINT8 winlevel = (UINT8) (0.5 + 0.625 * rawlevel); */
-	UINT8 winlevel = (UINT8) ((4 + (rawlevel * 5)) / 8);
+	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
+	u8 winlevel = (u8) ((4 + (rawlevel * 5)) / 8);
 
 	if(winlevel>100)
 		winlevel=100;
@@ -982,7 +996,7 @@ UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
 	return winlevel;
 }
 
-UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise)
+u8 acx_signal_determine_quality(u8 signal, u8 noise)
 {
 	int qual;
 
@@ -992,7 +1006,7 @@ UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise)
 		return 100;
 	if (qual < 0)
 		return 0;
-	return (UINT8)qual;
+	return (u8)qual;
 }
 
 /*----------------------------------------------------------------
@@ -1013,10 +1027,10 @@ UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise)
 *
 *----------------------------------------------------------------*/
 
-static inline void acx_log_rxbuffer(TIWLAN_DC *pDc)
+static inline void acx_log_rxbuffer(const TIWLAN_DC *pDc)
 {
 	unsigned int i;
-	struct rxhostdescriptor *pRxDesc;
+	const struct rxhostdescriptor *pRxDesc;
 
 	/* no FN_ENTER here, we don't want that */
 	if (unlikely(debug & L_BUFR))
@@ -1065,11 +1079,11 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 	struct rxhostdescriptor *RxHostPool;
 	TIWLAN_DC *pDc;
 	struct rxhostdescriptor *pRxHostDesc;
-	UINT16 buf_len;
-	int curr_idx;
+	u16 buf_len;
+	unsigned int curr_idx;
 	unsigned int count = 0;
 	p80211_hdr_t *buf;
-	int qual;
+	unsigned int qual;
 
 	FN_ENTER;
 
@@ -1116,10 +1130,10 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 
 		if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 			/* take into account additional header in front of packet */
-			if(priv->chip_type == CHIPTYPE_ACX111) {
-				buf = (p80211_hdr_t*)((UINT8*)&pRxHostDesc->data->buf + 8);
+			if(CHIPTYPE_ACX111 == priv->chip_type) {
+				buf = (p80211_hdr_t*)((u8*)&pRxHostDesc->data->buf + 8);
 			} else {
-				buf = (p80211_hdr_t*)((UINT8*)&pRxHostDesc->data->buf + 4);
+				buf = (p80211_hdr_t*)((u8*)&pRxHostDesc->data->buf + 4);
 			}
 
 		}
@@ -1178,7 +1192,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		 * address of the device that's managing our BSSID.
 		 * Disable it for now, since it removes information (levels
 		 * from different peers) and slows the Rx path. */
-		if (OK == acx_is_mac_address_equal(buf->a3.a2, priv->station_assoc.mac_addr) {
+		if (OK == acx_is_mac_address_equal(buf->a3.a2, priv->station_assoc.mac_addr)) {
 #endif
 			priv->wstats.qual.level = acx_signal_to_winlevel(pRxHostDesc->data->phy_level);
 			priv->wstats.qual.noise = acx_signal_to_winlevel(pRxHostDesc->data->phy_snr);
@@ -1241,18 +1255,17 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	wlandevice_t *priv = pDc->priv;
 	int res = 2;
 
-	UINT i;
+	unsigned int i;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT align_offs;
-	UINT alignment;
+	unsigned int align_offs, alignment;
 
 	struct framehdr *frame_hdr_phy;
-	UINT8 *frame_payload_phy;
+	u8 *frame_payload_phy;
 	struct txhostdescriptor *host_desc_phy;
 #endif
 
 	struct framehdr *frame_hdr;
-	UINT8 *frame_payload;
+	u8 *frame_payload;
 
 	struct txhostdescriptor *host_desc;
 
@@ -1324,7 +1337,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of TX host descriptor pool */
-	alignment = (UINT32) pDc->pTxHostDescQPool & 3;
+	alignment = (u32) pDc->pTxHostDescQPool & 3;
 	if (alignment) {
 		acxlog(L_STD, "%s: TxHostDescQPool not aligned properly\n", __func__);
 		align_offs = 4 - alignment;
@@ -1332,15 +1345,15 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		align_offs = 0;
 	}
 
-	host_desc = (struct txhostdescriptor *) ((UINT8 *) pDc->pTxHostDescQPool + align_offs);
-	host_desc_phy = (struct txhostdescriptor *) ((UINT8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
+	host_desc = (struct txhostdescriptor *) ((u8 *) pDc->pTxHostDescQPool + align_offs);
+	host_desc_phy = (struct txhostdescriptor *) ((u8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
 	frame_hdr_phy = (struct framehdr *) pDc->FrameHdrQPoolPhyAddr;
-	frame_payload_phy = (UINT8 *) pDc->TxBufferPoolPhyAddr;
+	frame_payload_phy = (u8 *) pDc->TxBufferPoolPhyAddr;
 #else
 	host_desc = pDc->pTxHostDescQPool;
 #endif
 	frame_hdr = pDc->pFrameHdrQPool;
-	frame_payload = (UINT8 *) pDc->pTxBufferPool;
+	frame_payload = (u8 *) pDc->pTxBufferPool;
 
 	for (i = 0; i < priv->TxQueueCnt*2 - 1; i++)
 	{
@@ -1348,9 +1361,9 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 			host_desc->data_phy = (ACX_PTR)cpu_to_le32(frame_hdr_phy);
 			frame_hdr_phy++;
-			host_desc->pNext = (ACX_PTR)cpu_to_le32(((UINT8 *) host_desc_phy + sizeof(struct txhostdescriptor)));
+			host_desc->pNext = (ACX_PTR)cpu_to_le32(((u8 *) host_desc_phy + sizeof(struct txhostdescriptor)));
 #endif
-			host_desc->data = (UINT8 *)frame_hdr;
+			host_desc->data = (u8 *)frame_hdr;
 			frame_hdr++;
 		} else {
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1365,7 +1378,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
-		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((UINT8 *) host_desc_phy + sizeof(struct txhostdescriptor)));
+		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) host_desc_phy + sizeof(struct txhostdescriptor)));
 		host_desc_phy++;
 #endif
 		host_desc++;
@@ -1377,7 +1390,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->data_phy = (ACX_PTR)cpu_to_le32(frame_payload_phy);
 	host_desc->desc_phy = host_desc_phy;
-	host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((UINT8 *) pDc->TxHostDescQPoolPhyAddr + align_offs));
+	host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) pDc->TxHostDescQPoolPhyAddr + align_offs));
 	/* host_desc->desc_phy_next = (struct txhostdescriptor *) pDc->TxHostDescQPoolPhyAddr; */
 #endif
 	res = 0;
@@ -1394,17 +1407,16 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 
-	UINT i;
-	UINT16 eth_body_len = WLAN_MAX_ETHFRM_LEN - WLAN_ETHHDR_LEN;
+	unsigned int i;
+	u16 eth_body_len = WLAN_MAX_ETHFRM_LEN - WLAN_ETHHDR_LEN;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT align_offs;
-	UINT alignment;
+	unsigned int align_offs, alignment;
 
-	UINT8 *frame_buffer_phy;
+	u8 *frame_buffer_phy;
 	struct txhostdescriptor *host_desc_phy;
 #endif
 
-	UINT8 *frame_buffer;
+	u8 *frame_buffer;
 	struct txhostdescriptor *host_desc;
 
 	FN_ENTER;
@@ -1465,7 +1477,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of TX host descriptor pool */
-	alignment = (UINT32) pDc->pTxHostDescQPool & 3;
+	alignment = (u32) pDc->pTxHostDescQPool & 3;
 	if (alignment) {
 		acxlog(L_STD, "%s: TxHostDescQPool not aligned properly\n", __func__);
 		align_offs = 4 - alignment;
@@ -1473,13 +1485,13 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		align_offs = 0;
 	}
 
-	host_desc = (struct txhostdescriptor *) ((UINT8 *) pDc->pTxHostDescQPool + align_offs);
-	host_desc_phy = (struct txhostdescriptor *) ((UINT8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
-	frame_buffer_phy = (UINT8 *) pDc->TxBufferPoolPhyAddr;
+	host_desc = (struct txhostdescriptor *) ((u8 *) pDc->pTxHostDescQPool + align_offs);
+	host_desc_phy = (struct txhostdescriptor *) ((u8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
+	frame_buffer_phy = (u8 *) pDc->TxBufferPoolPhyAddr;
 #else
 	host_desc = pDc->pTxHostDescQPool;
 #endif
-	frame_buffer = (UINT8 *) pDc->pTxBufferPool;
+	frame_buffer = (u8 *) pDc->pTxBufferPool;
 
 	for (i = 0; i < priv->TxQueueCnt*2 - 1; i++)
 	{
@@ -1492,7 +1504,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 			frame_buffer += sizeof(struct framehdr);
 #if (WLAN_HOSTIF!=WLAN_USB)
 			frame_buffer_phy += sizeof(struct framehdr);
-			host_desc->pNext = (ACX_PTR)((UINT8 *) host_desc_phy + sizeof(struct txhostdescriptor));
+			host_desc->pNext = (ACX_PTR)((u8 *) host_desc_phy + sizeof(struct txhostdescriptor));
 #endif
 		} else {
 			frame_buffer += eth_body_len;
@@ -1506,7 +1518,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
-		host_desc->desc_phy_next = (ACX_PTR)((UINT8 *) host_desc_phy + sizeof(struct txhostdescriptor));
+		host_desc->desc_phy_next = (ACX_PTR)((u8 *) host_desc_phy + sizeof(struct txhostdescriptor));
 		host_desc_phy++;
 #endif
 		host_desc++;
@@ -1519,7 +1531,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->data_phy = (ACX_PTR)frame_buffer_phy;
 	host_desc->desc_phy = host_desc_phy;
-	host_desc->desc_phy_next = (ACX_PTR)((UINT8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
+	host_desc->desc_phy_next = (ACX_PTR)((u8 *) pDc->TxHostDescQPoolPhyAddr + align_offs);
 #endif
 
 	FN_EXIT(0, 0);
@@ -1553,10 +1565,9 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 
-	UINT i;
+	unsigned int i;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT align_offs;
-	UINT alignment;
+	unsigned int align_offs, alignment;
 
 	struct rxhostdescriptor *host_desc_phy;
 	struct rxbuffer *data_phy;
@@ -1622,15 +1633,15 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of RX host descriptor pool */
-	if ((alignment = ((UINT32) pDc->pRxHostDescQPool) & 3)) {
+	if ((alignment = ((u32) pDc->pRxHostDescQPool) & 3)) {
 		acxlog(L_STD, "acx100_create_rx_host_desc_queue: RxHostDescQPool not aligned properly\n");
 		align_offs = 4 - alignment;
 	} else {
 		align_offs = 0;
 	}
 
-	host_desc = (struct rxhostdescriptor *) ((UINT8 *) pDc->pRxHostDescQPool + align_offs);
-	host_desc_phy = (struct rxhostdescriptor *) ((UINT8 *) pDc->RxHostDescQPoolPhyAddr + align_offs);
+	host_desc = (struct rxhostdescriptor *) ((u8 *) pDc->pRxHostDescQPool + align_offs);
+	host_desc_phy = (struct rxhostdescriptor *) ((u8 *) pDc->RxHostDescQPoolPhyAddr + align_offs);
 
 	priv->RxHostDescPoolStart = host_desc_phy;
 #else
@@ -1649,7 +1660,7 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 		CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
-		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((UINT8 *) host_desc_phy + sizeof(struct rxhostdescriptor)));
+		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) host_desc_phy + sizeof(struct rxhostdescriptor)));
 		host_desc_phy++;
 #endif
 		host_desc++;
@@ -1663,7 +1674,7 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 	CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->desc_phy = host_desc_phy;
-	host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((UINT8 *) pDc->RxHostDescQPoolPhyAddr + align_offs));
+	host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) pDc->RxHostDescQPoolPhyAddr + align_offs));
 #endif
 	result = 0;
 
@@ -1697,12 +1708,12 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 
-	UINT32 mem_offs;
-	UINT32 i;
+	u32 mem_offs;
+	u32 i;
 	struct txdescriptor *tx_desc;
 	struct txhostdescriptor *tx_hostdesc;
 
-	UINT hostmemptr; /* remains 0 in USB case */
+	dma_addr_t hostmemptr; /* remains 0 in USB case */
 
 	FN_ENTER;
 
@@ -1746,7 +1757,7 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 	mem_offs = pDc->ui32ACXTxQueueStart;
 	hostmemptr = pDc->TxHostDescQPoolPhyAddr;
 #else
-	mem_offs = (UINT32)pDc->pTxDescQPool;
+	mem_offs = (u32)pDc->pTxDescQPool;
 	hostmemptr = 0; /* will remain 0 for USB */
 #endif
 	tx_hostdesc = pDc->pTxHostDescQPool;
@@ -1760,6 +1771,8 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 		acxlog(L_DEBUG, "configure card tx descriptor = 0x%p, size: 0x%X\n", tx_desc, pDc->TxDescrSize);
 
 		/* pointer to hostdesc memory */
+		/* FIXME: type-incorrect assignment, might cause trouble
+		 * in some cases */
 		tx_desc->HostMemPtr = cpu_to_le32(hostmemptr);
 		/* initialise ctl */
 		tx_desc->Ctl_8 = DESC_CTL_INIT;
@@ -1775,16 +1788,16 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 #endif
 		/* go to the next */
 		mem_offs += pDc->TxDescrSize;
-		tx_desc = (struct txdescriptor *)(((UINT8 *)tx_desc) + pDc->TxDescrSize);
+		tx_desc = (struct txdescriptor *)(((u8 *)tx_desc) + pDc->TxDescrSize);
 	}
 	/* go to the last one */
-	tx_desc = (struct txdescriptor *)(((UINT8 *)tx_desc) - pDc->TxDescrSize);
+	tx_desc = (struct txdescriptor *)(((u8 *)tx_desc) - pDc->TxDescrSize);
 	/* tx_desc--; */
 	/* and point to the first making it a ring buffer */
 #if (WLAN_HOSTIF!=WLAN_USB)
 	tx_desc->pNextDesc = cpu_to_le32(pDc->ui32ACXTxQueueStart);
 #else
-	tx_desc->pNextDesc = cpu_to_le32((UINT32)pDc->pTxDescQPool);
+	tx_desc->pNextDesc = cpu_to_le32((u32)pDc->pTxDescQPool);
 #endif
 	FN_EXIT(0, 0);
 }
@@ -1811,23 +1824,23 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT32 mem_offs;
-	UINT32 i;
+	u32 mem_offs;
+	u32 i;
 	struct rxdescriptor *rx_desc;
 #endif
-	UINT8 ctl_init = 0x0;
+	u8 ctl_init = 0x0;
 
 	FN_ENTER;
 
-	if(priv->chip_type == CHIPTYPE_ACX100) {
-		ctl_init = ACX100_CTL_RECLAIM | ACX100_CTL_AUTODMA;
-	} else if(priv->chip_type == CHIPTYPE_ACX111) {
+	if (priv->chip_type == CHIPTYPE_ACX111) {
 		ctl_init = 0x0;
+	} else if (priv->chip_type == CHIPTYPE_ACX100) {
+		ctl_init = ACX100_CTL_RECLAIM | ACX100_CTL_AUTODMA;
 	}
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if(pDc->pRxDescQPool == NULL) { /* calculate it */
 		/* pRxDescQPool should be right AFTER Tx pool */
-		pDc->pRxDescQPool = (struct rxdescriptor *) ((UINT8 *) pDc->pTxDescQPool + (priv->TxQueueCnt * sizeof(struct txdescriptor)));
+		pDc->pRxDescQPool = (struct rxdescriptor *) ((u8 *) pDc->pTxDescQPool + (priv->TxQueueCnt * sizeof(struct txdescriptor)));
 	}
 #endif
 	pDc->rx_pool_count = priv->RxQueueCnt;
@@ -1880,9 +1893,9 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 *	FIXME: This function still needs a cleanup
 *----------------------------------------------------------------*/
 
-static int acx100_init_memory_pools(wlandevice_t *priv, acx_ie_memmap_t *mmt)
+static int acx100_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *mmt)
 {
-	UINT32 TotalMemoryBlocks;
+	u32 TotalMemoryBlocks;
         acx100_ie_memblocksize_t MemoryBlockSize;
 
         acx100_ie_memconfigoption_t MemoryConfigOption;
@@ -1920,7 +1933,7 @@ static int acx100_init_memory_pools(wlandevice_t *priv, acx_ie_memmap_t *mmt)
 
 
 	/* Declare start of the Rx host pool */
-	MemoryConfigOption.pRxHostDesc = cpu_to_le32((UINT32)priv->RxHostDescPoolStart);
+	MemoryConfigOption.pRxHostDesc = cpu_to_le32((u32)priv->RxHostDescPoolStart);
 	acxlog(L_DEBUG, "pRxHostDesc 0x%08x, RxHostDescPoolStart 0x%p\n", MemoryConfigOption.pRxHostDesc, priv->RxHostDescPoolStart);
 
 	/* 50% of the allotment of memory blocks go to tx descriptors */
@@ -2361,12 +2374,12 @@ static char type_string[32];	/* I *really* don't care that this is static,
 *
 *----------------------------------------------------------------*/
 
-static char *acx_get_packet_type_string(UINT16 fc)
+static const char *acx_get_packet_type_string(u16 fc)
 {
-	char *str_ftype = "UNKNOWN", *str_fstype = "UNKNOWN";
-	char *mgmt_arr[] = { "AssocReq", "AssocResp", "ReassocReq", "ReassocResp", "ProbeReq", "ProbeResp", "UNKNOWN", "UNKNOWN", "Beacon", "ATIM", "Disassoc", "Authen", "Deauthen" };
-	char *ctl_arr[] = { "PSPoll", "RTS", "CTS", "Ack", "CFEnd", "CFEndCFAck" };
-	char *data_arr[] = { "DataOnly", "Data CFAck", "Data CFPoll", "Data CFAck/CFPoll", "Null", "CFAck", "CFPoll", "CFAck/CFPoll" };
+	const char *str_ftype = "UNKNOWN", *str_fstype = "UNKNOWN";
+	static const char *mgmt_arr[] = { "AssocReq", "AssocResp", "ReassocReq", "ReassocResp", "ProbeReq", "ProbeResp", "UNKNOWN", "UNKNOWN", "Beacon", "ATIM", "Disassoc", "Authen", "Deauthen" };
+	static const char *ctl_arr[] = { "PSPoll", "RTS", "CTS", "Ack", "CFEnd", "CFEndCFAck" };
+	static const char *data_arr[] = { "DataOnly", "Data CFAck", "Data CFPoll", "Data CFAck/CFPoll", "Null", "CFAck", "CFPoll", "CFAck/CFPoll" };
 
 	FN_ENTER;
 	switch (WLAN_GET_FC_FTYPE(fc)) {
@@ -2391,10 +2404,10 @@ static char *acx_get_packet_type_string(UINT16 fc)
 	return type_string;
 }
 
-void acx_dump_bytes(void *data, int num)
+void acx_dump_bytes(const void *data, int num)
 {
   int i,remain=num;
-  unsigned char *ptr=(unsigned char *)data;
+  const unsigned char *ptr=(const unsigned char *)data;
 
   while (remain>0) {
     printk(KERN_WARNING);

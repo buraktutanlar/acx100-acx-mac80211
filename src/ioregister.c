@@ -60,7 +60,7 @@
  * an awful lot more space than simply always predefining for both
  * ACX100 and ACX111... */
 
-const UINT16 IO_ACX100[] =
+const u16 IO_ACX100[] =
 {
 	0x0000, /* IO_ACX_SOFT_RESET */
 	
@@ -102,7 +102,7 @@ const UINT16 IO_ACX100[] =
 	0x02d8 /* IO_ACX_ECPU_CTRL */
 };
 
-const UINT16 IO_ACX111[] =
+const u16 IO_ACX111[] =
 {
 	0x0000, /* IO_ACX_SOFT_RESET */
 
@@ -144,7 +144,7 @@ const UINT16 IO_ACX111[] =
 	0x0108, /* IO_ACX_ECPU_CTRL */
 };
 
-void acx_select_io_register_set(wlandevice_t *priv, UINT16 chip_type)
+void acx_select_io_register_set(wlandevice_t *priv, u16 chip_type)
 {
 	/* set the correct io resource list for the active chip */
 	if (CHIPTYPE_ACX100 == chip_type) {

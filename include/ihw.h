@@ -39,15 +39,15 @@
 #define __ACX_IHW_H
 
 typedef struct cmd {
-	UINT16 vala[0xc];
-	UINT valb;
-	UINT16 nul;
-	UINT16 valc;
+	u16 vala[0xc];
+	u32 valb;
+	u16 nul;
+	u16 valc;
 } cmd_t;
 
 typedef struct mac {
-	UINT32 vala;
-	UINT16 valb;
+	u32 vala;
+	u16 valb;
 } mac_t;
 
 #if (WLAN_HOSTIF!=WLAN_USB) /* must be used for non-USB only */
@@ -55,58 +55,58 @@ typedef struct mac {
 #ifdef IO_AS_MACROS
 #if ACX_IO_WIDTH == 32
 #define acx_read_reg32(priv, offset) \
-	readl((priv->iobase) + (offset))
+	readl(((priv)->iobase) + (offset))
 #define acx_write_reg32(priv, offset, val) \
-	writel((val), (priv->iobase) + (offset))
+	writel((val), ((priv)->iobase) + (offset))
 #else /* ACX_IO_WIDTH == 32 */
 #define acx_read_reg32(priv, offset) \
-	readw((priv->iobase) + (offset)) \
-	+ (readw((priv->iobase) + (offset) + 2) << 16)
+	readw(((priv)->iobase) + (offset)) \
+	+ (readw(((priv)->iobase) + (offset) + 2) << 16)
 #define acx_write_reg32(priv, offset, val) \
 	do { \
-		writew((val) & 0xffff, (priv->iobase) + (offset)); \
-		writew((val) >> 16, (priv->iobase) + (offset) + 2); \
+		writew((val) & 0xffff, ((priv)->iobase) + (offset)); \
+		writew((val) >> 16, ((priv)->iobase) + (offset) + 2); \
 	} while (0)
 #endif /* ACX_IO_WIDTH == 32 */
 #define acx_read_reg16(priv, offset) \
-	readw((priv->iobase) + (offset))
+	readw(((priv)->iobase) + (offset))
 #define acx_write_reg16(priv, offset, val) \
-	writew((val), (priv->iobase) + (offset))
+	writew((val), ((priv)->iobase) + (offset))
 #define acx_read_reg8(priv, offset) \
-	readb((priv->iobase) + (offset))
+	readb(((priv)->iobase) + (offset))
 #define acx_write_reg8(priv, offset, val) \
-	writeb((val), (priv->iobase) + (offset))
+	writeb((val), ((priv)->iobase) + (offset))
 #else /* IO_AS_MACROS */
-UINT32 acx_read_reg32(wlandevice_t *priv, UINT valb);
-void acx_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
-UINT16 acx_read_reg16(wlandevice_t *priv, UINT valb);
-void acx_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
-UINT8 acx_read_reg8(wlandevice_t *priv, UINT valb);
-void acx_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
+u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset);
+void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val);
+u16 acx_read_reg16(wlandevice_t *priv, unsigned int offset);
+void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val);
+u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset);
+void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
 #endif /* IO_AS_MACROS */
 #endif /* (WLAN_HOSTIF!=WLAN_USB) */
 
 void acx_get_info_state(wlandevice_t *priv);
 void acx_get_cmd_state(wlandevice_t *priv);
-void acx_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status);
+void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_status);
 
-int acx_issue_cmd(wlandevice_t *priv, UINT cmd, /*@null@*/ void *pcmdparam,
-		     int paramlen, UINT32 timeout);
+int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd, /*@null@*/ void *pcmdparam,
+		     unsigned int paramlen, u32 timeout);
 
 int acx_configure(wlandevice_t *priv, void *pdr, short type);
 int acx_configure_length(wlandevice_t *priv, void *pdr, short type,
 			    short length);
 int acx_interrogate(wlandevice_t *priv, void *pdr, short type);
 
-int acx_is_mac_address_zero(const mac_t *mac);
 void acx_clear_mac_address(const mac_t *mac);
-int acx_is_mac_address_equal(const UINT8 *one, const UINT8 *two);
-UINT8 acx_is_mac_address_group(const mac_t *mac);
-UINT8 acx_is_mac_address_directed(const mac_t *mac);
-void acx_set_mac_address_broadcast(UINT8 *address);
-int acx_is_mac_address_broadcast(const UINT8 *address);
-int acx_is_mac_address_multicast(const mac_t *mac);
-void acx_log_mac_address(int level, const UINT8 *mac, const char* tail);
+unsigned int acx_is_mac_address_zero(const mac_t *mac);
+unsigned int acx_is_mac_address_equal(const u8 *one, const u8 *two);
+unsigned int acx_is_mac_address_group(const mac_t *mac);
+unsigned int acx_is_mac_address_directed(const mac_t *mac);
+void acx_set_mac_address_broadcast(u8 *address);
+unsigned int acx_is_mac_address_broadcast(const u8 *address);
+unsigned int acx_is_mac_address_multicast(const mac_t *mac);
+void acx_log_mac_address(int level, const u8 *mac, const char *tail);
 
-void acx_power_led(wlandevice_t *priv, UINT8 enable);
+void acx_power_led(wlandevice_t *priv, u8 enable);
 #endif /* __ACX_IHW_H */

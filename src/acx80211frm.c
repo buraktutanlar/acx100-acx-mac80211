@@ -98,7 +98,7 @@
 * Arguments:
 *	buf	char buffer, destination for string format
 *		48 bit address.  Must be at least 18 bytes long.
-*	addr	UINT8 buffer containing the ieee802 48 bit address
+*	addr	u8 buffer containing the ieee802 48 bit address
 *		we're converting from.
 *
 * Returns:
@@ -111,7 +111,7 @@
 * STATUS: UNVERIFIED. NONV3.
 * 
 --------------------------------------------------------------*/
-void p802addr_to_str(char *buf, UINT8 *addr)
+void p802addr_to_str(char *buf, u8 *addr)
 {
 	int addrindex;
 	char c;
@@ -168,9 +168,9 @@ void acx_mgmt_encode_beacon(wlan_fr_beacon_t * f)
 	/*-- Fixed Fields ----*/
 	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_BEACON_OFF_TS);
-	f->bcn_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_BEACON_OFF_BCN_INT);
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_BEACON_OFF_CAPINFO);
 
 	f->len =
@@ -219,15 +219,15 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 	/*-- Fixed Fields ----*/
 	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_BEACON_OFF_TS);
-	f->bcn_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_BEACON_OFF_BCN_INT);
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_BEACON_OFF_CAPINFO);
 
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_BEACON_OFF_SSID);
-	while (((UINT8 *) ie_ptr) < (f->buf + f->len)) {
+	while (((u8 *) ie_ptr) < (f->buf + f->len)) {
 		switch (ie_ptr->eid) {
 		case WLAN_EID_SSID:
 			f->ssid = (wlan_ie_ssid_t *) ie_ptr;
@@ -259,7 +259,7 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 			break;
 		}
 		ie_ptr =
-		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
+		    (wlan_ie_t *) (((u8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
 }
 
@@ -385,7 +385,7 @@ void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t * f)
 	WLAN_ASSERT(f->len >= WLAN_DISASSOC_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->reason = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->reason = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_DISASSOC_OFF_REASON);
 
 	f->len =
@@ -429,7 +429,7 @@ void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->reason = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->reason = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_DISASSOC_OFF_REASON);
 
 	/*-- Information elements */
@@ -474,9 +474,9 @@ void acx_mgmt_encode_assocreq(wlan_fr_assocreq_t * f)
 	WLAN_ASSERT(f->len >= WLAN_ASSOCREQ_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_ASSOCREQ_OFF_CAP_INFO);
-	f->listen_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->listen_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				    + WLAN_ASSOCREQ_OFF_LISTEN_INT);
 
 	f->len = WLAN_HDR_A3_LEN +
@@ -524,15 +524,15 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_ASSOCREQ_OFF_CAP_INFO);
-	f->listen_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->listen_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				    + WLAN_ASSOCREQ_OFF_LISTEN_INT);
 
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_ASSOCREQ_OFF_SSID);
-	while (((UINT8 *) ie_ptr) < (f->buf + f->len)) {
+	while (((u8 *) ie_ptr) < (f->buf + f->len)) {
 		switch (ie_ptr->eid) {
 		case WLAN_EID_SSID:
 			f->ssid = (wlan_ie_ssid_t *) ie_ptr;
@@ -550,7 +550,7 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 			break;
 		}
 		ie_ptr =
-		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
+		    (wlan_ie_t *) (((u8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
 }
 
@@ -593,11 +593,11 @@ void acx_mgmt_encode_assocresp(wlan_fr_assocresp_t * f)
 	WLAN_ASSERT(f->len >= WLAN_ASSOCRESP_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_ASSOCRESP_OFF_CAP_INFO);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_ASSOCRESP_OFF_STATUS);
-	f->aid = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->aid = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			     + WLAN_ASSOCRESP_OFF_AID);
 
 	f->len =
@@ -642,11 +642,11 @@ void acx_mgmt_decode_assocresp(wlan_fr_assocresp_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_ASSOCRESP_OFF_CAP_INFO);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_ASSOCRESP_OFF_STATUS);
-	f->aid = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->aid = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			     + WLAN_ASSOCRESP_OFF_AID);
 
 	/*-- Information elements */
@@ -694,11 +694,11 @@ void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t * f)
 	WLAN_ASSERT(f->len >= WLAN_REASSOCREQ_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_REASSOCREQ_OFF_CAP_INFO);
-	f->listen_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->listen_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				    + WLAN_REASSOCREQ_OFF_LISTEN_INT);
-	f->curr_ap = (UINT8 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->curr_ap = (u8 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_REASSOCREQ_OFF_CURR_AP);
 
 	f->len =
@@ -747,17 +747,17 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_REASSOCREQ_OFF_CAP_INFO);
-	f->listen_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->listen_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				    + WLAN_REASSOCREQ_OFF_LISTEN_INT);
-	f->curr_ap = (UINT8 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->curr_ap = (u8 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_REASSOCREQ_OFF_CURR_AP);
 
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_REASSOCREQ_OFF_SSID);
-	while (((UINT8 *) ie_ptr) < (f->buf + f->len)) {
+	while (((u8 *) ie_ptr) < (f->buf + f->len)) {
 		switch (ie_ptr->eid) {
 		case WLAN_EID_SSID:
 			f->ssid = (wlan_ie_ssid_t *) ie_ptr;
@@ -775,7 +775,7 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 			break;
 		}
 		ie_ptr =
-		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
+		    (wlan_ie_t *) (((u8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
 }
 
@@ -818,11 +818,11 @@ void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t * f)
 	WLAN_ASSERT(f->len >= WLAN_REASSOCRESP_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_REASSOCRESP_OFF_CAP_INFO);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_REASSOCRESP_OFF_STATUS);
-	f->aid = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->aid = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			     + WLAN_REASSOCRESP_OFF_AID);
 
 	f->len =
@@ -867,11 +867,11 @@ void acx_mgmt_decode_reassocresp(wlan_fr_reassocresp_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_REASSOCRESP_OFF_CAP_INFO);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_REASSOCRESP_OFF_STATUS);
-	f->aid = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->aid = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			     + WLAN_REASSOCRESP_OFF_AID);
 
 	/*-- Information elements */
@@ -966,7 +966,7 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_PROBEREQ_OFF_SSID);
-	while (((UINT8 *) ie_ptr) < (f->buf + f->len)) {
+	while (((u8 *) ie_ptr) < (f->buf + f->len)) {
 		switch (ie_ptr->eid) {
 		case WLAN_EID_SSID:
 			f->ssid = (wlan_ie_ssid_t *) ie_ptr;
@@ -984,7 +984,7 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 			break;
 		}
 		ie_ptr =
-		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
+		    (wlan_ie_t *) (((u8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
 }
 
@@ -1028,9 +1028,9 @@ void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t * f)
 	/*-- Fixed Fields ----*/
 	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_PROBERESP_OFF_TS);
-	f->bcn_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_PROBERESP_OFF_BCN_INT);
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_PROBERESP_OFF_CAP_INFO);
 
 	f->len = WLAN_HDR_A3_LEN + WLAN_PROBERESP_OFF_CAP_INFO +
@@ -1080,15 +1080,15 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 	/*-- Fixed Fields ----*/
 	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_PROBERESP_OFF_TS);
-	f->bcn_int = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_PROBERESP_OFF_BCN_INT);
-	f->cap_info = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->cap_info = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_PROBERESP_OFF_CAP_INFO);
 
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_PROBERESP_OFF_SSID);
-	while (((UINT8 *) ie_ptr) < (f->buf + f->len)) {
+	while (((u8 *) ie_ptr) < (f->buf + f->len)) {
 		switch (ie_ptr->eid) {
 		case WLAN_EID_SSID:
 			f->ssid = (wlan_ie_ssid_t *) ie_ptr;
@@ -1110,7 +1110,7 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 			break;
 		default:
 			acxlog(L_DEBUG,"Bad EID=%dd in proberesp, off=%d .\n",
-			     ie_ptr->eid, f->buf - (UINT8 *) ie_ptr);
+			     ie_ptr->eid, f->buf - (u8 *) ie_ptr);
 /*			WLAN_HEX_DUMP(3, "frm w/ bad eid:", f->buf,
 				      f->len);
 */
@@ -1118,7 +1118,7 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 		}
 
 		ie_ptr =
-		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
+		    (wlan_ie_t *) (((u8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
 }
 
@@ -1161,11 +1161,11 @@ void acx_mgmt_encode_authen(wlan_fr_authen_t * f)
 	WLAN_ASSERT(f->len >= WLAN_AUTHEN_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->auth_alg = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->auth_alg = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_AUTHEN_OFF_AUTH_ALG);
-	f->auth_seq = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->auth_seq = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_AUTHEN_OFF_AUTH_SEQ);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_AUTHEN_OFF_STATUS);
 
 	f->len =
@@ -1214,17 +1214,17 @@ void acx_mgmt_decode_authen(wlan_fr_authen_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->auth_alg = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->auth_alg = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_AUTHEN_OFF_AUTH_ALG);
-	f->auth_seq = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->auth_seq = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				  + WLAN_AUTHEN_OFF_AUTH_SEQ);
-	f->status = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->status = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_AUTHEN_OFF_STATUS);
 
 	/*-- Information elements */
 	ie_ptr = (wlan_ie_t *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_AUTHEN_OFF_CHALLENGE);
-	if ((((UINT8 *) ie_ptr) < (f->buf + f->len)) &&
+	if ((((u8 *) ie_ptr) < (f->buf + f->len)) &&
 	    (ie_ptr->eid == WLAN_EID_CHALLENGE)) {
 		f->challenge = (wlan_ie_challenge_t *) ie_ptr;
 	}
@@ -1270,7 +1270,7 @@ void acx_mgmt_encode_deauthen(wlan_fr_deauthen_t * f)
 	WLAN_ASSERT(f->len >= WLAN_DEAUTHEN_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->reason = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->reason = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_DEAUTHEN_OFF_REASON);
 
 	f->len =
@@ -1316,7 +1316,7 @@ void acx_mgmt_decode_deauthen(wlan_fr_deauthen_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->reason = (UINT16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->reason = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				+ WLAN_DEAUTHEN_OFF_REASON);
 
 	/*-- Information elements */

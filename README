@@ -205,7 +205,8 @@ since this seeks to list all requirements in full):
 * a gcc package has to be installed
 * The /bin/bash shell is required for the start_net/stop_net scripts
 * module packages: module-init-tools for 2.5.x/2.6.x, modutils for Linux 2.4.x
-* firmware image and radio image for your ACX1xx card
+* firmware image and (sometimes) radio image for your ACX1xx card
+  (these need to be uploaded into the card RAM on every driver initialization)
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
 * the Linux hotplug package is required for automatic setup of CardBus cards
@@ -415,15 +416,15 @@ Further system configuration can be found at SYSTEM CUSTOMIZATION below.
 module directory and will run depmod. If successful, the system should
 attempt to auto load the driver on card insert.
 
+The firmware files can be copied to /usr/share/acx/ (the driver's default
+firmware directory) if you don't want to specify the firmware_dir= parameter
+on module loading above.
+
 In order to get the driver to autoload properly, you could add e.g. to
  /etc/modprobe.d/acx_wlan (or /etc/modprobe.conf):
 options acx_pci firmware_dir=/absolute/path/to/firmware_files debug=0x0
 options acx_usb firmware_dir=/absolute/path/to/firmware_files debug=0x0
 and run update-modules (this will be added to "make install" soon).
-
-The firmware files can be copied to /usr/share/acx/ (the driver's default
-firmware directory) if you don't want to specify the firmware_dir= parameter
-on module loading above.
 
 Once you insert the card, the driver will then load automatically
 without error (and will shut down the interface once you eject the card).
@@ -460,6 +461,20 @@ For troubleshooting, see below.
 
 === USAGE HINTS ===
 
+A VERY GOOD IDEA is to do a
+cat /proc/driver/acx_wlan0_eeprom > ~/acx_card_XXX_eeprom_image.log
+as soon as you get the driver running, and to store this file containing
+the data of the card's *configuration* settings EEPROM in a very safe place.
+In case the card somehow managed to trash its EEPROM (or EEPROM weakness),
+you would thus at least be able to restore the EEPROM (once we develop
+an EEPROM restore option which doesn't exist yet...).
+This would also help in case Windows trashed the card EEPROM somehow.
+I already managed to resurrect some DROP DEAD network card's EEPROM
+(most likely trashed by XP driver) once, and from that time on
+everybody around me called me a wizard ;-)
+Needless to say this is an even better idea once we actually implement
+modifying the card config EEPROM to allow for more useful settings ;-)
+
 Want to use driver as BUILTIN kernel driver, but then driver fails to know
 where the firmware files are? Use kernel boot parameter acx_firmware_dir=XXX.
 
@@ -475,7 +490,8 @@ MAC!
 Wireless traffic monitoring (promiscuous mode) with Kismet? Set card type
 Orinoco in kismet.conf (in case of an older Kismet release which didn't know
 the acx100 type yet).
-Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable.
+A kismet cmdline example would be "kismet -c acx100,wlan0,acx100 -- -q".
+Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable (if required).
 
 Wired-Wireless bridging? Driver would perhaps need to support WDS
 (whatever that is). For now, proxy ARP should do:
@@ -549,7 +565,7 @@ or CPU architecture or (non-)register calling convention or kernel version
 -- see syslog for evidence!!)
 and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
-Running "depmod -a" might actually fix the problem already, though.
+Running "depmod -ae" might actually fix the problem already, though.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
@@ -596,10 +612,14 @@ notebook with BIOS troubles as well (the BIOS needs to handle the PME#
 pin activity properly). Workaround: disconnect/hide the PME# signal
 on the card (pin 34, see mini-PCI spec).
 
-If your firmware upload fails due to upload corruption (see log!),
-then this could indicate I/O timing issues. Set ACX_IO_WIDTH=16
-in the Makefile, then recompile, to use 16bit I/O access instead
-of slightly problematic but faster 32bit access.
+If your firmware upload fails due to upload corruption (see log!) or
+there is some other I/O port communication weirdness during driver use
+such as reading back strange data, then this could indicate I/O timing issues:
+Set ACX_IO_WIDTH=16 in the Makefile, then recompile, to use 16bit I/O access
+instead of slightly problematic but faster 32bit access.
+The reason why 32bit access causes problems with some cards on some
+machines (it might be tied to the CardBus controller) is not known yet.
+If you have any useful additional information, please report.
 
 If you get messages similar to
 "Failed to allocate shared memory for Rx buffer...", then please report.
@@ -721,6 +741,8 @@ values :-\
 Note that signal levels in Ad-Hoc mode are being displayed relative to the station
 which answered during our initial scanning period, so the signal level source
 (and thus the average level!!) might change with every new association.
+UPDATE: changed driver to update level from every packet received, no matter
+which peer.
 
 Also try other channel values to reduce interference by cordless phones,
 microwaves etc.
@@ -876,14 +898,15 @@ one guy, after having been ill-advised by D-Link support that his DWL-120+
 uses an Atmel chipset, spent considerable time trying to get this card to work
 with an incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
 the DWL-120+ is using an ACX100 in USB mode!).
-This proves that D-Link really deserves the award above,
-and it also shows that one should avoid D-Link like the plague from now on
-(at least until they get rid of their stupid product naming habits),
-since they don't seem to know or care about their very own products.
-To be fair, they at least provide a page which lists many of their
-wireless cards and links to their corresponding Linux driver projects...
 
-Finally, let me mention that we also really dislike the way how
+However, all things considered, it seems like D-Link does care more about us
+than some other vendors: someone asked them for a redistribution license
+of the binary firmware files, and they (D-Link Germany) rather quickly
+followed up and granted redistribution (which quite surprised me, I have
+to admit). Together with actually wanting to release a Linux driver for
+TI cards (see above), this puts D-Link in a rather positive light...
+
+Finally, let me mention that we really dislike the way how
 Texas Instruments handles Linux driver support. It's a shameful pity,
 with delays to be measured in years versus the Windows driver
 support, and with poor and buggy binary driver support.
