@@ -5,7 +5,7 @@
 WARNING: this driver may still cause your box to lockup in very rare cases!
 If this happens, then please report at/create a bug report!
 
-RELIABILITY WARNING: The DWL-650+ seems to have a slightly too high
+Card reliability warning: The DWL-650+ seems to have a slightly too high
 defect rate (see doc/general_info). Consider buying any card with FCC ID
 O7J-GL242201 (0 defect reports) instead of the DWL-650+ (5+ defect/problem
 reports). One might attribute this to the higher sales numbers of the
@@ -48,7 +48,8 @@ and are at your wits end as to what might still make the card fail
 
 Other Texas Instruments chips which are e.g. 802.11g capable and may be named
 TNETW1130/1230 (ACX111) only just started to actually be supported in a useful
-way by this driver [040523].
+way by this driver, so due to different hardware implementations some ACX111
+card designs might not be working yet [040530].
 
 Also, due to confusion about similar card naming (for further information, see
 bottom), people keep thinking certain cards they own work with this driver.
@@ -77,6 +78,18 @@ Feel free to send us corrections/additions to this very confusing listing above.
 
 --- STATUS AS OF 040523 ---
 
+Status Matrix:
+
+		ACX100			ACX100 USB		ACX111
+Rates		1/2/5.5/11/22		1/2/5.5/11/22		11/22 (54 NIY)
+Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64?/128?/256?)
+Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64?/128?/256?)
+Auto		*			*			?
+Master		-			-			-
+Change Tx power	* (hardware)		- (may do via FW only)	-
+Config antennas	* (currently via FW)	?			-
+Sensitivity	* (hardware)		- (no go since USB?)	- (unknown radio)
+
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
 We're still not totally sure about the status of WEP support.
@@ -93,7 +106,7 @@ Master mode support (aka HostAP) has not really been implemented yet,
 but at least it can be configured now.
 
 The non-standard 4x mode (aka "44Mbps") is not supported yet and will need
-several driver changes.
+several driver changes. Don't hold your breath, this is really low priority.
 
 Many other things haven't been tested (properly) yet.
 
@@ -137,11 +150,13 @@ What to NOT do:
   You probably need the pcmcia-cs package for certain CardBus functions,
   though.
 
+
 --- FIRMWARE INSTALLATION ---
 
-NOTE: these firmware installation instructions might only apply
-to standard ACX100 cards, not necessarily to ACX111 or ACX100 USB cards
-(FIXME).
+You may tell us about your experiences with various firmware versions,
+then we'll add that info to doc/firmware_versions.txt.
+
+-- Firmware for ACX100 non-USB cards ---
 
 The firmware files are needed to drive the cards' onboard embedded
 wireless baseband CPU.
@@ -164,20 +179,9 @@ the usual RFMD, so these cards will not work with the limited proprietary
 linux driver binary's firmware and so a windows firmware with proper
 support for this radio type must be used.
 
-NOTE: For ACX111 cards even recently there are both a combined firmware
-(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FIXME file names?)
-available.
-You need to make sure the driver has both the main firmware functionality plus
-radio functionality available, otherwise you won't transmit anything!
-For non-radio firmwares you NEED the additional radio module, with radio
-firmwares you MUST NOT have the driver load the radio module.
-
-FIXME: need to establish proper script support for the fact that the
-ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
-
 Again, here are your options:
 
--- Firmware provided by Windows driver --
+- Firmware provided by Windows driver -
 
 Easy solution:
 
@@ -228,7 +232,7 @@ APLUSRMX.BIN - Maxim radio module
 Other files:
 SMCSN.BIN - combined(?) firmware for SMC2435W
 
--- Firmware from Linux binary driver (not recommended - too old) --
+- Firmware from Linux binary driver (not recommended - too old) -
 
 Several drivers are available on the internet, and they all seem to
 work. But since the firmware is embedded in the binary driver, it needs
@@ -244,9 +248,27 @@ The linux driver already has the radio module embedded in the firmware.
 The firmware version which this Linux driver contains is 1.5.0,
 as printed during our driver initialisation.
 
+-- Firmware for ACX100 USB cards (D-Link DWL-120+) --
 
-You may tell us about your experiences with various firmware versions,
-then we'll add that info to doc/firmware_versions.txt.
+Read the ACX100 instructions above, but keep in mind that they may be wrong
+since you're using a USB card with USB specific ACX100 firmware.
+FIXME: need to establish proper script support for the fact that the
+ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
+
+-- Firmware for ACX111 cards --
+
+Read the ACX100 instructions above, but keep in mind that they may be wrong
+since you're using an ACX111 card with ACX111 firmware.
+NOTE: For ACX111 cards even recently there are both a combined firmware
+(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FIXME file names?)
+available.
+You need to make sure the driver has both the main firmware functionality plus
+radio functionality available, otherwise you won't transmit anything!
+Either by using a base firmware plus additional radio image file, or by using
+a combined firmware including radio functionality.
+For non-radio firmwares you NEED the additional radio module, with radio
+firmwares you MUST NOT have the driver load the radio module.
+ACX111 cards usually have radio types 0x16 or 0x17 (see log message).
 
 --- "NORMAL" DRIVER INSTALLATION ---
 
@@ -501,16 +523,20 @@ Also, using an SB Live! with ACX100 may result in crashes and data corruption.
 If you get log messages like
 Buffer for request 8B0B too small (0<564)
 or other strange/erratic wireless config behaviour, then make damn sure that
-your wireless-tools version is correct! There are tons of possibilities
+your wireless-tools version is correct. There are tons of possibilities
 for version conflicts!
 
 -- Network failure --
-First, make absolutely sure you're using correct settings for
+First, did you ifup the card? (ifconfig wlan0 up)
+Without an activated interface there won't be any net connection at all...
+Also, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
 Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a card set to Peer).
 Further, the ESSID is CaSe SEnsITivE!
+Since the driver is currently doing passive scan only, your peer station HAS
+to be configured to send Beacon frames (100ms period works best).
 
 Then read the file containing the driver log (see "DEBUGGING / LOGGING").
 
@@ -732,5 +758,5 @@ shelled out considerable amounts of money for...
 
 Have fun!
 
-The ACX100 OSS driver project team :-)
+The ACX100/ACX111 OSS driver project team :-)
 http://acx100.sourceforge.net

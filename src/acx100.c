@@ -627,6 +627,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	       chip_name, (char *)pdev->slot_name /* was: pci_name(pdev) */, pdev->irq, phymem1, phymem2,
 	       mem1, mem_region1_size,
 	       mem2, mem_region2_size);
+	acxlog(0xffff, "initial debug setting is 0x%04x\n", debug);
 
 	if (0 == pdev->irq) {
 		acxlog(L_BINSTD | L_IRQ | L_INIT, "%s: %s: Can't get IRQ %d\n",
@@ -1213,6 +1214,7 @@ static int acx100_open(netdevice_t *dev)
 
 	FN_ENTER;
 
+	acxlog(L_STD, "OPENING DEVICE\n");
 	if (0 != acx100_lock(priv, &flags)) {
 		acxlog(L_INIT, "card unavailable, bailing\n");
 		result = -ENODEV;
@@ -1620,6 +1622,9 @@ void acx100_handle_info_irq(wlandevice_t *priv)
 {
 	acx100_get_info_state(priv);
 	acxlog(L_STD | L_IRQ, "Got Info IRQ: type 0x%04x, status 0x%04x\n", priv->info_type, priv->info_status);
+
+	priv->info_status = 0x0001; /* we received it */
+	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], 0x2); /* notify ACX1xx */
 }
 
 /*----------------------------------------------------------------
@@ -1978,9 +1983,9 @@ static int __init acx100_init_module(void)
 
 
 	acxlog(L_STD,
-	       "acx100: It looks like you were coaxed into buying a wireless network card\n");
+	       "acx100: It looks like you've been coaxed into buying a wireless network card\n");
 	acxlog(L_STD,
-	       "acx100: that uses the mysterious ACX100 chip from Texas Instruments.\n");
+	       "acx100: that uses the mysterious ACX100/ACX111 chip from Texas Instruments.\n");
 	acxlog(L_STD,
 	       "acx100: You should better have bought e.g. a PRISM(R) chipset based card,\n");
 	acxlog(L_STD,
@@ -1994,11 +1999,10 @@ static int __init acx100_init_module(void)
 	acxlog(L_STD, "acx100: ENABLED USB SUPPORT!\n");
 #endif
 
-	acxlog(L_STD, "acx100: %sUsing %s\n",
 #if (ACX_IO_WIDTH==32)
-	"", "32 bit I/O access.");
+	acxlog(L_STD, "acx100: Using 32 bit I/O access.\n");
 #else
-	"WARNING: ", "16 bit I/O access only!");
+	acxlog(L_STD, "acx100: WARNING: Using 16 bit I/O access only!\n");
 #endif
 
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);

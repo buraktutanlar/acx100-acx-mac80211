@@ -302,7 +302,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	}
 #endif
 
-	MemMap.PoolStart = cpu_to_le32((le32_to_cpu(MemMap.QueueEnd) + 0x1F + 4) & 0xffffffe0);
+	MemMap.PoolStart = cpu_to_le32((le32_to_cpu(MemMap.QueueEnd) + 0x1f + 4) & ~0x1f);
 
 	if (!acx100_configure(priv, &MemMap, ACX100_RID_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapWrite returns error\n");
@@ -632,7 +632,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.misc++;
 			break;
 		case 0x20:
-			err = "excessive Tx retries due to distance too high, unable to Tx or Tx frame error - change 'iwconfig txpower XXX' or 'sens'itivity or 'retry'";
+			err = "excessive Tx retries due to either distance too high or unable to Tx or Tx frame error - change 'iwconfig txpower XXX' or 'sens'itivity or 'retry'";
 			priv->wstats.discard.retries++;
 			break;
 		case 0x40:
@@ -1852,8 +1852,8 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 	priv = pDc->priv;
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	if(pDc->pRxDescQPool == NULL) { //calculate it
-		/* FIXME WHY IS IT "TxQueueNo" ?
+	if(pDc->pRxDescQPool == NULL) { /* calculate it */
+		/* WHY IS IT "TxQueueNo"?
 		 * Probably because Rx pool ptr should be right AFTER Tx pool */
 		pDc->pRxDescQPool = (struct rxdescriptor *) ((UINT8 *) pDc->pTxDescQPool + (priv->TxQueueNo * sizeof(struct txdescriptor)));
 	}
@@ -1878,7 +1878,7 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 		}
 
 		/* point to next rxdesc */
-		rx_desc->pNextDesc = mem_offs + sizeof(struct rxdescriptor); // next rxdesc pNextDesc
+		rx_desc->pNextDesc = mem_offs + sizeof(struct rxdescriptor); /* next rxdesc pNextDesc */
 
 		/* go to the next */
 		mem_offs += sizeof(struct rxdescriptor);
@@ -1976,12 +1976,12 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 
 	/* align the tx descriptor queue to an alignment of 0x20 (32 bytes) */
 	MemoryConfigOption.rx_mem =
-		cpu_to_le32((le32_to_cpu(mmt->PoolStart) + 0x1f) & 0xffffffe0);
+		cpu_to_le32((le32_to_cpu(mmt->PoolStart) + 0x1f) & ~0x1f);
 
 	/* align the rx descriptor queue to units of 0x20 and offset it
 	   by the tx descriptor queue */
 	MemoryConfigOption.tx_mem =
-	    cpu_to_le32((0x1f + le32_to_cpu(mmt->PoolStart) + priv->TotalRxBlockSize) & 0xffffffe0);
+	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + priv->TotalRxBlockSize + 0x1f) & ~0x1f);
 	acxlog(L_DEBUG, "rx_mem %08x rx_mem %08x\n", MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
@@ -2096,98 +2096,26 @@ static char type_string[32];	/* I *really* don't care that this is static,
 char *acx100_get_packet_type_string(UINT16 fc)
 {
 	char *ftype = "UNKNOWN", *fstype = "UNKNOWN";
+	char *mgmt_arr[] = { "AssocReq", "AssocResp", "ReassocReq", "ReassocResp", "ProbeReq", "ProbeResp", "UNKNOWN", "UNKNOWN", "Beacon", "ATIM", "Disassoc", "Authen", "Deauthen" };
+	char *ctl_arr[] = { "PSPoll", "RTS", "CTS", "Ack", "CFEnd", "CFEndCFAck" };
+	char *data_arr[] = { "DataOnly", "Data CFAck", "Data CFPoll", "Data CFAck/CFPoll", "Null", "CFAck", "CFPoll", "CFAck/CFPoll" };
 
 	FN_ENTER;
 	switch (WLAN_GET_FC_FTYPE(fc)) {
 	case WLAN_FTYPE_MGMT:
 		ftype = "MGMT";
-		switch (WLAN_GET_FC_FSTYPE(fc)) {
-		case WLAN_FSTYPE_ASSOCREQ:
-			fstype = "AssocReq";
-			break;
-		case WLAN_FSTYPE_ASSOCRESP:
-			fstype = "AssocResp";
-			break;
-		case WLAN_FSTYPE_REASSOCREQ:
-			fstype = "ReassocReq";
-			break;
-		case WLAN_FSTYPE_REASSOCRESP:
-			fstype = "ReassocResp";
-			break;
-		case WLAN_FSTYPE_PROBEREQ:
-			fstype = "ProbeReq";
-			break;
-		case WLAN_FSTYPE_PROBERESP:
-			fstype = "ProbeResp";
-			break;
-		case WLAN_FSTYPE_BEACON:
-			fstype = "Beacon";
-			break;
-		case WLAN_FSTYPE_ATIM:
-			fstype = "ATIM";
-			break;
-		case WLAN_FSTYPE_DISASSOC:
-			fstype = "Disassoc";
-			break;
-		case WLAN_FSTYPE_AUTHEN:
-			fstype = "Authen";
-			break;
-		case WLAN_FSTYPE_DEAUTHEN:
-			fstype = "Deauthen";
-			break;
-		}
+		if (WLAN_GET_FC_FSTYPE(fc) <= 0x0c)
+			fstype = mgmt_arr[WLAN_GET_FC_FSTYPE(fc)];
 		break;
 	case WLAN_FTYPE_CTL:
 		ftype = "CTL";
-		switch (WLAN_GET_FC_FSTYPE(fc)) {
-		case WLAN_FSTYPE_PSPOLL:
-			fstype = "PSPoll";
-			break;
-		case WLAN_FSTYPE_RTS:
-			fstype = "RTS";
-			break;
-		case WLAN_FSTYPE_CTS:
-			fstype = "CTS";
-			break;
-		case WLAN_FSTYPE_ACK:
-			fstype = "Ack";
-			break;
-		case WLAN_FSTYPE_CFEND:
-			fstype = "CFEnd";
-			break;
-		case WLAN_FSTYPE_CFENDCFACK:
-			fstype = "CFEndCFAck";
-			break;
-		}
+		if ((WLAN_GET_FC_FSTYPE(fc) >= 0x0a) && (WLAN_GET_FC_FSTYPE(fc) <= 0x0f))
+			fstype = ctl_arr[WLAN_GET_FC_FSTYPE(fc)-0x0a];
 		break;
 	case WLAN_FTYPE_DATA:
 		ftype = "DATA";
-		switch (WLAN_GET_FC_FSTYPE(fc)) {
-		case WLAN_FSTYPE_DATAONLY:
-			fstype = "DataOnly";
-			break;
-		case WLAN_FSTYPE_DATA_CFACK:
-			fstype = "Data CFAck";
-			break;
-		case WLAN_FSTYPE_DATA_CFPOLL:
-			fstype = "Data CFPoll";
-			break;
-		case WLAN_FSTYPE_DATA_CFACK_CFPOLL:
-			fstype = "Data CFAck/CFPoll";
-			break;
-		case WLAN_FSTYPE_NULL:
-			fstype = "Null";
-			break;
-		case WLAN_FSTYPE_CFACK:
-			fstype = "CFAck";
-			break;
-		case WLAN_FSTYPE_CFPOLL:
-			fstype = "CFPoll";
-			break;
-		case WLAN_FSTYPE_CFACK_CFPOLL:
-			fstype = "CFAck/CFPoll";
-			break;
-		}
+		if (WLAN_GET_FC_FSTYPE(fc) <= 0x07)
+			fstype = data_arr[WLAN_GET_FC_FSTYPE(fc)];
 		break;
 	}
 	sprintf(type_string, "%s/%s", ftype, fstype);

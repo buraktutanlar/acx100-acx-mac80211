@@ -97,10 +97,11 @@ const UINT8 reg_domain_ids[] =
  * cannot be determined from within a second file */
 const UINT8 reg_domain_ids_len = (UINT8)sizeof(reg_domain_ids);
 const UINT16 reg_domain_channel_masks[] =
-	{0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x00f8};
+	{0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x01fc};
 
 /* acx100_schedule()
  * Make sure to schedule away sometimes, in order to not hog the CPU too much.
+ * Remember to not do it in IRQ context, though!
  */
 void acx100_schedule(long timeout)
 {
@@ -1105,7 +1106,7 @@ int acx100_load_radio(wlandevice_t *priv)
 
 	if (NULL == radio_image)
 	{
-		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of older combined firmware, FATAL when using new separated firmware.\n",filename);
+		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of a combined firmware, FATAL when using a separated firmware (base firmware / radio image).\n",filename);
 		kfree(filename);
 		return 1; /* Doesn't need to be fatal, we might be using a combined image */
 	}
@@ -2409,8 +2410,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	
 	if (0 != (priv->set_mask & (GETSET_ESSID|GETSET_ALL))) {
 		/* not needed in AP mode */
-		if ((ACX_MODE_2_MANAGED_STA == priv->macmode_wanted)
-		||  (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted)) {
+		if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
 			/* if we aren't scanning already, then start scanning now */
 			if (0 == scanning)
 			{

@@ -279,9 +279,8 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 		priv->set_mask |= GETSET_TX|GETSET_RX;
 	}
 	else
-	if ((ACX_MODE_2_MANAGED_STA == priv->macmode_wanted)
-	 || (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted)) {
-		/* trigger scanning... */
+	if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
+		/* trigger scanning if we're a client... */
 		priv->set_mask |= GETSET_CHANNEL;
 	}
 	acx100_unlock(priv, &flags);
@@ -486,6 +485,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
                ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
 
+	/* FIXME: what about Auto mode? */
 	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 		result = -EINVAL;
 		goto end;
@@ -1202,10 +1202,7 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	if (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted) {
-		/* ok, let's assume it's supported, but print a
-		 * warning message
-		 * FIXME: should be removed once it's definitely working. */
-		acxlog(L_STD, "Warning: WEP support might not be supported in Ad-Hoc mode yet!\n");
+		/* it's most definitely supported now. */
 		/* return -EOPNOTSUPP; */
 	}
 
@@ -1781,7 +1778,7 @@ const char *reg_domain_strings[] =
   "France          (10-13)",
   "MKK (Japan)        (14)",
   "MKK1             (1-14)",
-  "Israel? (new!)  (4?-8?) (not all firmware versions)",
+  "Israel            (3-9) (not all firmware versions)",
   NULL /* needs to remain as last entry */
 };
 

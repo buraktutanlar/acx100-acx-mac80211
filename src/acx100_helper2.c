@@ -108,6 +108,8 @@ UINT16 CurrentAID = 1;
 
 char *state_str[7] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN", "INVALID??" };
 
+UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 /*----------------------------------------------------------------
 * acx100_sta_list_init
 *
@@ -462,19 +464,7 @@ int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *rxdesc)
 	fstype = WLAN_GET_FC_FSTYPE(p80211_hdr->a3.fc);
 
 	switch (ftype) {
-		case WLAN_FTYPE_MGMT:
-			result = acx100_process_mgmt_frame(rxdesc, priv);
-			break;
-		case WLAN_FTYPE_CTL:
-			if (fstype != WLAN_FSTYPE_PSPOLL)
-				result = 0;
-			else
-				result = 1;
-			/*   this call is irrelevant, since
-			 *   acx100_process_class_frame is a stub, so return
-			 *   immediately instead.
-			 * return acx100_process_class_frame(rxdesc, priv, 3); */
-			break;
+		/* check data frames first, for speed */
 		case WLAN_FTYPE_DATA:
 			/* binary driver did ftype-1 to appease jump
 			 * table layout */
@@ -501,6 +491,19 @@ int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *rxdesc)
 				default:
 					break;
 			}
+			break;
+		case WLAN_FTYPE_MGMT:
+			result = acx100_process_mgmt_frame(rxdesc, priv);
+			break;
+		case WLAN_FTYPE_CTL:
+			if (fstype != WLAN_FSTYPE_PSPOLL)
+				result = 0;
+			else
+				result = 1;
+			/*   this call is irrelevant, since
+			 *   acx100_process_class_frame is a stub, so return
+			 *   immediately instead.
+			 * return acx100_process_class_frame(rxdesc, priv, 3); */
 			break;
 		default:
 			break;
@@ -885,7 +888,6 @@ int acx100_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv)
 static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
 	client_t *clt;
-	UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	client_t *var_24 = NULL;
 	p80211_hdr_t* p80211_hdr;
 	struct txdescriptor *tx_desc;
@@ -1010,7 +1012,6 @@ fail:
  */
 static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
-	UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	UINT8 *da = NULL;
 	UINT8 *bssid = NULL;
 	p80211_hdr_t *p80211_hdr;
@@ -2942,7 +2943,6 @@ void acx100_timer(unsigned long address)
 	if (0 != acx100_lock(priv, &flags)) {
 		return;
 	}
-	acxlog(L_STD,"netdev queue status: %s\n",netif_queue_stopped(priv->netdev)?"stopped":"alive");
 
 	switch (priv->status) {
 	case ISTATUS_1_SCANNING:

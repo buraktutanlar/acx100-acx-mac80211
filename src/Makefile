@@ -180,7 +180,7 @@ uninstall:
 # 2.6 in-tree (kbuild)
 else # ifeq PATCHLEVEL
 
-EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF) $(COMMON_COMPILE_FLAGS)
+EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF) $(COMMON_COMPILE_FLAGS) $(COMMON_DRIVER_DEFINES)
 #EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=$(WLAN_HOSTIF)
 
 ifeq ($(WLAN_HOSTIF),WLAN_PCI)
