@@ -42,9 +42,8 @@
  *
  * --------------------------------------------------------------------
  */
-
-#ifndef _ACX100_CONV_H
-#define _ACX100_CONV_H
+#ifndef __ACX_ACX100_CONV_H
+#define __ACX_ACX100_CONV_H
 
 /*============================================================================*
  * Constants                                                                  *
@@ -101,4 +100,4 @@ int acx100_ether_to_txdesc(struct wlandevice *priv,
 void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 			     struct txdescriptor *txdesc);
 
-#endif /* _ACX100_CONV_H */
+#endif /* __ACX_ACX100_CONV_H */

@@ -35,6 +35,8 @@
  *
  * --------------------------------------------------------------------
  */
+#ifndef __ACX_ACX80211FRM_H
+#define __ACX_ACX80211FRM_H
 
 void acx_mgmt_decode_ibssatim(wlan_fr_ibssatim_t *f);
 void acx_mgmt_encode_ibssatim(wlan_fr_ibssatim_t *f);
@@ -58,3 +60,4 @@ void acx_mgmt_encode_probereq(wlan_fr_probereq_t *f);
 void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t *f);
 void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t *f);
 void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t *f);
+#endif /* __ACX_ACX80211FRM_H */

@@ -1,6 +1,9 @@
 # set to 0 if you don't want any debugging code to be compiled in
 export ACX_DEBUG=1
 
+# assume 32bit I/O width (16bit is also compatible with Compact Flash)
+export ACX_IO_WIDTH=32
+
 .PHONY: all extract_firmware fetch_firmware driver install uninstall clean
 
 all: driver

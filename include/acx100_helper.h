@@ -35,6 +35,9 @@
  *
  * --------------------------------------------------------------------
  */
+#ifndef __ACX_ACX100_HELPER_H
+#define __ACX_ACX100_HELPER_H
+
 #define ISTATUS_0_STARTED	0
 #define ISTATUS_1_SCANNING	1
 #define ISTATUS_2_WAIT_AUTH	2
@@ -379,3 +382,4 @@ int acx100_proc_output(char *buf, wlandevice_t *priv);
 int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
 int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
 int acx100_proc_phy_output(char *buf, wlandevice_t *priv);
+#endif /* __ACX_ACX100_HELPER_H */

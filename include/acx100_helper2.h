@@ -35,7 +35,8 @@
  *
  * --------------------------------------------------------------------
  */
-
+#ifndef __ACX_ACX100_HELPER2_H
+#define __ACX_ACX100_HELPER2_H
 
 typedef struct acx100_frame {
 	char val0x0[0x26];
@@ -222,3 +223,4 @@ void acx100_complete_dot11_scan(wlandevice_t *priv);
 void acx100_gen_challenge(challenge_text_t *);
 void acx100_get_random(UINT8 *, UINT16);
 void acx100_ibssid_gen(wlandevice_t *priv, unsigned char *p_out);
+#endif /* __ACX_ACX100_HELPER2_H */

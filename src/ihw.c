@@ -88,7 +88,12 @@ void acx100_dump_bytes(void *,int);
 *----------------------------------------------------------------*/
 inline UINT32 acx100_read_reg32(wlandevice_t *priv, UINT offset)
 {
+#if ACX_IO_WIDTH == 32
 	return readl(priv->iobase + offset);
+#else 
+	return readw(priv->iobase + offset)
+	    + (readw(priv->iobase + offset + 2) << 16);
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -154,7 +159,12 @@ inline UINT8 acx100_read_reg8(wlandevice_t *priv, UINT offset)
 *----------------------------------------------------------------*/
 inline void acx100_write_reg32(wlandevice_t *priv, UINT offset, UINT valb)
 {
+#if ACX_IO_WIDTH == 32
 	writel(valb, priv->iobase + offset);
+#else 
+	writew(valb & 0xffff, priv->iobase + offset);
+	writew(valb >> 16, priv->iobase + offset + 2);
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -209,23 +219,19 @@ inline void acx100_write_reg8(wlandevice_t *priv, UINT offset, UINT valb)
 
 void acx100_get_info_state(wlandevice_t *priv)
 {
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	UINT32 value;
 
-#if ACX_32BIT_IO
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0x1));
+
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
-#else 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS] + 0x2)); 
-#endif
 
-	priv->info_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
-	priv->info_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
+	value = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]));
+
+	priv->info_type = value & 0xffff;
+	priv->info_status = value >> 16;
+
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
 
@@ -250,28 +256,17 @@ void acx100_get_cmd_state(wlandevice_t *priv)
 {
 	UINT32 value;
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1); /* why auto increment ?? */
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], cpu_to_le32(0x0));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0x1)); /* why auto increment ?? */
 
-#if ACX_32BIT_IO
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 
 	value = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 	priv->cmd_type = (UINT16)value;
 	priv->cmd_status = (UINT16)(value >> 16);
-#else 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
 
-	priv->cmd_type = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
-	priv->cmd_status = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2);
 	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x\n", priv->cmd_type, priv->cmd_status);
-#endif
 
 }
 
@@ -294,23 +289,13 @@ void acx100_get_cmd_state(wlandevice_t *priv)
 *----------------------------------------------------------------*/
 void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala)
 {
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], cpu_to_le32(0x0));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0x1));
 
-#if ACX_32BIT_IO
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
-#else 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
-#endif
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA], vala);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2, 0x0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], cpu_to_le32(vala));
 }
 
 /*----------------------------------------------------------------
@@ -332,23 +317,13 @@ void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala)
 *----------------------------------------------------------------*/
 void acx100_write_cmd_status(wlandevice_t *priv, UINT vala)
 {
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0x1);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], cpu_to_le32(0x0));
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0x1));
 
-#if ACX_32BIT_IO
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
-#else 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, 
-		acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)); 
-#endif
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA], 0x0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2, vala);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], cpu_to_le32(vala));
 }
 
 /*----------------------------------------------------------------

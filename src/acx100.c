@@ -633,7 +633,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
 	       "Found %s-based wireless network card at %s, irq:%d, phymem1:0x%lx, phymem2:0x%lx, mem1:0x%lx, mem1_size:%ld, mem2:0x%lx, mem2_size:%ld.\n",
-	       chip_name, pci_name(pdev), pdev->irq, phymem1, phymem2,
+	       chip_name, (char *)pdev->slot_name /* was: pci_name(pdev) */, pdev->irq, phymem1, phymem2,
 	       mem1, mem_region1_size,
 	       mem2, mem_region2_size);
 

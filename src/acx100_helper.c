@@ -942,17 +942,16 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 	counter = 3;		/* NONBINARY: this should be moved directly */
 	acc = 0;		/*			in front of the loop. */
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0); /* be sure we are in little endian mode */
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0); /* be sure we are in little endian mode */
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0); /* reset data_offset_addr */
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], cpu_to_le32(0)); /* be sure we are in little endian mode */
+
 #if NO_AUTO_INCREMENT
 	acxlog(L_INIT, "not using auto increment for firmware loading.\n");
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0); /* use basic mode */
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0)); /* use basic mode */
 #else
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 1); /* use autoincrement mode */
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(1)); /* use autoincrement mode */
 #endif
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], (UINT16)(offset & 0xffff)); /* configure host indirect memory access address ?? */
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (UINT16)(offset >> 16));
+
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset)); /* configure host indirect memory access address ?? */
 
 	/* the next four bytes contain the image size. */
 	//image = apfw_image;
@@ -973,11 +972,10 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 			 * But maybe there are cards with 16bit interface
 			 * only */
 #if NO_AUTO_INCREMENT
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], (UINT16)((offset + len - 4) & 0xffff));
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (UINT16)((offset + len - 4) >> 16));
+			acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset + len - 4));
 #endif
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA], (UINT16)(acc & 0xffff));
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2, (UINT16)(acc >> 16));
+			
+			acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], cpu_to_le32(acc));
 			acc = 0;
 			counter = 3;
 		}
@@ -1035,16 +1033,15 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, U
 	counter = 3;
 	acc1 = 0;
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL], 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_END_CTL] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], cpu_to_le32(0));
+
 #if NO_AUTO_INCREMENT
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(0));
 #else
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_CTL] + 0x2, 1);
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], cpu_to_le32(1));
 #endif
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], (UINT16)(offset & 0xffff));
-	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (UINT16)(offset >> 16));
+
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset));
 
 	while (len < le32_to_cpu(apfw_image->size)) {
 		acc1 |= *image << (counter * 8);
@@ -1058,11 +1055,10 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, U
 
 		if (counter < 0) {
 #if NO_AUTO_INCREMENT
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], (UINT16)((offset + len - 4) & 0xffff));
-			acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (UINT16)((offset + len - 4) >> 16));
+			acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset + len - 4));
+
+			acc2 = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]));
 #endif
-			acc2 = acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
-			acc2 += acx100_read_reg16(priv, priv->io[IO_ACX_SLV_MEM_DATA] + 0x2) << 16;
 
 			if (acc2 != acc1) {
 				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %ld don't match!! (0x%08lx vs. 0x%08lx). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
@@ -1178,15 +1174,8 @@ void acx100_init_mboxes(wlandevice_t *priv)
 	acxlog(L_BINDEBUG,
 		   "==> Get the mailbox pointers from the scratch pad registers\n");
 
-#if ACX_32BIT_IO
-	cmd_offs = acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]);
-	info_offs = acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]);
-#else
-	cmd_offs = acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]);
-	cmd_offs += ((UINT32)acx100_read_reg16(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)) << 16;
-	info_offs = acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]);
-	info_offs += ((UINT32)acx100_read_reg16(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS] + 0x2)) << 16;
-#endif
+	cmd_offs = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	info_offs = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
 	
 	acxlog(L_BINDEBUG, "CmdMailboxOffset = %lx\n", cmd_offs);
 	acxlog(L_BINDEBUG, "InfoMailboxOffset = %lx\n", info_offs);
@@ -1862,20 +1851,11 @@ void acx100_scan_chan(wlandevice_t *priv)
 	s.count = cpu_to_le16(priv->scan_count);
 	s.start_chan = cpu_to_le16(1);
 	s.flags = cpu_to_le16(0x8000);
-#if (WLAN_HOSTIF!=WLAN_USB)	
 	s.max_rate = 20; /* 2 Mbps */
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);
 	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
-#else
-	/* FIXME: why does it differ that much? Should also use the priv
-	 * parameters when that is resolved... */
-	s.max_rate = 0;
-	s.options = 0;
-	s.chan_duration = cpu_to_le16(15);
-	s.max_probe_delay = cpu_to_le16(20);
-#endif
 
 	acx100_issue_cmd(priv, ACX100_CMD_SCAN, &s, sizeof(struct scan), 5000);
 
@@ -1889,6 +1869,7 @@ void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s)
 {
 	FN_ENTER;
 	acx100_set_status(priv, ISTATUS_1_SCANNING);
+
 	acx100_issue_cmd(priv, ACX100_CMD_SCAN, s, sizeof(struct scan), 5000);
 	FN_EXIT(0, 0);
 }
@@ -2244,10 +2225,6 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 	if (0 != (priv->set_mask & (SET_RXCONFIG|GETSET_ALL))) {
 		UINT8 rx_config[4 + ACX100_RID_RXCONFIG_LEN];
-#if (WLAN_HOSTIF==WLAN_USB)
-		priv->rx_config_1=0x2190;
-		priv->rx_config_2=0x0E5C;
-#else
 		switch (priv->monitor) {
 		case 0: /* normal mode */
 			priv->rx_config_1 = (UINT16)
@@ -2293,7 +2270,6 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 						 RX_CFG2_RCV_OTHER);
 			break;
 		}
-#endif		
 	//	printk("setting RXconfig to %x:%x\n", priv->rx_config_1, priv->rx_config_2);
 		
 		*(UINT16 *) &rx_config[0x4] = cpu_to_le16(priv->rx_config_1);

@@ -1,5 +1,5 @@
-#ifndef __MONITOR_H
-#define __MONITOR_H
+#ifndef __ACX_MONITOR_H
+#define __ACX_MONITOR_H
 
 /* required structs for prism header emulation (monitor mode) */
 #define WLAN_DEVNAMELEN_MAX 16
@@ -65,4 +65,4 @@ typedef struct p80211msg_lnxind_wlansniffrm {
 #define P80211ENUM_msgitem_status_invalid_did		14
 #define P80211ENUM_msgitem_status_missing_print_func	15
 
-#endif /* __MONITOR_H */
+#endif /* __ACX_MONITOR_H */

@@ -42,9 +42,8 @@
  *
  * --------------------------------------------------------------------
  */
-
-#ifndef _ACX100_H
-#define _ACX100_H
+#ifndef __ACX_ACX100_H
+#define __ACX_ACX100_H
 
 
 #if (WLAN_HOSTIF==WLAN_USB)
@@ -2781,4 +2780,4 @@ extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 #define ARPHRD_IEEE80211_PRISM 802
 #endif
 
-#endif /* _ACX100_H */
+#endif /* __ACX_ACX100_H */

@@ -35,6 +35,8 @@
  *
  * --------------------------------------------------------------------
  */
+#ifndef __ACX_IDMA_H
+#define __ACX_IDMA_H
 
 #include "acx100_conv.h"
 
@@ -198,3 +200,4 @@ typedef struct MemoryBlockSizeStruct {
 } memblocksize_t;
 
 #define ETH_P_80211_RAW		(ETH_P_ECONET + 1)
+#endif /* __ACX_IDMA_H */

@@ -42,9 +42,8 @@
  *
  * --------------------------------------------------------------------
  */
-
-#ifndef _P80211TYPES_H
-#define _P80211TYPES_H
+#ifndef __ACX_P80211TYPES_H
+#define __ACX_P80211TYPES_H
 
 /*================================================================*/
 /* System Includes */
@@ -678,4 +677,4 @@ UINT32 p80211_isvalid_getmibattribute(struct catlistitem *metalist,
 UINT32 p80211_isvalid_setmibattribute(struct catlistitem *metalist,
 				      UINT32 did, UINT8 * itembuf);
 
-#endif				/* _P80211TYPES_H */
+#endif /* __ACX_P80211TYPES_H */

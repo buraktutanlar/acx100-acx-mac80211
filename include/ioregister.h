@@ -43,12 +43,12 @@
  * --------------------------------------------------------------------
  */
 
-#ifndef _IOREGISTERS_H
-#define _IOREGISTERS_H
+#ifndef __ACX_IOREGISTER_H
+#define __ACX_IOREGISTER_H
 
 /* functions */
 UINT16* acx100_get_io_register_array(void);
 UINT16* acx111_get_io_register_array(void);
 void acx_free_io_register_arrays(void);
 
-#endif /* _IOREGISTERS_H */
+#endif /* __ACX_IOREGISTER_H */

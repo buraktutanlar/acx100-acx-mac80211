@@ -2930,14 +2930,15 @@ void acx100_timer(unsigned long address)
 	if (0 != acx100_lock(priv, &flags)) {
 		return;
 	}
+	acxlog(L_STD,"netdev queue status: %s\n",netif_queue_stopped(priv->netdev)?"stopped":"alive");
 
 	switch (priv->status) {
 	case ISTATUS_1_SCANNING:
 		if ((++priv->scan_retries < 5) && (0 == priv->bss_table_count)) {
 			acx100_set_timer(priv, 1000000);
-#if (WLAN_HOSTIF==WLAN_USB)
+#if 0
 			acx100_interrogate(priv,&status,ACX100_RID_SCAN_STATUS);
-			acxlog(L_DEBUG,"scan status=%d\n",status);
+			acxlog(L_STD,"scan status=%d\n",status);
 			if (status==0) {
 				acx100_complete_dot11_scan(priv);
 			}
@@ -2948,6 +2949,9 @@ void acx100_timer(unsigned long address)
 		{
 			acxlog(L_ASSOC, "Stopping scan (%s).\n", (0 != priv->bss_table_count) ? "stations found" : "scan timeout");
 			acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
+#if (WLAN_HOSTIF==WLAN_USB)
+			acx100_complete_dot11_scan(priv);
+#endif
 		}
 		break;
 	case ISTATUS_2_WAIT_AUTH:

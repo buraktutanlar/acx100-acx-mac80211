@@ -42,9 +42,8 @@
  *
  * --------------------------------------------------------------------
  */
-
-#ifndef _P80211HDR_H
-#define _P80211HDR_H
+#ifndef __ACX_P80211HDR_H
+#define __ACX_P80211HDR_H
 
 /*================================================================*/
 /* System Includes */
@@ -52,7 +51,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#ifndef  _WLAN_COMPAT_H
+#ifndef  __ACX_WLAN_COMPAT_H
 #include <wlan/wlan_compat.h>
 #endif
 
@@ -236,4 +235,4 @@ __WLAN_PRAGMA_PACKDFLT__ typedef union p80211_hdr {
 
 void p802addr_to_str(char *buf, UINT8 * addr);
 
-#endif				/* _P80211HDR_H */
+#endif /* __ACX_P80211HDR_H */

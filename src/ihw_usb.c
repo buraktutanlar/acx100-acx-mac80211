@@ -29,7 +29,7 @@
  *
  * Inquiries regarding the ACX100 Open Source Project can be
  * made directly to:
- *
+ 
  * acx100-users@lists.sf.net
  * http://acx100.sf.net
  *
@@ -100,8 +100,7 @@ static void acx100usb_control_complete(struct urb *, struct pt_regs *);
 #endif
 
 int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
-	UINT16 len,*buf;
-	int i,result,skipridheader,blocklen,inpipe,outpipe,flags,acklen=sizeof(hw->usbin);
+	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(hw->usbin);
 	int ucode;
 	struct usb_device *usbdev;
 	FN_ENTER;
@@ -132,7 +131,7 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 		hw->usbout.wridreq.frmlen=paramlen;
 		memcpy(hw->usbout.wridreq.data,&(((memmap_t *)pdr)->m),paramlen);
 		blocklen=8+paramlen;
-	} else if ((cmd==ACX100_CMD_ENABLE_RX)||(cmd==ACX100_CMD_ENABLE_TX)) {
+	} else if ((cmd==ACX100_CMD_ENABLE_RX)||(cmd==ACX100_CMD_ENABLE_TX)||(cmd==ACX100_CMD_SLEEP)) {
 		hw->usbout.rxtx.cmd=cmd;
 		hw->usbout.rxtx.status=0;
 		hw->usbout.rxtx.data=1;		/* just for testing */
@@ -190,7 +189,7 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	hw->ctrl_urb->timeout=timeout;
 	ucode=submit_urb(hw->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message (ack) failed with errcode %d\n",ucode);
 		return(0);
 	}
 	/* ---------------------------------
@@ -208,7 +207,9 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 		FN_EXIT(0,result);
 		return(0);
 	}
-	acxlog(L_XFER,"status=%d\n",hw->usbin.rridresp.status);
+	if (hw->usbin.rridresp.status!=1) {
+		acxlog(L_DEBUG,"command returned status %d\n",hw->usbin.rridresp.status);
+	}
 	if (cmd==ACX100_CMD_INTERROGATE) {
 		if ((pdr)&&(paramlen>0)) {
 			if (skipridheader) {
@@ -235,7 +236,6 @@ static void acx100usb_control_complete(struct urb *urb)
 static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 #endif
 {
-	wlandevice_t *priv=urb->context;
 	FN_ENTER;
 	FN_EXIT(0,0);
 }

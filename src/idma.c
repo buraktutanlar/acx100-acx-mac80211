@@ -956,6 +956,19 @@ inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
 	return winlevel;
 }
 
+inline UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise)
+{
+	int qual;
+
+	qual = (((signal - 30) * 100 / 70) + (100 - noise * 4)) / 2;
+
+	if (qual > 100)
+		return 100;
+	if (qual < 0)
+		return 0;
+	return (UINT8)qual;
+}
+
 /*----------------------------------------------------------------
 * acx100_log_rxbuffer
 *
@@ -1023,6 +1036,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	int curr_idx;
 	unsigned int count = 0;
 	p80211_hdr_t *buf;
+	int qual;
 
 	FN_ENTER;
 
@@ -1114,9 +1128,13 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 #endif
 			priv->wstats.qual.level = acx_signal_to_winlevel(pDesc->data->phy_level);
 			priv->wstats.qual.noise = acx_signal_to_winlevel(pDesc->data->phy_snr);
-			priv->wstats.qual.qual =
-				(priv->wstats.qual.noise <= 100) ?
+#ifndef OLD_QUALITY
+			qual = acx_signal_determine_quality(priv->wstats.qual.level, priv->wstats.qual.noise);
+#else
+			qual = (priv->wstats.qual.noise <= 100) ?
 					100 - priv->wstats.qual.noise : 0;
+#endif
+			priv->wstats.qual.qual = qual;
 			priv->wstats.qual.updated = 7; /* all 3 indicators updated */
 #if FROM_SCAN_SOURCE_ONLY
 		}

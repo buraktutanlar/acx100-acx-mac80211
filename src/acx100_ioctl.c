@@ -73,6 +73,8 @@
  *  performed. I don't now if this is safe, we'll see.
  */
 
+extern inline UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
+
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
@@ -568,8 +570,12 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 		address[i].sa_family = ARPHRD_ETHER;
 		qual[i].level = priv->bss_table[i].sir;
 		qual[i].noise = priv->bss_table[i].snr;
+#ifndef OLD_QUALITY
+		qual[i].qual = acx_signal_determine_quality(qual[i].level, qual[i].noise);
+#else
 		qual[i].qual = (qual[i].noise <= 100) ?
 			       100 - qual[i].noise : 0;;
+#endif
 		qual[i].updated = 0; /* no scan: level/noise/qual not updated */
 	}
 	if (0 != i)
@@ -657,8 +663,12 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	 * how to calibrate it yet */
 	iwe.u.qual.level = bss->sir;
 	iwe.u.qual.noise = bss->snr;
+#ifndef OLD_QUALITY
+	iwe.u.qual.qual = acx_signal_determine_quality(iwe.u.qual.level, iwe.u.qual.noise);
+#else
 	iwe.u.qual.qual = (iwe.u.qual.noise <= 100) ?
 				100 - iwe.u.qual.noise : 0;
+#endif
 	iwe.u.qual.updated = 7;
 	acxlog(L_IOCTL, "scan, link quality: %d/%d/%d\n", iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_QUAL_LEN);

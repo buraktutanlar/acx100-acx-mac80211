@@ -3,6 +3,11 @@ ifndef ACX_DEBUG
   $(warning ACX_DEBUG was not defined, assuming 1)
 endif # ACX_DEBUG
 
+ifndef ACX_IO_WIDTH
+  ACX_IO_WIDTH=16
+  $(warning ACX_IO_WIDTH was not defined, assuming 16bit access)
+endif # ACX_DEBUG
+
 PWD=$(shell pwd)
 KERNELRELEASE=$(shell uname -r)
 KERNELDIR = /lib/modules/$(KERNELRELEASE)
@@ -11,9 +16,7 @@ INSTALL = /usr/bin/install -c
 DEPMOD = $(shell which depmod)
 LN = $(shell which ln)
 
-# FIXME: should be changed to -DACX_32BIT_IO=$(ACX_32BIT_IO),
-# also same handling as for ACX_DEBUG above
-export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_32BIT_IO
+export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)
 
 -include $(KERNELDIR)/build/.config
 

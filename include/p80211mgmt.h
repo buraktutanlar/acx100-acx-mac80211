@@ -42,9 +42,8 @@
  *
  * --------------------------------------------------------------------
  */
-
-#ifndef _P80211MGMT_H
-#define _P80211MGMT_H
+#ifndef __ACX_P80211MGMT_H
+#define __ACX_P80211MGMT_H
 
 /*================================================================*/
 /* System Includes */
@@ -470,4 +469,4 @@ typedef struct wlan_fr_deauthen {
 
 
 
-#endif				/* _P80211MGMT_H */
+#endif /* __ACX_P80211MGMT_H */

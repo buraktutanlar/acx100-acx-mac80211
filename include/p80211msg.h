@@ -43,8 +43,8 @@
  * --------------------------------------------------------------------
  */
 
-#ifndef _P80211MSG_H
-#define _P80211MSG_H
+#ifndef __ACX_P80211MSG_H
+#define __ACX_P80211MSG_H
 
 /*================================================================*/
 /* System Includes */
@@ -52,7 +52,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#ifndef _WLAN_COMPAT_H
+#ifndef __ACX_WLAN_COMPAT_H
 #include <wlan/wlan_compat.h>
 #endif
 
@@ -90,4 +90,4 @@ __WLAN_PRAGMA_PACKDFLT__
 /* Extern Declarations */
 /*================================================================*/
 /* Function Declarations */
-#endif				/* _P80211MSG_H */
+#endif /* __ACX_P80211MSG_H */
