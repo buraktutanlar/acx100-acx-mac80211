@@ -385,7 +385,12 @@ typedef enum {
 #define ACX100_CMD_CONFIG_TIM		0x0a
 #define ACX100_CMD_JOIN			0x0b
 #define ACX100_CMD_WEP_MGMT		0x0c
+#if OLD_FIRMWARE_VERSIONS
 #define ACX100_CMD_HALT			0x0e	/* mapped to unknownCMD in FW150 */
+#else
+#define ACX100_CMD_MEM_READ		0x0d
+#define ACX100_CMD_MEM_WRITE		0x0e
+#endif
 #define ACX100_CMD_SLEEP		0x0f
 #define ACX100_CMD_WAKE			0x10
 #define ACX100_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */

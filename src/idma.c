@@ -186,6 +186,9 @@ int acx100_delete_dma_regions(wlandevice_t *priv)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
+	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
+	 * here instead? Or are we that much down the road that it's no
+	 * longer possible here? */
 	acx100_write_reg16(priv, priv->io[IO_ACX_ENABLE], 0);
 
 	/* used to be a for loop 1000, do scheduled delay instead */
@@ -547,7 +550,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		tx_desc->rate = 3;
 		
 		if(header->length != sizeof(struct framehdr)) {
-			acxlog(L_STD, "UHOH, packet has a different length than struct framehdr (0x%X vs. 0x%X)\n", sizeof(struct framehdr), header->length );
+			acxlog(L_DATA, "UHOH, packet has a different length than struct framehdr (0x%X vs. 0x%X)\n", sizeof(struct framehdr), header->length );
 			
 			/* copy the data at the right place */
 			memcpy(header->data + header->length, payload->data, payload->length);
@@ -794,9 +797,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 		/* check if txdesc is marked as "Tx finished" and "owned" */
 		if ((pTxDesc->Ctl & DESC_CTL_DONE) == DESC_CTL_DONE) {
 
-			acxlog(L_BUF, "cleaning %d\n", finger);
-
-			if (0 != pTxDesc->error)
+			if (unlikely(0 != pTxDesc->error))
 				acx_handle_tx_error(priv, pTxDesc);
 
 			if (1 == priv->txrate_auto)
@@ -818,6 +819,9 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 				acxlog(L_XFER, "wake queue (avail. Tx desc %d).\n", priv->TxQueueFree);
 				netif_wake_queue(priv->netdev);
 			}
+			/* log AFTER having done the work, faster */
+			acxlog(L_BUF, "cleaned %d\n", finger);
+
 		}
 		else
 			break;
@@ -1113,7 +1117,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	spin_lock_irqsave(&rx_lock, flags);
 	do {
 		count++;
-		if (count > pDc->rx_pool_count)
+		if (unlikely(count > pDc->rx_pool_count))
 		{ /* hmm, no luck: all descriptors empty, bail out */
 			spin_unlock_irqrestore(&rx_lock, flags);
 			acxlog(L_BUF, "%s: huh, descriptors empty...\n", __func__);
@@ -1130,7 +1134,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 #else
 	while (1) {
 		count++;
-		if (count > pDc->rx_pool_count)
+		if (unlikely(count > pDc->rx_pool_count))
 		{ /* hmm, no luck: all descriptors empty, bail out */
 			FN_EXIT(0, 0);
 			return;
@@ -1193,7 +1197,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		 * discard broken packets - but NOT for monitor!)
 		 * and update Rx packet statistics here */
 
-		if (priv->monitor) {
+		if (unlikely(priv->monitor)) {
 			acx100_rxmonitor(priv, pDesc->data);
 		} else if (buf_len >= 14) {
 			acx100_rx_ieee802_11_frame(priv, pDesc);
@@ -2035,7 +2039,7 @@ struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv)
 		tx_desc = (struct txdescriptor *)(((UINT32)tx_desc) + (4 * pDc->tx_head));
 	}
 
-	if (0 == (tx_desc->Ctl & ACX100_CTL_OWN)) {
+	if (unlikely(0 == (tx_desc->Ctl & ACX100_CTL_OWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
 		tx_desc = NULL;

@@ -832,7 +832,7 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 	while (len < le32_to_cpu(apfw_image->size)) {
 
 		int byte = *image;
-		acc |= *image << (counter * 8);
+		acc |= byte << (counter * 8);
 		sum += byte;
 
 		image++;
@@ -931,8 +931,8 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, U
 #if NO_AUTO_INCREMENT
 			acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset + len - 4));
 
-			acc2 = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]));
 #endif
+			acc2 = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]));
 
 			if (acc2 != acc1) {
 				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %d don't match!! (0x%08x vs. 0x%08x). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
@@ -1320,7 +1320,7 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 		dk.KeyID = priv->wep_current_index;
 		acx100_configure(priv, &dk, ACX100_RID_DOT11_WEP_KEY);
 	}
-	/* FIXME: wep_key_struct is filled nowhere! */
+	/* FIXME!!! wep_key_struct is filled nowhere! */
 	for (i = 0; i <= 9; i++) {
 		if (priv->wep_key_struct[i].len != 0) {
 			MAC_COPY(wep_mgmt.MacAddr, priv->wep_key_struct[i].addr);
@@ -1328,7 +1328,9 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 			memcpy(&wep_mgmt.Key, priv->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
 			wep_mgmt.Action = cpu_to_le16(1);
 			acxlog(L_ASSOC, "writing WEP key %d (len %d).\n", i, le16_to_cpu(wep_mgmt.KeySize));
-			if (0 != acx100_issue_cmd(priv, ACX100_CMD_WEP_MGMT, &wep_mgmt, 0x25, 5000)) {
+			/* FIXME: should we write sizeof or instead
+			 * use KeySize?? */
+			if (0 != acx100_issue_cmd(priv, ACX100_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt), 5000)) {
 				priv->wep_key_struct[i].index = i;
 			}
 		}
@@ -2262,7 +2264,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		/* set Tx */
 		acxlog(L_INIT, "Updating: %s Tx\n", priv->tx_disabled ? "disable" : "enable");
 		if ((UINT8)0 != priv->tx_disabled)
-			acx100_issue_cmd(priv, ACX100_CMD_DISABLE_TX, NULL, 0x1, 5000);
+			acx100_issue_cmd(priv, ACX100_CMD_DISABLE_TX, NULL, 0x0 /* FIXME: this used to be 0x1, but since we don't transfer a parameter... */, 5000);
 		else
 			acx100_issue_cmd(priv, ACX100_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000);
 		priv->set_mask &= ~GETSET_TX;
@@ -2419,7 +2421,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 
 				/* stop any previous scan */
-				acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
+				acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
 #warning Is this used anymore?
 				if(priv->chip_type == CHIPTYPE_ACX100) {
 					struct scan s;
@@ -2574,8 +2576,9 @@ int acx100_set_defaults(wlandevice_t *priv)
 
 	priv->rts_threshold = 2312; /* max. size: disable RTS mechanism */
 
-	priv->short_retry = 5;
-	priv->long_retry = 3;
+	/* use standard default values for retry limits */
+	priv->short_retry = 7; /* max. retries for (short) non-RTS packets */
+	priv->long_retry = 4; /* max. retries for long (RTS) packets */
 	priv->set_mask |= GETSET_RETRY;
 
 	priv->txrate_auto = (UINT8)0; /* FIXME: disable it by default, implementation not very good yet. */
@@ -2620,7 +2623,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->val0x2324[0x6] = (UINT8)0x1f;
 
 	/* set some more defaults */
-	priv->tx_level_dbm = (UINT8)20;
+	priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
 	priv->tx_level_auto = (UINT8)1;
 	priv->set_mask |= GETSET_TXPOWER;
 
@@ -3365,19 +3368,26 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 
 	/* yg: Why reading a 16-bits register for a 8-bits value ? */
 	*charbuf = (UINT8)acx100_read_reg16(priv, priv->io[IO_ACX_PHY_DATA]);
-	acxlog(L_DEBUG, "radio PHY read 0x%04x --> 0x%02x\n", reg, *charbuf); 
-	result = 1;
+#else
+	mem_read_write_t mem;
 
+	mem.addr = cpu_to_le16(reg);
+	mem.type = cpu_to_le16(0x82);
+	mem.len = cpu_to_le32(1);
+	acx100_issue_cmd(priv, ACX100_CMD_MEM_READ, &mem, 0x8 + mem.len, 200000);
+	*charbuf = (UINT8)mem.data[0];
+#endif
+	acxlog(L_DEBUG, "radio PHY read 0x%02x from 0x%04x\n", *charbuf, reg); 
+	result = 1;
+	goto done; /* silence compiler warning */
 done:
 	FN_EXIT(1, result);
-#endif
 	return result;
 }
 
 UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
 {
 #if (WLAN_HOSTIF!=WLAN_USB)
-
 	FN_ENTER;
 
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], cpu_to_le32(reg));
@@ -3391,10 +3401,16 @@ UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
 	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA], cpu_to_le16(value));
 	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA] + 2, 0);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], cpu_to_le32(1));
+#else
+	mem_read_write_t mem;
 
-	acxlog(L_DEBUG, "radio PHY write 0x%02x -->  0x%04x\n", value, reg); 
-
-	FN_EXIT(1, 1);
+	mem.addr = cpu_to_le16(reg);
+	mem.type = cpu_to_le16(0x82);
+	mem.len = cpu_to_le32(1);
+	mem.data[0] = value;
+	acx100_issue_cmd(priv, ACX100_CMD_MEM_WRITE, &mem, 0x8 + mem.len, 200000);
 #endif
+	acxlog(L_DEBUG, "radio PHY write 0x%02x to 0x%04x\n", value, reg); 
+	FN_EXIT(1, 1);
 	return 1;
 }

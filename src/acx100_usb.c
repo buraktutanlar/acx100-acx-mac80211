@@ -338,6 +338,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		}
 		memset(priv,0,sizeof(wlandevice_t));
 		priv->chip_type = CHIPTYPE_ACX100;
+		priv->radio_type = RADIO_RFMD_11; /* FIXME: correct? FIXME: should be read from register (via firmware) using standard ACX code */
 		priv->usbdev=usbdev;
 		/* ---------------------------------------------
 		** Initialize the device context and also check

@@ -737,12 +737,14 @@ static inline int acx100_ioctl_get_scan(struct net_device *dev, struct iw_reques
 	}
 	priv->scan_start = 0;
 
+#if ENODATA_TO_BE_USED_AFTER_SCAN_ERROR_ONLY
 	if (priv->bss_table_count == 0)
 	{
 		/* no stations found */
 		result = -ENODATA;
 		goto end;
 	}
+#endif
 
 	for (i = 0; i < priv->bss_table_count; i++)
 	{

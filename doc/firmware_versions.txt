@@ -26,3 +26,6 @@ ACX111 firmware versions:
 
 0.1.0.11:
   Nothing known so far.
+
+1.2.0.30:
+  Nothing known so far.

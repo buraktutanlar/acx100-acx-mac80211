@@ -15,7 +15,7 @@ ESSID="any" # THIS IS CASE SeNsItIvE!! any == associate to any ESSID
 # Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
 CHAN=6 # it's useful to try to stick to channels 1, 6 or 11 only, since these don't overlap with other channels
-#TXPOWER=20 # 0..20 (dBm) (18dBm is firmware default)
+#TXPOWER=18 # 0..20 (dBm) (18dBm is firmware default) overly large setting might perhaps destroy your radio eventually!
 MODE=Auto # Auto == auto-select Managed or Ad-Hoc depending on environment
 DEBUG=0xb
 #KEY="B401CD21B44CCD21DEADBEEF11" # WEP128

@@ -14,6 +14,8 @@ JANITORIAL/EASY:
 * add default firmware directory (/usr/share/acx/) in case of unspecified firmware_dir
 * introduce iwpriv for setting individual bits in set_mask and get_mask
 (for debugging)
+* put ACX100/ACX111/TNETW1100/TNETW1130/TNETW1230 strings on project page
+  /homepage once the driver has full support...
 - add .lsm file
 - AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!
@@ -23,9 +25,8 @@ JANITORIAL/EASY:
 - Check source code using code checker:
   splint (DONE!), flawfinder, pscan, icc, smatch/valgrind, pc-lint, freshmeat
   cqual/TAU/calltree/Perfometer/Nitro Technologies Memory Checker/MemCheck Deluxe
-- put ACX100/ACX111/TNETW1100/TNETW1130/TNETW1230 strings on project page
-  /homepage once the driver has full support...
 - check all alloc() type functions for proper after-use of free() type functions
+- per-card debug setting? (using priv->debug, needs to check priv NULL though)
 - real init script syntax (add init-usable script to scripts/)
 - driver really endianness-clean, e.g. for Mac use? Use cpu_to_leXX, leXX_to_cpu, most parts fixed, 040413 [AM]
 - average transfer rates in README: our driver vs. Windows standard driver
@@ -43,6 +44,9 @@ BUGS:
 * modprobe: page allocation failure. order:4, mo de:0x21
   in ALSA driver after multiple suspend/resume: our driver doesn't free
   DMA pages upon suspend, yet allocates new DMA pages on resume in init_mac!!
+* figure out why on my Dell Inspiron 8000, the notebook refuses to suspend
+  properly (immediate resume after power-off, urks!) when the ACX100 mini-PCI
+  is installed
 + switching from XFree86 to console may lead to "dead card" (no IRQs possible).
   Reinit only after eject/reinsert!!!
   IRQ problem!! Does PCI card have that as well? Or only a CardBus issue?
@@ -60,6 +64,16 @@ BUGS:
   https://sourceforge.net/forum/forum.php?thread_id=1049230&forum_id=257272
   IRQ loss has been reported to also happen when switching from text mode
   to frame buffer on Linux bootup
+- when Tx is broken (no reception of peer),
+  then it's possible to reactivate it using ACX100_CMD_ENABLE_TX and ENABLE_RX!!
+  Does it happen in case of lots of traffic?
+  Does reset work using other settings, too?
+  Not possible using SET_RXCONFIG, GETSET_ANTENNA, GETSET_SENSITIVITY,
+  GETSET_TXPOWER, GETSET_ED_THRESH, GETSET_CCA, GETSET_POWER_80211,
+  GETSET_RETRY, GETSET_REG_DOMAIN, GETSET_WEP
+  Maybe Tx disable is an overheating protection? It happens much more often with
+  my *builtin* mini-PCI card... In this case we really shouldn't do anything about it in order to not destroy hardware... :-\
+- /proc files won't get removed after card eject, only after driver unload!
 - ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!! (not too problematic)
 - TxError0x20 (hint: also happens in any case where the firmware cannot send
   any packets currently, e.g. during station scan etc.)
@@ -73,9 +87,6 @@ orum_id=257272)
   does not work the way it should. There are reports that WEP is being accepted
   by the driver after ifconfig up only??
 - iwlist wlan0 scanning doesn't work on first try. Huh, works properly! 040413 [AM]
-- figure out why on my Dell Inspiron 8000, the notebook refuses to suspend
-  properly (immediate resume after power-off, urks!) when the ACX100 mini-PCI
-  is installed
 - see Bug reports
 
 STANDARD TODO ITEMS:
@@ -89,14 +100,25 @@ STANDARD TODO ITEMS:
   to actually hang the machine!). Working quite nicely, even with
   network access after resume with all previous settings, 040421 [AM]
 - merge ACX100 USB support (acx100_usb.c) into main code somehow (many ioctl or /proc related things missing for USB)
-- ACX100 USB implement Tx power setting (via firmware)
+- ACX100 USB implement Tx power setting (via I/O register access via firmware)
 - rtnl_lock/unlock??
 - implement 802.11b power save mode
+- ACX100 USB scan not working? (chip_type??)
+- ACX100 USB no on-the-fly change of bitrate??
+- stabilize ACX100 USB (DHCP etc.)
+- ACX100 USB endianness
+- WEP flag in assoc_req ok??
+- crash on USB unload
+- split into README / INSTALL
+- full AMD64, PPC support
+- more verbose Info IRQ
+- implement our own log ring buffer (to prevent having to write to system logs)
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)
   Note: locking for packet transfer is finished
 + scan delays higher, configurable? wlandevice_t variables added, 040413 [AM]
 - HostAP (Master) mode support needs to be implemented/finished properly
+- do we need MII support? (SIOCETHTOOL / SIOCGMIIREG / SIOCDEVPRIVATE?)
 + Tx auto rate, crude first implementation done, 040413 [AM]
 - auto power adjustment "iwconfig txpower 20 auto"
 - implement packet fragmentation

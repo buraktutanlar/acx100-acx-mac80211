@@ -342,6 +342,13 @@ typedef struct acxp80211_packet {
 	struct acxp80211_hdr hdr; /* actual packet */
 } acxp80211_packet_t;		/* size: 0x56 */
 
+typedef struct {
+    UINT16 addr;
+    UINT16 type; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg. */
+    UINT32 len;
+    UINT8 data[256];
+} mem_read_write_t;
+
 typedef struct acxp80211_beacon_prb_resp_template {
 	UINT16 size; /* packet len indicator for firmware */
 	struct acxp80211_beacon_prb_resp pkt;
@@ -391,7 +398,7 @@ typedef struct acx100_wep_mgmt {
     UINT8	MacAddr[ETH_ALEN];
     UINT16	Action;
     UINT16	KeySize;
-    UINT16	Key[29];	/* 29*8 == 232bits == WEP256 */
+    UINT8	Key[29];	/* 29*8 == 232bits == WEP256 */
 } acx100_wep_mgmt_t;
 
 

@@ -1651,14 +1651,13 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	wlandevice_t *priv = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
 	UINT16 irqtype;
 	int irqcount = MAX_IRQLOOPS_PER_JIFFY;
-	static unsigned long entry_count = 0;
 	static int loops_this_jiffy = 0;
 	static unsigned long last_irq_jiffies = 0;
 
 	FN_ENTER;
 
 	irqtype = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_CLEAR]);
-	if (0xffff == irqtype)
+	if (unlikely(0xffff == irqtype))
 	{
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
@@ -1670,19 +1669,14 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	}
 		
 	irqtype &= ~(priv->irq_mask); /* check only "interesting" IRQ types */
-	pm_access(priv->pm);
+	/* pm_access(priv->pm); OUTDATED, thus disabled at the moment */
+	acxlog(L_IRQ, "IRQTYPE: 0x%X, irq_mask: 0x%X\n", irqtype, priv->irq_mask);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
 	 * with other cards!) */
 	if (0 == irqtype) {
-		acxlog(L_IRQ, "IRQTYPE: %X, irq_mask: %X\n", irqtype, priv->irq_mask);
 		FN_EXIT(0, 0);
 		return IRQ_NONE;
-	}
-	else
-	{
-		entry_count++;
-		acxlog(L_IRQ, "IRQTYPE: 0x%X, irq_mask: 0x%X, entry count: %ld\n", irqtype, priv->irq_mask, entry_count);
 	}
 /*	if (acx100_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
@@ -1692,7 +1686,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
   last_irq_jiffies = jiffies;
 
   while ((irqtype != 0) && (irqcount-- > 0)) {
-    if (++loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY) {
+    if (unlikely(++loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
       acxlog(-1, "HARD ERROR: Too many interrupts this jiffy\n");
       priv->irq_mask = 0;
         break;
@@ -1702,10 +1696,12 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
         /* do most important IRQ types first */
 	if (0 != (irqtype & 0x8)) {
 		acx100_process_rx_desc(priv);
+		acxlog(L_IRQ, "Got Rx Complete IRQ\n");
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8);
 	}
 	if (0 != (irqtype & 0x2)) {
 		acx100_clean_tx_desc(priv);
+		acxlog(L_IRQ, "Got Tx Complete IRQ\n");
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x2);
 #if 0
 /* this shouldn't happen here generally, since we'd also enable user packet
@@ -1721,58 +1717,57 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	/* group all further IRQ types to improve performance */
 	if (0 != (irqtype & 0x00f5)) {
 		if (0 != (irqtype & 0x1)) {
-			(void)printk("Got Rx Data IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1);
+			acxlog(L_STD|L_IRQ, "Got Rx Data IRQ\n");
 		}
 		if (0 != (irqtype & 0x4)) {
-			(void)printk("Got Tx Xfer IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4);
+			acxlog(L_STD|L_IRQ, "Got Tx Xfer IRQ\n");
 		}
 		if (0 != (irqtype & 0x10)) {
-			(void)printk("Got DTIM IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x10);
+			acxlog(L_STD|L_IRQ, "Got DTIM IRQ\n");
 		}
 		if (0 != (irqtype & 0x20)) {
-			(void)printk("Got Beacon IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x20);
+			acxlog(L_STD|L_IRQ, "Got Beacon IRQ\n");
 		}
 		if (0 != (irqtype & HOST_INT_TIMER) /* 0x40 */ ) {
 			acx100_timer((unsigned long)priv);
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TIMER);
+			acxlog(L_IRQ, "Got Timer IRQ\n");
 		}
-		if (0 != (irqtype & 0x80)) {
-			(void)printk("Got Key Not Found IRQ\n");
+		if (unlikely(0 != (irqtype & 0x80))) {
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x80);
+			acxlog(L_STD|L_IRQ, "Got Key Not Found IRQ\n");
 		}
 	}
 	if (0 != (irqtype & 0x0f00)) {
-		if (0 != (irqtype & 0x100)) {
-			(void)printk("Got IV ICV Failure IRQ\n");
+		if (unlikely(0 != (irqtype & 0x100))) {
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x100);
+			acxlog(L_STD|L_IRQ, "Got IV ICV Failure IRQ\n");
 		}
 		if (0 != (irqtype & 0x200)) {
-			(void)printk("Got Command Complete IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
 			/* save the state for the running issue cmd */
 			priv->irq_status |= 0x200; 
+			acxlog(L_IRQ, "Got Command Complete IRQ\n");
 		}
 		if (0 != (irqtype & 0x400)) {
 			acx100_handle_info_irq(priv);
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x400);
 		}
-		if (0 != (irqtype & 0x800)) {
-			(void)printk("Got Overflow IRQ\n");
+		if (unlikely(0 != (irqtype & 0x800))) {
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x800);
+			acxlog(L_STD|L_IRQ, "Got Overflow IRQ\n");
 		}
 	}
 	if (0 != (irqtype & 0xf000)) {
-		if (0 != (irqtype & 0x1000)) {
-			(void)printk("Got Process Error IRQ\n");
+		if (unlikely(0 != (irqtype & 0x1000))) {
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1000);
+			acxlog(L_STD|L_IRQ, "Got Process Error IRQ\n");
 		}
 		if (0 != (irqtype & HOST_INT_SCAN_COMPLETE) /* 0x2000 */ ) {
-			/* V1_3CHANGE: dbg msg only in V1 */
-			acxlog(L_IRQ, "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
 
 			/* place after_interrupt_task into schedule to get
 			   out of interrupt context */
@@ -1781,14 +1776,15 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
 			priv->irq_status |= HOST_INT_SCAN_COMPLETE;
 
+			acxlog(L_IRQ, "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
 		}
 		if (0 != (irqtype & 0x4000)) {
-			(void)printk("Got FCS Threshold IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4000);
+			acxlog(L_STD|L_IRQ, "Got FCS Threshold IRQ\n");
 		}
-		if (0 != (irqtype & 0x8000)) {
-			(void)printk("Got Unknown IRQ\n");
+		if (unlikely(0 != (irqtype & 0x8000))) {
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8000);
+			acxlog(L_STD|L_IRQ, "Got Unknown IRQ\n");
 		}
 	}
 /*	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], irqtype); */
@@ -1801,7 +1797,6 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 #endif
 
 /*	acx100_unlock(priv,&flags); */
-	entry_count--;
 	FN_EXIT(0, 0);
 	return IRQ_HANDLED;
 }

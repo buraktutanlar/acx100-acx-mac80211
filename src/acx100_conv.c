@@ -196,7 +196,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	FN_ENTER;
 
-	if (0 == skb->len) {
+	if (unlikely(0 == skb->len)) {
 		acxlog(L_DEBUG, "zero-length skb!\n");
 		return 1;
 	}
@@ -426,7 +426,7 @@ fail:
 		/* 802.3 Encapsulated */
 		/* Test for an overlength frame */
 
-		if ( payload_length > WLAN_MAX_ETHFRM_LEN) {
+		if (unlikely(payload_length > WLAN_MAX_ETHFRM_LEN)) {
 			/* A bogus length ethfrm has been encap'd. */
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "ENCAP frame too large (%d > %d)\n", 
@@ -461,7 +461,7 @@ fail:
 		/* build 802.3 + RFC1042 */
 
 		/* Test for an overlength frame */
-		if ( payload_length + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN ) {
+		if (unlikely(payload_length + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN)) {
 			/* A bogus length ethfrm has been sent. */
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "SNAP frame too large (%d > %d)\n", 
@@ -472,7 +472,7 @@ fail:
 		/* allocate space and setup host buffer */
 		buflen = payload_length + WLAN_ETHHDR_LEN;
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
-		if (skb == NULL) {
+		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "failed to allocate skb\n");
 			return NULL;
 		}
@@ -501,7 +501,7 @@ fail:
 		/* build a DIXII + RFC894 */
 		
 		/* Test for an overlength frame */
-		if ( payload_length - sizeof(wlan_llc_t) - sizeof(wlan_snap_t) + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN) {
+		if (unlikely(payload_length - sizeof(wlan_llc_t) - sizeof(wlan_snap_t) + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN)) {
 			/* A bogus length ethfrm has been sent. */
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "DIXII frame too large (%d > %d)\n",
@@ -513,7 +513,7 @@ fail:
 		/* allocate space and setup host buffer */
 		buflen = payload_length + WLAN_ETHHDR_LEN - sizeof(wlan_llc_t) - sizeof(wlan_snap_t);
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
-		if (skb == NULL) {
+		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "failed to allocate skb\n");
 			return NULL;
 		}
@@ -540,7 +540,7 @@ fail:
 		/* allocate space and setup hostbuf */
 
 		/* Test for an overlength frame */
-		if (payload_length + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN) {
+		if (unlikely(payload_length + WLAN_ETHHDR_LEN > WLAN_MAX_ETHFRM_LEN)) {
 			/* A bogus length ethfrm has been sent. */
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "OTHER frame too large (%d > %d)\n",
@@ -552,7 +552,7 @@ fail:
 		/* allocate space and setup host buffer */
 		buflen = payload_length + WLAN_ETHHDR_LEN;
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
-		if (skb == NULL) {
+		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "failed to allocate skb\n");
 			return NULL;
 		}

@@ -2,7 +2,28 @@
 *             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
-WARNING: this driver may still cause your box to lockup in very rare cases!
+!!!!! MANDATORY WARNINGS !!!!!
+
+I just learned that the WRT54G router (non-ACX1xx chipset) has trouble with its
+radio when running with higher than usual Tx power (70-100mW or so)
+which is possible using incredibly cool custom Linux firmwares, meaning that
+people end up with defective radios sometimes after 3 months even, if they
+choose irresponsibly high Tx power levels!!
+Since this driver can drive ACX1xx cards to use up to 100mW of power,
+I really don't know how long the radio would stand that.
+Thus it'd be useful to not use full output power if you can avoid it!!
+Note that so far I haven't had any defects during constantly using
+maximum power (our "20dBm" setting) for many months now, so it MIGHT
+be safe. However you might have different hardware which doesn't take that
+so easy...
+(BTW: my *builtin* mini-PCI card disables its radio every few hours,
+and that might be linked to overheating protection or so...)
+Thus I adjusted all driver files to use a hopefully safe 18dBm per default
+(which is the firmware default, too).
+Please inform us immediately if you suspect a dead radio resulting from
+prolonged use of overly large Tx power, we'd like to know that immediately!!!!!
+
+This driver may still cause your box to lockup in very rare cases!
 If this happens, then please report at/create a bug report!
 
 Card reliability warning: The DWL-650+ seems to have a slightly too high
@@ -10,6 +31,7 @@ defect rate (see doc/general_info). Consider buying any card with FCC ID
 O7J-GL242201 (0 defect reports) instead of the DWL-650+ (5+ defect/problem
 reports). One might attribute this to the higher sales numbers of the
 DWL-650+, but I'm not quite sure...
+
 
 Please NEVER consider using the NDIS driver loader cludge instead of our driver.
 For an incredible number of reasons against it, please see
@@ -559,6 +581,9 @@ several APs with hidden ESSID in your environment, then you need to also
 specify the AP MAC address in order to make sure that the *single attempt*
 we're making connects to the AP you want...
 
+If you get some "link failed" message or similar, try using
+MII_NOT_SUPPORTED=yes in your /etc/sysconfig/network-scripts/ifcfg-wlan0
+or similar file.
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-((
