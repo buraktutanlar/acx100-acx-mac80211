@@ -203,7 +203,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	payload = tx_desc->host_desc + 1;
 	header = tx_desc->host_desc;
-	if (0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
+	if ((unsigned long)0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
 		return 1;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
@@ -287,7 +287,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	MAC_COPY(w_hdr->a3.a2, a2);
 	MAC_COPY(w_hdr->a3.a3, a3);
 
-	if (0 != priv->wep_enabled)
+	if ((UINT8)0 != priv->wep_enabled)
 		fc |= host2ieee16(WLAN_SET_FC_ISWEP(1));
 		
 	w_hdr->a3.fc = fc;

@@ -127,6 +127,16 @@ extern int acx100_debug_func_indent;
 
 #endif /* ACX_DEBUG */
 
+/* Use worker_queues for 2.5/2.6 Kernels and queue tasks for 2.4 Kernels 
+   (used for the 'bottom half' of the interrupt routine) */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+#define USE_QUEUE_TASKS
+#else
+/* #define NEWER_KERNELS_ONLY 1 */
+#define USE_WORKER_TASKS
+#endif
+
 #define MAC_COPY(dst, src) \
 	*(UINT32 *)dst = *(UINT32 *)src; \
 	*(UINT16 *)(((UINT8 *)dst)+4) = *(UINT16 *)(((UINT8 *)src)+4); \
@@ -387,6 +397,9 @@ typedef enum {
 #define ACX100_CMD_TEST			0x17
 #define ACX100_CMD_RADIOINIT		0x18
 
+/*--- After Interrupt Commands -----------------------------------------------*/
+#define ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN		0x01
+#define ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE		0x02
 
 /*--- Buffer Management Commands ---------------------------------------------*/
 
@@ -1554,12 +1567,15 @@ typedef struct client {
 	struct client *next;	/* 0xa4 */
 } client_t;
 
-
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
 	struct	wlandevice 	*priv;
 	UINT32		val0x4;			/* spacing */
+	/* This is the pointer to the beginning of the cards tx queue pool.
+	   The Adress is relative to the internal memory mapping of the card! */
 	UINT32		ui32ACXTxQueueStart;	/* 0x8, official name */
+	/* This is the pointer to the beginning of the cards rx queue pool.
+	   The Adress is relative to the internal memory mapping of the card! */
 	UINT32		ui32ACXRxQueueStart;	/* 0xc */
 	UINT8		*pTxBufferPool;		/* 0x10 */
 	dma_addr_t	TxBufferPoolPhyAddr;	/* 0x14 */
@@ -1575,20 +1591,30 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	dma_addr_t	FrameHdrQPoolPhyAddr;	/* 0x30 */
 	UINT32 		val0x38;		/* 0x38, NOT USED */
 
+	/* This is the pointer to the beginning of the hosts tx queue pool.
+	   The address is relative to the cards internal memory mapping */
 	struct txhostdescriptor *pTxHostDescQPool;	/* V3POS 0x3c, V1POS 0x60 */
 	UINT		TxHostDescQPoolSize;	/* 0x40 */
+	/* This is the pointer to the beginning of the hosts tx queue pool.
+	   The address is relative to the host memory mapping */
 	UINT32		TxHostDescQPoolPhyAddr;	/* 0x44 */
 	UINT32		val0x48;		/* 0x48, NOT USED */
 	UINT32		val0x4c;		/* 0x4c, NOT USED */
 
+	/* This is the pointer to the beginning of the cards rx queue pool.
+	   The Adress is relative to the host memory mapping!! */
 	struct	rxdescriptor	*pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
 	UINT32		rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
 	UINT32		rx_tail;		/* 0x6c */
 	UINT32		val0x50;		/* V1POS:0x50, some size NOT USED */
 	UINT32		val0x54;		/* 0x54, official name NOT USED */
 
+	/* This is the pointer to the beginning of the hosts rx queue pool.
+	   The address is relative to the card internal memory mapping */
 	struct rxhostdescriptor *pRxHostDescQPool;	/* 0x58, is it really rxdescriptor? */
 	UINT32		RxHostDescQPoolSize;	/* 0x5c */
+	/* This is the pointer to the beginning of the hosts rx queue pool.
+	   The address is relative to the host memory mapping */
 	UINT32		RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
 	UINT32		val0x64;		/* 0x64, some size */
 	UINT32		*pRxBufferPool;		/* *rxdescq1; 0x70 */
@@ -1706,7 +1732,7 @@ typedef struct wlandevice {
 	void 		*iobase;		/* 18 */
 	void		*iobase2;		/* 1c */
 	UINT		chip_type;
-	char		*chip_name;
+	const char	*chip_name;
 	UINT8		bus_type;
 	UINT16		*io;
 
@@ -1721,6 +1747,15 @@ typedef struct wlandevice {
 	UINT32		get_mask;		/* mask of settings to fetch from the card */
 	UINT32		set_mask;		/* mask of settings to write to the card */
 
+	UINT8		irqs_active;	/* whether irq sending is activated */
+	UINT16		irq_status;
+	UINT8		after_interrupt_jobs; /* mini job list for doing actions after an interrupt occured */
+#ifdef USE_QUEUE_TASKS
+	struct tq_struct after_interrupt_task; /* our task for after interrupt actions */
+#else
+	struct work_struct after_interrupt_task; /* our task for after interrupt actions */
+#endif
+
 	/*** scanning ***/
 	UINT16		scan_count;		/* number of times to do channel scan */
 	UINT8		scan_mode;		/* 0 == active, 1 == passive, 2 == background */
@@ -1732,6 +1767,7 @@ typedef struct wlandevice {
 	UINT8		address[ETH_ALEN];	/* the BSSID before joining */
 	UINT8		bssid[ETH_ALEN];	/* the BSSID after having joined */
 	UINT8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
+	UINT16		aid;			/* The Association ID send from the AP */
 	UINT16		macmode_wanted;		/* That's the MAC mode we want (iwconfig) */
 	UINT16		macmode_chosen;		/* That's the MAC mode we chose after browsing the station list */
 	UINT16		macmode_joined;		/* This is the MAC mode we're currently in */
@@ -1925,6 +1961,7 @@ typedef struct wlandevice {
 
 void acx100_disable_irq(wlandevice_t *priv);
 void acx100_enable_irq(wlandevice_t *priv);
+void acx_schedule_after_interrupt_task(wlandevice_t *priv);
 void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 /*============================================================================*

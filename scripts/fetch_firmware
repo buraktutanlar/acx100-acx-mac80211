@@ -30,6 +30,9 @@ find_card()
   IDS_ACX100="104c:8400 104c:8401"
   IDS_ACX111="104c:9066"
   
+  echo
+  echo "Searching for ACX1xx cards on this system..."
+  let CARD_TYPE=0
   if [ -z "$LSPCI" ]; then
     echo "lspci not found! (package pciutils): Cannot determine wireless card type!"
     let CARD_TYPE=0
@@ -40,24 +43,22 @@ find_card()
     if [ -n "`echo $LSPCI_OUT|grep $card`" ]; then
       echo "DETECTED ACX100-based wireless card!"
       let CARD_TYPE=1
-      return
     fi
   done
   for card in $IDS_ACX111; do
     if [ -n "`echo $LSPCI_OUT|grep $card`" ]; then
       echo "DETECTED ACX111-based wireless card!"
       let CARD_TYPE=2
-      return
     fi
   done
-  echo "COULD NOT DETECT any ACX100- or ACX111-based wireless cards on this system."
-  echo "Decided to fetch firmware files for BOTH chipsets..."
-  echo
-  let CARD_TYPE=0
+  if [ $CARD_TYPE -eq 0 ]; then
+    echo "COULD NOT DETECT any ACX100- or ACX111-based wireless cards on this system."
+  fi
 }
 
 find_downloader()
 {
+  echo
   echo "Locating a suitable download tool..."
   WGET=`which wget`
   if test -n $WGET; then
@@ -80,19 +81,51 @@ find_downloader()
   exit 1
 }
 
+ask_user()
+{
+  echo
+  echo Which firmware files package would you like to download?
+  echo
+  echo "a) for ACX100 (TNETW1100) chipset based cards"
+  echo "b) for ACX111 (TNETW1130/1230) chipset based cards"
+  echo "c) for both chipsets"
+  echo "d) none"
+  echo -n "> "
+  read choice
+  case "$choice" in
+  	a|A)
+	let CARD_TYPE=1
+	;;
+	b|B)
+	let CARD_TYPE=2
+	;;
+	c|C)
+	let CARD_TYPE=0
+	;;
+	d|D)
+	let CARD_TYPE=255
+	;;
+	*)
+	echo "Invalid choice, choosing to download both firmware packages"
+	let CARD_TYPE=0
+  esac
+}
+
 download_files()
 {
   mkdir -p $DL_DIR
   
   pushd $DL_DIR 1>/dev/null
     if [ $CARD_TYPE -lt 2 ]; then # 0 or 1
+      echo "Downloading ACX100 firmware package..."
       for site in $ACX100_FILE_LOCATIONS; do
         FILE="`basename $site`"
         ${DL_STRING} "$site"
 	[ -f "$FILE" ] && break
       done
     fi
-    if [ $CARD_TYPE -ne 1 ]; then # 0 or 2
+    if [ $CARD_TYPE -eq 0 -o $CARD_TYPE -eq 2 ]; then
+      echo "Downloading ACX111 firmware package..."
       for site in $ACX111_FILE_LOCATIONS; do
         FILE="`basename $site`"
         ${DL_STRING} "$site"
@@ -140,9 +173,11 @@ extract_firmware()
 
 find_driver_dir
 
+find_downloader
+
 find_card
 
-find_downloader
+ask_user
 
 download_files
 

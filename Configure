@@ -9,7 +9,8 @@
 # some initial definitions
 
 CONFIG_MK=config.mk
-KERNEL_BUILD=/lib/modules/`uname -r`/build
+KERNEL_VER=`uname -r`
+KERNEL_BUILD=/lib/modules/$KERNEL_VER/build
 # If using 2.6 outputting to a seperate directory, make KERNEL_OUTPUT
 # point to that directory
 #KERNEL_OUTPUT=
@@ -86,6 +87,8 @@ wireless_stats() {
 	fi
 	let WIRELESS_VERSION=`grep define.*WIRELESS_EXT $KERNEL_BUILD/include/linux/wireless.h|tr '\t' ' '|cut -f3 -d' '`
 	echo Wireless header file is WIRELESS_EXT version $WIRELESS_VERSION.
+	gcc -v 2>&1|grep ver
+	echo Running linux $KERNEL_VER
 	if [ $WIRELESS_VERSION -lt 13 ]; then
 	  echo "Compile info: will choose to use code infrastructure for OLDER wireless extension interface version (< 13)"
 	  echo "This support is not perfectly tested, please report any problems!"
@@ -140,7 +143,7 @@ then
 	$ECHO "The following is needed for PCMCIA/CardBus cards:"
 	printflag "PCMCIA support" CONFIG_PCMCIA
 	printflag "CardBus support" CONFIG_CARDBUS
-	$ECHO "The following is needed for USB cards:"
+	$ECHO "The following is needed for USB card support:"
 	printflag "USB support" CONFIG_USB
 	$ECHO "The following is needed for PCI card support:"
 	printflag "PCI support" CONFIG_PCI

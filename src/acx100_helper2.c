@@ -1609,7 +1609,7 @@ int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int res = 0;
-	memmap_t pdr;
+/*	memmap_t pdr; */
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
@@ -1620,10 +1620,22 @@ int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 	else {
 		if (0 != acx100_is_mac_address_equal(priv->dev_addr, hdr->a4.a1 /* RA */)) {
 			if (WLAN_MGMT_STATUS_SUCCESS == req->status[0]) {
+				priv->aid = req->aid[0];
+#if (WLAN_HOSTIF==WLAN_USB)
+				/* FIXME!! need to do this here since
+				 * USB doesn't support our task handler yet */
+				{
+				memmap_t pdr;
 				pdr.m.asid.vala = req->aid[0];
 				acx100_configure(priv, &pdr, ACX100_RID_ASSOC_ID);
 				acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
 				acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
+				}
+#else
+				/* tell the card we are associated when we are out of interrupt context */
+				priv->after_interrupt_jobs |= ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE;
+				acx_schedule_after_interrupt_task(priv);
+#endif
 			}
 			else {
 				acxlog(L_STD | L_ASSOC, "Association FAILED: peer station sent response status code %d: \"%s\"!\n", req->status[0], get_status_string(req->status[0]));
@@ -2919,7 +2931,7 @@ void acx100_timer(unsigned long address)
 {
 	wlandevice_t *priv = (wlandevice_t *)address;
 	unsigned long flags;
-#if (WLAN_HOSTIF==WLAN_USB)
+#if 0
 	int status;
 #endif
 
@@ -2948,9 +2960,15 @@ void acx100_timer(unsigned long address)
 		else
 		{
 			acxlog(L_ASSOC, "Stopping scan (%s).\n", (0 != priv->bss_table_count) ? "stations found" : "scan timeout");
-			acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
 #if (WLAN_HOSTIF==WLAN_USB)
+			/* FIXME!! need to do this here since
+			 * USB doesn't support our task handler yet */
+			acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
 			acx100_complete_dot11_scan(priv);
+#else
+			/* stop the scan when we leave the interrupt context */
+			priv->after_interrupt_jobs |= ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN;
+			acx_schedule_after_interrupt_task(priv);
 #endif
 		}
 		break;

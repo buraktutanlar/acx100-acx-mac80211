@@ -97,6 +97,61 @@ typedef struct QueueConfig {
 	UINT16	pad;
 } QueueConfig_t;
 
+typedef struct ACX111QueueConfig {
+
+	UINT16 type;
+	UINT16 length;
+	UINT32 tx_memory_block_address;
+	UINT32 rx_memory_block_address;
+	UINT32 rx1_queue_address;
+	UINT32 reserved1;
+	UINT32 tx1_queue_address;
+	UINT8  tx1_attributes;
+	UINT16 reserved2;
+	UINT8  reserved3;
+
+} __WLAN_ATTRIB_PACK__ ACX111QueueConfig_t;
+
+typedef struct ACX111MemoryConfig {
+
+	UINT16 type;
+	UINT16 length;
+	UINT16 no_of_stations;
+	UINT16 memory_block_size;
+	UINT8 tx_rx_memory_block_allocation;
+	UINT8 count_rx_queues;
+	UINT8 count_tx_queues;
+	UINT8 options;
+	UINT8 fragmentation;
+	UINT16 reserved1;
+	UINT8 reserved2;
+
+	/* start of rx1 block */
+	UINT8 rx_queue1_count_descs;
+	UINT8 rx_queue1_reserved1;
+	UINT8 rx_queue1_reserved2; /* must be set to 7 */
+	UINT8 rx_queue1_reserved3; /* must be set to 0 */
+	UINT32 rx_queue1_host_rx_start;
+	/* end of rx1 block */
+
+	/* start of tx1 block */
+	UINT8 tx_queue1_count_descs;
+	UINT8 tx_queue1_reserved1;
+	UINT8 tx_queue1_reserved2;
+	UINT8 tx_queue1_attributes;
+	/* end of tx1 block */
+
+}  __WLAN_ATTRIB_PACK__ ACX111MemoryConfig_t;
+
+#if MAYBE_BOGUS
+typedef struct wep {
+	UINT16 vala;
+
+	UINT8 wep_key[MAX_KEYLEN];
+	char key_name[0x16];
+} wep_t;
+#endif
+
 typedef struct associd {
 	UINT16 vala;
 } associd_t;
@@ -195,6 +250,20 @@ typedef struct scan {
 	UINT16 max_probe_delay;
 } scan_t;			/* length 0xc */
 
+typedef struct acx111_scan {
+	UINT16 count; /* number of scans to do */
+	UINT8 channel_list_select;
+	UINT16 reserved1;
+	UINT8 reserved2;
+	UINT8 rate;
+	UINT8 options;
+	UINT16 chan_duration;
+	UINT16 max_probe_delay;
+	UINT8 modulation;
+	UINT8 channel_list[26];
+} __WLAN_ATTRIB_PACK__ acx111_scan_t;
+
+
 typedef struct tim {
 	UINT16 size;
 	UINT8 buf[0x100];
@@ -203,12 +272,12 @@ typedef struct tim {
 typedef struct proberesp {
 	UINT16 size;
 	char buf[0x54];
-} proberesp_t;
+} __WLAN_ATTRIB_PACK__ proberesp_t;
 
 typedef struct probereq {
 	UINT16 size;
 	char buf[0x44];
-} probereq_t;
+} __WLAN_ATTRIB_PACK__ probereq_t;
 
 typedef struct joinbss {
 	UINT8 bssid[ETH_ALEN];
@@ -222,7 +291,7 @@ typedef struct joinbss {
 	UINT8 channel;
 	UINT8 essid_len;
 	char essid[IW_ESSID_MAX_SIZE];	
-} joinbss_t; /* ACX100 specific join struct */
+} __WLAN_ATTRIB_PACK__ joinbss_t; /* ACX100 specific join struct */
 
 /*
  * I am temporarily redefining this because the above struct is somewhat wrong.
@@ -347,7 +416,8 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf);
 UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value);
 void acx100_start(wlandevice_t *priv);
 void acx100_reset_mac(wlandevice_t *priv);
-/*@null@*/ firmware_image_t *acx100_read_fw( const char *file);
+int acx100_check_file(const char *file);
+/*@null@*/ firmware_image_t *acx_read_fw( const char *file, UINT32 *size);
 int acx100_upload_fw(wlandevice_t *priv);
 int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 offset);
 int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset);
@@ -368,6 +438,7 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
 void acx100_set_probe_request_template(wlandevice_t *priv);
 void acx100_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);
+void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
 int acx100_set_rxconfig(wlandevice_t *priv);
 int acx100_load_radio(wlandevice_t *priv);
 int acx100_read_proc(char *page, char **start, off_t offset, int count,

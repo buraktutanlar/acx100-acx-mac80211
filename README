@@ -7,9 +7,9 @@ If this happens, then please report at/create a bug report!
 
 RELIABILITY WARNING: The DWL-650+ seems to have a slightly too high
 defect rate (see doc/general_info). Consider buying any card with FCC ID
-O7J-GL242201 (0 defect reports) instead of the 650+ (5+ defect/problem
-reports). One might attribute this to the higher sales numbers of the 650+,
-but I'm not quite sure...
+O7J-GL242201 (0 defect reports) instead of the DWL-650+ (5+ defect/problem
+reports). One might attribute this to the higher sales numbers of the
+DWL-650+, but I'm not quite sure...
 
 Please NEVER consider using the NDIS driver loader cludge instead of our driver.
 For an incredible number of reasons against it, please see
@@ -46,18 +46,15 @@ immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
 (and make sure to try previous versions of the driver as well!).
 
-Note that any Texas Instruments chips OTHER than the ACX100 (which is
-also known as TNETW1100) are not supported by this driver (yet).
-These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
-(ACX111).
-Almost working ACX111 support is in the driver, but it's still not quite
-working yet, due to many changes compared to the ACX100. [040413]
+Other Texas Instruments chips which are e.g. 802.11g capable and may be named
+TNETW1130/1230 (ACX111) only just started to actually be supported in a useful
+way by this driver [040523].
 
 Also, due to confusion about similar card naming (for further information, see
 bottom), people keep thinking certain cards they own work with this driver.
-Cards that are *NOT* based on ACX100 chipset (as opposed to the stupidly
-similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+, which *do*
-have ACX100) are:
+Cards that are *NOT* based on ACX1xx chipset (as opposed to the stupidly
+similarly named ACX1xx versions DWL-120+, DWL-520+ and DWL-650+, which *do*
+have ACX1xx) are:
 
 DWL-120 (PRISM2 chipset)
 DWL-520 (PRISM2)
@@ -71,9 +68,6 @@ DWL-G650, version B2 (Atheros AR5001)
 DWL-AG520 (Atheros AR5212)
 DWL-AB650 (Atheros AR5211)
 DWL-AG650 (Atheros AR5212)
-DWL-G520+ (ACX111: not fully supported yet, but it's being worked on!)
-DWL-G650+ (ACX111: dito)
-Netgear WG311 "v2" (ACX111, as opposed to v1, which is Atheros!)
 
 When looking at the DWL-G650 mess, I could puke again...
 Again, the cards mentioned in the listing above will NOT work with this driver
@@ -81,9 +75,10 @@ Again, the cards mentioned in the listing above will NOT work with this driver
 supporting your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
---- STATUS AS OF 040330 ---
+--- STATUS AS OF 040523 ---
 
-Currently this driver still is a bit experimental.
+Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
+still is a bit experimental.
 We're still not totally sure about the status of WEP support.
 Many situations should work, but it might still not work properly
 or fail sometimes.
@@ -116,6 +111,8 @@ since this seeks to list all requirements in full):
 * x86 box preferrably (other architectures such as Powerbooks may work since
   they have been tested from time to time, but please report IMMEDIATELY if
   they have any trouble, I'm very interested in that!)
+  Users who have other archs may need to remove certain compiler flags
+  in src/Makefile which are unsupported by their non-x86 compiler
 * most likely a Bus Master capable PCI slot for PCI card versions, slave
   PCI slot won't work (FIXME: is that true?)
 * relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
@@ -128,19 +125,23 @@ since this seeks to list all requirements in full):
 * a gcc package has to be installed
 * The /bin/bash shell is required for the start_net/stop_net scripts
 * module packages: modutils for Linux 2.4.x, module-init-tools for 2.5.x/2.6.x
-* firmware image and radio image for your ACX100 card
+* firmware image and radio image for your ACX1xx card
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
 * the Linux hotplug package is required for automatic setup of CardBus cards
   and for proper ACX100 USB cards operation
 
 What to NOT do:
-* believe that this has much to do with PCMCIA. The ACX100 cards are
+* believe that this has much to do with PCMCIA. The ACX1xx cards are
   CardBus cards, and thus PCI-based, NOT ISA-based (PCMCIA).
   You probably need the pcmcia-cs package for certain CardBus functions,
   though.
 
 --- FIRMWARE INSTALLATION ---
+
+NOTE: these firmware installation instructions might only apply
+to standard ACX100 cards, not necessarily to ACX111 or ACX100 USB cards
+(FIXME).
 
 The firmware files are needed to drive the cards' onboard embedded
 wireless baseband CPU.
@@ -162,6 +163,9 @@ Certain DWL-650+ and 520+ cards and Planet cards use a Maxim radio instead of
 the usual RFMD, so these cards will not work with the limited proprietary
 linux driver binary's firmware and so a windows firmware with proper
 support for this radio type must be used.
+
+FIXME: need to establish proper script support for the fact that the
+ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
 
 Again, here are your options:
 
@@ -357,7 +361,7 @@ And it doesn't work quite right yet, communication is distorted :-\
 (maybe the card firmware even keeps the MAC address of the EEPROM or so...)
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
-(in case of an older release which didn't know the acx100 type yet).
+(in case of an older Kismet release which didn't know the acx100 type yet).
 Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable.
 
 Wired-Wireless bridging? Driver would perhaps need to support WDS
@@ -413,6 +417,10 @@ may insert bogus end-of-line chars).
   
 -- Driver init failure --
 
+If you get "Invalid module format" during insmod, then it's probably a
+gcc version difference (see syslog) and you should make sure to compile
+the driver with the same gcc version that you used for compiling the kernel.
+
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
 strange PCI init failures), and it should be kernel CardBus support, not
@@ -427,6 +435,8 @@ pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
 And of course also trying the other CardBus slot in case you are lucky
 enough to have 2 slots sometimes actually helped to fix IRQ problems...
+With certain Toshiba notebooks you need to go into the system bios
+and set the PCIC *not* to be "auto", set to the other option.
 
 - General -
 If the system detects your card, but the driver is unable to initialize the
@@ -436,7 +446,7 @@ parameters, specifically the "pci=XXXX" flags, and most specifically,
 (DWL-650+, Vigor520).
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
-Also, make sure to shuffle cards in different PCI slots!! The ACX100 probably
+Also, make sure to shuffle cards in different PCI slots!! The ACX1xx probably
 needs PCI bus mastering support, and some motherboards either don't support it
 at all or not in certain crippled PCI slots.
 And of course there are also cases where it is PCI interrupt sharing which
@@ -446,6 +456,9 @@ Using APM instead of ACPI has also been reported several times as fixing
 init problems, so reconfigure your kernel to use the other one...
 (kernel boot parameter "pci=noacpi" might be useful here, and it also
 helped several times!)
+Oh, and last but not least, always make sure to get the latest BIOS for your
+computer - that also helped in some cases of broken power management code or
+resource allocation!
 
 -- Driver locked up the box --
 Umm... ouch!
@@ -487,10 +500,18 @@ Then read the file containing the driver log (see "DEBUGGING / LOGGING").
 Make sure that network association is working properly!
 (all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
 AUTHENTICATED to ASSOCIATED finish successfully)
+Also make sure your peer AP has reliable Beacon period settings
+(100ms is the standard value which our driver always detects during scan,
+longer periods may cause trouble).
 
 Also, check whether you actually use the newest or a working firmware version.
 In some cases it's actually not this driver but the firmware which is
 misbehaving...
+
+If you connect to an AP with hidden ESSID ("") and you happen to have
+several APs with hidden ESSID in your environment, then you need to also
+specify the AP MAC address in order to make sure that the *single attempt*
+we're making connects to the AP you want...
 
 
 If you are still having trouble, then make sure that you didn't get an iwconfig

@@ -17,10 +17,12 @@ INSTALL = /usr/bin/install -c
 DEPMOD = $(shell test -f /sbin/depmod && echo /sbin/depmod || which depmod)
 LN = $(shell which ln)
 # driver flags common to all kernel versions and configurations
-#COMMON_DRIVER_FLAGS = -msoft-float -pedantic -Werror
-COMMON_DRIVER_FLAGS = -msoft-float
+#COMMON_COMPILE_FLAGS = -msoft-float -pedantic -Werror
+COMMON_COMPILE_FLAGS = -msoft-float
+#COMMON_DRIVER_DEFINES = -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH) -DPOWER_SAVE_80211=1
+COMMON_DRIVER_DEFINES = -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)
 
-export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH) -DPOWER_SAVE_80211=1
+export CPPFLAGS += $(COMMON_DRIVER_DEFINES)
 
 -include $(KERNELDIR)/build/.config
 
@@ -85,6 +87,7 @@ modules:
 		MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_USB modules
 	@echo
 	@echo "*** WARNING: acx100_pci.ko changed to acx_pci.ko. Don't forget to update any scripts! ***"
+	@echo "*** Also, did you make sure to copy required firmware files to /usr/share/acx? ***"
 
 all: modules
 
@@ -116,6 +119,7 @@ usb_objs = acx_usb_main.o acx_usb_ihw.o acx_usb_helper.o acx_usb_ioctl.o acx_usb
 all: acx_pci.o acx_usb.o
 	@echo
 	@echo "*** WARNING: acx100_pci.o changed to acx_pci.o. Don't forget to update any scripts! ***"
+	@echo "*** Also, did you make sure to copy required firmware files to /usr/share/acx? ***"
 
 acx_pci.o: $(pci_objs)
 	$(LD) $(LDFLAGS) -o $@ $^
@@ -176,7 +180,7 @@ uninstall:
 # 2.6 in-tree (kbuild)
 else # ifeq PATCHLEVEL
 
-EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF) $(COMMON_DRIVER_FLAGS)
+EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF) $(COMMON_COMPILE_FLAGS)
 #EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=$(WLAN_HOSTIF)
 
 ifeq ($(WLAN_HOSTIF),WLAN_PCI)

@@ -156,7 +156,7 @@ MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff");
 #endif
 
 MODULE_PARM(firmware_dir, "s");
-MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware file from");
+MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware file from");
 
 
 /* -------------------------------------------------------------------------
@@ -204,7 +204,6 @@ static int acx100usb_start_xmit(struct sk_buff *,struct net_device *);
 static void acx100usb_set_rx_mode(struct net_device *);
 static void init_network_device(struct net_device *);
 static void acx100usb_send_tx_frags(wlandevice_t *);
-static void * acx100usb_read_firmware(const char *,unsigned int *);
 static int acx100usb_boot(struct usb_device *);
 void acx100usb_tx_data(wlandevice_t *,struct txdescriptor *);
 static void acx100usb_prepare_tx(wlandevice_t *,struct txdescriptor *);
@@ -232,10 +231,12 @@ int debug = L_STD;
 int acx100_debug_func_indent=0;
 static char * acx100usb_pstatus(int);
 void acx100usb_dump_bytes(void *,int) __attribute__((__unused__));
-static void dump_interface_descriptor(struct usb_interface_descriptor *);
 static void dump_device(struct usb_device *);
 static void dump_device_descriptor(struct usb_device_descriptor *);
+#if USB_24
 static void dump_endpoint_descriptor(struct usb_endpoint_descriptor *);
+static void dump_interface_descriptor(struct usb_interface_descriptor *);
+#endif
 static void dump_config_descriptor(struct usb_config_descriptor *);
 /* static void acx100usb_printsetup(devrequest *); */
 /* static void acx100usb_printcmdreq(struct acx100_usb_cmdreq *) __attribute__((__unused__)); */
@@ -319,6 +320,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		** and it will not need a driver anyway...so
 		** return a NULL
 		** --------------------------------------------- */
+		acxlog(L_INIT, "Finished booting, returning from probe().\n");
 #if USB_24
 		return NULL;
 #else
@@ -569,7 +571,8 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 
 static int acx100usb_boot(struct usb_device *usbdev)
 {
-	unsigned int offset=8,size,len,inpipe,outpipe;
+	unsigned int offset=8,len,inpipe,outpipe;
+	UINT32 size;
 	int result;
 	UINT16 *csptr;
 	char filename[128],*firmware,*usbbuf;
@@ -584,10 +587,10 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		kfree(usbbuf);
 		return(-EINVAL);
 	}
-	if (firmware_dir) sprintf(filename,"%s/ACX100.bin",firmware_dir);
-	else sprintf(filename,"/usr/share/acx/ACX100.bin");
+	if (firmware_dir) sprintf(filename,"%s/ACX100_USB.bin",firmware_dir);
+	else sprintf(filename,"/usr/share/acx/ACX100_USB.bin");
 	acxlog(L_INIT,"loading firmware %s\n",filename);
-	firmware=acx100usb_read_firmware(filename,&size);
+	firmware=(char *)acx_read_fw(filename, &size);
 	if (!firmware) {
 		kfree(usbbuf);
 		return(-EIO);
@@ -648,88 +651,6 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	}
 	kfree(usbbuf);
 	return(0);
-}
-
-
-
-
-/* ---------------------------------------------------------------------------
-** acx100usb_read_firmware():
-** Inputs:
-**    filename -> Filename of the firmware file
-**        size -> Pointer to an integer to take the size of the file
-** ---------------------------------------------------------------------------
-** Returns:
-**  (void *) Pointer to memory with firmware or NULL on failure
-**
-** Description:
-**  This function opens the specified file and reads the data into memory.
-** ------------------------------------------------------------------------ */
-
-static void * acx100usb_read_firmware(const char *filename,unsigned int *size)
-{
-	char *res = NULL;
-	mm_segment_t orgfs;
-	unsigned long page;
-	char *buffer;
-	struct file *inf;
-	int retval;
-	unsigned int offset = 0;
-
-	orgfs=get_fs(); /* store original fs */
-	set_fs(KERNEL_DS);
-	/* Read in whole file then check the size */
-	page=__get_free_page(GFP_KERNEL);
-	if (page) {
-		buffer=(char*)page;
-		inf=(struct file *)filp_open(filename,O_RDONLY,0);
-		if (IS_ERR(inf)) {
-			printk(KERN_ERR "ERROR %ld trying to open firmware image file '%s'.\n", -PTR_ERR(inf),filename);
-		} else {
-			if (inf->f_op&&inf->f_op->read) {
-				offset = 0;
-				do {
-					retval=inf->f_op->read(inf,buffer,PAGE_SIZE,&inf->f_pos);
-					if (retval < 0) {
-						printk(KERN_ERR "ERROR %d reading firmware image file '%s'.\n", -retval, filename);
-						if (res) vfree(res);
-						res = NULL;
-					}
-					if (retval > 0) {
-						if (!res) {
-							res = vmalloc(8+*(UINT32*)(4+buffer));
-							acxlog(L_INIT,"Allocated %d bytes for firmware module loading.\n", 8+(*(UINT32*)(4+buffer)));
-							*size=8+(*(UINT32*)(buffer+4));
-						}
-						if (!res) {
-							printk(KERN_ERR "Unable to allocate memory for firmware module loading.\n");
-							retval=0;
-						}
-						if (res) {
-							memcpy((UINT8*)res+offset, buffer,retval);
-							offset += retval;
-						}
-					}
-				} while (retval>0);
-			} else {
-				printk(KERN_ERR "ERROR: %s does not have a read method\n", filename);
-			}
-			retval=filp_close(inf,NULL);
-			if (retval) printk(KERN_ERR "ERROR %d closing %s\n", -retval, filename);
-			if ((res) && ((*size) != offset)) {
-				printk(KERN_INFO "Firmware is reporting a different size 0x%08x to read 0x%08x\n", (int)(*size), offset);
-				/*
-				vfree(res);
-				res = NULL;
-				*/
-			}
-		}
-		free_page(page);
-	} else {
-		printk(KERN_ERR "Unable to allocate memory for firmware loading.\n");
-	}
-	set_fs(orgfs);
-	return(res);
 }
 
 
@@ -989,9 +910,9 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			}
 			memcpy(rxdesc->data,ptr,packetsize);
 #ifdef ACX_DEBUG
-			if (debug&L_XFER) {
+			if (debug&L_DATA) {
 				if ((packetsize>0)&&(packetsize<1024)) {
-					acxlog(L_XFER,"received data:\n");
+					acxlog(L_DATA,"received data:\n");
 					acx100usb_dump_bytes(ptr,packetsize);
 				}
 			}
@@ -1112,22 +1033,22 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	** fill the USB transfer header
 	** ------------------------------------------- */
 	buf->hdr.desc=ACX100_USB_TX_DESC;
-	buf->hdr.MPDUlen=size;
+	buf->hdr.MPDUlen=cpu_to_le16(size);
 	buf->hdr.ctrl1=0;
 	buf->hdr.ctrl2=0;
-	buf->hdr.hostData=size|(desc->rate)<<24;
+	buf->hdr.hostData=cpu_to_le32(size|(desc->rate)<<24);
 	if (1 == priv->preamble_flag)
 		buf->hdr.ctrl1|=DESC_CTL_SHORT_PREAMBLE;
 	buf->hdr.ctrl1|=DESC_CTL_FIRST_MPDU;
 	buf->hdr.txRate=desc->rate;
 	buf->hdr.index=1;
-	buf->hdr.dataLength=size|((buf->hdr.txRate)<<24);
+	buf->hdr.dataLength=cpu_to_le16(size|((buf->hdr.txRate)<<24));
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t *)header->data)->a3.fc)==WLAN_FTYPE_DATA) {
 		buf->hdr.hostData|=(ACX100_USB_TXHI_ISDATA<<16);
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
-	if (acx100_is_mac_address_directed((mac_t *)addr)) buf->hdr.hostData|=(ACX100_USB_TXHI_DIRECTED<<16);
-	if (acx100_is_mac_address_broadcast(addr)) buf->hdr.hostData|=(ACX100_USB_TXHI_BROADCAST<<16);
+	if (acx100_is_mac_address_directed((mac_t *)addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16));
+	if (acx100_is_mac_address_broadcast(addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
 	if (debug&L_DATA) acx100usb_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
 	/* ---------------------------------------------
@@ -1723,18 +1644,6 @@ static char *acx100usb_pstatus(int val)
 }
 #endif
 
-static void dump_usbblock(char *block,int bytes)
-{
-  int i;
-  for (i=0;i<bytes;i++) {
-    if ((i&0xF)==0) {
-      if (i!=0) printk("\n");
-      printk(KERN_INFO);
-    }
-    printk("%02X ",(unsigned char)(block[i]));
-  }
-}
-
 static void dump_device(struct usb_device *usbdev)
 {
   int i;
@@ -1821,6 +1730,19 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd)
   printk(KERN_INFO "  bNumConfigurations: %d (0x%X)\n",dd->bNumConfigurations,dd->bNumConfigurations);
 }
 
+#if USB_24
+static void dump_usbblock(char *block,int bytes)
+{
+  int i;
+  for (i=0;i<bytes;i++) {
+    if ((i&0xF)==0) {
+      if (i!=0) printk("\n");
+      printk(KERN_INFO);
+    }
+    printk("%02X ",(unsigned char)(block[i]));
+  }
+}
+
 static void dump_endpoint_descriptor(struct usb_endpoint_descriptor *ep)
 {
   printk(KERN_INFO "Endpoint Descriptor:\n");
@@ -1858,6 +1780,7 @@ static void dump_interface_descriptor(struct usb_interface_descriptor *id)
   printk(KERN_INFO "  endpoint: 0x%X\n",(unsigned int)(id->endpoint));
 #endif
 }
+#endif
 
 void acx100usb_dump_bytes(void *data,int num)
 {

@@ -53,9 +53,17 @@ case $ANSWER in  ( y | Y | Yes | YES | yes | j | J | ja | Ja | JA ) ;;
 esac
 fi
 
-MODULE_AT="${SCRIPT_AT}/../src/acx_pci.o"
+case "`uname -r`" in
+	2.4*)
+		MODULE_AT="${SCRIPT_AT}/../src/acx_pci.o"
+		;;
+	*)
+		MODULE_AT="${SCRIPT_AT}/../src/acx_pci.ko"
+		;;
+esac
 
-if test ! -r "$MODULE_AT"; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx_pci.o, relative to the script's location. Bailing..."; exit 1; fi
+if test ! -r "$MODULE_AT"; then echo "Module not found or not readable.
+Have you built it? This script expects it to be at ../src/acx_pci.[k]o, relative to the script's location. Bailing..."; exit 1; fi
 
 # FIRMWARE_AT has to be given as an absolute path!!
 FIRMWARE_AT="${SCRIPT_AT}/../firmware"

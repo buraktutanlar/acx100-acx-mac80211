@@ -141,7 +141,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 #define PCI_DEVICE_ID_TI_ACX111		0x9066
 
 /* PCI Class & Sub-Class code, Network-'Other controller' */
-#define PCI_CLASS_NETWORK_OTHERS 0x280
+#define PCI_CLASS_NETWORK_OTHERS 	0x280
 
 /*================================================================*/
 /* Local Macros */
@@ -178,8 +178,8 @@ typedef struct device_id {
 	char *type;
 } device_id_t;
 
-char *name_acx100 = "ACX100";
-char *name_acx111 = "ACX111";
+const char *name_acx100 = "ACX100";
+const char *name_acx111 = "ACX111";
  
 /*@-fullinitblock@*/
 static const struct pci_device_id acx100_pci_id_tbl[] __devinitdata = {
@@ -289,6 +289,7 @@ static struct net_device_stats *acx100_get_stats(netdevice_t *dev);
 static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev);
 
 irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+void acx100_after_interrupt_task(void *data);
 static void acx100_set_rx_mode(netdevice_t *dev);
 void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
@@ -522,7 +523,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	UINT16 chip_type;
 
-	char *chip_name;
+	const char *chip_name;
 	unsigned long mem_region1 = 0;
 	unsigned long mem_region1_size;
 	unsigned long mem_region2 = 0;
@@ -657,10 +658,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	priv->chip_type = chip_type;
 	priv->chip_name = chip_name;
-	if (PCI_HEADER_TYPE_CARDBUS == pdev->hdr_type) {
+	if (PCI_HEADER_TYPE_CARDBUS == (int)pdev->hdr_type) {
 		priv->bus_type = (UINT8)ACX_CARDBUS;
 	} else
-	if (PCI_HEADER_TYPE_NORMAL == pdev->hdr_type) {
+	if (PCI_HEADER_TYPE_NORMAL == (int)pdev->hdr_type) {
 		priv->bus_type = (UINT8)ACX_PCI;
 	} else {
 		acxlog(L_STD, "ERROR: card has unknown bus type!!\n");
@@ -721,6 +722,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* register new dev in linked list */
 	acx100_device_chain_add(dev);
+
+	acxlog(L_BINSTD | L_IRQ | L_INIT,
+		       "%s: %s: Using IRQ %d\n",
+		       __func__, dev_info, pdev->irq);
 
 	dev->irq = pdev->irq;
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
@@ -788,6 +793,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	acx100_display_hardware_details(priv);
 
+	pci_set_drvdata(pdev, dev);
+
 	/* ...and register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
@@ -799,7 +806,6 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail;
 	}
 
-	pci_set_drvdata(pdev, dev);
 #if THIS_IS_OLD_PM_STUFF_ISNT_IT
 	priv->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
 			&acx100_pm_callback);
@@ -860,6 +866,9 @@ fail:
 
 	release_mem_region(pci_resource_start(pdev, mem_region2),
 			   pci_resource_len(pdev, mem_region2));
+
+	pci_set_drvdata(pdev, NULL); /* to be sure nothing is left */
+
 	pci_disable_device(pdev);
 
 done:
@@ -903,6 +912,11 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 
 	dev = (struct net_device *) pci_get_drvdata(pdev);
 	priv = (struct wlandevice *) dev->priv;
+	
+	if(dev == NULL || priv == NULL) {
+		acxlog(L_STD, "%s: card not used. Skipping any release code\n", __func__);
+		goto end;
+	}	
 
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device */
@@ -966,6 +980,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	/* put device into ACPI D3 mode (shutdown) */
 	pci_set_power_state(pdev, 3);
 
+	end:
 	FN_EXIT(0, 0);
 }
 
@@ -1134,6 +1149,7 @@ static void acx100_up(netdevice_t *dev)
 		acxlog(L_INIT, "firmware version < 1.9.3.e --> using hardware timer\n");
 	}
 	acx100_start(priv);
+	
 	acxlog(L_XFER, "start queue on startup.\n");
 	netif_start_queue(dev);
 
@@ -1212,12 +1228,22 @@ static int acx100_open(netdevice_t *dev)
 		result = -ENODEV;
 		goto done;
 	}
+
+	/* configure task scheduler */
+#ifdef USE_QUEUE_TASKS
+	priv->after_interrupt_task.routine = acx100_after_interrupt_task;
+	priv->after_interrupt_task.data = priv;
+#else
+	INIT_WORK(&priv->after_interrupt_task, acx100_after_interrupt_task, priv);
+#endif
+
 	/* request shared IRQ handler */
 	if (0 != request_irq(dev->irq, acx100_interrupt, SA_SHIRQ, dev->name, dev)) {
 		acxlog(L_BINSTD | L_INIT | L_IRQ, "request_irq failed\n");
 		result = -EAGAIN;
 		goto done;
 	}
+	acxlog(L_DEBUG | L_IRQ, "%s: request_irq %d successful\n", __func__, dev->irq);
 	acx100_up(dev);
 
 	priv->dev_state_mask |= ACX_STATE_IFACE_UP;
@@ -1486,6 +1512,7 @@ static struct net_device_stats *acx100_get_stats(netdevice_t *dev)
 	FN_EXIT(1, (int)&priv->stats);
 	return &priv->stats;
 }
+
 /*----------------------------------------------------------------
 * acx100_get_wireless_stats
 *
@@ -1560,6 +1587,7 @@ void acx100_enable_irq(wlandevice_t *priv)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], priv->irq_mask);
 	acx100_write_reg16(priv, priv->io[IO_ACX_FEMR], 0x8000);
+	priv->irqs_active = 1;
 #endif
 	FN_EXIT(0, 0);
 }
@@ -1586,8 +1614,14 @@ void acx100_disable_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 0x7fff);
+	if (CHIPTYPE_ACX100 == priv->chip_type)
+		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 0x7fff);
+	else
+	if (CHIPTYPE_ACX111 == priv->chip_type)
+		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 0xfdff);
+
 	acx100_write_reg16(priv, priv->io[IO_ACX_FEMR], 0x0);
+	priv->irqs_active = 0;
 #endif
 	FN_EXIT(0, 0);
 }
@@ -1600,7 +1634,8 @@ void acx100_handle_info_irq(wlandevice_t *priv)
 
 /*----------------------------------------------------------------
 * acx100_interrupt
-*
+* 
+* Never call a schedule or sleep in this method. Result will be an Kernel Panic.
 *
 * Arguments:
 *
@@ -1624,7 +1659,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	static unsigned long entry_count = 0;
 	static int loops_this_jiffy = 0;
 	static unsigned long last_irq_jiffies = 0;
-	
+
 	FN_ENTER;
 
 	irqtype = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_CLEAR]);
@@ -1652,7 +1687,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	else
 	{
 		entry_count++;
-		acxlog(L_IRQ, "IRQTYPE: %X, irq_mask: %X, entry count: %ld\n", irqtype, priv->irq_mask, entry_count);
+		acxlog(L_IRQ, "IRQTYPE: 0x%X, irq_mask: 0x%X, entry count: %ld\n", irqtype, priv->irq_mask, entry_count);
 	}
 /*	if (acx100_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
@@ -1723,6 +1758,8 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		if (0 != (irqtype & 0x200)) {
 			(void)printk("Got Command Complete IRQ\n");
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
+			/* save the state for the running issue cmd */
+			priv->irq_status |= 0x200; 
 		}
 		if (0 != (irqtype & 0x400)) {
 			acx100_handle_info_irq(priv);
@@ -1740,18 +1777,15 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		}
 		if (0 != (irqtype & HOST_INT_SCAN_COMPLETE) /* 0x2000 */ ) {
 			/* V1_3CHANGE: dbg msg only in V1 */
-			acxlog(L_IRQ,
-			       "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
-	
-			if (priv->status == ISTATUS_5_UNKNOWN) {
-				acx100_set_status(priv, priv->unknown0x2350);
-				priv->unknown0x2350 = 0;
-			} else if (priv->status == ISTATUS_1_SCANNING) {
-	
-				/* FIXME: this shouldn't be done in IRQ context !!! */
-				acx100_complete_dot11_scan(priv);
-			}
+			acxlog(L_IRQ, "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
+
+			/* place after_interrupt_task into schedule to get
+			   out of interrupt context */
+			acx_schedule_after_interrupt_task(priv);
+
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
+			priv->irq_status |= HOST_INT_SCAN_COMPLETE;
+
 		}
 		if (0 != (irqtype & 0x4000)) {
 			(void)printk("Got FCS Threshold IRQ\n");
@@ -1775,6 +1809,96 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 	entry_count--;
 	FN_EXIT(0, 0);
 	return IRQ_HANDLED;
+}
+
+/*----------------------------------------------------------------
+* acx_schedule_after_interrupt_task
+*
+* Schedule the call of the after_interrupt method after leaving
+* the interrupt context.
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+void acx_schedule_after_interrupt_task(wlandevice_t *priv) 
+{
+
+#ifdef USE_QUEUE_TASKS
+	schedule_task(&priv->after_interrupt_task);
+#else
+	schedule_work(&priv->after_interrupt_task);
+#endif
+
+}
+
+/*----------------------------------------------------------------
+* acx100_after_interrupt_task
+* 
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+void acx100_after_interrupt_task(void *data) {
+	wlandevice_t *priv = (wlandevice_t *) data;
+
+	FN_ENTER;
+
+	if(in_interrupt()) {
+		acxlog(L_IRQ, "You cannot call this method within interrupt context.\n");
+		return;
+	}
+			
+	if (priv->irq_status & HOST_INT_SCAN_COMPLETE /* 0x2000 */ ) {
+
+		if (priv->status == ISTATUS_5_UNKNOWN) {
+			acx100_set_status(priv, priv->unknown0x2350);
+			priv->unknown0x2350 = 0;
+		} else if (priv->status == ISTATUS_1_SCANNING) {
+			acx100_complete_dot11_scan(priv);
+		}
+		priv->irq_status ^= HOST_INT_SCAN_COMPLETE; /* clear the bit */
+	}
+
+	if(priv->after_interrupt_jobs != 0) { /* ok, some jobs to do */
+
+		if (priv->after_interrupt_jobs & ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN) {
+			acxlog(L_IRQ, "Send a stop scan cmd....\n");
+			acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
+
+			priv->after_interrupt_jobs ^= ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN; /* clear the bit */
+		}
+		
+		if (priv->after_interrupt_jobs & ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE) {
+
+			memmap_t pdr;
+			acx100_configure(priv, &pdr, ACX100_RID_ASSOC_ID);
+			acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
+			acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
+
+			priv->after_interrupt_jobs ^= ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE; /* clear the bit */
+		}
+	}
+
+	FN_EXIT(0, 0);
 }
 
 /*------------------------------------------------------------------------------
@@ -1853,7 +1977,7 @@ MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include
 MODULE_PARM(use_eth_name, "i");
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
 MODULE_PARM(firmware_dir, "s");
-MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware files from");
+MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
 /*@=fullinitblock@*/
 
 static int __init acx100_init_module(void)
@@ -1861,6 +1985,7 @@ static int __init acx100_init_module(void)
 	int res;
 
 	FN_ENTER;
+
 
 	acxlog(L_STD,
 	       "acx100: It looks like you were coaxed into buying a wireless network card\n");
@@ -1874,6 +1999,14 @@ static int __init acx100_init_module(void)
 	       "acx100: Given this info, it's evident that this driver is quite EXPERIMENTAL,\n");
 	acxlog(L_STD,
 	       "acx100: thus your mileage may vary. Visit http://acx100.sf.net for support.\n");
+
+#if (WLAN_HOSTIF==WLAN_USB)
+	acxlog(L_STD, "acx100: ENABLED USB SUPPORT!\n");
+#endif
+
+#ifndef ACX_32BIT_IO
+	acxlog(L_STD, "acx100: WARNING: Using 16 bit access only!\n");
+#endif
 
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
 	acxlog(L_STD|L_INIT, "%s: %s Driver initialized, waiting for cards to probe...\n", __func__, version);
@@ -1958,7 +2091,7 @@ static void __exit acx100_cleanup_module(void)
 			 */
 			acx100_reset_mac(priv);
 		}
-		else if (priv->chip_type == CHIPTYPE_ACX100) {
+		else if (CHIPTYPE_ACX100 == priv->chip_type) {
 			UINT16 temp;
 
 			/* halt eCPU */

@@ -12,6 +12,8 @@ JANITORIAL/EASY:
   much as possible, but have 16bit alternative, e.g. for CompactFlash
   implementations)
 * add default firmware directory (/usr/share/acx/) in case of unspecified firmware_dir
+* introduce iwpriv for setting individual bits in set_mask and get_mask
+(for debugging)
 - add .lsm file
 - AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!

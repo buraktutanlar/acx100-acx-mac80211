@@ -43,6 +43,7 @@
 int acx100_create_dma_regions(wlandevice_t *priv);
 int acx111_create_dma_regions(wlandevice_t *priv);
 int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc);
+int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc);
 int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc);
 void acx100_create_tx_desc_queue(TIWLAN_DC *pDc);
 void acx100_create_rx_desc_queue(TIWLAN_DC *pDc);
@@ -130,18 +131,21 @@ typedef struct txdescriptor {
 	UINT8	rate;				/* 0x2a */
 	UINT8	queue_ctrl;			/* 0x2b */
 	UINT32	queue_info;			/* 0x2c */
+
 } txdesc_t;			/* size : 48 = 0x30 */
+	/* NOTE: The acx111 txdescriptor structure is 4 byte 
+	   larger than the acx100 txdescriptor */
 
 typedef struct txhostdescriptor {
 	UINT8	*data_phy;
 	UINT16	data_offset;
-	UINT16	val0x6;
+	UINT16	reserved;
 	UINT16	Ctl;
 	UINT16	length;
 	struct	txhostdescriptor *desc_phy_next;	
-/* You can use this area as you want */
 	struct	txhostdescriptor *pNext;	/* 0x10 */
-	UINT32	Flags;				/* 0x14 */
+	UINT32	Status;				/* 0x14 */
+/* You can use this area as you want */
 	struct	txhostdescriptor *desc_phy;	/* 0x18 */
 	struct	txdescriptor *val0x1c;		/* 0x1c */
 	UINT32	val0x20;			/* 0x20 */
@@ -159,14 +163,18 @@ typedef struct rxdescriptor {
 	UINT16	total_length;			/* 0x10 */
 	UINT16	WEP_length;			/* 0x12 */
 	UINT32	WEP_ofs;			/* 0x14 */
-	UINT32	val0x18;			/* 0x18 */
+	UINT8	driverWorkspace[16]; 		/* 0x18 */
+#if 0
+	UINT32	val0x18;			/* 0x18 the following 16 bytes do not change when acx100 owns the descriptor */
 	UINT32	val0x1c;			/* 0x1c */
 	UINT32	val0x20;			/* 0x20 */
 	struct	rxbuffer *val0x24;		/* 0x24 */
+#endif 
+
 	UINT8	Ctl;
 	UINT8	rate;
 	UINT8	error;
-	UINT8	SNR;
+	UINT8	SNR;				/* modulation / preamble */
 	UINT8   RxLevel;
 	UINT8	queue_ctrl;
 	UINT16	unknown;
@@ -175,7 +183,8 @@ typedef struct rxdescriptor {
 
 typedef struct rxhostdescriptor {
 	struct	rxbuffer *data_phy;
-	UINT32	HostMemPtr;
+	UINT16	data_offset;
+	UINT16	reserved;
 	UINT16	Ctl;
 	UINT16	length;
 	struct	rxhostdescriptor *desc_phy_next;

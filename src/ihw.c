@@ -454,6 +454,13 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		goto done;
 	}
 
+	if(priv->irq_status & 0x200) {
+		acxlog((L_BINDEBUG | L_CTL), "irq status var is not empty: 0x%X\n", priv->irq_status);
+		//goto done;
+		priv->irq_status ^= 0x200;
+		acxlog((L_BINDEBUG | L_CTL), "irq status fixed to: 0x%X\n", priv->irq_status);
+	}
+
 	/*** now write the parameters of the command if needed ***/
 	if (pcmdparam != NULL && paramlen != 0) {
 		/* if it's an INTERROGATE command, just pass the length
@@ -481,12 +488,16 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 			 * fast here, so better don't schedule away here?
 			 * In theory, yes, but the timeout can be HUGE,
 			 * so better schedule away sometimes */
-			if ((irqtype =
+			if (!priv->irqs_active && (irqtype =
 			     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
 
 				acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
 				break;
 			} 
+			if(priv->irqs_active && (irqtype = priv->irq_status & 0x200)) {
+				priv->irq_status ^= 0x200;
+				break;
+			}
 
 			if (counter % 30000 == 0)
 			{
@@ -505,8 +516,9 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 
 	if ((irqtype | 0xfdff) == 0xfdff) {
 		acxlog(L_CTL,
-			"Polling for an IRQ failed with %X, cmd_status %d. Bailing.\n",
-			irqtype, cmd_status);
+			"Polling for an IRQ failed with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
+			irqtype, cmd_status, priv->irqs_active, priv->irq_status);
+		dump_stack();
 		goto done;
 	}
 
@@ -518,6 +530,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 				(timeout - counter) * 50,
 				cmd,
 				cmd_status);
+		dump_stack();
 	} else	{
 		/*** read in result parameters if needed ***/
 		if (pcmdparam != NULL && paramlen != 0) {
@@ -607,6 +620,19 @@ static short CtlLengthDot11[0x14] = {
 *----------------------------------------------------------------*/
 int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 {
+
+	/* TODO implement and check other acx111 commands */
+	if(priv->chip_type == CHIPTYPE_ACX111 &&
+		(type == ACX100_RID_DOT11_CURRENT_ANTENNA  
+		 || type == ACX100_RID_DOT11_ED_THRESHOLD
+		 /*|| type == ACX100_RID_DOT11_CURRENT_REG_DOMAIN*/
+		 || type == ACX100_RID_DOT11_CURRENT_CCA_MODE)) {
+		acxlog(L_INIT, "Configure Command 0x%02X not supported under acx111 (yet)\n", type);
+
+		return 0;
+	}
+
+
 	((memmap_t *)pdr)->type = cpu_to_le16(type);
 	if (type < 0x1000) {
 		((memmap_t *)pdr)->length = cpu_to_le16(CtlLength[type]);
@@ -880,6 +906,10 @@ void acx100_log_mac_address(int level, UINT8 * mac)
 *----------------------------------------------------------------*/
 void acx100_power_led(wlandevice_t *priv, UINT8 enable)
 {
+	if(priv->chip_type == CHIPTYPE_ACX111) {
+		/* acx111 makes all led handling itself */
+		return;
+	}
 	if (enable)
 		acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 
 			acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) & ~0x0800);
