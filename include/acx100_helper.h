@@ -302,8 +302,8 @@ typedef struct acxp80211_hdr {
 				   the first three bytes are the dsap, ssap and control
 				   respectively. the following 3 bytes are either ieee_oui
 				   or an RFC. See p80211conv.c/h for more. */
-	UINT16 val0x20;
-	UINT16 val0x22;
+	UINT16 beacon_interval;
+	UINT16 caps;
 	UINT8 info[0x30];	/* 0x24 */
 	/*
 	 * info[1] is essid_len

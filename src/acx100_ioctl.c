@@ -443,7 +443,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 		for (i = 0; i < wlandev->bss_table_count; i++) {
 			struct bss_info *bss = &wlandev->bss_table[i];
 			if (!memcmp(bss->bssid, ap, ETH_ALEN)) {
-				if ((!!wlandev->wep_enabled) != (!!bss->fWEPPrivacy)) {
+				if ((!!wlandev->wep_enabled) != !!(bss->caps & IEEE802_11_MGMT_CAP_WEP)) {
 					result = -EINVAL;
 					goto end;
                         	} else {
@@ -557,8 +557,8 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 				       wlandev->bss_table[i].bssid,
 				       WLAN_BSSID_LEN);
 
-				ap_table[i].cap = ((wlandev->bss_table[i].cap >> 1) ^ 1) & 1;	/* IBSS capability flag */
-				ap_table[i].wep = wlandev->bss_table[i].cap & 0x10;	/* Privacy/WEP capability flag */
+				ap_table[i].cap = ((wlandev->bss_table[i].caps >> 1) ^ 1) & 1;	/* IBSS capability flag */
+				ap_table[i].wep = wlandev->bss_table[i].caps & 0x10;	/* Privacy/WEP capability flag */
 			}
 		}
 
@@ -659,8 +659,8 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 	
 	/* Add mode */
 	iwe.cmd = SIOCGIWMODE;
-	if (WLAN_GET_MGMT_CAP_INFO_ESS(bss->cap) || WLAN_GET_MGMT_CAP_INFO_IBSS(bss->cap)) {
-		if (WLAN_GET_MGMT_CAP_INFO_ESS(bss->cap))
+	if (bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)) {
+		if (bss->caps & IEEE802_11_MGMT_CAP_ESS)
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
@@ -686,7 +686,7 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 
 	/* Add encryption */
 	iwe.cmd = SIOCGIWENCODE;
-	if (bss->cap & WLAN_GET_MGMT_CAP_INFO_PRIVACY(1))
+	if (bss->caps & IEEE802_11_MGMT_CAP_WEP)
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
 	else
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
@@ -795,18 +795,21 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 	}
 	else
 	{
-		len =
-		    len >
-		    WLAN_SSID_MAXLEN ? WLAN_SSID_MAXLEN : len;
+		if (dwrq->length > IW_ESSID_MAX_SIZE+1)
+		{
+			result = -E2BIG;
+			goto end_unlock;
+		}
 
-		memcpy(wlandev->essid, extra, len);
-		wlandev->essid[len] = '\0';
-		wlandev->essid_len = len;
+		wlandev->essid_len = len - 1;
+		memcpy(wlandev->essid, extra, wlandev->essid_len);
+		wlandev->essid[wlandev->essid_len] = '\0';
 		wlandev->essid_active = 1;
 	}
 
 	wlandev->set_mask |= GETSET_ESSID;
 
+end_unlock:
 	acx100_unlock(wlandev, &flags);
 	result = -EINPROGRESS;
 end:
@@ -823,7 +826,7 @@ static inline int acx100_ioctl_get_essid(struct net_device *dev, struct iw_reque
 	dwrq->flags = wlandev->essid_active;
 	if (wlandev->essid_active)
 	{
-		memcpy(extra, wlandev->essid, strlen(wlandev->essid));
+		memcpy(extra, wlandev->essid, wlandev->essid_len);
 		extra[wlandev->essid_len] = '\0';
 		dwrq->length = wlandev->essid_len + 1;
 		dwrq->flags = 1;
@@ -1721,7 +1724,7 @@ static inline int acx100_ioctl_set_short_preamble(struct net_device *dev, struct
 		return -EINVAL;
 
 	wlandev->preamble_mode = *extra;
-	switch(*extra) {
+	switch (*extra) {
 		case 0:
 			descr = "off";
 			wlandev->preamble_flag = 0;
@@ -1735,7 +1738,7 @@ static inline int acx100_ioctl_set_short_preamble(struct net_device *dev, struct
 
 			/* associated to a station? */
 			if (wlandev->station_assoc.bssid[0] != 0x00)
-				wlandev->preamble_flag = WLAN_GET_MGMT_CAP_INFO_SHORT(wlandev->station_assoc.cap);
+				wlandev->preamble_flag = wlandev->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE;
 			break;
 	}
 	printk("new Short Preamble setting: %s\n", descr);

@@ -2243,17 +2243,28 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT RxBufferPoolSize;
 } TIWLAN_DC;
 
-/*--- Scan table entry -------------------------------------------------------*/
+/*--- 802.11 Management capabilities -----------------------------------------*/
+#define IEEE802_11_MGMT_CAP_ESS		(1 << 0)
+#define IEEE802_11_MGMT_CAP_IBSS	(1 << 1)
+#define IEEE802_11_MGMT_CAP_CFP_ABLE	(1 << 2)
+#define IEEE802_11_MGMT_CAP_CFP_REQ	(1 << 3)
+#define IEEE802_11_MGMT_CAP_WEP		(1 << 4)
+#define IEEE802_11_MGMT_CAP_SHORT_PRE	(1 << 5)
+#define IEEE802_11_MGMT_CAP_PBCC	(1 << 6)
+#define IEEE802_11_MGMT_CAP_CHAN_AGIL	(1 << 7)
+
+/*--- 802.11 Basic Service Set info ------------------------------------------*/
 typedef struct bss_info {
-	char bssid[WLAN_BSSID_LEN];	/* 0x0 */
-	UINT16 cap;		/* 0x6 */
-	size_t essid_len;		/* 0x8 */
-	char essid[IW_ESSID_MAX_SIZE+1];	/* 0xc this one INCLUDES the trailing \0 !! */
-	UINT16 fWEPPrivacy;	/* 0x2c */
-	unsigned char supp_rates[64]; /* FIXME: used to be 8 (802.11b standard?), but 802.11g devices seem to allow for many more rates: how many exactly?? */
-	UINT8 channel;		/* 0x64; strange, this is accessed as UINT16 once. oh well, probably doesn't matter */
+	u8 bssid[ETH_ALEN];	/* BSSID */
+	u8 essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
+	size_t essid_len;	/* Length of ESSID (FIXME: \0 included?) */
+	UINT16 caps;		/* 802.11 capabilities information */
+	UINT8 channel;		/* 802.11 channel */
+	UINT16 wep;	/* WEP flag (FIXME: redundant, bit 4 in caps) */
+	unsigned char supp_rates[64]; /* FIXME: 802.11b section 7.3.2.2 allows 8 rates, but 802.11g devices seem to allow for many more: how many exactly? */
 	UINT32 sir;		/* 0x78; Standard IR */
 	UINT32 snr;		/* 0x7c; Signal to Noise Ratio */
+	UINT16 beacon_interval;	/* 802.11 beacon interval */
 } bss_info_t;				/* 132 0x84 */
 
 /*============================================================================*

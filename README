@@ -2,18 +2,25 @@
 *             Open-Source wireless driver for TI ACX100 chipset               *
 *******************************************************************************
 
+WARNING: this driver may still cause your box to lockup!
+If this happens, then please report at/create a bug report!
+
+--- CARD COMPATIBILITY (aka "OUCH!!") ---
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
-with ACX100 chip (except for USB implementations, which are extremely rare
--- initial successful firmware loading support is in the driver now,
-but it's far from working completely - feel free to work on this support).
+with ACX100 chip (except for USB and Compact Flash implementations,
+which are both extremely rare -- initial successful firmware loading support
+for USB is in the driver now, but it's far from working completely - feel free
+to work on this support).
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
-and are at your wits end as to what might still make the card fail.
+and are at your wits end as to what might still make the card fail
+(and make sure to try previous versions of the driver as well!).
 
 Note that any Texas Instruments chips OTHER than the ACX100 (which is
 also known as TNETW1100) are NOT supported by this driver (yet).
-These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230.
+These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
+(ACX111).
 For now, you should take these unsupported cards back to the shop
 where you bought them, mentioning completely missing unacceptable
 driver support from Texas Instruments.
@@ -50,11 +57,11 @@ We're still not totally sure about the status of WEP support.
 Many situations should work, but it might still not work properly
 or fail sometimes.
 
-Also, SMP appears to be problematic; if you have SMP, then turn it off.
-We will attempt to clean this up as soon as possible.
+Also, SMP appears to be problematic (locking issues); if you have SMP,
+then turn it off. We will attempt to clean this up as soon as possible.
 
 Furthermore, associating with some access points might still be problematic
-due to strict 802.11b compliance checks in their firmware.
+due to strict 802.11 compliance checks in their firmware.
 
 HostAP support has not been implemented yet, but it's definitely possible.
 
@@ -64,27 +71,38 @@ driver changes.
 Many other things haven't been tested (properly) yet.
 
 Skillful testers and BSD driver writers welcome!!
-(for FreeBSD development, please contact mochaspirit AT users DOT
-sourceforge DOT net)
+(for FreeBSD development, please visit http://wlan.kewl.org and cvs.kewl.org)
 There is a free download of the 802.11b spec at
 http://standards.ieee.org/getieee802/
 
 --- REQUIREMENTS ---
 
-Relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental),
-with CONFIG_NET_RADIO enabled ("Wireless LAN") and CONFIG_NET_WIRELESS,
-for wireless extensions (iwconfig etc.). And Non-SMP. And of course you
-need proper kernel header files / kernel source installed for the exact
-kernel you're running!
+What to do or have:
+* relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
+	with CONFIG_NET_RADIO enabled ("Wireless LAN")
+	and CONFIG_NET_WIRELESS, for wireless extensions (iwconfig etc.).
+	And Non-SMP (no CONFIG_SMP).
+* proper kernel header files / kernel source (packages) installed
+        for the exact (*EXACT*!!) kernel you're running! 
+* The /bin/bash shell is required for the Configure script
+* a make package has to be installed
+* a gcc package has to be installed
+* firmware image and radio image for your ACX100 card
+* the package containing iwconfig, iwpriv & Co. needs to be installed
+	on your system (on Debian: package wireless-tools)
+* the Linux hotplug package is useful (required??) for CardBus cards
 
-Also, you need to have the package containing iwconfig, iwpriv & Co.
-installed on your system (Debian: package wireless-tools).
+What to NOT do:
+* download the driver via Windows CVS (may insert bogus end-of-line chars)
 
-Next, a firmware is needed.
+
+About the firmware files:
 We cannot ship this with our driver, so you will have to get it elsewhere.
 There are two options:
 a) you have a windows driver installed or have a zip file with all the
-   necessary windows files in it (for example D-Link installer)
+   necessary windows files in it (for example D-Link installer).
+   This could be for ANY Windows version. All that matters here is that this
+   driver package contains relatively recent firmware image files.
 b) you have a binary linux driver (not recommended, since these contain
    much older firmware files)
 
@@ -101,6 +119,8 @@ Easy solution:
 
 wget ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_driver_302.zip
 unzip dwl520+_driver_302.zip
+(Warning: probably already outdated)
+
 cp Win2000/WLANGEN.BIN Win2000/RADIO0d.BIN Win2000/RADIO11.BIN firmware/
 Ready to roll. :)
 
@@ -110,16 +130,21 @@ The firmware used by the windows driver consists of several files normally
 named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
 the c:\winnt\system32 directory, or in the install archive.
 Place these files in the firmware directory, and you are ready to roll.
-MAKE SURE THAT THE CASE SENSITIVITY OF THE FILENAME CHARACTERS IS EXACTLY
+MAKE SURE THAT THE CASE SeNsItIvItY OF THE FILENAME CHARACTERS IS EXACTLY
 AS WRITTEN ABOVE!! Otherwise the driver will NOT find the image files...
 
-Note that earlier versions of the windows driver shipped with individual radio
-files (small firmware plus RFMD radio file plus Maxim radio file)
-as well as combined versions (one bigger firmware, which is the old concept).
-Here you have a choice, you can either copy the individual files over
+Note that earlier versions of the windows driver shipped with both a new
+firmware file plus its individual radio files (small firmware plus RFMD
+radio file plus Maxim radio file) and old combined versions (one bigger
+firmware *including* radio code, which is the old concept).
+Here you have a choice, you can either copy the newer individual files over
 (which will need to be renamed to the firmware names given above)
-or use the combined file on its own. If you copy the combined file it must be
-renamed to "WLANGEN.BIN".
+or use the old combined file on its own. If for some strange reason you decide
+to use the old combined file it must be renamed to "WLANGEN.BIN".
+Since our driver WILL attempt to load separate radio modules even with an
+old combined firmware (we don't do a version check yet), adding separate
+radio files to an old combined firmware WILL cause problems, so better
+don't do that...
 
 The firmware files in the recent driver package are:
 WLANGEN.BIN - Generic firmware
@@ -138,7 +163,7 @@ APLUSRMX.BIN - Maxim radio module
 Other files:
 SMCSN.BIN - combined(?) firmware for SMC2435W
 
--- Firmware from Linux binary driver --
+-- Firmware from Linux binary driver (not recommended - too old) --
 
 Several drivers are available on the internet, and they all seem to
 work. But since the firmware is embedded in the binary driver, it needs
@@ -185,10 +210,7 @@ experimental anyway :)
 
 To run the driver, you can use the script scripts/start_net (and adapt it).
 Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
-Again, no system installation is provided, since the various Linux
-distributions often differ in their exact network configuration methods.
-Thus maybe simply adapt and use our scripts/start_net script. Or add
-that script as a properly executed init script in /etc/[rc.d]/init.d/
+Further system configuration can be found at SYSTEM CUSTOMIZATION below.
 
 Debugging/logging options can be changed in a pretty powerful way by setting
 the module's "debug" parameter and/or its preinitialisation value in
@@ -204,7 +226,7 @@ The module itself can be loaded e.g. like:
 insmod src/acx100_pci.o firmware_dir=firmware
 
 NOTE that firmware_dir has to be given as an absolute path; a relative
-path will cause trouble!!
+path will cause trouble during card reinit operations!!
 
 If you want the driver to use eth0 device name instead of wlan0,
 then e.g. load as:
@@ -260,7 +282,7 @@ rebooting. Hopefully the driver compiling works then.
 In case of ACX100 CardBus, you need to make sure you're having
 CardBus support (otherwise you'll have strange PCI init failures),
 and it should be kernel CardBus support, not pcmcia-cs CardBus modules!
-(yenta socket instead of e.g. i82365)
+(yenta socket module instead of e.g. i82365 module)
 On SUSE: "kernel" type instead of "external".
 Thinkpad notebook? Make sure your CardBus feature is enabled in the
 configuration utility...
@@ -282,6 +304,16 @@ Then change to the logging console (Ctrl-Alt-F8), wait 10 seconds
 and write down the crash dump.
 Then please file a bug report. Thanks!
 
+This could also happen due to some PCI bus incompatibility (the ACX100
+states a PCI2.2 requirement!!). If you happen to have a SB Live! card and
+lose sound or have crashes when using the ACX100 card, then try
+loading the ACX100 card driver BEFORE loading the SB Live! (this managed
+to fix sound for one person)
+Hmm, OTOH someone else reported that inserting the ACX100 card AFTER
+bootup manages to fix it. So simply try swapping the sound/network
+module init sequence.
+Also, using an SB Live! with ACX100 may result in crashes and data corruption.
+
 -- Network failure --
 First, make absolutely sure you're using correct settings for
 association to the wireless network!
@@ -294,6 +326,9 @@ Then read the file containing the driver log (the file where
 the KERN_WARNING channel gets written to, somewhere in /var/log),
 as given in the syslog configuration file which is called /etc/sysklogd.conf
 or similar.
+debug level can be changed by doing e.g.
+iwpriv wlan0 set_debug 0xffff
+
 Make sure that network association is working properly!
 (all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
 AUTHENTICATED to ASSOCIATED finish successfully)
@@ -315,6 +350,9 @@ Signal level 21/100 (anything less: connection lost @1Mbps)
 Noise level 0/100 (anything more can be problematic, > 10 is deadly)
 Link Quality == reverse of Noise level
 
+Also try other channel values to reduce interference by cordless phones,
+microwaves etc.
+
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
@@ -328,7 +366,9 @@ lists, since we cannot track these properly.
 Instead, post a Tracker item at one of Bugs, Support Requests, Feature
 Requests. This way development will be much more organized, with proper
 status and processing assigned to each request, and hopefully nothing
-falling through the cracks.
+falling through the cracks. And please consider NOT posting anonymously,
+since this severely degrades tracking quality.
+Thanks for listening!
 
 --- BUGS / SHORTCOMINGS / PATCHES ---
 
@@ -345,8 +385,8 @@ For current tasks, please read TODO (or grep driver for FIXME and TODO).
 In case of bugs that didn't exist in previous versions,
 PLEASE do regression testing via CVS:
 http://www.winehq.org/site/docs/wine-devel/cvs-regression
-(remember: WE are doing the driver, so it's YOUR responsibility to fix any
-problems that might happen in between...)
+(remember: WE are doing the driver, so it's YOUR responsibility to get any
+problems fixed that might happen in between...;)
 
 If you manage to fix or implement something, then please immediately
 send patches for inclusion to the acx100-devel@lists.sf.net mailing list.
@@ -361,6 +401,20 @@ If you don't want to accept this implicit licensing, then please make
 sure to let us know which code parts are not supposed to be used by BSD
 systems. Thanks!
 ************************* !!!!!!!!!!!!!!!!!!!!!  *************************
+
+--- SYSTEM CUSTOMIZATION ---
+
+Again, no automatic system installation is provided, since the various Linux
+distributions often differ in their exact network configuration methods
+and it's really not our job to care about maybe 5 to 10 different
+distribution scripts (at least not now as long as our driver is
+especially experimental).
+Thus maybe simply adapt and use our scripts/start_net script. Or add
+that script as a properly executed init script in /etc/[rc.d]/init.d/
+(use e.g. /etc/init.d/skeleton as an example)
+Then create e.g. runlevel 2 symlinks ("ln -s") from K* and S* scripts in e.g.
+/etc/rc2.d/ to your init script in /etc/init.d/ and it should hopefully
+get loaded automatically on system bootup.
 
 --- AND FINALLY... ---
 
@@ -383,7 +437,7 @@ chipset. Good luck in finding a (correct) driver!!
 And it's even WORSE: I just found out that there is some newer
 version of the "DWL-650" out that also contains the ACX100
 (it uses the same hardware as the "+" versions).
-Not to mention that D-Link now uses the DWL*650* naming for about 5 or 6
+Not to mention that D-Link now uses the DWL*650* naming for about 6 or 7
 different products!
 This BRAINDEAD STUPIDITY in device naming easily entitles D-Link
 for the "Most Braindead Hardware Vendor 2003" award. And of course
@@ -402,11 +456,10 @@ one guy, after having been advised that his DWL-120+ uses an Atmel
 chipset, spent considerable time trying to get this card to work with an
 incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
 the DWL-120+ is using an ACX100 in USB mode!).
-This proves that D-Link really deserves my "Most Braindead Hardware
-Vendor 2003" award, and it also shows that one should avoid D-Link like
-the plague from now on (at least until they get rid of their stupid
-product naming habits), since they don't seem to know or care about
-their very own products.
+This proves that D-Link really deserves the award above,
+and it also shows that one should avoid D-Link like the plague from now on
+(at least until they get rid of their stupid product naming habits),
+since they don't seem to know or care about their very own products.
 
 Finally, let me mention that we also really dislike the way how
 Texas Instruments handles Linux driver support. It's a really shameful

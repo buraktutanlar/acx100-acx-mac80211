@@ -12,10 +12,9 @@ This is the current list of ToDos, in order of importance:
   Note: locking for packet transfer is finished
 - add further iwconfig/iwpriv support: channel traffic percentage indicator,
   iwspy, ...
+- wireless events support
 - further improve firmware management. Detect embedded linux radio 
   modules, etc...
-- implement packet fragmentation (to get rid of stupid hacks like
-  setting a small MTU)
 - try to make sure the driver doesn't crash if we remove the card when active
   (hw_unavailable)
 - clean up and unify return value handling. Right now the driver seems to have

@@ -201,8 +201,7 @@ typedef struct TxData {
 } TxData;			/* size: 2400 */
 
 void acx_client_sta_list_init(void);
-int acx80211_rx(rxhostdescriptor_t * skb,/* wlan_pb_t * a,*/
-		wlandevice_t * wlandev);
+int acx100_rx_ieee802_11_frame(wlandevice_t *wlandev, rxhostdescriptor_t *desc);
 int process_disassoc(wlan_fr_disassoc_t * req, wlandevice_t * hw);
 int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw);
 int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw);
@@ -219,8 +218,7 @@ void d11CompleteScan(wlandevice_t * wlandev);
 void acx100_set_status(wlandevice_t *hw, int vala);
 void IBSSIDGen(wlandevice_t * wlandev, unsigned char *p_out);
 
-extern void acx100_rx(/*wlan_pb_t * p80211*/
-	struct rxhostdescriptor *rxdesc, wlandevice_t * wlandev);
+extern void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *wlandev);
 
 void gen_challenge(challenge_text_t *);
 void get_ran(UINT8 *, UINT32);

@@ -132,7 +132,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 /* Local Static Definitions */
 #define DRIVER_SUFFIX	"_pci"
 
-#define MAX_WLAN_DEVICES 4
 #define CARD_EEPROM_ID_SIZE 6
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) //a la orinoco.c
 
@@ -266,6 +265,7 @@ static void acx100_get_firmware_version(wlandevice_t *wlandev)
 	{
 		acxlog(L_STD|L_INIT, "Huh, strange firmware version string \"%s\" without leading \"Rev \" string detected, please report!\n", fw.fw_id);
 		wlandev->firmware_numver = 0x01090407; /* assume 1.9.4.7 */
+		FN_EXIT(0, 0);
 		return;
 	}
 	fw_major = fw.fw_id[4] - '0';
@@ -348,6 +348,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 
 	FN_EXIT(0, 0);
 }
+
 /*----------------------------------------------------------------
 * acx100_probe_pci
 *
@@ -1458,45 +1459,44 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-/*----------------------------------------------------------------
-* acx100_rx
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-/* acx100_rx()
- * STATUS: *much* better now, maybe finally bug-free, VERIFIED.
- */
-void acx100_rx(struct rxhostdescriptor *rxdesc/* wlan_pb_t * pb */, 
-		wlandevice_t * hw)
+/*------------------------------------------------------------------------------
+ * acx100_rx
+ *
+ * The end of the Rx path. Pulls data from a rxhostdescriptor into a socket
+ * buffer and feeds it to the network stack via netif_rx().
+ *
+ * Arguments:
+ * 	rxdesc:	the rxhostdecriptor to pull the data from
+ *	hw:	the acx100 private struct of the interface
+ *
+ * Returns:
+ *
+ * Side effects:
+ *
+ * Call context:
+ *
+ * STATUS:
+ * 	*much* better now, maybe finally bug-free, VERIFIED.
+ *
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
+void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 {
-	netdevice_t *ndev;
+	netdevice_t *ndev = hw->netdev;
 	struct sk_buff *skb;
 
 	FN_ENTER;
 	if (hw->open) {
 		if ((skb = acx100_rxdesc_to_ether(hw, rxdesc))) {
-			ndev = root_acx100_dev.newest;
 			skb->dev = ndev;
+			skb->protocol = eth_type_trans(skb, ndev);
 			ndev->last_rx = jiffies;
 
-			skb->protocol = eth_type_trans(skb, ndev);
 			netif_rx(skb);
 
 			hw->stats.rx_packets++;
 			hw->stats.rx_bytes += skb->len;
-			/* V1_3CHANGE */
 		}
 	}
 	FN_EXIT(0, 0);
@@ -1539,9 +1539,8 @@ static int __init acx100_init_module(void)
 {
 	int res;
 
-	FN_ENTER;		//.data(0x4)=version
+	FN_ENTER;
 
-//#ifdef MODULE
 	acxlog(L_STD,
 	       "acx100: It looks like you were coaxed into buying a wireless network card\n");
 	acxlog(L_STD,
@@ -1551,13 +1550,12 @@ static int __init acx100_init_module(void)
 	acxlog(L_STD,
 	       "acx100: since that would mean REAL vendor Linux support.\n");
 	acxlog(L_STD,
-	       "acx100: Given this info, it's plain evident that this driver is EXPERIMENTAL,\n");
+	       "acx100: Given this info, it's evident that this driver is quite EXPERIMENTAL,\n");
 	acxlog(L_STD,
 	       "acx100: thus your mileage may vary. Visit http://acx100.sf.net for support.\n");
 
 	acxlog(L_BINSTD, "%s: %s Loaded\n", __func__, version);
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
-	//.data(0xc)=dev_info
 
 	res = pci_module_init(&acx100_pci_drv_id);
 	FN_EXIT(1, res);
@@ -1592,7 +1590,6 @@ static void __exit acx100_cleanup_module(void)
 	FN_EXIT(0, 0);
 }
 
-/* For kernels 2.5.* where modutils>=4.2.22, we must have a module_init and module_exit like so: */
 module_init(acx100_init_module);
 module_exit(acx100_cleanup_module);
 

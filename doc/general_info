@@ -64,3 +64,17 @@ Drivers development Kit
  Examples Driver Code (C Code)
  Example PCI Loader
 ----
+
+The Maxim radio in most cases probably is the MAX2820 (at least it's
+been confirmed for DWL-120+).
+Candidates might be the MAX2820, MAX2821 or MAX2822...
+Some cards *might* also contain the MAX2644 2.4GHz amplifier perhaps eventually.
+However, it's said to be a "one-chip" radio, so that probably isn't the case...
+
+But OTOH the 2820 doesn't have enough output power, so an amplifier is
+needed. This could be the MAX2242, which has 22.5dBm linear power output
+(+2.5dBm is to compensate loss due to T/R switch and bandpass filter).
+As such, I guess we can assume that a Maxim radio based card has a
+maximum power output of 20dBm.
+
+The RFMD radio might be the RF2948B.

@@ -87,27 +87,23 @@
 #include <acx80211frm.h>
 
 static UINT32 process_mgmt_frame(struct rxhostdescriptor *skb,
-		                /* wlan_pb_t * a,*/ wlandevice_t *
-				wlandev);
+				 wlandevice_t *wlandev);
 static int process_data_frame_master(struct rxhostdescriptor *skb,
-		                /* wlan_pb_t * a,*/ wlandevice_t *
-				wlandev);
+				 wlandevice_t *wlandev);
 static int process_data_frame_client(struct rxhostdescriptor *skb,
-		                /* wlan_pb_t * a,*/ wlandevice_t *
-				wlandev);
-static int process_NULL_frame(struct rxhostdescriptor * a, 
-		                wlandevice_t * hw, int vala);
+				     wlandevice_t *wlandev);
+static int process_NULL_frame(struct rxhostdescriptor *a, 
+			      wlandevice_t *hw, int vala);
 
-
+/* FIXME: sta_list and sta_hash_tab belong into the private per device struct
+ * in order to support multiple devices without strange interferences. They
+ * also should probably be of equal size (?). */
 static client_t sta_list[32];
-
 static client_t *sta_hash_tab[0x40];
 
-UINT8 *list2[0x4];
-
-UINT16 sendmod;
-
 alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
+
+UINT16 CurrentAID = 1;
 
 /*----------------------------------------------------------------
 * acx_client_sta_list_init
@@ -384,28 +380,24 @@ void acx100_set_status(wlandevice_t *hw, int status)
 	FN_EXIT(0, 0);
 }
 
-/*----------------------------------------------------------------
-* acx80211_rx
-* FIXME: change name to acx100_rx_frame
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-/* acx80211_rx()
+/*------------------------------------------------------------------------------
+ * acx100_rx_ieee802_11_frame
+ *
+ *
+ * Arguments:
+ *
+ * Returns:
+ *
+ * Side effects:
+ *
+ * Call context:
+ *
  * STATUS: FINISHED, UNVERIFIED.
- */
-int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
+ *
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
+int acx100_rx_ieee802_11_frame(wlandevice_t *hw, rxhostdescriptor_t *rxdesc)
 {
 	UINT16 ftype;
 	UINT fstype;
@@ -471,7 +463,6 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	return result;
 }
 
-UINT16 CurrentAID = 1;
 /*----------------------------------------------------------------
 * transmit_assocresp
 * FIXME: change name to acx100_transmit_assocresp
@@ -519,15 +510,14 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "<transmit_assocresp 1>\n");
 
-	// FIXME: is this correct, should it just test for toDS and fromDS
-	if (arg_0->hdr->a3.fc == 0x100 && arg_0->hdr->a3.fc == 0x200) {
-		sa = arg_0->hdr->a3.a1;
-		da = arg_0->hdr->a3.a2;
-		bssid = arg_0->hdr->a3.a3;
-	} else {
+	if (WLAN_GET_FC_TODS(arg_0->hdr->a3.fc) || WLAN_GET_FC_FROMDS(arg_0->hdr->a3.fc)) {
 		FN_EXIT(1, 1);
 		return 1;
 	}
+	
+	sa = arg_0->hdr->a3.a1;
+	da = arg_0->hdr->a3.a2;
+	bssid = arg_0->hdr->a3.a3;
 
 	clt = get_sta_list(da);
 
@@ -547,6 +537,8 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 			memcpy(clt->val0x10, arg_0->ssid, arg_0->ssid->len);
 
+			/* FIXME: huh, why choose the ESSID length
+			 * directly as the index!?!? */
 			if (arg_0->ssid->len <= 5) {
 				clt->val0x9a = var_1c[arg_0->ssid->len];
 			} else {
@@ -637,14 +629,14 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	if ((arg_0->hdr->a3.fc == 0x100) && (arg_0->hdr->a3.fc == 0x200)) {
-		sa = arg_0->hdr->a3.a1;
-		da = arg_0->hdr->a3.a2;
-		bssid = arg_0->hdr->a3.a3;
-	} else {
-		FN_EXIT(1, 0);
+	if (WLAN_GET_FC_TODS(arg_0->hdr->a3.fc) || WLAN_GET_FC_FROMDS(arg_0->hdr->a3.fc)) {
+		FN_EXIT(1, 1);
 		return 1;
 	}
+
+	sa = arg_0->hdr->a3.a1;
+	da = arg_0->hdr->a3.a2;
+	bssid = arg_0->hdr->a3.a3;
 
 	clt = get_sta_list(da);
 	if (clt != NULL) {
@@ -759,8 +751,7 @@ int process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = arg_0->hdr;
 
-	// FIXME: toDS and fromDS = 1 ??
-	if (hdr->a4.fc & 0x300)
+	if (WLAN_GET_FC_TODS(hdr->a4.fc) || WLAN_GET_FC_FROMDS(hdr->a4.fc))
 		res = 1;
 	else
 		TA = hdr->a3.a2;
@@ -810,8 +801,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
-	// FIXME: toDS and fromDS = 1 ??
-	if (hdr->a3.fc & 0x300)
+	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc))
 		res = 1;
 	else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0 */ )
@@ -983,10 +973,6 @@ static int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice
 				if (esi != 2) {
 					goto done;
 				}
-			} else {
-				if (4 == sendmod) {
-					goto done;
-				}
 			}
 			acx100_rx(rxdesc, hw);
 		}
@@ -997,6 +983,7 @@ fail:
 	FN_EXIT(1, result);
 	return result;
 }
+
 /*----------------------------------------------------------------
 * process_data_frame_client
 * FIXME: rename to acx100_process_data_frame_client
@@ -1127,7 +1114,7 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	if(WLAN_GET_FC_ISWEP(p80211_hdr->a3.fc)){
+	if (WLAN_GET_FC_ISWEP(p80211_hdr->a3.fc)) {
 		wep_offset = 0x10;
 	}
 
@@ -1529,8 +1516,8 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 		acxlog(L_STD, "huh, ESSID overflow in scanned station data?\n");
 
 	hw->bss_table[hw->bss_table_count].channel = pDSparms[2];
-	hw->bss_table[hw->bss_table_count].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
-	hw->bss_table[hw->bss_table_count].cap = hdr->val0x22;
+	hw->bss_table[hw->bss_table_count].wep = (hdr->caps  & IEEE802_11_MGMT_CAP_WEP);
+	hw->bss_table[hw->bss_table_count].caps = hdr->caps;
 	rate_count = pSuppRates[1];
 	if (rate_count > 64)
 		rate_count = 64;
@@ -1561,7 +1548,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	       hw->bss_table_count,
 	       ss->essid, ss->channel,
 	       a[0], a[1], a[2], a[3], a[4], a[5],
-	       (WLAN_GET_MGMT_CAP_INFO_IBSS(ss->cap)) ? "Ad-Hoc peer" : "Access Point",
+	       (ss->caps & IEEE802_11_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
 	       (int)(max_rate / 2), (max_rate & 1) ? ".5" : "",
 	       ss->sir, ss->snr);
 
@@ -1570,9 +1557,9 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	FN_EXIT(0, 0);
 }
 
-char *get_status_string(int status)
+const char * const get_status_string(int status)
 {
-	char *status_str[22] =
+	const char * const status_str[22] =
 	{ "Successful", "Unspecified failure",
 	  "Reserved error code", "Reserved error code", "Reserved erro code",
 	  "Reserved error code", "Reserved error code", "Reserved erro code",
@@ -1624,8 +1611,7 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
-	// FIXME: toDS and fromDS = 1 ??
-	if (hdr->a4.fc & 0x300)
+	if (WLAN_GET_FC_TODS(hdr->a4.fc) || WLAN_GET_FC_FROMDS(hdr->a4.fc))
 		res = 1;
 	else {
 		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a4.a1 /* RA */)) {
@@ -1675,8 +1661,7 @@ int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	// FIXME: toDS and fromDS = 1 ??
-	if (hdr->a3.fc & 0x300) {
+	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc)) {
 		result = 1;
 	} else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ ) {
@@ -1704,15 +1689,20 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 	p80211_hdr_t *hdr;
 	client_t *clt;
 	client_t *currclt;
+	int result = -1;
 
 	FN_ENTER;
 	acxlog(L_STATE|L_ASSOC, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
-	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc))
-		return 0;
+	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc)) {
+		result = 0;
+		goto end;
+	}
 
-	if (!hw)
-		return 0;
+	if (!hw) {
+		result = 0;
+		goto end;
+	}
 
 	acx100_log_mac_address(L_ASSOC, hw->dev_addr);
 	acx100_log_mac_address(L_ASSOC, hdr->a3.a1);
@@ -1720,16 +1710,21 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 	acx100_log_mac_address(L_ASSOC, hdr->a3.a3);
 	acx100_log_mac_address(L_ASSOC, hw->bssid);
 	if (!acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1) &&
-			!acx100_is_mac_address_equal(hw->bssid, hdr->a3.a1))
-		return 1;
-	if (hw->mode == 0)
-		return 0;
+			!acx100_is_mac_address_equal(hw->bssid, hdr->a3.a1)) {
+		result = 1;
+		goto end;
+	}
+	if (hw->mode == 0) {
+		result = 0;
+		goto end;
+	}
 
 	if (hw->auth_alg <= 1) {
 		if (hw->auth_alg != *(req->auth_alg))
 		{
 			acxlog(L_ASSOC, "authentication algorithm mismatch: want: %ld, req: %d\n", hw->auth_alg, *(req->auth_alg));
-			return 0;
+			result = 0;
+			goto end;
 		}
 	}
 	acxlog(L_ASSOC,"Algorithm is ok\n");
@@ -1749,7 +1744,8 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 		if (!(clt = sta_list_add(hdr->a3.a2)))
 		{
 			acxlog(L_ASSOC,"Could not allocate room for this client\n");
-			return 0;
+			result = 0;
+			goto end;
 		}
 
 		memcpy(clt->address, hdr->a3.a2, WLAN_ADDR_LEN);
@@ -1809,9 +1805,12 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 		transmit_assoc_req(hw);
 		break;
 	}
-	FN_EXIT(0, 0);
-	return 0;
+	result = 0;
+end:
+	FN_EXIT(1, result);
+	return result;
 }
+
 /*----------------------------------------------------------------
 * process_deauthen
 * FIXME rename to acx100_process_deauthen
@@ -1831,7 +1830,6 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 *
 *----------------------------------------------------------------*/
 
-
 /* process_deauthen()
  * STATUS: FINISHED, UNVERIFIED.
  */
@@ -1849,7 +1847,7 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 
 	hdr = arg_0->hdr;
 
-	if (hdr->a3.fc & 0x300)
+	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc))
 	{
 		result = 1;
 		goto end;
@@ -1892,6 +1890,7 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 	FN_EXIT(1, result);
 	return result;
 }
+
 /*----------------------------------------------------------------
 * process_deauthenticate
 * FIXME: rename to acx100_process_deauthenticate
@@ -1910,7 +1909,6 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 *
 *----------------------------------------------------------------*/
 
-
 /* process_deauthenticate()
  * STATUS: FINISHED, UNVERIFIED.
  */
@@ -1922,7 +1920,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	acxlog(L_STD, "processing deauthenticate packet. Hmm, should this have happened?\n");
 	hdr = req->hdr;
-	if (hdr->a3.fc & 0x300)
+	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc))
 		return 1;
 	else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ )
@@ -1937,6 +1935,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 	FN_EXIT(1, 1);
 	return 1;
 }
+
 /*----------------------------------------------------------------
 * transmit_deauthen
 * FIXME: rename to acx100_transmit_deauthen
@@ -1954,7 +1953,6 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 * Comment:
 *
 *----------------------------------------------------------------*/
-
 
 /* transmit_deauthen()
  * STATUS: should be ok, but UNVERIFIED.
@@ -2125,9 +2123,8 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 	packet_len = WLAN_HDR_A3_LEN;
 
 	if (sta_list != NULL) {
-		memcpy(sta_list->address, arg_0->hdr->a3.a2,
-		       WLAN_ADDR_LEN);
-		sta_list->val0x8 = (arg_0->hdr->a3.fc & 0x1000) >> 12;
+		memcpy(sta_list->address, arg_0->hdr->a3.a2, WLAN_ADDR_LEN);
+		sta_list->val0x8 = WLAN_GET_FC_PWRMGT(arg_0->hdr->a3.fc);
 		sta_list->auth_alg = *(arg_0->auth_alg);
 		sta_list->val0xe = 2;
 		sta_list->val0x98 = arg_0->hdr->a3.seq;
@@ -2408,10 +2405,10 @@ int transmit_assoc_req(wlandevice_t *hw)
 	if (hw->wep_restricted)
 		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_PRIVACY(1));
 	/* only ask for short preamble if the peer station supports it */
-	if (WLAN_GET_MGMT_CAP_INFO_SHORT(hw->station_assoc.cap))
+	if (hw->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE)
 		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_SHORT(1));
 	/* only ask for PBCC support if the peer station supports it */
-	if (WLAN_GET_MGMT_CAP_INFO_PBCC(hw->station_assoc.cap))
+	if (hw->station_assoc.caps & IEEE802_11_MGMT_CAP_PBCC)
 		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_PBCC(1));
 #endif
 	acxlog(L_ASSOC, "association: requesting capabilities 0x%04X\n", *(UINT16 *)pCurrPos);
@@ -2733,16 +2730,16 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		if (!acx100_is_mac_address_broadcast(wlandev->ap))
 			if (!acx100_is_mac_address_equal(this_bss->bssid, wlandev->ap))
 				continue;
-		if (!(this_bss->cap & (WLAN_SET_MGMT_CAP_INFO_ESS(1) | WLAN_SET_MGMT_CAP_INFO_IBSS(1))))
+		if (!(this_bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)))
 		{
 			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
-			this_bss->cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
+			this_bss->caps |= IEEE802_11_MGMT_CAP_IBSS;
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
-		       this_bss->cap, needed_cap);
+		       this_bss->caps, needed_cap);
 
 		/* peer station doesn't support what we need? */
-		if (!((this_bss->cap & needed_cap) == needed_cap))
+		if (!((this_bss->caps & needed_cap) == needed_cap))
 			continue; /* keep looking */
 
 		if (!(wlandev->reg_dom_chanmask & (1 << (this_bss->channel - 1) ) ))
@@ -2817,7 +2814,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		if (wlandev->preamble_mode == 2)
 			/* if Auto mode, then use Preamble setting which
 			 * the station supports */
-			wlandev->preamble_flag = WLAN_GET_MGMT_CAP_INFO_SHORT(wlandev->station_assoc.cap);
+			wlandev->preamble_flag = wlandev->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE;
 		if (wlandev->mode != 0) {
 			transmit_authen1(wlandev);
 			acx100_set_status(wlandev, ISTATUS_2_WAIT_AUTH);

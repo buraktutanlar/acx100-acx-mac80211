@@ -176,7 +176,7 @@ int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 			     i, bss->bssid[0], bss->bssid[1],
 			     bss->bssid[2], bss->bssid[3], bss->bssid[4],
 			     bss->bssid[5], bss->essid, bss->channel,
-			     bss->fWEPPrivacy ? "yes" : "no", bss->cap,
+			     bss->wep ? "yes" : "no", bss->caps,
 			     bss->sir, bss->snr);
 	}
 	/* TODO: add more interesting stuff (current state, essid, ...) here */
@@ -1327,15 +1327,11 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 	memset(txf->val0x18, 0, 8);
 
 	/* set entry 2: Beacon Interval (2 octets) */
-	txf->val0x20 = hw->beacon_interval;
+	txf->beacon_interval = hw->beacon_interval;
 
 	/* set entry 3: Capability information (2 octets) */
-#if BOGUS
-	/* value changed below, so it's bogus */
-	txf->val0x22 = 0;
-#endif
 	acx100_update_capabilities(hw);
-	txf->val0x22 = hw->capabilities;
+	txf->caps = hw->capabilities;
 
 	/* set entry 4: SSID (2 + (0 to 32) octets) */
 	acxlog(L_ASSOC, "SSID = %s, len = %i\n", hw->essid, hw->essid_len);
@@ -2061,15 +2057,11 @@ void acx100_set_probe_request_template(wlandevice_t * hw)
 	memset(txf->val0x18, 0, 8);
 
 	/* set entry 2: Beacon Interval (2 octets) */
-	txf->val0x20 = hw->beacon_interval;
+	txf->beacon_interval = hw->beacon_interval;
 
 	/* set entry 3: Capability information (2 octets) */
-#if BOGUS
-	/* value changed below, so it's bogus */
-	txf->val0x22 = 0;
-#endif
 	acx100_update_capabilities(hw);
-	txf->val0x22 = hw->capabilities;
+	txf->caps = hw->capabilities;
 
 	/* set entry 4: SSID (2 + (0 to 32) octets) */
 	acxlog(L_ASSOC, "SSID = %s, len = %i\n", hw->essid, hw->essid_len);

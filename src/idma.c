@@ -722,24 +722,24 @@ void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 	FN_EXIT(0, 0);
 }
 
-/*----------------------------------------------------------------
-* acx100_process_rx_desc
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
+/*------------------------------------------------------------------------------
+ * acx100_process_rx_desc
+ *
+ * RX path top level entry point called directly and only from the IRQ handler
+ *
+ * Arguments:
+ *
+ * Returns:
+ *
+ * Side effects:
+ *
+ * Call context: Hard IRQ
+ *
+ * STATUS:
+ *
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
 void acx100_process_rx_desc(wlandevice_t *wlandev)
 {
 	struct rxhostdescriptor *RxPool;
@@ -816,17 +816,14 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 			      100 - wlandev->wstats.qual.noise : 0;
 		wlandev->wstats.qual.updated = 7;
 
-		if (wlandev->monitor)
+		if (wlandev->monitor) {
 			acx100_rxmonitor(wlandev, pDesc->data);
-		else
-		{
-			if (buf_len >= 14) {
-				acx80211_rx(pDesc, wlandev);
-			} else
-			{
-				acxlog(L_DEBUG | L_XFER | L_DATA,
-				"NOT receiving packet (%s): size too small (%d)\n", acx100_get_packet_type_string(buf->a3.fc), buf_len);
-	                }
+		} else if (buf_len >= 14) {
+			acx100_rx_ieee802_11_frame(wlandev, pDesc);
+		} else {
+			acxlog(L_DEBUG | L_XFER | L_DATA,
+			       "NOT receiving packet (%s): size too small (%d)\n",
+			       acx100_get_packet_type_string(buf->a3.fc), buf_len);
 		}
 
 		pDesc->Ctl &= ~DESC_CTL_FREE; /* Host no longer owns this */
