@@ -118,12 +118,13 @@ VERSION_CODE=`grep LINUX_VERSION_CODE $KERNEL_OUTPUT/include/linux/version.h | \
 if [ -e "$KERNEL_OUTPUT/.config" ]
 then
 	$ECHO "Kernel configuration found, performing sanity checks"
-	configcheck PCMCIA
-	configcheck CARDBUS
+	configcheck MODULES
 	configcheck NET_RADIO
 	configcheck NET_WIRELESS
+	configcheck PCMCIA
+	configcheck CARDBUS
+	configcheck USB
 	configcheck PCI
-	configcheck MODULES
 	configcheck SMP
 	$ECHO "All of the following items are required by the driver:"
 	printflag "Loadable modules support" CONFIG_MODULES
@@ -132,6 +133,8 @@ then
 	$ECHO "The following is needed for PCMCIA/CardBus cards:"
 	printflag "PCMCIA support" CONFIG_PCMCIA
 	printflag "CardBus support" CONFIG_CARDBUS
+	$ECHO "The following is needed for USB cards:"
+	printflag "USB support" CONFIG_USB
 	$ECHO "The following is needed for PCI card support:"
 	printflag "PCI support" CONFIG_PCI
 	if is_unset CONFIG_MODULES
@@ -153,6 +156,12 @@ then
 	else
 		$ECHO "WARNING: Symmetric multiprocessing support (CONFIG_SMP) is enabled. If you"
 		$ECHO "really have more than one cpu, be warned that this driver is not yet SMP safe."
+		WARNING_FLAG=1
+	fi
+	if is_unset CONFIG_USB
+	then 
+		$ECHO "WARNING: USB support (CONFIG_USB) is disabled."
+		$ECHO "This is not a terribly good idea in case your ACX100 card is USB-based."
 		WARNING_FLAG=1
 	fi
 else

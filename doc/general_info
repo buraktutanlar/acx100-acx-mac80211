@@ -15,6 +15,13 @@ TNETW1100):
 The successor of the ACX100 chip is TNETW1100B (pin-for-pin
 compatible with ACX100, much lower power consumption)
 
+Further chips are TNETW1130 (ACX111) and TNETW1230. A new chip for
+mobile phones is TNETW1250 (which will probably be used together with
+TI's TNETW3422M radio). We think that we will be able to support all of
+those chips, also the 1250.
+
+FIXME: what is the TNETW2522 and RC2432?
+
 Transfer quality can be influenced by the following parameters:
 - txpower setting via iwconfig [implemented, 16.5 and 18dB]
 - antenna selection [not implemented yet; ctlDot11CurrentAntenna()]
@@ -84,3 +91,18 @@ As such, I guess we can assume that a Maxim radio based card has a
 maximum power output of 20dBm.
 
 The RFMD radio might be the RF2948B.
+
+DWL-650+ cards seem to be exceptionally unreliable:
+I've heard of at least 5 cards with severe or slight hardware problems
+(PC lockup on card insert or firmware upload issues due to RAM problems).
+One card which deadlocked the PC (i.e.: final and fatal card damage) was:
+H/W Ver.: B4
+F/W Ver.: 1.9.3.101
+FCC ID: KA2DWL-650PLUSB1
+Another deadlocked card:
+H/W Ver.: B3
+F/W Ver.: 1.9 (can't find any more subversion numbers)
+FCC ID: KA2DWL-650PLUSB1
+
+Not even a single card other than the DWL-650+ is known to me for causing
+hardware trouble...

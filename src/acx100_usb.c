@@ -170,6 +170,9 @@ MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware file fro
 #define ACX100_PRODUCT_ID_UNBOOTED 0x3B01
 #define ACX100_PRODUCT_ID_BOOTED 0x3B00
 
+#define ACX100_USB_RX_TIMEOUT (4*HZ)
+#define ACX100_USB_TX_TIMEOUT (4*HZ)
+
 
 /* -------------------------------------------------------------------------
 **                        Module Data Structures
@@ -202,7 +205,9 @@ static void acx100usb_send_tx_frags(wlandevice_t *);
 static void * acx100usb_read_firmware(const char *,unsigned int *);
 static int acx100usb_boot(struct usb_device *);
 void acx100usb_tx_data(wlandevice_t *,struct txdescriptor *);
+static void acx100usb_prepare_tx(wlandevice_t *,struct txdescriptor *);
 static void acx100usb_flush_tx(wlandevice_t *);
+static void acx100usb_trigger_next_tx(wlandevice_t *);
 
 static struct net_device_stats * acx100_get_stats(struct net_device *);
 static struct iw_statistics *acx100_get_wireless_stats(struct net_device *);
@@ -293,6 +298,9 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 	struct net_device *dev=NULL;
 	int numconfigs,numfaces,result;
 	struct usb_config_descriptor *config;
+	struct usb_endpoint_descriptor *epdesc;
+	FN_ENTER;
+	dump_device(usbdev);
 	/* ---------------------------------------------
 	** first check if this is the "unbooted" hardware
 	** --------------------------------------------- */
@@ -345,6 +353,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		** --------------------------------------------- */
 		spin_lock_init(&(priv->usb_ctrl_lock));
 		spin_lock_init(&(priv->usb_tx_lock));
+		priv->usb_tx_mutex=0;
+		priv->currentdesc=0;
 		/* ---------------------------------------------
 		** Allocate memory for a network device
 		** --------------------------------------------- */
@@ -430,7 +440,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		/* --------------------------------------
 		** Check the max. tx size of the endpoint
 		** -------------------------------------- */
-		struct usb_endpoint_descriptor * epdesc = usb_epnum_to_ep_desc(usbdev,1);   /* get the descriptor of the bulk endpoint */
+		epdesc = usb_epnum_to_ep_desc(usbdev,1);   /* get the descriptor of the bulk endpoint */
 		if (epdesc) {
 			priv->usb_max_bulkout=epdesc->wMaxPacketSize;
 		} else {
@@ -485,13 +495,14 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 #endif
 	int result;
 
-
+	/* --------------------------------------
+	** No WLAN device...no sense
+	** ----------------------------------- */
 	if (NULL == priv)
 		return;
-
 	/* --------------------------------------
-	 *  bring the device offline...
-	 *  ----------------------------------- */
+	**  bring the device offline...
+	**  ----------------------------------- */
 	if (priv->netdev) {
 		rtnl_lock();
 		acx100usb_stop(priv->netdev);
@@ -522,7 +533,7 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 		kfree(priv->netdev);
 	}
 	/* --------------------------------------
-	** finally free the context...
+	** finally free the WLAN device...
 	** -------------------------------------- */
 	if (priv) kfree(priv);
 }
@@ -551,7 +562,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	int result;
 	UINT16 *csptr;
 	char filename[128],*firmware,*usbbuf;
-	acxlog(L_DEBUG,"booting acx100 USB device...\n");
+	FN_ENTER;
 	usbbuf = (char *)kmalloc(ACX100_USB_RWMEM_MAXLEN,GFP_KERNEL);
 	if (!usbbuf) {
 		printk(KERN_ERR SHORTNAME ": not enough memory for allocating USB transfer buffer (req=%d bytes)\n",ACX100_USB_RWMEM_MAXLEN);
@@ -641,7 +652,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 **  (void *) Pointer to memory with firmware or NULL on failure
 **
 ** Description:
-**  currently missing
+**  This function opens the specified file and reads the data into memory.
 ** ------------------------------------------------------------------------ */
 
 static void * acx100usb_read_firmware(const char *filename,unsigned int *size)
@@ -722,7 +733,7 @@ static void * acx100usb_read_firmware(const char *filename,unsigned int *size)
 **  <NOTHING>
 **
 ** Description:
-**  Basic setup of a network device for use with the WLAN device
+**  Basic setup of a network device for use with the WLAN device.
 ** ------------------------------------------------------------------------- */
 
 static void init_network_device(struct net_device *dev) {
@@ -743,8 +754,9 @@ static void init_network_device(struct net_device *dev) {
 	dev->get_wireless_stats = (void *)&acx100_get_wireless_stats;
 #if WIRELESS_EXT >= 13
 	dev->wireless_handlers = (struct iw_handler_def *)&acx100_ioctl_handler_def;
+#else
+	dev->do_ioctl = (void *)&acx_ioctl_old;
 #endif
-	dev->do_ioctl = (void *)&acx100_ioctl_main;
 	dev->set_multicast_list = (void *)&acx100usb_set_rx_mode;
 #ifdef HAVE_TX_TIMEOUT
 	dev->tx_timeout = &acx100usb_tx_timeout;
@@ -760,17 +772,19 @@ static void init_network_device(struct net_device *dev) {
 
 
 
-/* ---------------------------------------------------------------------------
+/* --------------------------------------------------------------------------
 ** acx100usb_open():
 ** Inputs:
 **    dev -> Pointer to network device
-** ---------------------------------------------------------------------------
+** --------------------------------------------------------------------------
 ** Returns:
 **  <NOTHING>
 **
 ** Description:
-**
-*/
+**  This function is called when the user sets up the network interface.
+**  It initializes a management timer, sets up the USB card and starts
+**  the network tx queue and USB receive.
+** ---------------------------------------------------------------------- */
 
 static int acx100usb_open(struct net_device *dev)
 {
@@ -807,7 +821,9 @@ static int acx100usb_open(struct net_device *dev)
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function is invoked when a packet has been received by the USB
+**  part of the code. It converts the rxdescriptor to an ethernet frame and
+**  then commits the data to the network stack.
 ** ------------------------------------------------------------------------ */
 
 void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
@@ -841,7 +857,8 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function initiates a bulk-in USB transfer (in case the interface
+**  is up).
 ** ------------------------------------------------------------------------- */
 
 static void acx100usb_poll_rx(wlandevice_t *priv) {
@@ -850,7 +867,7 @@ static void acx100usb_poll_rx(wlandevice_t *priv) {
 	unsigned int inpipe;
 
 	FN_ENTER;
-	if (priv->dev_state_mask&ACX_STATE_IFACE_UP) {
+	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) {
 		inbuf=&(priv->bulkin);
 		usbdev=priv->usbdev;
 
@@ -866,7 +883,7 @@ static void acx100usb_poll_rx(wlandevice_t *priv) {
 		priv->bulkrx_urb->actual_length=0;
 		usb_fill_bulk_urb(priv->bulkrx_urb, usbdev, inpipe, inbuf, sizeof(acx100_usbin_t), acx100usb_complete_rx, priv);
 		priv->bulkrx_urb->transfer_flags=ASYNC_UNLINK;
-		priv->bulkrx_urb->timeout=8*HZ;
+		priv->bulkrx_urb->timeout=ACX100_USB_RX_TIMEOUT;
 		submit_urb(priv->bulkrx_urb, GFP_KERNEL);
 	}
 	FN_EXIT(0,0);
@@ -878,13 +895,16 @@ static void acx100usb_poll_rx(wlandevice_t *priv) {
 /* ---------------------------------------------------------------------------
 ** acx100usb_complete_rx():
 ** Inputs:
-**    urb -> Pointer to USB request block
+**     urb -> Pointer to USB request block
+**    regs -> Pointer to register-buffer for syscalls (see asm/ptrace.h)
 ** ---------------------------------------------------------------------------
 ** Returns:
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function is invoked whenever a bulk receive request returns. The
+**  received data is then committed to the network stack and the next
+**  USB receive is triggered.
 ** ------------------------------------------------------------------------- */
 
 #if USB_24
@@ -907,9 +927,17 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 	ticontext=&(priv->dc);
 	size=urb->actual_length;
 	/* ---------------------------------------------
+	** check if the transfer was aborted...
+	** ------------------------------------------ */
+	if (urb->status!=0) {
+		priv->stats.rx_errors++;
+		if (priv->dev_state_mask & ACX_STATE_IFACE_UP) acx100usb_poll_rx(priv);
+		return;
+	}
+	/* ---------------------------------------------
 	** check if the receive buffer is the right one
 	** --------------------------------------------- */
-	if (size==0) acxlog(L_STD,"encountered zerolength rx packet\n");
+	if (size==0) acxlog(L_STD,"acx_usb: warning, encountered zerolength rx packet\n");
 	acxlog(L_DEBUG,"bulk rx completed (urb->actual_length=%d)\n",size);
 	if ((size>0)&&(urb->transfer_buffer==&(priv->bulkin))) {
 		/* ------------------------------------------------------------------
@@ -925,7 +953,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
 			rxdesc->Ctl|=ACX100_CTL_OWN;
 			rxdesc->Status=0xF0000000;	/* set the MSB */
-			packetsize=(ptr->mac_cnt_rcvd&0xFFF)+ACX100_RXBUF_HDRSIZE; /* packetsize is limited to 12 bits */
+			packetsize=(ptr->mac_cnt_rcvd & 0xfff)+ACX100_RXBUF_HDRSIZE; /* packetsize is limited to 12 bits */
 			acxlog(L_DEBUG,"packetsize: %d\n",packetsize);
 			if (packetsize>sizeof(struct rxbuffer)) {
 				acxlog(L_STD,"acx100usb: ERROR, # of received bytes (%d) higher than capacity of buffer (%d bytes)\n",size,sizeof(struct rxbuffer));
@@ -936,9 +964,9 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			}
 			memcpy(rxdesc->data,ptr,packetsize);
 #ifdef ACX_DEBUG
-			if (debug&L_DATA) {
+			if (debug&L_DEBUG) {
 				if ((packetsize>0)&&(packetsize<1024)) {
-					acxlog(L_DATA,"received data:\n");
+					acxlog(L_DEBUG,"received data:\n");
 					acx100usb_dump_bytes(ptr,packetsize);
 				}
 			}
@@ -954,7 +982,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 	/* -------------------------------
 	** look for the next rx ...
 	** ---------------------------- */
-	if (priv->dev_state_mask&ACX_STATE_IFACE_UP) acx100usb_poll_rx(priv); /* receive of frame completed, now look for the next one */
+	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) acx100usb_poll_rx(priv); /* receive of frame completed, now look for the next one */
 	FN_EXIT(0,0);
 }
 
@@ -971,31 +999,76 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function is called by acx100_dma_tx_data() and is responsible for
+**  sending out the data within the given txdescriptor to the USB device.
+**  In order to avoid inconsistency on SMP systems, a Mutex is checked
+**  that forbids other packets to disturb the USB queue when there is
+**  more than 1 packet within the Tx queue at a time. In case there is
+**  a transfer in progress, this function immediately returns. It is
+**  within the responsibility of the acx100usb_complete_tx() function to
+**  ensure that these transfers are completed after the current transfer
+**  was finished. In case there are no transfers in progress, the Mutex
+**  is set and the transfer is triggered.
 ** ------------------------------------------------------------------------- */
 
-void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc) {
+void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc)
+{
+	int flags;
+	FN_ENTER;
+	/* ------------------------------------
+	** some sanity checks...
+	** --------------------------------- */
+	if ((!priv)||(!desc)) return;
+	/*-----------------------------------------------
+	** check if we are still not done sending the
+	** last frames...
+	** ------------------------------------------- */
+	spin_lock_irqsave(&(priv->usb_tx_lock),flags);
+	if (priv->usb_tx_mutex) {
+		spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
+		return;
+	}
+	/*-----------------------------------------------
+	** indicate a tx frame in progress...
+	** ------------------------------------------- */
+	priv->usb_tx_mutex=1;
+	spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
+	acx100usb_prepare_tx(priv,desc);
+	FN_EXIT(0,0);
+}
+
+
+
+/* ---------------------------------------------------------------------------
+** acx100usb_prepare_tx():
+** Inputs:
+**    priv -> Pointer to wlandevice structure
+**    desc -> Pointer to TX descriptor
+** ---------------------------------------------------------------------------
+** Returns:
+**  <NOTHING>
+**
+** Description:
+**  This function inserts the given txdescriptor into the USB output buffer
+**  and initiates the USB data transfer of the packet.
+** ------------------------------------------------------------------------- */
+
+static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	int txsize,ucode,size;
 	acx100_usb_txfrm_t *buf;
 	UINT8 *addr;
 	struct usb_device *usbdev;
 	unsigned int outpipe;
 	struct txhostdescriptor *header,*payload;
+	TIWLAN_DC *ticontext;
 	FN_ENTER;
-	/* ------------------------------------
-	** some sanity checks...
-	** --------------------------------- */
-	if ((!priv)||(!desc)) return;
+	priv->currentdesc = desc;
+	ticontext=&(priv->dc);
 	/* ------------------------------------------
 	** extract header and payload from descriptor
 	** --------------------------------------- */
 	header = desc->host_desc;
 	payload = desc->host_desc+1;
-	/*-----------------------------------------------
-	** wait until pending request terminates
-	** ------------------------------------------- */
-	spin_lock(&(priv->usb_tx_lock));
-	spin_unlock(&(priv->usb_tx_lock));
 	/* ----------------------------------------------
 	** concatenate header and payload into USB buffer
 	** ------------------------------------------- */
@@ -1025,7 +1098,6 @@ void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc) {
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t *)header->data)->a3.fc)==WLAN_FTYPE_DATA) {
 		buf->hdr.hostData|=(ACX100_USB_TXHI_ISDATA<<16);
 	}
-	// AP -> adr1, else adr3 ???
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
 	if (acx100_is_mac_address_directed((mac_t *)addr)) buf->hdr.hostData|=(ACX100_USB_TXHI_DIRECTED<<16);
 	if (acx100_is_mac_address_broadcast(addr)) buf->hdr.hostData|=(ACX100_USB_TXHI_BROADCAST<<16);
@@ -1050,21 +1122,21 @@ void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc) {
 	** ------------------------------------------ */
 	usbdev=priv->usbdev;
 	outpipe=usb_sndbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
-	acxlog(L_XFER,"sending initial %d bytes (remain: %d)\n",txsize,priv->usb_txsize-priv->usb_txoffset);
+	acxlog(L_DEBUG,"sending initial %d bytes (remain: %d)\n",txsize,priv->usb_txsize-priv->usb_txoffset);
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,txsize,acx100usb_complete_tx,priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=4*HZ;
-	spin_lock(&(priv->usb_tx_lock));
+	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
-	if (ucode!=0) acxlog(L_STD,"submit_urb() return code: %d\n",ucode);
-	/* TODO: error handling */
-	/* ------------------------------------
-	** free the descriptors...
-	** --------------------------------- */
-	header->Ctl|=DESC_CTL_DONE;
-	payload->Ctl|=DESC_CTL_DONE;
-	desc->Ctl|=DESC_CTL_DONE;
-	acx100_clean_tx_desc(priv);
+	acxlog(L_DEBUG,"dump: outpipe=%X buf=%p txsize=%d\n",outpipe,buf,txsize);
+	if (ucode!=0) {
+		acxlog(L_STD,"submit_urb() return code: %d (%s:%d)\n",ucode,__FILE__,__LINE__);
+		/* -------------------------------------------------
+		** on error, just mark the frame as done and update
+		** the statistics...
+		** ---------------------------------------------- */
+		priv->stats.tx_errors++;
+		acx100usb_trigger_next_tx(priv);
+	}
 	FN_EXIT(0,0);
 }
 
@@ -1072,15 +1144,17 @@ void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc) {
 
 
 /* ---------------------------------------------------------------------------
-** acx100usb_complete_rx():
+** acx100usb_send_tx_frags():
 ** Inputs:
-**    urb -> Pointer to USB request block
+**    priv -> Pointer to WLAN device structure
 ** ---------------------------------------------------------------------------
 ** Returns:
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function sends out the remaining bytes of a USB transfer buffer to
+**  the endpoint, due to the restrictions on the max. transfer size of bulk
+**  USB transfers.
 ** ------------------------------------------------------------------------- */
 
 static void acx100usb_send_tx_frags(wlandevice_t *priv) {
@@ -1090,9 +1164,6 @@ static void acx100usb_send_tx_frags(wlandevice_t *priv) {
 	char *buf;
 	FN_ENTER;
 
-	/* FIXME: we should set a lock or something so that the next
-	 * tx waits until all fragments of the current txes are processed
-	 */
 	buf=((char *)&(priv->bulkout))+priv->usb_txoffset;
 	diff=priv->usb_txsize-priv->usb_txoffset;
 	if (diff<=0) return;
@@ -1103,19 +1174,40 @@ static void acx100usb_send_tx_frags(wlandevice_t *priv) {
 		priv->usb_txoffset+=priv->usb_max_bulkout;
 		txsize=priv->usb_max_bulkout;
 	}
-	acxlog(L_XFER,"sending %d bytes (remain: %d)\n",txsize,priv->usb_txsize-priv->usb_txoffset);
+	acxlog(L_DEBUG,"sending %d bytes (remain: %d)\n",txsize,priv->usb_txsize-priv->usb_txoffset);
 	usbdev=priv->usbdev;
 	outpipe=usb_sndbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
-	acxlog(L_DEBUG,"packetsize: %d bytes\n",txsize);
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,txsize,acx100usb_complete_tx,priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=4*HZ;
+	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
-	acxlog(L_DEBUG,"submit_urb in tx returned %d\n",ucode);
+	if (ucode!=0) {
+		acxlog(L_STD,"submit_urb() return code: %d (%s:%d)\n",ucode,__FILE__,__LINE__);
+		/* -------------------------------------------------
+		** on error, just mark the frame as done and update
+		** the statistics...
+		** ---------------------------------------------- */
+		priv->stats.tx_errors++;
+		acx100usb_trigger_next_tx(priv);
+	}
 	FN_EXIT(0,0);
 }
 
 
+/* ---------------------------------------------------------------------------
+** acx100usb_flush_tx():
+** Inputs:
+**    priv -> Pointer to WLAN device structure
+** ---------------------------------------------------------------------------
+** Returns:
+**  <NOTHING>
+**
+** Description:
+**  This function sends out a null packet to the USB device. Because the
+**  device has an internal data buffer, transfers of packets whose size exactly
+**  divides the max. size of bulk transfers are not recognized as finished by
+**  the card. 
+** ------------------------------------------------------------------------- */
 
 static void acx100usb_flush_tx(wlandevice_t *priv)
 {
@@ -1123,17 +1215,26 @@ static void acx100usb_flush_tx(wlandevice_t *priv)
 	unsigned int outpipe;
 	int ucode;
 	char *buf;
+	FN_ENTER;
 	buf=((char *)&(priv->bulkout))+priv->usb_txoffset;
-  priv->usb_txoffset++;  /* just to make sure that this function is invoked only ONCE */
+	priv->usb_txoffset++;  /* just to make sure that this function is invoked only ONCE */
 	usbdev=priv->usbdev;
 	outpipe=usb_sndbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,0,&(acx100usb_complete_tx),priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=4*HZ;
+	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
-	acxlog(L_DEBUG,"flush(): usb_submit_urb in tx returned %d\n",ucode);
+        if (ucode!=0) {
+		acxlog(L_STD,"submit_urb() return code: %d (%s:%d)\n",ucode,__FILE__,__LINE__);
+		/* -------------------------------------------------
+		** on error, just mark the frame as done and update
+		** the statistics...
+		** ---------------------------------------------- */
+		priv->stats.tx_errors++;
+		acx100usb_trigger_next_tx(priv);
+	}
+	FN_EXIT(0,0);
 }
-
 
 
 
@@ -1141,13 +1242,23 @@ static void acx100usb_flush_tx(wlandevice_t *priv)
 /* ---------------------------------------------------------------------------
 ** acx100usb_complete_tx():
 ** Inputs:
-**    urb -> Pointer to USB request block
+**     urb -> Pointer to USB request block
+**    regs -> Pointer to register-buffer for syscalls (see asm/ptrace.h)
 ** ---------------------------------------------------------------------------
 ** Returns:
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**   This function is invoked upon termination of a USB transfer. As the
+**   USB device is only capable of sending a limited amount of bytes per
+**   transfer to the bulk-out endpoint, this routine checks if there are
+**   more bytes to send and triggers subsequent transfers. In case the
+**   transfer size exactly matches the maximum bulk-out size, it triggers
+**   a transfer of a null-frame, telling the card that this is it. Upon
+**   completion of a frame, it checks whether the Tx ringbuffer contains
+**   more data to send and invokes the Tx routines if this is the case.
+**   If there are no more occupied Tx descriptors, the Tx Mutex is unlocked
+**   and the network queue is switched back to life again.
 ** ------------------------------------------------------------------------- */
 
 #if USB_24
@@ -1157,39 +1268,99 @@ static void acx100usb_complete_tx(struct urb *urb, struct pt_regs *regs)
 #endif
 {
 	wlandevice_t *priv;
-	struct txhostdescriptor *txdesc;
-	TIWLAN_DC *ticontext;
 
 	FN_ENTER;
+
 	priv=(wlandevice_t *)urb->context;
-	/* ----------------------------
-	** grab the TI device context
-	** -------------------------- */
-	ticontext=&(priv->dc);
+	if (!priv) acxlog(L_STD,"ERROR, encountered NULL WLAN device in URB\n");
+	/* ------------------------------
+	** handle USB transfer errors...
+	** --------------------------- */
+	if (urb->status!=0) {
+		acx100usb_trigger_next_tx(priv);
+	}
 	/* ---------------------------------------------
 	** check if there is more data to transmit...
 	** --------------------------------------------- */
 	acxlog(L_DEBUG,"transfer_buffer: %p  priv->bulkout: %p\n",urb->transfer_buffer,&(priv->bulkout));
-	txdesc=&(ticontext->pTxHostDescQPool[ticontext->tx_tail]);
 	acxlog(L_DEBUG,"actual length: %d  status: %d\n",urb->actual_length,urb->status);
-	acxlog(L_DEBUG,"bulk xmt completed (status=%d, len=%d, txdesc=%p) tx_pool_count=%ld tx_tail=%ld\n",urb->status,urb->actual_length,txdesc,ticontext->tx_pool_count,ticontext->tx_tail);
+	acxlog(L_DEBUG,"bulk xmt completed (status=%d, len=%d) TxQueueFree=%ld\n",urb->status,urb->actual_length,priv->TxQueueFree);
 	if (priv->usb_txoffset<priv->usb_txsize) {
 		acx100usb_send_tx_frags(priv);
-	} else if ((priv->usb_txoffset==priv->usb_txsize)&&((priv->usb_txoffset%priv->usb_max_bulkout)==0)) {
-		/* ---------------------------------------------
-		** in case the block was exactly the maximum tx
-		** size of the bulk endpoint, send out a null
-		** message so that the card sends out the block
-		** from its internal memory...
-		** --------------------------------------------- */
-		acx100usb_flush_tx(priv);
-		spin_unlock(&(priv->usb_tx_lock));
 	} else {
-		spin_unlock(&(priv->usb_tx_lock));
+		if ((priv->usb_txoffset==priv->usb_txsize)&&((priv->usb_txoffset%priv->usb_max_bulkout)==0)) {
+			/* ---------------------------------------------
+			** in case the block was exactly the maximum tx
+			** size of the bulk endpoint, send out a null
+			** message so that the card sends out the block
+			** from its internal memory...
+			** --------------------------------------------- */
+			acx100usb_flush_tx(priv);
+		}
+		acx100usb_trigger_next_tx(priv);
 	}
 	FN_EXIT(0,0);
 }
 
+
+/* ---------------------------------------------------------------------------
+** acx100usb_trigger_next_tx():
+** Inputs:
+**     priv -> Pointer to WLAN device structure
+** ---------------------------------------------------------------------------
+** Returns:
+**  <NOTHING>
+**
+** Description:
+**  This function is invoked when the transfer of the current txdescriptor
+**  to send is completed OR if there went something wrong during the transfer
+**  of the descriptor. In either case, this function checks if there are more
+**  descriptors to send and handles the descriptors over to the 
+**  acx100usb_prepare_tx() function. If there are no more descriptors to send,
+**  the transfer-in-progress Mutex is released and the network tx queue is
+**  kicked back to life.
+** ------------------------------------------------------------------------ */
+
+static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
+	struct txdescriptor *txdesc;
+	struct txhostdescriptor *header,*payload;
+	int descnum,flags;
+	struct TIWLAN_DC *ticontext;
+	/* ----------------------------
+	** grab the TI device context
+	** -------------------------- */
+	ticontext=&(priv->dc);
+	/* ----------------------------------------------
+	** free the txdescriptor...
+	** ------------------------------------------- */
+	txdesc=priv->currentdesc;
+	header = txdesc->host_desc;
+	payload = txdesc->host_desc+1;
+	header->Ctl|=DESC_CTL_DONE;
+	payload->Ctl|=DESC_CTL_DONE;
+	txdesc->Ctl|=DESC_CTL_DONE;
+	acx100_clean_tx_desc(priv);
+	/* ----------------------------------------------
+	** check if there are still descriptors that have
+	** to be sent. acx100_clean_tx_desc() should
+	** have set the next non-free descriptor position
+	** in tx_tail...
+	** ------------------------------------------- */
+	descnum=ticontext->tx_tail;
+	txdesc=&(ticontext->pTxDescQPool[descnum]);
+	if (!(txdesc->Ctl & ACX100_CTL_OWN)) {
+		acx100usb_prepare_tx(priv,txdesc);
+	} else {
+		/* ----------------------------------------------
+		** now release the mutex and wake the output
+		** queue...
+		** ------------------------------------------- */
+		spin_lock_irqsave(&(priv->usb_tx_lock),flags);
+		priv->usb_tx_mutex=0;
+		spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
+		netif_wake_queue(priv->netdev);
+	}
+}
 
 
 /* ---------------------------------------------------------------------------
@@ -1198,15 +1369,18 @@ static void acx100usb_complete_tx(struct urb *urb, struct pt_regs *regs)
 **    dev -> Pointer to network device structure
 ** ---------------------------------------------------------------------------
 ** Returns:
-**  (int)
+**  (int) 0 on success, or error-code 
 **
 ** Description:
-**  MISSING
+**  This function stops the network functionality of the interface (invoked
+**  when the user calls ifconfig <wlan> down). The tx queue is halted and
+**  the device is markes as down. In case there were any pending USB bulk
+**  transfers, these are unlinked (asynchronously). The module in-use count
+**  is also decreased in this function.
 ** ------------------------------------------------------------------------- */
 
 static int acx100usb_stop(struct net_device *dev)
 {
-  FN_ENTER;
   wlandevice_t *priv;
   int already_down;
   if (!(dev->priv)) {
@@ -1214,6 +1388,7 @@ static int acx100usb_stop(struct net_device *dev)
     return -ENODEV;
   }
   priv=dev->priv;
+  FN_ENTER;
   /* --------------------------------
    * stop the transmit queue...
    * ------------------------------ */
@@ -1235,6 +1410,19 @@ static int acx100usb_stop(struct net_device *dev)
   return 0;
 }
 
+
+
+/* ---------------------------------------------------------------------------
+** acx100usb_start_xmit():
+** Inputs:
+**    skb -> Pointer to sk_buffer that contains the data to send 
+**    dev -> Pointer to the network device this transfer is directed to
+** ---------------------------------------------------------------------------
+** Returns:
+**  (int) 0 on success, or error-code
+**
+** Description:
+** ------------------------------------------------------------------------- */
 
 static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	int txresult = 0;
@@ -1308,26 +1496,46 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	pb->ethbuf = skb->data;
 #endif
 	templen = skb->len;
+	/* ------------------------------------
+	** get the next free tx descriptor...
+	** -------------------------------- */
 	if ((tx_desc = acx100_get_tx_desc(priv)) == NULL) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
 		goto end;
 	}
+	/* ------------------------------------
+	** convert the ethernet frame into our
+	** own tx descriptor type...
+	** -------------------------------- */
 	acx100_ether_to_txdesc(priv,tx_desc,skb);
+	/* -------------------------
+	** free the skb
+	** ---------------------- */
 	dev_kfree_skb(skb);
 	dev->trans_start = jiffies;
-	acx100_dma_tx_data(priv, tx_desc);  // this function finally calls acx100usb_tx_data()
+	/* -----------------------------------
+	** until the packages are flushed out,
+	** stop the queue...
+	** -------------------------------- */
+	netif_stop_queue(dev);
+	/* -----------------------------------
+	** transmit the data...
+	** -------------------------------- */
+	acx100_dma_tx_data(priv, tx_desc);  /* this function finally calls acx100usb_tx_data() */
 	txresult=0;
-
+	/* -----------------------------------
+	** statistical bookkeeping...
+	** -------------------------------- */
 	priv->stats.tx_packets++;
 	priv->stats.tx_bytes += templen;
-
 end:
 	acx100_unlock(priv, &flags);
-
 	FN_EXIT(1, txresult);
 	return txresult;
 }
+
+
 
 static struct net_device_stats *acx100_get_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
@@ -1336,12 +1544,16 @@ static struct net_device_stats *acx100_get_stats(netdevice_t *dev) {
 	return &priv->stats;
 }
 
+
+
 static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
 	FN_EXIT(1, (int)&priv->stats);
 	return &priv->wstats;
 }
+
+
 
 static void acx100usb_set_rx_mode(struct net_device *dev)
 {
@@ -1366,6 +1578,9 @@ static void acx100usb_tx_timeout(struct net_device *dev) {
 #endif
 
 
+
+
+
 /* ---------------------------------------------------------------------------
 ** init_module():
 ** Inputs:
@@ -1375,8 +1590,9 @@ static void acx100usb_tx_timeout(struct net_device *dev) {
 **  (int) Errorcode on failure, 0 on success
 **
 ** Description:
-**  MISSING
-*/
+**  This function is invoked upon loading of the kernel module. It registers
+**  itself at the Kernel's USB subsystem.
+** ------------------------------------------------------------------------ */
 
 int init_module() {
 	int err;
@@ -1402,15 +1618,14 @@ int init_module() {
 **  <NOTHING>
 **
 ** Description:
-**  MISSING
+**  This function is invoked as last step of the module unloading. It simply
+**  deregisters this module at the Kernel's USB subsystem.
 ** ------------------------------------------------------------------------- */
 
 void cleanup_module() {
 	usb_deregister(&acx100usb_driver);
 	printk(KERN_INFO "Cleaning up acx100 WLAN USB kernel module\n");
 }
-
-
 
 
 
@@ -1480,9 +1695,6 @@ static void dump_device(struct usb_device *usbdev)
   printk(KERN_INFO "  speed: %d\n",usbdev->speed);
   printk(KERN_INFO "  tt: 0x%X\n",(unsigned int)(usbdev->tt));
   printk(KERN_INFO "  ttport: %d\n",(unsigned int)(usbdev->ttport));
-#if USB_24
-  printk(KERN_INFO "  refcnt: %d\n",usbdev->refcnt);
-#endif
   printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",(unsigned int)(usbdev->toggle[0]),(unsigned int)(usbdev->toggle[1]));
   printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]);
   printk(KERN_INFO "  epmaxpacketin: ");

@@ -2,11 +2,17 @@
 *             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
-WARNING: this driver may still cause your box to lockup in rare cases!
+WARNING: this driver may still cause your box to lockup in very rare cases!
 If this happens, then please report at/create a bug report!
 
+RELIABILITY WARNING: The DWL-650+ seems to have a slightly too high
+defect rate (see doc/general_info). Consider buying any card with FCC ID
+O7J-GL242201 (0 defect reports) instead of the 650+ (5+ defect/problem
+reports). One might attribute this to the higher sales numbers of the 650+,
+but I'm not quite sure...
+
 Please NEVER consider using the NDIS driver loader cludge instead of our driver.
-For bazillions of reasons against it, please see
+For an incredible number of reasons against it, please see
 http://acx100.sourceforge.net/ndis_cludge.html
 If for some or another reason you're unhappy with the performance of our
 current driver version, then either fix it if you're capable of doing that
@@ -14,7 +20,7 @@ or immediately think of returning to the shop or, if that is not possible,
 of selling your very poorly supported Taxed Sinstruments based card in
 exchange for a wireless card that is well-supported under Linux.
 Buying the very problematic DriverLoader product instead in an attempt
-to "fix" missing driver Linux support will send the entirely wrong message to
+to "fix" missing Linux driver support will send the entirely wrong message to
 wireless card manufacturers, so please never choose to do that.
 There are many commercial products very much worth buying; but this is
 certainly not one of those...
@@ -22,18 +28,19 @@ certainly not one of those...
 Also, please take note that I learnt that TI is using and supporting
 Linux for at least TNETW1230 driver SDKs and Linux QoS management (only
 commercially available, I suppose?).
-However somehow they're too elitist to actually pass (parts of) that Linux
-infrastructure back to the desperate end users looking for proper
-TNETW1xxx driver support. Returning such completely improperly supported WLAN
-hardware to the shop and mentioning unacceptable terms suddenly doesn't sound
-like such a chore any more...
+However somehow they're still too elitist to actually pass (parts of) that
+Linux infrastructure back to the desperate end users looking for proper
+TNETW1xxx driver support, even after continuous user requests.
+Returning such completely improperly supported WLAN hardware to the shop
+and mentioning unacceptable terms suddenly doesn't sound like such a
+chore any more...
 
 --- CARD COMPATIBILITY (aka "the real dirt") ---
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB and Compact Flash implementations,
-which are both extremely rare -- unstable USB support exists for 2.4.x,
-and 2.6.x support is not quite functional at all yet).
+which are both extremely rare -- semi-stable USB support exists for 2.4.x,
+but 2.6.x USB support is not quite functional at all yet). [040413]
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
@@ -43,8 +50,8 @@ Note that any Texas Instruments chips OTHER than the ACX100 (which is
 also known as TNETW1100) are not supported by this driver (yet).
 These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
 (ACX111).
-Initial ACX111 support is in the driver, but it's still not quite working yet,
-due to many changes compared to the ACX100.
+Almost working ACX111 support is in the driver, but it's still not quite
+working yet, due to many changes compared to the ACX100. [040413]
 
 Also, due to confusion about similar card naming (for further information, see
 bottom), people keep thinking certain cards they own work with this driver.
@@ -90,7 +97,7 @@ due to strict 802.11 compliance checks in their firmware.
 Master mode support (aka HostAP) has not really been implemented yet,
 but at least it can be configured now.
 
-The non-standard 4x mode (aka "44Mbps") is NOT supported yet and will need
+The non-standard 4x mode (aka "44Mbps") is not supported yet and will need
 several driver changes.
 
 Many other things haven't been tested (properly) yet.
@@ -278,7 +285,7 @@ reading the guidelines at
 http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/HOTPLUG.txt
 However, this seems to still be a bit static.
 A more mobile approach might be the ifplugd/waproamd programs
-(configuration dependent on stations in reach).
+(see below; configuration dependent on stations in reach).
 
 DON'T FORGET that debugging/logging options can be changed in a pretty
 powerful way (see DEBUGGING / LOGGING).
@@ -339,7 +346,13 @@ where the firmware files are? Use kernel boot parameter acx_firmware_dir=XXX.
 Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
-Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf.
+Need to change MAC address? Use ifconfig wlan0 hw ether 112233445566
+Setting will only get updated when not associated: needs reinit of card parts.
+And it doesn't work quite right yet, communication is distorted :-\
+(maybe the card firmware even keeps the MAC address of the EEPROM or so...)
+
+Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
+(in case of an older release which didn't know the acx100 type yet).
 Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable.
 
 Wired-Wireless bridging? Driver would perhaps need to support WDS
@@ -414,7 +427,8 @@ enough to have 2 slots sometimes actually helped to fix IRQ problems...
 If the system detects your card, but the driver is unable to initialize the
 card due to the card having IDs 0xffff etc., then play with Linux boot
 parameters, specifically the "pci=XXXX" flags, and most specifically,
-"pci=assign-busses", since this managed to fix it for one person (DWL-650+).
+"pci=assign-busses", since this managed to fix it for several persons
+(DWL-650+, Vigor520).
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
 Also, make sure to shuffle cards in different PCI slots!! The ACX100 probably
@@ -492,26 +506,27 @@ Signal level 21/100 (anything less: connection lost @1Mbps)
 Noise level 0/100 (anything more can be problematic, > 10 is deadly)
 Link Quality == reverse of Noise level
 
-Note that these signal levels are *NOT* expressed in dBm (contrary to
-what too many people think, since in Windows it is in dBm), instead it's a
-percentage value (of course, since xx/100 is percentage). Hopefully
-we'll be able to calibrate our driver soon to show dBm values :-\
+Note that these signal levels are *NOT* expressed in dBm, instead it's a
+percentage value (of course, since xx/100 is percentage) which as closely as
+possible matches values of the current Windows driver.
+I still hope that we'll be able to calibrate our driver eventually to show dBm
+values :-\
+Note that signal levels in Ad-Hoc mode are being displayed relative to the station
+which answered during our initial scanning period, so the signal level source
+(and thus the average level!!) might change with every new association.
 
 Also try other channel values to reduce interference by cordless phones,
 microwaves etc.
 
 If you keep getting Tx errors, also try setting other values for
-"iwconfig sens" (e.g. 92).
+"iwconfig sens" (e.g. 92, useful values are between 30 to 100 and
+between 160 and 200).
 
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
 If you experience complete traffic lockups after some random time,
-then maybe consider temperature issues. At least one time an overheated
-ACX100 CardBus led to IRQ loss and thus an accumulation of busy ring
-buffers. But of course we're quite certain several traffic lockups
-are NOT related to temperature...
-Especially, don't use hdparm -u1, since it may lockup/delay driver IRQ
+then don't use hdparm -u1, since it may lockup/delay driver IRQ
 operation for some yet unknown reason.
 
 Some connection problems might also be caused by the Access Point using a
@@ -593,6 +608,22 @@ module autoloading configuration (e.g. in /etc/modprobe.conf or
 
 options acx_pci firmware_dir=/home/ivor/cvs/acx100-0_1a-rc1/firmware
 alias wlan0 acx_pci
+
+USING WAPROAMD
+The waproamd is "a roaming daemon for wireless IEEE 802.11 NICs supporting
+the Linux wireless extensions". 
+1. install waproamd (http://0pointer.de/lennart/projects/waproamd/) [debian package available] so it will be started before you insert the pcmcia wlan card;
+2. put your pcmcia card in;
+4. waproamd shall make all work for you.
+3. if driver was not loaded or loaded with errors do from console
+Remove acx_driver if loaded with errors
+"rmmod acx_pci"
+Load acx_pci driver (change paths according to Your settings. The below is for acx100 module build in 2.6.x kernel tree. [This is a one line command]
+"insmod /lib/modules/`uname -r`/kernel/drivers/net/wireless/acx100/acx_pci.ko use_eth_name=1 debug=0x01 firmware_dir=/lib/modules/acx100_fmwe/"
+The waproamd daemon has to look for available access points and set the eth1 nic properly.
+4. And finally try to use dhcp 
+"dhclient eth1"
+or set ifconfig manually. 
 
 --- AND FINALLY... ---
 

@@ -65,6 +65,7 @@ MIB		Managed Information Base
 MLME		MAC Layer Management Entity
 MPDU		MAC PDU
 PDU		Protocol Data Unit
+RSSI		Received Signal Strength Intensity
 RTS		Request To Send
 			When a station wants to transmit, it first sends
 			a RTS (Request To Send) packet to the Access

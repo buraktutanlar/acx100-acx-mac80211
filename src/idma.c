@@ -511,7 +511,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
 		tx_desc->rate = 20;	/* 2Mbps for MGMT pkt compatibility */
 	} else {
-		tx_desc->rate = priv->txrate_val;
+		tx_desc->rate = priv->txrate_curr;
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -614,10 +614,41 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 		union iwreq_data wrqu;
 		p80211_hdr_t *hdr = (p80211_hdr_t *)pTxDesc->host_desc->data;
 
-		memcpy(wrqu.addr.sa_data, hdr->a3.a1, ETH_ALEN);
+		MAC_COPY(wrqu.addr.sa_data, hdr->a3.a1);
 		wireless_send_event(priv->netdev, IWEVTXDROP, &wrqu, NULL);
 	}
 #endif
+}
+
+static UINT8 txrate_auto_table[] = { (UINT8)ACX_TXRATE_1, (UINT8)ACX_TXRATE_2,
+	(UINT8)ACX_TXRATE_5_5, (UINT8)ACX_TXRATE_11, (UINT8)ACX_TXRATE_22PBCC };
+
+static inline void acx_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
+{
+	acxlog(L_DEBUG, "rate %d/%d, fallback %d/%d, stepup %d/%d\n", pTxDesc->rate, priv->txrate_curr, priv->txrate_fallback_count, priv->txrate_fallback_threshold, priv->txrate_stepup_count, priv->txrate_stepup_threshold);
+	if ((pTxDesc->rate < priv->txrate_curr) || (0x0 != (pTxDesc->error & 0x30))) {
+		if (++priv->txrate_fallback_count
+				> priv->txrate_fallback_threshold) {
+			if (priv->txrate_auto_idx > 0) {
+				priv->txrate_auto_idx--;
+				priv->txrate_curr = txrate_auto_table[priv->txrate_auto_idx];
+				acxlog(L_XFER, "falling back to Tx rate %d.\n", priv->txrate_curr);
+			}
+			priv->txrate_fallback_count = 0;
+		}
+	}
+	else
+	if (pTxDesc->rate == priv->txrate_curr) {
+		if (++priv->txrate_stepup_count
+				> priv->txrate_stepup_threshold) {
+			if (priv->txrate_auto_idx < priv->txrate_auto_idx_max) {
+				priv->txrate_auto_idx++;
+				priv->txrate_curr = txrate_auto_table[priv->txrate_auto_idx];
+				acxlog(L_XFER, "stepping up to Tx rate %d.\n", priv->txrate_curr);
+			}
+			priv->txrate_stepup_count = 0;
+		}
+	}
 }
 
 /*----------------------------------------------------------------
@@ -718,6 +749,9 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 
 			if (0 != pTxDesc->error)
 				acx_handle_tx_error(priv, pTxDesc);
+
+			if (1 == priv->txrate_auto)
+				acx_handle_txrate_auto(priv, pTxDesc);
 
 			/* free it */
 			pTxDesc->Ctl = ACX100_CTL_OWN;
@@ -909,6 +943,19 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 	FN_EXIT(0, 0);
 }
 
+/*
+ * Calculate level like the feb 2003 windows driver seems to do
+ */
+inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
+{
+	UINT8 winlevel = (UINT8) (0.5 + 0.625 * rawlevel);
+
+	if(winlevel>100)
+		winlevel=100;
+
+	return winlevel;
+}
+
 /*----------------------------------------------------------------
 * acx100_log_rxbuffer
 *
@@ -1021,7 +1068,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 			buf = (p80211_hdr_t *)&pDesc->data->buf;
 		}
 
-		buf_len = pDesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */;      /* somelength */
+		buf_len = pDesc->data->mac_cnt_rcvd & 0xfff;      /* somelength */
 		if ((WLAN_GET_FC_FSTYPE(buf->a3.fc) != WLAN_FSTYPE_BEACON)
 		||  (debug & L_XFER_BEACON))
 			acxlog(L_XFER|L_DATA, "Rx pkt %02d (%s): time %lu, len %i, signal %d, SNR %d, macstat %02x, phystat %02x, phyrate %u, mode %d, status %d\n",
@@ -1029,8 +1076,8 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 				acx100_get_packet_type_string(buf->a3.fc),
 				pDesc->data->time,
 				buf_len,
-				pDesc->data->phy_level,
-				pDesc->data->phy_snr,
+				acx_signal_to_winlevel(pDesc->data->phy_level),
+				acx_signal_to_winlevel(pDesc->data->phy_snr),
 				pDesc->data->mac_status,
 				pDesc->data->phy_stat_baseband,
 				pDesc->data->phy_plcp_signal,
@@ -1057,12 +1104,23 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		 * manage to get it. Either these values are not meant to
 		 * be expressed in dBm, or it's some pretty complicated
 		 * calculation. */
-		priv->wstats.qual.level = pDesc->data->phy_level * 100 / 255;
-		priv->wstats.qual.noise = pDesc->data->phy_snr * 100 / 255;
-		priv->wstats.qual.qual =
-			(priv->wstats.qual.noise <= 100) ?
-			      100 - priv->wstats.qual.noise : 0;
-		priv->wstats.qual.updated = 7;
+
+#if FROM_SCAN_SOURCE_ONLY
+		/* only consider packets originating from the MAC
+		 * address of the device that's managing our BSSID.
+		 * Disable it for now, since it removes information (levels
+		 * from different peers) and slows the Rx path. */
+		if (0 == memcmp(buf->a3.a2, priv->station_assoc.mac_addr, ETH_ALEN)) {
+#endif
+			priv->wstats.qual.level = acx_signal_to_winlevel(pDesc->data->phy_level);
+			priv->wstats.qual.noise = acx_signal_to_winlevel(pDesc->data->phy_snr);
+			priv->wstats.qual.qual =
+				(priv->wstats.qual.noise <= 100) ?
+					100 - priv->wstats.qual.noise : 0;
+			priv->wstats.qual.updated = 7; /* all 3 indicators updated */
+#if FROM_SCAN_SOURCE_ONLY
+		}
+#endif
 
 		pDesc->Ctl &= ~ACX100_CTL_OWN; /* Host no longer owns this */
 		pDesc->Status = 0;
@@ -1538,8 +1596,8 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 	priv = pDc->priv;
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	/* FIXME WHY IS IT "TxQueueNo" ?
-	 * Probably because Rx pool ptr should be right AFTER Tx pool */
+	/* Why is "TxQueueNo" used here?
+	 * Because pRxDescQPool is right AFTER pTxDescQPool */
 	pDc->pRxDescQPool = (struct rxdescriptor *) ((UINT8 *) pDc->pTxDescQPool + (priv->TxQueueNo * sizeof(struct txdescriptor)));
 #endif
 	pDc->rx_pool_count = priv->RxQueueNo;

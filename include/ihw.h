@@ -44,7 +44,7 @@ typedef struct cmd {
 } cmd_t;
 
 typedef struct mac {
-	UINT vala;
+	UINT32 vala;
 	UINT16 valb;
 } mac_t;
 
@@ -71,7 +71,6 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type);
 int acx100_is_mac_address_zero(mac_t *mac);
 void acx100_clear_mac_address(mac_t *mac);
 int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two);
-void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from);
 UINT8 acx100_is_mac_address_group(mac_t *mac);
 UINT8 acx100_is_mac_address_directed(mac_t *mac);
 void acx100_set_mac_address_broadcast(UINT8 *address);

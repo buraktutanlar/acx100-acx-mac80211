@@ -128,6 +128,28 @@ extern int acx100_debug_func_indent;
 
 #endif /* ACX_DEBUG */
 
+#define MAC_COPY(dst, src) \
+	*(UINT32 *)dst = *(UINT32 *)src; \
+	*(UINT16 *)(((UINT8 *)dst)+4) = *(UINT16 *)(((UINT8 *)src)+4); \
+
+#define MAC_COPY_UNUSED1(dst, src) \
+{ \
+	int i; \
+	for (i = 0; i < ETH_ALEN; i++) \
+		*(((UINT8 *)dst)+i) = *(((UINT8 *)src)+i); \
+}
+
+#define MAC_COPY_UNUSED2(dst, src) memcpy(dst, src, ETH_ALEN);
+
+#define MAC_FILL(dst, val) \
+{ \
+	int i; \
+	for (i = 0; i < ETH_ALEN; i++) \
+		*(((UINT8 *)dst)+i) = val; \
+}
+
+#define MAC_BCAST(dst)	MAC_FILL(dst, 0xff)
+
 /*============================================================================*
  * Constants                                                                  *
  *============================================================================*/
@@ -190,6 +212,9 @@ extern int acx100_debug_func_indent;
 #define ACX100_RATEBIT_2			((UINT16)2)
 #define ACX100_RATEBIT_5dot5			((UINT16)4)
 #define ACX100_RATEBIT_11			((UINT16)8)
+
+#define ACX_PCI		0
+#define ACX_CARDBUS	1
 
 /* Radio type names, found in Win98 driver's TIACXLN.INF */
 #define RADIO_MAXIM_0D		0x0d
@@ -329,7 +354,7 @@ typedef enum {
 
 } IO_INDICES;
 
-#define IO_INDICES_SIZE END_OF_IO_ENUM * sizeof(UINT) 
+#define IO_INDICES_SIZE END_OF_IO_ENUM * sizeof(UINT16)
 
 /*--- EEPROM offsets ---------------------------------------------------------*/
 #define ACX100_EEPROM_ID_OFFSET		0x380
@@ -504,7 +529,7 @@ typedef enum {
  * len or code fields) */
 
 /* TODO: fill in the rest of these */
-#define ACX100_RID_GROUPADDR_LEN	((UINT16)16 * WLAN_ADDR_LEN)
+#define ACX100_RID_GROUPADDR_LEN	((UINT16)16 * ETH_ALEN)
 #define ACX100_RID_CREATEIBSS_LEN	((UINT16)0)
 #define ACX100_RID_FRAGTHRESH_LEN	((UINT16)0)
 #define ACX100_RID_RTSTHRESH_LEN	((UINT16)0)
@@ -618,7 +643,7 @@ typedef enum {
  * len or code fields) */
 #define ACX100_RID_PORTSTATUS_LEN		((UINT16)0)
 #define ACX100_RID_CURRENTSSID_LEN		((UINT16)34)
-#define ACX100_RID_CURRENTBSSID_LEN		((UINT16)WLAN_BSSID_LEN)
+#define ACX100_RID_CURRENTBSSID_LEN		((UINT16)ETH_ALEN)
 #define ACX100_RID_COMMSQUALITY_LEN		((UINT16)sizeof(acx100_commsquality_t))
 #define ACX100_RID_DBMCOMMSQUALITY_LEN		((UINT16)sizeof(acx100_dbmcommsquality_t))
 #define ACX100_RID_CURRENTTXRATE_LEN		((UINT16)0)
@@ -1085,13 +1110,13 @@ typedef struct acx100_HostScanRequest_data {
 
 /*-- Configuration Record: JoinRequest (data portion only) --*/
 typedef struct acx100_JoinRequest_data {
-	UINT8 bssid[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 channel __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_JoinRequest_data_t;
 
 /*-- Configuration Record: authenticateStation (data portion only) --*/
 typedef struct acx100_authenticateStation_data {
-	UINT8 address[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 address[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 algorithm __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_authenticateStation_data_t;
@@ -1587,7 +1612,7 @@ typedef struct acx100_rx_frame {
 typedef struct acx100_HandoverAddr {
 	UINT16 framelen __WLAN_ATTRIB_PACK__;
 	UINT16 infotype __WLAN_ATTRIB_PACK__;
-	UINT8 handover_addr[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 handover_addr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_HandoverAddr_t;
 
 /*-- Inquiry Frame, Diagnose: Communication Tallies --*/
@@ -1644,7 +1669,7 @@ typedef struct acx100_ScanResultSub {
 	UINT16 chid __WLAN_ATTRIB_PACK__;
 	UINT16 anl __WLAN_ATTRIB_PACK__;
 	UINT16 sl __WLAN_ATTRIB_PACK__;
-	UINT8 bssid[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 bcnint __WLAN_ATTRIB_PACK__;
 	UINT16 capinfo __WLAN_ATTRIB_PACK__;
 	acx100_bytestr32_t ssid __WLAN_ATTRIB_PACK__;
@@ -1681,7 +1706,7 @@ typedef struct acx100_HScanResultSub {
 	UINT16 chid __WLAN_ATTRIB_PACK__;
 	UINT16 anl __WLAN_ATTRIB_PACK__;
 	UINT16 sl __WLAN_ATTRIB_PACK__;
-	UINT8 bssid[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 bcnint __WLAN_ATTRIB_PACK__;
 	UINT16 capinfo __WLAN_ATTRIB_PACK__;
 	acx100_bytestr32_t ssid __WLAN_ATTRIB_PACK__;
@@ -1719,16 +1744,16 @@ typedef struct acx100_LinkStatus {
 
 typedef struct acx100_AssocStatus {
 	UINT16 assocstatus __WLAN_ATTRIB_PACK__;
-	UINT8 sta_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 sta_addr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	/* old_ap_addr is only valid if assocstatus == 2 */
-	UINT8 old_ap_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 old_ap_addr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 reason __WLAN_ATTRIB_PACK__;
 	UINT16 reserved __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_AssocStatus_t;
 
 /*-- Unsolicited Frame, MAC Mgmt: AuthRequest (AP Only) --*/
 typedef struct acx100_AuthRequest {
-	UINT8 sta_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	UINT8 sta_addr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	UINT16 algorithm __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_AuthReq_t;
 
@@ -1767,6 +1792,14 @@ typedef struct acx100_InfFrame {
 #define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
 #define ACX100_CTL_OWN        0x80	/* host owns the desc */
 
+
+#define ACX_TXRATE_1		10
+#define ACX_TXRATE_2		20
+#define ACX_TXRATE_5_5		55
+#define ACX_TXRATE_5_5PBCC	183
+#define ACX_TXRATE_11		110
+#define ACX_TXRATE_11PBCC	238
+#define ACX_TXRATE_22PBCC	220
 
 
 
@@ -2285,13 +2318,32 @@ typedef struct wep_key {
  * (strange_filler)? */
 
 typedef struct key_struct {
-	UINT8 addr[WLAN_ADDR_LEN];	/* 0x00 */
+	UINT8 addr[ETH_ALEN];	/* 0x00 */
 	UINT16 filler1;		/* 0x06 */
 	UINT32 filler2;		/* 0x08 */
 	UINT32 index;		/* 0x0c */
 	UINT16 len;		/* 0x10 */
 	UINT8 key[29];		/* 0x12; is this long enough??? */
 } key_struct_t;			/* size = 276. FIXME: where is the remaining space?? */
+
+
+typedef struct client {
+	UINT16 aid;		/* association ID */
+	char address[ETH_ALEN];	/* 0x2 */
+	UINT8 val0x8;
+	UINT8 used;		/* 0x9 */
+	UINT16 val0xa;
+	UINT16 auth_alg;
+	UINT16 val0xe;
+	UINT8 *val0x10;		// points to some data, don't know what yet
+	UINT32 unkn0x14;
+	UINT8 val0x18[0x80];	/* 0x18, used by acx100_process_authen() */
+	UINT16 val0x98;
+	UINT16 val0x9a;
+	UINT8 pad5[8];		/* 0x9c */
+	struct client *next;	/* 0xa4 */
+} client_t;
+
 
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
@@ -2346,7 +2398,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 
 /*--- 802.11 Basic Service Set info ------------------------------------------*/
 typedef struct bss_info {
-	UINT8 bssid[ETH_ALEN];	/* BSSID */
+	UINT8 bssid[ETH_ALEN];	/* BSSID (network ID of the device) */
+	UINT8 mac_addr[ETH_ALEN];	/* MAC address of the station's device */
 	UINT8 essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
 	size_t essid_len;	/* Length of ESSID (FIXME: \0 included?) */
 	UINT16 caps;		/* 802.11 capabilities information */
@@ -2409,6 +2462,8 @@ typedef struct wlandevice {
 	int			usb_txoffset;
 	int			usb_txsize;
 	int			usb_max_bulkout;
+	int			usb_tx_mutex;
+	struct txdescriptor *	currentdesc;
 	spinlock_t		usb_ctrl_lock;
 	spinlock_t		usb_tx_lock;
 	struct	urb		*ctrl_urb;
@@ -2442,7 +2497,8 @@ typedef struct wlandevice {
 	unsigned long	iobase2;		/* 1c */
 	UINT		chip_type;
 	char		*chip_name;
-	UINT		*io;
+	UINT8		bus_type;
+	UINT16		*io;
 
 	/*** Device state ***/
 	int		hw_unavailable;		/* indicates whether the hardware has been
@@ -2461,9 +2517,9 @@ typedef struct wlandevice {
 	UINT16		scan_probe_delay;
 			
 	/*** Wireless network settings ***/
-	UINT8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over when it makes sense only */
-	UINT8		address[WLAN_ADDR_LEN];
-	UINT8		bssid[WLAN_ADDR_LEN];
+	UINT8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over from the network device's MAC address (ifconfig) when it makes sense only */
+	UINT8		address[ETH_ALEN];	/* the BSSID before joining */
+	UINT8		bssid[ETH_ALEN];	/* the BSSID after having joined */
 	UINT8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
 	UINT16		macmode_wanted;		/* That's the MAC mode we want (iwconfig) */
 	UINT16		macmode_chosen;		/* That's the MAC mode we chose after browsing the station list */
@@ -2474,9 +2530,17 @@ typedef struct wlandevice {
 	char		essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
 	char		nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16		channel;		/* V3POS 22f0, V1POS b8 */
-	UINT8		txrate_val;		/* V3POS b8, V1POS ba */
+	UINT8		txrate_cfg;		/* Tx rate from iwconfig */
 	UINT8		txrate_auto;		/* whether to auto adjust Tx rates */
-	UINT8		txrate_fallback_retries;
+	UINT8		txrate_auto_idx;	/* index into rate table */
+	UINT8		txrate_auto_idx_max;
+	UINT8		txrate_curr;		/* the Tx rate we currently use */
+	/* settings in DWL-520+ .inf file: */
+	UINT8		txrate_fallback_retries; /* 0-255, default 1 */
+	UINT8		txrate_fallback_threshold; /* 0-100, default 12 */
+	UINT8		txrate_fallback_count;
+	UINT8		txrate_stepup_threshold; /* 0-100, default 3 */
+	UINT8		txrate_stepup_count;
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */
@@ -2489,6 +2553,10 @@ typedef struct wlandevice {
 	UINT8		scan_running;
 	UINT32		scan_start;
 	UINT16		scan_retries;		/* V3POS 2826, V1POS 27fe */
+
+	client_t	sta_list[32];		/* should those two be of */
+	client_t	*sta_hash_tab[64];	/* equal size? */
+	
 
 	/* 802.11 power save mode */
 	UINT8		ps_wakeup_cfg;
@@ -2620,30 +2688,33 @@ typedef struct wlandevice {
 #define RX_CFG2_RCV_OTHER		0x0001
 
 /*-- get and set mask values --*/
-#define GETSET_WEP		0x00000001L
-#define GETSET_TXPOWER		0x00000002L
-#define GETSET_SENSITIVITY	0x00000004L
-#define GETSET_ANTENNA		0x00000008L
-#define GETSET_ED_THRESH	0x00000010L
-#define GETSET_CCA		0x00000020L
-#define GETSET_TX		0x00000040L
-#define GETSET_RX		0x00000080L
-#define GETSET_RETRY		0x00000100L
-#define GETSET_REG_DOMAIN	0x00000200L
-#define GETSET_CHANNEL		0x00000400L
-#define GETSET_ESSID		0x00000800L
-#define GETSET_MODE		0x00001000L
-#define SET_MSDU_LIFETIME	0x00002000L
-#define GET_STATION_ID		0x00004000L
-#define SET_RATE_FALLBACK	0x00008000L
-#define SET_RXCONFIG		0x00010000L
-#define SET_WEP_OPTIONS		0x00020000L
-#define GETSET_LED_POWER	0x00040000L
-#define GETSET_POWER_80211	0x00080000L
+#define GETSET_LED_POWER	0x00000001L
+#define GET_STATION_ID		0x00000002L
+#define SET_TEMPLATES		0x00000004L
+#define SET_STA_LIST		0x00000008L
+#define GETSET_TX		0x00000010L
+#define GETSET_RX		0x00000020L
+#define SET_RXCONFIG		0x00000040L
+#define GETSET_ANTENNA		0x00000080L
+#define GETSET_SENSITIVITY	0x00000100L
+#define GETSET_TXPOWER		0x00000200L
+#define GETSET_ED_THRESH	0x00000400L
+#define GETSET_CCA		0x00000800L
+#define GETSET_POWER_80211	0x00001000L
+#define GETSET_RETRY		0x00002000L
+#define GETSET_REG_DOMAIN	0x00004000L
+#define GETSET_CHANNEL		0x00008000L
+#define GETSET_ESSID		0x00010000L
+#define GETSET_MODE		0x00020000L
+#define GETSET_WEP		0x00040000L
+#define SET_WEP_OPTIONS		0x00080000L
+#define SET_MSDU_LIFETIME	0x00100000L
+#define SET_RATE_FALLBACK	0x00200000L
 #define GETSET_ALL		0x80000000L
 
 void acx100_disable_irq(wlandevice_t *priv);
 void acx100_enable_irq(wlandevice_t *priv);
+void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 /*============================================================================*
  * Locking and synchronization functions                                      *

@@ -208,7 +208,7 @@ typedef struct probereq {
 } probereq_t;
 
 typedef struct joinbss {
-	UINT8 bssid[WLAN_ADDR_LEN];
+	UINT8 bssid[ETH_ALEN];
 	UINT16 beacon_interval;
 	UINT8 dtim_interval;
 	UINT8 rates_basic;
@@ -316,7 +316,7 @@ typedef struct dot11WEPDefaultKeyID {
 } dot11WEPDefaultKeyID_t;
 
 typedef struct acx100_wep_mgmt {
-    UINT8	MacAddr[WLAN_ADDR_LEN];
+    UINT8	MacAddr[ETH_ALEN];
     UINT16	Action;
     UINT16	KeySize;
     UINT16	Key[29];	/* 29*8 == 232bits == WEP256 */
@@ -361,7 +361,7 @@ int acx100_set_tim_template(wlandevice_t *priv);
 int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 						   struct acxp80211_beacon_prb_resp *bcn);
 void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all);
-int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd);
+int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
 void acx100_set_probe_request_template(wlandevice_t *priv);
 void acx100_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);

@@ -48,32 +48,19 @@
 #endif
 #include <linux/config.h>
 #include <linux/version.h>
-
 #include <linux/kernel.h>
-
 #include <linux/types.h>
-#include <linux/skbuff.h>
-#include <linux/slab.h>
+
 #include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #if WIRELESS_EXT > 12
 #include <net/iw_handler.h>
 #endif /* WE > 12 */
-#include <linux/netdevice.h>
 #include <asm/uaccess.h>
-
-#include <linux/ioport.h>
-
-#include <linux/pm.h>
-
-#include <linux/etherdevice.h>
-
 
 /*================================================================*/
 /* Project Includes */
 
-#include <version.h>
 #include <p80211mgmt.h>
 #include <acx100.h>
 #include <acx100_helper.h>
@@ -362,8 +349,7 @@ end:
 static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_request_info *info, __u32 *uwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-
-	acxlog(L_IOCTL, "Get Mode ==> %d\n", priv->macmode_joined);
+	int result;
 
 #if SHOW_SPECIFIC_MACMODE_JOINED
 	if (priv->status != ISTATUS_4_ASSOCIATED)
@@ -384,7 +370,8 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 				*uwrq = IW_MODE_MASTER;
 				break;
 			default:
-				return -EOPNOTSUPP;
+				result = -EOPNOTSUPP;
+				goto end;
 		}
 	}
 #if SHOW_SPECIFIC_MACMODE_JOINED
@@ -401,11 +388,16 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 				*uwrq = IW_MODE_MASTER;
 				break;
 			default:
-				return -EOPNOTSUPP;
+				result = -EOPNOTSUPP;
+				goto end;
 		}
 	}
 #endif
-	return 0;
+	result = 0;
+end:
+	acxlog(L_IOCTL, "Get Mode ==> %d\n", *uwrq);
+
+	return result;
 }
 
 static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
@@ -468,11 +460,11 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	unsigned char *ap;
 
 	FN_ENTER;
-	if (!awrq) {
+	if (NULL == awrq) {
 		result = -EFAULT;
 		goto end;
 	}
-	if (awrq->sa_family != ARPHRD_ETHER) {
+	if (ARPHRD_ETHER != awrq->sa_family) {
                 result = -EINVAL;
 		goto end;
 	}
@@ -481,20 +473,20 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
                ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
 
-	if (priv->macmode_joined != ACX_MODE_2_MANAGED_STA) {
+	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 		result = -EINVAL;
 		goto end;
 	}
 
 	if (0 != acx100_is_mac_address_broadcast(ap)) {
 		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
-		acx100_set_mac_address_broadcast(priv->ap);
+		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
 		acx100_scan_chan(priv);
 		result = -EINPROGRESS;
 	} else if (!memcmp(off, ap, ETH_ALEN)) {
 		/* "off" == 00:00:00:00:00:00 */
-		acx100_set_mac_address_broadcast(priv->ap);
+		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Not reassociating\n");
 	} else {
 		/* AB:CD:EF:01:23:45 */
@@ -505,7 +497,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 					result = -EINVAL;
 					goto end;
                         	} else {
-					memcpy(priv->ap, ap, ETH_ALEN);
+					MAC_COPY(priv->ap, ap);
 					acxlog(L_IOCTL, "Forcing reassociation\n");
 					acx100_scan_chan(priv);
 					result = -EINPROGRESS;
@@ -525,8 +517,12 @@ static inline int acx100_ioctl_get_ap(struct net_device *dev, struct iw_request_
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	acxlog(L_IOCTL, "Get BSSID\n");
-	/* as seen in Aironet driver, airo.c */
-	memcpy(awrq->sa_data, priv->bssid, WLAN_BSSID_LEN);
+	if (ISTATUS_4_ASSOCIATED == priv->status) {
+		/* as seen in Aironet driver, airo.c */
+		MAC_COPY(awrq->sa_data, priv->bssid);
+	} else {
+		MAC_FILL(awrq->sa_data, 0x0);
+	}
 	awrq->sa_family = ARPHRD_ETHER;
 	return 0;
 }
@@ -568,10 +564,10 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	}
 
 	for (i = 0; i < priv->bss_table_count; i++) {
-		memcpy(address[i].sa_data, priv->bss_table[i].bssid, ETH_ALEN);
+		MAC_COPY(address[i].sa_data, priv->bss_table[i].bssid);
 		address[i].sa_family = ARPHRD_ETHER;
-		qual[i].level = priv->bss_table[i].sir * 100 / 255;
-		qual[i].noise = priv->bss_table[i].snr * 100 / 255;
+		qual[i].level = priv->bss_table[i].sir;
+		qual[i].noise = priv->bss_table[i].snr;
 		qual[i].qual = (qual[i].noise <= 100) ?
 			       100 - qual[i].noise : 0;;
 		qual[i].updated = 0; /* no scan: level/noise/qual not updated */
@@ -625,7 +621,7 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	/* MAC address has to be added first */
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
-	memcpy(iwe.u.ap_addr.sa_data, bss->bssid, ETH_ALEN);
+	MAC_COPY(iwe.u.ap_addr.sa_data, bss->bssid);
 	acxlog(L_IOCTL, "scan, station address:\n");
 	acx100_log_mac_address(L_IOCTL, bss->bssid);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_ADDR_LEN);
@@ -659,8 +655,8 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	iwe.cmd = IWEVQUAL;
 	/* FIXME: these values should be expressed in dBm, but we don't know
 	 * how to calibrate it yet */
-	iwe.u.qual.level = bss->sir * 100 / 255;
-	iwe.u.qual.noise = bss->snr * 100 / 255;
+	iwe.u.qual.level = bss->sir;
+	iwe.u.qual.noise = bss->snr;
 	iwe.u.qual.qual = (iwe.u.qual.noise <= 100) ?
 				100 - iwe.u.qual.noise : 0;
 	iwe.u.qual.updated = 7;
@@ -770,7 +766,7 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 	FN_ENTER;
 	acxlog(L_IOCTL, "Set ESSID <== %s, length %d, flags 0x%04x\n", dwrq->pointer, len, dwrq->flags);
 
-	if (len <= 0) {
+	if (len < 0) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -848,7 +844,7 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	unsigned long flags;
 	int err;
-	unsigned char txrate_val;
+	UINT8 txrate_cfg, txrate_auto_idx_max;
 	int result = -EINVAL;
 
 	FN_ENTER;
@@ -858,31 +854,36 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 
 #define BITRATE_AUTO 1
 #if BITRATE_AUTO
-	if ((vwrq->fixed == 0) || (vwrq->fixed == 1)) {
+	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
 #else
-	if (vwrq->fixed == 1) {
+	if (1 == vwrq->fixed) {
 #endif
 
 		switch (vwrq->value) {
 
 		case 1000000:	/* 1Mbps */
-			txrate_val = 10;
+			txrate_cfg = ACX_TXRATE_1;
+			txrate_auto_idx_max = 0;
 			break;
 
 		case 2000000:	/* 2Mbps */
-			txrate_val = 20;
+			txrate_cfg = ACX_TXRATE_2;
+			txrate_auto_idx_max = 1;
 			break;
 
 		case 5500000:	/* 5.5Mbps */
-			txrate_val = 55;
+			txrate_cfg = ACX_TXRATE_5_5;
+			txrate_auto_idx_max = 2;
 			break;
 
 		case 11000000:	/* 11Mbps */
-			txrate_val = 110;
+			txrate_cfg = ACX_TXRATE_11;
+			txrate_auto_idx_max = 3;
 			break;
 
 		case 22000000:	/* 22Mbps */
-			txrate_val = 220;
+			txrate_cfg = ACX_TXRATE_22PBCC;
+			txrate_auto_idx_max = 4;
 			break;
 
 #if BITRATE_AUTO
@@ -890,7 +891,8 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 			/* -1 is used to set highest available rate in
 			 * case of iwconfig calls without rate given
 			 * (iwconfig wlan0 rate auto etc.) */
-			txrate_val = 110; /* FIXME: should be 220 instead, but since rate fallback doesn't actually work yet, we shouldn't use a rate not supported by many APs */
+			txrate_cfg = ACX_TXRATE_22PBCC; /* 22Mbps is not supported by many APs, thus fallback needs to work properly to be able to safely go back to 11! */
+			txrate_auto_idx_max = 4;
 			break;
 #endif
 		default:
@@ -898,36 +900,43 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 			goto end;
 		}
 
-	} else if (vwrq->fixed == 2) {
+	} else if (2 == vwrq->fixed) {
 
 		switch (vwrq->value) {
 
 		case 0:
-			txrate_val = 10;
+			txrate_cfg = ACX_TXRATE_1;
+			txrate_auto_idx_max = 0;
 			break;
 
 		case 1:
-			txrate_val = 20;
+			txrate_cfg = ACX_TXRATE_2;
+			txrate_auto_idx_max = 1;
 			break;
 
 		case 2:
-			txrate_val = 55;
+			txrate_cfg = ACX_TXRATE_5_5;
+			txrate_auto_idx_max = 2;
 			break;
 
 		case 3:
-			txrate_val = 183;
+			txrate_cfg = ACX_TXRATE_5_5PBCC;
+			txrate_auto_idx_max = 2;
 			break;
 
 		case 4:
-			txrate_val = 110;
+			txrate_cfg = ACX_TXRATE_11;
+			txrate_auto_idx_max = 3;
 			break;
 
 		case 5:
-			txrate_val = 238;
+			txrate_cfg = ACX_TXRATE_11PBCC;
+			txrate_auto_idx_max = 3;
 			break;
 
 		case 6:
-			txrate_val = 220;
+			txrate_cfg = ACX_TXRATE_22PBCC;
+			txrate_auto_idx_max = 4;
 			break;
 
 		default:
@@ -945,20 +954,37 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		goto end;
 	}
 
-	priv->txrate_val = txrate_val;
+	priv->txrate_cfg = txrate_cfg;
 #if BITRATE_AUTO
 	priv->txrate_auto = (UINT8)(vwrq->fixed == (__u8)0);
+	if (1 == priv->txrate_auto)
+	{
+		if (ACX_TXRATE_1 == txrate_cfg) { /* auto rate with 1Mbps max. useless */
+			priv->txrate_auto = (UINT8)0;
+			priv->txrate_curr = priv->txrate_cfg;
+		} else {
+			priv->txrate_auto_idx_max = txrate_auto_idx_max;
+			priv->txrate_auto_idx = 1; /* 2Mbps */
+			priv->txrate_curr = ACX_TXRATE_2; /* 2Mbps, play it safe at the beginning */
+			priv->txrate_fallback_count = 0;
+			priv->txrate_stepup_count = 0;
+		}
+	}
+	else
 #endif
+		priv->txrate_curr = priv->txrate_cfg;
 	
 	acx100_unlock(priv, &flags);
 
 #if BITRATE_AUTO
-	acxlog(L_IOCTL, "Tx rate = %d, auto rate %d\n", priv->txrate_val, priv->txrate_auto);
+	acxlog(L_IOCTL, "Tx rate = %d, auto rate %d, current rate %d\n", priv->txrate_cfg, priv->txrate_auto, priv->txrate_curr);
+	priv->set_mask |= SET_RATE_FALLBACK;
+	result = -EINPROGRESS;
 #else
-	acxlog(L_IOCTL, "Tx rate = %d\n", priv->txrate_val);
+	acxlog(L_IOCTL, "Tx rate = %d\n", priv->txrate_cfg);
+	result = 0;
 #endif
 
-	result = 0;
 end:
 	FN_EXIT(1, result);
 	return result;
@@ -984,10 +1010,7 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	/* FIXME: maybe txrate_val is the value we *wanted*, but not the
-	 * value it actually chose automatically. Needs verification and
-	 * perhaps fixing. */
-	vwrq->value = priv->txrate_val * 100000;
+	vwrq->value = priv->txrate_curr * 100000;
 #if BITRATE_AUTO
 	vwrq->fixed = (__u8)(priv->txrate_auto == (UINT8)0);
 #else
@@ -1426,7 +1449,7 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		range->min_r_time = 0;
 		range->max_r_time = 65535; /* FIXME: lifetime ranges and orders of magnitude are strange?? */
 
-		range->sensitivity = 0xff; /* FIXME: what range to use? and what about dBm calculation? */
+		range->sensitivity = 0xff;
 
 		for (i=0; i < (UINT16)priv->rate_spt_len; i++) {
 			range->bitrate[i] = (priv->rate_support1[i] & ~0x80) * 500000;
@@ -1440,8 +1463,8 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		range->max_qual.noise = (__u8)100;
 		/* FIXME: better values */
 		range->avg_qual.qual = (__u8)90;
-		range->avg_qual.level = (__u8)40;
-		range->avg_qual.noise = (__u8)10;
+		range->avg_qual.level = (__u8)80;
+		range->avg_qual.noise = (__u8)2;
 	}
 
 	return 0;
@@ -2394,11 +2417,12 @@ const struct iw_handler_def acx100_ioctl_handler_def =
 
 
 
+#if WIRELESS_EXT < 13
 /*================================================================*/
 /* Main function						  */
 /*================================================================*/
 /*----------------------------------------------------------------
-* acx100_ioctl_main
+* acx_ioctl_old
 *
 *
 * Arguments:
@@ -2417,7 +2441,7 @@ const struct iw_handler_def acx100_ioctl_handler_def =
 * in the new one (acx100_ioctl_handler[])!
 *
 *----------------------------------------------------------------*/
-int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
+int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	int result = 0;
@@ -2474,8 +2498,15 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx100_ioctl_get_mode(dev, NULL, &(iwr->u.mode), NULL);
 		break;
 
-	/* case SIOCSIWSENS: FIXME */
-	/* case SIOCGIWSENS: FIXME */
+	case SIOCSIWSENS:
+		/* Set sensitivity */
+		result = acx100_ioctl_set_sens(dev, NULL, &(iwr->u.sens), NULL);
+		break; 
+
+	case SIOCGIWSENS:
+		/* Get sensitivity */
+		result = acx100_ioctl_get_sens(dev, NULL, &(iwr->u.sens), NULL);
+		break;
 
 #if WIRELESS_EXT > 10
 	case SIOCGIWRANGE:
@@ -2645,16 +2676,42 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case SIOCSIWENCODE:
-		/* set encoding token & mode */
-		result = acx100_ioctl_set_encode(dev, NULL, &(iwr->u.encoding),
-						 NULL);
+		{
+			/* set encoding token & mode */
+			UINT8 key[29];
+			if (iwr->u.encoding.pointer) {
+				if (iwr->u.encoding.length > 29) {
+					result = -E2BIG;
+					break;
+				}
+				if (copy_from_user(key, iwr->u.encoding.pointer, iwr->u.encoding.length)) {
+					result = -EFAULT;
+					break;
+				}
+			}
+			else
+			if (0 != iwr->u.encoding.length) {
+				result = -EINVAL;
+				break;
+			}
+			result = acx100_ioctl_set_encode(dev, NULL,
+					&(iwr->u.encoding), key);
+		}
 		break;
 
 	case SIOCGIWENCODE:
-		/* get encoding token & mode */
+		{
+			/* get encoding token & mode */
+			UINT8 key[29];
 
-		result = acx100_ioctl_get_encode(dev, NULL, &(iwr->u.encoding),
-						 NULL);
+			result = acx100_ioctl_get_encode(dev, NULL,
+					&(iwr->u.encoding), key);
+			if (iwr->u.encoding.pointer) {
+				if (copy_to_user(iwr->u.encoding.pointer,
+						key, iwr->u.encoding.length))
+					result = -EFAULT;
+			}
+		}
 		break;
 
 	/******************** iwpriv ioctls below ********************/
@@ -2745,28 +2802,6 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = 0;
 #endif
 
-#if THIS_LEADS_TO_CRASHES
-	if (priv->macmode_wanted != ACX_MODE_2_MANAGED_STA && reinit == 1) {
-		if (result = acx100_lock(priv, &flags))
-			return result;
-
-		if (!acx100_set_beacon_template(priv)) {
-			acxlog(L_BINSTD,
-			       "acx100_set_beacon_template returns error\n");
-			result = -EFAULT;
-		}
-
-		if (!acx100_set_probe_response_template(priv)) {
-			acxlog(L_BINSTD,
-			       "acx100_set_probe_response_template returns error\n");
-			result = -EFAULT;
-		}
-
-		acx100_sta_list_init();
-
-		acx100_unlock(priv, &flags);
-	}
-#endif
-
 	return result;
 }
+#endif

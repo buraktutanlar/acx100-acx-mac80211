@@ -43,6 +43,7 @@ int acx111_create_dma_regions(wlandevice_t *priv);
 int acx100_delete_dma_region(wlandevice_t *wlandev);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
 void acx100_clean_tx_desc(wlandevice_t *priv);
+inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
 void acx100_process_rx_desc(wlandevice_t *priv);
 int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc);
 int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc);
@@ -62,7 +63,7 @@ char *acx100_get_packet_type_string(UINT16 fc);
 
 typedef struct rxbuffer {
 	/* UINT32	status;	*/	/* 0x0 MAC stat */
-	UINT16	mac_cnt_rcvd;	/* 0x0 */
+	UINT16	mac_cnt_rcvd;	/* 0x0, only 12 bits are len! (0xfff) */
 	UINT8	mac_cnt_mblks;	/* 0x2 */
 	UINT8	mac_status;	/* 0x3 */
 	/* UINT16	stat; */		/* 0x4 PHY stat */
@@ -70,7 +71,7 @@ typedef struct rxbuffer {
 	UINT8	phy_plcp_signal;	/* 0x5 */
 	UINT8	phy_level;		/* 0x6 PHY stat */
 	UINT8	phy_snr;		/* 0x7  PHY stat */
-	UINT32	time;		/* 0x8  timestamp */
+	UINT32	time;		/* 0x8  timestamp upon MAC rcv first byte */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8	val0x24[0x922];
 

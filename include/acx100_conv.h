@@ -101,6 +101,4 @@ int acx100_ether_to_txdesc(struct wlandevice *priv,
 void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 			     struct txdescriptor *txdesc);
 
-int acx100_stt_findproto(unsigned int proto);
-
 #endif /* _ACX100_CONV_H */

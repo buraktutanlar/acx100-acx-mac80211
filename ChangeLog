@@ -2,6 +2,55 @@ Changes:
 ========
 
 
+2004.04.13 - 0.2.0pre8 released
+- Tons of ACX100 USB patches, now working on 2.4.x, but no go on 2.6.x
+  (although 2.6.x compile working now)
+- 2.6.x out-of-kernel module build :)
+- add support for copying driver into 2.6.x kernel tree
+- add script fetch_firmware to automate firmware download
+- fix crashing card eject/reinsert, works quite well now
+- remove failed device from device list ring to avoid OOPS in cleanup_module
+- fix: only process those deauthen packets that are targeted at us
+- do card hardware shutdown in cleanup_module, NOT remove_pci
+- fix places with driver accessing freed memory and potentially crashing
+- fix potential crash by firmware loading error path
+- improvements for old Wireless Extensions layer, fixes OOPS
+- fix broken /proc file removal
+- tons of endianness fixes. Probably still not quite finished yet, but close
+- implement iwevent support, much improved iwlist
+- don't load radio image for ACX111 cards
+- make sure to actually commit Energy Detect value
+- fix grave timer bug (rounding error causing e.g. 1s instead of 1.5s)
+- enable "ifconfig wlan0 hw ether 112233445566" - semi-broken for unknown reason
+- adapt level displays to almost match levels used in Windows
+- implement simplistic Tx auto rate mechanism, but still almost unusable
+- add iwconfig sens support for RFMD and Maxim radios, implement iwconfig
+  mode Auto :)
+- more detailed error statistics
+- several structural changes in driver (scanning, MAC mode). Hopefully won't
+  break too much
+- many optimizations in Tx/Rx path, should be faster
+- add EEPROM write support (disabled for safety reasons), speed up EEPROM access
+- tons of source fixes with the help of splint code analysis tool
+- fix definition problem with short preamble flag management
+- software timer cleanup fix
+- many driver struct cleanups
+- enable setting Master (HostAP) mode, do some preliminary fixes for it
+- hopefully fix modversions problem
+- ESSID " " is actually used by some APs as the "hidden" ESSID, it seems
+- add kernel boot parameter acx_firmware_dir=XXX.
+- "make install" to install driver files in kernel dir and run depmod
+- don't fail to ACK any IRQ type
+- revert problematic free_netdev() change (only available in newer kernels)
+- update ALL files to use priv instead of wlandev/hw/context
+- implement setting of RTS threshold
+- Disable 802.11 power save mode for now, which hopefully will fix the
+  Tx error 0x20 traffic lockups
+- much smaller driver, probably needs about as much memory as pre7
+- huge README update
+- 50 tons of cleanups
+- radio type 0x15 is Ralink
+
 2004.01.27 - 0.2.0pre7 released
 - "fix" lockups of pre6, caused by improper locking
 - fix MSDU stuff, gets rid of Tx 0x10 errors (MSDU)

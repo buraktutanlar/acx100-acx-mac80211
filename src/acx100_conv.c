@@ -55,26 +55,9 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
-#include <linux/module.h>
-#include <linux/kernel.h>
-
-#include <linux/sched.h>
-#include <linux/types.h>
 #include <linux/skbuff.h>
-#include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#include <linux/netdevice.h>
-
-#include <linux/ioport.h>
-
-#include <linux/dcache.h>
-#include <linux/highmem.h>
-#include <linux/etherdevice.h>
-
-#include <wlan_compat.h>
 
 #include <p80211mgmt.h>
 #include <acx100.h>
@@ -120,7 +103,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 	
 	memcpy(header->data, &rxdesc->data->buf, WLAN_HDR_A3_LEN);
 	memcpy(payload->data, &rxdesc->data->val0x24, 
-		rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */ - WLAN_HDR_A3_LEN);
+		(rxdesc->data->mac_cnt_rcvd & 0xfff) - WLAN_HDR_A3_LEN);
 
 }
 
@@ -149,7 +132,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 *
 *----------------------------------------------------------------*/
 
-inline int acx100_stt_findproto(unsigned int proto)
+static inline int acx100_stt_findproto(unsigned int proto)
 {
 	/* Always return found for now.  This is the behavior used by the */
 	/*  Zoom Win95 driver when 802.1h mode is selected */
@@ -220,6 +203,8 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	payload = tx_desc->host_desc + 1;
 	header = tx_desc->host_desc;
+	if (0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
+		return 1;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
 	/* step 1: classify ether frame, DIX or 802.3? */
@@ -275,18 +260,17 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	fc = host2ieee16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA) |
 			 WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DATAONLY));
 
-	acxlog(L_DEBUG, "MODE: %d\n", priv->macmode_joined);
 	switch (priv->macmode_joined) {
 	case ACX_MODE_0_IBSS_ADHOC:
 	case ACX_MODE_1_UNUSED:
 		a1 = e_hdr->daddr;
-		a2 = priv->netdev->dev_addr;
+		a2 = priv->dev_addr;
 		a3 = priv->bssid;
 		break;
 	case ACX_MODE_2_MANAGED_STA:
 		fc |= host2ieee16(WLAN_SET_FC_TODS(1));
 		a1 = priv->bssid;
-		a2 = priv->netdev->dev_addr;
+		a2 = priv->dev_addr;
 		a3 = e_hdr->daddr;
 		break;
 	case ACX_MODE_3_MANAGED_AP:
@@ -299,9 +283,9 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		acxlog(L_STD, "Error: Converting eth to wlan in unknown mode.\n");
 		goto fail;
 	}
-	memcpy(w_hdr->a3.a1, a1, WLAN_ADDR_LEN);
-	memcpy(w_hdr->a3.a2, a2, WLAN_ADDR_LEN);
-	memcpy(w_hdr->a3.a3, a3, WLAN_ADDR_LEN);
+	MAC_COPY(w_hdr->a3.a1, a1);
+	MAC_COPY(w_hdr->a3.a2, a2);
+	MAC_COPY(w_hdr->a3.a3, a3);
 
 	if (0 != priv->wep_enabled)
 		fc |= host2ieee16(WLAN_SET_FC_ISWEP(1));
@@ -336,7 +320,7 @@ fail:
 /*----------------------------------------------------------------
 * acx100_rxdesc_to_ether
 *
-* Uses the contents of a received 802.11 frame to build an ether 
+* Uses the contents of a received 802.11 frame to build an ether
 * frame.
 *
 * This function extracts the src and dest address from the 802.11
@@ -371,18 +355,18 @@ fail:
 	p80211_hdr_t *w_hdr;
 	UINT buflen;
 	UINT16 fc;
-	size_t payload_length;
+	int payload_length;
 	UINT payload_offset;
 
 //	int i;
 
 	FN_ENTER;
 
-	payload_length = (rx_desc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - WLAN_HDR_A3_LEN;
+	payload_length = (rx_desc->data->mac_cnt_rcvd & 0xfff) - WLAN_HDR_A3_LEN;
 	payload_offset = WLAN_HDR_A3_LEN;
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
-	
+
 	/* check if additional header is included */
 	if (0 != (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR)) {
 		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
@@ -436,8 +420,8 @@ fail:
 	/* Test for the various encodings */
 	if ( (payload_length >= sizeof(wlan_ethhdr_t)) &&
 	     ((e_llc->dsap != (UINT8)0xaa) || (e_llc->ssap != (UINT8)0xaa)) &&
-	     ((0 == memcmp(daddr, e_hdr->daddr, WLAN_ETHADDR_LEN)) ||
-	      (0 == memcmp(saddr, e_hdr->saddr, WLAN_ETHADDR_LEN)))) {
+	     ((0 == memcmp(daddr, e_hdr->daddr, ETH_ALEN)) ||
+	      (0 == memcmp(saddr, e_hdr->saddr, ETH_ALEN)))) {
 		acxlog(L_DEBUG | L_DATA, "802.3 ENCAP len: %d\n", payload_length);
 		/* 802.3 Encapsulated */
 		/* Test for an overlength frame */
@@ -497,8 +481,8 @@ fail:
 
 		/* create 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, WLAN_ETHADDR_LEN);
-		memcpy(e_hdr->saddr, saddr, WLAN_ETHADDR_LEN); 
+		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
+		memcpy(e_hdr->saddr, saddr, ETH_ALEN); 
 		e_hdr->type = htons(payload_length);
 
 		/* Now copy the data from the 80211 frame.
@@ -538,8 +522,8 @@ fail:
 
 		/* create 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, WLAN_ETHADDR_LEN);
-		memcpy(e_hdr->saddr, saddr, WLAN_ETHADDR_LEN); 
+		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
+		memcpy(e_hdr->saddr, saddr, ETH_ALEN); 
 		e_hdr->type = e_snap->type;
 
 		/* Now copy the data from the 80211 frame.
@@ -577,8 +561,8 @@ fail:
 
 		/* set up the 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, WLAN_ETHADDR_LEN);
-		memcpy(e_hdr->saddr, saddr, WLAN_ETHADDR_LEN);
+		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
+		memcpy(e_hdr->saddr, saddr, ETH_ALEN);
 		e_hdr->type = htons(payload_length);
 		
 		/* now copy the data from the 80211 frame */

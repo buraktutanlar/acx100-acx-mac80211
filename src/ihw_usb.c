@@ -45,7 +45,6 @@ extern void acx100usb_dump_bytes(void *,int);
 #include <linux/config.h>
 #define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 
@@ -67,6 +66,7 @@ extern void acx100usb_dump_bytes(void *,int);
 #include <acx100_helper.h>
 #include <ihw.h>
 #include <acx100.h>
+
 
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
@@ -102,6 +102,7 @@ static void acx100usb_control_complete(struct urb *, struct pt_regs *);
 int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
 	UINT16 len,*buf;
 	int i,result,skipridheader,blocklen,inpipe,outpipe,flags,acklen=sizeof(hw->usbin);
+	int ucode;
 	struct usb_device *usbdev;
 	FN_ENTER;
 	skipridheader=0;
@@ -160,14 +161,17 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
 	usb_fill_control_urb(hw->ctrl_urb,usbdev,outpipe,hw->usb_setup,&(hw->usbout),blocklen,acx100usb_control_complete,hw);
 	hw->ctrl_urb->timeout=timeout;
-	/* lock will be released by Tx complete */
-	spin_lock(&(hw->usb_ctrl_lock));
-	submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	ucode=submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	if (ucode!=0) {
+		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
+		return(0);
+	}
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
-	spin_lock(&(hw->usb_ctrl_lock));
-	spin_unlock(&(hw->usb_ctrl_lock));
+	while (hw->ctrl_urb->status==-EINPROGRESS) {
+		udelay(500);
+	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
@@ -184,14 +188,17 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
 	usb_fill_control_urb(hw->ctrl_urb,usbdev,inpipe,hw->usb_setup,&(hw->usbin),acklen,acx100usb_control_complete,hw);
 	hw->ctrl_urb->timeout=timeout;
-	/* lock will be released by Tx complete */
-	spin_lock(&(hw->usb_ctrl_lock));
-	submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	ucode=submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	if (ucode!=0) {
+		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
+		return(0);
+	}
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
-	spin_lock(&(hw->usb_ctrl_lock));
-	spin_unlock(&(hw->usb_ctrl_lock));
+	while (hw->ctrl_urb->status==-EINPROGRESS) {
+		udelay(500);
+	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
@@ -229,10 +236,8 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 #endif
 {
 	wlandevice_t *priv=urb->context;
-
-	acxlog(L_DEBUG, "USB ctrl completed.\n");
-	/* release lock initiated by Tx operation */
-	spin_unlock(&(priv->usb_ctrl_lock));
+	FN_ENTER;
+	FN_EXIT(0,0);
 }
 
 /*****************************************************************************
@@ -400,34 +405,12 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 *
 *----------------------------------------------------------------*/
 
-inline int acx100_is_mac_address_zero(mac_t * mac) {
+inline int acx100_is_mac_address_zero(mac_t *mac)
+{
   if ((mac->vala == 0) && (mac->valb == 0)) {
     return(1);
   }
   return 0;
-}
-
-
-/*----------------------------------------------------------------
-* acx100_clear_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_clear_mac_address(mac_t *m) {
-  m->vala = 0;
-  m->valb = 0;
 }
 
 
@@ -448,7 +431,7 @@ inline void acx100_clear_mac_address(mac_t *m) {
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
+inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
 		return 0; /* no match */
@@ -456,28 +439,6 @@ inline int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 		return 1; /* matched */
 }
 
-
-/*----------------------------------------------------------------
-* acx100_copy_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_copy_mac_address(UINT8 * to, const UINT8 * const from)
-{
-	memcpy(to, from, ETH_ALEN);
-}
 
 /*----------------------------------------------------------------
 * acx100_is_mac_address_group
@@ -496,7 +457,7 @@ inline void acx100_copy_mac_address(UINT8 * to, const UINT8 * const from)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx100_is_mac_address_group(mac_t * mac)
+inline UINT8 acx100_is_mac_address_group(mac_t *mac)
 {
 	return mac->vala & 1;
 }
@@ -518,34 +479,12 @@ inline UINT8 acx100_is_mac_address_group(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx100_is_mac_address_directed(mac_t * mac)
+UINT8 acx100_is_mac_address_directed(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return 0;
 	}
 	return 1;
-}
-
-/*----------------------------------------------------------------
-* acx100_set_mac_address_broadcast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_set_mac_address_broadcast(UINT8 *mac)
-{
-	memset(mac, 0xff, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -588,7 +527,7 @@ inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx100_is_mac_address_multicast(mac_t * mac)
+inline int acx100_is_mac_address_multicast(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))

@@ -53,10 +53,10 @@
 #include <ioregister.h>
 
 /* static vars */
-static UINT *pIO_ACX100 = NULL;
-static UINT *pIO_ACX111 = NULL;
+static UINT16 *pIO_ACX100 = NULL;
+static UINT16 *pIO_ACX111 = NULL;
 
-UINT* acx100_get_io_register_array() 
+UINT16* acx100_get_io_register_array() 
 {
 	if(pIO_ACX100 != NULL) return pIO_ACX100;
 
@@ -108,7 +108,7 @@ UINT* acx100_get_io_register_array()
 	return pIO_ACX100;
 }
 
-UINT* acx111_get_io_register_array() 
+UINT16* acx111_get_io_register_array() 
 {
 	if(pIO_ACX111 != NULL) return pIO_ACX111;
 
@@ -160,3 +160,14 @@ UINT* acx111_get_io_register_array()
 	return pIO_ACX111;
 }
 
+void acx_free_io_register_arrays(void)
+{
+	if (pIO_ACX100) {
+		kfree(pIO_ACX100);
+		pIO_ACX100 = NULL;
+	}
+	if (pIO_ACX111) {
+		kfree(pIO_ACX111);
+		pIO_ACX111 = NULL;
+	}
+}

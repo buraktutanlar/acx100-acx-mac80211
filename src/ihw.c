@@ -638,7 +638,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 		return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 			CtlLength[type] + 4, 5000);
 	} else {
-		((memmap_t *)pdr)->length = CtlLengthDot11[type-0x1000];
+		((memmap_t *)pdr)->length = cpu_to_le16(CtlLengthDot11[type-0x1000]);
 		return acx100_issue_cmd(priv, ACX100_CMD_CONFIGURE, pdr, 
 			CtlLengthDot11[type-0x1000] + 4, 5000);
 	}
@@ -733,29 +733,6 @@ inline int acx100_is_mac_address_zero(mac_t * mac)
 }
 
 /*----------------------------------------------------------------
-* acx100_clear_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_clear_mac_address(mac_t * m)
-{
-	m->vala = 0;
-	m->valb = 0;
-}
-
-/*----------------------------------------------------------------
 * acx100_is_mac_address_equal
 *
 *
@@ -774,32 +751,10 @@ inline void acx100_clear_mac_address(mac_t * m)
 *----------------------------------------------------------------*/
 inline int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 {
-	if (memcmp(one, two, WLAN_ADDR_LEN))
+	if (memcmp(one, two, ETH_ALEN))
 		return 0; /* no match */
 	else
 		return 1; /* matched */
-}
-
-/*----------------------------------------------------------------
-* acx100_copy_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from)
-{
-	memcpy(to, from, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -841,34 +796,12 @@ inline UINT8 acx100_is_mac_address_group(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx100_is_mac_address_directed(mac_t * mac)
+inline UINT8 acx100_is_mac_address_directed(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return 0;
 	}
 	return 1;
-}
-
-/*----------------------------------------------------------------
-* acx100_set_mac_address_broadcast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx100_set_mac_address_broadcast(UINT8 *address)
-{
-	memset(address, 0xff, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -888,10 +821,18 @@ inline void acx100_set_mac_address_broadcast(UINT8 *address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-static const unsigned char bcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
 {
-	return !memcmp(address, bcast, ETH_ALEN);
+	unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+	if (memcmp(address, bcast_addr, ETH_ALEN) == 0)
+		return 1;
+
+	/* IPv6 broadcast address */
+	if ((address[0] == 0x33) && (address[1] == 0x33))
+		return 1;
+
+	return 0;
 }
 
 /*----------------------------------------------------------------

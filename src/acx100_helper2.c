@@ -55,7 +55,6 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
@@ -103,12 +102,6 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *skb,
 static int acx100_process_NULL_frame(struct rxhostdescriptor *a, 
 			      wlandevice_t *priv, int vala);
 
-/* FIXME: sta_list and sta_hash_tab belong into the private per device struct
- * in order to support multiple devices without strange interferences. They
- * also should probably be of equal size (?). */
-client_t sta_list[32];
-client_t *sta_hash_tab[64];
-
 alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
 UINT16 CurrentAID = 1;
@@ -135,11 +128,11 @@ char *state_str[7] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASS
 /* acx100_sta_list_init()
  * STATUS: should be ok..
  */
-void acx100_sta_list_init(void)
+void acx100_sta_list_init(wlandevice_t *priv)
 {
 	FN_ENTER;
-	memset(sta_hash_tab, 0, sizeof(sta_hash_tab));
-	memset(sta_list, 0, sizeof(sta_list));
+	memset(priv->sta_hash_tab, 0, sizeof(priv->sta_hash_tab));
+	memset(priv->sta_list, 0, sizeof(priv->sta_list));
 	FN_EXIT(0, 0);
 }
 
@@ -165,18 +158,18 @@ void acx100_sta_list_init(void)
  * Hmm, does this function have one "silent" parameter or 0 parameters?
  * Doesn't matter much anyway...
  */
-inline client_t *acx100_sta_list_alloc(UINT8 *address)
+inline client_t *acx100_sta_list_alloc(wlandevice_t *priv, UINT8 *address)
 {
 	int i = 0;
 
 	FN_ENTER;
 	for (i = 0; i <= 31; i++) {
-		if (sta_list[i].used == 0) {
-			sta_list[i].used = 1;
-			sta_list[i].auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
-			sta_list[i].val0xe = 1;
-			FN_EXIT(1, (int)&(sta_list[i]));
-			return &(sta_list[i]);
+		if (priv->sta_list[i].used == 0) {
+			priv->sta_list[i].used = 1;
+			priv->sta_list[i].auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
+			priv->sta_list[i].val0xe = 1;
+			FN_EXIT(1, (int)&(priv->sta_list[i]));
+			return &(priv->sta_list[i]);
 		}
 	}
 	FN_EXIT(1, 0);
@@ -203,13 +196,13 @@ inline client_t *acx100_sta_list_alloc(UINT8 *address)
 /* acx100_sta_list_add()
  * STATUS: FINISHED.
  */
-client_t *acx100_sta_list_add(UINT8 *address)
+client_t *acx100_sta_list_add(wlandevice_t *priv, UINT8 *address)
 {
 	client_t *client;
 	int index;
 
 	FN_ENTER;
-	client = acx100_sta_list_alloc(address);
+	client = acx100_sta_list_alloc(priv, address);
 	if (!client)
 		goto done;
 
@@ -217,8 +210,8 @@ client_t *acx100_sta_list_add(UINT8 *address)
 	index = ((address[4] << 8) + address[5]);
 	index -= index & 0x3ffc0;
 
-	client->next = sta_hash_tab[index];
-	sta_hash_tab[index] = client;
+	client->next = priv->sta_hash_tab[index];
+	priv->sta_hash_tab[index] = client;
 
 	acxlog(L_BINSTD | L_ASSOC,
 	       "<acx100_sta_list_add> sta = %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -248,7 +241,7 @@ client_t *acx100_sta_list_add(UINT8 *address)
 *----------------------------------------------------------------*/
 
 
-static inline client_t *acx100_sta_list_get_from_hash(UINT8 *address)
+static inline client_t *acx100_sta_list_get_from_hash(wlandevice_t *priv, UINT8 *address)
 {
 	int index;
 
@@ -258,7 +251,7 @@ static inline client_t *acx100_sta_list_get_from_hash(UINT8 *address)
 	index -= index & 0x3ffc0;
 
 	FN_EXIT(0, 0);
-	return sta_hash_tab[index];
+	return priv->sta_hash_tab[index];
 }
 
 /*----------------------------------------------------------------
@@ -281,16 +274,16 @@ static inline client_t *acx100_sta_list_get_from_hash(UINT8 *address)
 /* acx100_get_sta_list()
  * STATUS: FINISHED.
  */
-client_t *acx100_sta_list_get(char *address)
+client_t *acx100_sta_list_get(wlandevice_t *priv, UINT8 *address)
 {
 	client_t *client;
 	client_t *result = NULL;	/* can be removed if tracing unneeded */
 
 	FN_ENTER;
-	client = acx100_sta_list_get_from_hash(address);
+	client = acx100_sta_list_get_from_hash(priv, address);
 
 	for (; client; client = client->next) {
-		if (0 == memcmp(address, client->address, WLAN_ADDR_LEN)) {
+		if (0 == memcmp(address, client->address, ETH_ALEN)) {
 			result = client;
 			goto done;
 		}
@@ -303,7 +296,7 @@ client_t *acx100_sta_list_get(char *address)
 
 inline char *acx100_get_status_name(UINT16 status)
 {
-	if (status <= ISTATUS_5_UNKNOWN)
+	if (ISTATUS_5_UNKNOWN >= status)
 		return state_str[status];
 	else
 		return state_str[6];
@@ -344,6 +337,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting status = %d (%s)\n",
 	       __func__, status, stat);
 
+#if WIRELESS_EXT > 12 /* wireless_send_event() */
 	if (ISTATUS_4_ASSOCIATED == status) {
 		union iwreq_data wrqu;
 
@@ -353,20 +347,33 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 
 		wrqu.data.length = 0;
 		wrqu.data.flags = 0;
-		memcpy(wrqu.ap_addr.sa_data, priv->bssid, ETH_ALEN);
+		MAC_COPY(wrqu.ap_addr.sa_data, priv->bssid);
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(priv->netdev, SIOCGIWAP, &wrqu, NULL);
 	} else {
 		union iwreq_data wrqu;
 
-		/* FIXME: should probably just copy over bssid as well;
-		 * IOW: bssid should automatically have been erased
-		 * before upon losing association, and we wouldn't need
-		 * that duplicated branch here. */
-		memset(wrqu.ap_addr.sa_data, 0x0, ETH_ALEN);
+		/* send event with empty BSSID to indicate we're not associated */
+		MAC_FILL(wrqu.ap_addr.sa_data, 0x0);
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(priv->netdev, SIOCGIWAP, &wrqu, NULL);
+
+		if (ISTATUS_0_STARTED == status) {
+			if (memcmp(priv->netdev->dev_addr, priv->dev_addr, ETH_ALEN)) {
+				/* uh oh, the interface's MAC address changed,
+				 * need to update templates (and init STAs??) */
+				acxlog(L_STD, "Detected MAC address change, updating card configuration.\n");
+
+				/* the MAC address has to be updated first,
+				 * since otherwise we enter an eternal loop,
+				 * as update_card_settings calls set_status */
+				MAC_COPY(priv->dev_addr, priv->netdev->dev_addr);
+				priv->set_mask |= SET_TEMPLATES|SET_STA_LIST;
+				acx100_update_card_settings(priv, 0, 0, 0);
+			}
+		}
 	}
+#endif
 
 	if (priv->unknown0x2350 == ISTATUS_5_UNKNOWN) {
 		priv->unknown0x2350 = priv->status;
@@ -377,7 +384,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	if ((priv->status == ISTATUS_1_SCANNING)
 	    || (priv->status == ISTATUS_5_UNKNOWN)) {
 		priv->scan_retries = 0;
-		acx100_set_timer(priv, 15000000); /* 1.5 s initial scan time */
+		acx100_set_timer(priv, 1500000); /* 1.5 s initial scan time (used to be 15s, corrected to 1.5)*/
 	} else if (priv->status <= ISTATUS_3_AUTHENTICATED) {
 		priv->auth_assoc_retries = 0;
 		acx100_set_timer(priv, 1500000); /* 1.5 s */
@@ -557,7 +564,7 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 	da = arg_0->hdr->a3.a2;
 	bssid = arg_0->hdr->a3.a3;
 
-	clt = acx100_sta_list_get(da);
+	clt = acx100_sta_list_get(priv, da);
 
 	if (clt != NULL) {
 		if (clt->used == 1) {
@@ -597,9 +604,9 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			hd->frame_control = host2ieee16(WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_ASSOCRESP));	/* 0x10 */
 			hd->duration_id = arg_0->hdr->a3.dur;
 
-			memcpy(hd->da, da, WLAN_ADDR_LEN);
-			memcpy(hd->sa, sa, WLAN_ADDR_LEN);
-			memcpy(hd->bssid, bssid, WLAN_BSSID_LEN);
+			MAC_COPY(hd->da, da);
+			MAC_COPY(hd->sa, sa);
+			MAC_COPY(hd->bssid, bssid);
 
 			hd->sequence_control = arg_0->hdr->a3.seq;
 
@@ -675,13 +682,13 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 	da = arg_0->hdr->a3.a2;
 	bssid = arg_0->hdr->a3.a3;
 
-	clt = acx100_sta_list_get(da);
+	clt = acx100_sta_list_get(priv, da);
 	if (clt != NULL) {
 		if (clt->used == 1)
 			clt->used = 2;
 	} else {
-		clt = acx100_sta_list_add(da);
-		memcpy(clt->address, da, WLAN_ADDR_LEN);
+		clt = acx100_sta_list_add(priv, da);
+		MAC_COPY(clt->address, da);
 		clt->used = 2;
 	}
 
@@ -723,9 +730,9 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 		fr->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_REASSOCRESP);	/* 0x30 */
 		fr->duration_id = arg_0->hdr->a3.dur;
 
-		memcpy(fr->da, da, WLAN_ADDR_LEN);
-		memcpy(fr->sa, sa, WLAN_ADDR_LEN);
-		memcpy(fr->bssid, bssid, WLAN_BSSID_LEN);
+		MAC_COPY(fr->da, da);
+		MAC_COPY(fr->sa, sa);
+		MAC_COPY(fr->bssid, bssid);
 
 		fr->sequence_control = arg_0->hdr->a3.seq;
 
@@ -793,7 +800,7 @@ int acx100_process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *priv)
 		TA = hdr->a3.a2;
 
 	if (!res) {
-		if ((clts = acx100_sta_list_get(TA)) != NULL) {
+		if ((clts = acx100_sta_list_get(priv, TA)) != NULL) {
 			if (clts->used == 1) {
 				acxlog(L_BINDEBUG | L_ASSOC | L_XFER,
 				       "<transmit_deauth 2>\n");
@@ -859,38 +866,6 @@ int acx100_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv)
 }
 
 /*----------------------------------------------------------------
-* acx100_is_broadcast_address
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-int acx100_is_broadcast_address(UINT8 *address)
-{
-	UINT8 bcast_addr[WLAN_ADDR_LEN] =
-		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
-	if (memcmp(address, bcast_addr, WLAN_ADDR_LEN) == 0)
-		return 1;
-
-	/* IPv6 broadcast address */
-	if ((address[0] == 0x33) && (address[1] == 0x33))
-		return 1;
-
-	return 0;
-}
-
-/*----------------------------------------------------------------
 * acx100_process_data_frame_master
 *
 * Arguments:
@@ -910,7 +885,7 @@ int acx100_is_broadcast_address(UINT8 *address)
 static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
 	client_t *clt;
-	UINT8 bcast_addr[WLAN_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	client_t *var_24 = NULL;
 	p80211_hdr_t* p80211_hdr;
 	struct txdescriptor *tx_desc;
@@ -952,8 +927,8 @@ static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wla
 	}
 
 	/* check if it is our bssid, if not, leave */
-	if (memcmp(bssid, priv->bssid, WLAN_BSSID_LEN) == 0) {
-		if (!(clt = acx100_sta_list_get(bcast_addr)) || (clt->used != 3)) {
+	if (memcmp(bssid, priv->bssid, ETH_ALEN) == 0) {
+		if (!(clt = acx100_sta_list_get(priv, bcast_addr)) || (clt->used != 3)) {
 			acx100_transmit_deauthen(bcast_addr, 0, priv, WLAN_MGMT_REASON_RSVD /* 0 */);
 			acxlog(L_STD, "frame error #2??\n");
 			priv->stats.rx_errors++;
@@ -961,10 +936,10 @@ static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wla
 		} else {
 			esi = 2;
 			/* check if the da is not broadcast */
-			if (!acx100_is_broadcast_address(da)) {
+			if (!acx100_is_mac_address_broadcast(da)) {
 				if ((signed char) da[0x0] >= 0) {
 					esi = 0;
-					if (!(var_24 = acx100_sta_list_get(da))) {
+					if (!(var_24 = acx100_sta_list_get(priv, da))) {
 						goto station_not_found;
 					}
 					if (var_24->used != 0x3) {
@@ -984,12 +959,9 @@ static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wla
 			}
 			if ((esi == 0) || (esi == 2)) {
 				/* repackage, tx, and hope it someday reaches its destination */
-				memcpy(p80211_hdr->a3.a1, da,
-				       WLAN_ADDR_LEN);
-				memcpy(p80211_hdr->a3.a2, bssid,
-				       WLAN_ADDR_LEN);
-				memcpy(p80211_hdr->a3.a3, sa,
-				       WLAN_ADDR_LEN);
+				MAC_COPY(p80211_hdr->a3.a1, da);
+				MAC_COPY(p80211_hdr->a3.a2, bssid);
+				MAC_COPY(p80211_hdr->a3.a3, sa);
 				/* To_DS = 0, From_DS = 1 */
 				p80211_hdr->a3.fc =
 				    WLAN_SET_FC_FROMDS(1) +
@@ -1038,7 +1010,7 @@ fail:
  */
 static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
-	UINT8 bcast_addr[WLAN_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	UINT8 *da = NULL;
 	UINT8 *bssid = NULL;
 	p80211_hdr_t *p80211_hdr;
@@ -1098,7 +1070,7 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 	}
 
 	/* check if it is broadcast */
-	if (!acx100_is_broadcast_address(da)) {
+	if (!acx100_is_mac_address_broadcast(da)) {
 		if ((signed char) da[0] >= 0) {
 			/* no broadcast, so check if it is our address */
                         if (!acx100_is_mac_address_equal(da, priv->dev_addr)) {
@@ -1137,6 +1109,8 @@ done:
 
 /* acx100_process_mgmt_frame()
  * STATUS: FINISHED, UNVERIFIED. namechange!! (from process_mgnt_frame())
+ * FIXME: uses global struct alloc_p80211mgmt_req, make sure there's no
+ * race condition involved! (proper locking/processing)
  */
 static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
@@ -1160,14 +1134,14 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
 
 			if (!memcmp
 			    (alloc_p80211mgmt_req.a.assocreq.hdr->a3.a2,
-			     priv->address, WLAN_ADDR_LEN)) {
+			     priv->bssid, ETH_ALEN)) {
 				acx100_transmit_assocresp(&alloc_p80211mgmt_req.a.
 						   assocreq, priv);
 			}
@@ -1179,7 +1153,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
 			acx100_process_assocresp(&alloc_p80211mgmt_req.a.
@@ -1194,7 +1168,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1211,7 +1185,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
@@ -1231,7 +1205,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.proberesp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.proberesp.len =
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
 			if (priv->status == ISTATUS_1_SCANNING)
@@ -1256,7 +1230,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 				alloc_p80211mgmt_req.a.beacon.buf =
 				    (char *) p80211_hdr;
 				alloc_p80211mgmt_req.a.beacon.len =
-				    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+				    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 				acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
 				       p80211_hdr->a3.fc, p80211_hdr->a3.dur, p80211_hdr->a3.seq);
 				a = p80211_hdr->a3.a1;
@@ -1299,7 +1273,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.disassoc.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.disassoc.len = //rxdesc->p80211frmlen;
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 		acx_mgmt_decode_disassoc(&alloc_p80211mgmt_req.a.disassoc);
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			acx100_process_disassoc(&alloc_p80211mgmt_req.a.disassoc,
@@ -1317,11 +1291,11 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.authen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.authen.len = //rxdesc->p80211frmlen;
-			    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 		acx_mgmt_decode_authen(&alloc_p80211mgmt_req.a.authen);
-		if (!memcmp(priv->address,
+		if (!memcmp(priv->bssid,
 			    alloc_p80211mgmt_req.a.authen.hdr->a3.a2,
-			    WLAN_ADDR_LEN)) {
+			    ETH_ALEN)) {
 			acx100_process_authen(&alloc_p80211mgmt_req.a.authen,
 				       priv);
 		}
@@ -1331,7 +1305,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.deauthen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.deauthen.len =
-		    (rxdesc->data->mac_cnt_rcvd /* & 0xfff FIXME? */) - wep_offset;
+		    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 		acx_mgmt_decode_deauthen(&alloc_p80211mgmt_req.a.deauthen);
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			acx100_process_deauthen(&alloc_p80211mgmt_req.a.deauthen,
@@ -1431,9 +1405,9 @@ static int acx100_process_NULL_frame(struct rxhostdescriptor *rxdesc, wlandevice
 		result = 1;
 		goto done;
 	}
-	for (client = acx100_sta_list_get_from_hash(ebx); client;
+	for (client = acx100_sta_list_get_from_hash(priv, ebx); client;
 	     client = client->next) {
-		if (!memcmp(ebx, client->address, WLAN_ADDR_LEN)) {
+		if (!memcmp(ebx, client->address, ETH_ALEN)) {
 			resclt = client;
 			break;
 		}
@@ -1532,8 +1506,9 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	memset(&priv->bss_table[priv->bss_table_count], 0, sizeof(struct bss_info));
 
 	/* copy the BSSID element */
-	memcpy(priv->bss_table[priv->bss_table_count].bssid,
-	       hdr->a4.a3, WLAN_BSSID_LEN);
+	MAC_COPY(priv->bss_table[priv->bss_table_count].bssid, hdr->a4.a3);
+	/* copy the MAC address element (source address) */
+	MAC_COPY(priv->bss_table[priv->bss_table_count].mac_addr, hdr->a4.a2);
 
 	/* copy the ESSID element */
 	if (hdr->info[0x1] <= IW_ESSID_MAX_SIZE) {
@@ -1554,8 +1529,8 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 		rate_count = 64;
 	memcpy(priv->bss_table[priv->bss_table_count].supp_rates,
 	       &pSuppRates[2], rate_count);
-	priv->bss_table[priv->bss_table_count].sir = mmt->phy_level;
-	priv->bss_table[priv->bss_table_count].snr = mmt->phy_snr;
+	priv->bss_table[priv->bss_table_count].sir = acx_signal_to_winlevel(mmt->phy_level);
+	priv->bss_table[priv->bss_table_count].snr = acx_signal_to_winlevel(mmt->phy_snr);
 
 	a = priv->bss_table[priv->bss_table_count].bssid;
 	ss = &priv->bss_table[priv->bss_table_count];
@@ -1607,7 +1582,6 @@ const char * const status_str[22] =
   "Association denied due to requesting station not supporting the Channel Agility option. TRANSLATION: Bug in ACX100 driver?"};
 inline const char * const get_status_string(int status)
 {
-
 	  return status <= 21 ? status_str[status] : "Reserved";
 }
 
@@ -1759,11 +1733,11 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 		}
 	}
 	acxlog(L_ASSOC,"Algorithm is ok\n");
-	currclt = acx100_sta_list_get_from_hash(hdr->a3.a2);
+	currclt = acx100_sta_list_get_from_hash(priv, hdr->a3.a2);
 	acxlog(L_ASSOC,"Got current client for sta hash tab\n");
 	clt = NULL;
 	while (currclt) {
-		if (0 == memcmp(hdr->a3.a2, currclt->address, WLAN_ADDR_LEN)) {
+		if (0 == memcmp(hdr->a3.a2, currclt->address, ETH_ALEN)) {
 			clt = currclt;
 			break;
 		}
@@ -1772,14 +1746,14 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 	acxlog(L_ASSOC,"Found acceptable client\n");
 	/* create a new entry if station isn't registered yet */
 	if (!clt) {
-		if (!(clt = acx100_sta_list_add(hdr->a3.a2)))
+		if (!(clt = acx100_sta_list_add(priv, hdr->a3.a2)))
 		{
 			acxlog(L_ASSOC,"Could not allocate room for this client\n");
 			result = 0;
 			goto end;
 		}
 
-		memcpy(clt->address, hdr->a3.a2, WLAN_ADDR_LEN);
+		MAC_COPY(clt->address, hdr->a3.a2);
 		clt->used = 1;
 	}
 	/* now check which step in the authentication sequence we are
@@ -1821,7 +1795,7 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 			if ((currclt->aid >> 8) != 0x80)
 				break;
 		acx100_transmit_authen4(req, priv);
-		memcpy(clt->address, hdr->a3.a2, WLAN_ADDR_LEN);
+		MAC_COPY(clt->address, hdr->a3.a2);
 		clt->used = 2;
 		clt->val0xe = 4;
 		clt->val0x98 = hdr->a3.seq;
@@ -1903,7 +1877,7 @@ int acx100_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
 	acxlog(L_STD, "Processing deauthen packet. Hmm, should this have happened?\n");
 
 	addr = hdr->a3.a2;
-	if (memcmp(addr, priv->dev_addr, WLAN_ADDR_LEN))
+	if (memcmp(addr, priv->dev_addr, ETH_ALEN))
 	{
 		/* OK, we've been asked to leave the ESS. Do we 
 		 * ask to return or do we leave quietly? I'm 
@@ -1916,7 +1890,7 @@ int acx100_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
 		goto end;
 	}			
 
-	client = acx100_sta_list_get_from_hash(addr);
+	client = acx100_sta_list_get_from_hash(priv, addr);
 
 	if (client == NULL) {
 		result = 0;
@@ -1924,7 +1898,7 @@ int acx100_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
 	}
 
 	do {
-		if (0 == memcmp(addr, &client->address, WLAN_ADDR_LEN)) {
+		if (0 == memcmp(addr, &client->address, ETH_ALEN)) {
 			resclt = client;
 			goto end;
 		}
@@ -2032,22 +2006,21 @@ int acx100_transmit_deauthen(char *a, client_t *clt, wlandevice_t *priv, UINT16 
 
 	if (clt) {
 		clt->used = (UINT8)1;
-		memcpy(hd->da, clt->address, WLAN_ADDR_LEN);
+		MAC_COPY(hd->da, clt->address);
 	} else {
-		memcpy(hd->da, a, WLAN_ADDR_LEN);
+		MAC_COPY(hd->da, a);
 	}
-
-	memcpy(hd->sa, priv->dev_addr, WLAN_ADDR_LEN);
-
+	MAC_COPY(hd->sa, priv->dev_addr);
 	/* FIXME: this used to use dev_addr, but I think it should use
-	 * the BSSID of the network we're associated to: priv->address */
-	memcpy(hd->bssid, priv->address, WLAN_BSSID_LEN);
+	 * the BSSID of the network we're associated to: priv->bssid */
+	MAC_COPY(hd->bssid, priv->bssid);
+	
 	hd->sequence_control = 0;
 
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER,
 	       "<acx100_transmit_deauthen>sta=%02X:%02X:%02X:%02X:%02X:%02X for %d\n",
 	       hd->da[0x0], hd->da[0x1], hd->da[0x2],
-	       hd->da[0x3], hd->da[0x4], hd->da[0x5],reason);
+	       hd->da[0x3], hd->da[0x4], hd->da[0x5], reason);
 
 	hdesc_header->length = WLAN_HDR_A3_LEN;
 	hdesc_header->data_offset = 0;
@@ -2112,9 +2085,9 @@ int acx100_transmit_authen1(wlandevice_t *priv)
 	hd->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_AUTHEN);	/* 0xb0 */
 	hd->duration_id = host2ieee16(0x8000);
 
-	memcpy(hd->da, priv->address, WLAN_ADDR_LEN);
-	memcpy(hd->sa, priv->dev_addr, WLAN_ADDR_LEN);
-	memcpy(hd->bssid, priv->address, WLAN_BSSID_LEN);
+	MAC_COPY(hd->da, priv->bssid);
+	MAC_COPY(hd->sa, priv->dev_addr);
+	MAC_COPY(hd->bssid, priv->bssid);
 
 	hd->sequence_control = 0;
 
@@ -2170,7 +2143,7 @@ int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 	packet_len = WLAN_HDR_A3_LEN;
 
 	if (sta_list != NULL) {
-		memcpy(sta_list->address, arg_0->hdr->a3.a2, WLAN_ADDR_LEN);
+		MAC_COPY(sta_list->address, arg_0->hdr->a3.a2);
 		sta_list->val0x8 = WLAN_GET_FC_PWRMGT(arg_0->hdr->a3.fc);
 		sta_list->auth_alg = *(arg_0->auth_alg);
 		sta_list->val0xe = 2;
@@ -2190,9 +2163,9 @@ int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 		hd->duration_id = arg_0->hdr->a3.dur;
 		hd->sequence_control = arg_0->hdr->a3.seq;
 
-		memcpy(hd->da, arg_0->hdr->a3.a2, WLAN_ADDR_LEN);
-		memcpy(hd->sa, arg_0->hdr->a3.a1, WLAN_ADDR_LEN);
-		memcpy(hd->bssid, arg_0->hdr->a3.a3, WLAN_BSSID_LEN);
+		MAC_COPY(hd->da, arg_0->hdr->a3.a2);
+		MAC_COPY(hd->sa, arg_0->hdr->a3.a1);
+		MAC_COPY(hd->bssid, arg_0->hdr->a3.a3);
 
 		payload->auth_alg = *(arg_0->auth_alg);
 
@@ -2276,9 +2249,9 @@ int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 	hd->duration_id = arg_0->hdr->a3.dur;
 	hd->sequence_control = arg_0->hdr->a3.seq;
 	*/
-	memcpy(hd->da, priv->address, WLAN_ADDR_LEN);
-	memcpy(hd->sa, priv->dev_addr, WLAN_ADDR_LEN);
-	memcpy(hd->bssid, priv->address, WLAN_BSSID_LEN);
+	MAC_COPY(hd->da, priv->bssid);
+	MAC_COPY(hd->sa, priv->dev_addr);
+	MAC_COPY(hd->bssid, priv->bssid);
 
 	hdesc_header->length = WLAN_HDR_A3_LEN;
 	hdesc_header->data_offset = 0;
@@ -2351,9 +2324,10 @@ int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 	hd->duration_id = arg_0->hdr->a3.dur;
 	hd->sequence_control = arg_0->hdr->a3.seq;
 
-	memcpy(hd->da, arg_0->hdr->a3.a2, WLAN_ADDR_LEN);
-	/* FIXME: huh? why is there no sa"? */
-	memcpy(hd->bssid, arg_0->hdr->a3.a3, WLAN_BSSID_LEN);
+	MAC_COPY(hd->da, arg_0->hdr->a3.a2);
+	/* FIXME: huh? why was there no "sa"? Added, assume should do like authen2 */
+	MAC_COPY(hd->sa, arg_0->hdr->a3.a1);
+	MAC_COPY(hd->bssid, arg_0->hdr->a3.a3);
 
 	hdesc_header->length = WLAN_HDR_A3_LEN;
 	hdesc_header->data_offset = 0;
@@ -2421,9 +2395,9 @@ int acx100_transmit_assoc_req(wlandevice_t *priv)
 	hd->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_ASSOCREQ);  /* 0x00 */;
 	hd->duration_id = host2ieee16(0x8000);
 
-	memcpy(hd->da, priv->address, WLAN_ADDR_LEN);
-	memcpy(hd->sa, priv->dev_addr, WLAN_ADDR_LEN);
-	memcpy(hd->bssid, priv->address, WLAN_BSSID_LEN);
+	MAC_COPY(hd->da, priv->bssid);
+	MAC_COPY(hd->sa, priv->dev_addr);
+	MAC_COPY(hd->bssid, priv->bssid);
 
 	hd->sequence_control = 0;
 
@@ -2538,9 +2512,9 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 
 		hd->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DISASSOC);	/* 0xa0 */
 		hd->duration_id = 0;
-		memcpy(hd->da, priv->address, WLAN_ADDR_LEN);
-		memcpy(hd->sa, priv->dev_addr, WLAN_ADDR_LEN);
-		memcpy(hd->bssid, priv->dev_addr, WLAN_BSSID_LEN);
+		MAC_COPY(hd->da, priv->bssid);
+		MAC_COPY(hd->sa, priv->dev_addr);
+		MAC_COPY(hd->bssid, priv->dev_addr);
 		hd->sequence_control = 0;
 
 		hdesc_header->length = WLAN_HDR_A3_LEN;
@@ -2841,7 +2815,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 		memcpy(priv->essid_for_assoc, essid_src, essid_len);
 		priv->essid_for_assoc[essid_len] = '\0';
 		priv->channel = priv->station_assoc.channel;
-		memcpy(priv->address, priv->station_assoc.bssid, WLAN_ADDR_LEN);
+		MAC_COPY(priv->address, priv->station_assoc.bssid);
 
 		a = priv->address;
 		acxlog(L_STD | L_ASSOC,
@@ -2953,8 +2927,9 @@ void acx100_timer(unsigned long address)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: status = %d\n", __func__,
 	       priv->status);
-	if (0 != acx100_lock(priv, &flags))
+	if (0 != acx100_lock(priv, &flags)) {
 		return;
+	}
 
 	switch (priv->status) {
 	case ISTATUS_1_SCANNING:
