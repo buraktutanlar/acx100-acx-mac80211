@@ -1,3 +1,6 @@
+AES		Advanced Encryption Standard
+		AES is a rather strong encryption technique (much stronger
+		than e.g. WEP) which is(?) part of the 802.11i standard.
 AP		Access Point
 BSS		Basic Service Sets
 			The name for a number of wireless clients
@@ -40,8 +43,7 @@ ED		Energy Detect
 			Threshold to find out whether a channel is
 			carrying energy (the channel is "busy") or not
 			(see also CCA).
-ESSID
-		Extended Service Set ID
+ESSID		Extended Service Set ID
 			The ESSID is the name of the network you want to
 			access.  It is used to identify different
 			wireless networks.

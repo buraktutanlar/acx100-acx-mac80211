@@ -220,13 +220,13 @@ static const struct pci_device_id acx_pci_id_tbl[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(pci, acx_pci_id_tbl);
 
+#ifdef NONESSENTIAL_FEATURES
 typedef struct device_id {
 	unsigned char id[6];
 	char *descr;
 	char *type;
 } device_id_t;
 
-#ifdef NONESSENTIAL_FEATURES
 static const device_id_t device_ids[] =
 {
 	/*@-null@*/
@@ -414,6 +414,7 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 		return;
 	}
 
+/* FIXME: remove old parsing code once the new parsing turned out to be solid */
 #define NEW_PARSING 1
 #if NEW_PARSING
 	num = &fw.fw_id[3];
@@ -810,9 +811,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(priv, 0, sizeof(wlandevice_t));
 
-#if (WLAN_HOSTIF!=WLAN_USB)
 	priv->pdev = pdev;
-#endif
 	priv->chip_type = chip_type;
 	priv->chip_name = chip_name;
 	if (PCI_HEADER_TYPE_CARDBUS == (int)pdev->hdr_type) {
@@ -845,9 +844,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif /* NONESSENTIAL_FEATURES */
 
 	dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
-	if (NULL == dev) {
+	if (unlikely(NULL == dev)) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: Failed to alloc netdev\n", __func__);
+		       "%s: FAILED to alloc netdev\n", __func__);
 		result = -EIO;
 		goto fail_alloc_netdev;
 	}
@@ -1349,6 +1348,7 @@ static void acx_up(netdevice_t *dev)
 	else {
 		acxlog(L_INIT, "firmware version < 1.9.3.e --> using H/W timer\n");
 	}
+	/* FIXME: explicitly calling this here doesn't seem too clean... */
 	if ( CHIPTYPE_ACX111 == priv->chip_type ) {
 	    acx_init_wep(priv);
 	}
@@ -1513,7 +1513,6 @@ static int acx_close(netdevice_t *dev)
 
 	/* release shared IRQ handler */
 	free_irq(dev->irq, dev);
-	/* priv->val0x240c = 0; */
 
 	/* We currently don't have to do anything else.
 	 * Higher layers know we're not ready from dev->start==0 and
@@ -1550,7 +1549,7 @@ static int acx_close(netdevice_t *dev)
 
 static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 {
-	int txresult = 0;
+	int txresult = NOT_OK;
 	unsigned long flags;
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	struct txdescriptor *tx_desc;
@@ -1559,17 +1558,24 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	FN_ENTER;
 
 	if (unlikely(!skb)) {
-		return OK;
+		/* indicate success */
+		txresult = OK;
+		goto fail_no_unlock;
 	}
 	if (unlikely(!priv)) {
-		return NOT_OK;
+		txresult = NOT_OK;
+		goto fail_no_unlock;
 	}
 	if (unlikely(0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		return NOT_OK;
+		txresult = NOT_OK;
+		goto fail_no_unlock;
 	}
 
 	if (unlikely(OK != acx_lock(priv, &flags)))
-		return NOT_OK;
+	{
+		txresult = NOT_OK;
+		goto fail_no_unlock;
+	}
 
 	if (unlikely(0 != acx_queue_stopped(dev))) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
@@ -1577,12 +1583,12 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		goto fail;
 	}
 
-	if (ISTATUS_4_ASSOCIATED != priv->status) {
+	if (unlikely(ISTATUS_4_ASSOCIATED != priv->status)) {
 		acxlog(L_XFER, "Trying to xmit, but not associated yet: aborting...\n");
 		/* silently drop the packet, since we're not connected yet */
-		dev_kfree_skb(skb);
-		priv->stats.tx_errors++;
 		txresult = OK;
+		/* ...but indicate an error nevertheless */
+		priv->stats.tx_errors++;
 		goto fail;
 	}
 
@@ -1602,23 +1608,16 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
 	acx_stop_queue(dev, "during Tx");
 #endif
-	templen = skb->len;
-
 	if (unlikely((tx_desc = acx_get_tx_desc(priv)) == NULL)) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = NOT_OK;
 		goto fail;
 	}
 
+	templen = skb->len;
 	acx_ether_to_txdesc(priv, tx_desc, skb);
 	acx_dma_tx_data(priv, tx_desc);
 	dev->trans_start = jiffies;
-
-	dev_kfree_skb(skb);
-
-/*	if (txresult == 1) {
-		return NOT_OK;
-	} */
 
 #if 0
 	tx_desc = &priv->dc.pTxDescQPool[priv->dc.pool_idx];
@@ -1626,11 +1625,15 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		acx_wake_queue(dev, "after Tx start");
 	}
 #endif
+	txresult = OK;
 	priv->stats.tx_packets++;
 	priv->stats.tx_bytes += templen;
 
 fail:
 	acx_unlock(priv, &flags);
+fail_no_unlock:
+	if ((txresult == OK) && (NULL != skb))
+		dev_kfree_skb(skb);
 
 	FN_EXIT(1, txresult);
 	return txresult;
@@ -1788,7 +1791,7 @@ static void acx_set_multicast_list(netdevice_t *dev)
 
 	/* cannot update card settings directly here, atomic context!
 	 * FIXME: hmm, most likely it would be much better instead if
-	 * acx_update_card_settings() always worked in atomic context!*/
+	 * acx_update_card_settings() always worked in atomic context! */
 	SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
 	acx_schedule_after_interrupt_task(priv);
 
@@ -1875,19 +1878,19 @@ static void acx_disable_irq(wlandevice_t *priv)
                                         /* recommended action: try entering 802.11 PS mode again */
 #define INFO_IV_ICV_FAILURE     0x0005  /* encryption/decryption process on a packet failed */
 
-static char *info_type_msg[] = {
-    "(unknown)",
-    "scan complete",
-    "WEP key not found",
-    "internal watchdog reset was done",
-    "failed to send powersave (NULL frame) notification to AP",
-    "encrypt/decrypt on a packet has failed",
-    "(unknown)",
-    "MIC failure: fake WEP encrypt??"
-};
-
 static void acx_handle_info_irq(wlandevice_t *priv)
 {
+	char *info_type_msg[] = {
+		"(unknown)",
+		"scan complete",
+		"WEP key not found",
+		"internal watchdog reset was done",
+		"failed to send powersave (NULL frame) notification to AP",
+		"encrypt/decrypt on a packet has failed",
+		"(unknown)",
+		"MIC failure: fake WEP encrypt??"
+	};
+
 	acx_get_info_state(priv);
 	acxlog(L_STD | L_IRQ, "Got Info IRQ: status 0x%04x, type 0x%04x: %s\n",
 		priv->info_status, priv->info_type,
@@ -1948,9 +1951,6 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 		return IRQ_NONE;
 	}
 
-	/* Routine to perform blink with range */
-	if (unlikely(priv->led_power == 2))
-		acx_update_link_quality_led(priv);
 /*	if (acx_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
@@ -2090,6 +2090,9 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 	}
    }
 #endif
+	/* Routine to perform blink with range */
+	if (unlikely(priv->led_power == 2))
+		acx_update_link_quality_led(priv);
 
 /*	acx_unlock(priv,&flags); */
 	FN_EXIT(0, OK);

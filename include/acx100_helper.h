@@ -523,7 +523,7 @@ typedef struct acx_configoption {
     co_datarates_t		data_rates ACX_PACKED;
     co_domains_t		domains ACX_PACKED;
     co_product_id_t		product_id ACX_PACKED;
-    co_manuf_t			manufactor ACX_PACKED;
+    co_manuf_t			manufacturer ACX_PACKED;
 } acx_configoption_t;
 
 

@@ -20,8 +20,20 @@ mobile phones is TNETW1250 (which will probably be used together with
 TI's TNETW3422M radio). We think that we will be able to support all of
 those chips, also the 1250.
 The TNETW1130 frequently uses the 0x16 radio Radia RC2321H / RC2422.
+Hmm, however the USR(80)5410 uses:
+TI TNETW1130GVF
+   42Z3468 D4
+
+RADIA RC2422B
+      HK0407
+      A5D0
+
+RADIA RC2326
+      SG0405
+      410L2CK
 
 FIXME: what is the TNETW2522 and RC2432?
+The RC2432/RC2436 are said to support 802.11a/b/g
 
 Transfer quality can be influenced by the following parameters:
 - txpower setting via iwconfig [implemented, 16.5 and 18dB]

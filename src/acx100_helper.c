@@ -4043,12 +4043,12 @@ void acx111_read_configoption(wlandevice_t *priv)
 	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %.*s\n", co2.product_id.type, co2.product_id.len, co2.product_id.len, (char *)co2.product_id.list);
 
 	pEle += pEle[1] + 2;	
-	co2.manufactor.type = pEle[0];
-	co2.manufactor.len = pEle[1];
+	co2.manufacturer.type = pEle[0];
+	co2.manufacturer.len = pEle[1];
 	for (i=0;i<pEle[1];i++) {
-	    co2.manufactor.list[i] = pEle[i+2];
+	    co2.manufacturer.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %.*s\n", co2.manufactor.type, co2.manufactor.len, co2.manufactor.len, (char *)co2.manufactor.list);
+	acxlog(L_DEBUG, "ManufacturerID : %02X  Length: %02X, Data: %.*s\n", co2.manufacturer.type, co2.manufacturer.len, co2.manufacturer.len, (char *)co2.manufacturer.list);
 
 /*
 	acxlog(L_DEBUG, "EEPROM part : \n");

@@ -98,14 +98,14 @@ int acx_configure_length(wlandevice_t *priv, void *pdr, short type,
 			    short length);
 int acx_interrogate(wlandevice_t *priv, void *pdr, short type);
 
-int acx_is_mac_address_zero(mac_t *mac);
-void acx_clear_mac_address(mac_t *mac);
-int acx_is_mac_address_equal(UINT8 *one, UINT8 *two);
-UINT8 acx_is_mac_address_group(mac_t *mac);
-UINT8 acx_is_mac_address_directed(mac_t *mac);
+int acx_is_mac_address_zero(const mac_t *mac);
+void acx_clear_mac_address(const mac_t *mac);
+int acx_is_mac_address_equal(const UINT8 *one, const UINT8 *two);
+UINT8 acx_is_mac_address_group(const mac_t *mac);
+UINT8 acx_is_mac_address_directed(const mac_t *mac);
 void acx_set_mac_address_broadcast(UINT8 *address);
-int acx_is_mac_address_broadcast(const UINT8 * const address);
-int acx_is_mac_address_multicast(mac_t *mac);
+int acx_is_mac_address_broadcast(const UINT8 *address);
+int acx_is_mac_address_multicast(const mac_t *mac);
 void acx_log_mac_address(int level, const UINT8 *mac, const char* tail);
 
 void acx_power_led(wlandevice_t *priv, UINT8 enable);

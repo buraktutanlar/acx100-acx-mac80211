@@ -1783,16 +1783,6 @@ void cleanup_module() {
 }
 
 
-void acx100_enable_irq(wlandevice_t *priv) {
-	/* do nothing */
-}
-
-void acx100_disable_irq(wlandevice_t *priv) {
-	/* do nothing */
-}
-
-
-
 /* ---------------------------------------------------------------------------
 **                                   DEBUG STUFF
 ** --------------------------------------------------------------------------- */

@@ -91,9 +91,11 @@ chore any more...
 === CARD COMPATIBILITY (aka "the real dirt") ===
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
-with ACX100 chip (except for USB and Compact Flash implementations,
-which are both very rare -- USB support exists for both
-2.4.x and 2.6.x, however it may be not completely "stable" yet). [040523]
+with ACX100 chip (except for Compact Flash implementations,
+which are very rare). USB support exists for both 2.6.x and 2.4.x,
+however it may be not completely "stable" yet, and Linux 2.4.x USB stack
+is buggy (both uhci and usb-uhci; ohci and ehci should be ok, though),
+so better use 2.6.x for USB! [041203]
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
@@ -101,8 +103,9 @@ and are at your wits end as to what might still make the card fail
 
 Other Texas Instruments chips which are e.g. 802.11g capable and are named
 TNETW1130/1230 (ACX111) started to actually be supported in a useful way
-by this driver rather recently only, so due to different hardware
-implementations some ACX111 card designs might still not be working yet [040530].
+by this driver some time ago only, so due to different hardware
+implementations some ACX111 card designs might still not be working yet,
+even at this time [041203].
 
 Also, due to confusion about similar card naming (for further information, see
 bottom), people keep thinking certain cards they own work with this driver.
@@ -136,8 +139,8 @@ Status Matrix:
 		ACX100			ACX100 USB		ACX111
 Rates		1/2/5.5/11/22 (+auto)	1/2/5.5/11/22		all up to 54Mb (+auto)
 5GHz		--			--			NIY (any hardware?)
-Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64-/128-/256-)
-Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64-/128-/256-)
+Ad-Hoc		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64-/128-/256-)
+Managed		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64-/128-/256-)
 Auto mode	*			*			*
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
@@ -153,6 +156,7 @@ ACX111: not working yet.
 
 Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
+Please report any trouble here!
 
 Furthermore, associating with some access points might still be problematic
 due to strict 802.11 compliance checks in their firmware (which we fail
@@ -185,11 +189,11 @@ since this seeks to list all requirements in full):
   PPC (Powerbooks) may work since they have been tested from time to time,
   but please report IMMEDIATELY if they have any trouble,
   I'm very interested in that!
-  Users who have archs other than x86 may need to remove certain compiler
+  Users of architectures other than x86 may need to remove certain compiler
   flags in src/Makefile which are unsupported by their non-x86 compiler (e.g. -march=i586)
 * most likely a Bus Master capable PCI slot for PCI card versions, slave
-  PCI slot won't work (FIXME: is that true?)
-* relatively recent Linux kernel 2.4.x (>= 2.4.18 preferred) or 2.6.x
+  PCI slot won't work (FIXME: is that true? Please report!)
+* relatively recent Linux kernel 2.6.x or 2.4.x (>= 2.4.18 preferred)
 	with CONFIG_NET_RADIO enabled ("Wireless LAN")
 	and CONFIG_NET_WIRELESS, for wireless extensions (iwconfig etc.).
 	And Non-SMP (no CONFIG_SMP).
@@ -200,7 +204,7 @@ since this seeks to list all requirements in full):
 * a make package has to be installed
 * a gcc package has to be installed
 * The /bin/bash shell is required for the start_net/stop_net scripts
-* module packages: modutils for Linux 2.4.x, module-init-tools for 2.5.x/2.6.x
+* module packages: module-init-tools for 2.5.x/2.6.x, modutils for Linux 2.4.x
 * firmware image and radio image for your ACX1xx card
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
@@ -214,7 +218,8 @@ What to NOT do:
   though.
 * believe that this driver uses the hotplug package's firmware upload
   functionality. Right now it uses its completely separate and thus
-  Linux 2.4.x compatible mechanism!
+  Linux 2.4.x (which doesn't support this firmware upload)
+  compatible mechanism!
 
 
 === FIRMWARE INSTALLATION ===
@@ -343,7 +348,44 @@ For non-radio firmwares you NEED the additional radio module, with radio
 firmwares you MUST NOT have the driver load the radio module.
 ACX111 cards usually have radio types 0x16 or 0x17 (see log message).
 
-=== "NORMAL" DRIVER INSTALLATION ===
+=== LINUX 2.6 DRIVER INSTALLATION ===
+
+In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
+source tree.
+
+In order to build the module outside of a 2.6 kernel tree, just use the
+normal method as described for 2.4.x above (you'll most likely need to
+compile it as root since it needs write access in your kernel source
+directory).
+
+If instead you want to build the module "in-tree" (i.e. not in a separate
+acx100 module directory!), you'll have to:
+
+> SOLUTION ONE
+Run "make inject" to add the driver to an existing Linux 2.6.x source tree.
+By default, the kernel source is assumed to be in /usr/src/linux/, while if
+you want to specify another path, you should use the parameter KSRC, so
+¨make inject KSRC=[path to your kernel source].
+
+> SOLUTION TWO (this may be outdated)
+1. Create a directory drivers/net/wireless/acx in your 2.6 source tree.
+2. Copy the files
+      - src/Makefile
+      - src/*.c
+      - include/*.h
+   from the acx100 sources into drivers/net/wireless/acx in your 2.6 tree.
+3. uncomment line "#EXTRA_CFLAGS += -Idrivers/net/wireless/acx -DWLAN_HOSTIF=WLAN_PCI"
+   in Makefile you just copied. (line 142)
+4. Add a line reading "obj-m += acx/" to the bottom of
+   drivers/net/wireless/Makefile .
+5. Then build your kernel as usual, the acx100 driver will be built as module
+   (acx_pci.ko). Make sure you have the required 2.6 module userspace
+   package (module-init-tools) and enjoy ;-)
+
+> SOLUTION THREE (only for version before 0.2.0pre8)
+Other 2.6.x kernel patches can be found at http://luca.pca.it/projects/acx100/
+
+=== LINUX 2.4 DRIVER INSTALLATION ===
 
 This is the usual way to get the driver running on Linux 2.4.x.
 
@@ -415,43 +457,6 @@ then load with an activated use_eth_name option, like:
 insmod src/acx_pci.o firmware_dir=firmware use_eth_name=1
 
 For troubleshooting, see below.
-
-=== LINUX 2.6 DRIVER INSTALLATION ===
-
-In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
-source tree.
-
-In order to build the module outside of a 2.6 kernel tree, just use the
-normal method as described for 2.4.x above (you'll most likely need to
-compile it as root since it needs write access in your kernel source
-directory).
-
-If instead you want to build the module "in-tree" (i.e. not in a separate
-acx100 module directory!), you'll have to:
-
-> SOLUTION ONE
-Run "make inject" to add the driver to an existing Linux 2.6.x source tree.
-By default, the kernel source is assumed to be in /usr/src/linux/, while if
-you want to specify another path, you should use the parameter KSRC, so
-¨make inject KSRC=[path to your kernel source].
-
-> SOLUTION TWO (this may be outdated)
-1. Create a directory drivers/net/wireless/acx in your 2.6 source tree.
-2. Copy the files
-      - src/Makefile
-      - src/*.c
-      - include/*.h
-   from the acx100 sources into drivers/net/wireless/acx in your 2.6 tree.
-3. uncomment line "#EXTRA_CFLAGS += -Idrivers/net/wireless/acx -DWLAN_HOSTIF=WLAN_PCI"
-   in Makefile you just copied. (line 142)
-4. Add a line reading "obj-m += acx/" to the bottom of
-   drivers/net/wireless/Makefile .
-5. Then build your kernel as usual, the acx100 driver will be built as module
-   (acx_pci.ko). Make sure you have the required 2.6 module userspace
-   package (module-init-tools) and enjoy ;-)
-
-> SOLUTION THREE (only for version before 0.2.0pre8)
-Other 2.6.x kernel patches can be found at http://luca.pca.it/projects/acx100/
 
 === USAGE HINTS ===
 
@@ -544,6 +549,7 @@ or CPU architecture or (non-)register calling convention or kernel version
 -- see syslog for evidence!!)
 and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
+Running "depmod -a" might actually fix the problem already, though.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have

@@ -325,8 +325,8 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	for (i = 0; i < le16_to_cpu(payload->length); i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) payload->data)[i]);
 	acxlog(L_DATA, "\n");
-#endif	
-	
+#endif
+
 fail:
 	FN_EXIT(0, OK);
 	return OK;
@@ -455,7 +455,7 @@ fail:
 		/* FIXME: implement skb ring buffer similar to
 		 * xircom_tulip_cb.c? */
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
-		if (skb == NULL) {
+		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "rx: FAILED to allocate skb\n");
 			FN_EXIT(1, (int)NULL);
 			return NULL;
@@ -599,7 +599,8 @@ fail:
 	
 	/* the "<6>" output is from the KERN_INFO channel value */
 /* Can be used to debug conversion process */
-/*	acxlog(L_DATA, "p802.11 frame [%d]: ", (rx_desc->data->status & 0xfff));
+#if DEBUG_CONVERT
+	acxlog(L_DATA, "p802.11 frame [%d]: ", (rx_desc->data->status & 0xfff));
 	for (i = 0; i < (rx_desc->data->status & 0xfff); i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) w_hdr)[i]);
 	acxlog(L_DATA, "\n");
@@ -608,7 +609,8 @@ fail:
 	for (i = 0; i < skb->len; i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) skb->data)[i]);
 	acxlog(L_DATA, "\n");
-*/
+#endif
+
 	FN_EXIT(0, OK);
 	return skb;
 }

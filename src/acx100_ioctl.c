@@ -257,10 +257,10 @@ static inline int acx_ioctl_commit(struct net_device *dev,
 static inline int acx_ioctl_get_name(struct net_device *dev, struct iw_request_info *info, char *cwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	const char *names[] = { "IEEE 802.11g/b+", "IEEE 802.11b+" };
 
-	strcpy(cwrq, "IEEE 802.11b+");
-	if (CHIPTYPE_ACX111 == priv->chip_type)
-			cwrq[11] = 'g';
+	strcpy(cwrq, names[(CHIPTYPE_ACX111 == priv->chip_type) ? 0 : 1]);
+
 	acxlog(L_IOCTL, "Get Name ==> %s\n", cwrq);
 	return OK;
 }
@@ -392,7 +392,7 @@ static inline int acx_ioctl_set_mode(struct net_device *dev, struct iw_request_i
 			priv->macmode_wanted = ACX_MODE_3_MANAGED_AP;
 			break;
 #else
-			acxlog(0xffff, "Master mode (AP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under heavy development...\n");
+			acxlog(0xffff, "Master mode (AP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under development...\n");
 			/* fall through */
 #endif
 		default:
@@ -526,7 +526,7 @@ static inline int acx_ioctl_set_ap(struct net_device *dev,
 				      struct sockaddr *awrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	UINT8 off[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
+	const UINT8 off[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 	int result = 0;
 	UINT16 i;
 	unsigned char *ap;
@@ -3141,7 +3141,8 @@ static inline int acx100_ioctl_set_led_power(struct net_device *dev, struct iw_r
 	if (priv->led_power == 2)
 	{
 		(void)printk("old max link quality setting: %d\n", priv->brange_max_quality);
-		priv->brange_max_quality = (unsigned char)extra[1];
+		if (0 != (unsigned char)extra[1])
+			priv->brange_max_quality = (unsigned char)extra[1];
 	}
 	(void)printk("new power LED status: %d (%s)\n", priv->led_power, led_modes[priv->led_power]);
 	if (priv->led_power == 2)

@@ -9,15 +9,10 @@ Default: 0x009b
 SetLEDPower - change power LED setting (0 - off, 1 - on, 2 - blink with range
 Default: 1 (on)
 "iwpriv wlan0 SetLEDPower 0", "dmesg"
-GetBlinkMaxQ - set the current quality that equates to blinking at full speed
-Default: 60 
-"iwpriv wlan0 SetBlinkMaxQ 60", "dmesg"
+"iwpriv wlan0 SetLEDPower 2 60" (sets link quality value that equates
+to blinking at full speed to 60)
 
-GetBlinkMaxQ - get the current quality that equates to blinking at full speed
-"iwpriv wlan0 GetBlinkMaxQ", "dmesg"
-
-
-GetLEDPower - get the current power LED setting
+GetLEDPower - get the current power LED setting and optional power LED mode information
 "iwpriv wlan0 GetLEDPower", "dmesg"
 
 SetRates - sets 802.11 transfer rates, basic and operational rate set

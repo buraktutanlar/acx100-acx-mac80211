@@ -354,7 +354,7 @@ void acx_get_cmd_state(wlandevice_t *priv)
 	UINT32 value;
 
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* why auto increment?? */
+	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
 
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
@@ -387,7 +387,7 @@ void acx_get_cmd_state(wlandevice_t *priv)
 void acx_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status)
 {
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1);
+	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
 
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
 		acx_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
@@ -529,7 +529,7 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 	/*** execute command ***/
 	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_CMD);
 
-	/*** wait for IRQ to occur, then ACK it? ***/
+	/*** wait for IRQ to occur, then ACK it ***/
 
 	/*** make sure we have at least *some* timeout value ***/
 	if (unlikely(timeout == 0)) {
@@ -555,7 +555,7 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 			break;
 		}
 
-		if (counter % 15000 == 7500)
+		if (unlikely(counter % 15000 == 7500))
 		{
 			acx_schedule(HZ / 100);
 		}
@@ -794,9 +794,8 @@ static const UINT16 CtlLength[0x17] = {
 	ACX1xx_IE_FIRMWARE_STATISTICS_LEN,
 	0,
 	ACX1xx_IE_FEATURE_CONFIG_LEN,
-	ACX111_IE_KEY_CHOOSE_LEN
-	
-	};
+	ACX111_IE_KEY_CHOOSE_LEN,
+};
 
 static const UINT16 CtlLengthDot11[0x14] = {
 	0,
@@ -818,7 +817,7 @@ static const UINT16 CtlLengthDot11[0x14] = {
 	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
 	0,
 	0,
-	0
+	0,
 };
 
 /*----------------------------------------------------------------
@@ -969,7 +968,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_zero(mac_t *mac)
+inline int acx_is_mac_address_zero(const mac_t *mac)
 {
 	if ((mac->vala == 0) && (mac->valb == 0)) {
 		return OK;
@@ -994,7 +993,7 @@ inline int acx_is_mac_address_zero(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
+inline int acx_is_mac_address_equal(const UINT8 *one, const UINT8 *two)
 {
 	return memcmp(one, two, ETH_ALEN);
 }
@@ -1016,7 +1015,7 @@ inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_is_mac_address_group(mac_t *mac)
+inline UINT8 acx_is_mac_address_group(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return OK;
@@ -1041,7 +1040,7 @@ inline UINT8 acx_is_mac_address_group(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx_is_mac_address_directed(mac_t *mac)
+inline UINT8 acx_is_mac_address_directed(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return NOT_OK;
@@ -1066,11 +1065,11 @@ inline UINT8 acx_is_mac_address_directed(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_broadcast(const UINT8 *const address)
+inline int acx_is_mac_address_broadcast(const UINT8 *address)
 {
 	unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-	if (memcmp(address, bcast_addr, ETH_ALEN) == 0)
+	if (OK == acx_is_mac_address_equal(address, bcast_addr))
 		return OK;
 
 	/* IPv6 broadcast address */
@@ -1097,7 +1096,7 @@ inline int acx_is_mac_address_broadcast(const UINT8 *const address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx_is_mac_address_multicast(mac_t *mac)
+inline int acx_is_mac_address_multicast(const mac_t *mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))

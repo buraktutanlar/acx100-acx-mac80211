@@ -345,14 +345,6 @@ inline const char *acx_get_status_name(UINT16 status)
 * Call context:
 *
 * STATUS: should be ok.
-*
-* Comment:
-* 0 probably means: just started (acx_start()).
-* 1 probably means: starting scan?
-* 2 probably means: not authenticated yet (acx_process_deauthenticate())
-* 3 probably means: authenticated, but not associated yet (acx_process_disassociate(), acx_process_authen())
-* 4 probably means: associated (acx_process_assocresp(), acx_process_reassocresp())
-* 5 means: status unknown
 *----------------------------------------------------------------*/
 
 void acx_set_status(wlandevice_t *priv, UINT16 new_status)
@@ -2789,7 +2781,7 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 				continue;
 		if (!(this_bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)))
 		{
-			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
+			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc! Firmware upgrade of the peer might be useful...\n");
 			SET_BIT(this_bss->caps, IEEE802_11_MGMT_CAP_IBSS);
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%04x, needed_cap 0x%04x\n",

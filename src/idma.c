@@ -1178,7 +1178,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		 * address of the device that's managing our BSSID.
 		 * Disable it for now, since it removes information (levels
 		 * from different peers) and slows the Rx path. */
-		if (0 == memcmp(buf->a3.a2, priv->station_assoc.mac_addr, ETH_ALEN)) {
+		if (OK == acx_is_mac_address_equal(buf->a3.a2, priv->station_assoc.mac_addr) {
 #endif
 			priv->wstats.qual.level = acx_signal_to_winlevel(pRxHostDesc->data->phy_level);
 			priv->wstats.qual.noise = acx_signal_to_winlevel(pRxHostDesc->data->phy_snr);
