@@ -459,10 +459,10 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);
 
-  if (cmd!=ACX100_CMD_INTERROGATE) {
-    acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
-    acx100_dump_bytes(pcmdparam,paramlen);
-  }
+	if (cmd!=ACX100_CMD_INTERROGATE) {
+		acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
+		acx100_dump_bytes(pcmdparam,paramlen);
+	}
 
 	/*** make sure we have at least *some* timeout value ***/
 	if (timeout == 0) {
@@ -547,11 +547,12 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	}
 
 	if (cmd_status != 1) {
-		acxlog(L_STD | L_CTL, "%s failed: %s [%ld uSec] (%Xh)\n",
+		acxlog(L_STD | L_CTL, "%s failed: %s [%ld uSec] Cmd: %Xh, Result: %Xh\n",
 				__func__,
 				cmd_status <= 0x0f ?
 				cmd_error_strings[cmd_status] : "UNKNOWN REASON",
 				(timeout - counter) * 50,
+				cmd,
 				cmd_status);
 	} else	{
 		/*** read in result parameters if needed ***/
@@ -976,9 +977,11 @@ void acx100_log_mac_address(int level, UINT8 * mac)
 void acx100_power_led(wlandevice_t *wlandev, int enable)
 {
 	if (enable)
-		acx100_write_reg16(wlandev, 0x290, acx100_read_reg16(wlandev, 0x290) & ~0x0800);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE], 
+			acx100_read_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE]) & ~0x0800);
 	else
-		acx100_write_reg16(wlandev, 0x290, acx100_read_reg16(wlandev, 0x290) | 0x0800);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE], 
+			acx100_read_reg16(wlandev, wlandev->io[IO_ACX_GPIO_OE]) | 0x0800);
 }
 
 

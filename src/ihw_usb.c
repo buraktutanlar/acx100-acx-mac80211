@@ -99,15 +99,14 @@ extern void acx100usb_dump_bytes(void *,int);
 
 
 int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
-  UINT16 len,*buf;
-  int i,result,blocklen,inpipe,outpipe,flags,acklen=sizeof(hw->usbin);
+  int result,blocklen,inpipe,outpipe,acklen=sizeof(hw->usbin);
   struct usb_device *usbdev;
   FN_ENTER;
   /* ----------------------------------------------------
   ** get context from wlandevice
   ** ------------------------------------------------- */
   usbdev=hw->usbdev;
-  acxlog(L_DEBUG,"hw=%X usbdev=%X cmd=%d paramlen=%d timeout=%d\n",hw,usbdev,cmd,paramlen,timeout);
+  acxlog(L_DEBUG,"hw=%p usbdev=%p cmd=%d paramlen=%d timeout=%ld\n",hw,usbdev,cmd,paramlen,timeout);
   /* ----------------------------------------------------
   **
   ** ------------------------------------------------- */
@@ -253,7 +252,6 @@ static short CtlLengthDot11[0x14] = {
 
 int acx100_configure(wlandevice_t *hw,void *pdr,short type) {
   UINT16 len;
-  int result;
   /* ----------------------------------------------------
   ** check if ACX100 control command or if 802.11 command
   ** ------------------------------------------------- */
@@ -314,7 +312,7 @@ int acx100_interrogate(wlandevice_t *hw,void *pdr,short type) {
 	if (len==0) {
 		acxlog(L_DEBUG,"WARNING: ENCOUNTERED ZEROLENGTH RID (%x)\n",type);
 	}
-  acxlog(L_DEBUG,"interrogating: type(rid)=0x%X len=%d pdr=%X\n",type,len,pdr);
+  acxlog(L_DEBUG,"interrogating: type(rid)=0x%X len=%d pdr=%p\n",type,len,pdr);
   ((memmap_t *)pdr)->type=type;
   return(acx100_issue_cmd(hw,ACX100_CMD_INTERROGATE,pdr,len,5000));
 }

@@ -41,6 +41,7 @@ void acx100_disable_irq(wlandevice_t *hw);
 void acx100_enable_irq(wlandevice_t *hw);
 
 int acx100_create_dma_regions(wlandevice_t *hw);
+int acx111_create_dma_regions(wlandevice_t *hw);
 int acx100_delete_dma_region(wlandevice_t *wlandev);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
 void acx100_clean_tx_desc(wlandevice_t *hw);

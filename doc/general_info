@@ -47,6 +47,9 @@ The TI binary drivers have been developed by the following people:
 * Larry A. Cawley (mentioned on Alexander's site)
 * Lancelot Wang (Linux driver)
 
+Tim Rikers is the Linux Technology Guy at TI. Might be worthwhile to
+contact him about getting ACX1xx support from TI...
+
 ACX100 chip specifications are being listed at eupuls.com (maybe we can
 ask them to deliver them??):
 http://www.eupuls.com/product/eu_prod_wireless11.html

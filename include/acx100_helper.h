@@ -424,4 +424,7 @@ int acx100_set_rxconfig(wlandevice_t *hw);
 int acx100_load_radio(wlandevice_t * hw);
 int acx100_read_proc(char *page, char **start, off_t offset, int count,
 		     int *eof, void *data);
+int acx100_read_proc_diag(char *page, char **start, off_t offset, int count,
+		     int *eof, void *data);
 int acx100_proc_output(char *buf, wlandevice_t * hw);
+int acx100_proc_diag_output(char *buf, wlandevice_t * hw);

@@ -60,7 +60,9 @@ if test ! -r "$MODULE_AT"; then echo "Module not found or not readable. Have you
 # FIRMWARE_AT has to be given as an absolute path!!
 FIRMWARE_AT="${SCRIPT_AT}/../firmware"
 
-if test ! -r "$FIRMWARE_AT/WLANGEN.BIN"; then echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be at ../firmware/WLANGEN.BIN, relative to the script's location. Bailing..."; exit 1; fi
+# check whether either of the two required main firmware files is
+# available
+if test ! -r "$FIRMWARE_AT/WLANGEN.BIN" -a ! -r "$FIRMWARE_AT/TIACX111.BIN"; then echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be at ../firmware/WLANGEN.BIN (or ../firmware/TIACX111.BIN for the ACX111 chip), relative to the script's location. Bailing..."; exit 1; fi
 
 if test "$RATE" != "11M"; then echo "Transfer rate is not 11 Mbps, but $RATE. If something doesn't work, try 11 Mbps."; fi
 
@@ -74,7 +76,7 @@ if test "$RATE" != "11M"; then echo "Transfer rate is not 11 Mbps, but $RATE. If
 $SYNC
 sleep 1
 
-if test -n `lsmod |grep acx100_pci`; then ${SCRIPT_AT}/stop_net; fi
+if test -n "`lsmod |grep acx100_pci`"; then ${SCRIPT_AT}/stop_net; fi
 
 $INSMOD $MODULE_AT debug=$DEBUG firmware_dir=$FIRMWARE_AT
 if test "$?" = "0"; then echo "Module successfully inserted."; else echo "Error while inserting module! Bailing..."; exit 1; fi

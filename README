@@ -1,11 +1,11 @@
 *******************************************************************************
-*             Open-Source wireless driver for TI ACX100 chipset               *
+*             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
 WARNING: this driver may still cause your box to lockup!
 If this happens, then please report at/create a bug report!
 
-Please NEVER consider using the NDIS driver loader cludge instead of this driver.
+Please NEVER consider using the NDIS driver loader cludge instead of our driver.
 For bazillions of reasons against it, please see
 http://acx100.sourceforge.net/ndis_cludge.html
 
@@ -13,21 +13,20 @@ http://acx100.sourceforge.net/ndis_cludge.html
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB and Compact Flash implementations,
-which are both extremely rare -- initial successful firmware loading support
-for USB is in the driver now, but it's far from working completely - feel free
-to work on this support).
+which are both extremely rare -- successful firmware loading support
+for USB is in the driver now and receiving works, but transmitting doesn't
+- feel free to work on this support).
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
 (and make sure to try previous versions of the driver as well!).
 
 Note that any Texas Instruments chips OTHER than the ACX100 (which is
-also known as TNETW1100) are NOT supported by this driver (yet).
+also known as TNETW1100) are not supported by this driver (yet).
 These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
 (ACX111).
-For now, you should take these unsupported cards back to the shop
-where you bought them, mentioning completely missing unacceptable
-driver support from Texas Instruments.
+Initial ACX111 support is in the driver, but it's still a bit far from working,
+due to many changes compared to the ACX100.
 
 Also, due to similar card naming confusion (for further information, see
 bottom), people keep thinking certain cards they own work with this
@@ -47,7 +46,7 @@ DWL-G650, version B2 (Atheros AR5001)
 DWL-AG520 (Atheros AR5212)
 DWL-AB650 (Atheros AR5211)
 DWL-AG650 (Atheros AR5212)
-DWL-G520+ (TNETW1130: not supported yet, but it's being worked on!)
+DWL-G520+ (TNETW1130: not fully supported yet, but it's being worked on!)
 DWL-G650+ (TNETW1130)
 
 When looking at the DWL-G650 mess, I could puke again...
@@ -279,6 +278,7 @@ http://www.hazard.maks.net/parprouted/
 
 Don't forget to set the driver debug/log level (see above) to 0xffff in case
 normal message logging is insufficient to resolve your card problem!
+Also, cat /proc/driver/acx100* might give some clues...
 
 -- Driver build problems --
 If the driver compile or loading keeps failing, then it might be caused
@@ -406,6 +406,15 @@ Requests. This way development will be much more organized, with proper
 status and processing assigned to each request, and hopefully nothing
 falling through the cracks. And please consider NOT posting anonymously,
 since this severely degrades tracking quality.
+
+****************************************
+A useful report would include:
+- the acx100_log.txt file created via
+    "cat /proc/driver/acx100* > /tmp/acx100_log.txt"
+- in case you're experiencing connection issues or similar:
+    the output log files of the debug=XXXX parameter (see above)
+****************************************
+
 Thanks for listening!
 
 --- BUGS / SHORTCOMINGS / PATCHES ---

@@ -214,13 +214,17 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 	qcfg.AreaSize = (sizeof(struct txdescriptor) * TXBUFFERNO +
 	                 sizeof(struct rxdescriptor) * RXBUFFERNO + 8);
 	qcfg.vale = 1;  /* number of tx queues */
+#if (WLAN_HOSTIF==WLAN_USB)
 	qcfg.valf1=RXBUFFERNO;
+#endif
 
 	/* sets the beginning of the tx descriptor queue */
 	pDc->ui32ACXTxQueueStart = MemMap.queue_start;
 	qcfg.TxQueueStart = pDc->ui32ACXTxQueueStart;
 	qcfg.valj = 0;
+#if (WLAN_HOSTIF==WLAN_USB)
 	qcfg.valk = TXBUFFERNO;
+#endif
 
 	/* sets the beginning of the rx descriptor queue */
 	pDc->ui32ACXRxQueueStart = wlandev->TxQueueNo * sizeof(struct txdescriptor) + MemMap.queue_start;
@@ -258,12 +262,11 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 #if (WLAN_HOSTIF==WLAN_USB)
 	acxlog(L_DEBUG,"Memory Map before configure 1\n");
 	acx100usb_dump_bytes(&MemMap,44);
-#endif
 	if (!acx100_configure(wlandev,&MemMap,ACX100_RID_MEMORY_MAP)) {
 		acxlog(L_BINSTD,"Failed to write memory map\n");
 		goto error;
 	}
-
+#endif
 
 	/* FIXME: what does this do? name the fields */
 	/* start at least 4 bytes away from the end of the last pool */
@@ -298,6 +301,209 @@ error:
 	FN_EXIT(1, 1);
 	return 1;
 }
+
+
+
+
+int acx111_create_dma_regions(wlandevice_t * wlandev)
+{
+
+
+	struct ACX111_RX_CONFIG_BLOCK;
+
+	/* TODO make a cool struct an pace it in the wlandev struct ? */
+	/* This struct is specific for the ACX111 !!! */
+	struct ACX111MemoryConfiguration {
+		
+		UINT16 id;
+		UINT16 length;
+		UINT16 no_of_stations;
+		UINT16 memory_block_size;
+		UINT8 tx_rx_memory_block_allocation;
+		UINT8 count_rx_queues;
+		UINT8 count_tx_queues;
+		UINT8 options;
+		UINT8 fragmentation;
+		UINT16 reserved1;
+		UINT8 reserved2;
+
+		/* start of rx1 block */
+		UINT8 rx_queue1_count_descs;
+		UINT8 rx_queue1_reserved1;
+		UINT8 rx_queue1_reserved2; /* must be set to 7 */
+		UINT8 rx_queue1_reserved3; /* must be set to 0 */
+		UINT32 rx_queue1_host_rx_start;
+		/* end of rx1 block */
+
+		/* start of tx1 block */
+		UINT8 tx_queue1_count_descs;
+		UINT8 tx_queue1_reserved1;
+		UINT8 tx_queue1_reserved2;
+		UINT8 tx_queue1_attributes;
+		/* end of tx1 block */
+		
+#ifdef COMMENT
+		/* start init struct */
+		pt->m.gp.bytes[0x00] = 0x3; /* id */
+		pt->m.gp.bytes[0x01] = 0x0; /* id */
+		pt->m.gp.bytes[0x02] = 16; /* length */
+		pt->m.gp.bytes[0x03] = 0; /* length */
+		pt->m.gp.bytes[0x04] = 0; /* number of sta's */
+		pt->m.gp.bytes[0x05] = 0; /* number of sta's */
+		pt->m.gp.bytes[0x06] = 0x00; /* memory block size */
+		pt->m.gp.bytes[0x07] = 0x01; /* memory block size */
+		pt->m.gp.bytes[0x08] = 10; /* tx/rx memory block allocation */
+		pt->m.gp.bytes[0x09] = 0; /* number of Rx Descriptor Queues */
+		pt->m.gp.bytes[0x0a] = 0; /* number of Tx Descriptor Queues */
+		pt->m.gp.bytes[0x0b] = 0; /* options */
+		pt->m.gp.bytes[0x0c] = 0x0c; /* Tx memory/fragment memory pool allocation */
+		pt->m.gp.bytes[0x0d] = 0; /* reserved */
+		pt->m.gp.bytes[0x0e] = 0; /* reserved */
+		pt->m.gp.bytes[0x0f] = 0; /* reserved */
+		/* end init struct */
+#endif 
+
+	}  __WLAN_ATTRIB_PACK__ memconf;
+
+	/* FIXME: way too big to reside on the stack */
+	struct {
+		UINT16 val0x0[14];
+		UINT queue_start;
+		UINT val0x20;
+		UINT val0x24;
+		UINT val0x28;
+		UINT val0x2c;
+	} MemMap;
+	struct TIWLAN_DC *pDc;
+
+	FN_ENTER;
+
+	pDc = &wlandev->dc;
+	pDc->wlandev = wlandev;
+
+	spin_lock_init(&rx_lock);
+	spin_lock_init(&tx_lock);
+
+	QueueConfig_t qcfg;
+	
+	/* FIXME: which memmap is read here, acx100_init_memory_pools did not get called yet ? */
+	/* read out the acx100 physical start address for the queues */
+	if (!acx100_interrogate(wlandev, &MemMap, ACX100_RID_MEMORY_MAP)) {
+		acxlog(L_BINSTD, "ctlMemoryMapRead returns error\n");
+		FN_EXIT(1, 2);
+		return 2;
+	}
+
+	/* ### Calculate memory positions and queue sizes #### */
+
+	/* calculate size of queues */
+	qcfg.AreaSize = (sizeof(struct txdescriptor) * TXBUFFERNO +
+	                 sizeof(struct rxdescriptor) * RXBUFFERNO + 8);
+	qcfg.vale = 1;  /* number of tx queues */
+	qcfg.valf1=RXBUFFERNO;
+
+	/* sets the beginning of the tx descriptor queue */
+	pDc->ui32ACXTxQueueStart = MemMap.queue_start;
+	qcfg.TxQueueStart = pDc->ui32ACXTxQueueStart;
+	qcfg.valj = 0;
+	qcfg.valk = TXBUFFERNO;
+
+	/* sets the beginning of the rx descriptor queue */
+	pDc->ui32ACXRxQueueStart = wlandev->TxQueueNo * sizeof(struct txdescriptor) + MemMap.queue_start;
+	qcfg.RxQueueStart = pDc->ui32ACXRxQueueStart;
+	qcfg.vald = 1;
+
+	/* sets the end of the rx descriptor queue */
+	qcfg.QueueEnd = wlandev->RxQueueNo * sizeof(struct rxdescriptor) + pDc->ui32ACXRxQueueStart;
+
+	/* sets the beginning of the next queue */
+	qcfg.QueueEnd2 = qcfg.QueueEnd + 8;
+
+	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
+
+
+	/* ### Set up the card #### */
+
+	memset(&memconf, 0, sizeof(memconf));
+
+	/* set command (ACXMemoryConfiguration) */
+	memconf.id = 0x03; 
+	memconf.length = sizeof(memconf);
+
+	/* hm, I hope this is correct */
+	memconf.no_of_stations = 1;
+
+	/* specify the memory block size. Default is 256 */
+	memconf.memory_block_size = wlandev->memblocksize; 	
+
+	/* let's use 50%/50% for tx/rx */
+	memconf.tx_rx_memory_block_allocation = 10;
+
+
+	/* set the count of our queues */
+	memconf.count_rx_queues = 1; // TODO place this in constants
+	memconf.count_tx_queues = 1;
+
+	if(memconf.count_rx_queues != 1 || memconf.count_tx_queues != 1) {
+		acxlog(L_STD, 
+			"%s: Requested more buffers than supported.  Please adapt the structure! rxbuffers:%d txbuffers:%d\n", 
+			__func__, memconf.count_rx_queues, memconf.count_tx_queues);
+		goto error;
+	}
+	wlandev->TxQueueNo = TXBUFFERNO;
+	wlandev->RxQueueNo = RXBUFFERNO;
+
+	/* uhoh, hope this is correct-> BusMaster Indirect Memory Organization */
+	memconf.options = 1;
+
+	/* let's use 25% for fragmentations and 75% for frame transfers */
+	memconf.fragmentation = 0x0f; 
+
+	/* RX queue config */
+	memconf.rx_queue1_count_descs = RXBUFFERNO;
+	memconf.rx_queue1_reserved2 = 7; /* must be set to 7 */
+	memconf.rx_queue1_host_rx_start = qcfg.RxQueueStart;
+
+	/* TX queue config */
+	memconf.tx_queue1_count_descs = TXBUFFERNO;
+	/* memconf.tx_queue1_host_tx_start = qcfg.TxQueueStart; */
+
+
+	if (acx100_create_tx_host_desc_queue(pDc)) {
+		acxlog(L_BINSTD, "acx100_create_tx_host_desc_queue returns error\n");
+		goto error;
+	}
+	if (acx100_create_rx_host_desc_queue(pDc)) {
+		acxlog(L_BINSTD, "acx100_create_rx_host_desc_queue returns error\n");
+		goto error;
+	}
+	acx100_create_tx_desc_queue(pDc);
+	acx100_create_rx_desc_queue(pDc);
+
+	acxlog(L_STD, "%s: set up acx111 queue memory configuration (queue configs + descriptors)\n", __func__);
+	if (acx100_configure(wlandev, &memconf, 0x03) == 0) {
+		acxlog(L_STD, "setting up the memory configuration failed!\n");
+		goto error;
+	}
+
+
+#if THIS_IS_BOGUS_ISNT_IT
+	acx100_set_defaults(wlandev);
+#endif
+
+	FN_EXIT(1, 0);
+	return 0;
+
+error:
+	acx100_free_desc_queues(pDc);
+
+	FN_EXIT(1, 1);
+	return 1;
+}
+
+
+
+
 
 /*----------------------------------------------------------------
 * acx100_delete_dma_region
@@ -1551,10 +1757,12 @@ int acx100_init_memory_pools(wlandevice_t * wlandev, memmap_t * mmt)
 
 	/* alert the device to our decision */
 	if (!acx100_configure(wlandev, &MemoryConfigOption, ACX100_RID_MEMORY_CONFIG_OPTIONS)) {
+		acxlog(L_DEBUG,"%s: configure memory config options failed!", __func__);
 		return 0;
 	}
 	/* and tell the device to kick it into gear */
 	if (!acx100_issue_cmd(wlandev, ACX100_CMD_INIT_MEMORY, 0, 0, 5000)) {
+		acxlog(L_DEBUG,"%s: init memory failed!", __func__);
 		return 0;
 	}
 	FN_EXIT(0, 0);
@@ -1601,7 +1809,7 @@ int acx100_init_memory_pools(wlandevice_t * wlandev, memmap_t * mmt)
 		acxlog(L_BINSTD, "Ctl: MemoryBlockSizeWrite failed\n");
 		FN_EXIT(1, 0);
 		return 0;
-	}
+	} 
 
 	/* We figure out how many total blocks we can create, using
 	   the block size we chose, and the beginning and ending

@@ -112,14 +112,14 @@ MODULE_LICENSE("Dual MPL/GPL");
 /*================================================================*/
 /* Local Constants */
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
-#define PCI_ACX100_REGION1		0x01;
+#define PCI_ACX100_REGION1		0x01
 #define PCI_ACX100_REGION1_SIZE		0x1000	/* Memory size - 4K bytes */
-#define PCI_ACX100_REGION2		0x02;
+#define PCI_ACX100_REGION2		0x02
 #define PCI_ACX100_REGION2_SIZE   	0x10000 /* Memory size - 64K bytes */
 
-#define PCI_ACX111_REGION1		0x00;
+#define PCI_ACX111_REGION1		0x00
 #define PCI_ACX111_REGION1_SIZE		0x2000	/* Memory size - 8K bytes */
-#define PCI_ACX111_REGION2		0x01;
+#define PCI_ACX111_REGION2		0x01
 #define PCI_ACX111_REGION2_SIZE   	0x20000 /* Memory size - 128K bytes */
 
 /* Texas Instruments Vendor ID */
@@ -356,7 +356,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 			form_str = "standard?";
 			break;
 		case 0x01:
-			form_str = "D-Link DWL-520+/650+/Planet WL-8305?";
+			form_str = "D-Link DWL-520+/650+/G650+/Planet WL-8305?";
 			break;
 		default:
 			form_str = "UNKNOWN, please report!";
@@ -369,7 +369,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 }
 
 /*----------------------------------------------------------------
-* acx100_resolve_chip_type
+* acx100_setup_chip_type_properties
 *
 * Returns the active chiptype.
 *
@@ -384,7 +384,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 * STATUS: NOT REALLY FINISHED YET.
 *
 ----------------------------------------------------------------*/
-unsigned int acx100_resolve_chip_type(unsigned short device) {
+unsigned int acx100_setup_chip_type_properties(unsigned short device) {
 	/* TODO improve this check */
 
 	if(device == PCI_DEVICE_ID_TI_ACX111) {
@@ -480,7 +480,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 
 	/* The two chiptypes have different pci memory regions */
-	chip_type = acx100_resolve_chip_type(pdev->device);
+	chip_type = acx100_setup_chip_type_properties(pdev->device);
 	if(chip_type == CHIPTYPE_ACX100) {
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region1_size  = PCI_ACX100_REGION1_SIZE;
@@ -488,7 +488,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		mem_region2 = PCI_ACX100_REGION2;
 		mem_region2_size  = PCI_ACX100_REGION2_SIZE;
 	} else if(chip_type == CHIPTYPE_ACX111) {
-		acxlog(L_BINSTD, "%s: acx111 support is highly experimental!\n", __func__);
+		acxlog(L_BINSTD, "%s: WARNING: ACX111 support is highly experimental!\n", __func__);
 
 		mem_region1 = PCI_ACX111_REGION1;
 		mem_region1_size  = PCI_ACX111_REGION1_SIZE;
@@ -496,7 +496,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		mem_region2 = PCI_ACX111_REGION2;
 		mem_region2_size  = PCI_ACX111_REGION2_SIZE;
 	} else {
-		acxlog(L_BINSTD, "%s: bad chip ??\n", __func__);
+		acxlog(L_BINSTD, "%s: unknown or bad chip??\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -547,7 +547,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	       mem2, mem_region2_size,
 	       WIRELESS_EXT);
 
-	acxlog(L_INIT, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
+	acxlog(L_DEBUG, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
 	if ((wlandev = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: Memory allocation failure\n",
@@ -563,11 +563,13 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	if(chip_type == CHIPTYPE_ACX100) {
 		acxlog(L_BINSTD, "%s: using acx100 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		wlandev->io = acx100_get_io_register_array();
+		wlandev->chip_name = "ACX100";
 	} else if(chip_type == CHIPTYPE_ACX111) {
 		acxlog(L_BINSTD, "%s: using acx111 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		wlandev->io = acx111_get_io_register_array();
+		wlandev->chip_name = "ACX111";
 	} else {
-		acxlog(L_BINSTD, "%s: bad chip ??\n", __func__);
+		acxlog(L_BINSTD, "%s: unknown or bad chip??\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -592,22 +594,17 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
-	if(chip_type == CHIPTYPE_ACX111) {
-		/* TODO read later by interroage cmd */
-		for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-			buffer[i] = acx100_read_reg8(wlandev, 0x390 + i);
-		}
-	} else { /* use direct eeprom access */
-		for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-			if (!(acx100_read_eeprom_offset(wlandev,
-						 ACX100_EEPROM_ID_OFFSET + i,
-						 &buffer[i])))
-			{
-				acxlog(L_STD, "huh, reading EEPROM failed!?\n");
-				break;
-			}
+	/* use direct eeprom access */
+	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
+		if (!(acx100_read_eeprom_offset(wlandev,
+					 ACX100_EEPROM_ID_OFFSET + i,
+					 &buffer[i])))
+		{
+			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
+			break;
 		}
 	}
+	
 	for (i = 0; i < sizeof(device_ids) / sizeof(struct device_id); i++)
 	{
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE))
@@ -691,8 +688,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* ok, basic setup is finished, now start initialising the card */
 
-	/* TODO this isn't working with acx111 */
-	hardware_info = acx100_read_reg16(wlandev, 0x2ac);
+	hardware_info = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_EEPROM_INFORMATION]);
 	wlandev->form_factor = hardware_info & 0xff;
 	wlandev->radio_type = hardware_info >> 8 & 0xff;
 //	wlandev->eeprom_version = hardware_info >> 16;
@@ -732,6 +728,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
         wlandev->proc_entry = create_proc_read_entry("driver/acx100", 0, 0,
 						     acx100_read_proc, wlandev);
 
+        wlandev->proc_entry = create_proc_read_entry("driver/acx100_diag", 0, 0,
+						     acx100_read_proc_diag, wlandev);
 	result = 0;
 	goto done;
 
@@ -801,6 +799,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	netdev = (struct net_device *) pci_get_drvdata(pdev);
 	hw = (struct wlandevice *) netdev->priv;
 
+        remove_proc_entry("driver/acx100_diag", NULL);
         remove_proc_entry("driver/acx100", NULL);
 
 	/* unregister the device to not let the kernel
@@ -864,6 +863,11 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	acxlog(L_STD, "hw_unavailable++\n");
 	hw->hw_unavailable++;
 
+	/* stop our ecpu */
+	if(hw->chip_type == CHIPTYPE_ACX111) {
+		acx100_reset_mac(hw);
+	}
+
 	acx100_delete_dma_region(hw);
 
 	if (netdev)
@@ -876,11 +880,22 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 
 	/* finally, clean up PCI bus state */
 
-	release_mem_region(pci_resource_start(pdev, 1),
-			   pci_resource_len(pdev, 1));
+	if(hw->chip_type == CHIPTYPE_ACX100) {
 
-	release_mem_region(pci_resource_start(pdev, 2),
-			   pci_resource_len(pdev, 2));
+		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION1),
+				   pci_resource_len(pdev, PCI_ACX100_REGION1));
+
+		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION2),
+				   pci_resource_len(pdev, PCI_ACX100_REGION2));
+	}
+	if(hw->chip_type == CHIPTYPE_ACX111) {
+
+		release_mem_region(pci_resource_start(pdev, PCI_ACX111_REGION1),
+				   pci_resource_len(pdev, PCI_ACX111_REGION1));
+
+		release_mem_region(pci_resource_start(pdev, PCI_ACX111_REGION2),
+				   pci_resource_len(pdev, PCI_ACX111_REGION2));
+	}
 
 	/* put device into ACPI D3 mode (shutdown) */
 	pci_set_power_state(pdev, 3);
@@ -909,7 +924,7 @@ static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 				netif_device_detach(ndev);
 			
 			/* Cancel our association */
-			if (transmit_disassoc(&client, wlandev) == 1) {
+			if (acx100_transmit_disassoc(&client, wlandev) == 1) {
 				result = -EINVAL;
 			}
 			/* better wait for some time to make sure Tx is
@@ -1413,7 +1428,7 @@ static void acx100_set_rx_mode(netdevice_t * netdev)
 void acx100_handle_info_irq(wlandevice_t *wlandev)
 {
 	acx100_get_info_state(wlandev);
-	acxlog(L_STD | L_IRQ, "Info IRQ: type 0x%04x, status 0x%04x\n", wlandev->info_type, wlandev->info_status);
+	acxlog(L_STD | L_IRQ, "Got Info IRQ: type 0x%04x, status 0x%04x\n", wlandev->info_type, wlandev->info_status);
 }
 
 /*----------------------------------------------------------------
@@ -1504,7 +1519,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		} else if (wlandev->status == ISTATUS_1_SCANNING) {
 
 			/* FIXME: this shouldn't be done in IRQ context !!! */
-			d11CompleteScan(wlandev);
+			acx100_complete_dot11_scan(wlandev);
 		}
 		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
 	}
@@ -1533,7 +1548,6 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x200);
 	}
 	if (irqtype & 0x400) {
-		printk("Got Info IRQ\n");
 		acx100_handle_info_irq(wlandev);
 		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x400);
 	}

@@ -311,8 +311,11 @@ typedef enum {
 
 	IO_ACX_CMD_MAILBOX_OFFS,
 	IO_ACX_INFO_MAILBOX_OFFS,
+	IO_ACX_EEPROM_INFORMATION,
 
 	IO_ACX_ENABLE,
+
+	IO_ACX_GPIO_OE,
 
 	END_OF_IO_ENUM /* LEAVE THIS AT THE END, USED TO FIGURE OUT THE LENGTH */
 
@@ -2169,13 +2172,13 @@ typedef struct acx100_pdrec {
 /*--- Firmware statistics ----------------------------------------------------*/
 typedef struct fw_stats {
 	UINT val0x0;		/* hdr; */
-	UINT val0x4;
 	UINT tx_desc_of;
 	UINT rx_oom;
 	UINT rx_hdr_of;
 	UINT rx_hdr_use_next;
 	UINT rx_dropped_frame;
 	UINT rx_frame_ptr_err;
+	UINT rx_xfr_hint_trig;
 
 	UINT rx_dma_req;	/* val0x1c */
 	UINT rx_dma_err;	/* val0x20 */
@@ -2394,6 +2397,7 @@ typedef struct wlandevice {
 	UINT iobase;		/* 18 */
 	UINT iobase2;		/* 1c */
 	UINT chip_type;
+	char *chip_name;
 	UINT *io;
 
 	/*** Device status ***/

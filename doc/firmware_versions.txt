@@ -1,0 +1,14 @@
+1.5.0 (original Linux firmware):
+  Combined firmware (includes support for some radio types).
+  Nothing known so far.
+
+1.9.3.e:
+  Works relatively ok, but some Tx error 0x20 issues suspected,
+  and periodic transfer stalls sometimes (or is it a driver issue?).
+  Also, the connection sometimes hangs completely (frequently complained about).
+
+1.9.4.7:
+  Nothing known so far.
+
+1.9.8.b (from dwl520+_drivers_307.zip):
+  Perfect transfer (PheeNet WL-0022), everything ok so far.

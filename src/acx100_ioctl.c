@@ -105,9 +105,7 @@
 #define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0c
 #define ACX100_IOCTL_SET_MAC		ACX100_IOCTL + 0x0d
 #define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_LIST_NET_STATUS	ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_FW			ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0f
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -181,14 +179,6 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
 	name : "monitor" },
-{ cmd : ACX100_IOCTL_LIST_NET_STATUS,
-	set_args : 0,
-	get_args : 0,
-	name : "list_net_status" },
-{ cmd : ACX100_IOCTL_FW,
-	set_args : 0,
-	get_args : 0,
-	name : "fw" },
 { cmd : ACX100_IOCTL_TEST,
 	set_args : 0,
 	get_args : 0,
@@ -2090,118 +2080,6 @@ end:
 	return result;
 }
 
-static inline int acx100_ioctl_list_net_status(struct net_device *dev,
-					    struct iw_request_info *info,
-					    struct iw_param *vwrq, char *extra)
-{
-	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
-	int result = -EINVAL;
-	UINT8 *p;
-
-	FN_ENTER;
-
-	printk("wlandev:\n");
-	printk("ifup: %d\n", wlandev->ifup);
-	printk("mode: %d, macmode: %d, status: %d, channel: %d, reg_dom_id: 0x%02x, reg_dom_chanmask: 0x%04x, bitrateval: %d, bitrate_auto: %d, bss_table_count: %d\n",
-		wlandev->mode, wlandev->macmode, wlandev->status,
-		wlandev->channel, wlandev->reg_dom_id,
-		wlandev->reg_dom_chanmask, wlandev->bitrateval,
-		wlandev->bitrate_auto, wlandev->bss_table_count);
-	printk("ESSID: %s, essid_active: %d, essid_len: %d, essid_for_assoc: %s, nick: %s\n",
-		wlandev->essid, wlandev->essid_active, wlandev->essid_len,
-		wlandev->essid_for_assoc, wlandev->nick);
-	printk("monitor: %d, monitor_setting: %d\n",
-		wlandev->monitor, wlandev->monitor_setting);
-	p = wlandev->dev_addr;
-	printk("dev_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-		p[0], p[1], p[2], p[3], p[4], p[5]);
-	p = wlandev->address;
-	printk("address:  %02x:%02x:%02x:%02x:%02x:%02x\n",
-		p[0], p[1], p[2], p[3], p[4], p[5]);
-	p = wlandev->bssid;
-	printk("bssid:    %02x:%02x:%02x:%02x:%02x:%02x\n",
-		p[0], p[1], p[2], p[3], p[4], p[5]);
-	p = wlandev->ap;
-	printk("ap:       %02x:%02x:%02x:%02x:%02x:%02x\n",
-		p[0], p[1], p[2], p[3], p[4], p[5]);
-
-	result = 0;
-
-	FN_EXIT(1, result);
-	return result;
-}
-
-/*------------------------------------------------------------------------------
- * acx100_ioctl_get_fw_stats
- * Dump firmware statistics
- *
- * Arguments:
- *
- * Returns:
- *
- * Side effects:
- *
- * Call context:
- *
- * STATUS: NEW
- *
- * Comment:
- *
- *----------------------------------------------------------------------------*/
-static inline int acx100_ioctl_get_fw_stats(struct net_device *dev,
-					    struct iw_request_info *info,
-					    struct iw_param *vwrq, char *extra)
-{
-	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
-	fw_stats_t *fw_stats;
-	unsigned long flags;
-	int err;
-	int result = -EINVAL;
-
-	FN_ENTER;
-
-	if ((fw_stats = kmalloc(sizeof(fw_stats_t), GFP_KERNEL)) == NULL) {
-		result = -ENOMEM;
-		goto end;
-	}
-	
-	if ((err = acx100_lock(wlandev, &flags))) {
-		kfree(fw_stats);
-		result = err;
-		goto end;
-	}
-
-	acx100_interrogate(wlandev, fw_stats, ACX100_RID_FIRMWARE_STATISTICS);
-
-	acx100_unlock(wlandev, &flags);
-
-	printk("tx_desc_of %d, rx_oom %d, rx_hdr_of %d, rx_hdr_use_next %d\n",
-		fw_stats->tx_desc_of, fw_stats->rx_oom, fw_stats->rx_hdr_of, fw_stats->rx_hdr_use_next);
-	printk("rx_dropped_frame %d, rx_frame_ptr_err %d, rx_dma_req %d\n",
-		fw_stats->rx_dropped_frame, fw_stats->rx_frame_ptr_err, fw_stats->rx_dma_req);
-	printk("rx_dma_err %d, tx_dma_req %d, tx_dma_err %d, cmd_cplt %d, fiq %d\n",
-		fw_stats->rx_dma_err, fw_stats->tx_dma_req, fw_stats->tx_dma_err, fw_stats->cmd_cplt, fw_stats->fiq);
-	printk("rx_hdrs %d, rx_cmplt %d, rx_mem_of %d, rx_rdys %d, irqs %d\n",
-		fw_stats->rx_hdrs, fw_stats->rx_cmplt, fw_stats->rx_mem_of, fw_stats->rx_rdys, fw_stats->irqs);
-	printk("acx_trans_procs %d, decrypt_done %d, dma_0_done %d, dma_1_done %d\n",
-		fw_stats->acx_trans_procs, fw_stats->decrypt_done, fw_stats->dma_0_done, fw_stats->dma_1_done);
-	printk("tx_exch_complet %d, commands %d, acx_rx_procs %d\n",
-		fw_stats->tx_exch_complet, fw_stats->commands, fw_stats->acx_rx_procs);
-	printk("hw_pm_mode_changes %d, host_acks %d, pci_pm %d, acm_wakeups %d\n",
-		fw_stats->hw_pm_mode_changes, fw_stats->host_acks, fw_stats->pci_pm, fw_stats->acm_wakeups);
-	printk("wep_key_count %d, wep_default_key_count %d, dot11_def_key_mib %d\n",
-		fw_stats->wep_key_count, fw_stats->wep_default_key_count, fw_stats->dot11_def_key_mib);
-	printk("wep_key_not_found %d, wep_decrypt_fail %d\n",
-		fw_stats->wep_key_not_found, fw_stats->wep_decrypt_fail);
-
-	kfree(fw_stats);
-	result = 0;
-
-end:
-	FN_EXIT(1, result);
-	return result;
-}
-
 /*----------------------------------------------------------------
 * acx100_ioctl_unknown11
 *
@@ -2231,7 +2109,7 @@ static inline int acx100_ioctl_unknown11(struct net_device *dev, struct iw_reque
 		result = err;
 		goto end;
 	}
-	transmit_disassoc(&client, wlandev);
+	acx100_transmit_disassoc(&client, wlandev);
 	acx100_unlock(wlandev, &flags);
 	result = 0;
 
@@ -2451,8 +2329,6 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_led_power,
 	(iw_handler) acx100_ioctl_set_mac_address,
 	(iw_handler) acx100_ioctl_wlansniff,
-	(iw_handler) acx100_ioctl_list_net_status,
-	(iw_handler) acx100_ioctl_get_fw_stats,
 	(iw_handler) acx100_ioctl_unknown11
 };
 
@@ -2769,13 +2645,6 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		acx100_ioctl_set_tx_antenna(dev, NULL, NULL, iwr->u.name);
 		break;
 		
-	case ACX100_IOCTL_LIST_NET_STATUS:
-		acx100_ioctl_list_net_status(dev, NULL, NULL, NULL);
-		
-	case ACX100_IOCTL_FW:
-		acx100_ioctl_get_fw_stats(dev, NULL, NULL, NULL);
-		break;
-		
 	case ACX100_IOCTL_TEST:
 		acx100_ioctl_unknown11(dev, NULL, NULL, NULL);
 		break;
@@ -2807,7 +2676,7 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 			result = -EFAULT;
 		}
 
-		acx_client_sta_list_init();
+		acx100_client_sta_list_init();
 
 		acx100_unlock(wlandev, &flags);
 	}
