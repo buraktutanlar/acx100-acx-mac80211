@@ -2,7 +2,7 @@
 export ACX_DEBUG=1
 
 # assume 32bit I/O width (16bit is also compatible with Compact Flash)
-export ACX_IO_WIDTH=16 # go back to 16bit to cure some rare firmware upload failure cases
+export ACX_IO_WIDTH=32
 
 .PHONY: all extract_firmware fetch_firmware driver install uninstall clean
 

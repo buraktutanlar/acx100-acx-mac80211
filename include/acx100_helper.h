@@ -582,7 +582,7 @@ int acx100_load_radio(wlandevice_t *priv);
 void acx100_read_configoption(wlandevice_t *priv);
 UINT16 acx_proc_register_entries(struct net_device *dev);
 UINT16 acx_proc_unregister_entries(struct net_device *dev);
-void acx_update_ratevector(wlandevice_t *priv);
+void acx_update_dot11_ratevector(wlandevice_t *priv);
 void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 
 

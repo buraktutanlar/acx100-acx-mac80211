@@ -33,7 +33,7 @@ reports). One might attribute this to the higher sales numbers of the
 DWL-650+, but I'm not quite sure...
 
 
-Please NEVER consider using the NDIS driver loader cludge instead of our driver.
+Please don't use the NDIS driver loader cludge instead of our driver.
 For an incredible number of reasons against it, please see
 http://acx100.sourceforge.net/ndis_cludge.html
 If for some or another reason you're unhappy with the performance of our
@@ -98,7 +98,7 @@ Again, the cards mentioned in the listing above will NOT work with this driver
 supporting your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
-=== STATUS AS OF 040523 ===
+=== STATUS AS OF 040826 ===
 
 Status Matrix:
 
@@ -115,7 +115,7 @@ Sensitivity	* (hardware)		- (no go since USB?)	- (NIY, problems)
 
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
-We're still not totally sure about the status of WEP support.
+We're still not totally sure about the status of WEP support:
 ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
 ACX111: nothing yet.
@@ -124,7 +124,8 @@ Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
 
 Furthermore, associating with some access points might still be problematic
-due to strict 802.11 compliance checks in their firmware.
+due to strict 802.11 compliance checks in their firmware (which we fail
+to meet, of course).
 
 Master mode support (aka HostAP) has not really been implemented yet,
 but at least it can be configured now. It won't be supported for quite a while
@@ -506,6 +507,11 @@ or CPU architecture or (non-)register calling convention or kernel version
 -- see syslog for evidence!!)
 and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
+
+If your firmware upload fails due to upload corruption (see log!),
+then this could indicate I/O timing issues. Set ACX_IO_WIDTH=16
+in the Makefile, then recompile, to use 16bit I/O access instead
+of slightly problematic but faster 32bit access.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have

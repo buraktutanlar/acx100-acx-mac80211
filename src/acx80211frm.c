@@ -116,7 +116,7 @@ void p802addr_to_str(char *buf, UINT8 *addr)
 	char c;
 
 	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
-	for (addrindex = 0; addrindex < 6; addrindex++) {
+	for (addrindex = 0; addrindex < ETH_ALEN; addrindex++) {
 		c = '0' + (((unsigned)addr[addrindex]) >> 4);
 		if(c>'9') c+='a'-'9'-1;
 		*buf++ = c;

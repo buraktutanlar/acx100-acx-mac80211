@@ -1479,6 +1479,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	if (OK == acx100_is_mac_address_equal(hdr->a4.a3, priv->dev_addr))
 	{
 		acxlog(L_ASSOC, "huh, scan found our own MAC!?\n");
+		FN_EXIT(0, NOT_OK);
 		return; /* just skip this one silently */
 	}
 			
@@ -1539,18 +1540,6 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 
 	a = newbss->bssid;
 
-	acxlog(L_DEBUG, "Supported Rates:\n");
-	/* find max. transfer rate */
-	for (i=0; i < rate_count; i++)
-	{
-		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
-			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
-			(int)((pSuppRates[2+i] & ~0x80) / 2),
-			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
-		if ((pSuppRates[2+i] & ~0x80) > max_rate)
-			max_rate = pSuppRates[2+i] & ~0x80;
-	}
-
 	acxlog(L_STD | L_ASSOC,
 	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, "
 	       "BSSID %02X:%02X:%02X:%02X:%02X:%02X, %s/%d%sMbps, "
@@ -1562,6 +1551,18 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
                (newbss->caps & IEEE802_11_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
 	       (int)(max_rate / 2), (max_rate & 1) ? ".5" : "",
 	       newbss->caps, newbss->sir, newbss->snr);
+
+	acxlog(L_DEBUG, "Peer - Supported Rates:\n");
+	/* find max. transfer rate */
+	for (i=0; i < rate_count; i++)
+	{
+		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
+			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
+			(int)((pSuppRates[2+i] & ~0x80) / 2),
+			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
+		if ((pSuppRates[2+i] & ~0x80) > max_rate)
+			max_rate = pSuppRates[2+i] & ~0x80;
+	}
 
 	/* found one station --> increment counter */
 	priv->bss_table_count++;

@@ -190,9 +190,41 @@ while the PLCP payload (the MAC frame) is modulated using OFDM.
 Basically, you must use CCK-OFDM if you have mixed 11b/11g environment,
 or else (pure OFDM) 11b equipment may not realize that AP
 is sending a packet and start sending its own one.
+Sadly, looks like acx111 does not support CCK-OFDM, only pure OFDM.
 
 Re PBCC: avoid using it. It makes sense only if you have
 TI "11b+" hardware. You _must_ use PBCC in order to reach 22Mbps on it.
+
+Preambles:
+
+Long preamble (at 1Mbit rate, takes 144 us):
+    16 bytes	ones
+     2 bytes	0xF3A0 (lsb sent first)
+PLCP header follows (at 1Mbit also):
+     1 byte	Signal (speed, in 0.1Mbit units)
+     1 byte	Service
+	0,1,4:	reserved
+	2:	1=locked clock
+	3:	1=PBCC
+	5:	Length Extension (PBCC 22,33Mbit (11g only))  <-
+	6:	Length Extension (PBCC 22,33Mbit (11g only))  <- BLACK MAGIC HERE
+	7:	Length Extension                              <-
+     2 bytes	Length (time needed to tx this frame)
+     2 bytes	CRC
+PSDU follows (up to 2346 bytes at selected rate)
+
+While Signal value alone is not enough to determine rate and modulation,
+Signal+Service is always sufficient.
+
+Short preamble (at 1Mbit rate, takes 72 us):
+     7 bytes	zeroes
+     2 bytes	0x05CF (lsb sent first)
+PLCP header follows *at 2Mbit/s*. Format is the same as in long preamble.
+PSDU follows (up to 2346 bytes at selected rate)
+
+OFDM preamble is completely different, uses OFDM
+modulation from the start and thus easily identifiable.
+Not shown here.
 */
 
 typedef struct txdescriptor {

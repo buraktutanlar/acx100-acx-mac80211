@@ -172,12 +172,12 @@ char *firmware_dir;
 
 extern const struct iw_handler_def acx100_ioctl_handler_def;
 
-const char *name_acx100 = "ACX100";
-const char *name_tnetw1100a = "TNETW1100A";
-const char *name_tnetw1100b = "TNETW1100B";
+const char name_acx100[] = "ACX100";
+const char name_tnetw1100a[] = "TNETW1100A";
+const char name_tnetw1100b[] = "TNETW1100B";
 
-const char *name_acx111 = "ACX111";
-const char *name_tnetw1130 = "TNETW1130";
+const char name_acx111[] = "ACX111";
+const char name_tnetw1130[] = "TNETW1130";
 
  
 /*@-fullinitblock@*/
@@ -875,9 +875,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* ...and register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
-	if (OK != (err = register_netdev(dev))) {
+	err = register_netdev(dev);
+	if (OK != err) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: Register net device of %s failed: %d\n\n",
+		       "%s: %s: Register net device of %s failed: %d\n",
 		       __func__, dev_info, dev->name, err);
 		result = -EIO;
 		goto fail;
@@ -916,6 +917,9 @@ static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *de
 	if (dev != NULL)
 	{
 		acxlog(L_INIT, "Removing device %s!\n", dev->name);
+		/* BUG: acx100_probe_pci() -> acx100_reset_dev(dev)
+		-> fw load fails -> we come here with dev->name[0] = '\0'
+		and with non-registered dev!! */
 		unregister_netdev(dev);
 
 		/* find our PCI device in the global acx list and remove it */
@@ -2074,7 +2078,7 @@ static int __init acx100_init_module(void)
 #if (ACX_IO_WIDTH==32)
 	acxlog(L_STD, "acx100: Compiled to use 32bit I/O access (I/O timing issues might occur, such as firmware upload failure!)\n");
 #else
-	acxlog(L_STD, "acx100: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use 32bit mode.\n");
+	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode.\n");
 #endif
 
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);

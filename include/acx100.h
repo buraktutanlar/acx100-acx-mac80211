@@ -384,6 +384,7 @@ typedef enum {
 #define ACX111_IE_BSS_POWER_SAVE		0x0012
 #define ACX1xx_IE_FIRMWARE_STATISTICS		0x0013
 #define ACX1xx_IE_FEATURE_CONFIG		0x0015
+#define ACX111_IE_KEY_CHOOSE			0x0016 /* for rekeying */
 #define ACX1xx_IE_DOT11_STATION_ID		0x1001
 #define ACX100_IE_DOT11_UNKNOWN_1002		0x1002	/* mapped to cfgInvalid in FW150 */
 #define ACX111_IE_DOT11_FRAG_THRESH		0x1002	/* mapped to cfgInvalid in FW150 */
@@ -734,23 +735,6 @@ typedef struct acx100_InfFrame {
 #define ACX100_CTL_HOSTDONE   0x20	/* host has finished processing */
 #define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
 #define ACX100_CTL_OWN        0x80	/* host owns the desc */
-
-/* Values for acx100 tx descr rate field */
-#define ACX_TXRATE_1		10
-#define ACX_TXRATE_2		20
-#define ACX_TXRATE_5_5		55
-#define ACX_TXRATE_5_5PBCC	(55 | 0x80)
-#define ACX_TXRATE_11		110
-#define ACX_TXRATE_11PBCC	(110 | 0x80)
-#define ACX_TXRATE_22PBCC	220
-#define ACX_TXRATE_6_G		0x0D
-#define ACX_TXRATE_9_G		0x0F
-#define ACX_TXRATE_12_G		0x05
-#define ACX_TXRATE_18_G		0x07
-#define ACX_TXRATE_24_G		0x09
-#define ACX_TXRATE_36_G		0x0B
-#define ACX_TXRATE_48_G		0x01
-#define ACX_TXRATE_54_G		0x03
 
 /* Used in beacon frames and the like */
 #define DOT11RATEBYTE_1		(1*2)
@@ -1209,7 +1193,7 @@ struct txrate_ctrl {
 	UINT16  cfg;		      /* Tx rate from iwconfig */
 	UINT16  cur;		      /* the Tx rate we currently use */
 	UINT8   pbcc511;		  /* Use PBCC at 5 and 11Mbit? (else CCK) */
-	UINT8   flt;		      /* Auto adjust Tx rates? */
+	UINT8   do_auto;		      /* Auto adjust Tx rates? */
 	UINT8   fallback_threshold;     /* 0-100 */
 	UINT8   fallback_count;
 	UINT8   stepup_threshold;	/* 0-100 */

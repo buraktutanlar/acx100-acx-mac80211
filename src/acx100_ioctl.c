@@ -80,41 +80,40 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
+/* someone broke SET/GET convention: SETs must be even, GETs odd */
 #define ACX100_IOCTL			SIOCIWFIRSTPRIV
 #define ACX100_IOCTL_DEBUG		ACX100_IOCTL + 0x00
 #define ACX100_IOCTL_LIST_DOM		ACX100_IOCTL + 0x01
 #define ACX100_IOCTL_SET_DOM		ACX100_IOCTL + 0x02
 #define ACX100_IOCTL_GET_DOM		ACX100_IOCTL + 0x03
 #define ACX100_IOCTL_SET_SCAN_MODE	ACX100_IOCTL + 0x04
-#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x05
-#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x06
-#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x07
-#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x08
-#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x09
-#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x11
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x12
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x13
-#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x14
-#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x15
-#define ACX111_IOCTL_INFO		ACX100_IOCTL + 0x16
-#define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x17
-#define ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS	ACX100_IOCTL + 0x18
-#define ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS	ACX100_IOCTL + 0x19
-
-
+#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x06
+#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x08
+#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x09
+#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x0a
+#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x0b
+#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x12
+#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x14
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x16
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x18
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x19
+#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x1a
+#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x1b
+#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x1c
+#define ACX111_IOCTL_INFO		ACX100_IOCTL + 0x1d
+#define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x1e
+#define ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS	ACX100_IOCTL + 0x1f
+#define ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS	ACX100_IOCTL + 0x20
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
  * the long run this should be integrated into ieee802_11.h or wireless.h or
  * whatever IEEE802.11x framework evolves */
-static const long acx100_channel_freq[] = {
+static const UINT16 acx100_channel_freq[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484,
 };
@@ -939,7 +938,7 @@ static void
 acx_print_txrate(const char *msg, struct txrate_ctrl *txrate)
 {
 	acxlog(L_IOCTL, "%s: cfg %04x cur %04x auto %d pbcc511 %d\n",
-		msg, txrate->cfg, txrate->cur, txrate->flt, txrate->pbcc511
+		msg, txrate->cfg, txrate->cur, txrate->do_auto, txrate->pbcc511
 	);
 }
 
@@ -1013,16 +1012,26 @@ acx_ioctl_set_rate(struct net_device *dev,
 			result = -ENOTSUPP; /* rate is not supported by acx100 */
 			goto end;
 		}
-		/* auto rate: do 001000 => 001111 conversion, then mask again */
-		if(vwrq->fixed==0) {
-			txrate_cfg = (txrate_cfg<<1)-1;
-			txrate_cfg &= RATE111_ACX100_COMPAT;
-		}
+
+		/* always do 001000 => 001111 conversion, then mask again.
+		 *
+		 * We need to have all lower rates available, even
+		 * without auto rate, since these are being used
+		 * to calculate the 802.11 basic/operational rate vector
+		 * and a normal iwconfig rate should ALWAYS have all
+		 * lower rates set as basic rates (we are not able to
+		 * configure lower rates individually here!).
+		 * As a consequence of setting all lower bits here,
+		 * the acx111 rate mask actually used for Tx
+		 * needs to be limited to the highest bit again on Tx
+		 * when not in auto mode.
+		 * or we should instead perhaps add another variable
+		 * for that to avoid the calculation on Tx... */
+		txrate_cfg = (txrate_cfg<<1)-1;
+		txrate_cfg &= RATE111_ACX100_COMPAT;
 	} else {
-		/* auto rate: do 001000 => 001111 conversion */
-		if(vwrq->fixed==0) {
-			txrate_cfg = (txrate_cfg<<1)-1;
-		}
+		/* always do 001000 => 001111 conversion */
+		txrate_cfg = (txrate_cfg<<1)-1;
 	}
 
 	result = acx100_lock(priv, &flags);
@@ -1032,13 +1041,13 @@ acx_ioctl_set_rate(struct net_device *dev,
 	priv->defpeer.txrate.cfg = txrate_cfg;
 	priv->defpeer.txrate.cur = txrate_cfg;
 	priv->defpeer.txrate.pbcc511 = 0;
-	priv->defpeer.txrate.flt = (vwrq->fixed == 0);
-	if (priv->defpeer.txrate.flt)
+	priv->defpeer.txrate.do_auto = (vwrq->fixed == 0);
+	if (priv->defpeer.txrate.do_auto)
 	{
 		if (RATE111_1 == txrate_cfg) { /* auto rate with 1Mbps max. useless */
-			priv->defpeer.txrate.flt = 0;
+			priv->defpeer.txrate.do_auto = 0;
 		} else {
-			/* needed? curr = RATE111_1 + RATE111_2; */ /* 2Mbps, play it safe at the beginning */
+			/* needed? curr = RATE111_1 | RATE111_2; */ /* 2Mbps, play it safe at the beginning */
 			priv->defpeer.txrate.fallback_count = 0;
 			priv->defpeer.txrate.stepup_count = 0;
 		}
@@ -1046,7 +1055,7 @@ acx_ioctl_set_rate(struct net_device *dev,
 	priv->defpeer.txbase = priv->defpeer.txrate;
  
 	priv->ap_peer = priv->defpeer;
-	acx_update_ratevector(priv);
+	acx_update_dot11_ratevector(priv);
 	 if(priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
 		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
 	
@@ -1098,7 +1107,7 @@ acx_ioctl_get_rate(struct net_device *dev,
 	}
 
 	vwrq->value = acx111_rate_tbl[n];
-	vwrq->fixed = !priv->defpeer.txrate.flt;
+	vwrq->fixed = !priv->defpeer.txrate.do_auto;
 	vwrq->disabled = 0;
 	return OK;
 }
@@ -2082,6 +2091,7 @@ static inline int acx100_ioctl_set_antenna(struct net_device *dev, struct iw_req
 	(void)printk("0x40 ant. 2\n");
 	(void)printk("0x80 full diversity\n");
 	(void)printk("0xc0 partial diversity\n");
+	(void)printk("0x0f dwell time mask (in units of us)\n");
 	(void)printk("Tx antenna selection:\n");
 	(void)printk("0x00 ant. 2\n"); /* yep, those ARE reversed! */
 	(void)printk("0x20 ant. 1\n");
@@ -2416,7 +2426,7 @@ end:
 }
 
 /*----------------------------------------------------------------
-* acx100_ioctl_acx111_info
+* acx111_ioctl_info
 *
 *
 * Arguments:
@@ -2814,9 +2824,9 @@ fill_txrate(struct txrate_ctrl *txrate, u32 rate)
 	txrate->cur = rate;
  
 	while( !(rate & 0x8000) ) rate<<=1;
-	txrate->flt = (rate!=0x8000); /* more than one bit is set? */
+	txrate->do_auto = (rate!=0x8000); /* more than one bit is set? */
 	/* needed?
-	if(txrate->flt)
+	if(txrate->do_auto)
 		txrate->cur = RATE111_1 + RATE111_2; //2Mbps, play it safe at the beginning
 	*/
 }
@@ -2850,7 +2860,7 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 	fill_txrate( &priv->defpeer.txrate, erate);
 
 	priv->ap_peer = priv->defpeer;
-	acx_update_ratevector(priv);
+	acx_update_dot11_ratevector(priv);
 	if(priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
 		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
 
@@ -3156,35 +3166,35 @@ static const iw_handler acx100_ioctl_handler[] =
 static const iw_handler acx100_ioctl_private_handler[] =
 {
 #ifdef ACX_DEBUG
-	(iw_handler) acx100_ioctl_set_debug,			/* SIOCIWFIRSTPRIV */
+[ACX100_IOCTL_DEBUG			- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_debug,
 #else
-	(iw_handler) NULL,
+[ACX100_IOCTL_DEBUG			- ACX100_IOCTL] = (iw_handler) NULL,
 #endif
-	(iw_handler) acx100_ioctl_list_reg_domain,
-	(iw_handler) acx100_ioctl_set_reg_domain,
-	(iw_handler) acx100_ioctl_get_reg_domain,
-	(iw_handler) acx100_ioctl_set_scan_mode,
-	(iw_handler) acx100_ioctl_set_scan_chan_delay,
-	(iw_handler) acx100_ioctl_set_short_preamble,
-	(iw_handler) acx100_ioctl_get_short_preamble,
-	(iw_handler) acx100_ioctl_set_antenna,
-	(iw_handler) acx100_ioctl_get_antenna,
-	(iw_handler) acx100_ioctl_set_rx_antenna,
-	(iw_handler) acx100_ioctl_set_tx_antenna,
-	(iw_handler) acx100_ioctl_set_phy_amp_bias,
-	(iw_handler) acx100_ioctl_get_phy_chan_busy_percentage,
-	(iw_handler) acx100_ioctl_set_ed_threshold,
-	(iw_handler) acx100_ioctl_set_cca,
-	(iw_handler) acx100_ioctl_set_led_power,
-	(iw_handler) acx100_ioctl_wlansniff,
-	(iw_handler) acx100_ioctl_unknown11,
-	(iw_handler) acx100_ioctl_dbg_set_masks,
-	(iw_handler) acx100_ioctl_dbg_get_io,
-	(iw_handler) acx100_ioctl_dbg_set_io,
-	(iw_handler) acx111_ioctl_info,
-	(iw_handler) acx_ioctl_set_rates,
-	(iw_handler) acx111_ioctl_enable_low_power_packets,
-	(iw_handler) acx111_ioctl_enable_ex_low_power_packets,
+[ACX100_IOCTL_LIST_DOM           	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_list_reg_domain,
+[ACX100_IOCTL_SET_DOM            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_reg_domain,
+[ACX100_IOCTL_GET_DOM            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_reg_domain,
+[ACX100_IOCTL_SET_SCAN_MODE      	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_scan_mode,
+[ACX100_IOCTL_SET_SCAN_CHAN_DELAY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_scan_chan_delay,
+[ACX100_IOCTL_SET_PREAMB         	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_short_preamble,
+[ACX100_IOCTL_GET_PREAMB         	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_short_preamble,
+[ACX100_IOCTL_SET_ANT            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_antenna,
+[ACX100_IOCTL_GET_ANT            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_antenna,
+[ACX100_IOCTL_RX_ANT             	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_rx_antenna,
+[ACX100_IOCTL_TX_ANT             	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_tx_antenna,
+[ACX100_IOCTL_SET_PHY_AMP_BIAS   	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_phy_amp_bias,
+[ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_phy_chan_busy_percentage,
+[ACX100_IOCTL_SET_ED             	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_ed_threshold,
+[ACX100_IOCTL_SET_CCA            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_cca,
+[ACX100_IOCTL_SET_PLED           	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_led_power,
+[ACX100_IOCTL_MONITOR            	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_wlansniff,
+[ACX100_IOCTL_TEST               	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_unknown11,
+[ACX100_IOCTL_DBG_SET_MASKS      	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_dbg_set_masks,
+[ACX100_IOCTL_DBG_GET_IO         	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_dbg_get_io,
+[ACX100_IOCTL_DBG_SET_IO         	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_dbg_set_io,
+[ACX111_IOCTL_INFO			- ACX100_IOCTL] = (iw_handler) acx111_ioctl_info,
+[ACX100_IOCTL_SET_RATES          	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_rates,
+[ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS  - ACX100_IOCTL] = (iw_handler) acx111_ioctl_enable_low_power_packets,
+[ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS-ACX100_IOCTL] = (iw_handler) acx111_ioctl_enable_ex_low_power_packets,
 };
 
 const struct iw_handler_def acx100_ioctl_handler_def =
@@ -3575,7 +3585,7 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case ACX111_IOCTL_INFO:
-		acx100_ioctl_acx111_info(dev, NULL, NULL, NULL);
+		acx111_ioctl_info(dev, NULL, NULL, NULL);
 		break;
 
 	case ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS

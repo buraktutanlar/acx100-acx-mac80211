@@ -14,6 +14,7 @@ DEV=wlan0
 ESSID="any" # THIS IS CASE SeNsItIvE!! any == associate to any ESSID
 # Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
+AUTORATE=1
 CHAN=6 # it's useful to try to stick to channels 1, 6 or 11 only, since these don't overlap with other channels
 #SHORTPREAMBLE=1 #set a value of 1 in order to use "Short Preamble" (incompatible with very old WLAN hardware!)
 #TXPOWER=18 # 0..20 (dBm) (18dBm is firmware default) overly large setting might perhaps destroy your radio eventually!
@@ -96,9 +97,11 @@ if test "$?" = "0"; then echo "Module successfully inserted."; else echo "Error 
 
 if test -n "$IWCONF"; then
 
+test "$AUTORATE" = "1" && AUTO=auto || AUTO=
+
 if test -n "$RATE"; then
-  echo Setting rate to $RATE.
-  $IWCONF $DEV rate $RATE
+  echo Setting rate to $RATE $AUTO.
+  $IWCONF $DEV rate $RATE $AUTO
   test "$?" != "0" && echo Failed.
 fi
 if test -n "$CHAN"; then

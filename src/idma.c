@@ -164,15 +164,15 @@ void acx100_free_desc_queues(TIWLAN_DC *pDc)
 
 /* NB: this table maps RATE111 bits to ACX100 tx descr constants */
 static const UINT8 bitpos2rate100[] = {
-	ACX_TXRATE_1		,
-	ACX_TXRATE_2		,
-	ACX_TXRATE_5_5		,
+	RATE100_1		,
+	RATE100_2		,
+	RATE100_5		,
 	0			,
 	0			,
-	ACX_TXRATE_11		,
+	RATE100_11		,
 	0			,
 	0			,
-	ACX_TXRATE_22PBCC	,
+	RATE100_22		,
 };
 
 void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
@@ -233,6 +233,9 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	tx_desc->fixed_size.s.txc = txrate; /* used in tx cleanup routine for auto rate and accounting */
  
 	if (CHIPTYPE_ACX100 == priv->chip_type) {
+		/* FIXME: this expensive calculation part should be stored
+		 * in advance whenever rate config changes! */
+
 		/* set rate */
 		int n = 0;
 		UINT16 t = txrate->cur;
@@ -251,26 +254,27 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		tx_desc->u.r1.rate = n;
  
 		if(peer->shortpre && (txrate->cur != RATE111_1))
-			SET_BIT(tx_desc->Ctl_8, ACX100_CTL_PREAMBLE); /* set Preamble */
-		/* It seems as if the Preamble setting was actually REVERSED:
-		 * bit 0 should most likely actually be ACTIVATED
-		 * for Short Preamble, not the other way around as before!
-		 * This caused many Tx error 0x20 errors with APs
-		 * that don't support Short Preamble, since we were
-		 * thinking we are setting Long Preamble, when in fact
-		 * it was Short Preamble.
-		 * The flag reversal theory has been sort of confirmed
-		 * by throughput measurements:
-		 * ~ 680K/s with flag disabled
-		 * ~ 760K/s with flag enabled
-		 */
+			SET_BIT(tx_desc->Ctl_8, ACX100_CTL_PREAMBLE); /* set Short Preamble */
 
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(tx_desc->Ctl_8, ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG);
 	} else { /* ACX111 */
-		tx_desc->u.r2.rate111 = txrate->cur
+		if (txrate->do_auto)
+			tx_desc->u.r2.rate111 = txrate->cur;
+		else
+		{
+			/* need to limit our currently selected rate set
+			 * to the highest rate */
+			int n = 0;
+			UINT16 t = txrate->cur;
+			while(t>1) { t>>=1; n++; }
+			while(n>0) { t<<=1; n--; }
+			/* now we isolated the highest bit */
+			tx_desc->u.r2.rate111 = t;
+		}
+		tx_desc->u.r2.rate111 |=
 			/* WARNING: untested. I have no PBCC capable AP --vda */
-			| (txrate->pbcc511 ? RATE111_PBCC511 : 0)
+			(txrate->pbcc511 ? RATE111_PBCC511 : 0)
 			/* WARNING: I was never able to make it work with prism54 AP.
 			** It was falling down to 1Mbit where shortpre is not applicable,
 			** and not working at all at "5,11 basic rates only" setting.
@@ -306,16 +310,28 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	acx100usb_tx_data(priv, tx_desc);
 #endif
 	/* log the packet content AFTER sending it,
-	 * in order to not delay sending any further than absolutely needed */
-	acxlog(L_XFER | L_DATA,
-		"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x status %d\n",
-		acx100_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
-		tx_desc->total_length,
-		header->length,
-		payload->length,
-		priv->macmode_joined,
-		(CHIPTYPE_ACX100 == priv->chip_type) ? tx_desc->u.r1.rate : tx_desc->u.r2.rate111,
-		priv->status);
+	 * in order to not delay sending any further than absolutely needed
+	 * Do separate logs for acx100/111 to have human-readable rates */
+	if (CHIPTYPE_ACX100 == priv->chip_type)
+		acxlog(L_XFER | L_DATA,
+			"tx: pkt (%s): len %i (%i/%i) mode %d rate %03d status %d\n",
+			acx100_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
+			tx_desc->total_length,
+			header->length,
+			payload->length,
+			priv->macmode_joined,
+			tx_desc->u.r1.rate,
+			priv->status);
+	else
+		acxlog(L_XFER | L_DATA,
+			"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x status %d\n",
+			acx100_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
+			tx_desc->total_length,
+			header->length,
+			payload->length,
+			priv->macmode_joined,
+			tx_desc->u.r2.rate111,
+			priv->status);
 
 	if (debug & L_DATA)
 	{
@@ -444,30 +460,17 @@ In theory you can implement it, but so far it is considered not worth doing.
 */
 
 /* maps acx100 tx descr rate field to acx111 one */
-/* FIXME: guesswork. Someone please enlighten me about possible r1.rate values */
 static UINT16
 rate100to111(UINT8 r)
 {
 	switch(r) {
-	case ACX_TXRATE_1:	return RATE111_1;
-	case ACX_TXRATE_2:	return RATE111_2;
-	case ACX_TXRATE_5_5:
-	case ACX_TXRATE_5_5PBCC:return RATE111_5;
-	case ACX_TXRATE_11:
-	case ACX_TXRATE_11PBCC:	return RATE111_11;
-	case ACX_TXRATE_22PBCC:	return RATE111_22;
-/*
-I suspect that these never happen on acx100
-Uncomment ONLY if you definitely saw them
-	case ACX_TXRATE_6_G:	return RATE111_6;
-	case ACX_TXRATE_9_G:	return RATE111_9;
-	case ACX_TXRATE_12_G:	return RATE111_12;
-	case ACX_TXRATE_18_G:	return RATE111_18;
-	case ACX_TXRATE_24_G:	return RATE111_24;
-	case ACX_TXRATE_36_G:	return RATE111_36;
-	case ACX_TXRATE_48_G:	return RATE111_48;
-	case ACX_TXRATE_54_G:	return RATE111_54;
-*/
+	case RATE100_1:	return RATE111_1;
+	case RATE100_2:	return RATE111_2;
+	case RATE100_5:
+	case RATE100_5 | RATE100_PBCC511:	return RATE111_5;
+	case RATE100_11:
+	case RATE100_11 | RATE100_PBCC511:	return RATE111_11;
+	case RATE100_22:	return RATE111_22;
 	default:
 		printk(KERN_DEBUG "Unexpected acx100 txrate of %d! Please report\n",r);
 		return RATE111_2;
@@ -480,7 +483,7 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
 	UINT16 cur = txrate->cur;
 	int slower_rate_was_used;
 
-	acxlog(L_DEBUG, "tx: rate %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
+	acxlog(L_DEBUG, "tx: rate mask %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
 		rate, cur, txrate->cfg,
 		txrate->fallback_count, txrate->fallback_threshold,
 		txrate->stepup_count, txrate->stepup_threshold
@@ -496,17 +499,18 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
 	
 	if (slower_rate_was_used || (0 != (error & 0x30))) {
 		txrate->stepup_count = 0;
-		if (++txrate->fallback_count <= txrate->fallback_threshold) return;
+		if (++txrate->fallback_count <= txrate->fallback_threshold) 
+			return;
 		txrate->fallback_count = 0;
+
 		/* clear highest 1 bit in cur */
 		rate=0x1000;
-		
 		while(0 == (cur & rate))
 			rate >>= 1;
-		
 		CLEAR_BIT(cur, rate);
+
 		if(cur) { /* we can't disable all rates! */
-			acxlog(L_XFER, "tx: falling back to rate %04x\n", cur);
+			acxlog(L_XFER, "tx: falling back to rate mask %04x\n", cur);
 			txrate->cur = cur;
 		}
 	}
@@ -526,7 +530,7 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
 		    return; /* no higher rates allowed by config */
 		
 		SET_BIT(cur, rate);
-		acxlog(L_XFER, "tx: stepping up to rate %04x\n", cur);
+		acxlog(L_XFER, "tx: stepping up to rate mask %04x\n", cur);
 		txrate->cur = cur;
 	}
 }
@@ -544,7 +548,8 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, txdesc_t *pT
 		while(rate>1) { rate>>=1; n++; }
 		rate = 1<<n;
 	}
-	/* rate has only one bit set now, corresponding to currently used tx rate */
+	/* rate has only one bit set now, corresponding to tx rate 
+	** which was used by hardware to tx this particular packet */
  
 	do_handle_txrate_auto(txc, rate, pTxDesc->error);
 }
@@ -670,7 +675,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 			&&  txc != &priv->ap_peer.txrate
 			) {
 				printk(KERN_WARNING "Probable BUG in acx100 driver: txdescr->txc %08x is bad!\n", (u32)txc);
-			} else if (txc->flt) {
+			} else if (txc->do_auto) {
 				acx_handle_txrate_auto(priv, txc, pTxDesc);
 			}
  

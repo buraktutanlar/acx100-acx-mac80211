@@ -149,19 +149,19 @@ find_pos(UINT8 *p, int size, UINT8 v) {
 }
 
 void
-acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *peer)
+acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *bss_peer)
 {
-	UINT8 *peer_rate = peer->supp_rates;
-	UINT16 bmask = 0;
-	UINT16 omask = 0;
+	UINT8 *peer_rate = bss_peer->supp_rates;
+	UINT16 bmask = 0; /* basic rates */
+	UINT16 omask = 0; /* operational rates */
 
 	FN_ENTER;
 
 	if((priv->preamble_mode == 2) /* auto mode? */
-	&& (peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE)
+	&& (bss_peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE)
 	) {
 		peerinfo->shortpre =
-		((peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
+		((bss_peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
 	}
 
 	while(*peer_rate) {
@@ -191,12 +191,14 @@ acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *
 Helper: updates priv->rate_supported[_len] according to txrate/txbase.cfg
 *----------------------------------------------------------------*/
 void
-acx_update_ratevector(wlandevice_t *priv)
+acx_update_dot11_ratevector(wlandevice_t *priv)
 {
 	UINT16 ocfg = priv->defpeer.txrate.cfg;
 	UINT16 bcfg = priv->defpeer.txbase.cfg;
 	UINT8 *supp = priv->rate_supported;
 	UINT8 *dot11 = dot11ratebyte;
+
+	FN_ENTER;
 
 	while(ocfg) {
 		if(ocfg & 1) {
@@ -214,13 +216,14 @@ acx_update_ratevector(wlandevice_t *priv)
 #if ACX_DEBUG
 	if(debug & L_ASSOC) {
 		int i = priv->rate_supported_len;
-		printk(KERN_DEBUG "new ratevector:");
+		printk(KERN_WARNING "new ratevector:");
 		supp = priv->rate_supported;
 		while(i--)
 			printk(" %02x", *supp++);
 		printk("\n");
 	}
 #endif
+	FN_EXIT(0, 0);
 }
 
 /*------------------------------------------------------------------------------
@@ -330,7 +333,7 @@ int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		priv->status, acx100_get_status_name(priv->status),
 		priv->macmode_wanted, priv->macmode_joined, priv->channel,
 		priv->reg_dom_id, priv->reg_dom_chanmask,
-		priv->defpeer.txrate.cur, priv->defpeer.txrate.flt, priv->defpeer.txrate.cfg,
+		priv->defpeer.txrate.cur, priv->defpeer.txrate.do_auto, priv->defpeer.txrate.cfg,
 		priv->defpeer.txrate.fallback_count, priv->defpeer.txrate.fallback_threshold,
 		priv->defpeer.txrate.stepup_count, priv->defpeer.txrate.stepup_threshold,
 		priv->bss_table_count);
@@ -1085,7 +1088,7 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, U
 			acc2 = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 
 			if (acc2 != acc1) {
-				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %d don't match!! (0x%08x vs. 0x%08x). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
+				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %d don't match!! (0x%08x vs. 0x%08x). Memory defective or I/O timing issues, with DWL-xx0+?? Makefile: ACX_IO_WIDTH=16 should help... Please report!!\n", len, acc1, acc2);
 				result = NOT_OK;
 				break;
 			}
@@ -1179,6 +1182,7 @@ int acx100_upload_fw(wlandevice_t *priv)
 	{
 		acxlog(L_STD, "acx_read_fw failed.\n");
 		kfree(filename);
+		FN_EXIT(1, -EIO);
 		return NOT_OK;
 	}
 
@@ -2005,7 +2009,7 @@ int acx111_init_packet_templates(wlandevice_t *priv)
  * Or maybe not, since the radio module probably has a function interface
  * instead which then manages Tx level programming :-\
  */
-static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level)
+static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level_dbm)
 {
 	/* since it can be assumed that at least the Maxim radio has a
 	 * maximum power output of 20dBm and since it also can be
@@ -2053,20 +2057,34 @@ static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level)
 			acxlog(L_STD, "FIXME: unknown/unsupported radio type, cannot modify Tx power level yet!\n");
 			return NOT_OK;
 	}
-	acxlog(L_STD, "changing radio power level to %d dBm (0x%02x)\n", level, table[level]);
-	acx100_write_phy_reg(priv, 0x11, table[level]);
+	acxlog(L_STD, "changing radio power level to %d dBm (%d)\n", level_dbm, table[level_dbm]);
+	acx100_write_phy_reg(priv, 0x11, table[level_dbm]);
 #endif
 	return OK;
 }
 
-static inline int acx111_set_tx_level(wlandevice_t *priv, UINT8 level)
+static inline int acx111_set_tx_level(wlandevice_t *priv, UINT8 level_dbm)
 {
-
 	struct ACX111TxLevel tx_level;
 
-	tx_level.level = level;
+	/* my acx111 card has two power levels in its configoptions (== EEPROM):
+	 * 1 (30mW) [15dBm]
+	 * 2 (10mW) [10dBm]
+	 * For now, just assume all other acx111 cards have the same.
+	 * Ideally we would query it here, but we first need a
+	 * standard way to query individual configoptions easily. */
+	if (level_dbm <= 12)
+	{
+		tx_level.level = 2; /* 10 dBm */
+		priv->tx_level_dbm = 10;
+	}
+	else
+	{
+		tx_level.level = 1; /* 15 dBm */
+		priv->tx_level_dbm = 15;
+	}
 
-	if (OK != acx100_configure(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL) == 0) {
+	if (OK != acx100_configure(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL)) {
 		acxlog(L_INIT, "Error setting acx111 tx level\n");
 		return NOT_OK;
 	}
@@ -2079,7 +2097,7 @@ static inline UINT8 acx111_get_tx_level(wlandevice_t *priv) {
 	struct ACX111TxLevel tx_level;
 
 	tx_level.level = 0;
-	if (acx100_interrogate(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL) == 0) {
+	if (OK != acx100_interrogate(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL)) {
 		acxlog(L_INIT, "Error getting acx111 tx level\n");
 	}
 	return tx_level.level;
@@ -2195,7 +2213,7 @@ void acx100_scan_chan(wlandevice_t *priv)
 	s.count = cpu_to_le16(priv->scan_count);
 	s.start_chan = cpu_to_le16(1);
 	s.flags = cpu_to_le16(0x8000);
-	s.max_rate = ACX_TXRATE_2; /* 2 Mbps */
+	s.max_rate = RATE100_2; /* 2 Mbps */
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);
@@ -2219,7 +2237,7 @@ void acx111_scan_chan(wlandevice_t *priv) {
 	s.reserved1 = 0;
 	s.reserved2 = 0;
 
-	s.rate = ACX_TXRATE_2; /* 2 Mbps */
+	s.rate = RATE100_2; /* 2 Mbps */
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);;
@@ -2305,7 +2323,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 			acx100_interrogate(priv, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 			paddr = &stationID[4];
-			for (i = 0; i < 6; i++) {
+			for (i = 0; i < ETH_ALEN; i++) {
 				/* we copy the MAC address (reversed in
 				 * the card) to the netdevice's MAC
 				 * address, and on ifup it will be
@@ -2376,7 +2394,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		int i;
 
 		paddr = &stationID[4];
-		for (i = 0; i < 6; i++) {
+		for (i = 0; i < ETH_ALEN; i++) {
 			/* copy the MAC address we obtained when we noticed
 			 * that the ethernet iface's MAC changed 
 			 * to the card (reversed in
@@ -2406,17 +2424,15 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		acx100_sta_list_init(priv);
 		CLEAR_BIT(priv->set_mask, SET_STA_LIST);
 	}
-#if 0
 	if (0 != (priv->set_mask & (SET_RATE_FALLBACK|GETSET_ALL))) {
-		UINT8 rate[4 + ACX100_IE_RATE_FALLBACK_LEN];
+		UINT8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
 
 		/* configure to not do fallbacks when not in auto rate mode */
-		/* rate[4] = (0 != priv->txrate.flt) ? priv->txrate_fallback_retries : 0; */
+		rate[4] = (0 != priv->defpeer.txrate.do_auto) ? /* priv->txrate_fallback_retries */ 1 : 0;
 		acxlog(L_INIT, "Updating Tx fallback to %d retries\n", rate[4]);
-		acx100_configure(priv, &rate, ACX100_IE_RATE_FALLBACK);
+		acx100_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
 	}
-#endif
 	if (0 != (priv->set_mask & (GETSET_WEP|GETSET_ALL))) {
 		/* encode */
 		acxlog(L_INIT, "Updating WEP key settings\n");
@@ -2702,7 +2718,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 					s.count = cpu_to_le16(1);
 					s.start_chan = priv->channel;
 					s.flags = cpu_to_le16(0x8000);
-					s.max_rate = ACX_TXRATE_2; /* 2 Mbps */
+					s.max_rate = RATE100_2; /* 2 Mbps */
 					s.options = priv->scan_mode;
 					s.chan_duration = 50;
 					s.max_probe_delay = 100;
@@ -2871,7 +2887,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->long_retry = 4; /* max. retries for long (RTS) packets */
 	SET_BIT(priv->set_mask, GETSET_RETRY);
 
-	priv->defpeer.txrate.flt = 1;
+	priv->defpeer.txrate.do_auto = 1;
 	priv->defpeer.txrate.pbcc511 = 0;
 	priv->defpeer.txrate.fallback_threshold = 3;
 	priv->defpeer.txrate.stepup_threshold = 12;
@@ -2892,7 +2908,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 
 	/* Supported Rates element - the rates here are given in units of
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
-	acx_update_ratevector(priv);
+	acx_update_dot11_ratevector(priv);
 
 	priv->capab_short = 0;
 	priv->capab_pbcc = 1;
@@ -2907,7 +2923,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
 	    priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
 	} else {
-	    priv->tx_level_dbm = (UINT8)0x1E; /* This is the only supported powerlevel in the EEPROM */
+	    priv->tx_level_dbm = (UINT8)15; /* 30mW (15dBm) is default, at least in my acx111 card */
 	}
 	priv->tx_level_auto = (UINT8)1;
 	SET_BIT(priv->set_mask, GETSET_TXPOWER);
@@ -3143,15 +3159,15 @@ extern void error_joinbss_must_be_0x30_bytes_in_length(void);
 /* NB: does NOT match RATE100_nn */
 static UINT8
 bitpos2genframe_txrate[] = {
-	0x0A, /*  1 Mbit/s */
-	0x14, /*  2 Mbit/s */
-	0x37, /*  5.5 Mbit/s */
+	10, /*  1 Mbit/s */
+	20, /*  2 Mbit/s */
+	55, /*  5.5 Mbit/s */
 	0x0B, /*  6 Mbit/s */
 	0x0F, /*  9 Mbit/s */
-	0x6E, /* 11 Mbit/s */
+	110, /* 11 Mbit/s */
 	0x0A, /* 12 Mbit/s */
 	0x0E, /* 18 Mbit/s */
-	0xDC, /* 22 Mbit/s */
+	220, /* 22 Mbit/s */
 	0x09, /* 24 Mbit/s */
 	0x0D, /* 36 Mbit/s */
 	0x08, /* 48 Mbit/s */
@@ -3195,6 +3211,7 @@ acx_join_bssid(wlandevice_t *priv)
 		tmp.u.acx100.dtim_interval = priv->dtim_interval;
 		tmp.u.acx100.rates_basic = rate111to5bits(priv->defpeer.txbase.cfg);
 		tmp.u.acx100.rates_supported = rate111to5bits(priv->defpeer.txrate.cfg);
+		acxlog(L_DEBUG, "rates_basic 0x%04x --> 0x%02x rates_supported 0x%04x --> 0x%02x\n", priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
 	} else {
 		/* It was experimentally determined that rates_basic
 		** can take 11g rates as well, not only rates
@@ -3208,13 +3225,14 @@ acx_join_bssid(wlandevice_t *priv)
 	n = 0;
 	{
 		UINT16 t = priv->defpeer.txbase.cfg;
+		/* calculate number of highest bit set in t */
 		while(t>1) { t>>=1; n++; }
 	}
-	/* Now n == highest set bit number */
 	if(n>=sizeof(bitpos2genframe_txrate)) {
 		printk(KERN_ERR "acx_join_bssid: driver BUG! n=%d. please report\n", n);
 		n = 0;
 	}
+	/* look up what value the highest basic rate actually is */
 	tmp.txrate_val = bitpos2genframe_txrate[n];
 	tmp.preamble_type = priv->capab_short;
 	tmp.macmode = priv->macmode_chosen;     /* should be called BSS_Type? */
@@ -3592,11 +3610,11 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 	UINT8 *data_verify = NULL;
 	UINT32 count = 0;
 	
-	FN_ENTER;
-
 	acxlog(L_STD, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing, I will abort that now.\n");
 	return 0;
 	
+	FN_ENTER;
+
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
 	 * to be able to write to the EEPROM */
 	gpio_orig = acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]);
@@ -3815,7 +3833,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	for (i=0;i<pEle[1];i++) {
 	    co2.product_id.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %s\n", co2.product_id.type, co2.product_id.len, (char *)co2.product_id.list);
+	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %.*s\n", co2.product_id.type, co2.product_id.len, co2.product_id.len, (char *)co2.product_id.list);
 
 	pEle += pEle[1] + 2;	
 	co2.manufactor.type = pEle[0];
@@ -3823,7 +3841,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	for (i=0;i<pEle[1];i++) {
 	    co2.manufactor.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %s\n", co2.manufactor.type, co2.manufactor.len, (char *)co2.manufactor.list);
+	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %.*s\n", co2.manufactor.type, co2.manufactor.len, co2.manufactor.len, (char *)co2.manufactor.list);
 
 /*
 	acxlog(L_DEBUG, "EEPROM part : \n");
