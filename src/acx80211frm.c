@@ -577,7 +577,7 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 			break;
 		default:
 			/*
-			   WLAN_LOG_WARNING1(
+			   acx_log(L_DEBUG,
 			   "Unrecognized EID=%dd in assocreq decode.\n",
 			   ie_ptr->eid);
 			   WLAN_HEX_DUMP(3, "frm w/ bad eid:", f->buf, f->len );
@@ -1151,11 +1151,11 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 			f->ibss_parms = (wlan_ie_ibss_parms_t *) ie_ptr;
 			break;
 		default:
-			WLAN_LOG_WARNING2
-			    ("Bad EID=%dd in proberesp, off=%d .\n",
+			acxlog(L_DEBUG,"Bad EID=%dd in proberesp, off=%d .\n",
 			     ie_ptr->eid, f->buf - (UINT8 *) ie_ptr);
-			WLAN_HEX_DUMP(3, "frm w/ bad eid:", f->buf,
+/*			WLAN_HEX_DUMP(3, "frm w/ bad eid:", f->buf,
 				      f->len);
+*/
 			break;
 		}
 

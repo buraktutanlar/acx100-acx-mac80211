@@ -4,7 +4,8 @@
 
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
-with ACX100 chip (except for USB implementations, which are extremely rare).
+with ACX100 chip (except for USB implementations, which are extremely rare
+-- work for these is just starting).
 If it doesn't work with your ACX100 card, then please notify us
 immediately if you followed every installation advice and are at your
 wits end as to what might still make the card fail.
@@ -16,6 +17,9 @@ We're not totally sure about the status of WEP support. In Ad-Hoc
 and Managed mode, using a WEP key works, but there are bugs lurking
 everywhere when you try more "advanced" settings. This needs to be
 cleaned up soon.
+
+Also, SMP appears to be problematic, if you have SMP turn it off. We 
+will attempt to clean this up as soon as possible.
 
 Furthermore, associating with some access points might still be problematic
 due to very strict checks in their firmware.
@@ -29,50 +33,50 @@ http://standards.ieee.org/getieee802/
 
 Relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental),
 with CONFIG_NET_RADIO enabled ("Wireless LAN") and CONFIG_NET_WIRELESS,
-for wireless extensions (iwconfig etc.).
+for wireless extensions (iwconfig etc.). And Non-SMP.
 
 Next, a firmware is needed. We cannot ship this with our driver, so you
 will have to get it elsewhere. There are two options: you have a windows
 driver installed or have a zip file with all the necessary windows files
-in it (for example D-Link installer), or you have a binary linux driver.
-
-The firmware used by windows driver consists of several files normally
-named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
-windows/system32, or in the install archive. Place these files in the
-firmware directory, and you are ready to roll.
-MAKE SURE THAT THE CASE SENSITIVITY OF THE FILENAME CHARACTERS IS EXACTLY
-AS WRITTEN ABOVE!! Otherwise the driver will NOT find the image files...
-
-Another option is a binary Linux driver. Several drivers are available
-on the internet, and they all seem to work. But since the firmware is embedded
-in the binary driver, it needs to be extracted. Place the driver in
-the firmware directory and make sure it is called acx100_pci.o. Then
-run 'make extract_firmware', and you are set. Make sure that no radio
-modules (RADIO*.BIN) files are placed in the firmware directory when
-using a linux firmware, otherwise the driver will attempt to load and
-initialise the radio module for your card again, with unpredictable results
-(FIXME: need to check against firmware version on this one, to avoid such
-trouble).
-The linux driver already has the radio module embedded in the firmware.
-The firmware version this Linux driver contains is 1.5.0, as printed during
-our driver initialisation.
+in it (for example D-Link installer), or you have a binary linux driver
+(not recommended, since these contain much older firmware files).
 
 Certain DWL-650+ and 520+ cards and Planet cards use a Maxim radio instead of
 the usual RFMD, so these cards will not work with the linux driver firmware
 and so the windows firmware must be used.
 
+-- Firmware provided by Windows driver --
+
+Easy solution:
+
+wget ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_driver_302.zip
+unzip dwl520+_driver_302.zip
+cp Win2000/WLANGEN.BIN Win2000/RADIO0d.BIN Win2000/RADIO11.BIN firmware/
+Ready to roll. :)
+
+Longer background explanation (READ IN CASE OF PROBLEMS!):
+
+The firmware used by windows driver consists of several files normally
+named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
+the c:\winnt\system32 directory, or in the install archive.
+Place these files in the firmware directory, and you are ready to roll.
+MAKE SURE THAT THE CASE SENSITIVITY OF THE FILENAME CHARACTERS IS EXACTLY
+AS WRITTEN ABOVE!! Otherwise the driver will NOT find the image files...
+
 Note that earlier versions of the windows driver shipped with individual radio
-files as well as combined versions. Here you have a choice, you can either
-copy the individual files over (which will need to be renamed to the firmware
-names given above) or use the combined file on its own. If you copy
-the combined file it must be renamed to "WLANGEN.BIN".
+files (small firmware plus RFMD radio file plus Maxim radio file)
+as well as combined versions (one bigger firmware, which is the old concept).
+Here you have a choice, you can either copy the individual files over
+(which will need to be renamed to the firmware names given above)
+or use the combined file on its own. If you copy the combined file it must be
+renamed to "WLANGEN.BIN".
 
 The files in the recent driver package are:
 WLANGEN.BIN - Generic firmware
 RADIO0d.BIN - Maxim radio module
 RADIO11.BIN - RFMD radio module
-RADIO15.BIN - UNKNOWN radio module, e.g. for DrayTek Vigor 520, found in
-some special drivers
+RADIO15.BIN - UNKNOWN radio module, e.g. for DrayTek Vigor 520, found at
+e.g. ftp://ftp.draytek.com.tw/VIGOR520/Driver/3.99.3.0/driver.zip
 
 The files in earlier packages are:
 AIRPLUS.BIN  - Firmware with embedded RFMD module
@@ -83,6 +87,23 @@ APLUSRMX.BIN - Maxim radio module
 
 Other files:
 SMCSN.BIN - combined(?) firmware for SMC2435W
+
+-- Firmware from Linux binary driver --
+
+Several drivers are available on the internet, and they all seem to
+work. But since the firmware is embedded in the binary driver, it needs
+to be extracted. Place the driver in the firmware directory and make
+sure it is called acx100_pci.o. Then run 'make extract_firmware', and
+you are set. Make sure that no radio modules (RADIO*.BIN) files are
+placed in the firmware directory when using a linux firmware, otherwise
+the driver will attempt to load and initialise the radio module for your
+card again, with unpredictable results (FIXME: need to check against
+firmware version on this one, to avoid such trouble).
+The linux driver already has the radio module embedded in the firmware.
+The firmware version this Linux driver contains is 1.5.0, as printed during
+our driver initialisation.
+
+
 
 You may tell us about your experiences with various firmware versions on
 our Wiki page FirmwareExperiences.
@@ -119,9 +140,11 @@ Debugging/logging options can be changed in a pretty powerful way by setting
 the module's "debug" parameter and/or its preinitialisation value in
 acx100.c and/or via the iwpriv set_debug setting. A good default value
 after having managed to get the driver to run would be 0xb
-(L_STD|L_INIT|L_ASSOC).
+(L_STD|L_INIT|L_ASSOC debug channels).
 Your harddisk will certainly thank you a lot for having saved it
 from the horror of heaps of logs once you got the driver running...
+To check out further module parameters and options, please use modinfo
+and iwpriv.
 
 To run the driver, you can use the script scripts/start_net (and adapt it).
 Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
@@ -129,6 +152,12 @@ Again, no system installation is provided, since the various Linux
 distributions often differ in their exact network configuration methods.
 Thus maybe simply adapt and use our scripts/start_net script. Or add
 that script as a properly executed init script in /etc/[rc.d]/init.d/
+
+For troubleshooting, see below.
+
+Once you got the driver running, you could set EXPERIMENTAL_VER_x_y in
+include/acx100.h to 1, recompile and enjoy (or not) some new features
+to be released in the next minor version. (no warranty!)
 
 --- "CRAZY" INSTALLATION ---
 
@@ -149,30 +178,53 @@ with linux-2.6 ;-)
 
 --- TROUBLESHOOTING / WORKAROUNDS ---
 
-First, make absolutely sure you're using the correct settings for
+First, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
 Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a peer card).
+
 Then read the file containing the driver log (the file where
 the KERN_WARNING channel gets written to), as given in the syslog
 configuration, /etc/sysklogd.conf or similar.
+
+If you still have trouble, then make sure that you didn't get an iwconfig
+version incompatibility warning. This can mess up quite a lot :-((
+
 We tried to make the driver log as dumbed down as possible to make sure
 even casual users are able to follow the network association steps
 towards the final successful association.
+
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
+
+Power levels for a connection are (at least for my PheeNet WL-0022 CardBus):
+Signal level 86/100 (extremely good, at least to my AP PheeNet withDWL-900AP+ firmware; directly neighbouring the AP)
+Signal level 29/100 (anything less: connection lost @22Mbps)
+Signal level 26/100 (anything less: connection lost @11Mbps)
+Signal level 21/100 (anything less: connection lost @1Mbps)
+Noise level 0/100 (anything more can be problematic, > 10 is deadly)
+Link Quality == reverse of Noise level
+
 
 If you still have trouble getting a connection, or if the connection is
 problematic, then visit our Wiki HOWTO/troubleshooting pages for more
 info.
 
---- BUGS / PATCHES ---
+--- BUGS / SHORTCOMINGS / PATCHES ---
 
-Automatic rate adaptation is not implemented yet
-(setting rate to 22M will prevent communication with 11M peers).
-We'll have to implement auto rate adaptation properly soon.
-Many advanced features are not implemented yet.
+- will not work on SMP multi-processor kernels yet
+           (some problems, maybe even crashes). Working to fix that.
+- power management (suspend/resume) handlers are not implemented yet
+- no automatic rate adaptation yet
+           (setting rate to 22M will prevent communication with 11M peers)
+           We'll have to implement auto rate adaptation properly soon.
+- many advanced features are not implemented yet
+
 For current tasks, please read TODO.
+
+In case of bugs that didn't exist in previous versions,
+please do regression testing via CVS:
+http://www.winehq.org/site/docs/wine-devel/cvs-regression
 
 If you manage to fix or implement something, then please immediately
 send patches for inclusion to the acx100-devel@lists.sf.net mailing list.

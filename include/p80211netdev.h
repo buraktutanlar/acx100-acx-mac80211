@@ -449,7 +449,8 @@ typedef struct wlandevice {
 	/* cca settings */
 	unsigned char cca[4 + ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN];
 	/* reg domain settings */
-	unsigned char dom;
+	unsigned char reg_dom_id;
+	UINT16 reg_dom_chanmask;
 
 } wlandevice_t __WLAN_ATTRIB_PACK__;
 

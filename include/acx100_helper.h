@@ -334,10 +334,12 @@ typedef struct {
 } radioinit_t;
 
 
+void acx100_schedule(UINT32 timeout);
 int acx100_reset_dev(netdevice_t * hw);
 void acx100_join_bssid(wlandevice_t * hw);
 int acx100_init_mac(netdevice_t * hw);
 int acx100_set_defaults(wlandevice_t * hw);
+void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id);
 int acx100_set_probe_response_template(wlandevice_t * hw);
 int acx100_set_beacon_template(wlandevice_t * wlandev);
 void acx100_set_timer(wlandevice_t * hw, UINT32 time);

@@ -1,65 +1,128 @@
-#!/bin/sh
+#!/bin/bash
+
+#########################################
+# start_net script                      #
+# acx100 project                        #
+# acx100.sourceforge.net                #
+# edited by arnie <urnotwelcome@gmx.de> #
+#########################################
+
+# Please edit here
+
 DEV=wlan0
 IP=192.168.0.10
 NETMASK=255.255.255.0
 GATEWAY=192.168.0.254
 ESSID=any # any == associate to any ESSID
-echo Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
+# Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
-#CHAN=10
+CHAN=10
 #TXPOWER=16 # 16 == 16.5dBm, 18 == 18dBm (default)
-MODE=managed
+MODE=Managed
+DEBUG=0xb
 #KEY=B401CD21B44CCD21DEADBEEF11 # WEP128
 ALG=open # open == Open System, restricted == Shared Key
-DEBUG=0x9b
+
+# Usually no editing should be required below this line...
+# -- unless you want this script to fetch stuff with dhcp
+
+#########################################
+
+
+if [[ $UID != 0 ]]; then echo "You are not root. To insert the module into your kernel, you need to be root. Enter su and try again. Bailing..."; exit 1; fi
+
+SYNC=`which sync`
+INSMOD=`which insmod`
+IFCONF=`which ifconfig`
+IWCONF=`which iwconfig`
+SCRIPT_AT=`dirname $0`
+
+if [[ $SYNC == "" ]]; then echo "sync not found. Go get a sane Linux system. Bailing..."; exit 1; fi
+if [[ $INSMOD == "" ]]; then echo "insmod not found. Go get a sane Linux system. Bailing..."; exit 1; fi
+if [[ $IFCONF == "" ]]; then echo "ifconfig not found. I can insert the module for you, but you won't be able to configure your interface."; CONTINUE=ASK; fi
+if [[ $IWCONF == "" ]]; then echo "iwconfig not found. Make sure it is installed. The interface might work without, though."; CONTINUE=ASK; fi
+
+if [[ $CONTINUE == "ASK" ]]; then echo -n "Problems encountered. Do you want to continue? [n] "; read ANSWER
+case $ANSWER in  ( y | Y | Yes | YES | yes | j | J | ja | Ja | JA ) ;;
+                 ( * ) exit 1 ;;
+esac
+fi
+
+MODULE_AT="${SCRIPT_AT}/../src/acx100_pci.o"
+
+if ! [[ -r $MODULE_AT ]]; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx100_pci.o, relative to the script's location. Bailing..."; exit 1; fi 
+
+FIRMWARE_AT="${SCRIPT_AT}/../firmware"
+
+if ! [[ -r "$FIRMWARE_AT/WLANGEN.BIN" ]]; then echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be at ../firmware/WLANGEN.BIN, relative to the script's location. Bailing..."; exit 1; fi
+
+if [[ $RATE != "11M" ]]; then echo "Transfer rate is not 11 Mb, but $RATE. If something doesn't work, try 11 Mb."; fi
+
 
 # for better debugging
-set -x
+# set -x
 #echo 8 > /proc/sys/kernel/printk
 
+
 # just in case ;)
-sync
+$SYNC
 sleep 1
 
-insmod ../src/acx100_pci.o debug=$DEBUG firmware_dir=../firmware
+if [[ `lsmod |grep acx100_pci` ]]; then ${SCRIPT_AT}/stop_net; fi
 
-if [ -n "$RATE" ]; then
+$INSMOD $MODULE_AT debug=$DEBUG firmware_dir=$FIRMWARE_AT
+if [[ $? == 0 ]]; then echo "Module successfully inserted."; else echo "Error while inserting module! Bailing..."; exit 1; fi
+
+if [[ $IWCONF ]]; then
+
+if [[ -n "$RATE" ]]; then
   echo Setting rate to $RATE.
-  iwconfig $DEV rate $RATE
+  $IWCONF $DEV rate $RATE
+  if [[ $? != 0 ]]; then echo Failed.; fi
 fi
-if [ -n "$CHAN" ]; then
+if [[ -n "$CHAN" ]]; then
   echo Setting channel $CHAN.
-  iwconfig $DEV channel $CHAN
+  $IWCONF $DEV channel $CHAN
+  if [[ $? != 0 ]]; then echo Failed.; fi
 fi
-if [ -n "$TXPOWER" ]; then
+if [[ -n "$TXPOWER" ]]; then
   echo Setting Tx power level to $TXPOWER dBm.
-  iwconfig $DEV txpower $TXPOWER
+  $IWCONF $DEV txpower $TXPOWER
+  if [[ $? != 0 ]]; then echo Failed.; fi
   sleep 1
 fi
+
 echo Trying to join or setup ESSID $ESSID.
-iwconfig $DEV essid $ESSID
-if [ -n "$MODE" ]; then
+$IWCONF $DEV essid $ESSID
+if [[ $? != 0 ]]; then echo Failed.; fi
+  
+if [[ -n "$MODE" ]]; then
   echo Setting mode to $MODE.
-  iwconfig $DEV mode $MODE
+  $IWCONF $DEV mode $MODE
+  if [[ $? != 0 ]]; then echo Failed.; fi
 fi
 
-if [ -n "$KEY" ]; then
+if [[ -n "$KEY" ]]; then
   echo Setting key to $KEY, algorithm $ALG.
-  iwconfig $DEV key $ALG $KEY
+  $IWCONF $DEV key $ALG $KEY
+  if [[ $? != 0 ]]; then echo Failed.; fi
 fi
+
+fi
+
 
 # Hehe, this can be done after iwconfigs now :)
-ifconfig $DEV $IP netmask $NETMASK
-
-route add default gw $GATEWAY
+$IFCONF $DEV $IP netmask $NETMASK
+if [[ $? != 0 ]]; then echo "Error in \"$IFCONF $DEV $IP netmask $NETMASK\". Bailing..."; exit 1; else echo "Interface has been set up successfully."; fi
 
 # Finally, let's do some tweaking to make sure we don't have any
 # buffer management problems (yeah, it's an ugly workaround!)
-ifconfig $DEV mtu 576
+$IFCONF $DEV mtu 576
+if [[ $? != 0 ]]; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
 
 # # fetch an IP address from DHCP
 # rm -f /etc/dhcpc/dhcpcd-wlan0.pid > /dev/null
 # dhcpcd -d wlan0 -t 5
 
 # just in case ;)
-sync
+$SYNC

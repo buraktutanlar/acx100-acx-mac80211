@@ -2,6 +2,25 @@ Changes:
 ========
 
 
+2003.09.21 - 0.2.0pre2 released
+- fix ringbuffer increment screwup
+- fix capability flags announcing: it's not particularly healthy
+  to ask 11Mbps APs for PBCC support...
+- better handling of regulatory domains:
+  - scanning/association fixes for reported problem
+  - read default regulatory domain setting from EEPROM
+- add missing unregister_netdev(), might eventually perhaps fix reported issue
+- improvements in the CardBus layer support
+- make link quality display show real percentage levels, not broken dBm levels
+  (sorry, really couldn't find out how to convert values given to proper dBm!)
+- compile fixes for arm-linux (not tested yet due to lack of CardBus on iPAQ,
+  but if someone implemented USB support I could actually test the driver
+  on my XScale devel board!)
+- EXPERIMENTAL_VER_0_3: doubled driver init speed and killed CPU hogging
+- vastly improved scripts
+- huge README update
+- rename function names, remove some unused functions, docu cleanup
+
 2003.09.14 - 0.2.0pre1 released
 - "fix" major bug "association on every other attempt", by adding
   OS-based retry timer support for newer firmware versions which don't

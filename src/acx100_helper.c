@@ -45,6 +45,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/vmalloc.h>
 
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -96,6 +97,16 @@
 UINT8 DTIM_count;
 
 extern char *firmware_dir; /* declared in acx100.c, to keep together with other MODULE_PARMs */
+
+/* acx100_schedule()
+ * Make sure to schedule away sometimes, in order to not hog the CPU too much.
+ */
+void acx100_schedule(UINT32 timeout)
+{
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule_timeout(timeout);
+}
+
 /*----------------------------------------------------------------
 * acx100_reset_dev
 *
@@ -125,10 +136,10 @@ int acx100_reset_dev(netdevice_t * netdev)
 
 	FN_ENTER;
 	acx100_reset_mac(hw);
-	if (!(vala = hwReadRegister16(hw, ACX100_RESET_2) & 1)) {
+	if (!(vala = acx100_read_reg16(hw, ACX100_RESET_2) & 1)) {
 		goto fail;
 	}
-	if (hwReadRegister16(hw, ACX100_RESET_1) & 2) {
+	if (acx100_read_reg16(hw, ACX100_RESET_1) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		acxlog(L_BINSTD,
 			   "eCPU did not start after boot from flash\n");
@@ -140,14 +151,19 @@ int acx100_reset_dev(netdevice_t * netdev)
 			   "Failed to download firmware to the ACX100\n");
 		goto fail;
 	}
-	hwWriteRegister16(hw, ACX100_RESET_2, vala & ~0x1);
-	while (!(hwReadRegister16(hw, ACX100_STATUS) & 0x4000)) {
+	acx100_write_reg16(hw, ACX100_RESET_2, vala & ~0x1);
+	while (!(acx100_read_reg16(hw, ACX100_STATUS) & 0x4000)) {
 		/* ok, let's insert scheduling here.
 		 * This was an awfully CPU burning loop.
 		 */
+#if EXPERIMENTAL_VER_0_3
+		acx100_schedule(HZ / 20);
+	}
+#else
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout(HZ / 10);
 	};
+#endif
 	if (!acx100_verify_init(hw)) {
 		acxlog(L_BINSTD,
 			   "Timeout waiting for the ACX100 to complete Initialization\n");
@@ -195,25 +211,33 @@ void acx100_reset_mac(wlandevice_t * hw)
 
 	FN_ENTER;
 
-	temp = hwReadRegister16(hw, ACX100_RESET_2) | 0x1;
-	hwWriteRegister16(hw, ACX100_RESET_2, temp);
+	temp = acx100_read_reg16(hw, ACX100_RESET_2) | 0x1;
+	acx100_write_reg16(hw, ACX100_RESET_2, temp);
 
-	temp = hwReadRegister16(hw, ACX100_REG0) | 0x1;
-	hwWriteRegister16(hw, ACX100_REG0, temp);
+	temp = acx100_read_reg16(hw, ACX100_REG0) | 0x1;
+	acx100_write_reg16(hw, ACX100_REG0, temp);
 
 	/* used to be for loop 65536; do scheduled delay instead */
+#if EXPERIMENTAL_VER_0_3
+	acx100_schedule(HZ / 100);
+#else
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ / 10);
+#endif
 
 	/* now reset bit again */
-	hwWriteRegister16(hw, ACX100_REG0, temp & 0xfffe);
+	acx100_write_reg16(hw, ACX100_REG0, temp & 0xfffe);
 
-	temp = hwReadRegister16(hw, ACX100_RESET_0) | 0x1;
-	hwWriteRegister16(hw, ACX100_RESET_0, temp);
+	temp = acx100_read_reg16(hw, ACX100_RESET_0) | 0x1;
+	acx100_write_reg16(hw, ACX100_RESET_0, temp);
 
 	/* used to be for loop 65536; do scheduled delay instead */
+#if EXPERIMENTAL_VER_0_3
+	acx100_schedule(HZ / 100);
+#else
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ / 10);
+#endif
 
 	FN_EXIT(0, 0);
 }
@@ -226,7 +250,7 @@ void acx100_reset_mac(wlandevice_t * hw)
 *	wlandevice: private device that contains card device
 * Returns:
 *	0: failed
-*	1: success	
+*	1: success
 * Side effects:
 *
 * Call context:
@@ -266,7 +290,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 	vfree(apfw_image);
 
 	acxlog(L_DEBUG | L_INIT,
-	   "WriteACXImage (firmware): %d, ValidateACXImage: %d\n", res1, res2);
+	   "acx100_write_fw (firmware): %d, acx100_validate_fw: %d\n", res1, res2);
 	return (res1 && res2);
 }
 
@@ -302,8 +326,8 @@ int acx100_load_radio(wlandevice_t *wlandev)
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
 	char filename[PATH_MAX];
-	
-	ctlInterrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP);
+
+	acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP);
 	offset = mm.m.ip.CodeEnd;
 
 	sprintf(filename,"%s/RADIO%02x.BIN",firmware_dir, wlandev->radio_type);
@@ -312,6 +336,7 @@ int acx100_load_radio(wlandevice_t *wlandev)
 /*
  * 0d = RADIO0d.BIN = Maxim chipset
  * 11 = RADIO11.BIN = RFMD chipset
+ * 15 = RADIO15.BIN = UNKNOWN chipset
  */
 
 	if ( !radio_image )
@@ -320,12 +345,12 @@ int acx100_load_radio(wlandevice_t *wlandev)
 		return 1; /* Doesn't need to be fatal, we might be using a combined image */
 	}
 
-	ctlIssueCommand(wlandev, ACX100_CMD_SLEEP, 0, 0, 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_SLEEP, 0, 0, 5000);
 
 	res1 = acx100_write_fw(wlandev, radio_image, offset);
 	res2 = acx100_validate_fw(wlandev, radio_image, offset);
 
-	ctlIssueCommand(wlandev, ACX100_CMD_WAKE, 0, 0, 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_WAKE, 0, 0, 5000);
 	radioinit.offset = offset;
 	radioinit.len = radio_image->size;
 	
@@ -335,9 +360,9 @@ int acx100_load_radio(wlandevice_t *wlandev)
 	if (!(res1 && res2)) return 0;
 
 	/* will take a moment so let's have a big timeout */
-	ctlIssueCommand(wlandev, ACX100_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
 
-	if (!ctlInterrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP))
+	if (!acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP))
 	{
 		acxlog(L_STD, "Error reading memory map\n");
 		return 0;
@@ -496,12 +521,12 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 	counter = 3;		/* NONBINARY: this should be moved directly */
 	acc = 0;		/*			in front of the loop. */
 
-	hwWriteRegister16(hw, ACX100_FW_4, 0);
-	hwWriteRegister16(hw, ACX100_FW_5, 0);
-	hwWriteRegister16(hw, ACX100_FW_2, 0);
-	hwWriteRegister16(hw, ACX100_FW_3, 1);
-	hwWriteRegister16(hw, ACX100_FW_0, offset & 0xffff);
-	hwWriteRegister16(hw, ACX100_FW_1, offset >> 16);
+	acx100_write_reg16(hw, ACX100_FW_4, 0);
+	acx100_write_reg16(hw, ACX100_FW_5, 0);
+	acx100_write_reg16(hw, ACX100_FW_2, 0);
+	acx100_write_reg16(hw, ACX100_FW_3, 1);
+	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff);
+	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16);
 
 	/* the next four bytes contain the image size. */
 	//image = apfw_image;
@@ -521,12 +546,17 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 			 * 32bit write to register ACX100_DATA_LO...
 			 * But maybe there are cards with 16bit interface
 			 * only */
-			hwWriteRegister16(hw, ACX100_DATA_LO,
-					  acc & 0xffff);
-			hwWriteRegister16(hw, ACX100_DATA_HI, acc >> 16);
+			acx100_write_reg16(hw, ACX100_DATA_LO, acc & 0xffff);
+			acx100_write_reg16(hw, ACX100_DATA_HI, acc >> 16);
 			acc = 0;
 			counter = 3;
 		}
+#if EXPERIMENTAL_VER_0_3
+		if (len % 15000 == 0)
+		{
+			acx100_schedule(HZ / 50);
+		}
+#endif
 	}
 	/* compare our checksum with the stored image checksum */
 	return (sum == apfw_image->chksum);
@@ -569,12 +599,12 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 	counter = 3;
 	acc1 = 0;
 
-	hwWriteRegister16(hw, ACX100_FW_4, 0);
-	hwWriteRegister16(hw, ACX100_FW_5, 0);
-	hwWriteRegister16(hw, ACX100_FW_2, 0);
-	hwWriteRegister16(hw, ACX100_FW_3, 1);
-	hwWriteRegister16(hw, ACX100_FW_0, offset & 0xffff );
-	hwWriteRegister16(hw, ACX100_FW_1, offset >> 16 );
+	acx100_write_reg16(hw, ACX100_FW_4, 0);
+	acx100_write_reg16(hw, ACX100_FW_5, 0);
+	acx100_write_reg16(hw, ACX100_FW_2, 0);
+	acx100_write_reg16(hw, ACX100_FW_3, 1);
+	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff );
+	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16 );
 
 	while (len < apfw_image->size) {
 		acc1 |= *image << (counter * 8);
@@ -585,8 +615,8 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 		counter--;
 
 		if (counter < 0) {
-			acc2 = hwReadRegister16(hw, ACX100_DATA_LO);
-			acc2 += hwReadRegister16(hw, ACX100_DATA_HI) << 16;
+			acc2 = acx100_read_reg16(hw, ACX100_DATA_LO);
+			acc2 += acx100_read_reg16(hw, ACX100_DATA_HI) << 16;
 
 			if (acc2 != acc1) {
 				result = 0;
@@ -601,6 +631,12 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 			acc1 = 0;
 			counter = 3;
 		}
+#if EXPERIMENTAL_VER_0_3
+		if (len % 15000 == 0)
+		{
+			acx100_schedule(HZ / 50);
+		}
+#endif
 	}
 
 	// sum control verification
@@ -642,15 +678,19 @@ int acx100_verify_init(wlandevice_t * hw)
 	FN_ENTER;
 	for (timer = 100000; timer > 0; timer--) {
 
-		if (hwReadRegister16(hw, ACX100_STATUS) & 0x4000) {
+		if (acx100_read_reg16(hw, ACX100_STATUS) & 0x4000) {
 			result = 1;
-			hwWriteRegister16(hw, ACX100_IRQ_ACK, 0x4000);
+			acx100_write_reg16(hw, ACX100_IRQ_ACK, 0x4000);
 			break;
 		}
 
 		/* used to be for loop 65535; do scheduled delay instead */
+#if EXPERIMENTAL_VER_0_3
+		acx100_schedule(HZ / 50);
+#else
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout(HZ / 10);
+#endif
 	}
 
 	FN_EXIT(1, result);
@@ -667,20 +707,33 @@ int acx100_read_eeprom(wlandevice_t * hw)
 	UINT8 tmp[0x3b];
 
 	for (offs = 0x8c; offs < 0xb9; offs++) {
-		hwWriteRegister16(hw, ACX100_EEPROM_3, 0x0);
-		hwWriteRegister16(hw, ACX100_EEPROM_4, 0x0);
-		hwWriteRegister16(hw, ACX100_EEPROM_ADDR, offs);
-		hwWriteRegister16(hw, ACX100_EEPROM_2, 0x0);
-		hwWriteRegister16(hw, ACX100_EEPROM_0, 0x2);
-		hwWriteRegister16(hw, ACX100_EEPROM_1, 0x0);
+		acx100_write_reg16(hw, ACX100_EEPROM_3, 0x0);
+		acx100_write_reg16(hw, ACX100_EEPROM_4, 0x0);
+		acx100_write_reg16(hw, ACX100_EEPROM_ADDR, offs);
+		acx100_write_reg16(hw, ACX100_EEPROM_2, 0x0);
+		acx100_write_reg16(hw, ACX100_EEPROM_0, 0x2);
+		acx100_write_reg16(hw, ACX100_EEPROM_1, 0x0);
+#if EXPERIMENTAL_VER_0_3
+		while ((UINT16)acx100_read_reg16(hw, ACX100_EEPROM_0));
+		{
+			count++;
+			if (count > 0xffff)
+				return 0;
+			/* scheduling away instead of CPU burning loop
+			 * doesn't seem to work here:
+			 * awful delay, sometimes also failure.
+			 * Doesn't matter anyway (only small delay). */
+		}
+#else
 		do {
 			count++;
 			if (count > 0xffff)
 				return 0;
 		} while ((UINT16)
-			 hwReadRegister16(hw, ACX100_EEPROM_0));
+			acx100_read_reg16(hw, ACX100_EEPROM_0));
+#endif
 		tmp[offs - 0x8c] =
-			hwReadRegister16(hw, ACX100_EEPROM_DATA);
+			acx100_read_reg16(hw, ACX100_EEPROM_DATA);
 	}
 	return 1;
 }
@@ -713,8 +766,8 @@ void acx100_init_mboxes(wlandevice_t * hw)
 	FN_ENTER;
 	acxlog(L_BINDEBUG,
 		   "==> Get the mailbox pointers from the scratch pad registers\n");
-	cmd_offs = hwReadRegister32(hw, ACX100_CMD_MAILBOX_OFFS);
-	info_offs = hwReadRegister32(hw, ACX100_INFO_MAILBOX_OFFS);
+	cmd_offs = acx100_read_reg32(hw, ACX100_CMD_MAILBOX_OFFS);
+	info_offs = acx100_read_reg32(hw, ACX100_INFO_MAILBOX_OFFS);
 	acxlog(L_BINDEBUG, "CmdMailboxOffset = %x\n", cmd_offs);
 	acxlog(L_BINDEBUG, "InfoMailboxOffset = %x\n", info_offs);
 	acxlog(L_BINDEBUG,
@@ -781,7 +834,7 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	if (ctlInterrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+	if (acx100_interrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapRead failed!\n");
 		return 0;
 	}
@@ -790,7 +843,7 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 	pt->m.ip.WEPCacheStart = pt->m.ip.CodeEnd + 0x4;
 	pt->m.ip.WEPCacheEnd = pt->m.ip.CodeEnd + 0x4;
 
-	if (ctlConfigure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+	if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapWrite failed!\n");
 		return 0;
 	}
@@ -800,7 +853,7 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 	options.vald = 0x00;	/*  <-----------------------------------------------/ */
 
 	acxlog(L_ASSOC, "writing WEP options.\n");
-	ctlConfigure(hw, &options, ACX100_RID_WEP_OPTIONS);
+	acx100_configure(hw, &options, ACX100_RID_WEP_OPTIONS);
 	key = &wp.valb[2];
 	for (i = 0; i <= 3; i++) {
 		if (hw->wep_keys[i].size != 0) {
@@ -809,35 +862,35 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 			wp.valb[1] = hw->wep_keys[i].index;
 			memcpy(key, &hw->wep_keys[i].key, hw->wep_keys[i].size);
 			acxlog(L_ASSOC, "writing default WEP key.\n");
-			ctlConfigure(hw, &wp, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
+			acx100_configure(hw, &wp, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
 		}
 	}
 	if (hw->wep_keys[hw->current_index].size != 0) {
 		acxlog(L_ASSOC, "setting default WEP key number: %ld.\n", hw->current_index);
 		dk.value = hw->current_index;
-		ctlConfigure(hw, &dk, ACX100_RID_DOT11_WEP_KEY);
+		acx100_configure(hw, &dk, ACX100_RID_DOT11_WEP_KEY);
 	}
 	/* FIXME: key_struct is filled nowhere! */
 	for (i = 0; i <= 9; i++) {
 		if (hw->key_struct[i].len != 0) {
-			CopyMacAddress(wep_mgmt.addr, hw->key_struct[i].addr);
+			acx100_copy_mac_address(wep_mgmt.addr, hw->key_struct[i].addr);
 			wep_mgmt.len = hw->key_struct[i].len;
 			memcpy(&wep_mgmt.key, hw->key_struct[i].key, wep_mgmt.len);
 			wep_mgmt.vala = 1;
 			acxlog(L_ASSOC, "writing WEP key %d (len %d).\n", i, wep_mgmt.len);
-			if (ctlIssueCommand(hw, ACX100_CMD_WEP_MGMT, &wep_mgmt, 0x25, 5000)) {
+			if (acx100_issue_cmd(hw, ACX100_CMD_WEP_MGMT, &wep_mgmt, 0x25, 5000)) {
 				hw->key_struct[i].index = i;
 			}
 		}
 	}
 
-	if (ctlInterrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+	if (acx100_interrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
 		return 0;
 	}
 	pt->m.ip.PacketTemplateStart = pt->m.ip.WEPCacheEnd;	// NONBINARY: this does not need to be in this function
 
-	if (ctlConfigure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+	if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
 		return 0;
 	}
@@ -890,11 +943,11 @@ int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * mm)
 
 	acx100_set_tim_template(hw);
 
-	if (!ctlInterrogate(hw, mm, ACX100_RID_MEMORY_MAP))
+	if (!acx100_interrogate(hw, mm, ACX100_RID_MEMORY_MAP))
 		goto failed;
 
 	mm->m.ip.valc = mm->m.ip.PacketTemplateEnd + 4;
-	if (!ctlConfigure(hw, mm, ACX100_RID_MEMORY_MAP))
+	if (!acx100_configure(hw, mm, ACX100_RID_MEMORY_MAP))
 		goto failed;
 
 	result = 1;
@@ -952,7 +1005,7 @@ int acx100_init_max_beacon_template(wlandevice_t * hw)
 	FN_ENTER;
 	memset(&b, 0, sizeof(struct acxp80211_packet));
 	b.size = sizeof(struct acxp80211_packet) - 0x2;	/* subtract size of size field; 0x54 */
-	result = ctlIssueCommand(hw, ACX100_CMD_CONFIG_BEACON, &b, sizeof(struct acxp80211_packet), 5000);
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &b, sizeof(struct acxp80211_packet), 5000);
 	FN_EXIT(1, result);
 	return result;
 }
@@ -967,7 +1020,7 @@ int acx100_init_max_tim_template(wlandevice_t * hw)
 
 	memset(&t, 0, sizeof(struct tim));
 	t.size = sizeof(struct tim) - 0x2;	/* subtract size of size field */
-	return ctlIssueCommand(hw, ACX100_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
+	return acx100_issue_cmd(hw, ACX100_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
 }
 
 /*----------------------------------------------------------------
@@ -998,7 +1051,7 @@ int acx100_init_max_probe_response_template(wlandevice_t * hw)
 	memset(&pr, 0, sizeof(struct acxp80211_packet));
 	pr.size = sizeof(struct acxp80211_packet) - 0x2;	/* subtract size of size field; 0x54 */
 
-	return ctlIssueCommand(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, sizeof(struct acxp80211_packet), 5000);
+	return acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, sizeof(struct acxp80211_packet), 5000);
 }
 
 /*----------------------------------------------------------------
@@ -1030,7 +1083,7 @@ int acx100_init_max_probe_request_template(wlandevice_t * hw)
 	FN_ENTER;
 	memset(&pr, 0, sizeof(struct probereq));
 	pr.size = sizeof(struct probereq) - 0x2;	/* subtract size of size field */
-	return ctlIssueCommand(hw, ACX100_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct probereq), 5000);
+	return acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct probereq), 5000);
 }
 
 /*----------------------------------------------------------------
@@ -1073,7 +1126,7 @@ int acx100_set_tim_template(wlandevice_t * hw)
 	t.buf[0x8] = 0x0;
 	t.buf[0x9] = 0x0;
 	t.buf[0xa] = 0x0;
-	result = ctlIssueCommand(hw, ACX100_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
 	DTIM_count++;
 	if (DTIM_count == hw->val0x2302[0]) {
 		DTIM_count = 0;
@@ -1118,7 +1171,7 @@ int acx100_set_beacon_template(wlandevice_t * hw)
 	acxlog(L_BINDEBUG, "Beacon length:%d\n", (UINT16) len);
 
 	len += 2;		/* add length of "size" field */
-	result = ctlIssueCommand(hw, ACX100_CMD_CONFIG_BEACON, &b, len, 5000);;
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &b, len, 5000);;
 
 	FN_EXIT(1, result);
 
@@ -1165,9 +1218,9 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 	frame_len = WLAN_HDR_A4_LEN /* 0x1e */  + 6 + 4;
 
 	txf->a4.dur = 0x0;
-	SetMacAddressBroadcast(txf->a4.a1);
-	CopyMacAddress(txf->a4.a2, hw->dev_addr);
-	CopyMacAddress(txf->a4.a3, hw->bssid);
+	acx100_set_mac_address_broadcast(txf->a4.a1);
+	acx100_copy_mac_address(txf->a4.a2, hw->dev_addr);
+	acx100_copy_mac_address(txf->a4.a3, hw->bssid);
 	txf->a4.seq = 0x0;
 
 	/* set entry 1: Timestamp field (8 octets) */
@@ -1301,7 +1354,7 @@ int acx100_set_rxconfig(wlandevice_t *hw)
 	
 	*(UINT16 *) &rx_config[0x4] = hw->rx_config_1;
 	*(UINT16 *) &rx_config[0x6] = hw->rx_config_2;
-	ctlConfigure(hw, &rx_config, ACX100_RID_RXCONFIG);
+	acx100_configure(hw, &rx_config, ACX100_RID_RXCONFIG);
 
 	options.valc = 0x0e;
 	if (hw->monitor)
@@ -1309,7 +1362,7 @@ int acx100_set_rxconfig(wlandevice_t *hw)
 	else
 		options.vald = 0;
 
-	ctlConfigure(hw, &options, ACX100_RID_WEP_OPTIONS);
+	acx100_configure(hw, &options, ACX100_RID_WEP_OPTIONS);
 	return 0;
 }
 
@@ -1339,7 +1392,6 @@ int acx100_set_defaults(wlandevice_t * hw /* ebx */ )
 {
 	char antenna[0x14b];
 	char stationID[4 + ACX100_RID_DOT11_STATION_ID_LEN];
-	char domain[0x44];
 	char rate[4 + ACX100_RID_RATE_LEN];
 	char var_28[0xc];
 	char short_retry[4 + ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN];
@@ -1349,16 +1401,15 @@ int acx100_set_defaults(wlandevice_t * hw /* ebx */ )
 	char *paddr;
 	int result = 0;
 	UINT i;
-	memmap_t regdom;
 
 	FN_ENTER;
 	hw->unknown0x2350 = 0;
 
 	memset(antenna, 0, sizeof(antenna));
-	ctlInterrogate(hw, &antenna, ACX100_RID_DOT11_CURRENT_ANTENNA);
+	acx100_interrogate(hw, &antenna, ACX100_RID_DOT11_CURRENT_ANTENNA);
 	antenna[0x4] &= 0x3f;
 
-	ctlInterrogate(hw, &stationID, ACX100_RID_DOT11_STATION_ID);
+	acx100_interrogate(hw, &stationID, ACX100_RID_DOT11_STATION_ID);
 	paddr = &stationID[4];
 	for (i = 0; i < 6; i++) {
 		/* stupid obfuscating code, but this translation seems to be right */
@@ -1389,26 +1440,23 @@ int acx100_set_defaults(wlandevice_t * hw /* ebx */ )
 		hw->dev_addr[3], hw->dev_addr[4], hw->dev_addr[5]);
 	hw->essid_active = 1;
 
-	memcpy(&domain[0x24], hw->val0x2302, 0x20);
-	domain[0x14] = hw->val0x2302[0];	/* FIXME: perhaps crap */
-	ctlInterrogate(hw, &domain, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
-
 	long_retry[0x4] = hw->long_retry;
-	ctlConfigure(hw, &long_retry, ACX100_RID_DOT11_LONG_RETRY_LIMIT);
+	acx100_configure(hw, &long_retry, ACX100_RID_DOT11_LONG_RETRY_LIMIT);
 
 	short_retry[0x4] = hw->short_retry;
-	ctlConfigure(hw, &short_retry, ACX100_RID_DOT11_SHORT_RETRY_LIMIT);
+	acx100_configure(hw, &short_retry, ACX100_RID_DOT11_SHORT_RETRY_LIMIT);
 
 	*(UINT32 *) &xmt_msdu_lifetime[0x4] = hw->msdu_lifetime;
-	ctlConfigure(hw, &xmt_msdu_lifetime, ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME);
+	acx100_configure(hw, &xmt_msdu_lifetime, ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME);
 
 	/* the DWL-650+ seems to need an extra invitation to not
 	 * refuse proper scanning due to undefined regulatory domain...
 	 * So better do initialize the regulatory domain here to
 	 * prevent that from happening.
+	 * After all, we probably do need to set it somewhere after
+	 * startup...
 	 */
-	regdom.m.gp.bytes[0] = 0x10;
-	ctlConfigure(hw, &regdom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
+	acx100_set_reg_domain(hw, hw->reg_dom_id);
 	
 	/* FIXME: huh??? */
 	var_28[0x0] = hw->beacon_interval;
@@ -1416,12 +1464,12 @@ int acx100_set_defaults(wlandevice_t * hw /* ebx */ )
 	acx100_set_rxconfig(hw);
 
 	rate[4] = 0x0;
-	ctlConfigure(hw, &rate, ACX100_RID_RATE);
+	acx100_configure(hw, &rate, ACX100_RID_RATE);
 
 	/*
 	acxlog(L_DEBUG | L_XFER, "Enable Rx and Tx\n");
-	ctlIssueCommand(hw, ACX100_CMD_ENABLE_TX, &(hw->channel), 0x1, 5000);
-	ctlIssueCommand(hw, ACX100_CMD_ENABLE_RX, &(hw->channel), 0x1, 5000);
+	acx100_issue_cmd(hw, ACX100_CMD_ENABLE_TX, &(hw->channel), 0x1, 5000);
+	acx100_issue_cmd(hw, ACX100_CMD_ENABLE_RX, &(hw->channel), 0x1, 5000);
 	*/
 	result = 1;
 
@@ -1487,7 +1535,7 @@ int acx100_set_probe_response_template(wlandevice_t * hw)
 		   pr2[0x15], pr2[0x16], pr2[0x17]);
 
 	len += 2;		/* add length of "size" field */
-	result = ctlIssueCommand(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, len, 5000);
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, len, 5000);
 	FN_EXIT(1, result);
 	return result;
 }
@@ -1526,9 +1574,9 @@ void acx100_set_probe_request_template(wlandevice_t * hw)
 	frame_len = 0x18;
 	pt.hdr.a4.fc = 0x40;
 	pt.hdr.a4.dur = 0x0;
-	SetMacAddressBroadcast(pt.hdr.a4.a1);
-	CopyMacAddress(pt.hdr.a4.a2, hw->dev_addr);
-	CopyMacAddress(pt.hdr.a4.a3, dev_addr);
+	acx100_set_mac_address_broadcast(pt.hdr.a4.a1);
+	acx100_copy_mac_address(pt.hdr.a4.a2, hw->dev_addr);
+	acx100_copy_mac_address(pt.hdr.a4.a3, dev_addr);
 	pt.hdr.a4.seq = 0x0;
 //	pt.hdr.b4.a1[0x0] = 0x0;
 	//pt.hdr.a4.a4[0x1] = hw->next;
@@ -1575,7 +1623,7 @@ void acx100_set_probe_request_template(wlandevice_t * hw)
 	frame_len += 3;		/* ok, now add the remaining 3 bytes */
   if (hw->next != NULL);
 
-	ctlIssueCommand(hw, ACX100_CMD_CONFIG_PROBE_REQUEST, &pt, frame_len, 5000);
+	acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_REQUEST, &pt, frame_len, 5000);
 	FN_EXIT(0, 0);
 }
 
@@ -1652,7 +1700,7 @@ void acx100_parse_conf_opt(wlandevice_t *wlandev)
 	wlandev->antenna[0x4] = 0x8f;
 	wlandev->ed_threshold[0x4] = 0x70;
 	wlandev->cca[0x4] = 0x0d;
-	wlandev->dom = 0x10; // USA
+	acx100_check_eeprom_name(wlandev, 0x16F, &wlandev->reg_dom_id);
 
 	FN_EXIT(0, 0);
 }
@@ -1703,7 +1751,7 @@ void acx100_join_bssid(wlandevice_t * hw)
 	tmp.essid_len = strlen(hw->essid);
 	memcpy(tmp.essid, hw->essid, tmp.essid_len + 1);
 
-	ctlIssueCommand(hw, ACX100_CMD_JOIN, &tmp, tmp.essid_len + 0x11, 5000);
+	acx100_issue_cmd(hw, ACX100_CMD_JOIN, &tmp, tmp.essid_len + 0x11, 5000);
 	acxlog(L_ASSOC | L_BINDEBUG, "<acx100_join_bssid> BSS_Type = %d\n",
 		   tmp.macmode);
 	acxlog(L_ASSOC | L_BINDEBUG,
@@ -1776,7 +1824,7 @@ int acx100_init_mac(netdevice_t * ndev)
 		acxlog(L_STD, "acx100_set_defaults failed.\n");
 		goto done;
 	}
-	CopyMacAddress(ndev->dev_addr, hw->dev_addr);
+	acx100_copy_mac_address(ndev->dev_addr, hw->dev_addr);
 	hw->irq_mask = 0xdfb5;
 	/* hw->val0x240c = 0x1; */
 
@@ -1794,7 +1842,7 @@ int acx100_init_mac(netdevice_t * ndev)
 	}
 	result = 0;
 
-	  done:
+done:
 //	  hwEnableISR(hw);
 //	  acx100_start(hw);
 	FN_EXIT(1, result);
@@ -1841,7 +1889,7 @@ void acx100_scan_chan(wlandevice_t *wlandev)
 	s.chan_duration = 100;
 	s.max_probe_delay = 200;
 
-	ctlIssueCommand(wlandev, ACX100_CMD_SCAN, &s, sizeof(struct scan), 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_SCAN, &s, sizeof(struct scan), 5000);
 
 	FN_EXIT(0, 0);
 }
@@ -1853,7 +1901,7 @@ void acx100_scan_chan_p(wlandevice_t *wlandev, struct scan *s)
 {
 	FN_ENTER;
 	AcxSetStatus(wlandev, ISTATUS_1_SCANNING);
-	ctlIssueCommand(wlandev, ACX100_CMD_SCAN, s, sizeof(struct scan), 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_SCAN, s, sizeof(struct scan), 5000);
 	FN_EXIT(0, 0);
 }
 
@@ -1934,24 +1982,23 @@ void acx100_start(wlandevice_t *wlandev)
 	/* txpow */
 	acxlog(L_INIT, "Set transmit power = %d\n", wlandev->pow);
 	tempmemmap.m.gp.bytes[0] = wlandev->pow;
-	ctlConfigure(wlandev, &tempmemmap, ACX100_RID_DOT11_TX_POWER_LEVEL);
+	acx100_configure(wlandev, &tempmemmap, ACX100_RID_DOT11_TX_POWER_LEVEL);
 
 	/* antenna */
 	acxlog(L_INIT, "Setting antenna value: 0x%02X\n", (unsigned char)wlandev->antenna[0x4]);
-	ctlConfigure(wlandev, &(wlandev->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
+	acx100_configure(wlandev, &(wlandev->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
 
 	/* ed_threshold */
 	acxlog(L_INIT, "Setting ED threshold value: 0x%02X\n", (unsigned char)wlandev->ed_threshold[0x4]);
-	ctlConfigure(wlandev, &(wlandev->ed_threshold), ACX100_RID_DOT11_ED_THRESHOLD);
+	acx100_configure(wlandev, &(wlandev->ed_threshold), ACX100_RID_DOT11_ED_THRESHOLD);
 
 	/* cca */
 	acxlog(L_INIT, "Setting CCA value: 0x%02X\n", (unsigned char)wlandev->cca[0x4]);
-	ctlConfigure(wlandev, &(wlandev->cca), ACX100_RID_DOT11_CURRENT_CCA_MODE);
+	acx100_configure(wlandev, &(wlandev->cca), ACX100_RID_DOT11_CURRENT_CCA_MODE);
 
 	/* reg_domain */
-	acxlog(L_INIT, "Setting regulatory domain to 0x%x\n", wlandev->dom);
-	tempmemmap.m.gp.bytes[0] = wlandev->dom;
-	ctlConfigure(wlandev, &tempmemmap, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
+	acxlog(L_INIT, "Setting regulatory domain to 0x%x\n", wlandev->reg_dom_id);
+	acx100_set_reg_domain(wlandev, wlandev->reg_dom_id);
 
 
 	/* channel */
@@ -1972,8 +2019,8 @@ void acx100_start(wlandevice_t *wlandev)
 		acx100_scan_chan_p(wlandev, &s);
 	}
 	/* Set Tx and Rx */
-	ctlIssueCommand(wlandev, ACX100_CMD_ENABLE_TX, &(wlandev->channel), 0x1, 5000);
-	ctlIssueCommand(wlandev, ACX100_CMD_ENABLE_RX, &(wlandev->channel), 0x1, 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_TX, &(wlandev->channel), 0x1, 5000);
+	acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_RX, &(wlandev->channel), 0x1, 5000);
 
 	/* debug, rate, and nick don't need any handling */
 	/* what about sniffing mode ?? */
@@ -2021,7 +2068,7 @@ void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 		/* first two 16-bit words reserved for type and length */
 		tmp[1] = time;
 		tmp[4] = 0;
-		ctlConfigure(wlandev, &tmp, ACX100_RID_ACX_TIMER);
+		acx100_configure(wlandev, &tmp, ACX100_RID_ACX_TIMER);
 	}
 	else
 	{
@@ -2086,25 +2133,28 @@ void acx100_update_capabilities(wlandevice_t * hw)
 *	It should be found what mean the different values written
 *	in the registers.
 *	It should be checked if it would be possible to use a
-*	hwReadRegister8() instead of a hwReadRegister16() as the
+*	acx100_read_reg8() instead of a acx100_read_reg16() as the
 *	read value should be an octet. (ygauteron, 29.05.2003)
 ----------------------------------------------------------------*/
 unsigned int acx100_check_eeprom_name(wlandevice_t * hw,
-					  UINT16 addr, unsigned char *charbuf)
+					UINT16 addr, unsigned char *charbuf)
 {
+#if BOGUS
 	unsigned long start_jif;
+#endif
 	unsigned int i = 0;
 	unsigned int result;
 
 	FN_ENTER;
-	hwWriteRegister16(hw, ACX100_EEPROM_3, 0);
-	hwWriteRegister16(hw, ACX100_EEPROM_4, 0);
-	hwWriteRegister16(hw, ACX100_EEPROM_ADDR, addr);
-	hwWriteRegister16(hw, ACX100_EEPROM_2, 0);
-	hwWriteRegister16(hw, ACX100_EEPROM_0, 2);
-	hwWriteRegister16(hw, ACX100_EEPROM_1, 0);
+	acx100_write_reg16(hw, ACX100_EEPROM_3, 0);
+	acx100_write_reg16(hw, ACX100_EEPROM_4, 0);
+	acx100_write_reg16(hw, ACX100_EEPROM_ADDR, addr);
+	acx100_write_reg16(hw, ACX100_EEPROM_2, 0);
+	acx100_write_reg16(hw, ACX100_EEPROM_0, 2);
+	acx100_write_reg16(hw, ACX100_EEPROM_1, 0);
 
 	do {
+#if BOGUS
 		start_jif = jiffies;
 		/* NONBIN_DONE: could this CPU burning loop be replaced
 		 * with something much more sane?
@@ -2112,26 +2162,34 @@ unsigned int acx100_check_eeprom_name(wlandevice_t * hw,
 		 jiffies/second), we could replace the 100ms wait
 		 by proper rescheduling. Do it. */
 
-#if BOGUS
 		while ((jiffies - start_jif) <= 10);
+#else
+#if EXPERIMENTAL_VER_0_3
+		acx100_schedule(HZ / 50);
 #else
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout(HZ / 10);
 #endif
+#endif
 
+#if EXPERIMENTAL_VER_0_3
+		/* accumulate the 20ms to up to 5000ms */
+		if (i++ > 250) {
+#else
 		/* accumulate the 100ms to up to 5000ms */
 		if (i++ > 50 /* 0x32 */ ) {
+#endif
 			result = 0;
 			goto done;
 		}
-	} while (hwReadRegister16(hw, ACX100_EEPROM_0) != 0);
+	} while (acx100_read_reg16(hw, ACX100_EEPROM_0) != 0);
 
 	/* yg: Why reading a 16-bits register for a 8-bits value ? */
 	*charbuf =
-		(unsigned char) hwReadRegister16(hw, ACX100_EEPROM_DATA);
+		(unsigned char) acx100_read_reg16(hw, ACX100_EEPROM_DATA);
 	result = 1;
 
-	  done:
+done:
 	FN_EXIT(1, result);
 	return result;
 }

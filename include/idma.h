@@ -36,16 +36,6 @@
  * --------------------------------------------------------------------
  */
 
-void HandleInfoInterrupt(void);
-void HandleDTIMInterrupt(void);
-void HandleBeaconInterrupt(void);
-void HandleTickInterrupt(void);
-void HandleKeyNotFoundInterrupt(wlandevice_t *);
-void HandleIvIcvFailureInterrupt(wlandevice_t *);
-void HandleCommandCompleteInterrupt(void);
-void HandleOverflowInterrupt(wlandevice_t *);
-void HandleProcessErrorInterrupt(void);
-void HandleFCSThresholdInterrupt(wlandevice_t *);
 void hwDisableISR(wlandevice_t * hw);
 
 void hwEnableISR(wlandevice_t * hw);	/* for a description of this, see doc/acx100! */
@@ -75,9 +65,9 @@ char *GetPacketTypeString(UINT16 fc);
  * Some seem to have different meanings... */
 typedef struct rxbuffer {
 	UINT32 status; /* 0x0 */
-	UINT16 stat;   /* 0x2 */
-	UINT8 silence; /* 0x6 */
-	UINT8 signal;  /* 0x7 */
+	UINT16 stat;   /* 0x4 */
+	UINT8 level; /* 0x6 */
+	UINT8 snr;  /* 0x7 */
 	UINT32 time;    /* 0x8 */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8 val0x24[0x922];

@@ -46,6 +46,9 @@
 #ifndef _acx100_H
 #define _acx100_H
 
+/* set to 1 to compile in experimental code for next minor version */
+#define EXPERIMENTAL_VER_0_3	0
+
 /*** MTU SIZE ***/
 /* For the time being, the only way to set mtu is before the card is 
 	brought up. As of right now it is a compile issue. */

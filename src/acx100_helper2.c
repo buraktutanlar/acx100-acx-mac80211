@@ -714,7 +714,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 	else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0 */ )
 			res = 1;
-		else if (IsMacAddressEqual(hw->dev_addr, hdr->a3.a1 /* RA */)) {
+		else if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
 			res = 1;
 			if (hw->iStatus > ISTATUS_3_AUTHENTICATED) {
 				/* hw->val0x240 = req->reason[0]; Unused, so removed */
@@ -957,19 +957,19 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 	}
 
 	acxlog(L_DEBUG, "da ");
-	LogMacAddress(L_DEBUG, da);
+	acx100_log_mac_address(L_DEBUG, da);
 	acxlog(L_DEBUG, ",bssid ");
-	LogMacAddress(L_DEBUG, bssid);
+	acx100_log_mac_address(L_DEBUG, bssid);
 	acxlog(L_DEBUG, ",hw->bssid ");
-	LogMacAddress(L_DEBUG, hw->bssid);
+	acx100_log_mac_address(L_DEBUG, hw->bssid);
 	acxlog(L_DEBUG, ",dev_addr ");
-	LogMacAddress(L_DEBUG, hw->dev_addr);
+	acx100_log_mac_address(L_DEBUG, hw->dev_addr);
 	acxlog(L_DEBUG, ",bcast_addr ");
-	LogMacAddress(L_DEBUG, bcast_addr);
+	acx100_log_mac_address(L_DEBUG, bcast_addr);
 	acxlog(L_DEBUG, "\n");
 
 	/* check if it is our bssid */
-        if (!IsMacAddressEqual(hw->bssid, bssid)) {
+        if (!acx100_is_mac_address_equal(hw->bssid, bssid)) {
 		/* is not our bssid, so bail out */
 		goto done;
 	}
@@ -978,7 +978,7 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 	if (!is_broadcast_address(da)) {
 		if ((signed char) da[0] >= 0) {
 			/* no broadcast, so check if it is our address */
-                        if (!IsMacAddressEqual(da, hw->dev_addr)) {
+                        if (!acx100_is_mac_address_equal(da, hw->dev_addr)) {
 				/* its not, so bail out */
 				goto done;
 			}
@@ -1276,7 +1276,7 @@ int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw, int va
 int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala)
 {
 	UINT16 fc;
-	char *esi;
+	signed char *esi;
 	UINT8 *ebx;
 	p80211_hdr_t *fr;
 	client_t *client;
@@ -1371,7 +1371,7 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 	/* uh oh, we found more sites/stations than we can handle with
 	 * our current setup: pull the emergency brake and stop scanning! */
 	if ((UINT) hw->iStable > MAX_NUMBER_OF_SITE) {
-		ctlIssueCommand(hw, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
+		acx100_issue_cmd(hw, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
 		AcxSetStatus(hw, ISTATUS_2_WAIT_AUTH);
 
 		acxlog(L_BINDEBUG | L_ASSOC,
@@ -1391,7 +1391,7 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 		acxlog(L_DEBUG,
 		       "checking station %ld [%02X %02X %02X %02X %02X %02X]\n",
 		       station, a[0], a[1], a[2], a[3], a[4], a[5]);
-		if (IsMacAddressEqual
+		if (acx100_is_mac_address_equal
 		    (hdr->a4.a3,
 		     hw->val0x126c[station].address)) {
 			acxlog(L_DEBUG,
@@ -1427,8 +1427,8 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 	hw->val0x126c[hw->iStable].cap = hdr->val0x22;
 	memcpy(hw->val0x126c[hw->iStable].supp_rates,
 	       &pSuppRates[2], 0x8);
-	hw->val0x126c[hw->iStable].sir = mmt->silence;
-	hw->val0x126c[hw->iStable].snr = mmt->signal;
+	hw->val0x126c[hw->iStable].sir = mmt->level;
+	hw->val0x126c[hw->iStable].snr = mmt->snr;
 
 	a = hw->val0x126c[hw->iStable].address;
 	ss = &hw->val0x126c[hw->iStable];
@@ -1507,10 +1507,10 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 	if (hdr->a4.fc & 0x300)
 		res = 1;
 	else {
-		if (IsMacAddressEqual(hw->dev_addr, hdr->a4.a1 /* RA */)) {
+		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a4.a1 /* RA */)) {
 			if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
 				pdr.m.asid.vala = req->aid[0];
-				ctlConfigure(hw, &pdr, ACX100_RID_ASSOC_ID);
+				acx100_configure(hw, &pdr, ACX100_RID_ASSOC_ID);
 				AcxSetStatus(hw, ISTATUS_4_ASSOCIATED);
 				acxlog(L_BINSTD | L_ASSOC,
 				       "ASSOCIATED!\n");
@@ -1558,7 +1558,7 @@ int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 	else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ )
 			return 1;
-		if (IsMacAddressEqual(hw->dev_addr, hdr->a3.a1 /* RA */)) {
+		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
 			if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
 				AcxSetStatus(hw, ISTATUS_4_ASSOCIATED);
 			}
@@ -1587,9 +1587,9 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 	if (!hw)
 		return 0;
 
-	LogMacAddress(L_ASSOC, hw->dev_addr);
-	LogMacAddress(L_ASSOC, hdr->a3.a1);
-	if (!IsMacAddressEqual(hw->dev_addr, hdr->a3.a1))
+	acx100_log_mac_address(L_ASSOC, hw->dev_addr);
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a1);
+	if (!acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1))
 		return 1;
 
 	if (hw->mode == 0)
@@ -1769,7 +1769,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 	else {
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ )
 			return 1;
-		if (IsMacAddressEqual(hw->dev_addr, hdr->a3.a1)) {
+		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1)) {
 			if (hw->iStatus > ISTATUS_2_WAIT_AUTH) {
 				AcxSetStatus(hw, ISTATUS_2_WAIT_AUTH);
 				return 0;
@@ -2230,7 +2230,18 @@ int transmit_assoc_req(wlandevice_t *hw)
 	 * Anyway, now Managed network association works properly
 	 * without failing.
 	 */
+	/*
 	*(UINT16 *)pCurrPos = host2ieee16((hw->capabilities & ~(WLAN_SET_MGMT_CAP_INFO_IBSS(1))) | WLAN_SET_MGMT_CAP_INFO_ESS(1));
+	*/
+	*(UINT16 *)pCurrPos = host2ieee16(WLAN_SET_MGMT_CAP_INFO_ESS(1));
+	if (hw->wep_restricted)
+		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_PRIVACY(1));
+	/* only ask for short preamble if the peer station supports it */
+	if (WLAN_GET_MGMT_CAP_INFO_SHORT(hw->station_assoc.cap))
+		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_SHORT(1));
+	/* only ask for PBCC support if the peer station supports it */
+	if (WLAN_GET_MGMT_CAP_INFO_PBCC(hw->station_assoc.cap))
+		*(UINT16 *)pCurrPos |= host2ieee16(WLAN_SET_MGMT_CAP_INFO_PBCC(1));
 #endif
 	acxlog(L_ASSOC, "association: requesting capabilities 0x%04X\n", *(UINT16 *)pCurrPos);
 	pCurrPos += 2;
@@ -2516,9 +2527,6 @@ void d11CompleteScan(wlandevice_t *wlandev)
 
 	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area.\n", wlandev->iStable);
 
-	idx = 0;
-	/* not needed, already in for loop condition; probably part of loop */
-/*	if (wlandev->iStable) { */
 	for (idx = 0; idx < wlandev->iStable; idx++) {
 		/* V3CHANGE: dbg msg in V1 only */
 		acxlog(L_BINDEBUG | L_ASSOC,
@@ -2529,6 +2537,24 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		       (int) wlandev->val0x126c[idx].sir,
 		       (int) wlandev->val0x126c[idx].snr);
 
+		if (!(wlandev->val0x126c[idx].cap & 3))
+		{
+			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
+			wlandev->val0x126c[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
+		}
+		acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
+		       wlandev->val0x126c[idx].cap, needed_cap);
+
+		/* peer station doesn't support what we need? */
+		if (!((wlandev->val0x126c[idx].cap & needed_cap) == needed_cap))
+			continue; /* keep looking */
+
+		if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->val0x126c[idx].channel - 1) ) ))
+		{
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, wlandev->val0x126c[idx].channel);
+			continue; /* keep looking */
+		}
+
 		if ((!wlandev->essid_active)
 		 || (!memcmp(wlandev->val0x126c[idx].essid, wlandev->essid, essid_len)))
 		{
@@ -2536,24 +2562,15 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			       "ESSID matches: \"%s\" (station), \"%s\" (config)\n",
 			       wlandev->val0x126c[idx].essid,
 			       (wlandev->essid_active) ? wlandev->essid : "[any]");
-			if (!(wlandev->val0x126c[idx].cap & 3))
-			{
-				acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
-				wlandev->val0x126c[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
-			}
-			acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
-			       wlandev->val0x126c[idx].cap, needed_cap);
-			if (needed_cap & wlandev->val0x126c[idx].cap) {
-				idx_found = idx;
-				found_station = 1;
-				acxlog(L_ASSOC, "matching station found!!\n");
+			idx_found = idx;
+			found_station = 1;
+			acxlog(L_ASSOC, "matching station found!!\n");
 
-				/* stop searching if this station is
-				 * on the current channel, otherwise
-				 * keep looking for an even better match */
-				if (wlandev->val0x126c[idx].channel == wlandev->channel)
-					break;
-			}
+			/* stop searching if this station is
+			 * on the current channel, otherwise
+			 * keep looking for an even better match */
+			if (wlandev->val0x126c[idx].channel == wlandev->channel)
+				break;
 		}
 		else
 		if (wlandev->val0x126c[idx].essid[0] == '\0')
@@ -2561,11 +2578,9 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			/* hmm, station with empty SSID:
 			 * using hidden SSID broadcast?
 			 */
-			if (needed_cap & wlandev->val0x126c[idx].cap) {
-				idx_found = idx;
-				found_station = 1;
-				acxlog(L_ASSOC, "found station with empty (hidden?) SSID, considering for association attempt.\n");
-			}
+			idx_found = idx;
+			found_station = 1;
+			acxlog(L_ASSOC, "found station with empty (hidden?) SSID, considering for association attempt.\n");
 			/* ...and keep looking for better matches */
 		}
 	}
@@ -2640,13 +2655,13 @@ void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	ctlInterrogate(hw, &pm, ACX100_RID_POWER_MGMT);
+	acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT);
 	if (pm.m.power.a != 0x81)
 		return;
 	pm.m.power.a = 0;
 	pm.m.power.b = 0;
 	pm.m.power.c = 0;
-	ctlConfigure(hw, &pm, ACX100_RID_POWER_MGMT);
+	acx100_configure(hw, &pm, ACX100_RID_POWER_MGMT);
 }
 
 /*----------------------------------------------------------------

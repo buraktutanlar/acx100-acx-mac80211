@@ -97,113 +97,6 @@
 spinlock_t tx_lock;
 spinlock_t rx_lock;
 
-/* HandleInfoInterrupt()
- * STATUS: FINISHED.
- */
-void HandleInfoInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleDTIMInterrupt()
- * STATUS: FINISHED.
- */
-void HandleDTIMInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleBeaconInterrupt()
- * STATUS: FINISHED.
- */
-void HandleBeaconInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleTickInterrupt()
- * STATUS: FINISHED.
- */
-void HandleTickInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleKeyNotFoundInterrupt()
- * STATUS: FINISHED.
- */
-void HandleKeyNotFoundInterrupt(wlandevice_t * hw)
-{
-	FN_ENTER;
-
-	/* hw->val0x1204++; Unused, so removed */
-	hw->stats.rx_errors++;
-
-	FN_EXIT(0, 0);
-}
-
-/* HandleIvIcvFailureInterrupt()
- * STATUS: FINISHED.
- */
-void HandleIvIcvFailureInterrupt(wlandevice_t * hw)
-{
-	FN_ENTER;
-
-	hw->stats.rx_crc_errors++;
-	hw->stats.rx_errors++;
-
-	FN_EXIT(0, 0);
-}
-
-/* HandleCommandCompleteInterrupt()
- * STATUS: FINISHED.
- */
-void HandleCommandCompleteInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleOverflowInterrupt()
- * STATUS: FINISHED.
- */
-void HandleOverflowInterrupt(wlandevice_t * hw)
-{
-	FN_ENTER;
-
-	hw->overflow_errors++;
-	hw->stats.rx_over_errors++;
-
-	FN_EXIT(0, 0);
-}
-
-/* HandleProcessErrorInterrupt()
- * STATUS: FINISHED.
- */
-void HandleProcessErrorInterrupt(void)
-{
-	FN_ENTER;
-	FN_EXIT(0, 0);
-}
-
-/* HandleFCSThresholdInterrupt()
- * 3D
- * STATUS: FINISHED.
- */
-void HandleFCSThresholdInterrupt(wlandevice_t * hw)
-{
-	FN_ENTER;
-
-	/* hw->val0x1180 += hw->val0x2408; Unused, so removed */
-
-	FN_EXIT(0, 0);
-}
-
-
 /*----------------------------------------------------------------
 * hwEnableISR
 * FIXME: rename to acx100_enable_irq
@@ -227,9 +120,9 @@ void HandleFCSThresholdInterrupt(wlandevice_t * hw)
 void hwEnableISR(wlandevice_t * hw)
 {
 	/* if (hw->val0x240c != 0) { */
-		hwWriteRegister16(hw, ACX100_IRQ_MASK, hw->irq_mask);
+		acx100_write_reg16(hw, ACX100_IRQ_MASK, hw->irq_mask);
 	/* } */
-	hwWriteRegister16(hw, ACX100_IRQ_34, 0x8000);
+	acx100_write_reg16(hw, ACX100_IRQ_34, 0x8000);
 }
 
 /*----------------------------------------------------------------
@@ -256,9 +149,9 @@ void hwEnableISR(wlandevice_t * hw)
 void hwDisableISR(wlandevice_t * hw)
 {
 	/* if (hw->val0x240c != 0) { */
-		hwWriteRegister16(hw, ACX100_IRQ_MASK, 0x7fff);
+		acx100_write_reg16(hw, ACX100_IRQ_MASK, 0x7fff);
 	/* } */
-	hwWriteRegister16(hw, ACX100_IRQ_34, 0x0);
+	acx100_write_reg16(hw, ACX100_IRQ_34, 0x0);
 }
 
 /*----------------------------------------------------------------
@@ -318,7 +211,7 @@ int dmaCreateDC(wlandevice_t * hw)
 
 	tdc->wldev = hw;
 	/* which memmap is read here, acxInitMemoryPools did not get called yet ? */
-	if (!ctlInterrogate(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
+	if (!acx100_interrogate(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapRead returns error\n");
 		tdc->val0x7c = 1;
 		return 2;
@@ -361,7 +254,7 @@ int dmaCreateDC(wlandevice_t * hw)
 
 		acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
-		if (!ctlConfigureLength(hw, &CW, ACX100_RID_QUEUE_CONFIG, 0x14 + (CW.vale * 0x08))) {
+		if (!acx100_configure_length(hw, &CW, ACX100_RID_QUEUE_CONFIG, 0x14 + (CW.vale * 0x08))) {
 			acxlog(L_BINSTD,
 			       "ctlQueueConfigurationWrite returns error\n");
 
@@ -405,7 +298,7 @@ int dmaCreateDC(wlandevice_t * hw)
 			tdc->val0x7c = 1;
 			return 2;
 		}
-		if (!ctlInterrogate(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
+		if (!acx100_interrogate(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
 			acxlog(L_BINSTD, "Failed to read memory map\n");
 
 			dmaFreeRxHostDescQ(tdc);
@@ -419,7 +312,7 @@ int dmaCreateDC(wlandevice_t * hw)
 		/* start at least 4 bytes away from the end of the last pool */
 		MemMap.val0x24 = (MemMap.val0x20 + 0x1F + 4) & 0xffffffe0;
 
-		if (!ctlConfigure(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
+		if (!acx100_configure(hw, &MemMap, ACX100_RID_MEMORY_MAP)) {
 			acxlog(L_BINSTD,
 			       "ctlMemoryMapWrite returns error\n");
 
@@ -477,11 +370,15 @@ int dmaDeleteDC(wlandevice_t * hw)
 	FN_ENTER;
 
 	hw->dc.val0x7c = 1;
-	hwWriteRegister16(hw, ACX100_REG_104, 0);
+	acx100_write_reg16(hw, ACX100_REG_104, 0);
 
 	/* used to be a for loop 1000, do scheduled delay instead */
+#if EXPERIMENTAL_VER_0_3
+	acx100_schedule(HZ / 10);
+#else
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ / 10);
+#endif
 
 	dmaFreeTxHostDescQ(&hw->dc);
 	dmaFreeTxDescQ(&hw->dc);
@@ -574,7 +471,7 @@ void dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 	tx_desc->Ctl &= (UINT16) ~0x80;
 
 	wlandev->val0x244c[0] = 0x1;
-	hwWriteRegister16(wlandev, ACX100_REG_7C, 0x4);
+	acx100_write_reg16(wlandev, ACX100_REG_7C, 0x4);
 	spin_unlock_irqrestore(&tx_lock, flags);
 }
 /*----------------------------------------------------------------
@@ -605,7 +502,7 @@ void log_txbuffer(TIWLAN_DC *pDc)
 		pTxDesc = &pDc->pTxDescQPool[i];
 
 		if ((pTxDesc->Ctl & 0xc0) == 0xc0)
-			acxlog(L_BUF, "txbuf %d done!\n", i);
+			acxlog(L_BUF, "txbuf %d done.\n", i);
 	}
 }
 
@@ -887,7 +784,7 @@ void log_rxbuffer(TIWLAN_DC *pDc)
 		pDesc = &pDc->pRxHostDescQPool[i];
 
 		if ((pDesc->Ctl & 0x80) && (pDesc->val0x14 < 0))
-			acxlog(L_BUF, "rxbuf %d full!\n", i);
+			acxlog(L_BUF, "rxbuf %d full.\n", i);
 	}
 }
 
@@ -937,15 +834,15 @@ void dmaRxXfrISR(wlandevice_t * hw)
 	 * iPoolStart and the full descriptor we're supposed to handle. */
 	spin_lock_irqsave(&rx_lock, flags);
 	do {
-		curr_idx = pDc->iPoolStart;
-		pDesc = &RxPool[pDc->iPoolStart];
-		pDc->iPoolStart = (pDc->iPoolStart + 1) % pDc->iPoolSize;
 		count++;
 		if (count > pDc->iPoolSize)
 		{ /* hmm, no luck: all descriptors empty, bail out */
 			spin_unlock_irqrestore(&rx_lock, flags);
 			goto end;
 		}
+		curr_idx = pDc->iPoolStart;
+		pDesc = &RxPool[pDc->iPoolStart];
+		pDc->iPoolStart = (pDc->iPoolStart + 1) % pDc->iPoolSize;
 	}
 	/* "pDesc->val0x14 < 0" is there to check whether MSB
 	 * is set or not */
@@ -963,21 +860,26 @@ void dmaRxXfrISR(wlandevice_t * hw)
 		}
 	
 		buf_len = pDesc->pThisBuf->status & 0xfff;      /* somelength */
-		acxlog(L_XFER|L_DATA, "Rx packet %02d (%s): time %lu, len %i, SIR %d, SNR %d, mode %lX, iStatus %X\n",
+		acxlog(L_XFER|L_DATA, "Rx packet %02d (%s): time %lu, len %i, signal %d, SNR %d, mode %lX, iStatus %X\n",
 			curr_idx,
 			GetPacketTypeString(buf->a3.fc),
 			pDesc->pThisBuf->time,
 			buf_len,
-			pDesc->pThisBuf->silence,
-			pDesc->pThisBuf->signal,
+			pDesc->pThisBuf->level,
+			pDesc->pThisBuf->snr,
 			hw->mode,
 			hw->iStatus);
 
-		hw->wstats.qual.level = pDesc->pThisBuf->silence;
-		hw->wstats.qual.noise = pDesc->pThisBuf->signal;
+		/* I tried to figure out how to map these levels to dBm
+		 * values, but for the life of me I really didn't
+		 * manage to get it. Either these values are not meant to
+		 * be expressed in dBm, or it's some pretty complicated
+		 * calculation. */
+		hw->wstats.qual.level = pDesc->pThisBuf->level * 100 / 255;
+		hw->wstats.qual.noise = pDesc->pThisBuf->snr * 100 / 255;
 		hw->wstats.qual.qual =
-			(hw->wstats.qual.level > hw->wstats.qual.noise) ?
-			(hw->wstats.qual.level - hw->wstats.qual.noise) : 0;
+			(hw->wstats.qual.noise <= 100) ?
+			      100 - hw->wstats.qual.noise : 0;
 		hw->wstats.qual.updated = 7;
 	
 		if (hw->monitor)
@@ -1647,7 +1549,7 @@ int acxInitMemoryPools(wlandevice_t * hw, memmap_t * mmt)
 	MemoryBlockSize.size = hw->memblocksize;
 
 	/* Then we alert the card to our decision of block size */
-	if (!ctlConfigure(hw, &MemoryBlockSize, ACX100_RID_BLOCK_SIZE)) {
+	if (!acx100_configure(hw, &MemoryBlockSize, ACX100_RID_BLOCK_SIZE)) {
 		acxlog(L_BINSTD, "Ctl: MemoryBlockSizeWrite failed\n");
 		return 0;
 	}
@@ -1684,11 +1586,11 @@ int acxInitMemoryPools(wlandevice_t * hw, memmap_t * mmt)
 	    (0x1f + mmt->m.cw2.vali + hw->val0x2500) & 0xffffffe0;
 
 	/* alert the device to our decision */
-	if (!ctlConfigure(hw, &MemoryConfigOption, ACX100_RID_MEMORY_CONFIG_OPTIONS)) {
+	if (!acx100_configure(hw, &MemoryConfigOption, ACX100_RID_MEMORY_CONFIG_OPTIONS)) {
 		return 0;
 	}
 	/* and tell the device to kick it into gear */
-	if (!ctlIssueCommand(hw, ACX100_CMD_INIT_MEMORY, 0, 0, 5000)) {
+	if (!acx100_issue_cmd(hw, ACX100_CMD_INIT_MEMORY, 0, 0, 5000)) {
 		return 0;
 	}
 

@@ -13,7 +13,7 @@ CC = gcc
 #CFLAGS = -D__KERNEL__ -I/usr/src/linux/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -DMODVERSIONS -include /usr/src/linux/include/linux/modversions.h -I../include/ -c -DWLAN_HOSTIF=WLAN_PCI
 CFLAGS = -D__KERNEL__ -I$(KERNEL_BUILD)/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -DMODVERSIONS -I../include/ -c -DWLAN_HOSTIF=WLAN_PCI
 
-CFLAGS+=-include $(KERNEL_BUILD)/include/linux/modversions.h
+CFLAGS+=-include $(KERNEL_BUILD)/include/linux/modversions.h 
 LDFLAGS = -m elf_i386 -r
 
 objects =  acx100.o acx100_ioctl.o acx100_helper.o acx100_helper2.o ihw.o idma.o p80211conv.o acx80211frm.o

@@ -53,3 +53,5 @@ This is the current list of ToDos, in order of importance:
   Also, 4X support seems to be pretty much a dirty hack; but if Windows
   supports it and it's a real gain for many users, then we also ought to
   support it
+- Fix SMP hangups (hyperthreading might be the problem, but does not 
+  appear to be)

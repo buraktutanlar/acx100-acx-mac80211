@@ -43,6 +43,6 @@
  * --------------------------------------------------------------------
  */
 
-#define WLAN_RELEASE	"Ver 0.2.0pre1"
-#define WLAN_RELEASE_SUB "v0.2.0pre1"
+#define WLAN_RELEASE	"Ver 0.2.0pre2"
+#define WLAN_RELEASE_SUB "v0.2.0pre2"
 #define WLAN_RELEASE_CODE 0x000111
