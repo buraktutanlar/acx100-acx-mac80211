@@ -79,8 +79,11 @@
 #include <idma.h>
 #include <ihw.h>
 
+void acx100_dump_bytes(void *,int);
+
+
 /*****************************************************************************
- * 
+ *
  * The Really Low Level Stuff (TM)
  *
  ****************************************************************************/
@@ -222,6 +225,18 @@ inline void acx100_write_reg8(wlandevice_t *wlandev, UINT offset, UINT valb)
  * Intermediate Level
  *
  ****************************************************************************/
+
+void acx100_get_info_state(wlandevice_t *wlandev)
+{
+	acx100_write_reg16(wlandev, ACX100_FW_4, 0x0);
+	acx100_write_reg16(wlandev, ACX100_FW_5, 0x0);
+	acx100_write_reg16(wlandev, ACX100_FW_2, 0x0);
+	acx100_write_reg16(wlandev, ACX100_FW_3, 0x1);
+	acx100_write_reg16(wlandev, ACX100_FW_0, acx100_read_reg16(wlandev, ACX100_INFO_MAILBOX_OFFS));
+	acx100_write_reg16(wlandev, ACX100_FW_1, 0x0);
+	wlandev->info_type = acx100_read_reg16(wlandev, ACX100_DATA_LO);
+	wlandev->info_status = acx100_read_reg16(wlandev, ACX100_DATA_HI);
+}
 
 /*----------------------------------------------------------------
 * acx100_get_cmd_state
@@ -402,6 +417,11 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);
 
+  if (cmd!=ACX100_CMD_INTERROGATE) {
+    acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
+    acx100_dump_bytes(pcmdparam,paramlen);
+  }
+
 	/*** make sure we have at least *some* timeout value ***/
 	if (timeout == 0) {
 		timeout = 1;
@@ -493,6 +513,8 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 		if (pcmdparam != NULL && paramlen != 0) {
 			if (cmd == ACX100_CMD_INTERROGATE) {
 				acx100_read_cmd_param(hw, pcmdparam, paramlen);
+        acxlog(L_DEBUG,"output pdr (len=%d):\n",paramlen);
+        acx100_dump_bytes(pcmdparam,paramlen);
 			}
 		}
 		result = 1;
@@ -505,7 +527,7 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 
 
 /*****************************************************************************
- * 
+ *
  * The Upper Layer
  *
  ****************************************************************************/
@@ -912,4 +934,23 @@ void acx100_power_led(wlandevice_t *wlandev, int enable)
 		acx100_write_reg16(wlandev, 0x290, acx100_read_reg16(wlandev, 0x290) & ~0x0800);
 	else
 		acx100_write_reg16(wlandev, 0x290, acx100_read_reg16(wlandev, 0x290) | 0x0800);
+}
+
+
+void acx100_dump_bytes(void *data,int num) {
+  int i,remain=num;
+  unsigned char *ptr=(unsigned char *)data;
+  while (remain>0) {
+    if (remain<16) {
+      printk(KERN_WARNING);
+      for (i=0;i<remain;i++) printk("%02X ",*ptr++);
+      printk("\n");
+      remain=0;
+    } else {
+      printk(KERN_WARNING);
+      for (i=0;i<16;i++) printk("%02X ",*ptr++);
+      printk("\n");
+      remain-=16;
+    }
+  }
 }

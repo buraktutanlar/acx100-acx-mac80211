@@ -63,6 +63,7 @@
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
 #include <linux/vmalloc.h>
+#include <linux/interrupt.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
@@ -81,6 +82,8 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100.h>
+#include <acx100_helper.h>
+#include <acx100_helper2.h>
 
 /* -------------------------------------------------------------------------
 **                             Module Stuff
@@ -101,53 +104,17 @@ MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware file fro
 ** ---------------------------------------------------------------------- */
 
 
-#define MAXNETDEVICES 1
 #define SHORTNAME "acx100usb"
 
 #define ACX100_VENDOR_ID 0x2001
 #define ACX100_PRODUCT_ID_UNBOOTED 0x3B01
 #define ACX100_PRODUCT_ID_BOOTED 0x3B00
 
-#define ACX100_USB_UPLOAD_FW 0x10
-#define ACX100_USB_ACK_CS 0x11
-#define ACX100_USB_UNKNOWN_REQ1 0x12
-
-
-#define ACX100_USB_MAXCMDLEN 2048
-
-#define ACX100_INIT_SETUPCMD(_rtype,_req,_val,_ind,_len,_data) \
-  (_data)->requesttype=_rtype; \
-  (_data)->request=_req; \
-  (_data)->value=_val; \
-  (_data)->index=_ind; \
-  (_data)->length=_len
-
 
 /* -------------------------------------------------------------------------
 **                        Module Data Structures
 ** ---------------------------------------------------------------------- */
 
-typedef struct acx100usb_cmdblock {
-  UINT16 cmd __WLAN_ATTRIB_PACK__;
-  UINT16 pad __WLAN_ATTRIB_PACK__;
-  UINT16 rid __WLAN_ATTRIB_PACK__;
-  UINT8 parms[ACX100_USB_MAXCMDLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100usb_cmdblock_t;
-
-typedef struct acx100usb_resblock {
-  UINT16 cmd __WLAN_ATTRIB_PACK__;
-  UINT16 status __WLAN_ATTRIB_PACK__;
-  UINT8  response[ACX100_USB_MAXCMDLEN];
-} __WLAN_ATTRIB_PACK__ acx100usb_resblock_t;
-
-struct acx100usb_context {
-  struct usb_device *device;                   /* pointer to claimed USB device structure */
-  struct net_device *ndevices[MAXNETDEVICES];  /* pointerlist to network devices associated with the supported USB hardware */
-  unsigned int remove_pending;                 /* indicator, whether the module should be removed */
-  unsigned int numnetdevs;                     /* number of netdevices we have created */
-  acx100usb_cmdblock_t usbout;
-  acx100usb_resblock_t usbin;
-};
 
 
 
@@ -170,7 +137,12 @@ static void init_usb_device(struct usb_device *) __attribute__((__unused__));
 static void acx100usb_complete(struct urb *) __attribute__((__unused__));
 static void * acx100usb_read_firmware(const char *,unsigned int *);
 static int acx100usb_boot(struct usb_device *);
-static int acx100usb_exec_cmd(short,short,int,short parms[],struct acx100usb_context *);
+static void acx100_usb_complete_rx(struct urb *);
+
+static void acx100_poll_rx(wlandevice_t *);
+void acx100_rx(struct rxhostdescriptor *,wlandevice_t *);
+
+
 int init_module(void);
 void cleanup_module(void);
 
@@ -179,6 +151,7 @@ static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
 #ifdef ACX_DEBUG
+int acx100_debug_func_indent=0;
 static char * acx100usb_pstatus(int);
 static void acx100usb_dump_bytes(void *,int) __attribute__((__unused__));
 static void dump_interface_descriptor(struct usb_interface_descriptor *);
@@ -190,10 +163,17 @@ static void dump_config_descriptor(struct usb_config_descriptor *);
 static void acx100usb_printcmdreq(struct acx100_usb_cmdreq *) __attribute__((__unused__));
 #endif
 
-
 /* -------------------------------------------------------------------------
 **                             Module Data
 ** ---------------------------------------------------------------------- */
+
+#ifdef ACX_DEBUG
+int debug=L_ALL;
+//L_DEBUG|L_FUNC|L_STD|L_DATA;
+#endif
+
+char *firmware_dir;
+
 
 static struct usb_device_id acx100usb_ids[] = {
    { USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED) },
@@ -201,10 +181,6 @@ static struct usb_device_id acx100usb_ids[] = {
    { }
 };
 
-
-#ifdef ACX_DEBUG
-static int debug=L_DEBUG|L_FUNC;
-#endif
 
 /* USB driver data structure as required by the kernel's USB core */
 
@@ -216,7 +192,6 @@ static struct usb_driver acx100usb_driver = {
 };
 
 
-char *firmware_dir;
 
 /* ---------------------------------------------------------------------------
 ** acx100usb_probe():
@@ -238,9 +213,9 @@ char *firmware_dir;
 */
 
 static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const struct usb_device_id *devID) {
-  struct acx100usb_context *context;
-  struct net_device *netdev;
-  int i,numconfigs,numfaces,result;
+  wlandevice_t *context;
+  struct net_device *netdev=NULL;
+  int numconfigs,numfaces,result;
   struct usb_config_descriptor *config;
   /* ---------------------------------------------
   ** first check if this is the "unbooted" hardware
@@ -250,7 +225,6 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     ** Boot the device (i.e. upload the firmware)
     ** --------------------------------------------- */
     acx100usb_boot(dev);
-    acxlog(L_DEBUG,"probe done\n");
     /* ---------------------------------------------
     ** OK, we are done with booting. Normally, the
     ** ID for the unbooted device should disappear
@@ -263,15 +237,13 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     /* ---------------------------------------------
     ** allocate memory for the device driver context
     ** --------------------------------------------- */
-    context = (struct acx100usb_context *)kmalloc(sizeof(struct acx100usb_context),GFP_KERNEL);
+    context = (struct wlandevice *)kmalloc(sizeof(struct wlandevice),GFP_KERNEL);
     if (!context) {
-      printk(KERN_WARNING SHORTNAME ": could not allocate %d bytes memory for device driver context, giving up.\n",sizeof(struct acx100usb_context));
+      printk(KERN_WARNING SHORTNAME ": could not allocate %d bytes memory for device driver context, giving up.\n",sizeof(struct wlandevice));
       return(NULL);
     }
-    context->device=dev;
-    context->numnetdevs=0;
-    context->remove_pending=0;
-    for (i=0;i<MAXNETDEVICES;i++) context->ndevices[i]=0;
+    memset(context,0,sizeof(wlandevice_t));
+    context->usbdev=dev;
     /* ---------------------------------------------
     ** Initialize the device context and also check
     ** if this is really the hardware we know about.
@@ -287,9 +259,7 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     dump_device(dev);
 #endif
     /* ---------------------------------------------
-    ** Allocate memory for (currently) one network
-    ** device. If succesful, fill up the init()
-    ** routine and register the device
+    ** Allocate memory for a network device
     ** --------------------------------------------- */
     if ((netdev = (struct net_device *)kmalloc(sizeof(struct net_device),GFP_ATOMIC))==NULL) {
       printk(KERN_WARNING SHORTNAME ": failed to alloc netdev\n");
@@ -297,10 +267,29 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
       return(NULL);
     }
     memset(netdev, 0, sizeof(struct net_device));
-    context->ndevices[context->numnetdevs]=netdev;
-    context->numnetdevs++;
     netdev->init=(void *)&init_network_device;
     netdev->priv=context;
+    context->netdev=netdev;
+
+    context->urb=usb_alloc_urb(0);
+    if (!context->urb) {
+      printk(KERN_WARNING SHORTNAME ": failed to allocate URB\n");
+      kfree(netdev);
+      kfree(context);
+      return(NULL);
+    }
+
+    context->bulkrx_urb=usb_alloc_urb(0);
+    if (!context->bulkrx_urb) {
+      printk(KERN_WARNING SHORTNAME ": failed to allocate input URB\n");
+      usb_free_urb(context->urb);
+      kfree(netdev);
+      kfree(context);
+      return(NULL);
+    }
+    context->bulkrx_urb->status=0;
+
+
     /* --------------------------------------
     ** Allocate a network device name
     ** -------------------------------------- */
@@ -309,6 +298,7 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     if (result<0) {
       printk(KERN_ERR SHORTNAME ": failed to allocate wlan device name (errcode=%d), giving up.\n",result);
       kfree(netdev);
+      usb_free_urb(context->urb);
       kfree(context);
       return(NULL);
     }
@@ -320,6 +310,7 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     if (result!=0) {
       printk(KERN_ERR SHORTNAME ": failed to register network device for USB WLAN (errcode=%d), giving up.\n",result);
       kfree(netdev);
+      usb_free_urb(context->urb);
       kfree(context);
       return(NULL);
     }
@@ -355,22 +346,23 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
 */
 
 static void acx100usb_disconnect(struct usb_device *dev,void *devContext) {
-  unsigned int i;
-  int result;
-  struct acx100usb_context *context;
-  context = (struct acx100usb_context *)devContext;
+  int i,result;
+  wlandevice_t *context;
+  context = (wlandevice_t *)devContext;
   /* --------------------------------------
   ** Unregister the network devices (ouch!)
   ** -------------------------------------- */
-  for (i=0;i<context->numnetdevs;i++) {
-    result=unregister_netdevice(context->ndevices[i]);
-    acxlog(L_DEBUG,"unregister netdevice on device %d returned %d\n",i,result);
-    kfree(context->ndevices[i]);
-  }
+	if (context->netdev) {
+		result=unregister_netdevice(context->netdev);
+		acxlog(L_DEBUG,"unregister netdevice returned %d\n",result);
+		kfree(context->netdev);
+	}
+  if (context->urb) usb_free_urb(context->urb);
+  if (context->bulkrx_urb) usb_free_urb(context->bulkrx_urb);
   /* --------------------------------------
   ** finally free the context...
   ** -------------------------------------- */
-  kfree(context);
+  if (context) kfree(context);
 }
 
 
@@ -541,8 +533,10 @@ static void * acx100usb_read_firmware(const char *filename,unsigned int *size) {
       if (retval) printk(KERN_ERR "ERROR %d closing %s\n", -retval, filename);
       if ((res) && ((*size) != offset)) {
         printk(KERN_INFO "Firmware is reporting a different size 0x%08x to read 0x%08x\n", (int)(*size), offset);
-        //vfree(res);
-        //res = NULL;
+        /*
+        vfree(res);
+        res = NULL;
+        */
       }
     }
     free_page(page);
@@ -571,9 +565,10 @@ static void init_usb_device(struct usb_device *dev) {
 **
 ** Description:
 **  Basic setup of a network device for use with the WLAN device
-*/
+** ------------------------------------------------------------------------- */
 
 static void init_network_device(struct net_device *netdev) {
+  int result=0;
   /* --------------------------------------
   ** Setup the device and stop the queue
   ** -------------------------------------- */
@@ -594,7 +589,12 @@ static void init_network_device(struct net_device *netdev) {
   netdev->tx_timeout = &acx100usb_tx_timeout;
   netdev->watchdog_timeo = 4 * HZ;        /* 400 */
 #endif
-  SET_MODULE_OWNER(netdev);
+  acxlog(L_DEBUG,"now calling acx100_init_mac() with network device ptr\n");
+  result=acx100_init_mac(netdev);
+  if (!result) {
+    SET_MODULE_OWNER(netdev);
+  }
+  //return(result);
 }
 
 
@@ -608,140 +608,161 @@ static void init_network_device(struct net_device *netdev) {
 **  <NOTHING>
 **
 ** Description:
-**  currently missing (this function does not do anything useful yet anyway)
+**
 */
 
-static int acx100usb_open(struct net_device *dev) {
-  struct acx100usb_context *context;
-  short parms[3];
-  int result;
+static int acx100usb_open(struct net_device *netdev) {
+  wlandevice_t *wlandev = (wlandevice_t *)netdev->priv;
+  unsigned long flags;
 
-  FN_ENTER;
-  if (!(dev->priv)) {
-    printk(KERN_ERR SHORTNAME ": no pointer to acx100 context in network device, cannot operate.\n");
-    return(-ENODEV);
-  }
-  MOD_INC_USE_COUNT;  /* OK, now this module is used */
+  acx100_lock(wlandev, &flags);
 
+  init_timer(&(wlandev->mgmt_timer));
+  wlandev->mgmt_timer.function=acx100_timer;
+  wlandev->mgmt_timer.data=(unsigned long)netdev;
 
-  /* LOCK THAT CONTEXT ! */
+  /* set ifup to 1, since acx100_start needs it (FIXME: ugly) */
 
-  /* --------------------------------------
-  ** Initialize the USB device
-  ** -------------------------------------- */
-  context = (struct acx100usb_context *)dev->priv;
-  //usbdev = context->device;
-  /* --------------------------------------
-  ** Get some information from the device
-  ** -------------------------------------- */
-  parms[0]=0x20;
-  result=acx100usb_exec_cmd(ACX100_CMD_INTERROGATE,0xC,1,parms,context); /* reference result: 0x8 */
-  if (result<0) {
-  }
-  /* --------------------------------------
-  ** -------------------------------------- */
-  parms[0]=0x2;
-  result=acx100usb_exec_cmd(ACX100_CMD_INTERROGATE,ACX100_RID_DOT11_CURRENT_REG_DOMAIN,1,parms,context); /* expected result: 0x1 */
-  if (result<0) {
-  }
-  acxlog(L_DEBUG,"REG_DOMAIN result=0x%X\n",result);
-  /* --------------------------------------
-  ** some memory map stuff...
-  ** -------------------------------------- */
-  /*
-  taken from the USB snoop
-  parms[0]=0x28;
-  result=acx100usb_exec_cmd(ACX100_CMD_INTERROGATE,ACX100_RID_MEMORY_MAP,1,parms,context);
-  if (result<0) {
-  }
-  acxlog(L_DEBUG,"MEMORY_MAP result=0x%X\n",result);
-  */
-  /* --------------------------------------
-  ** Set WEP options...
-  ** -------------------------------------- */
-  /*
-  taken from the USB snoop
-  parms[0]=0x4;
-  result=acx100usb_exec_cmd(ACX100_CMD_CONFIGURE,ACX100_RID_WEP_OPTIONS,1,parms,context);
-  if (result<0) {
-  }
-  result=acx100usb_exec_cmd(ACX100_CMD_CONFIGURE,ACX100_RID_DOT11_WEP_KEY,?,parms,context);
-  */
-  FN_EXIT(1,0);
+  wlandev->ifup = 1;
+  acx100_unlock(wlandev,&flags);
+  acx100_start(wlandev);
+  /* --- */
+  //netdev->state |= (1<<WLAN_STATE_INUSE_BIT);
+  MOD_INC_USE_COUNT;
   return(0);
 }
 
 
 
 
+/*----------------------------------------------------------------
+* acx100_rx():
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
 
-/* ---------------------------------------------------------------------------
-** acx100usb_exec_cmd():
-** Inputs:
-**       cmd -> The command to send to the device
-**       rid -> RID to send (if applicable)
-**    nparms -> Number of (UINT16) parameters
-**     parms -> Pointer to buffer containing parameters
-**   context -> Pointer to driver context
-** ---------------------------------------------------------------------------
-** Returns:
-**  (int) Status from device or <0 on failure
-**
-** Description:
-**  This function executes the command specified by the parameters by performing
-**  a synchronous control transfer to the device (send) and from the device
-**  (ack).
-*/
+void acx100_rx(struct rxhostdescriptor *rxdesc,wlandevice_t * hw) {
+  netdevice_t *ndev;
+  struct sk_buff *skb;
 
-static int acx100usb_exec_cmd(short cmd,short rid,int nparms,short parms[],struct acx100usb_context *context) {
-  int i,result,length;
-  unsigned int inpipe,outpipe;
-  acx100usb_cmdblock_t *cmdreq;
-  acx100usb_resblock_t *cmdresp;
-  struct usb_device *usbdev;
-  /* --------------------------------------
-  ** Prepare buffer pointers...
-  ** -------------------------------------- */
-  cmdreq=(acx100usb_cmdblock_t *)&(context->usbout);
-  cmdresp=(acx100usb_resblock_t *)&(context->usbin);
-  /* --------------------------------------
-  ** Obtain the USB device
-  ** -------------------------------------- */
-  usbdev = context->device;
-  /* --------------------------------------
-  ** Obtain the I/O pipes
-  ** -------------------------------------- */
-  outpipe=usb_sndctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
-  inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
-  /* --------------------------------------
-  ** Fill the request block...
-  ** -------------------------------------- */
-  cmdreq->cmd=cmd;
-  cmdreq->rid=rid;
-  if (nparms>ACX100_USB_MAXCMDLEN) return(-1);
-  for (i=0;i<nparms;i++) ((short *)&(cmdreq->parms))[i]=parms[i];
-  /* --------------------------------------
-  ** Send the command to the device
-  ** -------------------------------------- */
-  length=6+(nparms*sizeof(UINT16));
-  result=usb_control_msg(usbdev,outpipe,ACX100_USB_UNKNOWN_REQ1,USB_TYPE_VENDOR|USB_DIR_OUT,0,0,&(context->usbout),length,3000);
-  if (result<0) return(result);
-  /* --------------------------------------
-  ** Check for device status...
-  ** -------------------------------------- */
-  result=usb_control_msg(usbdev,inpipe,ACX100_USB_UNKNOWN_REQ1,USB_TYPE_VENDOR|USB_DIR_IN,0,0,&(context->usbin),sizeof(struct acx100usb_resblock),3000);
-  if (result<0) return(result);
-  result=cmdresp->status;
-  result&=0xFFFF;
-  return(result);
+  FN_ENTER;
+#if 0
+  if (hw->state & (1<<WLAN_STATE_INUSE_BIT)) {
+    if ((skb = acx100_rxdesc_to_ether(hw, rxdesc))) {
+      ndev = root_acx100_dev.newest;
+      skb->dev = ndev;
+      ndev->last_rx = jiffies;
+
+      skb->protocol = eth_type_trans(skb, ndev);
+      netif_rx(skb);
+      hw->stats.rx_packets++;
+      hw->stats.rx_bytes += skb->len;
+      /* V1_3CHANGE */
+    }
+  }
+#endif
+  FN_EXIT(0, 0);
+}
+
+static void acx100_poll_rx(wlandevice_t *wlandev) {
+	int i;
+	acx100_usbin_t *inbuf;
+	acx100_usbout_t *outbuf;
+	struct usb_device *usbdev;
+	unsigned int outpipe;
+	int res;
+
+	FN_ENTER;
+	//acx100_interrogate(wlandev,params,ACX100_RID_UNKNOWN_09);
+	//
+	//
+	inbuf=&(wlandev->usbin);
+	outbuf=&(wlandev->usbout);
+	usbdev=wlandev->usbdev;
+	outpipe=usb_sndctrlpipe(usbdev,0);
+	/* fill setup message */
+	wlandev->usb_setup.bRequestType=0x0;
+	wlandev->usb_setup.bRequest=0x12;
+	wlandev->usb_setup.wValue=0;
+	wlandev->usb_setup.wIndex=0;
+	wlandev->usb_setup.wLength=8;
+	outbuf->rridreq.cmd=ACX100_CMD_INTERROGATE;
+	outbuf->rridreq.status=0;
+	outbuf->rridreq.rid=ACX100_RID_UNKNOWN_09;
+	outbuf->rridreq.frmlen=4;
+#ifdef ACX_DEBUG
+	char *ptr=(char *)outbuf;
+	acxlog(L_DEBUG,"sending ctrl message with data: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
+#endif
+	usb_fill_control_urb(wlandev->urb,usbdev,outpipe,(char *)&(wlandev->usb_setup),outbuf,8,acx100_usb_complete_rx,wlandev);
+	usb_submit_urb(wlandev->urb);
+
+#if 0
+	hw=wlandev->hw;
+	inbuf=&(hw->bulkin);
+	usbdev=hw->usbdev;
+
+	inpipe=usb_rcvbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
+
+	acxlog(L_DEBUG,"BULK POLL\n");
+	acxlog(L_DEBUG,"inbuf=%X inpipe=%d hw=%X  actlen=%d\n",inbuf,inpipe,hw,hw->bulkrx_urb->actual_length); 
+ 	if (hw->bulkrx_urb->status==-EINPROGRESS) {
+		usb_unlink_urb(hw->bulkrx_urb);
+	}
+
+	usb_fill_bulk_urb(hw->bulkrx_urb,usbdev,inpipe,inbuf,0x80,&(acx100_usb_complete_rx),hw);
+	hw->bulkrx_urb->transfer_flags=USB_ASYNC_UNLINK;
+	hw->bulkrx_urb->timeout=5*HZ;
+	usb_submit_urb(hw->bulkrx_urb);
+#endif
+	FN_EXIT(0,0);
 }
 
 
-static void acx100usb_complete(struct urb *request) {
-  acxlog(L_DEBUG,"request returned\n");
-  //usb_free_urb(request);
-}
+static void acx100_usb_complete_rx(struct urb *urb) {
+	wlandevice_t *hw;
+	unsigned int inpipe;
+	struct usb_device *usbdev;
 
+	FN_ENTER;
+
+	hw=(wlandevice_t *)urb->context;
+
+	if (urb->transfer_buffer==&(hw->usbin)) {
+		char *ptr=(char *)&(hw->usbin);
+		acxlog(L_DEBUG,"ctrl recv completed\n");
+		acxlog(L_DEBUG,"buf: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
+	} else {
+		char *ptr=(char *)&(hw->usb_setup);
+		acxlog(L_DEBUG,"ctrl send completed\n");
+     		usbdev=hw->usbdev;
+		inpipe=usb_rcvctrlpipe(usbdev,0);
+		 /* fill setup message */
+		hw->usb_setup.bRequestType=0xC0;
+		hw->usb_setup.bRequest=0x12;
+		hw->usb_setup.wValue=0;
+		hw->usb_setup.wIndex=0;
+		hw->usb_setup.wLength=8;
+		acxlog(L_DEBUG,"send recv request with setup packet: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
+		usb_fill_control_urb(hw->urb,usbdev,inpipe,(char *)&(hw->usb_setup),&(hw->usbin),8,acx100_usb_complete_rx,hw);
+		usb_submit_urb(hw->urb);
+	}
+
+
+	FN_EXIT(0,0);
+}
 
 
 static int acx100usb_stop(struct net_device *dev) {
@@ -856,16 +877,16 @@ static char * acx100usb_pstatus(int val) {
   }
 }
 
-#if 0
-static void acx100usb_printsetup(devrequest *req) {
-  acxlog(L_DEBUG,"setup-packet: type=0x%X req=0x%X val=0x%X ind=0x%X len=0x%X\n",req->requesttype,req->request,req->value,req->index,req->length);
+static void dump_usbblock(char *block,int bytes) {
+  int i;
+  for (i=0;i<bytes;i++) {
+    if ((i&0xF)==0) {
+      if (i!=0) printk("\n");
+      printk(KERN_INFO);
+    }
+    printk("%02X ",(unsigned char )(block[i]));
+  }
 }
-#endif
-
-static void acx100usb_printcmdreq(struct acx100_usb_cmdreq *req) {
-  acxlog(L_DEBUG,"cmdreq packet: type=0x%X  cmd=0x%X  parm0=0x%X  parm1=0x%X parm2=0x%X\n",req->type,req->cmd,req->parm0,req->parm1,req->parm2);
-}
-
 
 static void dump_device(struct usb_device *dev) {
   int i;
@@ -875,10 +896,10 @@ static void dump_device(struct usb_device *dev) {
   printk(KERN_INFO "acx100 device dump:\n");
   printk(KERN_INFO "  devnum: %d\n",dev->devnum);
   printk(KERN_INFO "  speed: %d\n",dev->speed);
-  printk(KERN_INFO "  tt: %p\n",dev->tt);
-  printk(KERN_INFO "  ttport: %d\n",dev->ttport);
-  printk(KERN_INFO "  refcnt: %d\n", dev->refcnt.counter);
-  printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",dev->toggle[0],dev->toggle[1]);
+  printk(KERN_INFO "  tt: 0x%X\n",(unsigned int)(dev->tt));
+  printk(KERN_INFO "  ttport: %d\n",(unsigned int)(dev->ttport));
+  printk(KERN_INFO "  refcnt: %d\n",dev->refcnt);
+  printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",(unsigned int)(dev->toggle[0]),(unsigned int)(dev->toggle[1]));
   printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",dev->halted[0],dev->halted[1]);
   printk(KERN_INFO "  epmaxpacketin: ");
   for (i=0;i<16;i++) printk("%d ",dev->epmaxpacketin[i]);
@@ -886,12 +907,12 @@ static void dump_device(struct usb_device *dev) {
   printk(KERN_INFO "  epmaxpacketout: ");
   for (i=0;i<16;i++) printk("%d ",dev->epmaxpacketout[i]);
   printk("\n");
-  printk("  parent: %p\n",dev->parent);
-  printk("  bus: %p\n",dev->bus);
+  printk("  parent: 0x%X\n",(unsigned int)(dev->parent));
+  printk("  bus: 0x%X\n",(unsigned int)(dev->bus));
+  printk(KERN_INFO "  configs: ");
+  for (i=0;i<dev->descriptor.bNumConfigurations;i++) printk("0x%X ",dev->config[i]);
   printk("\n");
   printk("  actconfig: %p\n",dev->actconfig);
-
-
   dump_device_descriptor(&(dev->descriptor));
   cd=dev->actconfig;
   dump_config_descriptor(cd);
@@ -918,8 +939,8 @@ static void dump_config_descriptor(struct usb_config_descriptor *cd) {
   printk(KERN_INFO "  iConfiguration: %d (0x%X)\n",cd->iConfiguration,cd->iConfiguration);
   printk(KERN_INFO "  bmAttributes: %d (0x%X)\n",cd->bmAttributes,cd->bmAttributes);
   printk(KERN_INFO "  MaxPower: %d (0x%X)\n",cd->MaxPower,cd->MaxPower);
-  printk(KERN_INFO "  *interface: %p\n",cd->interface);
-  printk(KERN_INFO "  *extra: %p\n",cd->extra);
+  printk(KERN_INFO "  *interface: 0x%X\n",(unsigned int)(cd->interface));
+  printk(KERN_INFO "  *extra: 0x%X\n",(unsigned int)(cd->extra));
   printk(KERN_INFO "  extralen: %d (0x%X)\n",cd->extralen,cd->extralen);
 }
 
@@ -976,23 +997,23 @@ static void dump_interface_descriptor(struct usb_interface_descriptor *id) {
   printk(KERN_INFO "  bInterfaceSubClass: %d (0x%X)\n",id->bInterfaceSubClass,id->bInterfaceSubClass);
   printk(KERN_INFO "  bInterfaceProtocol: %d (0x%X)\n",id->bInterfaceProtocol,id->bInterfaceProtocol);
   printk(KERN_INFO "  iInterface: %d (0x%X)\n",id->iInterface,id->iInterface);
-  printk(KERN_INFO "  endpoint: %p\n",id->endpoint);
+  printk(KERN_INFO "  endpoint: 0x%X\n",(unsigned int)(id->endpoint));
 }
 
 static void acx100usb_dump_bytes(void *data,int num) {
   int i,remain=num;
   unsigned char *ptr=(unsigned char *)data;
   while (remain>0) {
-    if (remain<8) {
-      printk(KERN_INFO);
+    if (remain<16) {
+      printk(KERN_WARNING);
       for (i=0;i<remain;i++) printk("%02X ",*ptr++);
       printk("\n");
       remain=0;
     } else {
-      printk(KERN_INFO);
-      for (i=0;i<8;i++) printk("%02X ",*ptr++);
+      printk(KERN_WARNING);
+      for (i=0;i<16;i++) printk("%02X ",*ptr++);
       printk("\n");
-      remain-=8;
+      remain-=16;
     }
   }
 }

@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/bin/sh
+
+# this script might require a bash compatible shell, but right now it
+# also runs in ksh and ash, so let's set it to /bin/sh
 
 # Added checks to see if the kernel configuration file exists and if so,
 # check if all necessary options are enabled. By Vesa-Pekka Palmu <depili@sci.fi>
@@ -15,7 +18,7 @@ version() {
 
 write_bool() {
 	value=`eval $ECHO '$'$1`
-	if [ "$value" == "y" ]
+	if test "$value" = "y"
 	then
 		$ECHO "$1=y" >> $CONFIG_MK
 	else
@@ -51,7 +54,7 @@ configcheck() {
 printflag() {
 	value=`eval echo '$'$2`
 	$ECHO "    $1 is \c"
-	if [ "$value" == "y" ]
+	if test "$value" = "y"
 	then
 		$ECHO "enabled."
 	else
@@ -61,7 +64,7 @@ printflag() {
 
 is_unset() {
 	value=`eval echo '$'$1`
-	if [ "$value" == "n" ]
+	if test "$value" = "n"
 	then
 		return 0
 	else

@@ -510,10 +510,11 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 
 	wlandev->unknown0x2350 = ISTATUS_5_UNKNOWN;
 	acx100_scan_chan(wlandev);
-
+#if (WLAN_HOSTIF!=WLAN_USB)
 	while (!(acx100_read_reg16(wlandev, ACX100_STATUS) & 0x2000)) {
 		/* FIXME: urks, busy loop! */
 	};
+#endif
 
 	acxlog(L_IOCTL, "after site survey status = %d\n",
 	       wlandev->status);
@@ -739,7 +740,7 @@ static inline int acx100_ioctl_get_scan(struct net_device *dev, struct iw_reques
 	for (i = 0; i < wlandev->bss_table_count; i++)
 	{
 		struct bss_info *bss = &wlandev->bss_table[i];
-		
+
 		ptr = acx100_ioctl_scan_add_station(wlandev, ptr, extra + IW_SCAN_MAX_DATA, bss);
 	}
 	dwrq->length = ptr - extra;
@@ -1199,6 +1200,8 @@ static inline int acx100_ioctl_set_power(struct net_device *dev, struct iw_reque
 			ps_periods = 255;
 		acxlog(L_IOCTL, "setting PS period value to %d periods due to %dus\n", ps_periods, vwrq->value);
 		wlandev->ps_listen_interval = ps_periods;
+		wlandev->ps_wakeup_cfg &= ~PS_CFG_WAKEUP_MODE_MASK;
+		wlandev->ps_wakeup_cfg |= PS_CFG_WAKEUP_EACH_ITVL;
 	}
 	switch (vwrq->flags & IW_POWER_MODE) {
 		/* FIXME: are we doing the right thing here? */
@@ -1658,7 +1661,7 @@ static inline int acx100_ioctl_set_debug(struct net_device *dev,
 }
 #endif
 
-static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41};
+static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51};
 
 static unsigned char *reg_domain_strings[] =
 { "FCC (USA)        (1-11)",
@@ -1669,7 +1672,9 @@ static unsigned char *reg_domain_strings[] =
   "Spain           (10-11)",
   "France          (10-13)",
   "MKK (Japan)        (14)",
-  "MKK1             (1-14)"
+  "MKK1             (1-14)",
+  "Israel? (new!)  (4?-8?) (not all firmware versions)",
+  NULL /* needs to remain as last entry */
 };
 
 /*----------------------------------------------------------------
@@ -1692,10 +1697,11 @@ static unsigned char *reg_domain_strings[] =
 static inline int acx100_ioctl_list_reg_domain(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	int i;
+	unsigned char **entry;
 
 	printk("Domain/Country  Channels  Setting\n");
-	for (i=0; i < 7; i++)
-		printk("%s      %d\n", reg_domain_strings[i], i+1);
+	for (i = 0, entry = reg_domain_strings; *entry; i++, entry++)
+		printk("%s      %d\n", *entry, i+1);
 	return 0;
 }
 
@@ -1729,7 +1735,7 @@ static inline int acx100_ioctl_set_reg_domain(struct net_device *dev, struct iw_
 		goto end;
 	}
 
-	if ((*extra < 1) || (*extra > 7)) {
+	if ((*extra < 1) || (*extra > sizeof(reg_domain_ids))) {
 		result = -EINVAL;
 		goto end_unlock;
 	}
@@ -1893,7 +1899,7 @@ static inline int acx100_ioctl_set_antenna(struct net_device *dev, struct iw_req
 	printk("new antenna value: 0x%02X\n", wlandev->antenna);
 	wlandev->set_mask |= GETSET_ANTENNA;
 
-	return 0;
+	return -EINPROGRESS;
 }
 
 /*----------------------------------------------------------------
@@ -2310,7 +2316,7 @@ end:
 }
 
 #if WIRELESS_EXT >= 13
-#warning "Compile info: choosing to use code infrastructure for newer wireless extension interface version (>= 13)"
+#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for newer wireless extension interface version (>= 13)"
 static const iw_handler acx100_ioctl_handler[] =
 {
 	(iw_handler) acx100_ioctl_commit,	/* SIOCSIWCOMMIT */
@@ -2464,7 +2470,7 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 /* WE 13 and higher will use acx100_ioctl_handler_def */
 #if WIRELESS_EXT < 13
-#warning "Compile info: choosing to use code infrastructure for older wireless extension interface version (< 13)"
+#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for older wireless extension interface version (< 13)"
 #warning "This is untested, please report if it works for you"
 	case SIOCGIWNAME:
 		/* get name == wireless protocol */
@@ -2724,7 +2730,7 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		acx100_ioctl_unknown11(dev, NULL, NULL, NULL);
 		break;
 #endif
-		
+
 	default:
 		acxlog(L_IOCTL, "wireless ioctl 0x%04X queried but not implemented yet!\n", cmd);
 		result = -EOPNOTSUPP;

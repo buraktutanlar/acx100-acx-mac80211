@@ -211,6 +211,7 @@ void acx100_reset_mac(wlandevice_t * hw)
 	UINT16 temp;
 
 	FN_ENTER;
+#if (WLAN_HOSTIF!=WLAN_USB)
 
 	temp = acx100_read_reg16(hw, ACX100_RESET_2) | 0x1;
 	acx100_write_reg16(hw, ACX100_RESET_2, temp);
@@ -226,7 +227,7 @@ void acx100_reset_mac(wlandevice_t * hw)
 
 	temp = acx100_read_reg16(hw, ACX100_RESET_0) | 0x1;
 	acx100_write_reg16(hw, ACX100_RESET_0, temp);
-
+#endif
 	/* used to be for loop 65536; do scheduled delay instead */
 	acx100_schedule(HZ / 100);
 
@@ -256,6 +257,7 @@ void acx100_reset_mac(wlandevice_t * hw)
 
 int acx100_reset_dev(netdevice_t * netdev)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *hw = (wlandevice_t *) netdev->priv;
 	UINT16 vala = 0;
 	int result = 0;
@@ -309,6 +311,7 @@ int acx100_reset_dev(netdevice_t * netdev)
 fail:
 	FN_EXIT(1, result);
 	return result;
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -347,7 +350,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 		return 0;
 	}
 	sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
-	
+
 	apfw_image = acx100_read_fw( filename );
 	if (!apfw_image)
 	{
@@ -401,17 +404,18 @@ int acx100_upload_fw(wlandevice_t * hw)
 int acx100_load_radio(wlandevice_t *wlandev)
 {
 	UINT32 offset;
-	
+
 	memmap_t mm;
 	int res1, res2;
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
 	char filename[PATH_MAX];
-
+	FN_ENTER;
 	acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP);
 	offset = mm.m.ip.CodeEnd;
 
 	sprintf(filename,"%s/RADIO%02x.BIN", firmware_dir, wlandev->radio_type);
+	acxlog(L_DEBUG,"trying to read %s\n",filename);
 	radio_image = acx100_read_fw(filename);
 
 /*
@@ -593,6 +597,7 @@ firmware_image_t* acx100_read_fw(const char *file)
 
 int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT32 offset)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	int counter;
 	int i;
 	UINT32 len;
@@ -656,6 +661,7 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 	}
 	/* compare our checksum with the stored image checksum */
 	return (sum == apfw_image->chksum);
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -678,6 +684,7 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 
 int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT32 offset)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	int result = 1;
 	const UINT8 *image = (UINT8*)apfw_image + 4;
 	UINT32 sum = 0;
@@ -751,6 +758,7 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 		}
 
 	return result;
+#endif
 }
 
 
@@ -782,6 +790,7 @@ int acx100_verify_init(wlandevice_t * hw)
 	int timer;
 
 	FN_ENTER;
+#if (WLAN_HOSTIF!=WLAN_USB)
 	for (timer = 100000; timer > 0; timer--) {
 
 		if (acx100_read_reg16(hw, ACX100_STATUS) & 0x4000) {
@@ -793,6 +802,7 @@ int acx100_verify_init(wlandevice_t * hw)
 		/* used to be for loop 65535; do scheduled delay instead */
 		acx100_schedule(HZ / 50);
 	}
+#endif
 
 	FN_EXIT(1, result);
 	return result;
@@ -803,6 +813,7 @@ int acx100_verify_init(wlandevice_t * hw)
  */
 int acx100_read_eeprom_area(wlandevice_t * hw)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	UINT32 count = 0;
 	int offs = 0x8c;
 	UINT8 tmp[0x3b];
@@ -828,6 +839,7 @@ int acx100_read_eeprom_area(wlandevice_t * hw)
 			acx100_read_reg16(hw, ACX100_EEPROM_DATA);
 	}
 	return 1;
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -853,6 +865,7 @@ int acx100_read_eeprom_area(wlandevice_t * hw)
 */
 void acx100_init_mboxes(wlandevice_t * hw)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	UINT16 cmd_offs, info_offs;
 
 	FN_ENTER;
@@ -871,6 +884,7 @@ void acx100_init_mboxes(wlandevice_t * hw)
 	acxlog(L_BINDEBUG, "InfoParameters = [ 0x%08X ]\n",
 		   hw->InfoParameters);
 	FN_EXIT(0, 0);
+#endif
 }
 
 /*----------------------------------------------------------------
@@ -903,8 +917,8 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 	struct {
 		UINT16 type;
 		UINT16 length;
-		UINT16 valc;
-		UINT8 vald;
+		UINT16 valc;   // max # of keys
+		UINT8 vald;    // WEP option (enable ? set to 1 ?)
 	} options;
 	struct {
 		UINT16 type;
@@ -979,7 +993,6 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 			}
 		}
 	}
-
 	if (acx100_interrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
 		return 0;
@@ -1014,20 +1027,34 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 *----------------------------------------------------------------*/
 
 /* acx100_init_packet_templates()
+ *
+ * NOTE: order is very important here, to have a correct memory layout!
+ * init templates: max Probe Request (station mode), max NULL data,
+ * max Beacon, max TIM, max Probe Response.
+ * 
  * acxInitPacketTemplates()
  * STATUS: almost ok, except for struct definitions.
  */
 int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * mm)
 {
 	/* FIXME: isnt this len V1 code ?? */
-	int len = 0;
+	int len = 0; /* not important, only for logging */
 	int result = 0;
 
 	FN_ENTER;
 
+#if NOT_WORKING_YET
+	/* FIXME: creating the NULL data template breaks
+	 * communication right now, needs further testing.
+	 * Also, need to set the template once we're joining a network. */
+	if (!acx100_init_max_null_data_template(hw))
+		goto failed;
+	len += sizeof(struct acxp80211_hdr) + 2;
+#endif
+
 	if (!acx100_init_max_beacon_template(hw))
 		goto failed;
-	len += sizeof(struct acxp80211_packet);
+	len += sizeof(struct acxp80211_beacon_prb_resp_template);
 
 	/* TODO: beautify code by moving init_tim down just before
 	 * set_tim */
@@ -1073,6 +1100,19 @@ success:
 	return result;
 }
 
+int acx100_init_max_null_data_template(wlandevice_t *wlandev)
+{
+	struct acxp80211_nullframe b;
+	int result;
+
+	FN_ENTER;
+	memset(&b, 0, sizeof(struct acxp80211_nullframe));
+	b.size = sizeof(struct acxp80211_nullframe) - 2;
+	result = acx100_issue_cmd(wlandev, ACX100_CMD_CONFIG_NULL_DATA, &b, sizeof(struct acxp80211_nullframe), 5000);
+	FN_EXIT(1, result);
+	return result;
+}
+
 /*----------------------------------------------------------------
 * acx100_init_max_beacon_template
 *
@@ -1097,13 +1137,13 @@ success:
  */
 int acx100_init_max_beacon_template(wlandevice_t * hw)
 {
-	struct acxp80211_packet b;
+	struct acxp80211_beacon_prb_resp_template b;
 	int result;
 
 	FN_ENTER;
-	memset(&b, 0, sizeof(struct acxp80211_packet));
-	b.size = sizeof(struct acxp80211_packet) - 0x2;	/* subtract size of size field; 0x54 */
-	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &b, sizeof(struct acxp80211_packet), 5000);
+	memset(&b, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
+	b.size = sizeof(struct acxp80211_beacon_prb_resp);
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &b, sizeof(struct acxp80211_beacon_prb_resp_template), 5000);
 	FN_EXIT(1, result);
 	return result;
 }
@@ -1145,12 +1185,12 @@ int acx100_init_max_tim_template(wlandevice_t * hw)
  */
 int acx100_init_max_probe_response_template(wlandevice_t * hw)
 {
-	acxp80211_packet_t pr;
+	struct acxp80211_beacon_prb_resp_template pr;
 	
-	memset(&pr, 0, sizeof(struct acxp80211_packet));
-	pr.size = sizeof(struct acxp80211_packet) - 0x2;	/* subtract size of size field; 0x54 */
+	memset(&pr, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
+	pr.size = sizeof(struct acxp80211_beacon_prb_resp);
 
-	return acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, sizeof(struct acxp80211_packet), 5000);
+	return acx100_issue_cmd(hw, ACX100_CMD_CONFIG_PROBE_RESPONSE, &pr, sizeof(struct acxp80211_beacon_prb_resp_template), 5000);
 }
 
 /*----------------------------------------------------------------
@@ -1258,19 +1298,19 @@ int acx100_set_tim_template(wlandevice_t * hw)
  */
 int acx100_set_beacon_template(wlandevice_t * hw)
 {
-	struct acxp80211_packet b;
+	struct acxp80211_beacon_prb_resp_template bcn;
 	int len, result;
 
 	FN_ENTER;
 
-	memset(&b, 0, sizeof(struct acxp80211_hdr));
-	len = acx100_set_generic_beacon_probe_response_frame(hw, &b.hdr);
-	b.hdr.a4.fc = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_BEACON);	/* 0x80 */
-	b.size = len;
+	memset(&bcn, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
+	len = acx100_set_generic_beacon_probe_response_frame(hw, &bcn.pkt);
+	bcn.pkt.hdr.fc = WLAN_SET_FC_FTYPE(WLAN_FTYPE_MGMT) | WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_BEACON);	/* 0x80 */
+	bcn.size = len;
 	acxlog(L_BINDEBUG, "Beacon length:%d\n", (UINT16) len);
 
 	len += 2;		/* add length of "size" field */
-	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &b, len, 5000);
+	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_BEACON, &bcn, len, 5000);
 
 	FN_EXIT(1, result);
 
@@ -1302,9 +1342,8 @@ int acx100_set_beacon_template(wlandevice_t * hw)
  * STATUS: done
  * fishy status fixed
 */
-int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
-						   hw,
-						   acxp80211_hdr_t * txf)
+int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *wlandev,
+						   struct acxp80211_beacon_prb_resp *bcn)
 {
 	int frame_len;
 	int i;
@@ -1312,56 +1351,56 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 
 	FN_ENTER;
 
-	/* set initial frame_len to 0x24: A4 header plus 3 UINT16 */
-	frame_len = WLAN_HDR_A4_LEN /* 0x1e */  + 6 + 4;
+	bcn->hdr.dur = 0x0;
+	acx100_set_mac_address_broadcast(bcn->hdr.a1);
+	acx100_copy_mac_address(bcn->hdr.a2, wlandev->dev_addr);
+	acx100_copy_mac_address(bcn->hdr.a3, wlandev->bssid);
+	bcn->hdr.seq = 0x0;
 
-	txf->a4.dur = 0x0;
-	acx100_set_mac_address_broadcast(txf->a4.a1);
-	acx100_copy_mac_address(txf->a4.a2, hw->dev_addr);
-	acx100_copy_mac_address(txf->a4.a3, hw->bssid);
-	txf->a4.seq = 0x0;
-
-	/* set entry 1: Timestamp field (8 octets) */
+	/*** set entry 1: Timestamp field (8 octets) ***/
 	/* FIXME: Strange usage of struct, is it ok ?
 	 * Answer: sort of. The current struct definition is for *one*
 	 * specific packet type only (and thus not for a Probe Response);
 	 * this needs to be redefined eventually */
-	memset(txf->val0x18, 0, 8);
+	memset(bcn->timestamp, 0, 8);
 
-	/* set entry 2: Beacon Interval (2 octets) */
-	txf->beacon_interval = hw->beacon_interval;
+	/*** set entry 2: Beacon Interval (2 octets) ***/
+	bcn->beacon_interval = wlandev->beacon_interval;
 
-	/* set entry 3: Capability information (2 octets) */
-	acx100_update_capabilities(hw);
-	txf->caps = hw->capabilities;
+	/*** set entry 3: Capability information (2 octets) ***/
+	acx100_update_capabilities(wlandev);
+	bcn->caps = wlandev->capabilities;
 
-	/* set entry 4: SSID (2 + (0 to 32) octets) */
-	acxlog(L_ASSOC, "SSID = %s, len = %i\n", hw->essid, hw->essid_len);
-	this = &txf->info[0];
+	/* set initial frame_len to 36: A3 header (24) + 8 UINT8 + 2 UINT16 */
+	frame_len = WLAN_HDR_A3_LEN + 8 + 2 + 2;
+
+	/*** set entry 4: SSID (2 + (0 to 32) octets) ***/
+	acxlog(L_ASSOC, "SSID = %s, len = %i\n", wlandev->essid, wlandev->essid_len);
+	this = &bcn->info[0];
 	this[0] = 0;		/* "SSID Element ID" */
-	this[1] = hw->essid_len;	/* "Length" */
-	memcpy(&this[2], hw->essid, hw->essid_len);
-	frame_len += 2 + hw->essid_len;
+	this[1] = wlandev->essid_len;	/* "Length" */
+	memcpy(&this[2], wlandev->essid, wlandev->essid_len);
+	frame_len += 2 + wlandev->essid_len;
 
-	/* set entry 5: Supported Rates (2 + (1 to 8) octets) */
-	this = &txf->info[2 + hw->essid_len];
+	/*** set entry 5: Supported Rates (2 + (1 to 8) octets) ***/
+	this = &bcn->info[2 + wlandev->essid_len];
 
 	this[0] = 1;		/* "Element ID" */
-	this[1] = hw->rate_spt_len;
-	if (hw->rate_spt_len < 2) {
-		for (i = 0; i < hw->rate_spt_len; i++) {
-			hw->rate_support1[i] &= ~0x80;
+	this[1] = wlandev->rate_spt_len;
+	if (wlandev->rate_spt_len > 2) {
+		for (i = 2; i < wlandev->rate_spt_len; i++) {
+			wlandev->rate_support1[i] &= ~0x80;
 		}
 	}
-	memcpy(&this[2], hw->rate_support1, hw->rate_spt_len);
+	memcpy(&this[2], wlandev->rate_support1, wlandev->rate_spt_len);
 	frame_len += 2 + this[1];	/* length calculation is not split up like that, but it's much cleaner that way. */
 
-	/* set entry 6: DS Parameter Set () */
+	/*** set entry 6: DS Parameter Set (2 + 1 octets) ***/
 	this = &this[2 + this[1]];
 	this[0] = 3;		/* "Element ID": "DS Parameter Set element" */
 	this[1] = 1;		/* "Length" */
-	this[2] = hw->channel;	/* "Current Channel" */
-	frame_len += 3;		/* ok, now add the remaining 3 bytes */
+	this[2] = wlandev->channel;	/* "Current Channel" */
+	frame_len += 2 + 1;		/* ok, now add the remaining 3 bytes */
 
 	FN_EXIT(1, frame_len);
 
@@ -1390,6 +1429,7 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 	 * Hopefully that's ok, but you never know if we're actually
 	 * right... (especially since Windows XP doesn't seem to show
 	 * actual Tx dBm values :-P) */
+#if (WLAN_HOSTIF!=WLAN_USB)
 	unsigned char dbm2val_maxim[21] = { 63, 63, 63, 62, 61, 61, 60, 60, 59, 58, 57, 55, 53, 50, 47, 43, 38, 31, 23, 13, 0};
 	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	
@@ -1411,7 +1451,7 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 	acx100_write_reg16(wlandev, 0x26c + 2, 0);
 	acx100_write_reg16(wlandev, 0x270, 1);
 	acx100_write_reg16(wlandev, 0x270 + 2, 0);
-
+#endif
 	return 0;
 }
 
@@ -1480,7 +1520,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			}
 			wlandev->get_mask &= ~GET_STATION_ID;
 		}
-	
+
 		if (wlandev->get_mask & (GETSET_ANTENNA|GETSET_ALL))
 		{
 			unsigned char antenna[4 + ACX100_RID_DOT11_CURRENT_ANTENNA_LEN];
@@ -1631,13 +1671,16 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 
 		/* change 802.11 power save mode settings */
 		acxlog(L_INIT, "Updating 802.11 power save mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", wlandev->ps_wakeup_cfg, wlandev->ps_listen_interval, wlandev->ps_options, wlandev->ps_hangover_period, wlandev->ps_enhanced_transition_time);
-		/* acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT); */
+		acx100_interrogate(wlandev, &pm, ACX100_RID_POWER_MGMT);
+		acxlog(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", pm.m.power.wakeup_cfg, pm.m.power.listen_interval, pm.m.power.options, pm.m.power.hangover_period, pm.m.power.enhanced_ps_transition_time);
 		pm.m.power.wakeup_cfg = wlandev->ps_wakeup_cfg;
 		pm.m.power.listen_interval = wlandev->ps_listen_interval;
 		pm.m.power.options = wlandev->ps_options;
 		pm.m.power.hangover_period = wlandev->ps_hangover_period;
 		pm.m.power.enhanced_ps_transition_time = wlandev->ps_enhanced_transition_time;
 		acx100_configure(wlandev, &pm, ACX100_RID_POWER_MGMT);
+		acx100_interrogate(wlandev, &pm, ACX100_RID_POWER_MGMT);
+		acxlog(L_INIT, "wakeup_cfg: 0x%02x\n", pm.m.power.wakeup_cfg);
 		acx100_schedule(HZ / 25);
 		acx100_interrogate(wlandev, &pm, ACX100_RID_POWER_MGMT);
 		acxlog(L_INIT, "power save mode change %s\n", (pm.m.power.wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
@@ -1694,20 +1737,21 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	{
 		/* reg_domain */
 		memmap_t dom;
-		static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41};
-		static unsigned int reg_domain_channel_masks[] = {0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff};
+		static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51};
+		static unsigned int reg_domain_channel_masks[] = {0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x00f8};
 		int i;
 
 		acxlog(L_INIT, "Updating regulatory domain: 0x%x\n",
 					wlandev->reg_dom_id);
-		for (i = 0; i < 7; i++)
+		for (i = 0; i < sizeof(reg_domain_ids); i++)
 			if (reg_domain_ids[i] == wlandev->reg_dom_id)
 				break;
 
-		if (i == 7)
+		if (i == sizeof(reg_domain_ids))
 		{
-			acxlog(L_STD, "invalid regulatory domain specified, falling back to FCC (USA)!\n");
+			acxlog(L_STD, "Invalid or unsupported regulatory domain 0x%02x specified, falling back to FCC (USA)! Please report if this sounds fishy!\n", wlandev->reg_dom_id);
 			i = 0;
+			wlandev->reg_dom_id = reg_domain_ids[i];
 		}
 
 		wlandev->reg_dom_chanmask = reg_domain_channel_masks[i];
@@ -1962,10 +2006,10 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 
 	wlandev->antenna = 0x8f;
 	wlandev->set_mask |= GETSET_ANTENNA;
-	
+
 	wlandev->ed_threshold = 0x70;
 	wlandev->set_mask |= GETSET_ED_THRESH;
-	
+
 	wlandev->cca = 0x0d;
 	wlandev->set_mask |= GETSET_CCA;
 
@@ -2010,23 +2054,23 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 int acx100_set_probe_response_template(wlandevice_t * hw)
 {
 	UINT8 *pr2;
-	struct acxp80211_packet pr;
+	struct acxp80211_beacon_prb_resp_template pr;
 	int len, result;
 
 	FN_ENTER;
-	memset(&pr, 0, sizeof(struct acxp80211_packet));
-	len = acx100_set_generic_beacon_probe_response_frame(hw, &pr.hdr);
+	memset(&pr, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
+	len = acx100_set_generic_beacon_probe_response_frame(hw, &pr.pkt);
 	pr.size = len;
-	pr.hdr.a4.fc = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_PROBERESP);
-	pr2 = pr.hdr.info;
+	pr.pkt.hdr.fc = WLAN_SET_FC_FTYPE(WLAN_FTYPE_MGMT) | WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_PROBERESP);
+	pr2 = pr.pkt.info;
 
 	acxlog(L_DATA | L_XFER, "SetProberTemp: cb = %d\n", len);
 	acxlog(L_DATA, "src=%02X:%02X:%02X:%02X:%02X:%02X\n",
-		   pr.hdr.a4.a2[0], pr.hdr.a4.a2[1], pr.hdr.a4.a2[2],
-		   pr.hdr.a4.a2[3], pr.hdr.a4.a2[4], pr.hdr.a4.a2[5]);
+		   pr.pkt.hdr.a2[0], pr.pkt.hdr.a2[1], pr.pkt.hdr.a2[2],
+		   pr.pkt.hdr.a2[3], pr.pkt.hdr.a2[4], pr.pkt.hdr.a2[5]);
 	acxlog(L_DATA, "BSSID=%02X:%02X:%02X:%02X:%02X:%02X\n",
-		   pr.hdr.a4.a3[0], pr.hdr.a4.a3[1], pr.hdr.a4.a3[2],
-		   pr.hdr.a4.a3[3], pr.hdr.a4.a3[4], pr.hdr.a4.a3[5]);
+		   pr.pkt.hdr.a3[0], pr.pkt.hdr.a3[1], pr.pkt.hdr.a3[2],
+		   pr.pkt.hdr.a3[3], pr.pkt.hdr.a3[4], pr.pkt.hdr.a3[5]);
 	acxlog(L_DATA,
 		   "SetProberTemp: Info1=%02X %02X %02X %02X %02X %02X %02X %02X\n",
 		   pr2[0], pr2[1], pr2[2], pr2[3], pr2[4], pr2[5], pr2[6],
@@ -2221,24 +2265,37 @@ int acx100_init_mac(netdevice_t * ndev)
 	struct memmap pkt;
 	wlandevice_t *hw = (wlandevice_t *) ndev->priv;
 
+	acxlog(L_DEBUG,"sizeof(memmap)=%d bytes\n",sizeof(pkt));
+
 	FN_ENTER;
 
 	acxlog(L_BINDEBUG, "******************************************\n");
 	acxlog(L_BINDEBUG | L_INIT,
 		   "************ acx100_initmac_1 ************\n");
 	acxlog(L_BINDEBUG, "******************************************\n");
-
+#if (WLAN_HOSTIF!=WLAN_USB)
 	hw->memblocksize = 0x100;
+#else
+	hw->memblocksize=0x80;
+#endif
 
 	acx100_init_mboxes(hw);
+#if (WLAN_HOSTIF!=WLAN_USB)	
 	acx100_load_radio(hw);
+#endif
 
+	if (!acx100_init_wep(hw,&pkt)) goto done;
+	acxlog(L_DEBUG,"between init_wep and init_packet_templates\n");
+	if (!acx100_init_packet_templates(hw,&pkt)) goto done;
+
+	/*
 	if (!acx100_init_wep(hw, &pkt)
 	|| !acx100_init_packet_templates(hw, &pkt)) {
 		acxlog(L_STD,
 			   "MYDBG: acx100_init_wep or acx100_init_packet_templates failed.\n");
 		goto done;
 	}
+	*/
 
 
 	/* V1_3CHANGE: V1 has acx100_create_dma_regions() loop.
@@ -2254,7 +2311,7 @@ int acx100_init_mac(netdevice_t * ndev)
 		goto done;
 	}
 	acx100_copy_mac_address(ndev->dev_addr, hw->dev_addr);
-	hw->irq_mask = 0xdfb5;
+	hw->irq_mask = 0xdbb5;
 	/* hw->val0x240c = 0x1; */
 
 	if (hw->mode != 0x2) {
@@ -2298,10 +2355,8 @@ done:
 /* AcxScan()
  * STATUS: should be ok, but struct not classified yet.
  */
-void acx100_scan_chan(wlandevice_t *wlandev)
-{
+void acx100_scan_chan(wlandevice_t *wlandev) {
 	struct scan s;
-
 	FN_ENTER;
 
 	/* now that we're starting a new scan, reset the number of stations
@@ -2314,11 +2369,18 @@ void acx100_scan_chan(wlandevice_t *wlandev)
 	s.count = 1;
 	s.start_chan = 1;
 	s.flags = 0x8000;
+#if (WLAN_HOSTIF!=WLAN_USB)	
 	s.max_rate = 20; /* 2 Mbps */
 	s.options = 1;
 
 	s.chan_duration = 100;
 	s.max_probe_delay = 200;
+#else
+	s.max_rate=0;
+	s.options=0;
+	s.chan_duration=15;
+	s.max_probe_delay=20;
+#endif
 
 	acx100_issue_cmd(wlandev, ACX100_CMD_SCAN, &s, sizeof(struct scan), 5000);
 
@@ -2386,7 +2448,7 @@ void acx100_start(wlandevice_t *wlandev)
 				// FIXME: These errors should actually be handled
 //				result = -EFAULT;
 			}
-	
+
 			if (!acx100_set_probe_response_template(wlandev)) {
 				acxlog(L_BINSTD, "acx100_set_probe_response_template returns error\n");
 //				result = -EFAULT;
@@ -2453,7 +2515,9 @@ void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 	/* newer firmware versions abandoned timer configuration
 	 * FIXME: any other versions between 1.8.3 (working) and
 	 * 1.9.3.e (removed)? */
-	if (wlandev->firmware_numver < 0x0109030e) {
+#if (WLAN_HOSTIF!=WLAN_USB)
+	if (wlandev->firmware_numver < 0x0109030e)
+	{
 		acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %d\n",
 		   (int) time);
 
@@ -2464,6 +2528,9 @@ void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 	} else {
 		mod_timer(&wlandev->mgmt_timer, jiffies + (time / 1000000)*HZ);
 	}
+#else
+	mod_timer(&(wlandev->mgmt_timer),jiffies+(time/1000000)*HZ);
+#endif
 	FN_EXIT(0, 0);
 }
 
@@ -2529,6 +2596,7 @@ void acx100_update_capabilities(wlandevice_t * hw)
 unsigned int acx100_read_eeprom_offset(wlandevice_t * hw,
 					UINT16 addr, unsigned char *charbuf)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 #if BOGUS
 	unsigned long start_jif;
 #endif
@@ -2572,4 +2640,5 @@ unsigned int acx100_read_eeprom_offset(wlandevice_t * hw,
 done:
 	FN_EXIT(1, result);
 	return result;
+#endif
 }

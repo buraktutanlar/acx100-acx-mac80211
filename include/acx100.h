@@ -46,6 +46,11 @@
 #ifndef _ACX100_H
 #define _ACX100_H
 
+
+#if (WLAN_HOSTIF==WLAN_USB)
+#include <linux/usb.h>
+#endif
+
 /*============================================================================*
  * Debug / log functionality                                                  *
  *============================================================================*/
@@ -72,6 +77,7 @@
 #define L_IOCTL		0x400	/* log ioctl calls */
 #define L_CTL		0x800	/* log of low-level ctl commands */
 #define L_BUF		0x1000	/* debug buffer mgmt (ring buffer etc.) */
+#define L_XFER_BEACON	0x2000	/* also log beacon packets */
 
 #define L_BINDEBUG	(L_BIN | L_DEBUG)
 #define L_BINSTD	(L_BIN | L_STD)
@@ -412,6 +418,7 @@ extern int acx100_debug_func_indent;
 /*--- Configuration RID Lengths: Network Params, Static Config Entities -----*/
 /* This is the length of JUST the DATA part of the RID (does not include the
  * len or code fields) */
+
 /* TODO: fill in the rest of these */
 #define ACX100_RID_ACX_TIMER_LEN			0x10
 #define ACX100_RID_POWER_MGMT_LEN			0x06
@@ -475,6 +482,7 @@ extern int acx100_debug_func_indent;
 /*--- Configuration RID Lengths: Network Params, Dynamic Config Entities -----*/
 /* This is the length of JUST the DATA part of the RID (does not include the
  * len or code fields) */
+
 /* TODO: fill in the rest of these */
 #define ACX100_RID_GROUPADDR_LEN	((UINT16)16 * WLAN_ADDR_LEN)
 #define ACX100_RID_CREATEIBSS_LEN	((UINT16)0)
@@ -1744,6 +1752,10 @@ typedef struct acx100_InfFrame {
 #define ACX100_USB_RRIDREQ	3
 #define ACX100_USB_WMEMREQ	4
 #define ACX100_USB_RMEMREQ	5
+#define ACX100_USB_UPLOAD_FW 0x10
+#define ACX100_USB_ACK_CS 0x11
+#define ACX100_USB_UNKNOWN_REQ1 0x12
+#define ACX100_USB_TX_DESC 0xA
 
 /* Received from the bulkin endpoint */
 #define ACX100_USB_ISFRM(a)	((a) < 0x7fff)
@@ -1758,12 +1770,44 @@ typedef struct acx100_InfFrame {
 #define ACX100_USB_BUFAVAIL	0x8006
 #define ACX100_USB_ERROR	0x8007
 
+#define ACX100_USB_TXHI_ISDATA     0x1
+#define ACX100_USB_TXHI_DIRECTED   0x2
+#define ACX100_USB_TXHI_BROADCAST  0x4
+
+#define ACX100_USB_CTL_PREAMBLE   0x01
+#define ACX100_USB_CTL_FIRSTFRAG  0x02
+#define ACX100_USB_CTL_AUTODMA    0x04
+#define ACX100_USB_CTL_RECLAIM    0x08
+#define ACX100_USB_CTL_HOSTDONE   0x20
+#define ACX100_USB_CTL_ACXDONE    0x40
+#define ACX100_USB_CTL_OWN        0x80
+
+#define ACX100_USB_CTL2_FCS       0x02
+#define ACX100_USB_CTL2_MORE_FRAG 0x04
+#define ACX100_USB_CTL2_RTS       0x20
+
+
 /*--- Request (bulk OUT) packet contents -------------------------------------*/
 
 typedef struct acx100_usb_txfrm {
-	acx100_tx_frame_t desc __WLAN_ATTRIB_PACK__;
-	UINT8 data[WLAN_DATA_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_txfrm_t;
+  UINT16 desc __WLAN_ATTRIB_PACK__;
+  UINT16 MPDUlen __WLAN_ATTRIB_PACK__;
+  UINT16 index __WLAN_ATTRIB_PACK__;
+  UINT16 txRate __WLAN_ATTRIB_PACK__;
+  UINT32 hostData __WLAN_ATTRIB_PACK__;
+  UINT8  ctrl1 __WLAN_ATTRIB_PACK__;
+  UINT8  ctrl2 __WLAN_ATTRIB_PACK__;
+  UINT16 dataLength __WLAN_ATTRIB_PACK__;
+  UINT8 data[WLAN_DATA_MAXLEN];
+} acx100_usb_txfrm_t __WLAN_ATTRIB_PACK__;
+
+typedef struct acx100_usb_scan {
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 pad0 __WLAN_ATTRIB_PACK__;
+	UINT16 unk1 __WLAN_ATTRIB_PACK__;
+	UINT16 unk2 __WLAN_ATTRIB_PACK__;
+} acx100_usb_scan_t __WLAN_ATTRIB_PACK__;
+
 
 typedef struct acx100_usb_cmdreq {
 	UINT16 type __WLAN_ATTRIB_PACK__;
@@ -1775,26 +1819,36 @@ typedef struct acx100_usb_cmdreq {
 } __WLAN_ATTRIB_PACK__ acx100_usb_cmdreq_t;
 
 typedef struct acx100_usb_wridreq {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status  __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
+	UINT16 frmlen __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_wridreq_t;
 
 typedef struct acx100_usb_rridreq {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT8 pad[58] __WLAN_ATTRIB_PACK__;
+	UINT16 frmlen __WLAN_ATTRIB_PACK__;
+	UINT8 pad[56] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rridreq_t;
 
 typedef struct acx100_usb_wmemreq {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-	UINT16 offset __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
+	/*
+  UINT16 offset __WLAN_ATTRIB_PACK__;
 	UINT16 page __WLAN_ATTRIB_PACK__;
+  */
 	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_wmemreq_t;
+
+typedef struct acx100_usb_rxtx_ctrl {
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
+	UINT8 data __WLAN_ATTRIB_PACK__;
+} __WLAN_ATTRIB_PACK__ acx100_usb_rxtx_ctrl_t;
 
 typedef struct acx100_usb_rmemreq {
 	UINT16 type __WLAN_ATTRIB_PACK__;
@@ -1833,9 +1887,10 @@ typedef struct acx100_usb_wridresp {
 } __WLAN_ATTRIB_PACK__ acx100_usb_wridresp_t;
 
 typedef struct acx100_usb_rridresp {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
+	UINT16 frmlen __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rridresp_t;
 
@@ -1866,13 +1921,15 @@ typedef struct acx100_usb_error {
 /*--- Unions for packaging all the known packet types together ---------------*/
 
 typedef union acx100_usbout {
-	UINT16 type __WLAN_ATTRIB_PACK__;
+  UINT16 type __WLAN_ATTRIB_PACK__;
 	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
 	acx100_usb_cmdreq_t cmdreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_wridreq_t wridreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_rridreq_t rridreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_wmemreq_t wmemreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_rmemreq_t rmemreq __WLAN_ATTRIB_PACK__;
+	acx100_usb_rxtx_ctrl_t rxtx __WLAN_ATTRIB_PACK__;
+	acx100_usb_scan_t scan __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usbout_t;
 
 typedef union acx100_usbin {
@@ -2294,6 +2351,17 @@ typedef struct wlandevice {
 	/*** Power managment ***/
 	struct pm_dev *pm;	/* PM crap */
 
+	/*** USB stuff ***/
+#if (WLAN_HOSTIF==WLAN_USB)
+	struct usb_device *usbdev;
+	acx100_usbout_t usbout;
+	acx100_usbin_t usbin;
+	acx100_usbin_t bulkin;
+	struct urb *urb;
+	struct urb *bulkrx_urb;
+	struct usb_ctrlrequest usb_setup;
+#endif
+
 	/*** Procfs support ***/
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc_entry;
@@ -2422,6 +2490,8 @@ typedef struct wlandevice {
 					 * but it should most likely be *one*
 					 * UINT32 instead, pointing to the cmd
 					 * param memory. V3POS 268c, V1POS 2664 */
+	UINT16 info_type;	/* V3POS 2508, V1POS 24e0 */
+	UINT16 info_status;	/* V3POS 250a, V1POS 24e2 */
 	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
 
 	/*** Unknown ***/

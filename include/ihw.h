@@ -48,22 +48,23 @@ typedef struct mac {
 	UINT16 valb;
 } mac_t;
 
-UINT32 acx100_read_reg32(wlandevice_t *act, UINT valb);
-void acx100_write_reg32(wlandevice_t *act, UINT vala, UINT valb);
-UINT16 acx100_read_reg16(wlandevice_t *act, UINT valb);
-void acx100_write_reg16(wlandevice_t *act, UINT vala, UINT16 valb);
-UINT8 acx100_read_reg8(wlandevice_t *act, UINT valb);
-void acx100_write_reg8(wlandevice_t *act, UINT vala, UINT valb);
+UINT32 acx100_read_reg32(wlandevice_t *wlandev, UINT valb);
+void acx100_write_reg32(wlandevice_t *wlandev, UINT vala, UINT valb);
+UINT16 acx100_read_reg16(wlandevice_t *wlandev, UINT valb);
+void acx100_write_reg16(wlandevice_t *wlandev, UINT vala, UINT16 valb);
+UINT8 acx100_read_reg8(wlandevice_t *wlandev, UINT valb);
+void acx100_write_reg8(wlandevice_t *wlandev, UINT vala, UINT valb);
 
-void acx100_get_cmd_state(wlandevice_t *act);
-void acx100_write_cmd_type(wlandevice_t *act, UINT16 vala);
-void acx100_write_cmd_status(wlandevice_t *act, UINT vala);
+void acx100_get_info_state(wlandevice_t *wlandev);
+void acx100_get_cmd_state(wlandevice_t *wlandev);
+void acx100_write_cmd_type(wlandevice_t *wlandev, UINT16 vala);
+void acx100_write_cmd_status(wlandevice_t *wlandev, UINT vala);
 
 int acx100_issue_cmd(wlandevice_t *wlandev, UINT command, void *hw,
 		     int valb, UINT32 valc);
 
-int acx100_configure(wlandevice_t *act, void *pdr, short type);
-int acx100_configure_length(wlandevice_t *act, void *pdr, short type,
+int acx100_configure(wlandevice_t *wlandev, void *pdr, short type);
+int acx100_configure_length(wlandevice_t *wlandev, void *pdr, short type,
 			    short length);
 int acx100_interrogate(wlandevice_t *hw, void *pdr, short type);
 

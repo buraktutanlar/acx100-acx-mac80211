@@ -70,6 +70,21 @@ typedef struct InitPacket2 {
 //              UINT PacketTemplateEnd;  //0x18
 } InitPacket2_t;
 
+typedef struct acx100usb_memmap {
+	UINT16	rid;
+	UINT16	length;
+	UINT32	CodeStart;
+	UINT32	CodeEnd;
+	UINT32	WEPStart;
+	UINT32	WEPEnd;
+	UINT32	PacketStart;
+	UINT32	PacketEnd;
+	UINT32	QueueStart;
+	UINT32	QueueEnd;
+	UINT32	PoolStart;
+	UINT32	PoolEnd;
+} acx100usb_memmap_t;
+
 #ifdef V1_VERSION
 typedef struct ConfigWrite {
 	UINT16 vala;		//0x4
@@ -87,7 +102,7 @@ typedef struct ConfigWrite {
 	UINT8 valj;		//0x21
 } ConfigWrite_t;
 typedef struct ConfigWrite2 {
-	UINT16 vala;		//0x4
+	UINT16 vala;		//0x4 
 	UINT16 valb;		//0x6
 	UINT CodeStart;		//0x8
 	UINT CodeEnd;		//0xc
@@ -157,27 +172,30 @@ typedef struct ConfigWrite3 {
 #endif
 
 typedef struct QueueConfig {
-	UINT16 vala;
-	UINT16 valb;
-	UINT32 AreaSize;
+	UINT16 vala;		/* rid */
+	UINT16 valb;            /* length */
+	UINT32 AreaSize;     
 	UINT32 RxQueueStart;
-	UINT8  vald;
-	UINT8  vale;
-	UINT16 valf;
+	UINT8  vald;           /* queue options */
+	UINT8  vale;	       /* # tx queues */
+	UINT8 valf1;
+	UINT8 valf2;           /* # rx buffers */
 	UINT32 QueueEnd;
 	UINT32 QueueEnd2;
-	UINT32 TxQueueStart;
-	UINT8  valj;
-	UINT8  valk;
+	UINT32 TxQueueStart;   
+	UINT8  valj;           /*  */
+	UINT8  valk;           /* # tx buffers */
 	UINT16 vall;
 } QueueConfig_t;
 
+#if MAYBE_BOGUS
 typedef struct wep {
 	UINT16 vala;
 
 	UINT8 wep_key[MAX_KEYLEN];
 	char key_name[0x16];
 } wep_t;
+#endif
 
 typedef struct associd {
 	UINT16 vala;
@@ -217,7 +235,7 @@ typedef struct memmap {
 		struct ConfigWrite2 cw2;
 		struct ConfigWrite3 cw3;
 		struct QueueConfig qc;
-		struct wep wp;
+		/* struct wep wp; */
 		struct associd asid;
 		struct powermgmt power;
 		struct defaultkey dkey;
@@ -325,13 +343,35 @@ typedef struct acxp80211_hdr {
 //  p80211_hdr_a4_t b4;
 } acxp80211_hdr_t;		/* size: 0x54 */
 
+/* struct used for Beacon and for Probe Response frames */
+typedef struct acxp80211_beacon_prb_resp {
+	p80211_hdr_a3_t hdr;     /* 24 Bytes */
+	UINT8 timestamp[8];      /* 8 Bytes */
+	UINT16 beacon_interval;  /* 2 Bytes */
+	UINT16 caps;             /* 2 Bytes */
+	UINT8 info[48];          /* 48 Bytes */
+#if INFO_CONSISTS_OF
+	UINT8 ssid[1+1+IW_ESSID_MAX_SIZE]; /* 34 Bytes */
+	UINT8 supp_rates[1+1+8]; /* 10 Bytes */
+	UINT8 ds_parms[1+1+1]; /* 3 Bytes */
+	UINT8 filler;		/* 1 Byte alignment filler */
+#endif
+} acxp80211_beacon_prb_resp_t;
 
 typedef struct acxp80211_packet {
-	UINT16 size;		//this is probably to align it for memory mapping, the actual packet
-	// should start with the packet.
-	struct acxp80211_hdr hdr;
+	UINT16 size; /* packet len indicator for firmware */
+	struct acxp80211_hdr hdr; /* actual packet */
 } acxp80211_packet_t;		/* size: 0x56 */
 
+typedef struct acxp80211_beacon_prb_resp_template {
+	UINT16 size; /* packet len indicator for firmware */
+	struct acxp80211_beacon_prb_resp pkt;
+} acxp80211_beacon_prb_resp_template_t;
+
+typedef struct acxp80211_nullframe {
+	UINT16 size;
+	struct p80211_hdr_a3 hdr;
+} acxp80211_nullframe_t;
 
 typedef struct {
     UINT32 chksum;
@@ -367,13 +407,14 @@ int acx100_read_eeprom_area(wlandevice_t * wlandev);
 void acx100_init_mboxes(wlandevice_t * hw);
 int acx100_init_wep(wlandevice_t * wlandev, memmap_t * pt);
 int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * pt);
+int acx100_init_max_probe_request_template(wlandevice_t * hw);
+int acx100_init_max_null_data_template(wlandevice_t * hw);
 int acx100_init_max_beacon_template(wlandevice_t * wlandev);
 int acx100_init_max_tim_template(wlandevice_t * hw);
 int acx100_init_max_probe_response_template(wlandevice_t * hw);
-int acx100_init_max_probe_request_template(wlandevice_t * hw);
 int acx100_set_tim_template(wlandevice_t * acx);
-int acx100_set_generic_beacon_probe_response_frame(wlandevice_t * hw,
-						   acxp80211_hdr_t * txf);
+int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *wlandev,
+						   struct acxp80211_beacon_prb_resp *bcn);
 void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, int set_all);
 int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd);
 void acx100_set_probe_request_template(wlandevice_t * skb);

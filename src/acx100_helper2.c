@@ -2308,7 +2308,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 	hd->sequence_control = arg_0->hdr->a3.seq;
 
 	memcpy(hd->da, arg_0->hdr->a3.a2, WLAN_ADDR_LEN);
-	/* FIXME: huh? why is there no ¨sa"? */
+	/* FIXME: huh? why is there no sa"? */
 	memcpy(hd->bssid, arg_0->hdr->a3.a3, WLAN_BSSID_LEN);
 
 	hdesc_header->length = WLAN_HDR_A3_LEN;
@@ -2863,7 +2863,7 @@ void acx100_timer(unsigned long address)
 {
 	wlandevice_t *hw = (wlandevice_t *)address;
 	unsigned long flags;
-	
+
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
@@ -2892,7 +2892,7 @@ void acx100_timer(unsigned long address)
 			acx100_set_status(hw, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(hw, 1500000);
-		break;
+    break;
 	case ISTATUS_3_AUTHENTICATED:
 		if (hw->auth_assoc_retries++ <= 9) {
 			acxlog(L_ASSOC,

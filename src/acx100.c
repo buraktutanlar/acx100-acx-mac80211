@@ -886,7 +886,7 @@ static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 * STATUS:
 *	stable
 * Comment:
-*	This function is called by acx100_open (when ifconfig sets the 
+*	This function is called by acx100_open (when ifconfig sets the
 *	device as up).
 *----------------------------------------------------------------*/
 static void acx100_up(netdevice_t * dev)
@@ -1309,6 +1309,12 @@ static void acx100_set_rx_mode(netdevice_t * netdev)
 	FN_EXIT(0, 0);
 }
 
+void acx100_handle_info_irq(wlandevice_t *wlandev)
+{
+	acx100_get_info_state(wlandev);
+	acxlog(L_STD | L_IRQ, "Info IRQ: type 0x%04x, status 0x%04x\n", wlandev->info_type, wlandev->info_status);
+}
+
 /*----------------------------------------------------------------
 * acx100_interrupt
 *
@@ -1427,6 +1433,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if (irqtype & 0x400) {
 		printk("Got Info IRQ\n");
+		acx100_handle_info_irq(wlandev);
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x400);
 	}
 	if (irqtype & 0x800) {

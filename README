@@ -5,6 +5,10 @@
 WARNING: this driver may still cause your box to lockup!
 If this happens, then please report at/create a bug report!
 
+Please NEVER consider using the NDIS driver loader cludge instead of this driver.
+For bazillions of reasons against it, please see
+http://acx100.sourceforge.net/ndis_cludge.html
+
 --- CARD COMPATIBILITY (aka "OUCH!!") ---
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
@@ -28,9 +32,14 @@ driver support from Texas Instruments.
 Also, due to similar card naming confusion (for further information, see
 bottom), people keep thinking certain cards they own work with this
 driver. Cards that are *NOT* based on ACX100 chipset (as opposed to
-the stupidly similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+)
-are:
-DWL-G120 (PRISM GT chipset)
+the stupidly similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+,
+which *do* have ACX100) are:
+
+DWL-120 (PRISM2 chipset)
+DWL-520 (PRISM2)
+DWL-650 (PRISM2, minus few newer variants which D-Link messed up to have the
+         ACX100 instead)
+DWL-G120 (PRISM GT)
 DWL-G520 (Atheros AR5212A)
 DWL-G650, version A1 (PRISM GT)
 DWL-G650, version B1 (Atheros AR5211)
@@ -38,16 +47,13 @@ DWL-G650, version B2 (Atheros AR5001)
 DWL-AG520 (Atheros AR5212)
 DWL-AB650 (Atheros AR5211)
 DWL-AG650 (Atheros AR5212)
-DWL-G520+ (TNETW1130: not supported yet!)
+DWL-G520+ (TNETW1130: not supported yet, but it's being worked on!)
 DWL-G650+ (TNETW1130)
 
 When looking at the DWL-G650 mess, I could puke again...
-Again, these cards listed above will NOT work with this driver, you will
-hopefully be able to find a different Linux driver supporting your card's
-chipset...
-Of course, all old DWL-120/520/650 cards also don't work with this
-driver, since they used Prism2 (except for some rare samples of the
-DWL-650, where D-Link ALSO used ACX100, confusingly).
+Again, the card mentioned in the listing above will NOT work with this driver,
+you will hopefully be able to find a different Linux driver supporting
+your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
 --- STATUS AS OF 031101 ---
@@ -70,23 +76,24 @@ driver changes.
 
 Many other things haven't been tested (properly) yet.
 
-Skillful testers and BSD driver writers welcome!!
-(for FreeBSD development, please visit http://wlan.kewl.org and cvs.kewl.org)
+A working FreeBSD driver that's derived from our driver can be found at
+http://wlan.kewl.org and cvs.kewl.org (thanks, guys, for the cool work!).
 There is a free download of the 802.11b spec at
 http://standards.ieee.org/getieee802/
 
 --- REQUIREMENTS ---
 
-What to do or have:
+What to do or have (we will NOT remind you later about any requirements,
+since this seeks to list all requirements in full):
 * relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
 	with CONFIG_NET_RADIO enabled ("Wireless LAN")
 	and CONFIG_NET_WIRELESS, for wireless extensions (iwconfig etc.).
 	And Non-SMP (no CONFIG_SMP).
 * proper kernel header files / kernel source (packages) installed
         for the exact (*EXACT*!!) kernel you're running! 
-* The /bin/bash shell is required for the Configure script
 * a make package has to be installed
 * a gcc package has to be installed
+* The /bin/bash shell is required for the start_net/stop_net scripts
 * firmware image and radio image for your ACX100 card
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
@@ -190,8 +197,7 @@ This is the usual way to get the driver running on Linux 2.4.x.
 You have two choices:
 
 The fast way:
-  Just run "make" in the main directory (make sure to have package
-  "make" installed on your system!), and your driver will be ready
+  Just run "make" in the main directory, and your driver will be ready
   in a second. It is located in src/acx100_pci.o .
 
   In case the build fails, then please make sure that the symbolic link
@@ -257,6 +263,7 @@ Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf.
+Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable.
 
 Wired-Wireless bridging? Driver would perhaps need to support WDS
 (whatever that is). For now, proxy ARP should do:
@@ -291,6 +298,10 @@ but doesn't get recognized as a CardBus card), then try to use
 further memory and port areas in /etc/pcmcia/config.opts (restart
 pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
+If the system detects your card, but the driver is unable to initialize the
+card due to the card having IDs 0xffff etc., then play with Linux boot
+parameters, specifically the "pci=XXXX" flags, and most specifically,
+"pci=assign-busses", since this managed to fix it for one person (DWL-650+).
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
 
@@ -343,7 +354,8 @@ towards the final successful association.
 
 Usual power levels for a connection are (at least for my PheeNet WL-0022
 CardBus, other people WILL have better or worse results!):
-Signal level 86/100 (extremely good, at least to my PheeNet AP with DWL-900AP+ firmware; directly neighbouring the AP)
+Signal level 86/100 (extremely good, at least to my PheeNet AP with DWL-900AP+
+                     firmware; directly neighbouring the AP)
 Signal level 29/100 (anything less: connection lost @22Mbps)
 Signal level 26/100 (anything less: connection lost @11Mbps)
 Signal level 21/100 (anything less: connection lost @1Mbps)
