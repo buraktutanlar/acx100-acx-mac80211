@@ -1801,7 +1801,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	acxlog(L_INIT, "Regulatory domain ID as read from EEPROM: 0x%x\n", wlandev->reg_dom_id);
 	wlandev->set_mask |= GETSET_REG_DOMAIN;
 
-	wlandev->msdu_lifetime = 0x800;
+	wlandev->msdu_lifetime = 5000; /* was 0x800, probably was too low */
 	wlandev->set_mask |= SET_MSDU_LIFETIME;
 
 	wlandev->short_retry = 0x5;

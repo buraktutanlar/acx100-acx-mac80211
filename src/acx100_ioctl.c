@@ -2147,6 +2147,7 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 				result = -E2BIG;
 				break;
 			}
+			/* FIXME: why copy essid into stack nirvana ? */
 			if (copy_from_user(essid, iwr->u.essid.pointer,
 						iwr->u.essid.length))
 			{
@@ -2154,16 +2155,15 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 				break;
 			}
 			result = acx100_ioctl_set_essid(dev, NULL,
-					&(iwr->u.essid), NULL);
+					&(iwr->u.essid), essid);
+		}
 		break;
-
 
 	case SIOCGIWESSID:
 		/* get ESSID */
 		result = acx100_ioctl_get_essid(dev, NULL, &(iwr->u.essid),
 						NULL);
 		break;
-
 
 	case SIOCSIWRATE:
 		/* set default bit rate (bps) */
