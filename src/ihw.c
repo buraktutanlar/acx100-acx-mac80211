@@ -74,13 +74,11 @@
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
 #include <acx100.h>
-#include <p80211netdev.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
 #include <ihw.h>
-#include <acx100mgmt.h>
 
 /*****************************************************************************
  * 
@@ -358,6 +356,25 @@ static inline void acx100_read_cmd_param(wlandevice_t * hw, memmap_t * cmd, int 
 	memcpy(cmd, (UINT *) hw->CommandParameters, len);
 }
 
+static const char * const cmd_error_strings[] = {
+	"Idle[TIMEOUT]",
+	"[SUCCESS]",
+	"Unknown Command",
+	"Invalid Information Element",
+	"unknown_FIXME",
+	"channel invalid in current regulatory domain",
+	"unknown_FIXME2",
+	"Command rejected (read-only information element)",
+	"Command rejected",
+	"Already asleep",
+	"Tx in progress",
+	"Already awake",
+	"Write only",
+	"Rx in progress",
+	"Invalid parameter",
+	"Scan in progress"
+};
+
 /*----------------------------------------------------------------
 * acx100_issue_cmd
 *
@@ -382,24 +399,6 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	int result = 0;
 	UINT16 irqtype = 0;
 	UINT16 cmd_status;
-	char *cmd_error_strings[] = {
-"Idle[TIMEOUT]",
-"[SUCCESS]",
-"Unknown Command",
-"Invalid Information Element",
-"unknown_FIXME",
-"channel invalid in current regulatory domain",
-"unknown_FIXME2",
-"Command rejected (read-only information element)",
-"Command rejected",
-"Already asleep",
-"Tx in progress",
-"Already awake",
-"Write only",
-"Rx in progress",
-"Invalid parameter",
-"Scan in progress"
-	};
 
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);

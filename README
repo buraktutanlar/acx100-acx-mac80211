@@ -178,7 +178,7 @@ The slow way:
   Type "make config" in the main directory to cause some configuration
   settings to be checked.
   Then you type "make driver". This will compile a driver for
-  Linux 2.4.x (2.5.x does NOT work correctly yet, but we're working on it).
+  Linux 2.4.x (for 2.5 / 2.6 see below)
 
 No install option has yet been provided (because the driver is still a bit
 experimental anyway :)
@@ -212,22 +212,22 @@ insmod src/acx100_pci.o firmware_dir=firmware use_eth_name=1
 
 For troubleshooting, see below.
 
---- "CRAZY" INSTALLATION ---
+--- LINUX 2.6 INSTALLATION ---
 
-What, you really intend to use the driver on Linux 2.5.x/2.6.x??
+In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
+source tree and have to build the module "in-tree". You'll have to:
 
-OK, if you really want to do that, then do:
-
-1. create drivers/net/wireless/acx100 in your 2.6 source tree
-2. copy all .c from acx100/src and all .h from acx100.include into
-   drivers/net/wireless/acx100 (DO NOT copy any Makefiles)
-3. apply the patch from
-http://www.cs.uni-magdeburg.de/~aschultz/acx100/linux-2.6.0-test1-acx100-A0.diff
-to adjust/create the Makefiles
-(this may fail for versions other than 2.6.0-test1, of course, so you may
-need to adapt it...)
-4. build your kernel, cross your fingers and hopefully enjoy acx100
-with linux-2.6 ;-)
+1. Create a directory drivers/net/wireless/acx100 in your 2.6 source tree.
+2. Copy the files
+      - src/Makefile
+      - src/*.c
+      - include/*.h
+   from the acx100 sources into drivers/net/wireless/acx100 in your 2.6 tree.
+3. Add a line reading "obj-m += acx100/" to the bottom of
+   drivers/net/wireless/Makefile .
+4. Then build your kernel as usual, the acx100 driver will be built as module
+   (acx100_pci.ko). Make sure you have the required 2.6 module userspace
+   package (module-init-tools) and enjoy ;-)
 
 --- USAGE HINTS ---
 

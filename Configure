@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Added checks to see if the kernel configuration file exists and if so,
+# check if all necessary options are enabled. By Vesa-Pekka Palmu <depili@sci.fi>
+
 CONFIG_MK=config.mk
 KERNEL_BUILD=/lib/modules/`uname -r`/build
 ECHO="/bin/echo -e "
@@ -29,8 +32,77 @@ rm -f $CONFIG_MK
 VERSION_CODE=`grep LINUX_VERSION_CODE $KERNEL_BUILD/include/linux/version.h | \
     sed -e 's/[^0-9]//g'`
 
+qgrep() {
+	grep $* >/dev/null 2>&1
+}
+
+configcheck() {
+	eval "CONFIG_$1=n"
+	if qgrep "^CONFIG_$1=y" "$KERNEL_BUILD/.config" ; then
+		eval "CONFIG_$1=y"
+	elif qgrep "^CONFIG_$1=m" "$KERNEL_BUILD/.config" ; then
+		eval "CONFIG_$1=y"
+	fi
+}
+
+printflag() {
+	value=`eval echo '$'$2`
+	/bin/echo -e "    $1 is \c"
+	if [ "$value" == "y" ] ; then
+		echo "enabled."
+	else
+		echo "DISABLED."
+	fi
+}
+
+isok() {
+	value=`eval echo '$'$1`
+	if [ "$value" == "n" ] ; then
+		return 0
+	else
+		#$ECHO "Debug"
+		return 1
+	fi
+}
+
+fail() {
+	$ECHO "Kernel configuration lacks needed options, please correct"
+	exit 1
+}
+
+if [ -e "$KERNEL_BUILD/.config" ]; then
+	$ECHO "Kernel configuration found, performing sanity checks"
+	configcheck PCMCIA
+	configcheck CARDBUS
+	configcheck NET_WIRELESS
+	configcheck NET_RADIO
+	configcheck PCI
+	configcheck MODULES
+	$ECHO "All of the following items are required by the driver:"
+	printflag "Loadable modules support" CONFIG_MODULES
+	printflag "Wireless LAN (non-hamradio) support" CONFIG_NET_RADIO
+	printflag "Wireless extensions support" CONFIG_NET_WIRELESS
+	$ECHO "The following is needed for PCMCIA/CardBus cards:"
+	printflag "PCMCIA support" CONFIG_PCMCIA
+	printflag "CardBus support" CONFIG_CARDBUS
+	$ECHO "The following is needed for PCI card support:"
+	printflag "PCI support" CONFIG_PCI
+	if isok CONFIG_MODULES ; then
+		fail
+	elif isok CONFIG_NET_RADIO ; then
+		fail
+	elif isok CONFIG_NET_WIRELESS ; then
+		fail	
+	else
+		$ECHO "Kernel configuration satisfies the minimum requirements"
+	fi
+else
+	$ECHO "Unable to find kernel configuration -> unable to perform sanity checks"
+	$ECHO "Make sure your kernel has the required options enabled, see README"
+fi
+
 if [ $VERSION_CODE -ge `version 2 5 0` ]; then
-        $ECHO "Kernel 2.5 support is highly experimental."
+        $ECHO "Kernel 2.5/2.6 support is highly experimental."
 	sleep 2
         KERN_25=y
 else

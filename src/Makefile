@@ -8,7 +8,7 @@ export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG)
 # 2.6 in-tree (kbuild)
 ifeq ($(VERSION).$(PATCHLEVEL), 2.6)
 
-EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=WLAN_PCI
+EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI
 
 obj-m += acx100_pci.o
 

@@ -36,22 +36,22 @@
  * --------------------------------------------------------------------
  */
 
-void acx100_disable_irq(wlandevice_t * hw);
+/* for a description of this, see doc/acx100! */
+void acx100_disable_irq(wlandevice_t *hw);
+void acx100_enable_irq(wlandevice_t *hw);
 
-void acx100_enable_irq(wlandevice_t * hw);	/* for a description of this, see doc/acx100! */
-
-int acx100_create_dma_regions(wlandevice_t * hw);
-int acx100_delete_dma_region(wlandevice_t * wlandev);
+int acx100_create_dma_regions(wlandevice_t *hw);
+int acx100_delete_dma_region(wlandevice_t *wlandev);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
-void acx100_clean_tx_desc(wlandevice_t * hw);
-void acx100_process_rx_desc(wlandevice_t * hw);
-int acx100_create_tx_host_desc_queue(TIWLAN_DC * pDc);
-int acx100_create_rx_host_desc_queue(TIWLAN_DC * pDc);
-void acx100_create_tx_desc_queue(TIWLAN_DC * pDc);
-void acx100_create_rx_desc_queue(TIWLAN_DC * pDc);
-void acx100_free_desc_queues(TIWLAN_DC * pDc);
-int acx100_init_memory_pools(wlandevice_t * hw, memmap_t * vala);
-struct txdescriptor *acx100_get_tx_desc(wlandevice_t * hw);
+void acx100_clean_tx_desc(wlandevice_t *hw);
+void acx100_process_rx_desc(wlandevice_t *hw);
+int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc);
+int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc);
+void acx100_create_tx_desc_queue(TIWLAN_DC *pDc);
+void acx100_create_rx_desc_queue(TIWLAN_DC *pDc);
+void acx100_free_desc_queues(TIWLAN_DC *pDc);
+int acx100_init_memory_pools(wlandevice_t *hw, memmap_t *vala);
+struct txdescriptor *acx100_get_tx_desc(wlandevice_t *hw);
 
 char *acx100_get_packet_type_string(UINT16 fc);
 
@@ -59,15 +59,15 @@ char *acx100_get_packet_type_string(UINT16 fc);
  * These fields are still not quite obvious, though.
  * Some seem to have different meanings... */
 typedef struct rxbuffer {
-	UINT32 status; /* 0x0 */
-	UINT16 stat;   /* 0x4 */
-	UINT8 level; /* 0x6 */
-	UINT8 snr;  /* 0x7 */
-	UINT32 time;    /* 0x8 */
+	UINT32 status;		/* 0x0 */
+	UINT16 stat;		/* 0x4 */
+	UINT8 level;		/* 0x6 */
+	UINT8 snr;		/* 0x7 */
+	UINT32 time;		/* 0x8 */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8 val0x24[0x922];
 
-} rxb_t;			//0x956
+} rxb_t;			/* 0x956 */
 
 typedef struct txbuffer {
 } txb_t;
@@ -90,10 +90,11 @@ typedef struct framehdr {
 #define	DESC_CTL_FIRST_MPDU	0x02
 #define	DESC_CTL_AUTODMA	0x04
 #define	DESC_CTL_RECLAIM	0x08
-#define	DESC_CTL_USED_FOR_TX	0x40		// owned
-#define	DESC_CTL_FREE		0x80		// tx finished
+#define	DESC_CTL_USED_FOR_TX	0x40	/* owned */
+#define	DESC_CTL_FREE		0x80	/* tx finished */
 
-#define	DESC_CTL_INIT		(DESC_CTL_FREE | DESC_CTL_RECLAIM | DESC_CTL_AUTODMA | DESC_CTL_FIRST_MPDU)
+#define	DESC_CTL_INIT		(DESC_CTL_FREE | DESC_CTL_RECLAIM | \
+				 DESC_CTL_AUTODMA | DESC_CTL_FIRST_MPDU)
 
 #define	DESC_CTL_DONE		(DESC_CTL_USED_FOR_TX | DESC_CTL_FREE)
 
@@ -159,7 +160,7 @@ typedef struct rxhostdescriptor {
 	struct rxbuffer *data_phy;	/* 0x00 */
 	UINT HostMemPtr;	/* 0x04 */
 	UINT16 Ctl;		/* 0x08 */
-	UINT16 length;	/* 0x0a */
+	UINT16 length;		/* 0x0a */
 	struct rxhostdescriptor *desc_phy_next;	/* 0x0c */
 
 	UINT val0x10;		/* 0x10 */
@@ -178,3 +179,4 @@ typedef struct rxhostdescriptor {
 	char val0x2b;		/* 0x2b */
 } rxhostdesc_t;			/* size 44 = 0x2c */
 
+#define ETH_P_80211_RAW		(ETH_P_ECONET + 1)

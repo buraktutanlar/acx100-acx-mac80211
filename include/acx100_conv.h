@@ -1,4 +1,4 @@
-/* include/p80211conv.h
+/* include/acx100_conv.h
  *
  * --------------------------------------------------------------------
  *
@@ -43,11 +43,12 @@
  * --------------------------------------------------------------------
  */
 
-#ifndef _LINUX_P80211CONV_H
-#define _LINUX_P80211CONV_H
+#ifndef _ACX100_CONV_H
+#define _ACX100_CONV_H
 
-/*================================================================*/
-/* Constants */
+/*============================================================================*
+ * Constants                                                                  *
+ *============================================================================*/
 
 #define WLAN_ETHADDR_LEN	6
 #define WLAN_IEEE_OUI_LEN	3
@@ -60,12 +61,9 @@
 #define WLAN_MAX_ETHFRM_LEN	1514
 #define WLAN_ETHHDR_LEN		14
 
-/*================================================================*/
-/* Macros */
-
-
-/*================================================================*/
-/* Types */
+/*============================================================================*
+ * Types                                                                      *
+ *============================================================================*/
 
 /* local ether header type */
 typedef struct wlan_ethhdr {
@@ -87,21 +85,22 @@ typedef struct wlan_snap {
 	UINT16 type __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ wlan_snap_t;
 
-/* Circular include trick */
+/* FIXME: Circular include trick */
 struct wlandevice;
 struct txdescriptor;
 struct rxhostdescriptor;
 
-/*================================================================*/
-/* Externs */
+/*============================================================================*
+ * Function Declarations                                                      *
+ *============================================================================*/
 
-/*================================================================*/
-/* Function Declarations */
-
-int acx100_ether_to_txdesc(struct wlandevice *wlandev,struct txdescriptor *txdesc, struct sk_buff *skb);
-struct sk_buff* acx100_rxdesc_to_ether(struct wlandevice *wlandev, struct rxhostdescriptor *rxdesc);
-void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc, struct txdescriptor *txdesc);
+int acx100_ether_to_txdesc(struct wlandevice *wlandev,
+			   struct txdescriptor *txdesc, struct sk_buff *skb);
+struct sk_buff *acx100_rxdesc_to_ether(struct wlandevice *wlandev,
+				       struct rxhostdescriptor *rxdesc);
+void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
+			     struct txdescriptor *txdesc);
 
 int acx100_stt_findproto(unsigned int proto);
 
-#endif
+#endif /* _ACX100_CONV_H */

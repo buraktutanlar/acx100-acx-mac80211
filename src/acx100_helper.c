@@ -80,7 +80,6 @@
 #include <version.h>
 #include <p80211mgmt.h>
 #include <acx100.h>
-#include <p80211netdev.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
@@ -160,6 +159,7 @@ int acx100_read_proc(char *buf, char **start, off_t offset, int count,
 int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 {
 	char *p = buf;
+	int i;
 
 	FN_ENTER;
 	p += sprintf(p, "acx100 driver version:\t%s\n", WLAN_RELEASE_SUB);
@@ -170,6 +170,16 @@ int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 	p += sprintf(p, "EEPROM version:\t\t0x%04x\n", wlandev->eeprom_version);
 	p += sprintf(p, "firmware version:\t%s (0x%08lx)\n",
 		     wlandev->firmware_version, wlandev->firmware_id);
+	p += sprintf(p, "BSS table has %d entries:\n", wlandev->bss_table_count);
+	for (i = 0; i < wlandev->bss_table_count; i++) {
+		struct bss_info *bss = &wlandev->bss_table[i];
+		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %ld  WEP %s  Cap 0x%x  SIR %ld  SNR %ld\n", 
+			     i, bss->address[0], bss->address[1],
+			     bss->address[2], bss->address[3], bss->address[4],
+			     bss->address[5], bss->essid, bss->channel,
+			     bss->fWEPPrivacy ? "yes" : "no", bss->cap,
+			     bss->sir, bss->snr);
+	}
 	/* TODO: add more interesting stuff (current state, essid, ...) here */
 	FN_EXIT(1, p - buf);
 	return p - buf;
@@ -1333,15 +1343,15 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
         unsigned char *table; 
 	/* FIXME!!!! this table is CRAP! It doesn't reflect actual dBm
            values yet :-\ */
-	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	unsigned char dbm2val_maxim[21] = { 60, 57, 54, 51, 48, 45, 42, 39, 36, 33, 30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 0};
+	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	
 	switch (wlandev->radio_type) {
+		case 0x0d:
+			table = &dbm2val_maxim[0];
+			break;
 		case 0x11:
 			table = &dbm2val_rfmd[0];
-			break;
-		case 0x15:
-			table = &dbm2val_maxim[0];
 			break;
 		default:
 			acxlog(L_STD, "FIXME: unknown/unsupported radio type, cannot modify Tx power level yet!\n");
@@ -1363,12 +1373,16 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	unsigned long flags;
 	unsigned char scanning = 0;
 
+	FN_ENTER;
+
 	if (init)
 		/* cannot use acx100_lock() - hw_unavailable is set */
 		spin_lock_irqsave(&wlandev->lock, flags);
 	else
-		if (acx100_lock(wlandev, &flags))
+		if (acx100_lock(wlandev, &flags)) {
+			FN_EXIT(0, 0);
 			return;
+		}
 
 	if (get_all)
 		wlandev->get_mask |= GETSET_ALL;
@@ -1543,6 +1557,14 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 		wlandev->set_mask &= ~GETSET_CCA;
 	}
 
+	if (wlandev->set_mask & (GETSET_LED_POWER|GETSET_ALL))
+	{
+		/* Enable Tx */
+		acxlog(L_INIT, "Updating power LED status: %d\n", wlandev->led_power);
+		acx100_power_led(wlandev, wlandev->led_power);
+		wlandev->set_mask &= ~GETSET_LED_POWER;
+	}
+
 	if (wlandev->set_mask & (GETSET_TX|GETSET_ALL))
 	{
 		/* Enable Tx */
@@ -1577,7 +1599,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	{
 		UINT8 xmt_msdu_lifetime[4 + ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
-		acxlog(L_INIT, "Updating xmt MSDU lifetime: %ld\n",
+		acxlog(L_INIT, "Updating xmt MSDU lifetime: %d\n",
 					wlandev->msdu_lifetime);
 		xmt_msdu_lifetime[4] = wlandev->msdu_lifetime;
 		acx100_configure(wlandev, &xmt_msdu_lifetime, ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME);
@@ -1738,6 +1760,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			wlandev->get_mask, wlandev->set_mask);
 
 	acx100_unlock(wlandev, &flags);
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -2183,7 +2206,7 @@ void acx100_scan_chan(wlandevice_t *wlandev)
 	 * (not doing so would keep outdated stations in our list,
 	 * and if we decide to associate to "any" station, then we'll always
 	 * pick an outdated one) */
-	wlandev->iStable = 0;
+	wlandev->bss_table_count = 0;
 	acx100_set_status(wlandev, ISTATUS_1_SCANNING);
 	s.count = 1;
 	s.start_chan = 1;
@@ -2235,14 +2258,21 @@ void acx100_start(wlandevice_t *wlandev)
 {
 	unsigned long flags;
 	static int init = 1;
+	int dont_lock_up = 0;
 
 	FN_ENTER;
 
-	if (acx100_lock(wlandev, &flags))
-	{
-		acxlog(L_STD, "ERROR: lock failed!\n");
-		return;
+	if (spin_is_locked(wlandev->lock)) {
+		printk(KERN_EMERG "Preventing lock-up!");
+		dont_lock_up = 1;
 	}
+
+	if (!dont_lock_up)
+		if (acx100_lock(wlandev, &flags))
+		{
+			acxlog(L_STD, "ERROR: lock failed!\n");
+			return;
+		}
 
 	/* This is the reinit phase, why only run this for mode 0 ? */
 	if (init)
@@ -2286,7 +2316,8 @@ void acx100_start(wlandevice_t *wlandev)
 	acx100_join_bssid(wlandev);
 #endif
 
-	acx100_unlock(wlandev, &flags);
+	if (!dont_lock_up)
+		acx100_unlock(wlandev, &flags);
 	FN_EXIT(0, 0);
 }
 

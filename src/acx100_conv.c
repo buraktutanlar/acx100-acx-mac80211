@@ -76,14 +76,11 @@
 #include <p80211mgmt.h>
 #include <acx100.h>
 #include <acx100_conv.h>
-#include <p80211netdev.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
 #include <ihw.h>
-#include <acx100mgmt.h>
-
 
 static UINT8 oui_rfc1042[] = { 0x00, 0x00, 0x00 };
 static UINT8 oui_8021h[] = { 0x00, 0x00, 0xf8 };

@@ -79,7 +79,6 @@
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
 #include <acx100.h>
-#include <p80211netdev.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <idma.h>
@@ -1459,22 +1458,22 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	UINT8 *pDSparms;
 	UINT32 station;
 	UINT8 *a;
-	struct iS *ss;
+	struct bss_info *ss;
 	int i, max_rate = 0;
 
-	acxlog(L_STATE, "%s: UNVERIFIED, previous iStable: %d.\n",
-	       __func__, hw->iStable);
+	acxlog(L_STATE, "%s: UNVERIFIED, previous bss_table_count: %d.\n",
+	       __func__, hw->bss_table_count);
 
 	FN_ENTER;
 
 	/* uh oh, we found more sites/stations than we can handle with
 	 * our current setup: pull the emergency brake and stop scanning! */
-	if ((UINT) hw->iStable > MAX_NUMBER_OF_SITE) {
+	if ((UINT) hw->bss_table_count > MAX_NUMBER_OF_SITE) {
 		acx100_issue_cmd(hw, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
 		acx100_set_status(hw, ISTATUS_2_WAIT_AUTH);
 
 		acxlog(L_BINDEBUG | L_ASSOC,
-		       "<Scan Beacon> iStable > MAX_NUMBER_OF_SITE\n");
+		       "<Scan Beacon> bss_table_count > MAX_NUMBER_OF_SITE\n");
 
 		return;
 	}
@@ -1485,14 +1484,14 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	pDSparms = &pSuppRates[pSuppRates[0x1] + 0x2];
 
 	/* filter out duplicate stations we already registered in our list */
-	for (station = 0; station < hw->iStable; station++) {
-		UINT8 *a = hw->val0x126c[station].address;
+	for (station = 0; station < hw->bss_table_count; station++) {
+		UINT8 *a = hw->bss_table[station].address;
 		acxlog(L_DEBUG,
 		       "checking station %ld [%02X %02X %02X %02X %02X %02X]\n",
 		       station, a[0], a[1], a[2], a[3], a[4], a[5]);
 		if (acx100_is_mac_address_equal
 		    (hdr->a4.a3,
-		     hw->val0x126c[station].address)) {
+		     hw->bss_table[station].address)) {
 			acxlog(L_DEBUG,
 			       "station already in our list, no need to add.\n");
 			return;
@@ -1509,28 +1508,28 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	 * starting next site survey scan (leading to garbled ESSID strings with
 	 * old garbage). Thus let's completely zero out the entry that we're
 	 * going to fill next in order to not risk any corruption. */
-	memset(&hw->val0x126c[hw->iStable], 0, sizeof(struct iS));
+	memset(&hw->bss_table[hw->bss_table_count], 0, sizeof(struct bss_info));
 
 	/* copy the SSID element */
-	memcpy(hw->val0x126c[hw->iStable].address,
+	memcpy(hw->bss_table[hw->bss_table_count].address,
 	       hdr->a4.a3, WLAN_BSSID_LEN);
 
 	if (hdr->info[0x1] <= 0x20) {
-		hw->val0x126c[hw->iStable].size = hdr->info[0x1];
-		memcpy(hw->val0x126c[hw->iStable].essid,
+		hw->bss_table[hw->bss_table_count].size = hdr->info[0x1];
+		memcpy(hw->bss_table[hw->bss_table_count].essid,
 		       &hdr->info[0x2], hdr->info[0x1]);
 	}
 
-	hw->val0x126c[hw->iStable].channel = pDSparms[2];
-	hw->val0x126c[hw->iStable].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
-	hw->val0x126c[hw->iStable].cap = hdr->val0x22;
-	memcpy(hw->val0x126c[hw->iStable].supp_rates,
+	hw->bss_table[hw->bss_table_count].channel = pDSparms[2];
+	hw->bss_table[hw->bss_table_count].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
+	hw->bss_table[hw->bss_table_count].cap = hdr->val0x22;
+	memcpy(hw->bss_table[hw->bss_table_count].supp_rates,
 	       &pSuppRates[2], 0x8);
-	hw->val0x126c[hw->iStable].sir = mmt->level;
-	hw->val0x126c[hw->iStable].snr = mmt->snr;
+	hw->bss_table[hw->bss_table_count].sir = mmt->level;
+	hw->bss_table[hw->bss_table_count].snr = mmt->snr;
 
-	a = hw->val0x126c[hw->iStable].address;
-	ss = &hw->val0x126c[hw->iStable];
+	a = hw->bss_table[hw->bss_table_count].address;
+	ss = &hw->bss_table[hw->bss_table_count];
 
 	acxlog(L_DEBUG, "Supported Rates: ");
 	/* find max. transfer rate */
@@ -1548,7 +1547,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	acxlog(L_STD | L_ASSOC,
 	       "%s: found and registered station %d: ESSID \"%s\" on channel %ld, BSSID %02X %02X %02X %02X %02X %02X (%s, %d%sMbps), SIR %ld, SNR %ld.\n",
 	       __func__,
-	       hw->iStable,
+	       hw->bss_table_count,
 	       ss->essid, ss->channel,
 	       a[0], a[1], a[2], a[3], a[4], a[5],
 	       (WLAN_GET_MGMT_CAP_INFO_IBSS(ss->cap)) ? "Ad-Hoc peer" : "Access Point",
@@ -1556,7 +1555,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	       ss->sir, ss->snr);
 
 	/* found one station --> increment counter */
-	hw->iStable++;
+	hw->bss_table_count++;
 	FN_EXIT(0, 0);
 }
 
@@ -2693,42 +2692,42 @@ void d11CompleteScan(wlandevice_t *wlandev)
 	}
 	essid_len = strlen(wlandev->essid);
 
-	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area.\n", wlandev->iStable);
+	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area.\n", wlandev->bss_table_count);
 
-	for (idx = 0; idx < wlandev->iStable; idx++) {
+	for (idx = 0; idx < wlandev->bss_table_count; idx++) {
 		/* V3CHANGE: dbg msg in V1 only */
 		acxlog(L_BINDEBUG | L_ASSOC,
 		       "<Scan Table> %d: SSID=\"%s\",CH=%d,SIR=%d,SNR=%d\n",
 		       (int) idx,
-		       wlandev->val0x126c[idx].essid,
-		       (int) wlandev->val0x126c[idx].channel,
-		       (int) wlandev->val0x126c[idx].sir,
-		       (int) wlandev->val0x126c[idx].snr);
+		       wlandev->bss_table[idx].essid,
+		       (int) wlandev->bss_table[idx].channel,
+		       (int) wlandev->bss_table[idx].sir,
+		       (int) wlandev->bss_table[idx].snr);
 
-		if (!(wlandev->val0x126c[idx].cap & 3))
+		if (!(wlandev->bss_table[idx].cap & 3))
 		{
 			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
-			wlandev->val0x126c[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
+			wlandev->bss_table[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
-		       wlandev->val0x126c[idx].cap, needed_cap);
+		       wlandev->bss_table[idx].cap, needed_cap);
 
 		/* peer station doesn't support what we need? */
-		if (!((wlandev->val0x126c[idx].cap & needed_cap) == needed_cap))
+		if (!((wlandev->bss_table[idx].cap & needed_cap) == needed_cap))
 			continue; /* keep looking */
 
-		if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->val0x126c[idx].channel - 1) ) ))
+		if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->bss_table[idx].channel - 1) ) ))
 		{
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, wlandev->val0x126c[idx].channel);
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, wlandev->bss_table[idx].channel);
 			continue; /* keep looking */
 		}
 
 		if ((!wlandev->essid_active)
-		 || (!memcmp(wlandev->val0x126c[idx].essid, wlandev->essid, essid_len)))
+		 || (!memcmp(wlandev->bss_table[idx].essid, wlandev->essid, essid_len)))
 		{
 			acxlog(L_ASSOC,
 			       "ESSID matches: \"%s\" (station), \"%s\" (config)\n",
-			       wlandev->val0x126c[idx].essid,
+			       wlandev->bss_table[idx].essid,
 			       (wlandev->essid_active) ? wlandev->essid : "[any]");
 			idx_found = idx;
 			found_station = 1;
@@ -2737,11 +2736,11 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			/* stop searching if this station is
 			 * on the current channel, otherwise
 			 * keep looking for an even better match */
-			if (wlandev->val0x126c[idx].channel == wlandev->channel)
+			if (wlandev->bss_table[idx].channel == wlandev->channel)
 				break;
 		}
 		else
-		if (wlandev->val0x126c[idx].essid[0] == '\0')
+		if (wlandev->bss_table[idx].essid[0] == '\0')
 		{
 			/* hmm, station with empty SSID:
 			 * using hidden SSID broadcast?
@@ -2759,12 +2758,12 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		/* use ESSID we just found, but if it is empty (no broadcast),
 		 * use user configured ESSID instead */
 		memcpy(wlandev->essid_for_assoc,
-			(wlandev->val0x126c[idx].essid[0] == '\0') ?
-			wlandev->essid : wlandev->val0x126c[idx_found].essid,
+			(wlandev->bss_table[idx].essid[0] == '\0') ?
+			wlandev->essid : wlandev->bss_table[idx_found].essid,
 			sizeof(wlandev->essid_for_assoc));
-		wlandev->channel = wlandev->val0x126c[idx_found].channel;
+		wlandev->channel = wlandev->bss_table[idx_found].channel;
 		memcpy(wlandev->address,
-		       wlandev->val0x126c[idx_found].address, WLAN_ADDR_LEN);
+		       wlandev->bss_table[idx_found].address, WLAN_ADDR_LEN);
 
 		a = wlandev->address;
 		acxlog(L_STD | L_ASSOC,
@@ -2772,7 +2771,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		       __func__, idx_found, a[0], a[1], a[2], a[3], a[4], a[5]);
 		acx100_join_bssid(wlandev);
 
-		memcpy(&wlandev->station_assoc, &wlandev->val0x126c[idx_found], sizeof(struct iS));
+		memcpy(&wlandev->station_assoc, &wlandev->bss_table[idx_found], sizeof(struct bss_info));
 		if (wlandev->preamble_mode == 2)
 			/* if Auto mode, then use Preamble setting which
 			 * the station supports */

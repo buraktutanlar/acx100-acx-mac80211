@@ -80,7 +80,6 @@
 #include <wlan_compat.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211netdev.h>
 #include <acx100.h>
 
 /* -------------------------------------------------------------------------

@@ -74,13 +74,11 @@
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
 #include <acx100.h>
-#include <p80211netdev.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
 #include <ihw.h>
-#include <acx100mgmt.h>
 #include <monitor.h>
 
 /* these used to be increased to 32 each,
@@ -462,7 +460,7 @@ void acx100_clean_tx_desc(wlandevice_t *wlandev)
 	TIWLAN_DC *pDc = &wlandev->dc;
 	txdesc_t *pTxDesc;
 	UINT finger, watch;
-	int flags;
+	unsigned long flags;
 
 	FN_ENTER;
 
@@ -1137,12 +1135,12 @@ void acx100_create_tx_desc_queue(TIWLAN_DC * pDc)
 
 	wlandev = pDc->wlandev;
 
-	pDc->pTxDescQPool = (struct txdescriptor *) (wlandev->pvMemBaseAddr2 +
+	pDc->pTxDescQPool = (struct txdescriptor *) (wlandev->iobase2 +
 				     pDc->ui32ACXTxQueueStart);
 	pDc->tx_pool_count = wlandev->TxQueueNo;
 
 	acxlog(L_BINDEBUG, "wlandev->rHwInfo.pvMemBaseAddr2 = 0x%08x\n",
-	       wlandev->pvMemBaseAddr2);
+	       wlandev->iobase2);
 	acxlog(L_BINDEBUG, "pDc->ui32ACXTxQueueStart = 0x%08x\n",
 	       pDc->ui32ACXTxQueueStart);
 	acxlog(L_BINDEBUG, "pDc->pTxDescQPool = 0x%08x\n",

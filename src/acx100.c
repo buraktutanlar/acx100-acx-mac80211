@@ -93,13 +93,11 @@
 #include <p80211mgmt.h>
 #include <acx100.h>
 #include <acx100_conv.h>
-#include <p80211netdev.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
 #include <ihw.h>
-#include <acx100mgmt.h>
 
 /********************************************************************/
 /* Module information                                               */
@@ -493,11 +491,9 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	wlandev->membase = phymem1;
 	wlandev->iobase = mem1;
-	wlandev->pvMemBaseAddr1 = mem1;
 
 	wlandev->membase2 = phymem2;
 	wlandev->iobase2 = mem2;
-	wlandev->pvMemBaseAddr2 = mem2;
 
 	wlandev->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
@@ -631,7 +627,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
 			&acx100_pm_callback);
 
-        create_proc_read_entry("driver/acx100", 0, 0, acx100_read_proc, wlandev);
+        wlandev->proc_entry = create_proc_read_entry("driver/acx100", 0, 0,
+						     acx100_read_proc, wlandev);
 
 	result = 0;
 	goto done;
@@ -703,6 +700,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	hw = (struct wlandevice *) netdev->priv;
 
         remove_proc_entry("driver/acx100", NULL);
+
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device */
 	netif_device_detach(netdev);
@@ -1388,6 +1386,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			wlandev->unknown0x2350 = 0;
 		} else if (wlandev->iStatus == ISTATUS_1_SCANNING) {
 
+			/* FIXME: this shouldn't be done in IRQ context !!! */
 			d11CompleteScan(wlandev);
 		}
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, HOST_INT_SCAN_COMPLETE);
