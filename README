@@ -802,6 +802,10 @@ module autoloading configuration (e.g. in /etc/modprobe.conf or
 options acx_pci firmware_dir=/home/ivor/cvs/acx100-0_1a-rc1/firmware
 alias wlan0 acx_pci
 
+ACX111 card support can be changed to use 32 ring buffers instead of 16
+(we are using 16 since 32 often fails to allocate enough memory!) by
+changing the RXBUFFERCOUNT_ACX111/TXBUFFERCOUNT_ACX111 defines to 32.
+
 USING WAPROAMD
 The waproamd is "a roaming daemon for wireless IEEE 802.11 NICs supporting
 the Linux wireless extensions". 

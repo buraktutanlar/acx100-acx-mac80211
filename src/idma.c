@@ -42,9 +42,9 @@
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT > 12
+#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif /* WE > 12 */
+#endif /* WE >= 13 */
 
 #include <wlan_compat.h>
 
@@ -71,8 +71,8 @@
  * so back to 16 again... */
 #define RXBUFFERCOUNT_ACX100 16
 #define TXBUFFERCOUNT_ACX100 16
-#define RXBUFFERCOUNT_ACX111 32
-#define TXBUFFERCOUNT_ACX111 32
+#define RXBUFFERCOUNT_ACX111 16 /* used to be 32, and the Windows driver uses */
+#define TXBUFFERCOUNT_ACX111 16 /* 32 too, but mem alloc of 32 often fails */
 #define TXBUFFERCOUNT_USB 10
 #define RXBUFFERCOUNT_USB 10
 

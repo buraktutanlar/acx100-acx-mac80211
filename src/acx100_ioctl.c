@@ -51,12 +51,13 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/io.h>
+#include <asm/uaccess.h> /* required for 2.4.x kernels; verify_write() */
 
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT > 12
+#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif /* WE > 12 */
+#endif /* WE >= 13 */
 
 /*================================================================*/
 /* Project Includes */
@@ -1591,6 +1592,7 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 /* Private functions						  */
 /*================================================================*/
 
+#if WIRELESS_EXT < 13
 /*----------------------------------------------------------------
 * acx_ioctl_get_iw_priv
 *
@@ -1625,6 +1627,7 @@ static inline int acx_ioctl_get_iw_priv(struct iwreq *iwr)
 	}
 	return result;
 }
+#endif
 
 /*----------------------------------------------------------------
 * acx_ioctl_get_nick
@@ -3284,7 +3287,7 @@ const struct iw_handler_def acx_ioctl_handler_def =
 #endif /* WE > 15 */
 };
 
-#endif /* WE > 12 */
+#endif /* WE >= 13 */
 
 
 
@@ -3310,15 +3313,16 @@ const struct iw_handler_def acx_ioctl_handler_def =
 * This is the *OLD* ioctl handler.
 * Make sure to not only place your additions here, but instead mainly
 * in the new one (acx_ioctl_handler[])!
+* FIXME: remove commented #ifdefs, since they're duplicates?
 *
 *----------------------------------------------------------------*/
 int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	int result = 0;
-#if WIRELESS_EXT < 13
+/* #if WIRELESS_EXT < 13 [see above] */
 	struct iwreq *iwr = (struct iwreq *)ifr;
-#endif
+/* #endif */
 
 	acxlog(L_IOCTL, "%s cmd = 0x%04X\n", __func__, cmd);
 
@@ -3332,7 +3336,7 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 
 	switch (cmd) {
 /* WE 13 and higher will use acx_ioctl_handler_def */
-#if WIRELESS_EXT < 13
+/* #if WIRELESS_EXT < 13 [see above] */
 	case SIOCGIWNAME:
 		/* get name == wireless protocol */
 		result = acx_ioctl_get_name(dev, NULL,
@@ -3680,7 +3684,7 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		acx111_ioctl_info(dev, NULL, NULL, NULL);
 		break;
 
-#endif
+/* #endif */
 
 	default:
 		acxlog(L_IOCTL, "wireless ioctl 0x%04X queried but not implemented yet!\n", cmd);
@@ -3692,14 +3696,14 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 	&& (0 != priv->set_mask))
 		acx_update_card_settings(priv, 0, 0, 0);
 
-#if WIRELESS_EXT < 13
+/* #if WIRELESS_EXT < 13 [see above] */
 	/* older WEs don't have a commit handler,
 	 * so we need to fix return code in this case */
 	if (-EINPROGRESS == result)
 		result = 0;
-#endif
+/* #endif */
 
 	return result;
 }
-#endif
+#endif /* WE < 13 */
 

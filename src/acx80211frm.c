@@ -53,7 +53,7 @@
 #include <linux/types.h>
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT > 12
+#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
 #endif
 

@@ -2273,23 +2273,15 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 
 #ifdef MODULE
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-#ifdef ACX_DEBUG
-module_param(debug, int, 0);
-#endif
-module_param(use_eth_name, int, 0);
-module_param(firmware_dir, charp, 0);
-#else
 #ifdef ACX_DEBUG
 MODULE_PARM(debug, "i"); /* doh, 2.6.x screwed up big time: here the define has its own ";" ("double ; detected"), yet in 2.4.x it DOESN'T (the sane thing to do), grrrrr! */
-#endif
-MODULE_PARM(use_eth_name, "i");
-MODULE_PARM(firmware_dir, "s");
+MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include/acx100.h)");
 #endif
 
 /*@-fullinitblock@*/
-MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include/acx100.h)");
+MODULE_PARM(use_eth_name, "i");
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
+MODULE_PARM(firmware_dir, "s");
 MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
 /*@=fullinitblock@*/
 

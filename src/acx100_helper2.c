@@ -58,9 +58,9 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT > 12
+#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif /* WE > 12 */
+#endif /* WE >= 13 */
 #include <linux/netdevice.h>
 #include <asm/io.h>
 #include <linux/delay.h>

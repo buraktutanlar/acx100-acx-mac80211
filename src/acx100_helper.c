@@ -66,7 +66,7 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT > 12
+#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
 #endif
 #include <asm/uaccess.h>
