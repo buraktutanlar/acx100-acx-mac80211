@@ -61,6 +61,7 @@
 #include <linux/kernel.h>
 #include <linux/usb.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
@@ -84,6 +85,8 @@
 #include <acx100.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
+#include <acx100_conv.h>
+#include <idma.h>
 
 /* -------------------------------------------------------------------------
 **                             Module Stuff
@@ -589,7 +592,6 @@ static void init_network_device(struct net_device *netdev) {
   netdev->tx_timeout = &acx100usb_tx_timeout;
   netdev->watchdog_timeo = 4 * HZ;        /* 400 */
 #endif
-  acxlog(L_DEBUG,"now calling acx100_init_mac() with network device ptr\n");
   result=acx100_init_mac(netdev);
   if (!result) {
     SET_MODULE_OWNER(netdev);
@@ -619,7 +621,7 @@ static int acx100usb_open(struct net_device *netdev) {
 
   init_timer(&(wlandev->mgmt_timer));
   wlandev->mgmt_timer.function=acx100_timer;
-  wlandev->mgmt_timer.data=(unsigned long)netdev;
+  wlandev->mgmt_timer.data=(unsigned long)wlandev;
 
   /* set ifup to 1, since acx100_start needs it (FIXME: ugly) */
 
@@ -654,26 +656,22 @@ static int acx100usb_open(struct net_device *netdev) {
 *----------------------------------------------------------------*/
 
 void acx100_rx(struct rxhostdescriptor *rxdesc,wlandevice_t * hw) {
-  netdevice_t *ndev;
-  struct sk_buff *skb;
+	netdevice_t *ndev = hw->netdev;
+	struct sk_buff *skb;
+	FN_ENTER;
+	if (hw->open) {
+		if ((skb = acx100_rxdesc_to_ether(hw, rxdesc))) {
+			skb->dev = ndev;
+			skb->protocol = eth_type_trans(skb, ndev);
+			ndev->last_rx = jiffies;
 
-  FN_ENTER;
-#if 0
-  if (hw->state & (1<<WLAN_STATE_INUSE_BIT)) {
-    if ((skb = acx100_rxdesc_to_ether(hw, rxdesc))) {
-      ndev = root_acx100_dev.newest;
-      skb->dev = ndev;
-      ndev->last_rx = jiffies;
+			netif_rx(skb);
 
-      skb->protocol = eth_type_trans(skb, ndev);
-      netif_rx(skb);
-      hw->stats.rx_packets++;
-      hw->stats.rx_bytes += skb->len;
-      /* V1_3CHANGE */
-    }
-  }
-#endif
-  FN_EXIT(0, 0);
+			hw->stats.rx_packets++;
+			hw->stats.rx_bytes += skb->len;
+		}
+	}
+	FN_EXIT(0, 0);
 }
 
 static void acx100_poll_rx(wlandevice_t *wlandev) {
@@ -681,52 +679,22 @@ static void acx100_poll_rx(wlandevice_t *wlandev) {
 	acx100_usbin_t *inbuf;
 	acx100_usbout_t *outbuf;
 	struct usb_device *usbdev;
-	unsigned int outpipe;
+	unsigned int inpipe,outpipe;
 	int res;
 
 	FN_ENTER;
-	//acx100_interrogate(wlandev,params,ACX100_RID_UNKNOWN_09);
-	//
-	//
-	inbuf=&(wlandev->usbin);
-	outbuf=&(wlandev->usbout);
+	inbuf=&(wlandev->bulkin);
 	usbdev=wlandev->usbdev;
-	outpipe=usb_sndctrlpipe(usbdev,0);
-	/* fill setup message */
-	wlandev->usb_setup.bRequestType=0x0;
-	wlandev->usb_setup.bRequest=0x12;
-	wlandev->usb_setup.wValue=0;
-	wlandev->usb_setup.wIndex=0;
-	wlandev->usb_setup.wLength=8;
-	outbuf->rridreq.cmd=ACX100_CMD_INTERROGATE;
-	outbuf->rridreq.status=0;
-	outbuf->rridreq.rid=ACX100_RID_UNKNOWN_09;
-	outbuf->rridreq.frmlen=4;
-#ifdef ACX_DEBUG
-	char *ptr=(char *)outbuf;
-	acxlog(L_DEBUG,"sending ctrl message with data: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
-#endif
-	usb_fill_control_urb(wlandev->urb,usbdev,outpipe,(char *)&(wlandev->usb_setup),outbuf,8,acx100_usb_complete_rx,wlandev);
-	usb_submit_urb(wlandev->urb);
-
-#if 0
-	hw=wlandev->hw;
-	inbuf=&(hw->bulkin);
-	usbdev=hw->usbdev;
 
 	inpipe=usb_rcvbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
 
-	acxlog(L_DEBUG,"BULK POLL\n");
-	acxlog(L_DEBUG,"inbuf=%X inpipe=%d hw=%X  actlen=%d\n",inbuf,inpipe,hw,hw->bulkrx_urb->actual_length); 
- 	if (hw->bulkrx_urb->status==-EINPROGRESS) {
-		usb_unlink_urb(hw->bulkrx_urb);
+ 	if (wlandev->bulkrx_urb->status==-EINPROGRESS) {
+		usb_unlink_urb(wlandev->bulkrx_urb);
 	}
-
-	usb_fill_bulk_urb(hw->bulkrx_urb,usbdev,inpipe,inbuf,0x80,&(acx100_usb_complete_rx),hw);
-	hw->bulkrx_urb->transfer_flags=USB_ASYNC_UNLINK;
-	hw->bulkrx_urb->timeout=5*HZ;
-	usb_submit_urb(hw->bulkrx_urb);
-#endif
+	usb_fill_bulk_urb(wlandev->bulkrx_urb,usbdev,inpipe,inbuf,sizeof(acx100_usbin_t),&(acx100_usb_complete_rx),wlandev);
+	wlandev->bulkrx_urb->transfer_flags=USB_ASYNC_UNLINK;
+	wlandev->bulkrx_urb->timeout=5*HZ;
+	usb_submit_urb(wlandev->bulkrx_urb);
 	FN_EXIT(0,0);
 }
 
@@ -734,33 +702,57 @@ static void acx100_poll_rx(wlandevice_t *wlandev) {
 static void acx100_usb_complete_rx(struct urb *urb) {
 	wlandevice_t *hw;
 	unsigned int inpipe;
+	int size;
 	struct usb_device *usbdev;
+	char *ptr;
+	struct rxhostdescriptor *rxdesc;
+	TIWLAN_DC *ticontext;
 
 	FN_ENTER;
-
 	hw=(wlandevice_t *)urb->context;
-
-	if (urb->transfer_buffer==&(hw->usbin)) {
-		char *ptr=(char *)&(hw->usbin);
-		acxlog(L_DEBUG,"ctrl recv completed\n");
-		acxlog(L_DEBUG,"buf: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
-	} else {
-		char *ptr=(char *)&(hw->usb_setup);
-		acxlog(L_DEBUG,"ctrl send completed\n");
-     		usbdev=hw->usbdev;
-		inpipe=usb_rcvctrlpipe(usbdev,0);
-		 /* fill setup message */
-		hw->usb_setup.bRequestType=0xC0;
-		hw->usb_setup.bRequest=0x12;
-		hw->usb_setup.wValue=0;
-		hw->usb_setup.wIndex=0;
-		hw->usb_setup.wLength=8;
-		acxlog(L_DEBUG,"send recv request with setup packet: %02X %02X %02X %02X %02X %02X %02X %02X\n",ptr[0],ptr[1],ptr[2],ptr[3],ptr[4],ptr[5],ptr[6],ptr[7]);
-		usb_fill_control_urb(hw->urb,usbdev,inpipe,(char *)&(hw->usb_setup),&(hw->usbin),8,acx100_usb_complete_rx,hw);
-		usb_submit_urb(hw->urb);
+	/* ----------------------------
+	 * grab the TI device context
+	 * -------------------------- */
+	ticontext=&(hw->dc);
+	/* ---------------------------------------------
+	 * check if the receive buffer is the right one
+	 * --------------------------------------------- */
+	if (urb->transfer_buffer==&(hw->bulkin)) {
+		/* ------------------------------------------------------------------
+		 * now fill the data into the rxhostdescriptor for further processing
+		 * ---------------------------------------------------------------- */
+		if (!(ticontext->pRxHostDescQPool)) {
+			acxlog(L_STD,"acx100usb: ERROR rxhostdescriptor pool is NULL\n");
+			return; /* bail out before something bad happens */
+		}
+		rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
+		acxlog(L_DEBUG,"bulk recv completed (len=%d, rxdesc=%X) rx_pool_count=%d rx_tail=%d\n",urb->actual_length,rxdesc,ticontext->rx_pool_count,ticontext->rx_tail);
+		ptr=&(hw->bulkin);
+		rxdesc->Ctl|=DESC_CTL_FREE;
+		rxdesc->val0x14=0xF0000000;	// set the MSB
+		size=urb->actual_length;
+		if (size>sizeof(struct rxbuffer)) {
+			acxlog(L_STD,"acx100usb: ERROR, # of received bytes (%d) higher than capacity of buffer (%d bytes)\n",size,sizeof(struct rxbuffer));
+			/* -------------------------
+			 * prevent buffer overflow
+			 * -----------------------*/
+			size=sizeof(struct rxbuffer);
+		}
+		memcpy(rxdesc->data,ptr,size);
+#ifdef ACX_DEBUG
+		if (debug&L_DATA) {
+			if ((urb->actual_length>0)&&(urb->actual_length<1024)) {
+				acx100usb_dump_bytes(ptr,urb->actual_length);
+			}
+		}
+#endif
+		/* ---------------------------------------------
+		* now handle the received data....
+		* --------------------------------------------- */
+		if (size>0) {	/* >0 ain't enough */
+			acx100_process_rx_desc(hw);
+		}
 	}
-
-
 	FN_EXIT(0,0);
 }
 

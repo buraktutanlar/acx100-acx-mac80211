@@ -105,6 +105,11 @@ alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
 UINT16 CurrentAID = 1;
 
+
+#if (WLAN_HOSTIF==WLAN_USB)
+extern void acx100_poll_rx(wlandevice_t *);
+#endif
+
 /*----------------------------------------------------------------
 * acx_client_sta_list_init
 * FIXME: change name to acx100_client_sta_list_init
@@ -2866,6 +2871,9 @@ void acx100_timer(unsigned long address)
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+#if (WLAN_HOSTIF==WLAN_USB)
+	acx100_poll_rx(hw);
+#endif
 
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: status = %d\n", __func__,
 	       hw->status);

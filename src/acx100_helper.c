@@ -1774,7 +1774,10 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	if (wlandev->set_mask & (SET_RXCONFIG|GETSET_ALL))
 	{
 		char rx_config[4 + ACX100_RID_RXCONFIG_LEN];
-
+#if (WLAN_HOSTIF==WLAN_USB)
+		wlandev->rx_config_1=0x2190;
+		wlandev->rx_config_2=0x0E5C;
+#else
 		switch (wlandev->monitor)
 		{
 		case 0: /* normal mode */
@@ -1817,7 +1820,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 						RX_CFG2_RCV_OTHER;
 			break;
 		}
-		
+#endif		
 	//	printk("setting RXconfig to %x:%x\n", hw->rx_config_1, hw->rx_config_2);
 		
 		*(UINT16 *) &rx_config[0x4] = wlandev->rx_config_1;
@@ -1923,7 +1926,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 
 	/* query some settings from the card.
 	 * FIXME: is antenna query needed here?? */
-	wlandev->get_mask = GETSET_ANTENNA|GET_STATION_ID;
+	wlandev->get_mask = GETSET_ANTENNA|GET_STATION_ID|GETSET_REG_DOMAIN;
 	acx100_update_card_settings(wlandev, 1, 0, 0);
 
 	sprintf(wlandev->essid, "STA%02X%02X%02X",

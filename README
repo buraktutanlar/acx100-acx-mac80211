@@ -101,7 +101,10 @@ since this seeks to list all requirements in full):
 
 What to NOT do:
 * download the driver via Windows CVS (may insert bogus end-of-line chars)
-
+* believe that this has much to do with PCMCIA. The ACX100 cards are
+  CardBus cards, and thus PCI-based, NOT ISA-based (PCMCIA).
+  You probably need the pcmcia-cs package for certain CardBus functions,
+  though.
 
 About the firmware files:
 We cannot ship this with our driver, so you will have to get it elsewhere.
@@ -218,13 +221,13 @@ To run the driver, you can use the script scripts/start_net (and adapt it).
 Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
 Further system configuration can be found at SYSTEM CUSTOMIZATION below.
 
-Debugging/logging options can be changed in a pretty powerful way by setting
-the module's "debug" parameter and/or its preinitialisation value in
-acx100.c and/or via the iwpriv set_debug setting. A good default value
-after having managed to get the driver to run would be 0xb
-(L_STD|L_INIT|L_ASSOC debug channels).
-Your hard disk will certainly thank you a lot for having saved it
-from the horror of heaps of logs once you got the driver running...
+DON'T FORGET that debugging/logging options can be changed in a pretty
+powerful way by setting the module's "debug" parameter and/or its
+preinitialisation value in acx100.c and/or via the iwpriv set_debug setting.
+A good default value after having managed to get the driver to run would be
+0xb (L_STD|L_INIT|L_ASSOC debug channels). Your hard disk will certainly
+thank you a lot for having saved it from the horror of heaps of logs once
+you got the driver running...
 To check out further module parameters and options, please use modinfo
 and iwpriv.
 
@@ -259,6 +262,8 @@ source tree and have to build the module "in-tree". You'll have to:
 
 --- USAGE HINTS ---
 
+iwpriv commands? See doc/iwpriv.txt
+
 Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
@@ -286,7 +291,9 @@ Consider completely recompiling the kernel (make sure to keep any old
 rebooting. Hopefully the driver compiling works then.
 
 -- Driver init failure --
-In case of ACX100 CardBus, you need to make sure you're having
+
+- CardBus -
+You need to make sure you're having
 CardBus support (otherwise you'll have strange PCI init failures),
 and it should be kernel CardBus support, not pcmcia-cs CardBus modules!
 (yenta socket module instead of e.g. i82365 module)
@@ -298,12 +305,17 @@ but doesn't get recognized as a CardBus card), then try to use
 further memory and port areas in /etc/pcmcia/config.opts (restart
 pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
+
+- General -
 If the system detects your card, but the driver is unable to initialize the
 card due to the card having IDs 0xffff etc., then play with Linux boot
 parameters, specifically the "pci=XXXX" flags, and most specifically,
 "pci=assign-busses", since this managed to fix it for one person (DWL-650+).
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
+Also, make sure to shuffle cards in different PCI slots! The ACX100
+probably needs PCI bus mastering support, and some motherboards either
+don't support it at all or not in certain crippled PCI slots.
 
 -- Driver locked up the box --
 Umm... ouch!
@@ -330,7 +342,7 @@ First, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
 Ad-Hoc mode, or maybe the other way around (to use Managed mode to
-associate with a peer card).
+associate with a card set to Peer).
 Further, the ESSID is CaSe SEnsITivE!
 
 Then read the file containing the driver log (the file where
@@ -347,6 +359,7 @@ AUTHENTICATED to ASSOCIATED finish successfully)
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-((
+Get new wireless-tools then...
 
 We tried to make the driver log as dumbed down as possible to make sure
 even casual wireless users are able to follow the network association steps

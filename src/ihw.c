@@ -940,6 +940,10 @@ void acx100_power_led(wlandevice_t *wlandev, int enable)
 void acx100_dump_bytes(void *data,int num) {
   int i,remain=num;
   unsigned char *ptr=(unsigned char *)data;
+
+  if (!(debug & L_DEBUG))
+	  return;
+
   while (remain>0) {
     if (remain<16) {
       printk(KERN_WARNING);
