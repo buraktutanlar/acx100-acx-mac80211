@@ -112,9 +112,9 @@ then
 	fi
 	if is_unset CONFIG_SMP
 	then 
-		$ECHO "You don't have symmetric multiprocessing support (CONFIG_SMP) enabled."
+		$ECHO "symmetric multiprocessing support (CONFIG_SMP) is disabled."
 	else
-		$ECHO "You do have symmetric multiprocessing support (CONFIG_SMP) enabled. If you"
+		$ECHO "symmetric multiprocessing support (CONFIG_SMP) is enabled. If you"
 		$ECHO "really have more than one cpu, be warned that this driver is not yet SMP safe."
 	fi
 else

@@ -2250,8 +2250,8 @@ typedef struct bss_info {
 	size_t essid_len;		/* 0x8 */
 	char essid[IW_ESSID_MAX_SIZE+1];	/* 0xc this one INCLUDES the trailing \0 !! */
 	UINT16 fWEPPrivacy;	/* 0x2c */
-	unsigned char supp_rates[0x8];
-	UINT32 channel;		/* 0x64; strange, this is accessed as UINT16 once. oh well, probably doesn't matter */
+	unsigned char supp_rates[64]; /* FIXME: used to be 8 (802.11b standard?), but 802.11g devices seem to allow for many more rates: how many exactly?? */
+	UINT8 channel;		/* 0x64; strange, this is accessed as UINT16 once. oh well, probably doesn't matter */
 	UINT32 sir;		/* 0x78; Standard IR */
 	UINT32 snr;		/* 0x7c; Signal to Noise Ratio */
 } bss_info_t;				/* 132 0x84 */

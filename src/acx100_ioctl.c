@@ -698,10 +698,8 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 	iwe.cmd = SIOCGIWRATE;
 	iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
 	ptr_rate = ptr + IW_EV_LCP_LEN;
-	for (i = 0; i < 8; i++)
+	for (i = 0; bss->supp_rates[i]; i++)
 	{
-		if (bss->supp_rates[i] == 0)
-			break;
 		iwe.u.bitrate.value = (bss->supp_rates[i] & ~0x80) * 500000; /* units of 500kb/s */
 		acxlog(L_IOCTL, "scan, rate: %d [%02x]\n", iwe.u.bitrate.value, bss->supp_rates[i]);
 		ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf, &iwe, IW_EV_PARAM_LEN);
@@ -2249,12 +2247,12 @@ static const iw_handler acx100_ioctl_handler[] =
 	(iw_handler) NULL,			/* SIOCGIWPRIV */
 	(iw_handler) NULL,			/* SIOCSIWSTATS */
 	(iw_handler) NULL,			/* SIOCGIWSTATS */
-#if WIRELESS_EXT > 15
+#if IW_HANDLER_VERSION > 4
 	iw_handler_set_spy,			/* SIOCSIWSPY */
 	iw_handler_get_spy,			/* SIOCGIWSPY */
 	iw_handler_set_thrspy,			/* SIOCSIWTHRSPY */
 	iw_handler_get_thrspy,			/* SIOCGIWTHRSPY */
-#else /* WE > 15 */
+#else /* IW_HANDLER_VERSION > 4 */
 #ifdef WIRELESS_SPY
 	(iw_handler) NULL /* acx100_ioctl_set_spy */,	/* SIOCSIWSPY */
 	(iw_handler) NULL /* acx100_ioctl_get_spy */,	/* SIOCGIWSPY */
@@ -2264,7 +2262,7 @@ static const iw_handler acx100_ioctl_handler[] =
 #endif /* WSPY */
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) NULL,			/* [nothing] */
-#endif /* WE > 15 */
+#endif /* IW_HANDLER_VERSION > 4 */
 	(iw_handler) acx100_ioctl_set_ap,	/* SIOCSIWAP */
 	(iw_handler) acx100_ioctl_get_ap,	/* SIOCGIWAP */
 	(iw_handler) NULL,			/* [nothing] */

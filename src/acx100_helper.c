@@ -172,7 +172,7 @@ int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 	p += sprintf(p, "BSS table has %d entries:\n", wlandev->bss_table_count);
 	for (i = 0; i < wlandev->bss_table_count; i++) {
 		struct bss_info *bss = &wlandev->bss_table[i];
-		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %ld  WEP %s  Cap 0x%x  SIR %ld  SNR %ld\n", 
+		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %d  WEP %s  Cap 0x%x  SIR %ld  SNR %ld\n", 
 			     i, bss->bssid[0], bss->bssid[1],
 			     bss->bssid[2], bss->bssid[3], bss->bssid[4],
 			     bss->bssid[5], bss->essid, bss->channel,

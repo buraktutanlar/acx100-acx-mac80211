@@ -1462,6 +1462,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	UINT32 station;
 	UINT8 *a;
 	struct bss_info *ss;
+	UINT8 rate_count;
 	int i, max_rate = 0;
 
 	acxlog(L_STATE, "%s: UNVERIFIED, previous bss_table_count: %d.\n",
@@ -1530,8 +1531,11 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	hw->bss_table[hw->bss_table_count].channel = pDSparms[2];
 	hw->bss_table[hw->bss_table_count].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
 	hw->bss_table[hw->bss_table_count].cap = hdr->val0x22;
+	rate_count = pSuppRates[1];
+	if (rate_count > 64)
+		rate_count = 64;
 	memcpy(hw->bss_table[hw->bss_table_count].supp_rates,
-	       &pSuppRates[2], pSuppRates[1]);
+	       &pSuppRates[2], rate_count);
 	hw->bss_table[hw->bss_table_count].sir = mmt->level;
 	hw->bss_table[hw->bss_table_count].snr = mmt->snr;
 
@@ -1540,7 +1544,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 
 	acxlog(L_DEBUG, "Supported Rates:\n");
 	/* find max. transfer rate */
-	for (i=0; i < pSuppRates[1]; i++)
+	for (i=0; i < rate_count; i++)
 	{
 		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
 			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
@@ -1552,7 +1556,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	acxlog(L_DEBUG, ".\n");
 
 	acxlog(L_STD | L_ASSOC,
-	       "%s: found and registered station %d: ESSID \"%s\" on channel %ld, BSSID %02X %02X %02X %02X %02X %02X (%s, %d%sMbps), SIR %ld, SNR %ld.\n",
+	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, BSSID %02X %02X %02X %02X %02X %02X, %s/%d%sMbps, SIR %ld, SNR %ld.\n",
 	       __func__,
 	       hw->bss_table_count,
 	       ss->essid, ss->channel,
@@ -2743,7 +2747,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 
 		if (!(wlandev->reg_dom_chanmask & (1 << (this_bss->channel - 1) ) ))
 		{
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, this_bss->channel);
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %d, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, this_bss->channel);
 			continue; /* keep looking */
 		}
 
