@@ -77,6 +77,15 @@ fail() {
 	exit 1
 }
 
+wireless_stats() {
+	if [ ! -f $KERNEL_BUILD/include/linux/wireless.h ]; then
+		$ECHO "$KERNEL_BUILD/include/linux/wireless.h header file doesn't exist!" 
+		fail
+	fi
+	WIRELESS_VERSION=`grep define.*WIRELESS_EXT $KERNEL_BUILD/include/linux/wireless.h|tr '\t' ' '|cut -f3 -d' '`
+	echo Wireless header file is WIRELESS_EXT version $WIRELESS_VERSION.
+}
+
 $ECHO Kernel version file: $KERNEL_BUILD/include/linux/version.h
 $ECHO Kernel configuration file: $KERNEL_BUILD/.config
 $ECHO "Make damn sure these really match your currently running kernel!!"
@@ -112,6 +121,7 @@ then
 		fail	
 	else
 		$ECHO "Kernel configuration satisfies the minimum requirements, continuing."
+		wireless_stats
 	fi
 	if is_unset CONFIG_SMP
 	then 

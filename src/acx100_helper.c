@@ -213,20 +213,23 @@ void acx100_reset_mac(wlandevice_t * hw)
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
 
-	temp = acx100_read_reg16(hw, ACX100_RESET_2) | 0x1;
-	acx100_write_reg16(hw, ACX100_RESET_2, temp);
+	temp = acx100_read_reg16(hw, hw->io[IO_ACX_ECPU_CTRL]) | 0x1;
+	acx100_write_reg16(hw, hw->io[IO_ACX_ECPU_CTRL], temp);
 
-	temp = acx100_read_reg16(hw, ACX100_REG0) | 0x1;
-	acx100_write_reg16(hw, ACX100_REG0, temp);
+	temp = acx100_read_reg16(hw, hw->io[IO_ACX_SOFT_RESET]) | 0x1;
+	acxlog(L_BINSTD, "%s: enable soft reset...\n", __func__);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SOFT_RESET], temp);
 
 	/* used to be for loop 65536; do scheduled delay instead */
 	acx100_schedule(HZ / 100);
 
 	/* now reset bit again */
-	acx100_write_reg16(hw, ACX100_REG0, temp & ~0x1);
+	acxlog(L_BINSTD, "%s: disable soft reset and go to init mode...\n", __func__);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SOFT_RESET], temp & ~0x1);
 
-	temp = acx100_read_reg16(hw, ACX100_RESET_0) | 0x1;
-	acx100_write_reg16(hw, ACX100_RESET_0, temp);
+	temp = acx100_read_reg16(hw, hw->io[IO_ACX_EE_START]) | 0x1;
+	acx100_write_reg16(hw, hw->io[IO_ACX_EE_START], temp);
+
 #endif
 	/* used to be for loop 65536; do scheduled delay instead */
 	acx100_schedule(HZ / 100);
@@ -260,6 +263,7 @@ int acx100_reset_dev(netdevice_t * netdev)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *hw = (wlandevice_t *) netdev->priv;
 	UINT16 vala = 0;
+	UINT16 var = 0;
 	int result = 0;
 
 	FN_ENTER;
@@ -268,42 +272,105 @@ int acx100_reset_dev(netdevice_t * netdev)
 	acxlog(L_INIT, "reset hw_unavailable++\n");
 	hw->hw_unavailable++;
 	
+	/* reset the device to make sure the eCPU is stopped 
+	   to upload the firmware correctly */
 	acx100_reset_mac(hw);
-	if (!(vala = acx100_read_reg16(hw, ACX100_RESET_2) & 1)) {
-		goto fail;
-	}
-	if (acx100_read_reg16(hw, ACX100_RESET_1) & 2) {
-		/* eCPU most likely means "embedded CPU" */
-		acxlog(L_BINSTD,
-			   "eCPU did not start after boot from flash\n");
-		goto fail;
+	
+	/* TODO maybe seperate the two init parts into functions */
+	if (hw->chip_type == CHIPTYPE_ACX100) {
+
+		if (!(vala = acx100_read_reg16(hw, hw->io[IO_ACX_ECPU_CTRL]) & 1)) {
+			acxlog(L_BINSTD, "eCPU already running (%xh)\n", vala);
+			goto fail;
+		}
+
+		if (acx100_read_reg16(hw, hw->io[IO_ACX_SOR_CFG]) & 2) {
+			/* eCPU most likely means "embedded CPU" */
+			acxlog(L_BINSTD, "eCPU did not start after boot from flash\n");
+			goto fail;
+		}
+
+		/* load the firmware */
+		if (!acx100_upload_fw(hw)) {
+			acxlog(L_STD, "Failed to upload firmware to the ACX100\n");
+			goto fail;
+		}
+
+		acx100_write_reg16(hw, hw->io[IO_ACX_ECPU_CTRL], vala & ~0x1);
+
+	} else if (hw->chip_type == CHIPTYPE_ACX111) {
+		if (!(vala = acx100_read_reg16(hw, hw->io[IO_ACX_ECPU_CTRL]) & 1)) {
+			acxlog(L_BINSTD, "eCPU already running (%xh)\n", vala);
+			goto fail;
+		}
+
+		/* check sense on reset flags */
+		if (acx100_read_reg16(hw, hw->io[IO_ACX_SOR_CFG]) & 0x10) { 			
+			acxlog(L_BINSTD, "eCPU did not start after boot from flash\n");
+			goto fail;
+		}
+	
+		/* load the firmware */
+		if (!acx100_upload_fw(hw)) {
+			acxlog(L_STD, "Failed to upload firmware to the ACX100\n");
+			goto fail;
+		}
+
+		/* additional reset is needed after the firmware has been downloaded to the card */
+		acx100_reset_mac(hw);
+
+		acxlog(L_BINSTD, "%s: configure interrupt mask at %xh to: %Xh...\n", __func__, 
+			hw->io[IO_ACX_IRQ_MASK], acx100_read_reg16(hw, hw->io[IO_ACX_IRQ_MASK]) ^ 0x4600);
+		acx100_write_reg16(hw, hw->io[IO_ACX_IRQ_MASK], 
+			acx100_read_reg16(hw, hw->io[IO_ACX_IRQ_MASK]) ^ 0x4600);
+
+		/* acx100_write_reg16(hw, hw->io[IO_ACX_IRQ_MASK], 0x0); */
+
+		acxlog(L_BINSTD, "%s: boot up eCPU and wait for complete...\n", __func__);
+		acx100_write_reg16(hw, hw->io[IO_ACX_ECPU_CTRL], 0x0);
 	}
 
-	if (!acx100_upload_fw(hw)) {
-		acxlog(L_STD,
-			   "Failed to upload firmware to the ACX100\n");
-		goto fail;
-	}
-	acx100_write_reg16(hw, ACX100_RESET_2, vala & ~0x1);
-	while (!(acx100_read_reg16(hw, ACX100_STATUS) & 0x4000)) {
+	/* wait for eCPU bootup */
+	while (!(vala = acx100_read_reg16(hw, hw->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x4000)) { 
 		/* ok, let's insert scheduling here.
 		 * This was an awfully CPU burning loop.
 		 */
-		acx100_schedule(HZ / 20);
+		acx100_schedule(HZ / 10);
+		var++;
+		
+		if(var > 250) { 
+			acxlog(L_BINSTD, "Timeout waiting for the ACX100 to complete Initialization (ICOMP), %d\n", vala);
+			goto fail;
+		}
 	}
+
 	if (!acx100_verify_init(hw)) {
 		acxlog(L_BINSTD,
 			   "Timeout waiting for the ACX100 to complete Initialization\n");
 		goto fail;
 	}
 
-	if (!acx100_read_eeprom_area(hw)) {
+	acxlog(L_BINSTD, "%s: Received signal that card is ready to be configured :) (the eCPU has woken up)\n", __func__);
+
+	if (hw->chip_type == CHIPTYPE_ACX111) {
+		acxlog(L_BINSTD, "%s: Clean up cmd mailbox access area\n", __func__);
+		acx100_write_cmd_status(hw, 0);
+		acx100_get_cmd_state(hw);
+		if(hw->cmd_status != 0) {
+			acxlog(L_BINSTD, "Error cleaning cmd mailbox area\n");
+			goto fail;
+		}
+	}
+
+	/* TODO what is this one doing ?? adapt for acx111 */
+	if (!acx100_read_eeprom_area(hw) && hw->chip_type == CHIPTYPE_ACX100) {
 		/* does "CIS" mean "Card Information Structure"?
 		 * If so, then this would be a PCMCIA message...
 		 */
 		acxlog(L_BINSTD, "CIS error\n");
 		goto fail;
 	}
+
 	/* reset succeeded, so let's release the hardware lock */
 	acxlog(L_INIT, "reset hw_unavailable--\n");
 	hw->hw_unavailable--;
@@ -338,7 +405,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 	int res1 = 0;
 	int res2 = 0;
 	firmware_image_t* apfw_image;
-	char filename[PATH_MAX];
+	char *filename;
 	int try;
 
 	FN_ENTER;
@@ -349,12 +416,21 @@ int acx100_upload_fw(wlandevice_t * hw)
 		acxlog(L_STD, "ERROR: no directory for firmware file specified, ABORTING. Make sure to set module parameter 'firmware_dir'! (specified as absolute path!)\n");
 		return 0;
 	}
-	sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
 
+	filename = kmalloc(PATH_MAX, GFP_USER);
+	if (!filename)
+		return -ENOMEM;
+	if(hw->chip_type == CHIPTYPE_ACX100) {
+		sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
+	} else if(hw->chip_type == CHIPTYPE_ACX111) {
+		sprintf(filename,"%s/TIACX111.BIN", firmware_dir);
+	}
+	
 	apfw_image = acx100_read_fw( filename );
 	if (!apfw_image)
 	{
 		acxlog(L_STD, "acx100_read_fw failed.\n");
+		kfree(filename);
 		return 0;
 	}
 
@@ -374,6 +450,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 
 	acxlog(L_DEBUG | L_INIT,
 	   "acx100_write_fw (firmware): %d, acx100_validate_fw: %d\n", res1, res2);
+	kfree(filename);
 	FN_EXIT(1, res1 && res2);
 	return (res1 && res2);
 }
@@ -404,15 +481,21 @@ int acx100_upload_fw(wlandevice_t * hw)
 int acx100_load_radio(wlandevice_t *wlandev)
 {
 	UINT32 offset;
-
 	memmap_t mm;
 	int res1, res2;
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
-	char filename[PATH_MAX];
+	char *filename;
+
 	FN_ENTER;
 	acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP);
 	offset = mm.m.ip.CodeEnd;
+
+	filename = kmalloc(PATH_MAX, GFP_USER);
+	if (!filename) {
+		acxlog(L_STD, "ALERT: can't allocate filename\n");
+		return 0;
+	}
 
 	sprintf(filename,"%s/RADIO%02x.BIN", firmware_dir, wlandev->radio_type);
 	acxlog(L_DEBUG,"trying to read %s\n",filename);
@@ -427,6 +510,7 @@ int acx100_load_radio(wlandevice_t *wlandev)
 	if ( !radio_image )
 	{
 		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of older combined firmware, FATAL when using new separated firmware.\n",filename);
+		kfree(filename);
 		return 1; /* Doesn't need to be fatal, we might be using a combined image */
 	}
 
@@ -447,6 +531,7 @@ int acx100_load_radio(wlandevice_t *wlandev)
 	/* will take a moment so let's have a big timeout */
 	acx100_issue_cmd(wlandev, ACX100_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
 
+	kfree(filename);
 	if (!acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP))
 	{
 		acxlog(L_STD, "Error reading memory map\n");
@@ -615,17 +700,17 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 	counter = 3;		/* NONBINARY: this should be moved directly */
 	acc = 0;		/*			in front of the loop. */
 
-	acx100_write_reg16(hw, ACX100_FW_4, 0);
-	acx100_write_reg16(hw, ACX100_FW_5, 0);
-	acx100_write_reg16(hw, ACX100_FW_2, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_END_CTL], 0); /* be sure we are in little endian mode */
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_END_CTL] + 0x2, 0); /* be sure we are in little endian mode */
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL], 0); /* reset data_offset_addr */
 #if NO_AUTO_INCREMENT
 	acxlog(L_INIT, "not using auto increment for firmware loading.\n");
-	acx100_write_reg16(hw, ACX100_FW_3, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0); /* use basic mode */
 #else
-	acx100_write_reg16(hw, ACX100_FW_3, 1);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL] + 0x2, 1); /* use autoincrement mode */
 #endif
-	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff);
-	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR], offset & 0xffff); /* configure host indirect memory access address ?? */
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR] + 0x2, offset >> 16);
 
 	/* the next four bytes contain the image size. */
 	//image = apfw_image;
@@ -642,15 +727,15 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 		/* we upload the image by blocks of four bytes */
 		if (counter < 0) {
 			/* this could probably also be done by doing
-			 * 32bit write to register ACX100_DATA_LO...
+			 * 32bit write to register hw->io[IO_ACX_SLV_MEM_DATA]...
 			 * But maybe there are cards with 16bit interface
 			 * only */
 #if NO_AUTO_INCREMENT
-			acx100_write_reg16(hw, ACX100_FW_0, (offset + len - 4) & 0xffff);
-			acx100_write_reg16(hw, ACX100_FW_1, (offset + len - 4) >> 16);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR], (offset + len - 4) & 0xffff);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (offset + len - 4) >> 16);
 #endif
-			acx100_write_reg16(hw, ACX100_DATA_LO, acc & 0xffff);
-			acx100_write_reg16(hw, ACX100_DATA_HI, acc >> 16);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_DATA], acc & 0xffff);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_DATA] + 0x2, acc >> 16);
 			acc = 0;
 			counter = 3;
 		}
@@ -659,6 +744,10 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 			acx100_schedule(HZ / 50);
 		}
 	}
+
+	
+	acxlog(L_STD,"%s: Firmware written.\n", __func__);
+	
 	/* compare our checksum with the stored image checksum */
 	return (sum == apfw_image->chksum);
 #endif
@@ -702,16 +791,16 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 	counter = 3;
 	acc1 = 0;
 
-	acx100_write_reg16(hw, ACX100_FW_4, 0);
-	acx100_write_reg16(hw, ACX100_FW_5, 0);
-	acx100_write_reg16(hw, ACX100_FW_2, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_END_CTL], 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_END_CTL] + 0x2, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL], 0);
 #if NO_AUTO_INCREMENT
-	acx100_write_reg16(hw, ACX100_FW_3, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL] + 0x2, 0);
 #else
-	acx100_write_reg16(hw, ACX100_FW_3, 1);
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_CTL] + 0x2, 1);
 #endif
-	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff );
-	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16 );
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR], offset & 0xffff );
+	acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR] + 0x2, offset >> 16 );
 
 	while (len < apfw_image->size) {
 		acc1 |= *image << (counter * 8);
@@ -723,11 +812,11 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 
 		if (counter < 0) {
 #if NO_AUTO_INCREMENT
-			acx100_write_reg16(hw, ACX100_FW_0, (offset + len - 4) & 0xffff);
-			acx100_write_reg16(hw, ACX100_FW_1, (offset + len - 4) >> 16);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR], (offset + len - 4) & 0xffff);
+			acx100_write_reg16(hw, hw->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (offset + len - 4) >> 16);
 #endif
-			acc2 = acx100_read_reg16(hw, ACX100_DATA_LO);
-			acc2 += acx100_read_reg16(hw, ACX100_DATA_HI) << 16;
+			acc2 = acx100_read_reg16(hw, hw->io[IO_ACX_SLV_MEM_DATA]);
+			acc2 += acx100_read_reg16(hw, hw->io[IO_ACX_SLV_MEM_DATA] + 0x2) << 16;
 
 			if (acc2 != acc1) {
 				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %ld don't match!! (0x%08lx vs. 0x%08lx). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
@@ -747,6 +836,7 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 		{
 			acx100_schedule(HZ / 50);
 		}
+		
 	}
 
 	/* sum control verification */
@@ -790,12 +880,13 @@ int acx100_verify_init(wlandevice_t * hw)
 	int timer;
 
 	FN_ENTER;
-#if (WLAN_HOSTIF!=WLAN_USB)
-	for (timer = 100000; timer > 0; timer--) {
 
-		if (acx100_read_reg16(hw, ACX100_STATUS) & 0x4000) {
+#if (WLAN_HOSTIF!=WLAN_USB)
+	for (timer = 100; timer > 0; timer--) {
+
+		if (acx100_read_reg16(hw, hw->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x4000) {
 			result = 1;
-			acx100_write_reg16(hw, ACX100_IRQ_ACK, 0x4000);
+			acx100_write_reg16(hw, hw->io[IO_ACX_IRQ_ACK], 0x4000);
 			break;
 		}
 
@@ -809,6 +900,7 @@ int acx100_verify_init(wlandevice_t * hw)
 }
 
 /* acx100_read_eeprom_area
+ * NOT ADAPTED FOR ACX111 !!
  * STATUS: OK.
  */
 int acx100_read_eeprom_area(wlandevice_t * hw)
@@ -819,13 +911,14 @@ int acx100_read_eeprom_area(wlandevice_t * hw)
 	UINT8 tmp[0x3b];
 
 	for (offs = 0x8c; offs < 0xb9; offs++) {
-		acx100_write_reg16(hw, ACX100_EEPROM_3, 0x0);
-		acx100_write_reg16(hw, ACX100_EEPROM_4, 0x0);
-		acx100_write_reg16(hw, ACX100_EEPROM_ADDR, offs);
-		acx100_write_reg16(hw, ACX100_EEPROM_2, 0x0);
-		acx100_write_reg16(hw, ACX100_EEPROM_0, 0x2);
-		acx100_write_reg16(hw, ACX100_EEPROM_1, 0x0);
-		while ((UINT16)acx100_read_reg16(hw, ACX100_EEPROM_0))
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CFG], 0);
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_ADDR], offs);
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CTL], 2);
+		acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+
+		while ((UINT16)acx100_read_reg16(hw, hw->io[IO_ACX_EEPROM_CTL]))
 		{
 			count++;
 			if (count > 0xffff)
@@ -836,7 +929,7 @@ int acx100_read_eeprom_area(wlandevice_t * hw)
 			 * Doesn't matter anyway (only small delay). */
 		}
 		tmp[offs - 0x8c] =
-			acx100_read_reg16(hw, ACX100_EEPROM_DATA);
+			acx100_read_reg16(hw, hw->io[IO_ACX_EEPROM_DATA]);
 	}
 	return 1;
 #endif
@@ -865,23 +958,33 @@ int acx100_read_eeprom_area(wlandevice_t * hw)
 */
 void acx100_init_mboxes(wlandevice_t * hw)
 {
+
 #if (WLAN_HOSTIF!=WLAN_USB)
-	UINT16 cmd_offs, info_offs;
+	UINT32 cmd_offs, info_offs;
 
 	FN_ENTER;
 	acxlog(L_BINDEBUG,
 		   "==> Get the mailbox pointers from the scratch pad registers\n");
-	cmd_offs = acx100_read_reg32(hw, ACX100_CMD_MAILBOX_OFFS);
-	info_offs = acx100_read_reg32(hw, ACX100_INFO_MAILBOX_OFFS);
-	acxlog(L_BINDEBUG, "CmdMailboxOffset = %x\n", cmd_offs);
-	acxlog(L_BINDEBUG, "InfoMailboxOffset = %x\n", info_offs);
+
+#if ACX_32BIT_IO
+	cmd_offs = acx100_read_reg32(hw, hw->io[IO_ACX_CMD_MAILBOX_OFFS]);
+	info_offs = acx100_read_reg32(hw, hw->io[IO_ACX_INFO_MAILBOX_OFFS]);
+#else
+	cmd_offs = acx100_read_reg16(hw, hw->io[IO_ACX_CMD_MAILBOX_OFFS]);
+	cmd_offs += ((UINT32)acx100_read_reg16(hw, hw->io[IO_ACX_CMD_MAILBOX_OFFS] + 0x2)) << 16;
+	info_offs = acx100_read_reg16(hw, hw->io[IO_ACX_INFO_MAILBOX_OFFS]);
+	info_offs += ((UINT32)acx100_read_reg16(hw, hw->io[IO_ACX_INFO_MAILBOX_OFFS] + 0x2)) << 16;
+#endif
+	
+	acxlog(L_BINDEBUG, "CmdMailboxOffset = %lx\n", cmd_offs);
+	acxlog(L_BINDEBUG, "InfoMailboxOffset = %lx\n", info_offs);
 	acxlog(L_BINDEBUG,
 		   "<== Get the mailbox pointers from the scratch pad registers\n");
 	hw->CommandParameters = hw->iobase2 + cmd_offs + 0x4;
 	hw->InfoParameters = hw->iobase2 + info_offs + 0x4;
-	acxlog(L_BINDEBUG, "CommandParameters = [ 0x%08X ]\n",
-		   (int) hw->CommandParameters);
-	acxlog(L_BINDEBUG, "InfoParameters = [ 0x%08X ]\n",
+	acxlog(L_BINDEBUG, "CommandParameters = [ 0x%08lX ]\n",
+		   hw->CommandParameters);
+	acxlog(L_BINDEBUG, "InfoParameters = [ 0x%08lX ]\n",
 		   hw->InfoParameters);
 	FN_EXIT(0, 0);
 #endif
@@ -950,13 +1053,60 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 	}
 
 	acxlog(L_BINDEBUG, "CodeEnd:%X\n", pt->m.ip.CodeEnd);
-	pt->m.ip.WEPCacheStart = pt->m.ip.CodeEnd + 0x4;
-	pt->m.ip.WEPCacheEnd = pt->m.ip.CodeEnd + 0x4;
 
-	if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
-		acxlog(L_STD, "ctlMemoryMapWrite failed!\n");
-		return 0;
+	if(hw->chip_type == CHIPTYPE_ACX100) {
+
+		pt->m.ip.WEPCacheStart = pt->m.ip.CodeEnd + 0x4;
+		pt->m.ip.WEPCacheEnd = pt->m.ip.CodeEnd + 0x4;
+
+		if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+			acxlog(L_STD, "%s: ctlMemoryMapWrite failed!\n", __func__);
+			return 0;
+		}
+
+	} else if(hw->chip_type == CHIPTYPE_ACX111) {
+
+		/* Hmm, this one has a new name: ACXMemoryConfiguration */
+
+		/*if (acx100_interrogate(hw, pt, 0x03) == 0) {
+			acxlog(L_STD, "ctlMemoryConfiguration interrogate failed!\n");
+			return 0;
+		}*/
+
+		/* TODO make a cool struct an pace it in the wlandev struct ? */
+		
+		/* start init struct */
+		pt->m.gp.bytes[0x00] = 0x3; /* id */
+		pt->m.gp.bytes[0x01] = 0x0; /* id */
+		pt->m.gp.bytes[0x02] = 16; /* length */
+		pt->m.gp.bytes[0x03] = 0; /* length */
+		pt->m.gp.bytes[0x04] = 0; /* number of sta's */
+		pt->m.gp.bytes[0x05] = 0; /* number of sta's */
+		pt->m.gp.bytes[0x06] = 0x00; /* memory block size */
+		pt->m.gp.bytes[0x07] = 0x01; /* memory block size */
+		pt->m.gp.bytes[0x08] = 10; /* tx/rx memory block allocation */
+		pt->m.gp.bytes[0x09] = 0; /* number of Rx Descriptor Queues */
+		pt->m.gp.bytes[0x0a] = 0; /* number of Tx Descriptor Queues */
+		pt->m.gp.bytes[0x0b] = 0; /* options */
+		pt->m.gp.bytes[0x0c] = 0x0c; /* Tx memory/fragment memory pool allocation */
+		pt->m.gp.bytes[0x0d] = 0; /* reserved */
+		pt->m.gp.bytes[0x0e] = 0; /* reserved */
+		pt->m.gp.bytes[0x0f] = 0; /* reserved */
+		/* end init struct */
+
+
+		/* set up one STA Context */
+		pt->m.gp.bytes[0x04] = 1;
+		pt->m.gp.bytes[0x05] = 0;
+
+		acxlog(L_STD, "set up an STA-Context\n");
+		if (acx100_configure(hw, pt, 0x03) == 0) {
+			acxlog(L_STD, "setting up an STA-Context failed!\n");
+			return 0;
+		}
+
 	}
+
 
 	/* FIXME: what kind of specific memmap struct is used here? */
 	options.valc = 0x0e;	/* Not cw, because this needs to be a single byte --\ */
@@ -993,15 +1143,19 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 			}
 		}
 	}
-	if (acx100_interrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
-		acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
-		return 0;
-	}
-	pt->m.ip.PacketTemplateStart = pt->m.ip.WEPCacheEnd;	// NONBINARY: this does not need to be in this function
 
-	if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
-		acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
-		return 0;
+	if(hw->chip_type == CHIPTYPE_ACX100) {
+
+		if (acx100_interrogate(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+			acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
+			return 0;
+		}
+		pt->m.ip.PacketTemplateStart = pt->m.ip.WEPCacheEnd;	// NONBINARY: this does not need to be in this function
+
+		if (acx100_configure(hw, pt, ACX100_RID_MEMORY_MAP) == 0) {
+			acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
+			return 0;
+		}
 	}
 
 	FN_EXIT(0, 0);
@@ -1066,14 +1220,23 @@ int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * mm)
 		goto failed;
 	len += sizeof(struct acxp80211_hdr) + 2;	//size
 
+	/* hmm, should check if this is going right...*/
 	acx100_set_tim_template(hw);
 
-	if (!acx100_interrogate(hw, mm, ACX100_RID_MEMORY_MAP))
-		goto failed;
+	/* the acx111 should set up it's memory by itself (or I hope so..) */
+	if(hw->chip_type == CHIPTYPE_ACX100) {
 
-	mm->m.ip.valc = mm->m.ip.PacketTemplateEnd + 4;
-	if (!acx100_configure(hw, mm, ACX100_RID_MEMORY_MAP))
-		goto failed;
+		if (!acx100_interrogate(hw, mm, ACX100_RID_MEMORY_MAP)) {
+			acxlog(L_BINDEBUG | L_INIT, "interrogate failed");
+			goto failed;
+		}
+
+		mm->m.ip.valc = mm->m.ip.PacketTemplateEnd + 4;
+		if (!acx100_configure(hw, mm, ACX100_RID_MEMORY_MAP)) {
+			acxlog(L_BINDEBUG | L_INIT, "configure failed");
+			goto failed;
+		}
+	}
 
 	result = 1;
 	goto success;
@@ -1887,7 +2050,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	wlandev->get_mask &= ~GETSET_ALL;
 	wlandev->set_mask &= ~GETSET_ALL;
 
-	acxlog(L_INIT, "get_mask 0x%08lx, set_mask 0x%08lx  - after update \n",
+	acxlog(L_INIT, "get_mask 0x%08lx, set_mask 0x%08lx - after update\n",
 			wlandev->get_mask, wlandev->set_mask);
 
 #ifdef BROKEN_LOCKING
@@ -2007,8 +2170,10 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->tx_level_auto = 1;
 	wlandev->set_mask |= GETSET_TXPOWER;
 
+#if BETTER_KEEP_VALUE_WE_GOT_ABOVE
 	wlandev->antenna = 0x8f;
 	wlandev->set_mask |= GETSET_ANTENNA;
+#endif
 
 	wlandev->ed_threshold = 0x70;
 	wlandev->set_mask |= GETSET_ED_THRESH;
@@ -2607,12 +2772,16 @@ unsigned int acx100_read_eeprom_offset(wlandevice_t * hw,
 	unsigned int result;
 
 	FN_ENTER;
-	acx100_write_reg16(hw, ACX100_EEPROM_3, 0);
-	acx100_write_reg16(hw, ACX100_EEPROM_4, 0);
-	acx100_write_reg16(hw, ACX100_EEPROM_ADDR, addr);
-	acx100_write_reg16(hw, ACX100_EEPROM_2, 0);
-	acx100_write_reg16(hw, ACX100_EEPROM_0, 2);
-	acx100_write_reg16(hw, ACX100_EEPROM_1, 0);
+
+	acxlog(L_INIT, "Setting action read in %Xh\n",hw->io[IO_ACX_EEPROM_CTL]);
+	acxlog(L_INIT, "Setting eeprom read id in %Xh\n",hw->io[IO_ACX_EEPROM_ADDR]);
+
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CFG], 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_ADDR], addr);
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CTL], 2);
+	acx100_write_reg16(hw, hw->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
 
 	do {
 #if BOGUS
@@ -2629,15 +2798,16 @@ unsigned int acx100_read_eeprom_offset(wlandevice_t * hw,
 #endif
 
 		/* accumulate the 20ms to up to 5000ms */
-		if (i++ > 250) {
+		if (i++ > 50) { 
 			result = 0;
+			acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
 			goto done;
 		}
-	} while (acx100_read_reg16(hw, ACX100_EEPROM_0) != 0);
+
+	} while (acx100_read_reg16(hw, hw->io[IO_ACX_EEPROM_CTL]) != 0);
 
 	/* yg: Why reading a 16-bits register for a 8-bits value ? */
-	*charbuf =
-		(unsigned char) acx100_read_reg16(hw, ACX100_EEPROM_DATA);
+	*charbuf = (unsigned char) acx100_read_reg16(hw, hw->io[IO_ACX_EEPROM_DATA]);
 	result = 1;
 
 done:

@@ -127,11 +127,12 @@ Again, here are your options:
 
 Easy solution:
 
-wget ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_driver_302.zip
-unzip dwl520+_driver_302.zip
-(Warning: probably already outdated)
+wget ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_drivers_307.zip
+unzip dwl520+_drivers_307.zip
+(these may be outdated, you might want to check for newer versions)
 
-cp Win2000/WLANGEN.BIN Win2000/RADIO0d.BIN Win2000/RADIO11.BIN firmware/
+cp Win2000/WLANGEN.bin Win2000/WLANGEN.BIN Win2000/RADIO0d.BIN Win2000/RADIO11.BIN firmware/
+mv firmware/WLANGEN.bin firmware/WLANGEN.BIN
 Ready to roll. :)
 
 Longer background explanation (READ IN CASE OF PROBLEMS!):
@@ -292,7 +293,7 @@ rebooting. Hopefully the driver compiling works then.
 
 -- Driver init failure --
 
-- CardBus -
+- CardBus specific -
 You need to make sure you're having
 CardBus support (otherwise you'll have strange PCI init failures),
 and it should be kernel CardBus support, not pcmcia-cs CardBus modules!
@@ -305,6 +306,8 @@ but doesn't get recognized as a CardBus card), then try to use
 further memory and port areas in /etc/pcmcia/config.opts (restart
 pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
+And of course also trying the other CardBus slot in case you are lucky
+enough to have 2 slots sometimes helps to fix IRQ problems...
 
 - General -
 If the system detects your card, but the driver is unable to initialize the
@@ -313,9 +316,14 @@ parameters, specifically the "pci=XXXX" flags, and most specifically,
 "pci=assign-busses", since this managed to fix it for one person (DWL-650+).
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
-Also, make sure to shuffle cards in different PCI slots! The ACX100
-probably needs PCI bus mastering support, and some motherboards either
-don't support it at all or not in certain crippled PCI slots.
+Also, make sure to shuffle cards in different PCI slots!! The ACX100 probably
+needs PCI bus mastering support, and some motherboards either don't support it
+at all or not in certain crippled PCI slots.
+And of course there are also cases where it is PCI interrupt sharing which
+causes init trouble. A log message like "PCI: Sharing IRQ 3 with 00:01.1"
+indicates that sharing is happening, which might cause trouble.
+Using APM instead of ACPI has also been reported as fixing init problems, so
+reconfigure your kernel to use the other one...
 
 -- Driver locked up the box --
 Umm... ouch!
@@ -356,6 +364,10 @@ Make sure that network association is working properly!
 (all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
 AUTHENTICATED to ASSOCIATED finish successfully)
 
+Also, check whether you actually use the newest or a working firmware version.
+In some cases it's actually not this driver but the firmware which is
+misbehaving...
+
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-((
@@ -382,8 +394,9 @@ When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
 If you still have trouble getting a connection, or if the connection is
-problematic, then visit our Wiki HOWTO/troubleshooting pages for more
-info.
+problematic, then try
+http://www.houseofcraig.net/acx100_howto.php
+or visit our Wiki HOWTO/troubleshooting pages for more info.
 
 And if that still doesn't give you the info you need,
 then consider NOT posting a request on the Forum or writing to the mailing

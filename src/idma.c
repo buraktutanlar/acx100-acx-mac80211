@@ -124,8 +124,8 @@ void acx100_enable_irq(wlandevice_t * wlandev)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acx100_write_reg16(wlandev, ACX100_IRQ_MASK, wlandev->irq_mask);
-	acx100_write_reg16(wlandev, ACX100_IRQ_34, 0x8000);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_MASK], wlandev->irq_mask);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_FEMR], 0x8000);
 #endif
 	FN_EXIT(0, 0);
 }
@@ -152,8 +152,8 @@ void acx100_disable_irq(wlandevice_t * wlandev)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acx100_write_reg16(wlandev, ACX100_IRQ_MASK, 0x7fff);
-	acx100_write_reg16(wlandev, ACX100_IRQ_34, 0x0);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_MASK], 0x7fff);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_FEMR], 0x0);
 #endif
 	FN_EXIT(0, 0);
 }
@@ -239,6 +239,7 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 		acxlog(L_BINSTD, "ctlQueueConfigurationWrite returns error\n");
 		goto error;
 	}
+
 	if (acx100_create_tx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx100_create_tx_host_desc_queue returns error\n");
 		goto error;
@@ -253,6 +254,7 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 		acxlog(L_BINSTD, "Failed to read memory map\n");
 		goto error;
 	}
+
 #if (WLAN_HOSTIF==WLAN_USB)
 	acxlog(L_DEBUG,"Memory Map before configure 1\n");
 	acx100usb_dump_bytes(&MemMap,44);
@@ -277,6 +279,7 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 		acxlog(L_BINSTD, "ctlMemoryMapWrite returns error\n");
 		goto error;
 	}
+
 	if (!acx100_init_memory_pools(wlandev, (memmap_t *) &MemMap)) {
 		acxlog(L_BINSTD, "acx100_init_memory_pools returns error\n");
 		goto error;
@@ -318,7 +321,7 @@ int acx100_delete_dma_region(wlandevice_t * wlandev)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acx100_write_reg16(wlandev, ACX100_REG_104, 0);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_ENABLE], 0);
 
 	/* used to be a for loop 1000, do scheduled delay instead */
 	acx100_schedule(HZ / 10);
@@ -387,7 +390,7 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 	}
 
 	acxlog(L_XFER | L_DATA,
-		"Tx pkt (%s): len %i, hdr_len %i, pyld_len %i, mode %lX, status %X\n",
+		"Tx pkt (%s): len %i, hdr_len %i, pyld_len %i, mode %d, status %d\n",
 		acx100_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
 		tx_desc->total_length,
 		header->length,
@@ -411,7 +414,7 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 	payload->Ctl &= (UINT16) ~DESC_CTL_FREE;
 	tx_desc->Ctl &= (UINT16) ~DESC_CTL_FREE;
 
-	acx100_write_reg16(wlandev, ACX100_REG_7C, 0x4);
+	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_INT_TRIG], 0x4);
 
 	spin_unlock_irqrestore(&tx_lock, flags);
 #endif
@@ -830,7 +833,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 		buf_len = pDesc->data->status & 0xfff;      /* somelength */
 		if ((WLAN_GET_FC_FSTYPE(buf->a3.fc) != WLAN_FSTYPE_BEACON)
 		||  (debug & L_XFER_BEACON))
-			acxlog(L_XFER|L_DATA, "Rx pkt %02d (%s): time %lu, len %i, signal %d, SNR %d, mode %lX, status %X\n",
+			acxlog(L_XFER|L_DATA, "Rx pkt %02d (%s): time %lu, len %i, signal %d, SNR %d, mode %d, status %d\n",
 				curr_idx,
 				acx100_get_packet_type_string(buf->a3.fc),
 				pDesc->data->time,

@@ -97,6 +97,7 @@
 #include <acx100_helper2.h>
 #include <idma.h>
 #include <ihw.h>
+#include <ioregister.h>
 
 /********************************************************************/
 /* Module information                                               */
@@ -111,13 +112,25 @@ MODULE_LICENSE("Dual MPL/GPL");
 /*================================================================*/
 /* Local Constants */
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
-#define PCI_SIZE		0x1000	/* Memory size - 4K bytes */
-#define PCI_SIZE2   0x10000
+#define PCI_ACX100_REGION1		0x01;
+#define PCI_ACX100_REGION1_SIZE		0x1000	/* Memory size - 4K bytes */
+#define PCI_ACX100_REGION2		0x02;
+#define PCI_ACX100_REGION2_SIZE   	0x10000 /* Memory size - 64K bytes */
+
+#define PCI_ACX111_REGION1		0x00;
+#define PCI_ACX111_REGION1_SIZE		0x2000	/* Memory size - 8K bytes */
+#define PCI_ACX111_REGION2		0x01;
+#define PCI_ACX111_REGION2_SIZE   	0x20000 /* Memory size - 128K bytes */
+
+/* Texas Instruments Vendor ID */
+#define PCI_VENDOR_ID_TI		0x104c
 
 /* ACX100 22Mb/s WLAN controller */
-#define PCI_VENDOR_ID_TI		0x104c
 #define PCI_DEVICE_ID_TI_ACX100		0x8400
 #define PCI_DEVICE_ID_TI_ACX100_CB	0x8401
+
+/* ACX111 54Mb/s WLAN controller */
+#define PCI_DEVICE_ID_TI_ACX111		0x9066
 
 /* PCI Class & Sub-Class code, Network-'Other controller' */
 #define PCI_CLASS_NETWORK_OTHERS 0x280
@@ -196,6 +209,12 @@ static struct pci_device_id acx100_pci_id_tbl[] = {
 	{
 		.vendor = PCI_VENDOR_ID_TI,
 		.device = PCI_DEVICE_ID_TI_ACX100_CB,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
+	{
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_ACX111,
 		.subvendor = PCI_ANY_ID,
 		.subdevice = PCI_ANY_ID,
 	},
@@ -350,6 +369,32 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 }
 
 /*----------------------------------------------------------------
+* acx100_resolve_chip_type
+*
+* Returns the active chiptype.
+*
+* Arguments:
+*	device		the pciid from the device
+*
+* Returns:
+*	the chip type
+*
+* Side effects:
+*
+* STATUS: NOT REALLY FINISHED YET.
+*
+----------------------------------------------------------------*/
+unsigned int acx100_resolve_chip_type(unsigned short device) {
+	/* TODO improve this check */
+
+	if(device == PCI_DEVICE_ID_TI_ACX111) {
+		return CHIPTYPE_ACX111;
+	} else {
+		return CHIPTYPE_ACX100;
+	}
+}
+
+/*----------------------------------------------------------------
 * acx100_probe_pci
 *
 * Probe routine called when a PCI device w/ matching ID is found.
@@ -400,6 +445,11 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned int i;
 	UINT32 hardware_info;
 	char *devname_mask;
+	unsigned int chip_type;
+	unsigned long mem_region1 = 0;
+	unsigned long mem_region1_size;
+	unsigned long mem_region2 = 0;
+	unsigned long mem_region2_size;
 
 	FN_ENTER;
 
@@ -429,12 +479,34 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	acxlog(L_DEBUG, "wake: %d\n", pci_enable_wake(pdev, 0, 0));
 #endif
 
+	/* The two chiptypes have different pci memory regions */
+	chip_type = acx100_resolve_chip_type(pdev->device);
+	if(chip_type == CHIPTYPE_ACX100) {
+		mem_region1 = PCI_ACX100_REGION1;
+		mem_region1_size  = PCI_ACX100_REGION1_SIZE;
+
+		mem_region2 = PCI_ACX100_REGION2;
+		mem_region2_size  = PCI_ACX100_REGION2_SIZE;
+	} else if(chip_type == CHIPTYPE_ACX111) {
+		acxlog(L_BINSTD, "%s: acx111 support is highly experimental!\n", __func__);
+
+		mem_region1 = PCI_ACX111_REGION1;
+		mem_region1_size  = PCI_ACX111_REGION1_SIZE;
+
+		mem_region2 = PCI_ACX111_REGION2;
+		mem_region2_size  = PCI_ACX111_REGION2_SIZE;
+	} else {
+		acxlog(L_BINSTD, "%s: bad chip ??\n", __func__);
+		result = -EIO;
+		goto fail;
+	}
+
 	/* Figure out our resources */
-	phymem1 = pci_resource_start(pdev, 1);
-	phymem2 = pci_resource_start(pdev, 2);
+	phymem1 = pci_resource_start(pdev, mem_region1);
+	phymem2 = pci_resource_start(pdev, mem_region2);
 
 	if (!request_mem_region
-	    (phymem1, pci_resource_len(pdev, 1), "Acx100_1")) {
+	    (phymem1, pci_resource_len(pdev, mem_region1), "Acx100_1")) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 1 (or also: are you sure you have CardBus support in kernel?)\n", __func__);
 		result = -EIO;
@@ -442,14 +514,14 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	if (!request_mem_region
-	    (phymem2, pci_resource_len(pdev, 2), "Acx100_2")) {
+	    (phymem2, pci_resource_len(pdev, mem_region2), "Acx100_2")) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 2\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
 
-	mem1 = (unsigned long) ioremap(phymem1, PCI_SIZE);
+	mem1 = (unsigned long) ioremap(phymem1, mem_region1_size);
 	if (mem1 == 0) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
@@ -458,7 +530,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail;
 	}
 
-	mem2 = (unsigned long) ioremap(phymem2, PCI_SIZE2);
+	mem2 = (unsigned long) ioremap(phymem2, mem_region2_size);
 	if (mem2 == 0) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
@@ -469,9 +541,11 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
-	       "Found ACX100-based wireless network card, phymem1:0x%x, phymem2:0x%x, irq:%d, mem1:0x%x, mem2:0x%x, compiled with wireless extensions v%d\n",
-	       (unsigned int) phymem1, (unsigned int) phymem2, pdev->irq,
-	       (unsigned int) mem1, (unsigned int) mem2, WIRELESS_EXT);
+	       "Found ACX100-based wireless network card, phymem1:0x%lx, phymem2:0x%lx, irq:%d, mem1:0x%lx, mem1_size:%ld, mem2:0x%lx, mem2_size:%ld compiled with wireless extensions v%d\n",
+	       phymem1, phymem2, pdev->irq,
+	       mem1, mem_region1_size,
+	       mem2, mem_region2_size,
+	       WIRELESS_EXT);
 
 	acxlog(L_INIT, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
 	if ((wlandev = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
@@ -484,6 +558,25 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(wlandev, 0, sizeof(wlandevice_t));
 
+	/* set the correct io resource list for the active chip */
+	wlandev->chip_type = chip_type;
+	if(chip_type == CHIPTYPE_ACX100) {
+		acxlog(L_BINSTD, "%s: using acx100 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
+		wlandev->io = acx100_get_io_register_array();
+	} else if(chip_type == CHIPTYPE_ACX111) {
+		acxlog(L_BINSTD, "%s: using acx111 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
+		wlandev->io = acx111_get_io_register_array();
+	} else {
+		acxlog(L_BINSTD, "%s: bad chip ??\n", __func__);
+		result = -EIO;
+		goto fail;
+	}
+	if(wlandev->io == NULL) {
+		acxlog(L_BINSTD, "%s: error getting io mappings.\n", __func__);
+		result = -EIO;
+		goto fail;
+	}
+		
 	spin_lock_init(&wlandev->lock);
 
 	wlandev->open = 0;
@@ -499,13 +592,20 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
-	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (!(acx100_read_eeprom_offset(wlandev,
-					 ACX100_EEPROM_ID_OFFSET + i,
-					 &buffer[i])))
-		{
-			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
-			break;
+	if(chip_type == CHIPTYPE_ACX111) {
+		/* TODO read later by interroage cmd */
+		for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
+			buffer[i] = acx100_read_reg8(wlandev, 0x390 + i);
+		}
+	} else { /* use direct eeprom access */
+		for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
+			if (!(acx100_read_eeprom_offset(wlandev,
+						 ACX100_EEPROM_ID_OFFSET + i,
+						 &buffer[i])))
+			{
+				acxlog(L_STD, "huh, reading EEPROM failed!?\n");
+				break;
+			}
 		}
 	}
 	for (i = 0; i < sizeof(device_ids) / sizeof(struct device_id); i++)
@@ -556,7 +656,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	netdev->irq = pdev->irq;
-	netdev->base_addr = pci_resource_start(pdev, 0);
+	netdev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
 
 	if (!acx100_reset_dev(netdev)) {
 		acxlog(L_BINSTD | L_INIT,
@@ -591,6 +691,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* ok, basic setup is finished, now start initialising the card */
 
+	/* TODO this isn't working with acx111 */
 	hardware_info = acx100_read_reg16(wlandev, 0x2ac);
 	wlandev->form_factor = hardware_info & 0xff;
 	wlandev->radio_type = hardware_info >> 8 & 0xff;
@@ -653,11 +754,11 @@ fail:
 	if (mem2)
 		iounmap((void *) mem2);
 
-	release_mem_region(pci_resource_start(pdev, 1),
-			   pci_resource_len(pdev, 1));
+	release_mem_region(pci_resource_start(pdev, mem_region1),
+			   pci_resource_len(pdev, mem_region1));
 
-	release_mem_region(pci_resource_start(pdev, 2),
-			   pci_resource_len(pdev, 2));
+	release_mem_region(pci_resource_start(pdev, mem_region2),
+			   pci_resource_len(pdev, mem_region2));
 	pci_disable_device(pdev);
 
 done:
@@ -1344,7 +1445,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	
 	FN_ENTER;
 
-	irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
+	irqtype = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_IRQ_STATUS_CLEAR]) & ~(wlandev->irq_mask);
 	pm_access(wlandev->pm);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
@@ -1376,11 +1477,11 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (irqtype & 0x8) {
 		acx100_process_rx_desc(wlandev);
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x8);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x8);
 	}
 	if (irqtype & 0x2) {
 		acx100_clean_tx_desc(wlandev);
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x2);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x2);
 #if 0
 /* this shouldn't happen here generally, since we'd also enable user packet
  * xmit for management packets, which we really DON'T want */
@@ -1405,56 +1506,56 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			/* FIXME: this shouldn't be done in IRQ context !!! */
 			d11CompleteScan(wlandev);
 		}
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, HOST_INT_SCAN_COMPLETE);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], HOST_INT_SCAN_COMPLETE);
 	}
 	if (irqtype & HOST_INT_TIMER /* 0x40 */ ) {
 		acx100_timer((unsigned long)wlandev);
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, HOST_INT_TIMER);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], HOST_INT_TIMER);
 	}
 	if (irqtype & 0x10) {
 		printk("Got DTIM IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x10);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x10);
 	}
 	if (irqtype & 0x20) {
 		printk("Got Beacon IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x20);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x20);
 	}
 	if (irqtype & 0x80) {
 		printk("Got Key Not Found IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x80);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x80);
 	}
 	if (irqtype & 0x100) {
 		printk("Got IV ICV Failure IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x100);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x100);
 	}
 	if (irqtype & 0x200) {
 		printk("Got Command Complete IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x200);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x200);
 	}
 	if (irqtype & 0x400) {
 		printk("Got Info IRQ\n");
 		acx100_handle_info_irq(wlandev);
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x400);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x400);
 	}
 	if (irqtype & 0x800) {
 		printk("Got Overflow IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x800);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x800);
 	}
 	if (irqtype & 0x1000) {
 		printk("Got Process Error IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x1000);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x1000);
 	}
 	if (irqtype & 0x4000) {
 		printk("Got FCS Threshold IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x4000);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x4000);
 	}
 	if (irqtype & 0x8000) {
 		printk("Got Unknown IRQ\n");
-		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x8000);
+		acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], 0x8000);
 	}
-//	acx100_write_reg16(wlandev, ACX100_IRQ_ACK, irqtype);
+//	acx100_write_reg16(wlandev, wlandev->io[IO_ACX_IRQ_ACK], irqtype);
 #if IRQ_ITERATE
-	irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
+	irqtype = acx100_read_reg16(wlandev, wlandev->io[IO_ACX_IRQ_STATUS_CLEAR]) & ~(wlandev->irq_mask);
 	if (irqtype)
 		acxlog(L_IRQ, "IRQTYPE: %X\n", irqtype);
    }

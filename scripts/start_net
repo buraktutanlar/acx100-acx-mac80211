@@ -10,9 +10,7 @@
 # Please edit here
 
 DEV=wlan0
-IP=192.168.0.10
-NETMASK=255.255.255.0
-GATEWAY=192.168.0.254
+
 ESSID="any" # THIS IS CASE SeNsItIvE!! any == associate to any ESSID
 # Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
@@ -22,6 +20,11 @@ MODE=Managed
 DEBUG=0xb
 #KEY="B401CD21B44CCD21DEADBEEF11" # WEP128
 ALG=open # open == Open System, restricted == Shared Key
+
+USE_DHCP=0 # set to 1 for auto configuration instead of fixed IP setting
+IP=192.168.0.10
+NETMASK=255.255.255.0
+GATEWAY=192.168.0.254
 
 # Usually no editing should be required below this line...
 # -- unless you want this script to fetch stuff with dhcp
@@ -44,7 +47,7 @@ if test -z "$INSMOD"; then echo "insmod not found. Go get a sane Linux system. B
 if test -z "$IFCONF"; then echo "ifconfig not found. I can insert the module for you, but you won't be able to configure your interface."; CONTINUE=ASK; fi
 if test -z "$IWCONF"; then echo "iwconfig not found. Make sure it is installed. The interface might work without, though."; CONTINUE=ASK; fi
 
-if test -z "$CONTINUE"; then echo -n "Problems encountered. Do you want to continue? [n] "; read ANSWER
+if test -n "$CONTINUE"; then echo -n "Problems encountered. Do you want to continue? [n] "; read ANSWER
 case $ANSWER in  ( y | Y | Yes | YES | yes | j | J | ja | Ja | JA ) ;;
                  ( * ) exit 1 ;;
 esac
@@ -117,24 +120,24 @@ fi
 #test -n "$IWPRIV" && "$IWPRIV" $DEV set_led_power 0
 
 
-# Hehe, this can be done after iwconfigs now :)
-$IFCONF $DEV $IP netmask $NETMASK
-if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV $IP netmask $NETMASK\". Bailing..."; exit 1; else echo "Interface has been set up successfully."; fi
+if test $USE_DHCP -eq 1; then
+  # fetch an IP address from DHCP
+  rm -f /etc/dhcpc/dhcpcd-$DEV.pid > /dev/null
+  dhcpcd -d $DEV -t 5
+  # OR
+  # pump -i $DEV
+else
+  # Hehe, this can be done after iwconfigs now :)
+  $IFCONF $DEV $IP netmask $NETMASK
+  if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV $IP netmask $NETMASK\". Bailing..."; exit 1; else echo "Interface has been set up successfully."; fi
+  
+  test -n "$GATEWAY" && $ROUTE add default gw $GATEWAY
+fi
 
 # Finally, let's do some tweaking to make sure we don't have any
 # buffer management problems (yeah, it's an ugly workaround!)
 $IFCONF $DEV mtu 576
 if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
-
-if test -n "$GATEWAY"; then
-  $ROUTE add default gw $GATEWAY
-fi
-
-# # fetch an IP address from DHCP
-# rm -f /etc/dhcpc/dhcpcd-$DEV.pid > /dev/null
-# dhcpcd -d $DEV -t 5
-# OR
-# pump -i $DEV
 
 # just in case ;)
 $SYNC

@@ -89,24 +89,25 @@
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
-#define ACX100_IOCTL		SIOCIWFIRSTPRIV
-#define ACX100_IOCTL_DEBUG	ACX100_IOCTL + 0x00
-#define ACX100_IOCTL_LIST_DOM	ACX100_IOCTL + 0x01
-#define ACX100_IOCTL_SET_DOM	ACX100_IOCTL + 0x02
-#define ACX100_IOCTL_GET_DOM	ACX100_IOCTL + 0x03
-#define ACX100_IOCTL_SET_PREAMB	ACX100_IOCTL + 0x04
-#define ACX100_IOCTL_GET_PREAMB	ACX100_IOCTL + 0x05
-#define ACX100_IOCTL_SET_ANT	ACX100_IOCTL + 0x06
-#define ACX100_IOCTL_GET_ANT	ACX100_IOCTL + 0x07
-#define ACX100_IOCTL_RX_ANT	ACX100_IOCTL + 0x08
-#define ACX100_IOCTL_TX_ANT	ACX100_IOCTL + 0x09
-#define ACX100_IOCTL_SET_ED	ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_SET_CCA	ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_PLED	ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_SET_MAC	ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_MONITOR	ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_FW		ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_TEST	ACX100_IOCTL + 0x10
+#define ACX100_IOCTL			SIOCIWFIRSTPRIV
+#define ACX100_IOCTL_DEBUG		ACX100_IOCTL + 0x00
+#define ACX100_IOCTL_LIST_DOM		ACX100_IOCTL + 0x01
+#define ACX100_IOCTL_SET_DOM		ACX100_IOCTL + 0x02
+#define ACX100_IOCTL_GET_DOM		ACX100_IOCTL + 0x03
+#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x04
+#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x05
+#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x06
+#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x07
+#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x08
+#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x09
+#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0a
+#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0b
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_SET_MAC		ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_LIST_NET_STATUS	ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_FW			ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x11
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -180,6 +181,10 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
 	name : "monitor" },
+{ cmd : ACX100_IOCTL_LIST_NET_STATUS,
+	set_args : 0,
+	get_args : 0,
+	name : "list_net_status" },
 { cmd : ACX100_IOCTL_FW,
 	set_args : 0,
 	get_args : 0,
@@ -362,7 +367,7 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
 
-	acxlog(L_IOCTL, "Get Mode => %ld\n", wlandev->macmode);
+	acxlog(L_IOCTL, "Get Mode => %d\n", wlandev->macmode);
 
 	if (wlandev->status != ISTATUS_4_ASSOCIATED)
 	/* if (!wlandev->ifup) */
@@ -495,7 +500,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
 	unsigned long flags;
 	int err;
-	int result = -EINVAL;
+	int result = 0;
 
 	if ((err = acx100_lock(wlandev, &flags))) {
 		result = err;
@@ -510,8 +515,9 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 
 	wlandev->unknown0x2350 = ISTATUS_5_UNKNOWN;
 	acx100_scan_chan(wlandev);
+
 #if (WLAN_HOSTIF!=WLAN_USB)
-	while (!(acx100_read_reg16(wlandev, ACX100_STATUS) & 0x2000)) {
+	while (!(acx100_read_reg16(wlandev, wlandev->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x2000)) {
 		/* FIXME: urks, busy loop! */
 	};
 #endif
@@ -525,12 +531,6 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	}
 
 	if (dwrq->flags == SIOCGIWAPLIST) {
-		/* The variables being used in this ioctl,
-		 * despite being localised in local brackets,
-		 * still take up a lot of stack space,
-		 * thus still possibly leading to IRQ handler
-		 * stack overflow. They should probably be
-		 * dynamically allocated instead. */
 		struct ap {
 			int essid_len;
 			char essid[IW_ESSID_MAX_SIZE];
@@ -539,10 +539,15 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 
 			int cap;
 			int wep;
-		} ap_table[IW_MAX_AP];
-
+		};
+		struct ap *ap_table;
 		int i = 0;
 
+		ap_table = kmalloc(sizeof(struct ap) * IW_MAX_AP, GFP_USER);
+		if (!ap_table) {
+			result = -ENOMEM;
+			goto end;
+		}
 		if (wlandev->bss_table_count != 0) {
 
 			for (; i < wlandev->bss_table_count; i++) {
@@ -566,20 +571,23 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 		dwrq->length =
 		    wlandev->bss_table_count * sizeof(struct ap);
 		/* FIXME memcpy? */
-		if (copy_to_user
-		    (dwrq->pointer, &ap_table,
-		     dwrq->length) != 0) {
+		if (copy_to_user (dwrq->pointer, ap_table, dwrq->length) != 0)
 			result = -EFAULT;
-			goto end;
-		}
+		kfree(ap_table);
 
 	} else if (dwrq->pointer != 0) {
 
 		struct ap_addr {
 			sa_family_t sa_family;
 			char sa_data[ETH_ALEN];
-		} addresses[IW_MAX_AP];
+		};
+		struct ap_addr *addresses;
 
+		addresses = kmalloc(sizeof(struct ap_addr)*IW_MAX_AP, GFP_USER);
+		if (!addresses) {
+			result = -ENOMEM;
+			goto end;
+		}
 		if (wlandev->bss_table_count != 0) {
 
 			int i;
@@ -596,14 +604,11 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 
 		dwrq->length = wlandev->bss_table_count;
 		/* FIXME memcpy? */
-		if (copy_to_user
-		    (dwrq->pointer, &addresses,
-		     wlandev->bss_table_count * sizeof(struct ap_addr)) != 0) {
+		if (copy_to_user (dwrq->pointer, addresses,
+		     wlandev->bss_table_count * sizeof(struct ap_addr)) != 0)
 			result = -EFAULT;
-			goto end;
-		}
+		kfree(addresses);
 	}
-	result = 0;
 
 end:
 	acx100_unlock(wlandev, &flags);
@@ -2085,6 +2090,47 @@ end:
 	return result;
 }
 
+static inline int acx100_ioctl_list_net_status(struct net_device *dev,
+					    struct iw_request_info *info,
+					    struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
+	int result = -EINVAL;
+	UINT8 *p;
+
+	FN_ENTER;
+
+	printk("wlandev:\n");
+	printk("ifup: %d\n", wlandev->ifup);
+	printk("mode: %d, macmode: %d, status: %d, channel: %d, reg_dom_id: 0x%02x, reg_dom_chanmask: 0x%04x, bitrateval: %d, bitrate_auto: %d, bss_table_count: %d\n",
+		wlandev->mode, wlandev->macmode, wlandev->status,
+		wlandev->channel, wlandev->reg_dom_id,
+		wlandev->reg_dom_chanmask, wlandev->bitrateval,
+		wlandev->bitrate_auto, wlandev->bss_table_count);
+	printk("ESSID: %s, essid_active: %d, essid_len: %d, essid_for_assoc: %s, nick: %s\n",
+		wlandev->essid, wlandev->essid_active, wlandev->essid_len,
+		wlandev->essid_for_assoc, wlandev->nick);
+	printk("monitor: %d, monitor_setting: %d\n",
+		wlandev->monitor, wlandev->monitor_setting);
+	p = wlandev->dev_addr;
+	printk("dev_addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+		p[0], p[1], p[2], p[3], p[4], p[5]);
+	p = wlandev->address;
+	printk("address:  %02x:%02x:%02x:%02x:%02x:%02x\n",
+		p[0], p[1], p[2], p[3], p[4], p[5]);
+	p = wlandev->bssid;
+	printk("bssid:    %02x:%02x:%02x:%02x:%02x:%02x\n",
+		p[0], p[1], p[2], p[3], p[4], p[5]);
+	p = wlandev->ap;
+	printk("ap:       %02x:%02x:%02x:%02x:%02x:%02x\n",
+		p[0], p[1], p[2], p[3], p[4], p[5]);
+
+	result = 0;
+
+	FN_EXIT(1, result);
+	return result;
+}
+
 /*------------------------------------------------------------------------------
  * acx100_ioctl_get_fw_stats
  * Dump firmware statistics
@@ -2405,6 +2451,7 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_led_power,
 	(iw_handler) acx100_ioctl_set_mac_address,
 	(iw_handler) acx100_ioctl_wlansniff,
+	(iw_handler) acx100_ioctl_list_net_status,
 	(iw_handler) acx100_ioctl_get_fw_stats,
 	(iw_handler) acx100_ioctl_unknown11
 };
@@ -2714,16 +2761,19 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		result = acx100_ioctl_wlansniff(dev, NULL, NULL, iwr->u.name);
 		break;
 
-	case ACX100_IOCTL_FW:
-		acx100_ioctl_get_fw_stats(dev, NULL, NULL, NULL);
-		break;
-		
 	case ACX100_IOCTL_RX_ANT:
 		acx100_ioctl_set_rx_antenna(dev, NULL, NULL, iwr->u.name);
 		break;
 		
 	case ACX100_IOCTL_TX_ANT:
 		acx100_ioctl_set_tx_antenna(dev, NULL, NULL, iwr->u.name);
+		break;
+		
+	case ACX100_IOCTL_LIST_NET_STATUS:
+		acx100_ioctl_list_net_status(dev, NULL, NULL, NULL);
+		
+	case ACX100_IOCTL_FW:
+		acx100_ioctl_get_fw_stats(dev, NULL, NULL, NULL);
 		break;
 		
 	case ACX100_IOCTL_TEST:

@@ -1220,7 +1220,7 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 		break;
 	case WLAN_FSTYPE_BEACON /* 0x08 */ :
 		if (hw->mode != 3) {
-			switch (hw->status){
+			switch (hw->status) {
 			   case ISTATUS_1_SCANNING:
 			   case ISTATUS_5_UNKNOWN:
 				memset(&alloc_p80211mgmt_req.a.beacon, 0,
@@ -1229,24 +1229,20 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 				    (char *) p80211_hdr;
 				alloc_p80211mgmt_req.a.beacon.len =
 				    (rxdesc->data->status & 0xfff) - wep_offset;
-				acxlog(L_DATA, "fc: %X\n",
-				       p80211_hdr->a3.fc);
-				acxlog(L_DATA, "dur: %X\n",
-				       p80211_hdr->a3.dur);
+				acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
+				       p80211_hdr->a3.fc, p80211_hdr->a3.dur, p80211_hdr->a3.seq);
 				a = p80211_hdr->a3.a1;
 				acxlog(L_DATA,
-				       "a1: %02X:%02X:%02X:%02X:%02X:%02X\n",
+				       "BCN a1: %02X:%02X:%02X:%02X:%02X:%02X\n",
 				       a[0], a[1], a[2], a[3], a[4], a[5]);
 				a = p80211_hdr->a3.a2;
 				acxlog(L_DATA,
-				       "a2: %02X:%02X:%02X:%02X:%02X:%02X\n",
+				       "BCN a2: %02X:%02X:%02X:%02X:%02X:%02X\n",
 				       a[0], a[1], a[2], a[3], a[4], a[5]);
 				a = p80211_hdr->a3.a3;
 				acxlog(L_DATA,
-				       "a3: %02X:%02X:%02X:%02X:%02X:%02X\n",
+				       "BCN a3: %02X:%02X:%02X:%02X:%02X:%02X\n",
 				       a[0], a[1], a[2], a[3], a[4], a[5]);
-				acxlog(L_DATA, "seq: %X\n",
-				       p80211_hdr->a3.seq);
 				acx_mgmt_decode_beacon
 				    (&alloc_p80211mgmt_req.a.beacon);
 				acx100_process_probe_response(rxdesc->data,
@@ -1263,7 +1259,7 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 			}
 		} else {
 			acxlog(L_DEBUG,
-			       "Incoming beacon message not handled in mode %ld.\n",
+			       "Incoming beacon message not handled in mode %d.\n",
 			       hw->mode);
 		}
 		break;
@@ -2782,6 +2778,9 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			acxlog(L_ASSOC, "found station with empty (hidden?) SSID, considering for association attempt.\n");
 			/* ...and keep looking for better matches */
 		}
+		else
+		    acxlog(L_ASSOC, "ESSID doesn't match: \"%s\" (station), \"%s\" (config)\n",
+			    this_bss->essid, (wlandev->essid_active) ? wlandev->essid : "[any]");
 	}
 	if (found_station) {
 		UINT8 *a;

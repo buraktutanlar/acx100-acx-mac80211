@@ -234,7 +234,7 @@ int acx100_ether_to_txdesc(wlandevice_t * wlandev,
 	fc = host2ieee16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA) |
 			 WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DATAONLY));
 
-	acxlog(L_DEBUG, "MODE: %ld\n", wlandev->macmode);
+	acxlog(L_DEBUG, "MODE: %d\n", wlandev->macmode);
 	switch (wlandev->macmode) {
 	case WLAN_MACMODE_NONE:		/* 0 */
 	case WLAN_MACMODE_IBSS_STA:	/* 1 */

@@ -3,7 +3,7 @@ ifndef ACX_DEBUG
   $(warning ACX_DEBUG was not defined, assuming 1)
 endif
 
-export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG)
+export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_32BIT_IO
 
 # 2.6 in-tree (kbuild)
 ifeq ($(VERSION).$(PATCHLEVEL), 2.6)
@@ -12,7 +12,7 @@ EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI
 
 obj-m += acx100_pci.o
 
-acx100_pci-objs := acx100.o acx100_conv.o acx100_helper.o acx100_helper2.o acx100_ioctl.o acx80211frm.o idma.o ihw.o
+acx100_pci-objs := acx100.o acx100_conv.o acx100_helper.o acx100_helper2.o acx100_ioctl.o acx80211frm.o idma.o ihw.o ioregister.o
 
 else
 
@@ -29,7 +29,7 @@ CPPFLAGS += -D__KERNEL__ -DMODULE -DWLAN_HOSTIF=WLAN_PCI -I$(KERNEL_BUILD)/inclu
 LDFLAGS = -m elf_i386 -r
 
 includes = $(wildcard ../include/*.h)
-objects = acx100.o acx100_ioctl.o acx100_helper.o acx100_helper2.o ihw.o idma.o acx100_conv.o acx80211frm.o
+objects = acx100.o acx100_ioctl.o acx100_helper.o acx100_helper2.o ihw.o idma.o acx100_conv.o acx80211frm.o ioregister.o
 
 usb_objs = acx100_usb.o ihw_usb.o acx100usb_helper.o acx100usb_ioctl.o acx100usb_helper2.o acx80211frm.o idmausb.o acx100_conv.o 
 
@@ -66,6 +66,6 @@ $(objects): $(includes)
 $(usb_objs): $(includes)
 
 clean:
-	rm -f $(objects) acx100_pci.o acx100_usb.o *~ ../include/*~ ../scripts/*~
+	rm -f $(objects) $(usb_objs) acx100_pci.o acx100usb.o *~ ../include/*~ ../scripts/*~
 
 endif

@@ -158,6 +158,10 @@ extern int acx100_debug_func_indent;
 #define ACX100_RIDDATA_MAXLEN		ACX100_RID_GUESSING_MAXLEN
 #define ACX100_USB_RWMEM_MAXLEN		2048
 
+/* The supported chip models */
+#define CHIPTYPE_ACX100		1
+#define CHIPTYPE_ACX111		2
+
 /*--- Support Constants ------------------------------------------------------*/
 #define ACX100_BAP_PROC				((UINT16)0)
 #define ACX100_BAP_INT				((UINT16)1)
@@ -274,48 +278,47 @@ extern int acx100_debug_func_indent;
 #define ACX100_DLSTATE_FLASHWRITEPENDING	4
 
 /*--- Register I/O offsets ---------------------------------------------------*/
-#define ACX100_REG0			0x00
 
-#define ACX100_FW_0			0x14
-#define ACX100_FW_1			0x16
-#define ACX100_DATA_LO			0x18
-#define ACX100_DATA_HI			0x1a
-#define ACX100_FW_2			0x1c
-#define ACX100_FW_3			0x1e
-#define ACX100_FW_4			0x20
-#define ACX100_FW_5			0x22
+/* please add further ACX1XX hardware register definitions only when
+   it turns out you need them in the driver, and please try to use
+   firmware functionality instead, since using direct I/O access instead
+   of letting the firmware do it might confuse the firmware's state 
+   machine */
 
-#define ACX100_IRQ_34			0x34
+typedef enum {
+	IO_ACX_SOFT_RESET = 0,
+	IO_ACX_ECPU_CTRL,
+	IO_ACX_FEMR,		/* Function Event Mask */
+	IO_ACX_SOR_CFG,
+	IO_ACX_EE_START,
 
-/* 7C seems to be used to trigger some action processing by the ACX100 */
-#define ACX100_REG_7C			0x7c
+	IO_ACX_SLV_MEM_ADDR,
+	IO_ACX_SLV_MEM_DATA,
+	IO_ACX_SLV_MEM_CTL,
+	IO_ACX_SLV_END_CTL,
 
-#define ACX100_IRQ_MASK			0x98
-#define ACX100_STATUS			0xa4
-#define ACX100_IRQ_STATUS		0xa8
-#define ACX100_IRQ_ACK			0xac
-#define ACX100_IRQ_SOMETHING		0xb0
+	IO_ACX_INT_TRIG,
+	IO_ACX_IRQ_MASK,
+	IO_ACX_IRQ_STATUS_NON_DES,
+	IO_ACX_IRQ_STATUS_CLEAR, /* CLEAR = clear on read */
+	IO_ACX_IRQ_ACK,
+	IO_ACX_HINT_TRIG,
 
-#define ACX100_REG_104			0x104
+	IO_ACX_EEPROM_CTL,
+	IO_ACX_EEPROM_CFG,
+	IO_ACX_EEPROM_ADDR,
+	IO_ACX_EEPROM_DATA,
 
-#define ACX100_REG_124			0x124
+	IO_ACX_CMD_MAILBOX_OFFS,
+	IO_ACX_INFO_MAILBOX_OFFS,
 
-#define ACX100_EEPROM_0			0x250
-#define ACX100_EEPROM_1			0x252
-#define ACX100_EEPROM_ADDR		0x254
-#define ACX100_EEPROM_2			0x256
-#define ACX100_EEPROM_DATA		0x258
-#define ACX100_EEPROM_3			0x25c
-#define ACX100_EEPROM_4			0x25e
+	IO_ACX_ENABLE,
 
-#define ACX100_CMD_MAILBOX_OFFS		0x2a4
-#define ACX100_INFO_MAILBOX_OFFS	0x2a8
+	END_OF_IO_ENUM /* LEAVE THIS AT THE END, USED TO FIGURE OUT THE LENGTH */
 
-#define ACX100_RESET_0			0x2d0
-#define ACX100_RESET_1			0x2d4
-#define ACX100_RESET_2			0x2d8
+} IO_INDICES;
 
-/*--- Register Field Masks ---------------------------------------------------*/
+#define IO_INDICES_SIZE END_OF_IO_ENUM * sizeof(UINT) 
 
 /*--- EEPROM offsets ---------------------------------------------------------*/
 #define ACX100_EEPROM_ID_OFFSET		0x380
@@ -348,6 +351,7 @@ extern int acx100_debug_func_indent;
 #define ACX100_CMD_CONFIG_PROBE_REQUEST	0x16
 #define ACX100_CMD_TEST			0x17
 #define ACX100_CMD_RADIOINIT		0x18
+
 
 /*--- Buffer Management Commands ---------------------------------------------*/
 
@@ -2389,6 +2393,8 @@ typedef struct wlandevice {
 	UINT membase2;		/* 14 */
 	UINT iobase;		/* 18 */
 	UINT iobase2;		/* 1c */
+	UINT chip_type;
+	UINT *io;
 
 	/*** Device status ***/
 	int hw_unavailable;	/* indicates whether the hardware has been
@@ -2406,8 +2412,8 @@ typedef struct wlandevice {
 	UINT8 address[WLAN_ADDR_LEN];
 	UINT8 bssid[WLAN_ADDR_LEN];
 	UINT8 ap[ETH_ALEN];	/* The AP we want, FF:FF:FF:FF:FF:FF is any */
-	UINT32 macmode;		/* This is the mode we're currently in */
-	UINT32 mode;		/* That's the MAC mode we want */
+	UINT8 macmode;		/* This is the mode we're currently in */
+	UINT8 mode;		/* That's the MAC mode we want */
 	char essid_active;	/* specific ESSID active, or select any? */
 	size_t essid_len;		/* to avoid dozens of strlen() */
 	char essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
@@ -2490,9 +2496,10 @@ typedef struct wlandevice {
 					 * but it should most likely be *one*
 					 * UINT32 instead, pointing to the cmd
 					 * param memory. V3POS 268c, V1POS 2664 */
+
 	UINT16 info_type;	/* V3POS 2508, V1POS 24e0 */
 	UINT16 info_status;	/* V3POS 250a, V1POS 24e2 */
-	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
+	UINT32 InfoParameters;	/* V3POS 2814, V1POS 27ec */
 
 	/*** Unknown ***/
 	char dtim_interval;	/* V3POS 2302 */
