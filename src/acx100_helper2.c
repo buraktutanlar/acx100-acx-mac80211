@@ -1042,16 +1042,11 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 	if (debug & L_DEBUG)
 	{
 		printk("rx: da ");
-		acx100_log_mac_address(L_DEBUG, da);
-		printk(",bssid ");
-		acx100_log_mac_address(L_DEBUG, bssid);
-		printk(",priv->bssid ");
-		acx100_log_mac_address(L_DEBUG, priv->bssid);
-		printk(",dev_addr ");
-		acx100_log_mac_address(L_DEBUG, priv->dev_addr);
-		printk(",bcast_addr ");
-		acx100_log_mac_address(L_DEBUG, bcast_addr);
-		printk("\n");
+		acx100_log_mac_address(L_DEBUG, da, ",bssid ");
+		acx100_log_mac_address(L_DEBUG, bssid, ",priv->bssid ");
+		acx100_log_mac_address(L_DEBUG, priv->bssid, ",dev_addr ");
+		acx100_log_mac_address(L_DEBUG, priv->dev_addr, ",bcast_addr ");
+		acx100_log_mac_address(L_DEBUG, bcast_addr, "\n");
 	}
 
 #if WE_DONT_WANT_TO_REJECT_MULTICAST
@@ -1536,6 +1531,18 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 
 	a = newbss->bssid;
 
+	/* find max. transfer rate and do optional debug log */
+	acxlog(L_DEBUG, "Peer - Supported Rates:\n");
+	for (i=0; i < rate_count; i++)
+	{
+		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
+			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
+			(int)((pSuppRates[2+i] & ~0x80) / 2),
+			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
+		if ((pSuppRates[2+i] & ~0x80) > max_rate)
+			max_rate = pSuppRates[2+i] & ~0x80;
+	}
+
 	acxlog(L_STD | L_ASSOC,
 	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, "
 	       "BSSID %02X:%02X:%02X:%02X:%02X:%02X, %s/%d%sMbps, "
@@ -1547,18 +1554,6 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
                (newbss->caps & IEEE802_11_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
 	       (int)(max_rate / 2), (max_rate & 1) ? ".5" : "",
 	       newbss->caps, newbss->sir, newbss->snr);
-
-	acxlog(L_DEBUG, "Peer - Supported Rates:\n");
-	/* find max. transfer rate */
-	for (i=0; i < rate_count; i++)
-	{
-		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
-			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
-			(int)((pSuppRates[2+i] & ~0x80) / 2),
-			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
-		if ((pSuppRates[2+i] & ~0x80) > max_rate)
-			max_rate = pSuppRates[2+i] & ~0x80;
-	}
 
 	/* found one station --> increment counter */
 	priv->bss_table_count++;
@@ -1721,12 +1716,11 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 		goto end;
 	}
 
-	acx100_log_mac_address(L_ASSOC, priv->dev_addr);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a1);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a2);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a3);
-	acx100_log_mac_address(L_ASSOC, priv->bssid);
-	acxlog(L_ASSOC, "\n");
+	acx100_log_mac_address(L_ASSOC, priv->dev_addr, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a1, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a2, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a3, " ");
+	acx100_log_mac_address(L_ASSOC, priv->bssid, "\n");
 	
 	if ((OK != acx100_is_mac_address_equal(priv->dev_addr, hdr->a3.a1)) &&
 			(OK != acx100_is_mac_address_equal(priv->bssid, hdr->a3.a1))) {
@@ -1871,12 +1865,11 @@ int acx100_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
 	}
 
 	acxlog(L_ASSOC, "DEAUTHEN ");
-	acx100_log_mac_address(L_ASSOC, priv->dev_addr);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a1);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a2);
-	acx100_log_mac_address(L_ASSOC, hdr->a3.a3);
-	acx100_log_mac_address(L_ASSOC, priv->bssid);
-	acxlog(L_ASSOC, "\n");
+	acx100_log_mac_address(L_ASSOC, priv->dev_addr, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a1, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a2, " ");
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a3, " ");
+	acx100_log_mac_address(L_ASSOC, priv->bssid, "\n");
 	
 	if ((OK != acx100_is_mac_address_equal(priv->dev_addr, hdr->a3.a1)) &&
 			(OK != acx100_is_mac_address_equal(priv->bssid, hdr->a3.a1))) {

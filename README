@@ -558,7 +558,7 @@ pin activity properly). Workaround: disconnect/hide the PME# signal
 on the card (pin 34, see mini-PCI spec).
 
 
--- Driver locked up the box --
+-- Driver locked up the box (OOPS etc.) --
 Umm... ouch!
 First, use newest driver version.
 Then please configure a log console (see "DEBUGGING / LOGGING").
@@ -606,6 +606,10 @@ AUTHENTICATED to ASSOCIATED finish successfully)
 Also make sure your peer AP has reliable Beacon period settings
 (100ms is the standard value which our driver always detects during scan,
 longer periods may cause trouble).
+
+Maybe basic or operational rate set is set incorrectly, so association
+to an AP fails.
+Try to fix it, with something like iwpriv wlan0 SetRates "1,2 1,2,5,11".
 
 Also, check whether you actually use the newest or a working firmware version.
 In some cases it's actually not this driver but the firmware which is

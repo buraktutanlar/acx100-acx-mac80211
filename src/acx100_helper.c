@@ -1768,6 +1768,7 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 
 	FN_ENTER;
 
+	/* bcn->hdr.fc has to be set by calling function!! */
 	bcn->hdr.dur = 0x0;
 	MAC_BCAST(bcn->hdr.a1);
 	MAC_COPY(bcn->hdr.a2, priv->dev_addr);
@@ -1791,28 +1792,42 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 	/* set initial frame_len to 36: A3 header (24) + 8 UINT8 + 2 UINT16 */
 	frame_len = WLAN_HDR_A3_LEN + 8 + 2 + 2;
 
+	this = &bcn->info[0];
+
 	/*** set entry 4: SSID (2 + (0 to 32) octets) ***/
 	acxlog(L_ASSOC, "SSID = %s, len = %i\n", priv->essid, priv->essid_len);
-	this = &bcn->info[0];
 	this[0] = 0;		/* "SSID Element ID" */
 	this[1] = priv->essid_len;	/* "Length" */
 	memcpy(&this[2], priv->essid, priv->essid_len);
 	frame_len += 2 + priv->essid_len;
-
-	/*** set entry 5: Supported Rates (2 + (1 to 8) octets) ***/
 	this = &bcn->info[2 + priv->essid_len];
 
+	/*** set entry 5: Supported Rates (2 + (1 to 8) octets) ***/
 	this[0] = 1;		/* "Element ID" */
 	this[1] = priv->rate_supported_len;
 	memcpy(&this[2], priv->rate_supported, priv->rate_supported_len);
 	frame_len += 2 + this[1];	/* length calculation is not split up like that, but it's much cleaner that way. */
+	this = &this[2 + this[1]];
 
 	/*** set entry 6: DS Parameter Set (2 + 1 octets) ***/
-	this = &this[2 + this[1]];
 	this[0] = 3;		/* "Element ID": "DS Parameter Set element" */
 	this[1] = 1;		/* "Length" */
 	this[2] = priv->channel;	/* "Current Channel" */
 	frame_len += 2 + 1;		/* ok, now add the remaining 3 bytes */
+	this = &this[2 + this[1]];
+
+	if ((ACX_MODE_FF_AUTO == priv->macmode_wanted)
+	||  (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted)) {
+		this[0] = 6; /* "Element ID": "IBSS Param set" */
+		this[1] = 2;
+		*(UINT16 *)&this[2] = 0; /* ATIM window */
+		this = &this[4];
+		frame_len += 4;
+	}
+
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
+		/* FIXME: set 802.11g rates here! */
+	}
 
 	FN_EXIT(1, frame_len);
 
@@ -1850,8 +1865,8 @@ int acx100_set_beacon_template(wlandevice_t *priv)
 
 	memset(&bcn, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
 	len = acx100_set_generic_beacon_probe_response_frame(priv, &bcn.pkt);
-	bcn.pkt.hdr.fc = cpu_to_le16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_MGMT) | WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_BEACON));	/* 0x80 */
 	bcn.size = cpu_to_le16(len);
+	bcn.pkt.hdr.fc = cpu_to_le16(WLAN_SET_FC_FTYPE(WLAN_FTYPE_MGMT) | WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_BEACON));	/* 0x80 */
 	acxlog(L_BINDEBUG, "Beacon length:%d\n", (UINT16) len);
 
 	len += 2;		/* add length of "size" field */
@@ -2982,6 +2997,7 @@ int acx100_set_probe_response_template(wlandevice_t *priv)
 	int result;
 
 	FN_ENTER;
+
 	memset(&pr, 0, sizeof(struct acxp80211_beacon_prb_resp_template));
 	len = acx100_set_generic_beacon_probe_response_frame(priv, &pr.pkt);
 	pr.size = cpu_to_le16(len);
@@ -3214,20 +3230,24 @@ acx_join_bssid(wlandevice_t *priv)
 		tmp.u.acx111.rates_basic = priv->defpeer.txbase.cfg;
 	}
 
-	/* tx rate for Beacon, Probe Response, RTS, and PS-Poll frames */
+	/* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
+	** will be sent (rate/modulation/preamble) */
 	n = 0;
 	{
 		UINT16 t = priv->defpeer.txbase.cfg;
 		/* calculate number of highest bit set in t */
 		while(t>1) { t>>=1; n++; }
 	}
-	if(n>=sizeof(bitpos2genframe_txrate)) {
+	if(n >= sizeof(bitpos2genframe_txrate)) {
 		printk(KERN_ERR "acx_join_bssid: driver BUG! n=%d. please report\n", n);
 		n = 0;
 	}
 	/* look up what value the highest basic rate actually is */
-	tmp.txrate_val = bitpos2genframe_txrate[n];
-	tmp.preamble_type = priv->capab_short;
+	tmp.genfrm_txrate = bitpos2genframe_txrate[n];
+	tmp.genfrm_mod_pre = 0; /* FIXME: was = priv->capab_short (which is always 0); */
+	/* we can use short pre *if* all peers can understand it */
+	/* FIXME #2: we need to correctly set PBCC/OFDM bits here too */
+
 	tmp.macmode = priv->macmode_chosen;     /* should be called BSS_Type? */
 	tmp.channel = priv->channel;
 	tmp.essid_len = priv->essid_len;
@@ -3449,7 +3469,7 @@ void acx100_set_timer(wlandevice_t *priv, UINT32 timeout)
 
 	acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %d\n", timeout);
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acxlog(L_STD, "ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!!\n");
+		acxlog(L_STD, "attempt to set the timer when the card interface is not up!\n");
 		FN_EXIT(0, 0);
 		return;
 	}
@@ -3687,7 +3707,7 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 	acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x0); /* disable Rx/Tx */
 #endif
 
-	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], (UINT32)reg);
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], reg);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], 2);
 
 	while (0 != acx100_read_reg32(priv, priv->io[IO_ACX_PHY_CTL]))

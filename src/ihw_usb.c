@@ -550,10 +550,12 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 *
 *----------------------------------------------------------------*/
 
-void acx100_log_mac_address(int level, UINT8 * mac) {
+void acx100_log_mac_address(int level, UINT8 * mac, const char* tail) {
 	if (debug & level) {
-		printk("%02X.%02X.%02X.%02X.%02X.%02X",
-			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
+			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+			tail
+		);
 	}
 }
 

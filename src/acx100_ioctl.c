@@ -709,8 +709,8 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
 	MAC_COPY(iwe.u.ap_addr.sa_data, bss->bssid);
-	acxlog(L_IOCTL, "scan, station address:\n");
-	acx100_log_mac_address(L_IOCTL, bss->bssid);
+	acxlog(L_IOCTL, "scan, station address: ");
+	acx100_log_mac_address(L_IOCTL, bss->bssid, "\n");
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_ADDR_LEN);
 
 	/* Add ESSID */
@@ -1056,7 +1056,7 @@ acx_ioctl_set_rate(struct net_device *dev,
  
 	priv->ap_peer = priv->defpeer;
 	acx_update_dot11_ratevector(priv);
-	 if(priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
+	if(priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
 		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
 	
 	acx100_unlock(priv, &flags);
@@ -2838,26 +2838,26 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	unsigned long flags;
 	int result;
-	u32 brate = 0, erate = 0;
+	u32 brate = 0, orate = 0; /* basic, operational rate set */
 
 	FN_ENTER;
 
 	acxlog(L_IOCTL, "set_rates %s\n", extra);
-	result = fill_ratemasks(extra, &brate, &erate, acx111_supported, acx111_gen_mask, 0);
+	result = fill_ratemasks(extra, &brate, &orate, acx111_supported, acx111_gen_mask, 0);
 	if(result) goto end;
-	SET_BIT(erate, brate);
-	acxlog(L_IOCTL, "brate %08x erate %08x\n", brate, erate);
+	SET_BIT(orate, brate);
+	acxlog(L_IOCTL, "brate %08x orate %08x\n", brate, orate);
 
 	result = verify_rate(brate, priv->chip_type);
 	if(result) goto end;
-	result = verify_rate(erate, priv->chip_type);
+	result = verify_rate(orate, priv->chip_type);
 	if(result) goto end;
 
 	result = acx100_lock(priv, &flags);
 	if(result) goto end;
  
 	fill_txrate( &priv->defpeer.txbase, brate);
-	fill_txrate( &priv->defpeer.txrate, erate);
+	fill_txrate( &priv->defpeer.txrate, orate);
 
 	priv->ap_peer = priv->defpeer;
 	acx_update_dot11_ratevector(priv);

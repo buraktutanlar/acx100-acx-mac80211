@@ -818,7 +818,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 
 	/* TODO implement and check other acx111 commands */
 	if(priv->chip_type == CHIPTYPE_ACX111 &&
-		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA  
+		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA /* acx111 has differing struct size */
 		 || type == ACX1xx_IE_DOT11_ED_THRESHOLD
 		 /*|| type == ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN*/
 		 || type == ACX1xx_IE_DOT11_CURRENT_CCA_MODE)) {
@@ -1095,11 +1095,13 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_log_mac_address(int level, const UINT8 *mac)
+void acx100_log_mac_address(int level, const UINT8 *mac, const char* tail)
 {
 	if (debug & level) {
-		printk("%02X:%02X:%02X:%02X:%02X:%02X",
-			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
+			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+			tail
+		);
 	}
 }
 

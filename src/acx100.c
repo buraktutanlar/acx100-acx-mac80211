@@ -160,7 +160,8 @@ MODULE_LICENSE("Dual MPL/GPL");
 typedef char *dev_info_t;
 static dev_info_t dev_info = "TI acx" DRIVER_SUFFIX;
 
-static char version[] __devinitdata = "TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
+/* this one should NOT be __devinitdata, otherwise memory section conflict in some kernel versions! */
+static char version[] = "TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
 
 #ifdef ACX_DEBUG
 int debug = L_BIN|L_ASSOC|L_INIT|L_STD;
@@ -469,7 +470,9 @@ void acx100_display_hardware_details(wlandevice_t *priv)
 			radio_str = "Radia";
 			break;
 		case RADIO_UNKNOWN_17:
-			radio_str = "UNKNOWN, used e.g. in ACX111 cards, please report the radio type name!";
+			/* TI seems to have a radio which is
+			 * additionally 802.11a capable, too */
+			radio_str = "802.11a/b/g radio in ACX111 cards?? Please report!!!";
 			break;
 		default:
 			radio_str = "UNKNOWN, please report the radio type name!";
@@ -478,7 +481,7 @@ void acx100_display_hardware_details(wlandevice_t *priv)
 
 	switch(priv->form_factor) {
 		case 0x00:
-			form_str = "unknown";
+			form_str = "unspecified";
 			break;
 		case 0x01:
 			form_str = "(mini-)PCI / CardBus";

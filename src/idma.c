@@ -66,16 +66,15 @@
 #include <ihw.h>
 #include <monitor.h>
 
-/* these used to be increased to 32 each,
+/* ACX100 buffers used to be increased to 32 each,
  * but several people had memory allocation issues,
  * so back to 16 again... */
-#if (WLAN_HOSTIF==WLAN_USB)
-#define TXBUFFERCOUNT 10
-#define RXBUFFERCOUNT 10
-#else
-#define RXBUFFERCOUNT 16
-#define TXBUFFERCOUNT 16
-#endif
+#define RXBUFFERCOUNT_ACX100 16
+#define TXBUFFERCOUNT_ACX100 16
+#define RXBUFFERCOUNT_ACX111 32
+#define TXBUFFERCOUNT_ACX111 32
+#define TXBUFFERCOUNT_USB 10
+#define RXBUFFERCOUNT_USB 10
 
 #define MINFREE_TX 3
 
@@ -1175,11 +1174,11 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		acxlog(L_BINSTD, "pDc->pFrameHdrQPool memory allocation fail\n");
 		goto fail;
 	}
-	acxlog(L_BINDEBUG, "pDc->pFrameHdrQPool = 0x%08x\n", (UINT) pDc->pFrameHdrQPool);
-	acxlog(L_BINDEBUG, "pDc->pFrameHdrQPoolPhyAddr = 0x%08x\n", (UINT) pDc->FrameHdrQPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->pFrameHdrQPool = 0x%p\n", pDc->pFrameHdrQPool);
+	acxlog(L_BINDEBUG, "pDc->pFrameHdrQPoolPhyAddr = 0x%08x\n", pDc->FrameHdrQPoolPhyAddr);
 #else
 	if ((pDc->pFrameHdrQPool=kmalloc(pDc->FrameHdrQPoolSize,GFP_KERNEL))==NULL) {
-		acxlog(L_STD,"pDc->pFrameHdrQPool memory allocation fail\n");
+		acxlog(L_STD, "pDc->pFrameHdrQPool memory allocation fail\n");
 		goto fail;
 	}
 	memset(pDc->pFrameHdrQPool,0,pDc->FrameHdrQPoolSize);
@@ -1193,12 +1192,12 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		acxlog(L_BINSTD, "pDc->pTxBufferPool memory allocation fail\n");
 		goto fail;
 	}
-	acxlog(L_BINDEBUG, "pDc->TxBufferPoolSize = 0x%08x\n", (UINT) pDc->TxBufferPoolSize);
-	acxlog(L_BINDEBUG, "pDc->TxBufferPool = 0x%08x\n", (UINT) pDc->pTxBufferPool);
-	acxlog(L_BINDEBUG, "pDc->TxBufferPoolPhyAddr = 0x%08x\n", (UINT) pDc->TxBufferPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPoolSize = 0x%08x\n", pDc->TxBufferPoolSize);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPool = 0x%p\n", pDc->pTxBufferPool);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPoolPhyAddr = 0x%08x\n", pDc->TxBufferPoolPhyAddr);
 #else
 	if ((pDc->pTxBufferPool=kmalloc(pDc->TxBufferPoolSize,GFP_KERNEL))==NULL) {
-		acxlog(L_STD,"pDc->pTxBufferPool memory allocation fail\n");
+		acxlog(L_STD, "pDc->pTxBufferPool memory allocation fail\n");
 		goto fail;
 	}
 	memset(pDc->pTxBufferPool,0,pDc->TxBufferPoolSize);
@@ -1213,19 +1212,19 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		acxlog(L_BINSTD, "Failed to allocate shared memory for TxHostDesc queue\n");
 		goto fail;
 	}
-	acxlog(L_BINDEBUG, "pDc->pTxHostDescQPool = 0x%08x\n", (UINT) pDc->pTxHostDescQPool);
+	acxlog(L_BINDEBUG, "pDc->pTxHostDescQPool = 0x%p\n", pDc->pTxHostDescQPool);
 	acxlog(L_BINDEBUG, "pDc->TxHostDescQPoolPhyAddr = 0x%08x\n", pDc->TxHostDescQPoolPhyAddr);
 #else
 	if ((pDc->pTxHostDescQPool=kmalloc(pDc->TxHostDescQPoolSize,GFP_KERNEL))==NULL) {
 		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue\n");
 		goto fail;
 	}
-	memset(pDc->pTxHostDescQPool,0,pDc->TxHostDescQPoolSize);
+	memset(pDc->pTxHostDescQPool, 0, pDc->TxHostDescQPoolSize);
 #endif
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of TX host descriptor pool */
-	alignment = (UINT) pDc->pTxHostDescQPool & 3;
+	alignment = (UINT32) pDc->pTxHostDescQPool & 3;
 	if (alignment) {
 		acxlog(L_BINSTD, "%s: TxHostDescQPool not aligned properly\n", __func__);
 		align_offs = 4 - alignment;
@@ -1238,9 +1237,9 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	frame_hdr_phy = (struct framehdr *) pDc->FrameHdrQPoolPhyAddr;
 	frame_payload_phy = (UINT8 *) pDc->TxBufferPoolPhyAddr;
 #else
-	host_desc = (struct txhostdescriptor *)pDc->pTxHostDescQPool;
+	host_desc = pDc->pTxHostDescQPool;
 #endif
-	frame_hdr = (struct framehdr *) pDc->pFrameHdrQPool;
+	frame_hdr = pDc->pFrameHdrQPool;
 	frame_payload = (UINT8 *) pDc->pTxBufferPool;
 
 	for (i = 0; i < priv->TxQueueCnt*2 - 1; i++)
@@ -1271,8 +1270,8 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 #endif
 		host_desc++;
 	}
-	host_desc->data = (UINT8 *)cpu_to_le32(frame_payload);
-	host_desc->pNext = 0;
+	host_desc->data = frame_payload;
+	host_desc->pNext = (ACX_PTR)NULL;
 	host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1320,9 +1319,9 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		FN_EXIT(1, 2);
 		return 2;
 	}
-	acxlog(L_BINDEBUG, "pDc->TxBufferPoolSize = 0x%08x\n", (UINT) pDc->TxBufferPoolSize);
-	acxlog(L_BINDEBUG, "pDc->TxBufferPool = 0x%08x\n", (UINT) pDc->pTxBufferPool);
-	acxlog(L_BINDEBUG, "pDc->TxBufferPoolPhyAddr = 0x%08x\n", (UINT) pDc->TxBufferPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPoolSize = 0x%08x\n", pDc->TxBufferPoolSize);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPool = 0x%p\n", pDc->pTxBufferPool);
+	acxlog(L_BINDEBUG, "pDc->TxBufferPoolPhyAddr = 0x%08x\n", pDc->TxBufferPoolPhyAddr);
 #else
 	if ((pDc->pTxBufferPool=kmalloc(pDc->TxBufferPoolSize,GFP_KERNEL))==NULL) {
 		acxlog(L_STD,"pDc->pTxBufferPool memory allocation error\n");
@@ -1345,8 +1344,8 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 		FN_EXIT(1, 2);
 		return 2;
 	}
-	acxlog(L_BINDEBUG, "pDc->pTxHostDescQPool = 0x%08x\n", (UINT) pDc->pTxHostDescQPool);
-	acxlog(L_BINDEBUG, "pDc->TxHostDescQPoolPhyAddr = 0x%08x\n", (UINT) pDc->TxHostDescQPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->pTxHostDescQPool = 0x%p\n", pDc->pTxHostDescQPool);
+	acxlog(L_BINDEBUG, "pDc->TxHostDescQPoolPhyAddr = 0x%08x\n", pDc->TxHostDescQPoolPhyAddr);
 #else
 	if ((pDc->pTxHostDescQPool=kmalloc(pDc->TxHostDescQPoolSize,GFP_KERNEL))==NULL) {
 		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue\n");
@@ -1359,7 +1358,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of TX host descriptor pool */
-	alignment = (UINT) pDc->pTxHostDescQPool & 3;
+	alignment = (UINT32) pDc->pTxHostDescQPool & 3;
 	if (alignment) {
 		acxlog(L_BINSTD, "%s: TxHostDescQPool not aligned properly\n", __func__);
 		align_offs = 4 - alignment;
@@ -1496,17 +1495,17 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 	memset(pDc->pRxBufferPool, 0, pDc->RxBufferPoolSize);
 #endif
 
-	acxlog(L_BINDEBUG, "pDc->pRxHostDescQPool = 0x%08x\n", (UINT) pDc->pRxHostDescQPool);
+	acxlog(L_BINDEBUG, "pDc->pRxHostDescQPool = 0x%p\n", pDc->pRxHostDescQPool);
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acxlog(L_BINDEBUG, "pDc->RxHostDescQPoolPhyAddr = 0x%08x\n", (UINT) pDc->RxHostDescQPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->RxHostDescQPoolPhyAddr = 0x%08x\n", pDc->RxHostDescQPoolPhyAddr);
 #endif
-	acxlog(L_BINDEBUG, "pDc->pRxBufferPool = 0x%08x\n", (UINT) pDc->pRxBufferPool);
+	acxlog(L_BINDEBUG, "pDc->pRxBufferPool = 0x%p\n", pDc->pRxBufferPool);
 #if (WLAN_HOSTIF!=WLAN_USB)
-	acxlog(L_BINDEBUG, "pDc->RxBufferPoolPhyAddr = 0x%08x\n", (UINT) pDc->RxBufferPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->RxBufferPoolPhyAddr = 0x%08x\n", pDc->RxBufferPoolPhyAddr);
 #endif
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* check for proper alignment of RX host descriptor pool */
-	if ((alignment = ((UINT) pDc->pRxHostDescQPool) & 3)) {
+	if ((alignment = ((UINT32) pDc->pRxHostDescQPool) & 3)) {
 		acxlog(L_BINSTD, "acx100_create_rx_host_desc_queue: RxHostDescQPool not aligned properly\n");
 		align_offs = 4 - alignment;
 	} else {
@@ -1609,15 +1608,6 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 		pDc->TxDescrSize = sizeof(struct txdescriptor)+4;
 	}
 
-#if (WLAN_HOSTIF==WLAN_USB)
-  /* allocate memory for TxDescriptors */
-	pDc->pTxDescQPool = kmalloc(pDc->tx_pool_count*pDc->TxDescrSize,GFP_KERNEL);
-	if (!pDc->pTxDescQPool) {
-		acxlog(L_STD,"Not enough memory to allocate txdescriptor queue\n");
-		return;
-	}
-#endif
-
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if(pDc->pTxDescQPool == NULL) { /* calculate it */
 		pDc->pTxDescQPool = (struct txdescriptor *) (priv->iobase2 +
@@ -1627,9 +1617,16 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 	acxlog(L_BINDEBUG, "priv->iobase2 = 0x%p\n", priv->iobase2);
 	acxlog(L_BINDEBUG, "pDc->ui32ACXTxQueueStart = 0x%08x\n",
 	       pDc->ui32ACXTxQueueStart);
-	acxlog(L_BINDEBUG, "pDc->pTxDescQPool = 0x%08x\n",
-	       (UINT32) pDc->pTxDescQPool);
+	acxlog(L_BINDEBUG, "pDc->pTxDescQPool = 0x%p\n", pDc->pTxDescQPool);
+#else
+  /* allocate memory for TxDescriptors */
+	pDc->pTxDescQPool = kmalloc(pDc->tx_pool_count*pDc->TxDescrSize,GFP_KERNEL);
+	if (!pDc->pTxDescQPool) {
+		acxlog(L_STD, "Not enough memory to allocate txdescriptor queue\n");
+		return;
+	}
 #endif
+
 	priv->TxQueueFree = priv->TxQueueCnt;
 	pDc->tx_head = 0;
 	pDc->tx_tail = 0;
@@ -1641,7 +1638,7 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 	mem_offs = (UINT32)pDc->pTxDescQPool;
 	hostmemptr = 0; /* will remain 0 for USB */
 #endif
-	tx_hostdesc = (struct txhostdescriptor *) pDc->pTxHostDescQPool;
+	tx_hostdesc = pDc->pTxHostDescQPool;
 
 	/* clear whole send pool */
 	memset(pDc->pTxDescQPool, 0, pDc->tx_pool_count * pDc->TxDescrSize);
@@ -1649,7 +1646,7 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 	/* loop over whole send pool */
 	for (i = 0; i < pDc->tx_pool_count; i++) {
 
-		acxlog(L_BINDEBUG, "configure card tx descriptor = 0x%08x, size: 0x%X\n", (UINT32)tx_desc, pDc->TxDescrSize);
+		acxlog(L_BINDEBUG, "configure card tx descriptor = 0x%p, size: 0x%X\n", tx_desc, pDc->TxDescrSize);
 
 		/* pointer to hostdesc memory */
 		tx_desc->HostMemPtr = cpu_to_le32(hostmemptr);
@@ -1667,10 +1664,10 @@ static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 #endif
 		/* go to the next */
 		mem_offs += pDc->TxDescrSize;
-		tx_desc = (struct txdescriptor *)(((UINT32)tx_desc) + pDc->TxDescrSize);
+		tx_desc = (struct txdescriptor *)(((UINT8 *)tx_desc) + pDc->TxDescrSize);
 	}
 	/* go to the last one */
-	tx_desc = (struct txdescriptor *)(((UINT32)tx_desc) - pDc->TxDescrSize);
+	tx_desc = (struct txdescriptor *)(((UINT8 *)tx_desc) - pDc->TxDescrSize);
 	/* tx_desc--; */
 	/* and point to the first making it a ring buffer */
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1731,7 +1728,7 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 	/* loop over whole receive pool */
 	for (i = 0; i < pDc->rx_pool_count; i++) {
 
-		acxlog(L_BINDEBUG, "configure card rx descriptor = 0x%08x\n", (UINT32)rx_desc);
+		acxlog(L_BINDEBUG, "configure card rx descriptor = 0x%p\n", rx_desc);
 
 		if(priv->chip_type == CHIPTYPE_ACX100) {
 			rx_desc->Ctl_8 = 0xc;
@@ -1815,7 +1812,7 @@ static int acx100_init_memory_pools(wlandevice_t *priv, acx100_ie_memmap_t *mmt)
 
 	/* Declare start of the Rx host pool */
 	MemoryConfigOption.pRxHostDesc = cpu_to_le32((UINT32)priv->RxHostDescPoolStart);
-	acxlog(L_DEBUG, "pRxHostDesc %08x, RxHostDescPoolStart %p\n", MemoryConfigOption.pRxHostDesc, priv->RxHostDescPoolStart);
+	acxlog(L_DEBUG, "pRxHostDesc 0x%08x, RxHostDescPoolStart 0x%p\n", MemoryConfigOption.pRxHostDesc, priv->RxHostDescPoolStart);
 
 	/* 50% of the allotment of memory blocks go to tx descriptors */
 	priv->TxBlockNum = TotalMemoryBlocks / 2;
@@ -1935,33 +1932,33 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	}
 
 	/* # of items in Rx and Tx queues */
-	priv->TxQueueCnt = TXBUFFERCOUNT;
-	priv->RxQueueCnt = RXBUFFERCOUNT;
+	priv->TxQueueCnt = TXBUFFERCOUNT_ACX100;
+	priv->RxQueueCnt = RXBUFFERCOUNT_ACX100;
+
+#if (WLAN_HOSTIF==WLAN_USB)
+	qcfg.NumTxDesc = TXBUFFERCOUNT_USB;
+	qcfg.NumRxDesc = RXBUFFERCOUNT_USB;
+#endif
 
 	/* calculate size of queues */
 	qcfg.AreaSize = cpu_to_le32(
-			(sizeof(struct txdescriptor) * TXBUFFERCOUNT +
-	                 sizeof(struct rxdescriptor) * RXBUFFERCOUNT + 8)
+			(sizeof(struct txdescriptor) * TXBUFFERCOUNT_ACX100 +
+	                 sizeof(struct rxdescriptor) * RXBUFFERCOUNT_ACX100 + 8)
 			);
 	qcfg.NumTxQueues = 1;  /* number of tx queues */
 
 	/* sets the beginning of the tx descriptor queue */
 	pDc->ui32ACXTxQueueStart = le32_to_cpu(MemMap.QueueStart);
-	qcfg.TxQueueStart = cpu_to_le32(pDc->ui32ACXTxQueueStart);
+	qcfg.TxQueueStart = MemMap.QueueStart;
 	qcfg.TxQueuePri = 0;
 
-#if (WLAN_HOSTIF==WLAN_USB)
-	qcfg.NumTxDesc = TXBUFFERCOUNT;
-	qcfg.NumRxDesc = RXBUFFERCOUNT;
-#endif
-
 	/* sets the beginning of the rx descriptor queue, after the tx descrs */
-	pDc->ui32ACXRxQueueStart = priv->TxQueueCnt * sizeof(struct txdescriptor) + le32_to_cpu(MemMap.QueueStart);
+	pDc->ui32ACXRxQueueStart = pDc->ui32ACXTxQueueStart + priv->TxQueueCnt * sizeof(struct txdescriptor);
 	qcfg.RxQueueStart = cpu_to_le32(pDc->ui32ACXRxQueueStart);
 	qcfg.QueueOptions = 1;		/* auto reset descriptor */
 
 	/* sets the end of the rx descriptor queue */
-	qcfg.QueueEnd = cpu_to_le32(priv->RxQueueCnt * sizeof(struct rxdescriptor) + pDc->ui32ACXRxQueueStart);
+	qcfg.QueueEnd = cpu_to_le32(pDc->ui32ACXRxQueueStart + priv->RxQueueCnt * sizeof(struct rxdescriptor));
 
 	/* sets the beginning of the next queue */
 	qcfg.HostQueueEnd = cpu_to_le32(le32_to_cpu(qcfg.QueueEnd) + 8);
@@ -1992,6 +1989,8 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 		goto fail;
 	}
 
+	/* FIXME: huh, why call ACX1xx_IE_MEMORY_MAP twice in the USB case?
+	   Is this needed?? */
 #if (WLAN_HOSTIF==WLAN_USB)
 	if (OK != acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD,"Failed to write memory map\n");
@@ -2058,8 +2057,8 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 
 	/* ### Calculate memory positions and queue sizes #### */
 
-	priv->TxQueueCnt = TXBUFFERCOUNT;
-	priv->RxQueueCnt = RXBUFFERCOUNT;
+	priv->TxQueueCnt = TXBUFFERCOUNT_ACX111;
+	priv->RxQueueCnt = RXBUFFERCOUNT_ACX111;
 
 	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
@@ -2105,12 +2104,12 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	}
 
 	/* RX descriptor queue config */
-	memconf.rx_queue1_count_descs = RXBUFFERCOUNT;
+	memconf.rx_queue1_count_descs = RXBUFFERCOUNT_ACX111;
 	memconf.rx_queue1_reserved2 = 7; /* must be set to 7 */
 	memconf.rx_queue1_host_rx_start = pDc->RxHostDescQPoolPhyAddr;
 
 	/* TX descriptor queue config */
-	memconf.tx_queue1_count_descs = TXBUFFERCOUNT;
+	memconf.tx_queue1_count_descs = TXBUFFERCOUNT_ACX111;
 	memconf.tx_queue1_attributes = 15; /* highest priority */
 
 	acxlog(L_STD, "%s: set up acx111 queue memory configuration (queue configs + descriptors)\n", __func__);

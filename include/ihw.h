@@ -104,7 +104,7 @@ UINT8 acx100_is_mac_address_directed(mac_t *mac);
 void acx100_set_mac_address_broadcast(UINT8 *address);
 int acx100_is_mac_address_broadcast(const UINT8 * const address);
 int acx100_is_mac_address_multicast(mac_t *mac);
-void acx100_log_mac_address(int level, const UINT8 *mac);
+void acx100_log_mac_address(int level, const UINT8 *mac, const char* tail);
 
 void acx100_power_led(wlandevice_t *priv, UINT8 enable);
 #endif /* __ACX_IHW_H */

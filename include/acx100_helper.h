@@ -290,9 +290,11 @@ typedef struct __WLAN_ATTRIB_PACK__ acx_joinbss {
 			UINT8 dtim_interval;
 		} acx111;
 	} u;
-	UINT8 txrate_val;
-	UINT8 preamble_type;
-	UINT8 macmode;
+	UINT8 genfrm_txrate;	/* generated frame (beacon, probe resp, RTS, PS poll) tx rate */
+	UINT8 genfrm_mod_pre;	/* generated frame modulation/preamble:
+				** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
+				** bit5: short pre */
+	UINT8 macmode;		/* BSS Type, must be one of ACX_MODE_xxx */
 	UINT8 channel;
 	UINT8 essid_len;
 	char essid[IW_ESSID_MAX_SIZE];	

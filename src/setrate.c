@@ -125,7 +125,7 @@ fill_ratevector(const char **pstr, u8 *vector, int size,
 
 static /* TODO: remove 'static' when moved to wireless.c */
 int
-fill_ratevectors(const char *str, u8 *brate, u8 *erate, int size,
+fill_ratevectors(const char *str, u8 *brate, u8 *orate, int size,
 		int (*supported)(int mbit, int mod, void *opaque), void *opaque)
 {
 	int r;
@@ -133,10 +133,10 @@ fill_ratevectors(const char *str, u8 *brate, u8 *erate, int size,
 	r = fill_ratevector(&str, brate, size, supported, opaque, 0x80);
 	if(r) return r;
 
-	erate[0] = 0;
+	orate[0] = 0;
 	if(*str==' ') {
 		str++;
-		r = fill_ratevector(&str, erate, size, supported, opaque, 0);
+		r = fill_ratevector(&str, orate, size, supported, opaque, 0);
 		if(r) return r;
 		/* TODO: sanitize, e.g. remove/error on rates already in basic rate set? */
 	}
@@ -190,7 +190,7 @@ fill_ratemask(const char **pstr, u32* mask,
 
 static /* TODO: remove 'static' when moved to wireless.c */
 int
-fill_ratemasks(const char *str, u32 *bmask, u32 *emask,
+fill_ratemasks(const char *str, u32 *bmask, u32 *omask,
 		int (*supported)(int mbit, int mod,void *opaque),
 		u32 (*gen_mask)(int mbit, int mod,void *opaque),
 		void *opaque)
@@ -202,7 +202,7 @@ fill_ratemasks(const char *str, u32 *bmask, u32 *emask,
 
 	if(*str==' ') {
 		str++;
-		r = fill_ratemask(&str, emask, supported, gen_mask, opaque);
+		r = fill_ratemask(&str, omask, supported, gen_mask, opaque);
 		if(r) return r;
 	}
 	if(*str)

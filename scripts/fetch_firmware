@@ -62,12 +62,12 @@ find_downloader()
   echo "Locating a suitable download tool..."
   WGET=`which wget`
   if test -n $WGET; then
-    DL_STRING="$WGET -c -t 3 --passive-ftp"
+    DL_STRING="$WGET -c -t 3 -T 20 --passive-ftp"
     return
   fi
   CURL=`which curl`
   if test -n $CURL; then
-    DL_STRING="$CURL -0"
+    DL_STRING="$CURL -0 --connect-timeout 20"
     return
   fi
   SNARF=`which snarf`

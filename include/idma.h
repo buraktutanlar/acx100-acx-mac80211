@@ -83,9 +83,9 @@ typedef struct __WLAN_ATTRIB_PACK__ framehdr {
 /* figure out tx descriptor pointer, depending on different acx100 or acx111
  * tx descriptor length */
 #define GET_TX_DESC_PTR(dc, index) \
-	(struct txdescriptor *) (((UINT32)dc->pTxDescQPool) + (index * dc->TxDescrSize))
+	(struct txdescriptor *) (((UINT8 *)dc->pTxDescQPool) + (index * dc->TxDescrSize))
 #define GET_NEXT_TX_DESC_PTR(dc, txdesc) \
-	(struct txdescriptor *) (((UINT32)txdesc) + dc->TxDescrSize)
+	(struct txdescriptor *) (((UINT8 *)txdesc) + dc->TxDescrSize)
 
 /* flags:
  * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
@@ -227,10 +227,19 @@ modulation from the start and thus easily identifiable.
 Not shown here.
 */
 
+/* some fields here are actually pointers,
+ * but they have to remain UINT32, since using ptr instead
+ * (8 bytes on 64bit systems!!) would disrupt the fixed descriptor
+ * format the acx firmware expects in the non-user area.
+ * Since we need to cram an 8 byte ptr into 4 bytes, this probably
+ * means that ACX related data needs to remain in low memory
+ * (address value needs <= 4 bytes) on 64bit
+ * (alternatively we need to cope with the shorted value somehow) */
+typedef UINT32 ACX_PTR;
 typedef struct __WLAN_ATTRIB_PACK__ txdescriptor {
-	UINT32	pNextDesc;		/* pointer to the next txdescriptor */
-	UINT32	HostMemPtr;
-	UINT32	AcxMemPtr;
+	ACX_PTR	pNextDesc;		/* pointer to the next txdescriptor */
+	ACX_PTR	HostMemPtr;
+	ACX_PTR	AcxMemPtr;
 	UINT32	tx_time;
 	UINT16	total_length;
 	UINT16	Reserved;
@@ -267,15 +276,6 @@ typedef struct __WLAN_ATTRIB_PACK__ txdescriptor {
 /* NOTE: The acx111 txdescriptor structure is 4 byte larger */
 /* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
 
-/* some fields here are actually pointers,
- * but they have to remain UINT32, since using ptr instead
- * (8 bytes on 64bit systems!!) would disrupt the fixed descriptor
- * format the acx firmware expects in the non-user area.
- * Since we need to cram an 8 byte ptr into 4 bytes, this probably
- * means that ACX related data needs to remain in low memory
- * (address value needs <= 4 bytes) on 64bit
- * (alternatively we need to cope with the shorted value somehow) */
-typedef UINT32 ACX_PTR;
 typedef struct __WLAN_ATTRIB_PACK__ txhostdescriptor {
 	ACX_PTR	data_phy;			/* 0x00 [UINT8 *] */
 	UINT16	data_offset;			/* 0x04 */
@@ -291,9 +291,9 @@ typedef struct __WLAN_ATTRIB_PACK__ txhostdescriptor {
 } txhostdesc_t;		/* size: variable, currently 0x20 */
 
 typedef struct __WLAN_ATTRIB_PACK__ rxdescriptor {
-	UINT32	pNextDesc;			/* 0x00 */
-	UINT32	HostMemPtr;			/* 0x04 */
-	UINT32	ACXMemPtr;			/* 0x08 */
+	ACX_PTR	pNextDesc;			/* 0x00 */
+	ACX_PTR	HostMemPtr;			/* 0x04 */
+	ACX_PTR	ACXMemPtr;			/* 0x08 */
 	UINT32	rx_time;			/* 0x0c */
 	UINT16	total_length;			/* 0x10 */
 	UINT16	WEP_length;			/* 0x12 */
