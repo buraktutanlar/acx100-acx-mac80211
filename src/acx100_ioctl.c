@@ -92,16 +92,17 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x08
 #define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x09
 #define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x11
-#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x12
-#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x13
-#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x14
+#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x0b
+#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x12
+#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x13
+#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x14
+#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x15
 
 
 /* channel frequencies
@@ -160,6 +161,10 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetPhyAmpBias"},
+{ cmd : ACX100_IOCTL_GET_PHY_MEDIUM_BUSY,
+	set_args : 0,
+	get_args : 0,
+	name : "GetPhyMediumBusy" },
 { cmd : ACX100_IOCTL_SET_ED,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -2676,6 +2681,39 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 }
 
 /*----------------------------------------------------------------
+* acx100_ioctl_get_phy_busy_percentage
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: NEW
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+static inline int acx100_ioctl_get_phy_busy_percentage(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	struct {
+		UINT16 rid;
+		UINT16 len;
+		UINT32 busytime;
+		UINT32 totaltime;
+	} usage;
+
+	if (!acx100_interrogate(priv, &usage, ACX1xx_IE_MEDIUM_USAGE))
+		return 0;
+	(void)printk("Medium usage percentage since last invocation: %d%% (microseconds: %d of %d)\n", usage.busytime * 100 / usage.totaltime, usage.busytime, usage.totaltime);
+	return 0;
+}
+
+/*----------------------------------------------------------------
 * acx100_ioctl_set_ed_threshold
 *
 *
@@ -2874,6 +2912,7 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_rx_antenna,
 	(iw_handler) acx100_ioctl_set_tx_antenna,
 	(iw_handler) acx100_ioctl_set_phy_amp_bias,
+	(iw_handler) acx100_ioctl_get_phy_busy_percentage,
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
 	(iw_handler) acx100_ioctl_set_scan_chan_delay,

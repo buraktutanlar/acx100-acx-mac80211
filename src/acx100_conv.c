@@ -57,6 +57,7 @@
 
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
+#include <linux/etherdevice.h>
 #include <linux/wireless.h>
 
 #include <p80211mgmt.h>
@@ -68,6 +69,13 @@
 
 static UINT8 oui_rfc1042[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0x00 };
 static UINT8 oui_8021h[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0xf8 };
+
+#define COPY_OUI(dst, src) \
+	*(UINT16 *)dst = *(UINT16 *)src; \
+	dst[2] = src[2];
+
+#define COMPARE_OUI(dst, src) \
+	!((*(UINT16 *)dst == *(UINT16 *)src) && (dst[2] == src[2]))
 
 /*----------------------------------------------------------------
 * acx100_rxdesc_to_txdesc
@@ -238,9 +246,11 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		/* setup the SNAP header */
 		e_snap->type = htons(proto);
 		if (0 != acx100_stt_findproto(proto)) {
-			memcpy(e_snap->oui, oui_8021h, WLAN_IEEE_OUI_LEN);
+			/* memcpy(e_snap->oui, oui_8021h, WLAN_IEEE_OUI_LEN); */
+			COPY_OUI(e_snap->oui, oui_8021h);
 		} else {
-			memcpy(e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN);
+			/* memcpy(e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN); */
+			COPY_OUI(e_snap->oui, oui_rfc1042);
 		}
 		/* trim off ethernet header and copy payload to tx_desc */
 		payload->length = skb->len - sizeof(wlan_ethhdr_t);
@@ -295,8 +305,9 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	w_hdr->a3.seq = 0;
 
 	/* the "<6>" output is from the KERN_INFO channel value */
-/* Can be used to debug conversion process */
-/*	acxlog(L_DATA, "Original eth frame [%d]: ", skb->len);
+	/* Can be used to debug conversion process */
+#if DEBUG_CONVERT
+	acxlog(L_DATA, "Original eth frame [%d]: ", skb->len);
 	for (i = 0; i < skb->len; i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) skb->data)[i]);
 	acxlog(L_DATA, "\n");
@@ -310,7 +321,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	for (i = 0; i < payload->length; i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) payload->data)[i]);
 	acxlog(L_DATA, "\n");
-*/	
+#endif	
 	
 fail:
 	FN_EXIT(0, 0);
@@ -436,6 +447,8 @@ fail:
 
 		/* allocate space and setup host buffer */
 		buflen = payload_length;
+		/* FIXME: implement skb ring buffer similar to
+		 * xircom_tulip_cb.c? */
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (skb == NULL) {
 			acxlog(L_STD, "failed to allocate skb\n");
@@ -451,10 +464,10 @@ fail:
 		   (e_llc->dsap == (UINT8)0xaa) &&
 		   (e_llc->ssap == (UINT8)0xaa) &&
 		   (e_llc->ctl == (UINT8)0x03) && 
-		   (((memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN)==0) &&
+		   (((COMPARE_OUI( e_snap->oui, oui_rfc1042)==0) &&
 /*		    (ethconv == WLAN_ETHCONV_8021h) &&  */
 		    (0 != acx100_stt_findproto(ieee2host16(e_snap->type)))) || 
-		    (0 != memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN))))
+		    (0 != COMPARE_OUI( e_snap->oui, oui_rfc1042))))
 	{
 		acxlog(L_DEBUG | L_DATA, "SNAP+RFC1042 len: %d\n", payload_length);
 		/* it's a SNAP + RFC1042 frame && protocol is in STT */
@@ -481,8 +494,8 @@ fail:
 
 		/* create 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
-		memcpy(e_hdr->saddr, saddr, ETH_ALEN); 
+		MAC_COPY(e_hdr->daddr, daddr);
+		MAC_COPY(e_hdr->saddr, saddr); 
 		e_hdr->type = htons(payload_length);
 
 		/* Now copy the data from the 80211 frame.
@@ -522,8 +535,8 @@ fail:
 
 		/* create 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
-		memcpy(e_hdr->saddr, saddr, ETH_ALEN); 
+		MAC_COPY(e_hdr->daddr, daddr);
+		MAC_COPY(e_hdr->saddr, saddr); 
 		e_hdr->type = e_snap->type;
 
 		/* Now copy the data from the 80211 frame.
@@ -561,15 +574,16 @@ fail:
 
 		/* set up the 802.3 header */
 		e_hdr = (wlan_ethhdr_t *) skb->data;
-		memcpy(e_hdr->daddr, daddr, ETH_ALEN);
-		memcpy(e_hdr->saddr, saddr, ETH_ALEN);
+		MAC_COPY(e_hdr->daddr, daddr);
+		MAC_COPY(e_hdr->saddr, saddr);
 		e_hdr->type = htons(payload_length);
 		
 		/* now copy the data from the 80211 frame */
 		memcpy(skb->data + WLAN_ETHHDR_LEN, e_llc, payload_length);
 	}
 
-/*	skb->protocol = eth_type_trans(skb, priv->netdev); */
+	skb->dev = priv->netdev;
+	skb->protocol = eth_type_trans(skb, priv->netdev);
 	
 	/* the "<6>" output is from the KERN_INFO channel value */
 /* Can be used to debug conversion process */

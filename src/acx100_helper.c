@@ -272,27 +272,31 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	txdesc_t *pTxDesc;
         UINT8 *a;
 	fw_stats_t *fw_stats;
+	char *rtl, *thd, *ttl;
 
 	FN_ENTER;
 
 	p += sprintf(p, "*** Rx buf ***\n");
 	for (i = 0; i < pDc->rx_pool_count; i++)
 	{
+		rtl = (i == pDc->rx_tail) ? " [tail]" : "";
 		pDesc = &pDc->pRxHostDescQPool[i];
 		if ((0 != (pDesc->Ctl & ACX100_CTL_OWN)) && (0 != (pDesc->Status & BIT31)))
-			p += sprintf(p, "%02u FULL\n", i);
+			p += sprintf(p, "%02u FULL%s\n", i, rtl);
 		else
-			p += sprintf(p, "%02u empty\n", i);
+			p += sprintf(p, "%02u empty%s\n", i, rtl);
 	}
 	p += sprintf(p, "\n");
 	p += sprintf(p, "*** Tx buf ***\n");
 	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
+		thd = (i == pDc->tx_head) ? " [head]" : "";
+		ttl = (i == pDc->tx_tail) ? " [tail]" : "";
 		if ((UINT8)DESC_CTL_DONE == (pTxDesc->Ctl & (UINT8)DESC_CTL_DONE))
-			p += sprintf(p, "%02u DONE\n", i);
+			p += sprintf(p, "%02u DONE %s%s\n", i, thd, ttl);
 		else
-			p += sprintf(p, "%02u empty\n", i);
+			p += sprintf(p, "%02u empty%s%s\n", i, thd, ttl);
 		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
 	p += sprintf(p, "\n");
@@ -488,7 +492,6 @@ int acx100_reset_dev(netdevice_t *dev)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	UINT16 vala = 0;
-	UINT16 var = 0;
 
 	FN_ENTER;
 
@@ -501,6 +504,8 @@ int acx100_reset_dev(netdevice_t *dev)
 	acx100_reset_mac(priv);
 	
 	/* TODO maybe seperate the two init parts into functions */
+	/* FIXME: they turned out to become pretty much equal now,
+	   so they could be merged, I guess */
 	if (priv->chip_type == CHIPTYPE_ACX100) {
 
 		if (!(vala = acx100_read_reg16(priv, priv->io[IO_ACX_ECPU_CTRL]) & 1)) {
@@ -528,10 +533,13 @@ int acx100_reset_dev(netdevice_t *dev)
 			goto fail;
 		}
 
+#if 0
 		/* check sense on reset flags */
 		if (0 != (acx100_read_reg16(priv, priv->io[IO_ACX_SOR_CFG]) & 0x10)) { 			
 			acxlog(L_BINSTD, "%s: eCPU do not start after boot (SOR), is this fatal?\n", __func__);
 		}
+#endif
+		acx100_schedule(HZ / 100);
 	
 		/* load the firmware */
 		if (0 == acx100_upload_fw(priv)) {
@@ -539,33 +547,15 @@ int acx100_reset_dev(netdevice_t *dev)
 			goto fail;
 		}
 
-		/* additional reset is needed after the firmware has been downloaded to the card */
-		acx100_reset_mac(priv);
+		acx100_schedule(HZ / 100);
 
-		acxlog(L_BINSTD, "%s: configure interrupt mask at %xh to: %Xh...\n", __func__, 
-			priv->io[IO_ACX_IRQ_MASK], acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_MASK]) ^ 0x4600);
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 
-			acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_MASK]) ^ 0x4600);
-
+		/* now start eCPU by clearing bit */
 		acxlog(L_BINSTD, "%s: boot up eCPU and wait for complete...\n", __func__);
-		acx100_write_reg16(priv, priv->io[IO_ACX_ECPU_CTRL], 0x0);
-	}
-
-	/* wait for eCPU bootup */
-	while (!(vala = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x4000)) { 
-		/* ok, let's insert scheduling here.
-		 * This was an awfully CPU burning loop.
-		 */
-		acx100_schedule(HZ / 10);
-		var++;
-		
-		if (var > 250) { 
-			acxlog(L_BINSTD, "Timeout waiting for the ACX100 to complete Initialization (ICOMP), %d\n", vala);
-			goto fail;
-		}
+		acx100_write_reg16(priv, priv->io[IO_ACX_ECPU_CTRL], vala & ~0x1);
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
+	/* wait for eCPU bootup */
 	if (0 == acx100_verify_init(priv)) {
 		acxlog(L_BINSTD,
 			   "Timeout waiting for the ACX100 to complete Initialization\n");
@@ -1184,9 +1174,9 @@ int acx100_verify_init(wlandevice_t *priv)
 
 	for (timer = 100; timer > 0; timer--) {
 
-		if (0 != (acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x4000)) {
+		if (0 != (acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES]) & HOST_INT_FCS_THRESHOLD)) {
 			result = 1;
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4000);
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_FCS_THRESHOLD);
 			break;
 		}
 
@@ -2590,8 +2580,10 @@ int acx100_set_defaults(wlandevice_t *priv)
 	if(priv->chip_type == CHIPTYPE_ACX100) {
 		/* priv->irq_mask = 0xdbb5; not longer used anymore! */
 		priv->irq_mask = 0xd9b5;
+		priv->irq_mask_off = 0x7fff;
 	} else if(priv->chip_type == CHIPTYPE_ACX111) {
 		priv->irq_mask = 0x98e5;
+		priv->irq_mask_off = 0xfdff;
 	}
 
 	priv->led_power = (UINT8)1; /* LED is active on startup */
@@ -3182,6 +3174,7 @@ void acx100_set_timer(wlandevice_t *priv, UINT32 timeout)
 	acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %d\n", timeout);
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		acxlog(L_STD, "ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!!\n");
+		FN_EXIT(0, 0);
 		return;
 	}
 

@@ -472,10 +472,10 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		goto done;
 	}
 
-	if(priv->irq_status & 0x200) {
+	if(priv->irq_status & HOST_INT_CMD_COMPLETE) {
 		acxlog((L_BINDEBUG | L_CTL), "irq status var is not empty: 0x%X\n", priv->irq_status);
 		/* goto done; */
-		priv->irq_status ^= 0x200;
+		priv->irq_status ^= HOST_INT_CMD_COMPLETE;
 		acxlog((L_BINDEBUG | L_CTL), "irq status fixed to: 0x%X\n", priv->irq_status);
 	}
 
@@ -511,13 +511,13 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		 * In theory, yes, but the timeout can be HUGE,
 		 * so better schedule away sometimes */
 		if (!priv->irqs_active && (irqtype =
-		     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
+		     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & HOST_INT_CMD_COMPLETE) {
 
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_CMD_COMPLETE);
 			break;
 		} 
-		if(priv->irqs_active && (irqtype = priv->irq_status & 0x200)) {
-			priv->irq_status ^= 0x200;
+		if(priv->irqs_active && (irqtype = priv->irq_status & HOST_INT_CMD_COMPLETE)) {
+			priv->irq_status ^= HOST_INT_CMD_COMPLETE;
 			break;
 		}
 
@@ -535,7 +535,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	priv->cmd_status = 0;
 	acx100_write_cmd_type_or_status(priv, 0, 1);
 
-	if (!(irqtype & 0x200)) {
+	if (!(irqtype & HOST_INT_CMD_COMPLETE)) {
 		acxlog(L_CTL,
 			"Polling for an IRQ failed with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
 			irqtype, cmd_status, priv->irqs_active, priv->irq_status);

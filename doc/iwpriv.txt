@@ -4,41 +4,59 @@ Commands ("iwpriv wlan0"):
 
 SetSebug - sets debugging/logging level (see L_* #defines in include/acx100.h)
 Default: 0x009b
-"iwpriv wlan0 set_debug 0x000b" (L_STD | L_INIT | L_ASSOC)
+"iwpriv wlan0 SetDebug 0x000b" (L_STD | L_INIT | L_ASSOC)
 
 ListRegDmain - lists the available regulatory domain settings in syslog
-"iwpriv wlan0 list_reg_domain", "dmesg"
+"iwpriv wlan0 ListRegDomain", "dmesg"
 
 SetRegDomain - sets the value of the regulatory domain setting
 Default: depending on card EEPROM data
-"iwpriv wlan0 set_reg_domain 3", "dmesg"
+"iwpriv wlan0 SetRegDomain 3", "dmesg"
 
 GetRegDomain - returns the value of the current regulatory domain setting
-"iwpriv wlan0 get_reg_domain", "dmesg"
+"iwpriv wlan0 GetRegDomain", "dmesg"
 
 SetSPreamble - Activates the Short Preamble transfer (slightly faster rates)
-Default: off (better compatibility)
-"iwpriv wlan0 set_s_preamble 1", "dmesg"
+Default: 0, off (better compatibility, slower)
+"iwpriv wlan0 SetSPreamble 1", "dmesg"
 
 GetSPreamble - returns the Short Preamble transfer setting
-"iwpriv wlan0 get_s_preamble", "dmesg"
+"iwpriv wlan0 GetSPreamble", "dmesg"
 
-SetAntenna, get_antenna, set_rx_ant, set_tx_ant - experimental antenna command
+SetAntenna, GetAntenna, SetRxAnt, SetTxAnt - experimental antenna command
+
+SetPhyAmpBias - sets the bias (offset) level of the "external" radio amplifier
+Default: firmware dependent
+Range: 0 to 7
+"iwpriv wlan0 SetPhyAmpBias 4", "dmesg"
+
+GetPhyBusyCount - get the percentage that the medium has been found to be busy
+"iwpriv wlan0 GetPhyBusyCount", "dmesg"
 
 SetED - change Energy Detect threshold setting
 Default: 0x70 == 112
-"iwpriv wlan0 set_ed 150", "dmesg"
+"iwpriv wlan0 SetED 150", "dmesg"
 
 SetCCA - change Channel Clear Assessment setting
 Default: 0x0d == 13
-"iwpriv wlan0 set_cca 15", "dmesg"
+"iwpriv wlan0 SetCCA 15", "dmesg"
+
+SetScanDelay - sets time (in ms) to wait per channel on a scan
 
 SetLEDPower - change power LED setting (save power)
 Default: on
-"iwpriv wlan0 set_led_power 0", "dmesg"
-
-SetScanDelay - sets time (in ms) to wait per channel on a scan
+"iwpriv wlan0 SetLEDPower 0", "dmesg"
 
 monitor - activate Kismet monitor mode (Orinoco card type)
 Default: off
 "iwpriv wlan0 monitor 2 4"
+
+Test - random test functionality
+
+DbgSetMasks - sets internal activation masks (debugging only)
+
+DbgGetIO - query card I/O registers
+
+DbgSetIO - set card I/O registers
+
+GetAcx111Info - get misc. ACX111 firmware status information

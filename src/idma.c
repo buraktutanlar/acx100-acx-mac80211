@@ -1109,12 +1109,6 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to handle. */
 	while (1) {
-		count++;
-		if (unlikely(count > pDc->rx_pool_count))
-		{ /* hmm, no luck: all descriptors empty, bail out */
-			FN_EXIT(0, 0);
-			return;
-		}
 		/* we're not in user context but in IRQ context here,
 		 * so we don't need to use _irqsave() since an IRQ can
 		 * only happen once anyway. user context access DOES
@@ -1124,11 +1118,17 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		curr_idx = pDc->rx_tail;
 		pDesc = &RxPool[pDc->rx_tail];
 		pDc->rx_tail = (pDc->rx_tail + 1) % pDc->rx_pool_count;
-		if ((pDesc->Ctl & ACX100_CTL_OWN) || (0 == (pDesc->Status & BIT31))) {
+		if ((pDesc->Ctl & ACX100_CTL_OWN) && (pDesc->Status & BIT31)) {
 			RX_SPIN_UNLOCK(&rx_lock);
 			break;
 		}
 		RX_SPIN_UNLOCK(&rx_lock);
+		count++;
+		if (unlikely(count > pDc->rx_pool_count))
+		{ /* hmm, no luck: all descriptors empty, bail out */
+			FN_EXIT(0, 0);
+			return;
+		}
 	}
 
 	/* now process descriptors, starting with the first we figured out */
@@ -1220,7 +1220,8 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		pDesc = &RxPool[pDc->rx_tail];
 
 		/* if next descriptor is empty, then bail out */
-		if (!((pDesc->Ctl & ACX100_CTL_OWN) && (pDesc->Status & BIT31)))
+		/* if (!((pDesc->Ctl & ACX100_CTL_OWN) && (!(pDesc->Status & BIT31)))) */
+		if (!(pDesc->Status & BIT31))
 		{
 			RX_SPIN_UNLOCK(&rx_lock);
 			break;
@@ -1519,12 +1520,12 @@ int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 		host_desc->Ctl |= ACX100_CTL_OWN;
 
-		host_desc++;
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
 		host_desc->desc_phy_next = (struct txhostdescriptor *)((UINT8 *) host_desc_phy + sizeof(struct txhostdescriptor));
 		host_desc_phy++;
 #endif
+		host_desc++;
 	}
 	host_desc->data = (UINT8 *) frame_buffer;
 	/* TODO is this correct ?? */

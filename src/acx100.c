@@ -90,7 +90,6 @@
 
 #include <linux/dcache.h>
 #include <linux/highmem.h>
-#include <linux/etherdevice.h>
 
 /*================================================================*/
 /* Project Includes */
@@ -336,14 +335,16 @@ static void acx100_get_firmware_version(wlandevice_t *priv)
 	priv->firmware_id = fw.hw_id;
 
 	/* we're able to find out more detailed chip names now */
-	switch (fw.hw_id) {
-		case 0x01020505:
+	switch (fw.hw_id & 0xffff0000) {
+		case 0x01010000:
+		case 0x01020000:
 			priv->chip_name = name_tnetw1100a;
 			break;
-		case 0x01030505:
+		case 0x01030000:
 			priv->chip_name = name_tnetw1100b;
 			break;
-		case 0x03010101:
+		case 0x03000000:
+		case 0x03010000:
 			priv->chip_name = name_tnetw1130;
 			break;
 		default:
@@ -1369,17 +1370,17 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 
 	FN_ENTER;
 
-	if (!skb) {
+	if (unlikely(!skb)) {
 		return 0;
 	}
-	if (!priv) {
+	if (unlikely(!priv)) {
 		return 1;
 	}
-	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
+	if (unlikely(0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		return 1;
 	}
 
-	if (0 != acx100_lock(priv, &flags))
+	if (unlikely(0 != acx100_lock(priv, &flags)))
 		return 1;
 
 	if (0 != netif_queue_stopped(dev)) {
@@ -1432,7 +1433,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 
 	pb->eth_hdr = (wlan_ethhdr_t *) pb->ethbuf;
  */
-	if ((tx_desc = acx100_get_tx_desc(priv)) == NULL){
+	if (unlikely((tx_desc = acx100_get_tx_desc(priv)) == NULL)) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
 		goto fail;
@@ -1487,15 +1488,17 @@ fail:
  */
 static void acx100_tx_timeout(netdevice_t *dev)
 {
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 /*	char tmp[4]; */
 /*	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 */
 
-/*	ctlCmdFlushTxQueue((wlandevice_t*)dev->priv,(memmap_t*)&tmp); */
 	FN_ENTER;
+	/* clean tx descs, they may have been completely full */
+	acx100_clean_tx_desc(priv);
+	priv->stats.tx_errors++;
 	acxlog(L_STD, "Tx timeout!\n");
-	((wlandevice_t *)dev->priv)->stats.tx_errors++;
 	FN_EXIT(0, 0);
 }
 
@@ -1631,12 +1634,7 @@ void acx100_disable_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
-	if (CHIPTYPE_ACX100 == priv->chip_type)
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 0x7fff);
-	else
-	if (CHIPTYPE_ACX111 == priv->chip_type)
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], 0xfdff);
-
+	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_MASK], priv->irq_mask_off);
 	acx100_write_reg16(priv, priv->io[IO_ACX_FEMR], 0x0);
 	priv->irqs_active = 0;
 #endif
@@ -1720,15 +1718,18 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 #endif
 
         /* do most important IRQ types first */
-	if (0 != (irqtype & 0x8)) {
+	if (0 != (irqtype & HOST_INT_RX_COMPLETE)) {
 		acx100_process_rx_desc(priv);
 		acxlog(L_IRQ, "Got Rx Complete IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8);
+		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_RX_COMPLETE);
 	}
-	if (0 != (irqtype & 0x2)) {
-		acx100_clean_tx_desc(priv);
+	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
+		static int txcnt = 0;
+
+		if (txcnt++ % 4 == 0)
+			acx100_clean_tx_desc(priv);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");
-		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x2);
+		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
 #if 0
 /* this shouldn't happen here generally, since we'd also enable user packet
  * xmit for management packets, which we really DON'T want */
@@ -1741,59 +1742,79 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 #endif
 	}
 	/* group all further IRQ types to improve performance */
-	if (0 != (irqtype & 0x00f5)) {
-		if (0 != (irqtype & 0x1)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1);
+	if (0 != (irqtype & (  /* 00f5 */
+		HOST_INT_RX_DATA |
+		HOST_INT_TX_XFER |
+		HOST_INT_DTIM |
+		HOST_INT_BEACON |
+		HOST_INT_TIMER |
+		HOST_INT_KEY_NOT_FOUND
+		)
+	)) {
+		if (0 != (irqtype & HOST_INT_RX_DATA)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_RX_DATA);
 			acxlog(L_STD|L_IRQ, "Got Rx Data IRQ\n");
 		}
-		if (0 != (irqtype & 0x4)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4);
+		if (0 != (irqtype & HOST_INT_TX_XFER)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_XFER);
 			acxlog(L_STD|L_IRQ, "Got Tx Xfer IRQ\n");
 		}
-		if (0 != (irqtype & 0x10)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x10);
+		if (0 != (irqtype & HOST_INT_DTIM)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_DTIM);
 			acxlog(L_STD|L_IRQ, "Got DTIM IRQ\n");
 		}
-		if (0 != (irqtype & 0x20)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x20);
+		if (0 != (irqtype & HOST_INT_BEACON)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_BEACON);
 			acxlog(L_STD|L_IRQ, "Got Beacon IRQ\n");
 		}
-		if (0 != (irqtype & HOST_INT_TIMER) /* 0x40 */ ) {
+		if (0 != (irqtype & HOST_INT_TIMER)) {
 			acx100_timer((unsigned long)priv);
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TIMER);
 			acxlog(L_IRQ, "Got Timer IRQ\n");
 		}
-		if (unlikely(0 != (irqtype & 0x80))) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x80);
+		if (unlikely(0 != (irqtype & HOST_INT_KEY_NOT_FOUND))) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_KEY_NOT_FOUND);
 			acxlog(L_STD|L_IRQ, "Got Key Not Found IRQ\n");
 		}
 	}
-	if (0 != (irqtype & 0x0f00)) {
-		if (unlikely(0 != (irqtype & 0x100))) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x100);
+	if (0 != (irqtype & (  /* 0f00 */
+		HOST_INT_IV_ICV_FAILURE |
+		HOST_INT_CMD_COMPLETE |
+		HOST_INT_INFO |
+		HOST_INT_OVERFLOW
+		)
+	)) {
+		if (unlikely(0 != (irqtype & HOST_INT_IV_ICV_FAILURE))) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_IV_ICV_FAILURE);
 			acxlog(L_STD|L_IRQ, "Got IV ICV Failure IRQ\n");
 		}
-		if (0 != (irqtype & 0x200)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
+		if (0 != (irqtype & HOST_INT_CMD_COMPLETE)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_CMD_COMPLETE);
 			/* save the state for the running issue cmd */
-			priv->irq_status |= 0x200; 
+			priv->irq_status |= HOST_INT_CMD_COMPLETE;
 			acxlog(L_IRQ, "Got Command Complete IRQ\n");
 		}
-		if (0 != (irqtype & 0x400)) {
+		if (0 != (irqtype & HOST_INT_INFO)) {
 			acx100_handle_info_irq(priv);
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x400);
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_INFO);
 		}
-		if (unlikely(0 != (irqtype & 0x800))) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x800);
+		if (unlikely(0 != (irqtype & HOST_INT_OVERFLOW))) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_OVERFLOW);
 			acxlog(L_STD|L_IRQ, "Got Overflow IRQ\n");
 		}
 	}
-	if (0 != (irqtype & 0xf000)) {
-		if (unlikely(0 != (irqtype & 0x1000))) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x1000);
+	if (0 != (irqtype & ( /* f000 */
+		HOST_INT_PROCESS_ERROR |
+		HOST_INT_SCAN_COMPLETE |
+		HOST_INT_FCS_THRESHOLD |
+		HOST_INT_UNKNOWN
+		)
+	)) {
+		if (unlikely(0 != (irqtype & HOST_INT_PROCESS_ERROR))) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_PROCESS_ERROR);
 			acxlog(L_STD|L_IRQ, "Got Process Error IRQ\n");
 		}
-		if (0 != (irqtype & HOST_INT_SCAN_COMPLETE) /* 0x2000 */ ) {
+		if (0 != (irqtype & HOST_INT_SCAN_COMPLETE)) {
 
 			/* place after_interrupt_task into schedule to get
 			   out of interrupt context */
@@ -1804,12 +1825,12 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 
 			acxlog(L_IRQ, "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
 		}
-		if (0 != (irqtype & 0x4000)) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x4000);
+		if (0 != (irqtype & HOST_INT_FCS_THRESHOLD)) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_FCS_THRESHOLD);
 			acxlog(L_STD|L_IRQ, "Got FCS Threshold IRQ\n");
 		}
-		if (unlikely(0 != (irqtype & 0x8000))) {
-			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8000);
+		if (unlikely(0 != (irqtype & HOST_INT_UNKNOWN))) {
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_UNKNOWN);
 			acxlog(L_STD|L_IRQ, "Got Unknown IRQ\n");
 		}
 	}
@@ -1883,7 +1904,7 @@ void acx100_after_interrupt_task(void *data) {
 		return;
 	}
 			
-	if (priv->irq_status & HOST_INT_SCAN_COMPLETE /* 0x2000 */ ) {
+	if (priv->irq_status & HOST_INT_SCAN_COMPLETE) {
 
 		if (priv->status == ISTATUS_5_UNKNOWN) {
 			acx100_set_status(priv, priv->unknown0x2350);
@@ -1924,7 +1945,7 @@ void acx100_after_interrupt_task(void *data) {
  * buffer and feeds it to the network stack via netif_rx().
  *
  * Arguments:
- * 	rxdesc:	the rxhostdecriptor to pull the data from
+ * 	rxdesc:	the rxhostdescriptor to pull the data from
  *	priv:	the acx100 private struct of the interface
  *
  * Returns:
@@ -1946,14 +1967,8 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 	FN_ENTER;
 	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		if ((skb = acx100_rxdesc_to_ether(priv, rxdesc))) {
-			netdevice_t *dev = priv->netdev;
-
-			skb->dev = dev;
-			skb->protocol = eth_type_trans(skb, dev);
-			dev->last_rx = jiffies;
-
 			(void)netif_rx(skb);
-
+			priv->netdev->last_rx = jiffies;
 			priv->stats.rx_packets++;
 			priv->stats.rx_bytes += skb->len;
 		}

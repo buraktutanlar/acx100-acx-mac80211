@@ -106,7 +106,7 @@ Status Matrix:
 Rates		1/2/5.5/11/22		1/2/5.5/11/22		11/22 (54 NIY)
 Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64?/128?/256?)
 Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64?/128?/256?)
-Auto		*			*			?
+Auto		*			*			*
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
@@ -127,7 +127,7 @@ due to strict 802.11 compliance checks in their firmware.
 Master mode support (aka HostAP) has not really been implemented yet,
 but at least it can be configured now.
 
-The non-standard 4x mode (aka "44Mbps") is not supported yet and will need
+The non-standard 4x (4X) mode (aka "44Mbps") is not supported yet and will need
 several driver changes. Don't hold your breath, this is really low priority.
 
 Many other things haven't been tested (properly) yet.
@@ -156,6 +156,8 @@ since this seeks to list all requirements in full):
 	And Non-SMP (no CONFIG_SMP).
 * proper kernel header files / kernel source (packages) installed
         for the exact (*EXACT*!!) kernel you're running! 
+  It is recommended that this kernel is new enough to support wireless
+  extensions version WIRELESS_EXT > 13
 * a make package has to be installed
 * a gcc package has to be installed
 * The /bin/bash shell is required for the start_net/stop_net scripts
@@ -559,7 +561,8 @@ for version conflicts!
 
 -- Network failure --
 First, did you ifup the card? (ifconfig wlan0 up)
-Without an activated interface there won't be any net connection at all...
+Without an activated interface there won't be any net connection at all,
+since the wireless part (and much more) of the card will be deactivated...
 Also, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
@@ -664,8 +667,8 @@ Thanks for listening!
 
 === BUGS / SHORTCOMINGS / PATCHES ===
 
-- will not work on SMP multi-processor kernels yet
-           (some problems, maybe even crashes). Working to fix that.
+- might not work on SMP multi-processor kernels sometimes
+           (some problems, maybe even crashes). Reported to work, currently
 - power management (suspend/resume) handlers are not completely stable yet
 - no automatic rate adaptation yet
            (setting rate to 22M will prevent communication with 11M peers)

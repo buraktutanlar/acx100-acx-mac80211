@@ -95,6 +95,40 @@ extern int acx100_debug_func_indent;
 
 #define FUNC_INDENT_INCREMENT 2
 
+#define DEBUG_TSC 0
+#if DEBUG_TSC
+#define FN_ENTER \
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			unsigned long d; \
+			rdtscl(d); \
+			printk("%lx ", d); \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			printk("==> %s\n", __func__); \
+			acx100_debug_func_indent += FUNC_INDENT_INCREMENT; \
+		} \
+	} while (0)
+
+#define FN_EXIT(p, v) \
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			unsigned long d; \
+			rdtscl(d); \
+			printk("%lx ", d); \
+			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			if (p) { \
+				printk("<== %s: %08x\n", __func__, v); \
+			} else { \
+				printk("<== %s\n", __func__); \
+			} \
+		} \
+	} while (0)
+#else
 #define FN_ENTER \
 	do { \
 		if (debug & L_FUNC) { \
@@ -111,8 +145,8 @@ extern int acx100_debug_func_indent;
 	do { \
 		if (debug & L_FUNC) { \
 			int i; \
-			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
 			printk("%lx ", jiffies); \
+			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
 			for (i = 0; i < acx100_debug_func_indent; i++) \
 				printk(" "); \
 			if (p) { \
@@ -122,6 +156,7 @@ extern int acx100_debug_func_indent;
 			} \
 		} \
 	} while (0)
+#endif
 
 #else /* ACX_DEBUG */
 
@@ -208,8 +243,22 @@ extern int acx100_debug_func_indent;
 #define RADIO_UNKNOWN_17	0x17	/* most likely *sometimes* used in ACX111 cards */
 
 /*--- IRQ Constants ----------------------------------------------------------*/
-#define HOST_INT_TIMER			0x40
-#define HOST_INT_SCAN_COMPLETE		0x2000	/* official name */
+#define HOST_INT_RX_DATA	0x0001
+#define HOST_INT_TX_COMPLETE	0x0002
+#define HOST_INT_TX_XFER	0x0004
+#define HOST_INT_RX_COMPLETE	0x0008
+#define HOST_INT_DTIM		0x0010
+#define HOST_INT_BEACON		0x0020
+#define HOST_INT_TIMER		0x0040
+#define HOST_INT_KEY_NOT_FOUND	0x0080
+#define HOST_INT_IV_ICV_FAILURE	0x0100
+#define HOST_INT_CMD_COMPLETE	0x0200
+#define HOST_INT_INFO		0x0400
+#define HOST_INT_OVERFLOW	0x0800
+#define HOST_INT_PROCESS_ERROR	0x1000
+#define HOST_INT_SCAN_COMPLETE	0x2000 /* official name */
+#define HOST_INT_FCS_THRESHOLD	0x4000
+#define HOST_INT_UNKNOWN	0x8000
 
 /*--- Register I/O offsets ---------------------------------------------------*/
 
@@ -1215,7 +1264,8 @@ typedef struct wlandevice {
 	UINT32		firmware_id;
 
 	/*** Hardware resources ***/
-	UINT16		irq_mask;		/* interrupts types to mask out (not wanted) */
+	UINT16		irq_mask;		/* interrupts types to mask out (not wanted) with many IRQs activated */
+	UINT16		irq_mask_off;		/* interrupts types to mask out (not wanted) with IRQs off */
 
 	unsigned long	membase;		/* 10 */
 	unsigned long	membase2;		/* 14 */
