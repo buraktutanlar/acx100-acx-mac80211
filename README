@@ -110,7 +110,7 @@ Auto		*			*			?
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
-Sensitivity	* (hardware)		- (no go since USB?)	- (unknown radio)
+Sensitivity	* (hardware)		- (no go since USB?)	- (NIY, slight problems)
 
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
@@ -408,8 +408,9 @@ Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
 Need to change MAC address? Use ifconfig wlan0 hw ether 112233445566
-Setting will only get updated when not associated: needs reinit of card parts.
-And it doesn't work quite right yet, communication is distorted :-\
+(make sure card interface is down!)
+Driver will only update MAC when not associated: needs reinit of card parts.
+And it doesn't work quite right yet, communication is slightly distorted :-\
 (maybe the card firmware even keeps the MAC address of the EEPROM or so...)
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
@@ -783,6 +784,11 @@ than providing sufficient specs to OSS developers), not the other way around!
 Just imagine the weird looks of thousands and thousands of Linux users
 when they discovered the lack of support for the product that they just
 shelled out considerable amounts of money for...
+
+For an example of a vendor whose actions I deem useful, let me just mention
+Sitecom. They list Linux compatibility status for many of their products on
+their website, and from the look of it they clearly support Linux quite
+actively.
 
 Have fun!
 

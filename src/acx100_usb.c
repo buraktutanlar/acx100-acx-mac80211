@@ -681,7 +681,7 @@ static void init_network_device(struct net_device *dev) {
 	** put the ACX100 out of sleep mode
 	** ----------------------------------- */
 	priv=dev->priv;
-	acx100_issue_cmd(priv,ACX100_CMD_WAKE,NULL,0,5000);
+	acx100_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
 	/* --------------------------------------
 	** Register the callbacks for the network
 	** device functions.
@@ -734,7 +734,7 @@ static int acx100usb_open(struct net_device *dev)
 	/* ---------------------------------
 	** put the ACX100 out of sleep mode
 	** ------------------------------ */
-	acx100_issue_cmd(priv,ACX100_CMD_WAKE,NULL,0,5000);
+	acx100_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
 
 	init_timer(&(priv->mgmt_timer));
 	priv->mgmt_timer.function=acx100_timer;
@@ -1023,7 +1023,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	** ------------------------------------------- */
 	acxlog(L_XFER,"tx_data: headerlen=%d  payloadlen=%d\n",header->length,payload->length);
 	buf=&(priv->bulkout.txfrm);
-	size=header->length+payload->length;
+	size=header->length + payload->length;
 	if (size>WLAN_DATA_MAXLEN) {
 		acxlog(L_STD,"acx100usb: ERROR, USB buffer smaller than total data to send (%d vs. %d)\n",size,WLAN_DATA_MAXLEN);
 		return;
@@ -1368,12 +1368,12 @@ static int acx100usb_stop(struct net_device *dev)
 	/* ------------------------
 	** disable rx and tx ...
 	** --------------------- */
-	acx100_issue_cmd(priv,ACX100_CMD_DISABLE_TX,NULL,0,5000);
-	acx100_issue_cmd(priv,ACX100_CMD_DISABLE_RX,NULL,0,5000);
+	acx100_issue_cmd(priv,ACX1xx_CMD_DISABLE_TX,NULL,0,5000);
+	acx100_issue_cmd(priv,ACX1xx_CMD_DISABLE_RX,NULL,0,5000);
 	/* -------------------------
 	** power down the device...
 	** ---------------------- */
-	acx100_issue_cmd(priv,ACX100_CMD_SLEEP,NULL,0,5000);
+	acx100_issue_cmd(priv,ACX1xx_CMD_SLEEP,NULL,0,5000);
 	/* --------------------------------------------
 	** decrease module-in-use count (if necessary)
 	** ----------------------------------------- */

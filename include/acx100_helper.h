@@ -99,8 +99,8 @@ typedef struct QueueConfig {
 
 typedef struct ACX111QueueConfig {
 
-	UINT16 type;
-	UINT16 length;
+	UINT16 rid;
+	UINT16 len;
 	UINT32 tx_memory_block_address;
 	UINT32 rx_memory_block_address;
 	UINT32 rx1_queue_address;
@@ -114,8 +114,8 @@ typedef struct ACX111QueueConfig {
 
 typedef struct ACX111MemoryConfig {
 
-	UINT16 type;
-	UINT16 length;
+	UINT16 rid;
+	UINT16 len;
 	UINT16 no_of_stations;
 	UINT16 memory_block_size;
 	UINT8 tx_rx_memory_block_allocation;
@@ -142,6 +142,23 @@ typedef struct ACX111MemoryConfig {
 	/* end of tx1 block */
 
 }  __WLAN_ATTRIB_PACK__ ACX111MemoryConfig_t;
+
+typedef struct ACX111FeatureConfig {
+
+	UINT16 id;
+	UINT16 length;
+	UINT32 feature_options;
+	UINT32 data_flow_options;
+	
+} __WLAN_ATTRIB_PACK__ ACX111FeatureConfig_t;
+
+typedef struct ACX111TxLevel {
+
+	UINT16 id;
+	UINT16 length;
+	UINT8 level;
+	
+} __WLAN_ATTRIB_PACK__ ACX111TxLevel_t;
 
 #if MAYBE_BOGUS
 typedef struct wep {
@@ -346,7 +363,7 @@ typedef struct {
     UINT16 addr;
     UINT16 type; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg. */
     UINT32 len;
-    UINT8 data[256];
+    UINT32 data;
 } mem_read_write_t;
 
 typedef struct acxp80211_beacon_prb_resp_template {
@@ -375,7 +392,7 @@ typedef struct acx100_wep_options {
     UINT16	rid;
     UINT16	len;
     UINT16	NumKeys;	/* max # of keys */
-    UINT8	WEPOption;
+    UINT8	WEPOption;	/* 0 == decrypt default key only, 1 == override decrypt */
     UINT8	Pad;		/* used only for acx111 */
 } acx100_wep_options_t;
 

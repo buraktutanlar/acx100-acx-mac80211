@@ -62,8 +62,10 @@ typedef struct mac {
 	readw(priv->iobase + offset) \
 	+ (readw(priv->iobase + offset + 2) << 16)
 #define acx100_write_reg32(priv, offset, val) \
-	writew(val & 0xffff, priv->iobase + offset) \
-	writew(val >> 16, priv->iobase + offset + 2)
+	do { \
+		writew(val & 0xffff, priv->iobase + offset); \
+		writew(val >> 16, priv->iobase + offset + 2); \
+	} while (0)
 #endif
 #define acx100_read_reg16(priv, offset) \
 	readw(priv->iobase + offset)
@@ -84,8 +86,7 @@ void acx100_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
 
 void acx100_get_info_state(wlandevice_t *priv);
 void acx100_get_cmd_state(wlandevice_t *priv);
-void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala);
-void acx100_write_cmd_status(wlandevice_t *priv, UINT vala);
+void acx100_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status);
 
 int acx100_issue_cmd(wlandevice_t *priv, UINT cmd, /*@null@*/ void *pcmdparam,
 		     int paramlen, UINT32 timeout);

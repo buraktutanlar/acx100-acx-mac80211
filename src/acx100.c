@@ -305,7 +305,7 @@ static void acx100_get_firmware_version(wlandevice_t *priv)
 
 	FN_ENTER;
 	
-	(void)acx100_interrogate(priv, &fw, ACX100_RID_FWREV);
+	(void)acx100_interrogate(priv, &fw, ACX1xx_IE_FWREV);
 	memcpy(priv->firmware_version, &fw.fw_id, 20);
 	if (strncmp((char *)fw.fw_id, "Rev ", 4) != 0)
 	{
@@ -373,7 +373,9 @@ void acx100_display_hardware_details(wlandevice_t *priv)
 		case RADIO_RALINK_15:
 			radio_str = "Ralink";
 			break;
-		case RADIO_UNKNOWN_16:
+		case RADIO_RADIA_16:
+			radio_str = "Radia";
+			break;
 		case RADIO_UNKNOWN_17:
 			radio_str = "UNKNOWN, used e.g. in ACX111 cards, please report the radio type name!";
 			break;
@@ -1500,8 +1502,10 @@ static void acx100_tx_timeout(netdevice_t *dev)
 static struct net_device_stats *acx100_get_stats(netdevice_t *dev)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+#if ANNOYING_GETS_CALLED_TOO_OFTEN
 	FN_ENTER;
 	FN_EXIT(1, (int)&priv->stats);
+#endif
 	return &priv->stats;
 }
 
@@ -1630,7 +1634,7 @@ void acx100_handle_info_irq(wlandevice_t *priv)
 /*----------------------------------------------------------------
 * acx100_interrupt
 * 
-* Never call a schedule or sleep in this method. Result will be an Kernel Panic.
+* Never call a schedule or sleep in this method. Result will be a Kernel Panic.
 *
 * Arguments:
 *
@@ -1648,7 +1652,7 @@ void acx100_handle_info_irq(wlandevice_t *priv)
 
 irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ struct pt_regs *regs)
 {
-	wlandevice_t *priv = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
+	wlandevice_t *priv;
 	UINT16 irqtype;
 	int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	static int loops_this_jiffy = 0;
@@ -1656,6 +1660,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 
 	FN_ENTER;
 
+	priv = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
 	irqtype = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_CLEAR]);
 	if (unlikely(0xffff == irqtype))
 	{
@@ -1872,7 +1877,7 @@ void acx100_after_interrupt_task(void *data) {
 
 		if (priv->after_interrupt_jobs & ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN) {
 			acxlog(L_IRQ, "Send a stop scan cmd....\n");
-			acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, NULL, 0, 5000);
+			acx100_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
 
 			priv->after_interrupt_jobs ^= ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN; /* clear the bit */
 		}
@@ -1880,7 +1885,7 @@ void acx100_after_interrupt_task(void *data) {
 		if (priv->after_interrupt_jobs & ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE) {
 
 			memmap_t pdr;
-			acx100_configure(priv, &pdr, ACX100_RID_ASSOC_ID);
+			acx100_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
 			acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
 			acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
 
@@ -2062,8 +2067,8 @@ static void __exit acx100_cleanup_module(void)
         	remove_proc_entry(procbuf, NULL);
 
 		/* disable both Tx and Rx to shut radio down properly */
-		acx100_issue_cmd(priv, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
-		acx100_issue_cmd(priv, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
+		acx100_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000);
+		acx100_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000);
 	
 		/* disable power LED to save power :-) */
 		acxlog(L_INIT, "switching off power LED to save power. :-)\n");

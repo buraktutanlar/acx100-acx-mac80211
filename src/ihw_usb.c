@@ -99,8 +99,8 @@ static void acx100usb_control_complete(struct urb *);
 static void acx100usb_control_complete(struct urb *, struct pt_regs *);
 #endif
 
-int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
-	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(hw->usbin);
+int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
+	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->usbin);
 	int ucode;
 	struct usb_device *usbdev;
 	FN_ENTER;
@@ -108,41 +108,35 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	/* ----------------------------------------------------
 	** get context from wlandevice
 	** ------------------------------------------------- */
-	usbdev=hw->usbdev;
+	usbdev=priv->usbdev;
 	/* ----------------------------------------------------
 	** check which kind of command was issued...
 	** ------------------------------------------------- */
+	priv->usbout.cmd=cmd;
+	priv->usbout.status=0;
 	if (cmd==ACX100_CMD_INTERROGATE) {
-		hw->usbout.rridreq.cmd=cmd;
-		hw->usbout.rridreq.status=0;
-		hw->usbout.rridreq.rid=((memmap_t *)pdr)->type;
-		hw->usbout.rridreq.frmlen=paramlen;
+		priv->usbout.u.rridreq.rid=((memmap_t *)pdr)->type;
+		priv->usbout.u.rridreq.frmlen=paramlen;
 		blocklen=8;
-		switch (hw->usbout.rridreq.rid) {
+		switch (priv->usbout.u.rridreq.rid) {
 			case ACX100_RID_SCAN_STATUS:skipridheader=1;break;
 		}
 		if (skipridheader) acklen=paramlen+4;
 		else acklen=paramlen+8;
-		acxlog(L_XFER,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",hw->usbout.rridreq.cmd,hw->usbout.rridreq.status,hw->usbout.rridreq.rid,hw->usbout.rridreq.frmlen);
+		acxlog(L_XFER,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbout.cmd,priv->usbout.status,priv->usbout.u.rridreq.rid,priv->usbout.u.rridreq.frmlen);
 	} else if (cmd==ACX100_CMD_CONFIGURE) {
-		hw->usbout.wridreq.cmd=cmd;
-		hw->usbout.wridreq.status=0;
-		hw->usbout.wridreq.rid=((memmap_t *)pdr)->type;
-		hw->usbout.wridreq.frmlen=paramlen;
-		memcpy(hw->usbout.wridreq.data,&(((memmap_t *)pdr)->m),paramlen);
+		priv->usbout.u.wridreq.rid=((memmap_t *)pdr)->type;
+		priv->usbout.u.wridreq.frmlen=paramlen;
+		memcpy(priv->usbout.u.wridreq.data,&(((memmap_t *)pdr)->m),paramlen);
 		blocklen=8+paramlen;
 	} else if ((cmd==ACX100_CMD_ENABLE_RX)||(cmd==ACX100_CMD_ENABLE_TX)||(cmd==ACX100_CMD_SLEEP)) {
-		hw->usbout.rxtx.cmd=cmd;
-		hw->usbout.rxtx.status=0;
-		hw->usbout.rxtx.data=1;		/* just for testing */
+		priv->usbout.u.rxtx.data=1;		/* just for testing */
 		blocklen=5;
 	} else {
 		/* ----------------------------------------------------
 		** All other commands (not thoroughly tested)
 		** ------------------------------------------------- */
-		hw->usbout.wmemreq.cmd=cmd;
-		hw->usbout.wmemreq.status=0;
-		if ((pdr)&&(paramlen>0)) memcpy(hw->usbout.wmemreq.data,pdr,paramlen);
+		if ((pdr)&&(paramlen>0)) memcpy(priv->usbout.u.wmemreq.data,pdr,paramlen);
 		blocklen=4+paramlen;
 	}
 	/* ----------------------------------------------------
@@ -152,15 +146,15 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
 #ifdef ACX_DEBUG
 	acxlog(L_XFER,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
-	if (debug&L_DATA) acx100usb_dump_bytes(&(hw->usbout),blocklen);
+	if (debug&L_DATA) acx100usb_dump_bytes(&(priv->usbout),blocklen);
 #endif
 	/* --------------------------------------
 	** fill setup packet and control urb
 	** ----------------------------------- */
-	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
-	usb_fill_control_urb(hw->ctrl_urb,usbdev,outpipe,hw->usb_setup,&(hw->usbout),blocklen,acx100usb_control_complete,hw);
-	hw->ctrl_urb->timeout=timeout;
-	ucode=submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
+	usb_fill_control_urb(priv->ctrl_urb,usbdev,outpipe,priv->usb_setup,&(priv->usbout),blocklen,acx100usb_control_complete,priv);
+	priv->ctrl_urb->timeout=timeout;
+	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
 		return(0);
@@ -168,14 +162,14 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
-	while (hw->ctrl_urb->status==-EINPROGRESS) {
+	while (priv->ctrl_urb->status==-EINPROGRESS) {
 		udelay(500);
 	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
-	result=hw->ctrl_urb->actual_length;
-	acxlog(L_XFER,"wrote=%d bytes (status=%d)\n",result,hw->ctrl_urb->status);
+	result=priv->ctrl_urb->actual_length;
+	acxlog(L_XFER,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
 	if (result<0) {
 		return(0);
 	}
@@ -183,11 +177,11 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	** Check for device acknowledge ...
 	** -------------------------------------- */
 	acxlog(L_XFER,"sending USB control msg (in) (acklen=%d)\n",acklen);
-	hw->usbin.rridresp.status=0; /* delete old status flag -> set to fail */
-	FILL_SETUP_PACKET(hw->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
-	usb_fill_control_urb(hw->ctrl_urb,usbdev,inpipe,hw->usb_setup,&(hw->usbin),acklen,acx100usb_control_complete,hw);
-	hw->ctrl_urb->timeout=timeout;
-	ucode=submit_urb(hw->ctrl_urb, GFP_KERNEL);
+	priv->usbin.status=0; /* delete old status flag -> set to fail */
+	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
+	usb_fill_control_urb(priv->ctrl_urb,usbdev,inpipe,priv->usb_setup,&(priv->usbin),acklen,acx100usb_control_complete,priv);
+	priv->ctrl_urb->timeout=timeout;
+	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message (ack) failed with errcode %d\n",ucode);
 		return(0);
@@ -195,32 +189,32 @@ int acx100_issue_cmd(wlandevice_t *hw,UINT cmd,void *pdr,int paramlen,UINT32 tim
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
-	while (hw->ctrl_urb->status==-EINPROGRESS) {
+	while (priv->ctrl_urb->status==-EINPROGRESS) {
 		udelay(500);
 	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
-	result=hw->ctrl_urb->actual_length;
+	result=priv->ctrl_urb->actual_length;
 	acxlog(L_XFER,"read=%d bytes\n",result);
 	if (result<0) {
 		FN_EXIT(0,result);
 		return(0);
 	}
-	if (hw->usbin.rridresp.status!=1) {
-		acxlog(L_DEBUG,"command returned status %d\n",hw->usbin.rridresp.status);
+	if (priv->usbin.status!=1) {
+		acxlog(L_DEBUG,"command returned status %d\n",priv->usbin.status);
 	}
 	if (cmd==ACX100_CMD_INTERROGATE) {
 		if ((pdr)&&(paramlen>0)) {
 			if (skipridheader) {
-				memcpy(pdr,&(hw->usbin.rmemresp.data),paramlen);
-				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",hw->usbin.rmemresp.cmd,hw->usbin.rmemresp.status);
+				memcpy(pdr,&(priv->usbin.u.rmemresp.data),paramlen);
+				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",priv->usbin.cmd,priv->usbin.status);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
 				if (debug&L_DATA) acx100usb_dump_bytes(pdr,paramlen);
 			}
 			else {
-				memcpy(pdr,&(hw->usbin.rridresp.rid),paramlen+4);
-				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",hw->usbin.rridresp.cmd,hw->usbin.rridresp.status,hw->usbin.rridresp.rid,hw->usbin.rridresp.frmlen);
+				memcpy(pdr,&(priv->usbin.u.rridresp.rid),paramlen+4);
+				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbin.cmd,priv->usbin.status,priv->usbin.u.rridresp.rid,priv->usbin.u.rridresp.frmlen);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen+4);
 				if (debug&L_DATA) acx100usb_dump_bytes(pdr,paramlen+4);
 			}

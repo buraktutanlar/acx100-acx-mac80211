@@ -234,7 +234,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	pDc->priv = priv;
 
 	/* read out the acx100 physical start address for the queues */
-	if (!acx100_interrogate(priv, &MemMap, ACX100_RID_MEMORY_MAP)) {
+	if (!acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapRead returns error\n");
 		FN_EXIT(1, 2);
 		return 2;
@@ -274,7 +274,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
-	if (!acx100_configure_length(priv, &qcfg, ACX100_RID_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ //0x14 + (qcfg.vale * 8))) {
+	if (!acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ //0x14 + (qcfg.vale * 8))) {
 		acxlog(L_BINSTD, "ctlQueueConfigurationWrite returns error\n");
 		goto error;
 	}
@@ -293,13 +293,13 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acx100_create_tx_desc_queue(pDc);
 	acx100_create_rx_desc_queue(pDc);
-	if (!acx100_interrogate(priv, &MemMap, ACX100_RID_MEMORY_MAP)) {
+	if (!acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "Failed to read memory map\n");
 		goto error;
 	}
 
 #if (WLAN_HOSTIF==WLAN_USB)
-	if (!acx100_configure(priv, &MemMap, ACX100_RID_MEMORY_MAP)) {
+	if (!acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD,"Failed to write memory map\n");
 		goto error;
 	}
@@ -307,7 +307,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	MemMap.PoolStart = cpu_to_le32((le32_to_cpu(MemMap.QueueEnd) + 0x1f + 4) & ~0x1f);
 
-	if (!acx100_configure(priv, &MemMap, ACX100_RID_MEMORY_MAP)) {
+	if (!acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapWrite returns error\n");
 		goto error;
 	}
@@ -379,8 +379,8 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	memset(&memconf, 0, sizeof(memconf));
 
 	/* set command (ACXMemoryConfiguration) */
-	memconf.type = cpu_to_le16(0x03); 
-	memconf.length = cpu_to_le16(sizeof(memconf));
+	memconf.rid = cpu_to_le16(ACX1xx_IE_QUEUE_CONFIG); 
+	memconf.len = cpu_to_le16(sizeof(memconf));
 
 	/* hm, I hope this is correct */
 	memconf.no_of_stations = cpu_to_le16(1);
@@ -435,15 +435,15 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 		goto error;
 	}
 
-	/* read out queuconfig */
+	/* read out queueconfig */
 	memset(&queueconf, 0xff, sizeof(queueconf));
 
-	if (!acx100_interrogate(priv, &queueconf, ACX100_RID_MEMORY_CONFIG_OPTIONS /*0x05*/)) {
+	if (!acx100_interrogate(priv, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS /*0x05*/)) {
 		acxlog(L_BINSTD, "read queuehead returns error\n");
 	}
 
 	acxlog(L_BINSTD, "dump queue head:\n");
-	acxlog(L_BINSTD, "length: %d\n", queueconf.length);
+	acxlog(L_BINSTD, "length: %d\n", queueconf.len);
 	acxlog(L_BINSTD, "tx_memory_block_address (from card): %X\n", queueconf.tx_memory_block_address);
 	acxlog(L_BINSTD, "rx_memory_block_address (from card): %X\n", queueconf.rx_memory_block_address);
 
@@ -1931,7 +1931,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	MemoryBlockSize.size = cpu_to_le16(priv->memblocksize);
 
 	/* Then we alert the card to our decision of block size */
-	if (!acx100_configure(priv, &MemoryBlockSize, ACX100_RID_BLOCK_SIZE)) {
+	if (!acx100_configure(priv, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) {
 		acxlog(L_BINSTD, "Ctl: MemoryBlockSizeWrite failed\n");
 		FN_EXIT(1, 0);
 		return 0;
@@ -1956,7 +1956,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 
 
 	/* Declare start of the Rx host pool */
-	MemoryConfigOption.pRxHostDesc = (UINT32)cpu_to_le32(priv->RxHostDescPoolStart);
+	MemoryConfigOption.pRxHostDesc = cpu_to_le32((UINT32)priv->RxHostDescPoolStart);
 	acxlog(L_DEBUG, "pRxHostDesc %08x, RxHostDescPoolStart %p\n", MemoryConfigOption.pRxHostDesc, priv->RxHostDescPoolStart);
 
 	/* 50% of the allotment of memory blocks go to tx descriptors */
@@ -1989,7 +1989,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	acxlog(L_DEBUG, "rx_mem %08x rx_mem %08x\n", MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
-	if (!acx100_configure(priv, &MemoryConfigOption, ACX100_RID_MEMORY_CONFIG_OPTIONS)) {
+	if (!acx100_configure(priv, &MemoryConfigOption, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
 		acxlog(L_DEBUG,"%s: configure memory config options failed!\n", __func__);
 		FN_EXIT(1, 0);
 		return 0;

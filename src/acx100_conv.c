@@ -180,8 +180,8 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 {
 	unsigned short proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
 	UINT16 fc;
-	struct txhostdescriptor *payload;
 	struct txhostdescriptor *header;
+	struct txhostdescriptor *payload;
 	p80211_hdr_t * w_hdr;
 
 	wlan_ethhdr_t *e_hdr; 
@@ -201,10 +201,10 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		return 1;
 	}
 
-	payload = tx_desc->host_desc + 1;
 	header = tx_desc->host_desc;
 	if ((unsigned long)0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
 		return 1;
+	payload = tx_desc->host_desc + 1;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
 	/* step 1: classify ether frame, DIX or 802.3? */

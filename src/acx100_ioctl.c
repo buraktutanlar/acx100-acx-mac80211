@@ -98,7 +98,9 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
 #define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0f
 #define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x12
+#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x13
 
 
 /* channel frequencies
@@ -181,6 +183,14 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
 	name : "DbgSetMasks" },
+{ cmd : ACX100_IOCTL_DBG_GET_IO,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
+	get_args : 0,
+	name : "DbgGetIO" },
+{ cmd : ACX100_IOCTL_DBG_SET_IO,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
+	get_args : 0,
+	name : "DbgSetIO" },
 { cmd : ACX100_IOCTL_ACX111_INFO,
 	set_args : 0,
 	get_args : 0,
@@ -426,7 +436,9 @@ static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_reques
 
 	acxlog(L_IOCTL, "Set Sensitivity <== %d\n", vwrq->value);
 
-	if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
+	if ((RADIO_RFMD_11 == priv->radio_type)
+	|| (RADIO_MAXIM_0D == priv->radio_type)
+	|| (RADIO_RALINK_15 == priv->radio_type)) {
 		priv->sensitivity = (1 == vwrq->disabled) ? 0 : vwrq->value;
 		priv->set_mask |= GETSET_SENSITIVITY;
 		return -EINPROGRESS;
@@ -440,7 +452,9 @@ static inline int acx100_ioctl_get_sens(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
+	if ((RADIO_RFMD_11 == priv->radio_type)
+	|| (RADIO_MAXIM_0D == priv->radio_type)
+	|| (RADIO_RALINK_15 == priv->radio_type)) {
 		acxlog(L_IOCTL, "Get Sensitivity ==> %d\n", priv->sensitivity);
 
 		vwrq->value = priv->sensitivity;
@@ -493,8 +507,10 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
                ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
 
-	/* FIXME: what about Auto mode? */
-	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
+	/* We want to restrict to a specific AP when in Managed or Auto mode
+	 * only, right? */
+	if ((ACX_MODE_2_MANAGED_STA != priv->macmode_wanted)
+	&& (ACX_MODE_FF_AUTO != priv->macmode_wanted)) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -519,6 +535,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 			struct bss_info *bss = &priv->bss_table[i];
 			if (!memcmp(bss->bssid, ap, ETH_ALEN)) {
 				if ((!!priv->wep_enabled) != !!(bss->caps & IEEE802_11_MGMT_CAP_WEP)) {
+					acxlog(L_STD | L_IOCTL, "The WEP setting of the matching AP (%d) differs from our WEP setting --> will NOT restrict association to its BSSID!\n", i);
 					result = -EINVAL;
 					goto end;
                         	} else {
@@ -747,13 +764,14 @@ static inline int acx100_ioctl_get_scan(struct net_device *dev, struct iw_reques
 	/* no scan available if device is not up yet */
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP))
 	{
+		acxlog(L_IOCTL, "iface not up yet\n");
 		result = -EAGAIN;
 		goto end;
 	}
 
 	if (priv->scan_start && time_before(jiffies, priv->scan_start + 3*HZ))
 	{
-		/* scan still in progress, so no results yet, sorry */
+		acxlog(L_IOCTL, "scan still in progress, so no results yet, sorry\n");
 		result = -EAGAIN;
 		goto end;
 	}
@@ -1934,7 +1952,7 @@ static inline int acx100_ioctl_set_short_preamble(struct net_device *dev, struct
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	char *descr = NULL;
 
-	if ((*extra < (char)0) || (*extra > (char)2))
+	if (*extra > (char)2)
 		return -EINVAL;
 
 	priv->preamble_mode = (UINT8)*extra;
@@ -2276,6 +2294,77 @@ static inline int acx100_ioctl_dbg_set_masks(struct net_device *dev, struct iw_r
 	return result;
 }
 
+/* debug helper function to be able to debug I/O things relatively easily */
+static inline int acx100_ioctl_dbg_get_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	int *parms = (int*)extra;
+	int result = -EINVAL;
+
+	/* expected value order: DbgGetIO type address magic */
+
+	if (parms[2] != 0x1234) {
+		acxlog(L_IOCTL, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", parms[2], 0x1234);
+		goto end;
+	}
+	switch(parms[0]) {
+		case 0x0: /* Internal RAM */
+			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
+			break;
+		case 0xffff: /* MAC registers */
+			acxlog(L_IOCTL, "value at register 0x%04x is 0x%08x\n", parms[1], acx100_read_reg32(priv, parms[1]));
+			break;
+		case 0x81: /* PHY RAM table */
+			acxlog(L_IOCTL, "sorry, access to PHY RAM not implemented yet.\n");
+			break;
+		case 0x82: /* PHY registers */
+			acxlog(L_IOCTL, "sorry, access to PHY registers not implemented yet.\n");
+			break;
+		default:
+			acxlog(0xffff, "Invalid I/O type specified, aborting!\n");
+			goto end;
+	}
+	result = 0;
+end:
+	return result;
+}
+
+/* debug helper function to be able to debug I/O things relatively easily */
+static inline int acx100_ioctl_dbg_set_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	int *parms = (int*)extra;
+	int result = -EINVAL;
+
+	/* expected value order: DbgSetIO type address value magic */
+
+	if (parms[3] != 0x1234) {
+		acxlog(0xffff, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", parms[3], 0x1234);
+		goto end;
+	}
+	switch(parms[0]) {
+		case 0x0: /* Internal RAM */
+			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
+			break;
+		case 0xffff: /* MAC registers */
+			acxlog(L_IOCTL, "setting value at register 0x%04x to 0x%08x\n", parms[1], parms[2]);
+			acx100_write_reg32(priv, parms[1], parms[2]);
+			break;
+		case 0x81: /* PHY RAM table */
+			acxlog(L_IOCTL, "sorry, access to PHY RAM not implemented yet.\n");
+			break;
+		case 0x82: /* PHY registers */
+			acxlog(L_IOCTL, "sorry, access to PHY registers not implemented yet.\n");
+			break;
+		default:
+			acxlog(0xffff, "Invalid I/O type specified, aborting!\n");
+			goto end;
+	}
+	result = 0;
+end:
+	return result;
+}
+
 /*----------------------------------------------------------------
 * acx100_ioctl_acx111_info
 *
@@ -2324,42 +2413,42 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	/* get Acx111 Memory Configuration */
 	memset(&memconf, 0x00, sizeof(memconf));
 
-	if (!acx100_interrogate(priv, &memconf, 0x03)) {
+	if (!acx100_interrogate(priv, &memconf, ACX1xx_IE_QUEUE_CONFIG)) {
 		acxlog(L_BINSTD, "read memconf returns error\n");
 	}
 
 	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0x00, sizeof(queueconf));
 
-	if (!acx100_interrogate(priv, &queueconf, 0x05)) {
+	if (!acx100_interrogate(priv, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
 		acxlog(L_BINSTD, "read queuehead returns error\n");
 	}
 
 	/* get Acx111 Memory Map */
 	memset(memmap, 0x00, sizeof(memmap));
 
-	if (!acx100_interrogate(priv, &memmap, 0x08)) {
+	if (!acx100_interrogate(priv, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "read mem map returns error\n");
 	}
 
 	/* get Acx111 Rx Config */
 	memset(rxconfig, 0x00, sizeof(rxconfig));
 
-	if (!acx100_interrogate(priv, &rxconfig, 0x10)) {
+	if (!acx100_interrogate(priv, &rxconfig, ACX1xx_IE_RXCONFIG)) {
 		acxlog(L_BINSTD, "read rxconfig returns error\n");
 	}
 	
 	/* get Acx111 fcs error count */
 	memset(fcserror, 0x00, sizeof(fcserror));
 
-	if (!acx100_interrogate(priv, &fcserror, 0x0e)) {
+	if (!acx100_interrogate(priv, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT)) {
 		acxlog(L_BINSTD, "read fcserror returns error\n");
 	}
 	
 	/* get Acx111 rate fallback */
 	memset(ratefallback, 0x00, sizeof(ratefallback));
 
-	if (!acx100_interrogate(priv, &ratefallback, 0x06)) {
+	if (!acx100_interrogate(priv, &ratefallback, ACX1xx_IE_RATE_FALLBACK)) {
 		acxlog(L_BINSTD, "read ratefallback returns error\n");
 	}
 
@@ -2370,7 +2459,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 
 	/* dump Acx111 Mem Configuration */
 	acxlog(L_STD, "dump mem config:\n");
-	acxlog(L_STD, "data read: %d, struct size: %d\n", memconf.length, sizeof(memconf));
+	acxlog(L_STD, "data read: %d, struct size: %d\n", memconf.len, sizeof(memconf));
 	acxlog(L_STD, "Number of stations: %1X\n", memconf.no_of_stations);
 	acxlog(L_STD, "Memory block size: %1X\n", memconf.memory_block_size);
 	acxlog(L_STD, "tx/rx memory block allocation: %1X\n", memconf.tx_rx_memory_block_allocation);
@@ -2387,7 +2476,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 
 	/* dump Acx111 Queue Configuration */
 	acxlog(L_STD, "dump queue head:\n");
-	acxlog(L_STD, "data read: %d, struct size: %d\n", queueconf.length, sizeof(queueconf));
+	acxlog(L_STD, "data read: %d, struct size: %d\n", queueconf.len, sizeof(queueconf));
 	acxlog(L_STD, "tx_memory_block_address (from card): %X\n", queueconf.tx_memory_block_address);
 	acxlog(L_STD, "rx_memory_block_address (from card): %X\n", queueconf.rx_memory_block_address);
 
@@ -2727,6 +2816,8 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_wlansniff,
 	(iw_handler) acx100_ioctl_unknown11,
 	(iw_handler) acx100_ioctl_dbg_set_masks,
+	(iw_handler) acx100_ioctl_dbg_get_io,
+	(iw_handler) acx100_ioctl_dbg_set_io,
 	(iw_handler) acx100_ioctl_acx111_info
 };
 

@@ -97,7 +97,7 @@ extern int acx100_debug_func_indent;
 	do { \
 		if (debug & L_FUNC) { \
 			int i; \
-			printk("%ld ", jiffies); \
+			printk("%lx ", jiffies); \
 			for (i = 0; i < acx100_debug_func_indent; i++) \
 				printk(" "); \
 			printk("==> %s\n", __func__); \
@@ -110,7 +110,7 @@ extern int acx100_debug_func_indent;
 		if (debug & L_FUNC) { \
 			int i; \
 			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
-			printk("%ld ", jiffies); \
+			printk("%lx ", jiffies); \
 			for (i = 0; i < acx100_debug_func_indent; i++) \
 				printk(" "); \
 			if (p) { \
@@ -165,7 +165,6 @@ extern int acx100_debug_func_indent;
  * Constants                                                                  *
  *============================================================================*/
 
-/*--- Mins & Maxs ------------------------------------------------------------*/
 #define ACX100_CMD_ALLOC_LEN_MIN	((UINT16)4)
 #define ACX100_CMD_ALLOC_LEN_MAX	((UINT16)2400)
 #define ACX100_BAP_DATALEN_MAX		((UINT16)4096)
@@ -196,34 +195,6 @@ extern int acx100_debug_func_indent;
 #define CHIPTYPE_ACX111		2
 
 /*--- Support Constants ------------------------------------------------------*/
-#define ACX100_BAP_PROC				((UINT16)0)
-#define ACX100_BAP_INT				((UINT16)1)
-#define ACX100_PORTTYPE_IBSS			((UINT16)0)
-#define ACX100_PORTTYPE_BSS			((UINT16)1)
-#define ACX100_PORTTYPE_WDS			((UINT16)2)
-#define ACX100_WEPFLAGS_PRIVINVOKED		((UINT16)BIT0)
-#define ACX100_WEPFLAGS_EXCLUDE			((UINT16)BIT1)
-#define ACX100_WEPFLAGS_DISABLE_TXCRYPT		((UINT16)BIT4)
-#define ACX100_WEPFLAGS_DISABLE_RXCRYPT		((UINT16)BIT7)
-#define ACX100_WEPFLAGS_IV_INTERVAL1		((UINT16)0)
-#define ACX100_WEPFLAGS_IV_INTERVAL10		((UINT16)BIT5)
-#define ACX100_WEPFLAGS_IV_INTERVAL50		((UINT16)BIT6)
-#define ACX100_WEPFLAGS_IV_INTERVAL100		((UINT16)(BIT5 | BIT6))
-#define ACX100_ROAMMODE_FWSCAN_FWROAM		((UINT16)1)
-#define ACX100_ROAMMODE_FWSCAN_HOSTROAM		((UINT16)2)
-#define ACX100_ROAMMODE_HOSTSCAN_HOSTROAM	((UINT16)3)
-#define ACX100_PORTSTATUS_DISABLED		((UINT16)1)
-#define ACX100_PORTSTATUS_INITSRCH		((UINT16)2)
-#define ACX100_PORTSTATUS_CONN_IBSS		((UINT16)3)
-#define ACX100_PORTSTATUS_CONN_ESS		((UINT16)4)
-#define ACX100_PORTSTATUS_OOR_ESS		((UINT16)5)
-#define ACX100_PORTSTATUS_CONN_WDS		((UINT16)6)
-#define ACX100_PORTSTATUS_HOSTAP		((UINT16)8)
-#define ACX100_RATEBIT_1			((UINT16)1)
-#define ACX100_RATEBIT_2			((UINT16)2)
-#define ACX100_RATEBIT_5dot5			((UINT16)4)
-#define ACX100_RATEBIT_11			((UINT16)8)
-
 #define ACX_PCI		0
 #define ACX_CARDBUS	1
 
@@ -231,89 +202,12 @@ extern int acx100_debug_func_indent;
 #define RADIO_MAXIM_0D		0x0d
 #define RADIO_RFMD_11		0x11
 #define RADIO_RALINK_15		0x15
-#define RADIO_UNKNOWN_16	0x16	/* used in ACX111 cards */
+#define RADIO_RADIA_16		0x16	/* used in ACX111 cards (WG311v2, WL-121, ...) */
 #define RADIO_UNKNOWN_17	0x17	/* most likely *sometimes* used in ACX111 cards */
 
 /*--- IRQ Constants ----------------------------------------------------------*/
 #define HOST_INT_TIMER			0x40
 #define HOST_INT_SCAN_COMPLETE		0x2000	/* official name */
-
-/*--- MAC Internal memory constants and macros -------------------------------*/
-/* Masks and macros used to manipulate MAC internal memory addresses.  MAC
- * internal memory addresses are 23 bit quantities.  The MAC uses a paged
- * address space where the upper 16 bits are the page number and the lower 7
- * bits are the offset.  There are various Host API elements that require two
- * 16-bit quantities to specify a MAC internal memory address.  Unfortunately,
- * some of the API's use a page/offset format where the offset value is JUST
- * the lower 7 bits and the page is the remaining 16 bits.  Some of the APIs
- * assume that the 23 bit address has been split at the 16th bit.  We refer to
- * these two formats as AUX format and CMD format.  The macros below help
- * handle some of this.
- */
-
-/* Handy constant */
-#define ACX100_ADDR_AUX_OFF_MAX		((UINT16)0x007f)
-
-/* Mask bits for discarding unwanted pieces in a flat address */
-#define ACX100_ADDR_FLAT_AUX_PAGE_MASK	0x007fff80
-#define ACX100_ADDR_FLAT_AUX_OFF_MASK	0x0000007f
-#define ACX100_ADDR_FLAT_CMD_PAGE_MASK	0xffff0000
-#define ACX100_ADDR_FLAT_CMD_OFF_MASK	0x0000ffff
-
-/* Mask bits for discarding unwanted pieces in AUX format 16-bit address parts */
-#define ACX100_ADDR_AUX_PAGE_MASK	0xffff
-#define ACX100_ADDR_AUX_OFF_MASK	0x007f
-
-/* Mask bits for discarding unwanted pieces in CMD format 16-bit address parts */
-#define ACX100_ADDR_CMD_PAGE_MASK	0x007f
-#define ACX100_ADDR_CMD_OFF_MASK	0xffff
-
-/* Make a 32-bit flat address from AUX format 16-bit page and offset */
-#define ACX100_ADDR_AUX_MKFLAT(p,o) \
-	(((UINT32)(((UINT16)(p)) & ACX100_ADDR_AUX_PAGE_MASK)) << 7) \
-	| ((UINT32)(((UINT16)(o)) & ACX100_ADDR_AUX_OFF_MASK))
-
-/* Make a 32-bit flat address from CMD format 16-bit page and offset */
-#define ACX100_ADDR_CMD_MKFLAT(p,o) \
-	(((UINT32)(((UINT16)(p)) & ACX100_ADDR_CMD_PAGE_MASK)) << 16) \
-	| ((UINT32)(((UINT16)(o)) & ACX100_ADDR_CMD_OFF_MASK))
-
-/* Make AUX format offset and page from a 32-bit flat address */
-#define ACX100_ADDR_AUX_MKPAGE(f) \
-	((UINT16)((((UINT32)(f)) & ACX100_ADDR_FLAT_AUX_PAGE_MASK) >> 7))
-#define ACX100_ADDR_AUX_MKOFF(f) \
-	((UINT16)(((UINT32)(f)) & ACX100_ADDR_FLAT_AUX_OFF_MASK))
-
-/* Make CMD format offset and page from a 32-bit flat address */
-#define ACX100_ADDR_CMD_MKPAGE(f) \
-	((UINT16)((((UINT32)(f)) & ACX100_ADDR_FLAT_CMD_PAGE_MASK) >> 16))
-#define ACX100_ADDR_CMD_MKOFF(f) \
-	((UINT16)(((UINT32)(f)) & ACX100_ADDR_FLAT_CMD_OFF_MASK))
-
-/*--- Aux register masks/tests -----------------------------------------------*/
-/* Some of the upper bits of the AUX offset register are used to select address
- * space. */
-#define ACX100_AUX_CTL_EXTDS		0x00
-#define ACX100_AUX_CTL_NV		0x01
-#define ACX100_AUX_CTL_PHY		0x02
-#define ACX100_AUX_CTL_ICSRAM		0x03
-
-/* Make AUX register offset and page values from a flat address */
-#define ACX100_AUX_MKOFF(f, c) \
-		(ACX100_ADDR_AUX_MKOFF(f) | (((UINT16)(c)) << 12))
-#define ACX100_AUX_MKPAGE(f)	ACX100_ADDR_AUX_MKPAGE(f)
-
-/*--- Controller Memory addresses --------------------------------------------*/
-#define HFA3842_PDA_BASE		0x007f0000UL
-#define HFA3841_PDA_BASE		0x003f0000UL
-#define HFA3841_PDA_BOGUS_BASE		0x00390000UL
-
-/*--- Driver Download states  ------------------------------------------------*/
-#define ACX100_DLSTATE_DISABLED			0
-#define ACX100_DLSTATE_RAMENABLED		1
-#define ACX100_DLSTATE_FLASHENABLED		2
-#define ACX100_DLSTATE_FLASHWRITTEN		3
-#define ACX100_DLSTATE_FLASHWRITEPENDING	4
 
 /*--- Register I/O offsets ---------------------------------------------------*/
 
@@ -374,35 +268,36 @@ typedef enum {
 
 /*--- Controller Commands ----------------------------------------------------*/
 /* can be found in table cmdTable in firmware "Rev. 1.5.0" (FW150) */
-#define ACX100_CMD_RESET		0x00
-#define ACX100_CMD_INTERROGATE		0x01
-#define ACX100_CMD_CONFIGURE		0x02
-#define ACX100_CMD_ENABLE_RX		0x03
-#define ACX100_CMD_ENABLE_TX		0x04
-#define ACX100_CMD_DISABLE_RX		0x05
-#define ACX100_CMD_DISABLE_TX		0x06
-#define ACX100_CMD_FLUSH_QUEUE		0x07
-#define ACX100_CMD_SCAN			0x08
-#define ACX100_CMD_STOP_SCAN		0x09
-#define ACX100_CMD_CONFIG_TIM		0x0a
-#define ACX100_CMD_JOIN			0x0b
-#define ACX100_CMD_WEP_MGMT		0x0c
+#define ACX1xx_CMD_RESET		0x00
+#define ACX1xx_CMD_INTERROGATE		0x01
+#define ACX1xx_CMD_CONFIGURE		0x02
+#define ACX1xx_CMD_ENABLE_RX		0x03
+#define ACX1xx_CMD_ENABLE_TX		0x04
+#define ACX1xx_CMD_DISABLE_RX		0x05
+#define ACX1xx_CMD_DISABLE_TX		0x06
+#define ACX1xx_CMD_FLUSH_QUEUE		0x07
+#define ACX1xx_CMD_SCAN			0x08
+#define ACX1xx_CMD_STOP_SCAN		0x09
+#define ACX1xx_CMD_CONFIG_TIM		0x0a
+#define ACX1xx_CMD_JOIN			0x0b
+#define ACX1xx_CMD_WEP_MGMT		0x0c
 #if OLD_FIRMWARE_VERSIONS
 #define ACX100_CMD_HALT			0x0e	/* mapped to unknownCMD in FW150 */
 #else
-#define ACX100_CMD_MEM_READ		0x0d
-#define ACX100_CMD_MEM_WRITE		0x0e
+#define ACX1xx_CMD_MEM_READ		0x0d
+#define ACX1xx_CMD_MEM_WRITE		0x0e
 #endif
-#define ACX100_CMD_SLEEP		0x0f
-#define ACX100_CMD_WAKE			0x10
-#define ACX100_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */
+#define ACX1xx_CMD_SLEEP		0x0f
+#define ACX1xx_CMD_WAKE			0x10
+#define ACX1xx_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */
 #define ACX100_CMD_INIT_MEMORY		0x12
-#define ACX100_CMD_CONFIG_BEACON	0x13
-#define ACX100_CMD_CONFIG_PROBE_RESPONSE	0x14
-#define ACX100_CMD_CONFIG_NULL_DATA	0x15
-#define ACX100_CMD_CONFIG_PROBE_REQUEST	0x16
-#define ACX100_CMD_TEST			0x17
-#define ACX100_CMD_RADIOINIT		0x18
+#define ACX1xx_CMD_CONFIG_BEACON	0x13
+#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x14
+#define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
+#define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x16
+#define ACX1xx_CMD_TEST			0x17
+#define ACX1xx_CMD_RADIOINIT		0x18
+#define ACX111_CMD_RADIOCALIB		0x19
 
 /*--- After Interrupt Commands -----------------------------------------------*/
 #define ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN		0x01
@@ -431,497 +326,92 @@ typedef enum {
  * Record ID Constants                                                        *
  *============================================================================*/
 
-/*--- Configuration RIDs: Network Parameters, Static Configuration Entities --*/
+/*--- Information Elements: Network Parameters, Static Configuration Entities --*/
 /* these are handled by real_cfgtable in firmware "Rev 1.5.0" (FW150) */
-#define ACX100_RID_UNKNOWN_00			0x00	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_ACX_TIMER			0x01
-#define ACX100_RID_POWER_MGMT			0x02
-#define ACX100_RID_QUEUE_CONFIG			0x03
-#define ACX100_RID_BLOCK_SIZE			0x04
-#define ACX100_RID_MEMORY_CONFIG_OPTIONS	0x05
-#define ACX100_RID_RATE_FALLBACK		0x06
-#define ACX100_RID_WEP_OPTIONS			0x07
-#define ACX100_RID_MEMORY_MAP			0x08	/* huh? */
-#define ACX100_RID_SSID				0x08	/* huh? */
-#define ACX100_RID_SCAN_STATUS			0x09	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_ASSOC_ID			0x0a
-#define ACX100_RID_UNKNOWN_0B			0x0b	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_UNKNOWN_0C			0x0c	/* very small implementation in FW150! */
-#define ACX100_RID_FWREV			0x0d
-#define ACX100_RID_FCS_ERROR_COUNT		0x0e
-#define ACX100_RID_MEDIUM_USAGE			0x0f
-#define ACX100_RID_RXCONFIG			0x10
-#define ACX100_RID_UNKNOWN_11			0x11	/* NONBINARY: large implementation in FW150! link quality readings or so? */
-#define ACX100_RID_UNKNOWN_12			0x12	/* NONBINARY: VERY large implementation in FW150!! maybe monitor mode??? :-) */
-#define ACX100_RID_FIRMWARE_STATISTICS		0x13
-#define ACX100_RID_DOT11_STATION_ID		0x1001
-#define ACX100_RID_DOT11_UNKNOWN_1002		0x1002	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_BEACON_PERIOD		0x1003	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_DTIM_PERIOD		0x1004	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_SHORT_RETRY_LIMIT	0x1005
-#define ACX100_RID_DOT11_LONG_RETRY_LIMIT	0x1006
-#define ACX100_RID_DOT11_WEP_KEY		0x1007
-#define ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME	0x1008
-#define ACX100_RID_DOT11_UNKNOWN_1009		0x1009	/* mapped to some very boring binary table in FW150 */
-#define ACX100_RID_DOT11_CURRENT_REG_DOMAIN	0x100a
-#define ACX100_RID_DOT11_CURRENT_ANTENNA	0x100b
-#define ACX100_RID_DOT11_UNKNOWN_100C		0x100c	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_TX_POWER_LEVEL		0x100d
-#define ACX100_RID_DOT11_CURRENT_CCA_MODE	0x100e
-#define ACX100_RID_DOT11_ED_THRESHOLD		0x100f
-#define ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET	0x1010
-#define ACX100_RID_DOT11_UNKNOWN_1011		0x1011	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_UNKNOWN_1012		0x1012	/* mapped to cfgInvalid in FW150 */
-#define ACX100_RID_DOT11_UNKNOWN_1013		0x1013	/* mapped to cfgInvalid in FW150 */
+#define ACX1xx_IE_UNKNOWN_00			0x0000	/* mapped to cfgInvalid in FW150 */
+#define ACX100_IE_ACX_TIMER			0x0001
+#define ACX1xx_IE_POWER_MGMT			0x0002
+#define ACX1xx_IE_QUEUE_CONFIG			0x0003
+#define ACX100_IE_BLOCK_SIZE			0x0004
+#define ACX1xx_IE_MEMORY_CONFIG_OPTIONS		0x0005
+#define ACX1xx_IE_RATE_FALLBACK			0x0006
+#define ACX100_IE_WEP_OPTIONS			0x0007
+#define ACX111_IE_RADIO_BAND			0x0007
+#define ACX1xx_IE_MEMORY_MAP			0x0008	/* huh? */
+#define ACX100_IE_SSID				0x0008	/* huh? */
+#define ACX1xx_IE_SCAN_STATUS			0x0009	/* mapped to cfgInvalid in FW150 */
+#define ACX1xx_IE_ASSOC_ID			0x000a
+#define ACX1xx_IE_UNKNOWN_0B			0x000b	/* mapped to cfgInvalid in FW150 */
+#define ACX100_IE_UNKNOWN_0C			0x000c	/* very small implementation in FW150! */
+#define ACX111_IE_CONFIG_OPTIONS		0x000c
+#define ACX1xx_IE_FWREV				0x000d
+#define ACX1xx_IE_FCS_ERROR_COUNT		0x000e
+#define ACX1xx_IE_MEDIUM_USAGE			0x000f
+#define ACX1xx_IE_RXCONFIG			0x0010
+#define ACX100_IE_UNKNOWN_11			0x0011	/* NONBINARY: large implementation in FW150! link quality readings or so? */
+#define ACX111_IE_QUEUE_THRESH			0x0011
+#define ACX100_IE_UNKNOWN_12			0x0012	/* NONBINARY: VERY large implementation in FW150!! */
+#define ACX111_IE_BSS_POWER_SAVE		0x0012
+#define ACX1xx_IE_FIRMWARE_STATISTICS		0x0013
+#define ACX1xx_IE_DOT11_STATION_ID		0x1001
+#define ACX100_IE_DOT11_UNKNOWN_1002		0x1002	/* mapped to cfgInvalid in FW150 */
+#define ACX111_IE_DOT11_FRAG_THRESH		0x1002	/* mapped to cfgInvalid in FW150 */
+#define ACX100_IE_DOT11_BEACON_PERIOD		0x1003	/* mapped to cfgInvalid in FW150 */
+#define ACX1xx_IE_DOT11_DTIM_PERIOD		0x1004	/* mapped to cfgInvalid in FW150 */
+#define ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT	0x1005
+#define ACX1xx_IE_DOT11_LONG_RETRY_LIMIT	0x1006
+#define ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	0x1007 /* configure default keys */
+#define ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	0x1008
+#define ACX1xx_IE_DOT11_UNKNOWN_1009		0x1009	/* mapped to some very boring binary table in FW150 */
+#define ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN	0x100a
+#define ACX1xx_IE_DOT11_CURRENT_ANTENNA		0x100b
+#define ACX1xx_IE_DOT11_UNKNOWN_100C		0x100c	/* mapped to cfgInvalid in FW150 */
+#define ACX1xx_IE_DOT11_TX_POWER_LEVEL		0x100d
+#define ACX1xx_IE_DOT11_CURRENT_CCA_MODE	0x100e
+#define ACX1xx_IE_DOT11_ED_THRESHOLD		0x100f
+#define ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	0x1010	/* set default key ID */
+#define ACX100_IE_DOT11_UNKNOWN_1011		0x1011	/* mapped to cfgInvalid in FW150 */
+#define ACX100_IE_DOT11_UNKNOWN_1012		0x1012	/* mapped to cfgInvalid in FW150 */
+#define ACX100_IE_DOT11_UNKNOWN_1013		0x1013	/* mapped to cfgInvalid in FW150 */
 
 /*--- Configuration RID Lengths: Network Params, Static Config Entities -----*/
 /* This is the length of JUST the DATA part of the RID (does not include the
  * len or code fields) */
 
 /* TODO: fill in the rest of these */
-#define ACX100_RID_ACX_TIMER_LEN			0x10
-#define ACX100_RID_POWER_MGMT_LEN			0x06
-#define ACX100_RID_QUEUE_CONFIG_LEN			0x1c
-#define ACX100_RID_BLOCK_SIZE_LEN			0x02
-#define ACX100_RID_MEMORY_CONFIG_OPTIONS_LEN		0x14
-#define ACX100_RID_RATE_FALLBACK_LEN			0x01
-#define ACX100_RID_WEP_OPTIONS_LEN			0x03
-#define ACX100_RID_MEMORY_MAP_LEN			0x28
-#define ACX100_RID_SSID_LEN				0x20
-#define ACX100_RID_ASSOC_ID_LEN				0x02
-#define ACX100_RID_FWREV_LEN				0x18
-#define ACX100_RID_FCS_ERROR_COUNT_LEN			0x04
-#define ACX100_RID_MEDIUM_USAGE_LEN			0x08
-#define ACX100_RID_RXCONFIG_LEN				0x04
-#define ACX100_RID_FIRMWARE_STATISTICS_LEN		0x9c
-#define ACX100_RID_DOT11_STATION_ID_LEN			0x06
-#define ACX100_RID_DOT11_BEACON_PERIOD_LEN		0x02
-#define ACX100_RID_DOT11_DTIM_PERIOD_LEN		0x01
-#define ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN		0x01
-#define ACX100_RID_DOT11_LONG_RETRY_LIMIT_LEN		0x01
-#define ACX100_RID_DOT11_WEP_KEY_LEN			0x09
-#define ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN		0x20
-#define ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN	0x04
-#define ACX100_RID_DOT11_CURRENT_REG_DOMAIN_LEN		0x02
+#define ACX100_IE_ACX_TIMER_LEN				0x10
+#define ACX1xx_IE_POWER_MGMT_LEN			0x06
+#define ACX1xx_IE_QUEUE_CONFIG_LEN			0x1c
+#define ACX100_IE_BLOCK_SIZE_LEN			0x02
+#define ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN		0x14
+#define ACX1xx_IE_RATE_FALLBACK_LEN			0x01
+#define ACX100_IE_WEP_OPTIONS_LEN			0x03
+#define ACX1xx_IE_MEMORY_MAP_LEN			0x28
+#define ACX100_IE_SSID_LEN				0x20
+#define ACX1xx_IE_SCAN_STATUS_LEN			0x04
+#define ACX1xx_IE_ASSOC_ID_LEN				0x02
+#define ACX1xx_IE_FWREV_LEN				0x18
+#define ACX1xx_IE_FCS_ERROR_COUNT_LEN			0x04
+#define ACX1xx_IE_MEDIUM_USAGE_LEN			0x08
+#define ACX1xx_IE_RXCONFIG_LEN				0x04
+#define ACX1xx_IE_FIRMWARE_STATISTICS_LEN		0x9c
+#define ACX1xx_IE_DOT11_STATION_ID_LEN			0x06
+#define ACX100_IE_DOT11_BEACON_PERIOD_LEN		0x02
+#define ACX1xx_IE_DOT11_DTIM_PERIOD_LEN			0x01
+#define ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN		0x01
+#define ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN		0x01
+#define ACX100_IE_DOT11_WEP_DEFAULT_KEY_LEN		0x20
+#define ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN	0x04
+#define ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN		0x02
 #if (WLAN_HOSTIF==WLAN_USB)
-#define ACX100_RID_DOT11_CURRENT_ANTENNA_LEN		0x02
+#define ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN		0x02
 #else
-#define ACX100_RID_DOT11_CURRENT_ANTENNA_LEN		0x01
+#define ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN		0x01
 #endif
-#define ACX100_RID_DOT11_TX_POWER_LEVEL_LEN		0x01
-#define ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN		0x01
-#define ACX100_RID_DOT11_ED_THRESHOLD_LEN		0x04
-#define ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET_LEN	0x01
-#define ACX100_RID_SCAN_STATUS_LEN			0x04
-
-/*--- Configuration RIDs: Network Parameters, Dynamic Configuration Entities -*/
-#define ACX100_RID_GROUPADDR		((UINT16)0xFC80)
-#define ACX100_RID_CREATEIBSS		((UINT16)0xFC81)
-#define ACX100_RID_FRAGTHRESH		((UINT16)0xFC82)
-#define ACX100_RID_RTSTHRESH		((UINT16)0xFC83)
-#define ACX100_RID_TXRATECNTL		((UINT16)0xFC84)
-#define ACX100_RID_PROMISCMODE		((UINT16)0xFC85)
-#define ACX100_RID_FRAGTHRESH0		((UINT16)0xFC90)
-#define ACX100_RID_FRAGTHRESH1		((UINT16)0xFC91)
-#define ACX100_RID_FRAGTHRESH2		((UINT16)0xFC92)
-#define ACX100_RID_FRAGTHRESH3		((UINT16)0xFC93)
-#define ACX100_RID_FRAGTHRESH4		((UINT16)0xFC94)
-#define ACX100_RID_FRAGTHRESH5		((UINT16)0xFC95)
-#define ACX100_RID_FRAGTHRESH6		((UINT16)0xFC96)
-#define ACX100_RID_RTSTHRESH0		((UINT16)0xFC97)
-#define ACX100_RID_RTSTHRESH1		((UINT16)0xFC98)
-#define ACX100_RID_RTSTHRESH2		((UINT16)0xFC99)
-#define ACX100_RID_RTSTHRESH3		((UINT16)0xFC9A)
-#define ACX100_RID_RTSTHRESH4		((UINT16)0xFC9B)
-#define ACX100_RID_RTSTHRESH5		((UINT16)0xFC9C)
-#define ACX100_RID_RTSTHRESH6		((UINT16)0xFC9D)
-#define ACX100_RID_TXRATECNTL0		((UINT16)0xFC9E)
-#define ACX100_RID_TXRATECNTL1		((UINT16)0xFC9F)
-#define ACX100_RID_TXRATECNTL2		((UINT16)0xFCA0)
-#define ACX100_RID_TXRATECNTL3		((UINT16)0xFCA1)
-#define ACX100_RID_TXRATECNTL4		((UINT16)0xFCA2)
-#define ACX100_RID_TXRATECNTL5		((UINT16)0xFCA3)
-#define ACX100_RID_TXRATECNTL6		((UINT16)0xFCA4)
-
-/*--- Configuration RID Lengths: Network Params, Dynamic Config Entities -----*/
-/* This is the length of JUST the DATA part of the RID (does not include the
- * len or code fields) */
-
-/* TODO: fill in the rest of these */
-#define ACX100_RID_GROUPADDR_LEN	((UINT16)16 * ETH_ALEN)
-#define ACX100_RID_CREATEIBSS_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL_LEN	((UINT16)4)
-#define ACX100_RID_PROMISCMODE_LEN	((UINT16)2)
-#define ACX100_RID_FRAGTHRESH0_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH1_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH2_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH3_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH4_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH5_LEN	((UINT16)0)
-#define ACX100_RID_FRAGTHRESH6_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH0_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH1_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH2_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH3_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH4_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH5_LEN	((UINT16)0)
-#define ACX100_RID_RTSTHRESH6_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL0_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL1_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL2_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL3_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL4_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL5_LEN	((UINT16)0)
-#define ACX100_RID_TXRATECNTL6_LEN	((UINT16)0)
-
-/*--- Configuration RIDs: Behavior Parameters --------------------------------*/
-#define ACX100_RID_ITICKTIME		((UINT16)0xFCE0)
-
-/*--- Configuration RID Lengths: Behavior Parameters -------------------------*/
-/* This is the length of JUST the DATA part of the RID (does not include the
- * len or code fields) */
-#define ACX100_RID_ITICKTIME_LEN	((UINT16)2)
-
-/*--- Information RIDs: NIC Information --------------------------------------*/
-#define ACX100_RID_MAXLOADTIME		((UINT16)0xFD00)
-#define ACX100_RID_DOWNLOADBUFFER	((UINT16)0xFD01)
-#define ACX100_RID_PRIIDENTITY		((UINT16)0xFD02)
-#define ACX100_RID_PRISUPRANGE		((UINT16)0xFD03)
-#define ACX100_RID_PRI_CFIACTRANGES	((UINT16)0xFD04)
-#define ACX100_RID_NICSERIALNUMBER	((UINT16)0xFD0A)
-#define ACX100_RID_NICIDENTITY		((UINT16)0xFD0B)
-#define ACX100_RID_MFISUPRANGE		((UINT16)0xFD0C)
-#define ACX100_RID_CFISUPRANGE		((UINT16)0xFD0D)
-#define ACX100_RID_CHANNELLIST		((UINT16)0xFD10)
-#define ACX100_RID_REGULATORYDOMAINS	((UINT16)0xFD11)
-#define ACX100_RID_TEMPTYPE		((UINT16)0xFD12)
-#define ACX100_RID_CIS			((UINT16)0xFD13)
-#define ACX100_RID_STAIDENTITY		((UINT16)0xFD20)
-#define ACX100_RID_STASUPRANGE		((UINT16)0xFD21)
-#define ACX100_RID_STA_MFIACTRANGES	((UINT16)0xFD22)
-#define ACX100_RID_STA_CFIACTRANGES	((UINT16)0xFD23)
-#define ACX100_RID_BUILDSEQ		((UINT16)0xFFFE)
-#define ACX100_RID_FWID			((UINT16)0xFFFF)
-
-/*--- Information RID Lengths: NIC Information -------------------------------*/
-/* This is the length of JUST the DATA part of the RID (does not include the
- * len or code fields) */
-#define ACX100_RID_MAXLOADTIME_LEN	((UINT16)0)
-#define ACX100_RID_DOWNLOADBUFFER_LEN	((UINT16)sizeof(acx100_downloadbuffer_t))
-#define ACX100_RID_PRIIDENTITY_LEN	((UINT16)8)
-#define ACX100_RID_PRISUPRANGE_LEN	((UINT16)10)
-#define ACX100_RID_CFIACTRANGES_LEN	((UINT16)10)
-#define ACX100_RID_NICSERIALNUMBER_LEN	((UINT16)12)
-#define ACX100_RID_NICIDENTITY_LEN	((UINT16)8)
-#define ACX100_RID_MFISUPRANGE_LEN	((UINT16)10)
-#define ACX100_RID_CFISUPRANGE_LEN	((UINT16)10)
-#define ACX100_RID_CHANNELLIST_LEN	((UINT16)0)
-#define ACX100_RID_REGULATORYDOMAINS_LEN	((UINT16)12)
-#define ACX100_RID_TEMPTYPE_LEN		((UINT16)0)
-#define ACX100_RID_CIS_LEN		((UINT16)480)
-#define ACX100_RID_STAIDENTITY_LEN	((UINT16)8)
-#define ACX100_RID_STASUPRANGE_LEN	((UINT16)10)
-#define ACX100_RID_MFIACTRANGES_LEN	((UINT16)10)
-#define ACX100_RID_CFIACTRANGES2_LEN	((UINT16)10)
-#define ACX100_RID_BUILDSEQ_LEN		((UINT16)sizeof(acx100_BuildSeq_t))
-#define ACX100_RID_FWID_LEN		((UINT16)sizeof(acx100_FWID_t))
-
-/*--- Information RIDs: MAC Information --------------------------------------*/
-#define ACX100_RID_PORTSTATUS		((UINT16)0xFD40)
-#define ACX100_RID_CURRENTSSID		((UINT16)0xFD41)
-#define ACX100_RID_CURRENTBSSID		((UINT16)0xFD42)
-#define ACX100_RID_COMMSQUALITY		((UINT16)0xFD43)
-#define ACX100_RID_CURRENTTXRATE	((UINT16)0xFD44)
-#define ACX100_RID_CURRENTBCNINT	((UINT16)0xFD45)
-#define ACX100_RID_CURRENTSCALETHRESH	((UINT16)0xFD46)
-#define ACX100_RID_PROTOCOLRSPTIME	((UINT16)0xFD47)
-#define ACX100_RID_SHORTRETRYLIMIT	((UINT16)0xFD48)
-#define ACX100_RID_LONGRETRYLIMIT	((UINT16)0xFD49)
-#define ACX100_RID_MAXTXLIFETIME	((UINT16)0xFD4A)
-#define ACX100_RID_MAXRXLIFETIME	((UINT16)0xFD4B)
-#define ACX100_RID_CFPOLLABLE		((UINT16)0xFD4C)
-#define ACX100_RID_AUTHALGORITHMS	((UINT16)0xFD4D)
-#define ACX100_RID_PRIVACYOPTIMP	((UINT16)0xFD4F)
-#define ACX100_RID_DBMCOMMSQUALITY	((UINT16)0xFD51)
-#define ACX100_RID_CURRENTTXRATE1	((UINT16)0xFD80)
-#define ACX100_RID_CURRENTTXRATE2	((UINT16)0xFD81)
-#define ACX100_RID_CURRENTTXRATE3	((UINT16)0xFD82)
-#define ACX100_RID_CURRENTTXRATE4	((UINT16)0xFD83)
-#define ACX100_RID_CURRENTTXRATE5	((UINT16)0xFD84)
-#define ACX100_RID_CURRENTTXRATE6	((UINT16)0xFD85)
-#define ACX100_RID_OWNMACADDRESS	((UINT16)0xFD86)
-/* #define ACX100_RID_PCFINFO		((UINT16)0xFD87) */
-#define ACX100_RID_SCANRESULTS       	((UINT16)0xFD88)	/* NEW */
-#define ACX100_RID_HOSTSCANRESULTS   	((UINT16)0xFD89)	/* NEW */
-#define ACX100_RID_AUTHENTICATIONUSED	((UINT16)0xFD8A)	/* NEW */
-
-/*--- Information RID Lengths: MAC Information -------------------------------*/
-/* This is the length of JUST the DATA part of the RID (does not include the
- * len or code fields) */
-#define ACX100_RID_PORTSTATUS_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTSSID_LEN		((UINT16)34)
-#define ACX100_RID_CURRENTBSSID_LEN		((UINT16)ETH_ALEN)
-#define ACX100_RID_COMMSQUALITY_LEN		((UINT16)sizeof(acx100_commsquality_t))
-#define ACX100_RID_DBMCOMMSQUALITY_LEN		((UINT16)sizeof(acx100_dbmcommsquality_t))
-#define ACX100_RID_CURRENTTXRATE_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTBCNINT_LEN		((UINT16)0)
-#define ACX100_RID_STACURSCALETHRESH_LEN	((UINT16)12)
-#define ACX100_RID_APCURSCALETHRESH_LEN		((UINT16)6)
-#define ACX100_RID_PROTOCOLRSPTIME_LEN		((UINT16)0)
-#define ACX100_RID_SHORTRETRYLIMIT_LEN		((UINT16)0)
-#define ACX100_RID_LONGRETRYLIMIT_LEN		((UINT16)0)
-#define ACX100_RID_MAXTXLIFETIME_LEN		((UINT16)0)
-#define ACX100_RID_MAXRXLIFETIME_LEN		((UINT16)0)
-#define ACX100_RID_CFPOLLABLE_LEN		((UINT16)0)
-#define ACX100_RID_AUTHALGORITHMS_LEN		((UINT16)4)
-#define ACX100_RID_PRIVACYOPTIMP_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE1_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE2_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE3_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE4_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE5_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTTXRATE6_LEN		((UINT16)0)
-#define ACX100_RID_OWNMACADDRESS_LEN		((UINT16)6)
-#define ACX100_RID_PCFINFO_LEN			((UINT16)6)
-#define ACX100_RID_CNFAPPCFINFO_LEN		((UINT16)sizeof(acx100_PCFInfo_data_t))
-#define ACX100_RID_SCANREQUEST_LEN		((UINT16)sizeof(acx100_ScanRequest_data_t))
-#define ACX100_RID_JOINREQUEST_LEN		((UINT16)sizeof(acx100_JoinRequest_data_t))
-#define ACX100_RID_AUTHENTICATESTA_LEN		((UINT16)sizeof(acx100_authenticateStation_data_t))
-#define ACX100_RID_CHANNELINFOREQUEST_LEN	((UINT16)sizeof(acx100_ChannelInfoRequest_data_t))
-
-/*--- Information RIDs: Modem Information ------------------------------------*/
-#define ACX100_RID_PHYTYPE		((UINT16)0xFDC0)
-#define ACX100_RID_CURRENTCHANNEL	((UINT16)0xFDC1)
-#define ACX100_RID_CURRENTPOWERSTATE	((UINT16)0xFDC2)
-#define ACX100_RID_CCAMODE		((UINT16)0xFDC3)
-#define ACX100_RID_SUPPORTEDDATARATES	((UINT16)0xFDC6)
-
-/*--- Information RID Lengths: Modem Information -----------------------------*/
-/* This is the length of JUST the DATA part of the RID (does not include the
- * len or code fields) */
-#define ACX100_RID_PHYTYPE_LEN			((UINT16)0)
-#define ACX100_RID_CURRENTCHANNEL_LEN		((UINT16)0)
-#define ACX100_RID_CURRENTPOWERSTATE_LEN	((UINT16)0)
-#define ACX100_RID_CCAMODE_LEN			((UINT16)0)
-#define ACX100_RID_SUPPORTEDDATARATES_LEN	((UINT16)10)
-
-/*--- API Enhancements (not yet implemented) ---------------------------------*/
-#define ACX100_RID_CNFWEPDEFAULTKEYID	((UINT16)0xFC23)
-#define ACX100_RID_CNFWEPDEFAULTKEY0	((UINT16)0xFC24)
-#define ACX100_RID_CNFWEPDEFAULTKEY1	((UINT16)0xFC25)
-#define ACX100_RID_CNFWEPDEFAULTKEY2	((UINT16)0xFC26)
-#define ACX100_RID_CNFWEPDEFAULTKEY3	((UINT16)0xFC27)
-#define ACX100_RID_CNFWEPFLAGS		((UINT16)0xFC28)
-#define ACX100_RID_CNFWEPKEYMAPTABLE	((UINT16)0xFC29)
-#define ACX100_RID_CNFAUTHENTICATION	((UINT16)0xFC2A)
-#define ACX100_RID_CNFMAXASSOCSTATIONS	((UINT16)0xFC2B)
-#define ACX100_RID_CNFTXCONTROL		((UINT16)0xFC2C)
-#define ACX100_RID_CNFROAMINGMODE	((UINT16)0xFC2D)
-#define ACX100_RID_CNFHOSTAUTH		((UINT16)0xFC2E)
-#define ACX100_RID_CNFRCVCRCERROR	((UINT16)0xFC30)
-/* #define ACX100_RID_CNFMMLIFE		((UINT16)0xFC31) */
-#define ACX100_RID_CNFALTRETRYCNT	((UINT16)0xFC32)
-#define ACX100_RID_CNFAPBCNINT		((UINT16)0xFC33)
-#define ACX100_RID_CNFAPPCFINFO		((UINT16)0xFC34)
-#define ACX100_RID_CNFSTAPCFINFO	((UINT16)0xFC35)
-#define ACX100_RID_CNFPRIORITYQUSAGE	((UINT16)0xFC37)
-#define ACX100_RID_CNFTIMCTRL		((UINT16)0xFC40)
-#define ACX100_RID_CNFTHIRTY2TALLY	((UINT16)0xFC42)
-#define ACX100_RID_CNFENHSECURITY	((UINT16)0xFC43)
-#define ACX100_RID_CNFDBMADJUST  	((UINT16)0xFC46)	/* NEW */
-#define ACX100_RID_CNFSHORTPREAMBLE	((UINT16)0xFCB0)
-#define ACX100_RID_CNFEXCLONGPREAMBLE	((UINT16)0xFCB1)
-#define ACX100_RID_CNFAUTHRSPTIMEOUT	((UINT16)0xFCB2)
-#define ACX100_RID_CNFBASICRATES	((UINT16)0xFCB3)
-#define ACX100_RID_CNFSUPPRATES		((UINT16)0xFCB4)
-#define ACX100_RID_CNFFALLBACKCTRL	((UINT16)0xFCB5)	/* NEW */
-#define ACX100_RID_WEPKEYDISABLE  	((UINT16)0xFCB6)	/* NEW */
-#define ACX100_RID_WEPKEYMAPINDEX 	((UINT16)0xFCB7)	/* NEW AP */
-#define ACX100_RID_BROADCASTKEYID 	((UINT16)0xFCB8)	/* NEW AP */
-#define ACX100_RID_ENTSECFLAGEYID 	((UINT16)0xFCB9)	/* NEW AP */
-#define ACX100_RID_CNFPASSIVESCANCTRL	((UINT16)0xFCBA)	/* NEW STA */
-#define ACX100_RID_SCANREQUEST		((UINT16)0xFCE1)
-#define ACX100_RID_JOINREQUEST		((UINT16)0xFCE2)
-#define ACX100_RID_AUTHENTICATESTA	((UINT16)0xFCE3)
-#define ACX100_RID_CHANNELINFOREQUEST	((UINT16)0xFCE4)
-#define ACX100_RID_HOSTSCAN          	((UINT16)0xFCE5)	/* NEW STA */
-
-#define ACX100_RID_CNFWEPDEFAULTKEY_LEN		((UINT16)6)
-#define ACX100_RID_CNFWEP128DEFAULTKEY_LEN	((UINT16)14)
-#define ACX100_RID_CNFPRIOQUSAGE_LEN		((UINT16)4)
-
-/*============================================================================*
- * PD Record codes                                                            *
- *============================================================================*/
-
-#define ACX100_PDR_PCB_PARTNUM			((UINT16)0x0001)
-#define ACX100_PDR_PDAVER			((UINT16)0x0002)
-#define ACX100_PDR_NIC_SERIAL			((UINT16)0x0003)
-#define ACX100_PDR_MKK_MEASUREMENTS		((UINT16)0x0004)
-#define ACX100_PDR_NIC_RAMSIZE			((UINT16)0x0005)
-#define ACX100_PDR_MFISUPRANGE			((UINT16)0x0006)
-#define ACX100_PDR_CFISUPRANGE			((UINT16)0x0007)
-#define ACX100_PDR_NICID			((UINT16)0x0008)
-#define ACX100_PDR_REFDAC_MEASUREMENTS		((UINT16)0x0010)
-#define ACX100_PDR_VGDAC_MEASUREMENTS		((UINT16)0x0020)
-#define ACX100_PDR_LEVEL_COMP_MEASUREMENTS	((UINT16)0x0030)
-#define ACX100_PDR_MODEM_TRIMDAC_MEASUREMENTS	((UINT16)0x0040)
-#define ACX100_PDR_COREGA_HACK			((UINT16)0x00ff)
-#define ACX100_PDR_MAC_ADDRESS			((UINT16)0x0101)
-#define ACX100_PDR_MKK_CALLNAME			((UINT16)0x0102)
-#define ACX100_PDR_REGDOMAIN			((UINT16)0x0103)
-#define ACX100_PDR_ALLOWED_CHANNEL		((UINT16)0x0104)
-#define ACX100_PDR_DEFAULT_CHANNEL		((UINT16)0x0105)
-#define ACX100_PDR_PRIVACY_OPTION		((UINT16)0x0106)
-#define ACX100_PDR_TEMPTYPE			((UINT16)0x0107)
-#define ACX100_PDR_REFDAC_SETUP			((UINT16)0x0110)
-#define ACX100_PDR_VGDAC_SETUP			((UINT16)0x0120)
-#define ACX100_PDR_LEVEL_COMP_SETUP		((UINT16)0x0130)
-#define ACX100_PDR_TRIMDAC_SETUP		((UINT16)0x0140)
-#define ACX100_PDR_IFR_SETTING			((UINT16)0x0200)
-#define ACX100_PDR_RFR_SETTING			((UINT16)0x0201)
-#define ACX100_PDR_HFA3861_BASELINE		((UINT16)0x0202)
-#define ACX100_PDR_HFA3861_SHADOW		((UINT16)0x0203)
-#define ACX100_PDR_HFA3861_IFRF			((UINT16)0x0204)
-#define ACX100_PDR_HFA3861_CHCALSP		((UINT16)0x0300)
-#define ACX100_PDR_HFA3861_CHCALI		((UINT16)0x0301)
-#define ACX100_PDR_3842_NIC_CONFIG		((UINT16)0x0400)
-#define ACX100_PDR_USB_ID			((UINT16)0x0401)
-#define ACX100_PDR_PCI_ID			((UINT16)0x0402)
-#define ACX100_PDR_PCI_IFCONF			((UINT16)0x0403)
-#define ACX100_PDR_PCI_PMCONF			((UINT16)0x0404)
-#define ACX100_PDR_RFENRGY			((UINT16)0x0406)
-#define ACX100_PDR_UNKNOWN407			((UINT16)0x0407)
-#define ACX100_PDR_UNKNOWN408			((UINT16)0x0408)
-#define ACX100_PDR_UNKNOWN409			((UINT16)0x0409)
-#define ACX100_PDR_HFA3861_MANF_TESTSP		((UINT16)0x0900)
-#define ACX100_PDR_HFA3861_MANF_TESTI		((UINT16)0x0901)
-#define ACX100_PDR_END_OF_PDA			((UINT16)0x0000)
-
-/*============================================================================*
- * Macros                                                                     *
- *============================================================================*/
-
-/*--- Register ID macros -----------------------------------------------------*/
-#define ACX100_CMD		ACX100_CMD_OFF
-#define ACX100_PARAM0		ACX100_PARAM0_OFF
-#define ACX100_PARAM1		ACX100_PARAM1_OFF
-#define ACX100_PARAM2		ACX100_PARAM2_OFF
-#define ACX100_RESP0		ACX100_RESP0_OFF
-#define ACX100_RESP1		ACX100_RESP1_OFF
-#define ACX100_RESP2		ACX100_RESP2_OFF
-#define ACX100_INFOFID		ACX100_INFOFID_OFF
-#define ACX100_RXFID		ACX100_RXFID_OFF
-#define ACX100_ALLOCFID		ACX100_ALLOCFID_OFF
-#define ACX100_TXCOMPLFID	ACX100_TXCOMPLFID_OFF
-#define ACX100_SELECT0		ACX100_SELECT0_OFF
-#define ACX100_OFFSET0		ACX100_OFFSET0_OFF
-#define ACX100_DATA0		ACX100_DATA0_OFF
-#define ACX100_SELECT1		ACX100_SELECT1_OFF
-#define ACX100_OFFSET1		ACX100_OFFSET1_OFF
-#define ACX100_DATA1		ACX100_DATA1_OFF
-#define ACX100_EVSTAT		ACX100_EVSTAT_OFF
-#define ACX100_INTEN		ACX100_INTEN_OFF
-#define ACX100_EVACK		ACX100_EVACK_OFF
-#define ACX100_CONTROL		ACX100_CONTROL_OFF
-#define ACX100_SWSUPPORT0	ACX100_SWSUPPORT0_OFF
-#define ACX100_SWSUPPORT1	ACX100_SWSUPPORT1_OFF
-#define ACX100_SWSUPPORT2	ACX100_SWSUPPORT2_OFF
-#define ACX100_AUXPAGE		ACX100_AUXPAGE_OFF
-#define ACX100_AUXOFFSET	ACX100_AUXOFFSET_OFF
-#define ACX100_AUXDATA		ACX100_AUXDATA_OFF
-#define ACX100_PCICOR		ACX100_PCICOR_OFF
-
-
-/*--- Register Test/Get/Set Field macros -------------------------------------*/
-#define ACX100_CMD_ISBUSY(value)	((UINT16)((UINT16)(value) & ACX100_CMD_BUSY))
-#define ACX100_CMD_AINFO_GET(value)	((UINT16)(((UINT16)(value) & ACX100_CMD_AINFO) >> 8))
-#define ACX100_CMD_AINFO_SET(value)	((UINT16)((UINT16)(value) << 8))
-#define ACX100_CMD_MACPORT_GET(value)	((UINT16)(ACX100_CMD_AINFO_GET((UINT16)(value) & ACX100_CMD_MACPORT)))
-#define ACX100_CMD_MACPORT_SET(value)	((UINT16)ACX100_CMD_AINFO_SET(value))
-#define ACX100_CMD_ISRECL(value)	((UINT16)(ACX100_CMD_AINFO_GET((UINT16)(value) & ACX100_CMD_RECL)))
-#define ACX100_CMD_RECL_SET(value)	((UINT16)ACX100_CMD_AINFO_SET(value))
-#define ACX100_CMD_QOS_GET(value)	((UINT16)(((UINT16)(value) & 0x3000) >> 12))
-#define ACX100_CMD_QOS_SET(value)	((UINT16)((((UINT16)(value)) << 12) & 0x3000))
-#define ACX100_CMD_ISWRITE(value)	((UINT16)(ACX100_CMD_AINFO_GET((UINT16)(value) & ACX100_CMD_WRITE)))
-#define ACX100_CMD_WRITE_SET(value)	((UINT16)ACX100_CMD_AINFO_SET((UINT16)value))
-#define ACX100_CMD_PROGMODE_GET(value)	((UINT16)(ACX100_CMD_AINFO_GET((UINT16)(value) & ACX100_CMD_PROGMODE)))
-#define ACX100_CMD_PROGMODE_SET(value)	((UINT16)ACX100_CMD_AINFO_SET((UINT16)value))
-#define ACX100_CMD_CMDCODE_GET(value)	((UINT16)(((UINT16)(value)) & ACX100_CMD_CMDCODE))
-#define ACX100_CMD_CMDCODE_SET(value)	((UINT16)(value))
-
-#define ACX100_STATUS_RESULT_GET(value)	((UINT16)((((UINT16)(value)) & ACX100_STATUS_RESULT) >> 8))
-#define ACX100_STATUS_RESULT_SET(value)	(((UINT16)(value)) << 8)
-#define ACX100_STATUS_CMDCODE_GET(value)	(((UINT16)(value)) & ACX100_STATUS_CMDCODE)
-#define ACX100_STATUS_CMDCODE_SET(value)	((UINT16)(value))
-
-#define ACX100_OFFSET_ISBUSY(value)	((UINT16)(((UINT16)(value)) & ACX100_OFFSET_BUSY))
-#define ACX100_OFFSET_ISERR(value)	((UINT16)(((UINT16)(value)) & ACX100_OFFSET_ERR))
-#define ACX100_OFFSET_DATAOFF_GET(value)	((UINT16)(((UINT16)(value)) & ACX100_OFFSET_DATAOFF))
-#define ACX100_OFFSET_DATAOFF_SET(value)	((UINT16)(value))
-
-#define ACX100_EVSTAT_ISTICK(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_TICK))
-#define ACX100_EVSTAT_ISWTERR(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_WTERR))
-#define ACX100_EVSTAT_ISINFDROP(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_INFDROP))
-#define ACX100_EVSTAT_ISINFO(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_INFO))
-#define ACX100_EVSTAT_ISDTIM(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_DTIM))
-#define ACX100_EVSTAT_ISCMD(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_CMD))
-#define ACX100_EVSTAT_ISALLOC(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_ALLOC))
-#define ACX100_EVSTAT_ISTXEXC(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_TXEXC))
-#define ACX100_EVSTAT_ISTX(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_TX))
-#define ACX100_EVSTAT_ISRX(value)	((UINT16)(((UINT16)(value)) & ACX100_EVSTAT_RX))
-
-#define ACX100_INTEN_ISTICK(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_TICK))
-#define ACX100_INTEN_TICK_SET(value)	((UINT16)(((UINT16)(value)) << 15))
-#define ACX100_INTEN_ISWTERR(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_WTERR))
-#define ACX100_INTEN_WTERR_SET(value)	((UINT16)(((UINT16)(value)) << 14))
-#define ACX100_INTEN_ISINFDROP(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_INFDROP))
-#define ACX100_INTEN_INFDROP_SET(value)	((UINT16)(((UINT16)(value)) << 13))
-#define ACX100_INTEN_ISINFO(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_INFO))
-#define ACX100_INTEN_INFO_SET(value)	((UINT16)(((UINT16)(value)) << 7))
-#define ACX100_INTEN_ISDTIM(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_DTIM))
-#define ACX100_INTEN_DTIM_SET(value)	((UINT16)(((UINT16)(value)) << 5))
-#define ACX100_INTEN_ISCMD(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_CMD))
-#define ACX100_INTEN_CMD_SET(value)	((UINT16)(((UINT16)(value)) << 4))
-#define ACX100_INTEN_ISALLOC(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_ALLOC))
-#define ACX100_INTEN_ALLOC_SET(value)	((UINT16)(((UINT16)(value)) << 3))
-#define ACX100_INTEN_ISTXEXC(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_TXEXC))
-#define ACX100_INTEN_TXEXC_SET(value)	((UINT16)(((UINT16)(value)) << 2))
-#define ACX100_INTEN_ISTX(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_TX))
-#define ACX100_INTEN_TX_SET(value)	((UINT16)(((UINT16)(value)) << 1))
-#define ACX100_INTEN_ISRX(value)	((UINT16)(((UINT16)(value)) & ACX100_INTEN_RX))
-#define ACX100_INTEN_RX_SET(value)	((UINT16)(((UINT16)(value)) << 0))
-
-#define ACX100_EVACK_ISTICK(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_TICK))
-#define ACX100_EVACK_TICK_SET(value)	((UINT16)(((UINT16)(value)) << 15))
-#define ACX100_EVACK_ISWTERR(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_WTERR))
-#define ACX100_EVACK_WTERR_SET(value)	((UINT16)(((UINT16)(value)) << 14))
-#define ACX100_EVACK_ISINFDROP(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_INFDROP))
-#define ACX100_EVACK_INFDROP_SET(value)	((UINT16)(((UINT16)(value)) << 13))
-#define ACX100_EVACK_ISINFO(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_INFO))
-#define ACX100_EVACK_INFO_SET(value)	((UINT16)(((UINT16)(value)) << 7))
-#define ACX100_EVACK_ISDTIM(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_DTIM))
-#define ACX100_EVACK_DTIM_SET(value)	((UINT16)(((UINT16)(value)) << 5))
-#define ACX100_EVACK_ISCMD(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_CMD))
-#define ACX100_EVACK_CMD_SET(value)	((UINT16)(((UINT16)(value)) << 4))
-#define ACX100_EVACK_ISALLOC(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_ALLOC))
-#define ACX100_EVACK_ALLOC_SET(value)	((UINT16)(((UINT16)(value)) << 3))
-#define ACX100_EVACK_ISTXEXC(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_TXEXC))
-#define ACX100_EVACK_TXEXC_SET(value)	((UINT16)(((UINT16)(value)) << 2))
-#define ACX100_EVACK_ISTX(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_TX))
-#define ACX100_EVACK_TX_SET(value)	((UINT16)(((UINT16)(value)) << 1))
-#define ACX100_EVACK_ISRX(value)	((UINT16)(((UINT16)(value)) & ACX100_EVACK_RX))
-#define ACX100_EVACK_RX_SET(value)	((UINT16)(((UINT16)(value)) << 0))
-
-#define ACX100_CONTROL_AUXEN_SET(value)	((UINT16)(((UINT16)(value)) << 14))
-#define ACX100_CONTROL_AUXEN_GET(value)	((UINT16)(((UINT16)(value)) >> 14))
-
-/*--- Host Maintained State Info ---------------------------------------------*/
-#define ACX100_STATE_PREINIT	0
-#define ACX100_STATE_INIT	1
-#define ACX100_STATE_RUNNING	2
+#define ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN		0x01
+#define ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN		0x01
+#define ACX1xx_IE_DOT11_ED_THRESHOLD_LEN		0x04
+#define ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN		0x01
 
 /*============================================================================*
  * Types and their related constants                                          *
@@ -1010,31 +500,6 @@ typedef struct acx100_rx_frame {
 	UINT16 data_length __WLAN_ATTRIB_PACK__;	/* IEEE? (big endian) format */
 } __WLAN_ATTRIB_PACK__ acx100_rx_frame_t;
 
-/*--- Communication Frames: Field Masks for Receive Frames -------------------*/
-/*-- Offsets --*/
-#define ACX100_RX_DATA_LEN_OFF		((UINT16)44)
-#define ACX100_RX_80211HDR_OFF		((UINT16)14)
-#define ACX100_RX_DATA_OFF		((UINT16)60)
-
-/*-- Status Fields --*/
-#define ACX100_RXSTATUS_MSGTYPE		((UINT16)(BIT15 | BIT14 | BIT13))
-#define ACX100_RXSTATUS_MACPORT		((UINT16)(BIT10 | BIT9 | BIT8))
-#define ACX100_RXSTATUS_UNDECR		((UINT16)BIT1)
-#define ACX100_RXSTATUS_FCSERR		((UINT16)BIT0)
-
-/*--- Communication Frames: Test/Get/Set Field Values for Receive Frames -----*/
-#define ACX100_RXSTATUS_MSGTYPE_GET(value) \
-		((UINT16)((((UINT16)(value)) & ACX100_RXSTATUS_MSGTYPE) >> 13))
-#define ACX100_RXSTATUS_MSGTYPE_SET(value) \
-		((UINT16)(((UINT16)(value)) << 13))
-#define ACX100_RXSTATUS_MACPORT_GET(value) \
-		((UINT16)((((UINT16)(value)) & ACX100_RXSTATUS_MACPORT) >> 8))
-#define ACX100_RXSTATUS_MACPORT_SET(value) \
-		((UINT16)(((UINT16)(value)) << 8))
-#define ACX100_RXSTATUS_ISUNDECR(value)	 \
-		((UINT16)(((UINT16)(value)) & ACX100_RXSTATUS_UNDECR))
-#define ACX100_RXSTATUS_ISFCSERR(value)	 \
-		((UINT16)(((UINT16)(value)) & ACX100_RXSTATUS_FCSERR))
 
 /*============================================================================*
  * Information Frames Structures                                              *
@@ -1206,6 +671,7 @@ typedef struct acx100_PSUserCount {
 	UINT16 usercnt __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_PSUserCount_t;
 
+
 /*-- Collection of all Inf frames --*/
 typedef union acx100_infodata {
 	acx100_CommTallies16_t commtallies16 __WLAN_ATTRIB_PACK__;
@@ -1224,6 +690,7 @@ typedef struct acx100_InfFrame {
 	UINT16 infotype __WLAN_ATTRIB_PACK__;
 	acx100_infodata_t info __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_InfFrame_t;
+
 
 /* Descriptor Control Bits */
 
@@ -1310,8 +777,6 @@ typedef struct acx100_usb_txfrm {
 } acx100_usb_txfrm_t __WLAN_ATTRIB_PACK__;
 
 typedef struct acx100_usb_scan {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 pad0 __WLAN_ATTRIB_PACK__;
 	UINT16 unk1 __WLAN_ATTRIB_PACK__;
 	UINT16 unk2 __WLAN_ATTRIB_PACK__;
 } acx100_usb_scan_t __WLAN_ATTRIB_PACK__;
@@ -1323,8 +788,6 @@ typedef struct acx100_usb_scan_status {
 } acx100_usb_scan_status_t __WLAN_ATTRIB_PACK__;
 
 typedef struct acx100_usb_cmdreq {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
 	UINT16 parm0 __WLAN_ATTRIB_PACK__;
 	UINT16 parm1 __WLAN_ATTRIB_PACK__;
 	UINT16 parm2 __WLAN_ATTRIB_PACK__;
@@ -1332,24 +795,18 @@ typedef struct acx100_usb_cmdreq {
 } __WLAN_ATTRIB_PACK__ acx100_usb_cmdreq_t;
 
 typedef struct acx100_usb_wridreq {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status  __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
 	UINT16 frmlen __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_wridreq_t;
 
 typedef struct acx100_usb_rridreq {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
 	UINT16 frmlen __WLAN_ATTRIB_PACK__;
 	UINT8 pad[56] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rridreq_t;
 
 typedef struct acx100_usb_wmemreq {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	/*
   UINT16 offset __WLAN_ATTRIB_PACK__;
 	UINT16 page __WLAN_ATTRIB_PACK__;
@@ -1358,14 +815,10 @@ typedef struct acx100_usb_wmemreq {
 } __WLAN_ATTRIB_PACK__ acx100_usb_wmemreq_t;
 
 typedef struct acx100_usb_rxtx_ctrl {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT8 data __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rxtx_ctrl_t;
 
 typedef struct acx100_usb_rmemreq {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rmemreq_t;
 
@@ -1382,40 +835,30 @@ typedef struct acx100_usb_infofrm {
 } __WLAN_ATTRIB_PACK__ acx100_usb_infofrm_t;
 
 typedef struct acx100_usb_cmdresp {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 resp0 __WLAN_ATTRIB_PACK__;
 	UINT16 resp1 __WLAN_ATTRIB_PACK__;
 	UINT16 resp2 __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_cmdresp_t;
 
 typedef struct acx100_usb_wridresp {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 resp0 __WLAN_ATTRIB_PACK__;
 	UINT16 resp1 __WLAN_ATTRIB_PACK__;
 	UINT16 resp2 __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_wridresp_t;
 
 typedef struct acx100_usb_rridresp {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 rid __WLAN_ATTRIB_PACK__;
 	UINT16 frmlen __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rridresp_t;
 
 typedef struct acx100_usb_wmemresp {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT16 resp0 __WLAN_ATTRIB_PACK__;
 	UINT16 resp1 __WLAN_ATTRIB_PACK__;
 	UINT16 resp2 __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_wmemresp_t;
 
 typedef struct acx100_usb_rmemresp {
-	UINT16 cmd __WLAN_ATTRIB_PACK__;
-	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rmemresp_t;
 
@@ -1431,9 +874,27 @@ typedef struct acx100_usb_error {
 
 /*--- Unions for packaging all the known packet types together ---------------*/
 
+#if OLD
 typedef union acx100_usbout {
   UINT16 type __WLAN_ATTRIB_PACK__;
+        acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
+        acx100_usb_cmdreq_t cmdreq __WLAN_ATTRIB_PACK__;
+        acx100_usb_wridreq_t wridreq __WLAN_ATTRIB_PACK__;
+        acx100_usb_rridreq_t rridreq __WLAN_ATTRIB_PACK__;
+        acx100_usb_wmemreq_t wmemreq __WLAN_ATTRIB_PACK__;
+        acx100_usb_rmemreq_t rmemreq __WLAN_ATTRIB_PACK__;
+        acx100_usb_rxtx_ctrl_t rxtx __WLAN_ATTRIB_PACK__;
+        acx100_usb_scan_t scan __WLAN_ATTRIB_PACK__;
+} __WLAN_ATTRIB_PACK__ acx100_usbout_t;
+#else
+typedef struct acx100_bulkout {
 	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
+} __WLAN_ATTRIB_PACK__ acx100_bulkout_t;
+
+typedef struct acx100_usbout {
+  UINT16 cmd __WLAN_ATTRIB_PACK__;
+  UINT16 status __WLAN_ATTRIB_PACK__;
+  union {
 	acx100_usb_cmdreq_t cmdreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_wridreq_t wridreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_rridreq_t rridreq __WLAN_ATTRIB_PACK__;
@@ -1441,8 +902,11 @@ typedef union acx100_usbout {
 	acx100_usb_rmemreq_t rmemreq __WLAN_ATTRIB_PACK__;
 	acx100_usb_rxtx_ctrl_t rxtx __WLAN_ATTRIB_PACK__;
 	acx100_usb_scan_t scan __WLAN_ATTRIB_PACK__;
+  } u;
 } __WLAN_ATTRIB_PACK__ acx100_usbout_t;
+#endif
 
+#if OLD
 typedef union acx100_usbin {
 	UINT16 type __WLAN_ATTRIB_PACK__;
 	acx100_usb_rxfrm_t rxfrm __WLAN_ATTRIB_PACK__;
@@ -1457,6 +921,25 @@ typedef union acx100_usbin {
 	acx100_usb_error_t usberror __WLAN_ATTRIB_PACK__;
 	UINT8 boguspad[3000] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usbin_t;
+#else
+typedef struct acx100_usbin {
+  UINT16 cmd __WLAN_ATTRIB_PACK__;
+  UINT16 status __WLAN_ATTRIB_PACK__;
+  union {
+	acx100_usb_rxfrm_t rxfrm __WLAN_ATTRIB_PACK__;
+	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
+	acx100_usb_infofrm_t infofrm __WLAN_ATTRIB_PACK__;
+	acx100_usb_cmdresp_t cmdresp __WLAN_ATTRIB_PACK__;
+	acx100_usb_wridresp_t wridresp __WLAN_ATTRIB_PACK__;
+	acx100_usb_rridresp_t rridresp __WLAN_ATTRIB_PACK__;
+	acx100_usb_wmemresp_t wmemresp __WLAN_ATTRIB_PACK__;
+	acx100_usb_rmemresp_t rmemresp __WLAN_ATTRIB_PACK__;
+	acx100_usb_bufavail_t bufavail __WLAN_ATTRIB_PACK__;
+	acx100_usb_error_t usberror __WLAN_ATTRIB_PACK__;
+	UINT8 boguspad[3000] __WLAN_ATTRIB_PACK__;
+  } u;
+} __WLAN_ATTRIB_PACK__ acx100_usbin_t;
+#endif
 
 #endif /* WLAN_HOSTIF == WLAN_USB */
 
@@ -1701,7 +1184,7 @@ typedef struct wlandevice {
 	acx100_usbin_t		usbin;
 	acx100_usbin_t		bulkin;
 	acx100_usbout_t		usbout;
-	acx100_usbout_t		bulkout;
+	acx100_bulkout_t	bulkout;
 	int			usb_txoffset;
 	int			usb_txsize;
 	int			usb_max_bulkout;
