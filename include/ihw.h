@@ -51,39 +51,8 @@ typedef struct mac {
 } mac_t;
 
 #if (WLAN_HOSTIF!=WLAN_USB) /* must be used for non-USB only */
-#define IO_AS_MACROS
-#ifdef IO_AS_MACROS
-#if ACX_IO_WIDTH == 32
-#define acx_read_reg32(priv, offset) \
-	readl(((priv)->iobase) + (offset))
-#define acx_write_reg32(priv, offset, val) \
-	writel((val), ((priv)->iobase) + (offset))
-#else /* ACX_IO_WIDTH == 32 */
-#define acx_read_reg32(priv, offset) \
-	readw(((priv)->iobase) + (offset)) \
-	+ (readw(((priv)->iobase) + (offset) + 2) << 16)
-#define acx_write_reg32(priv, offset, val) \
-	do { \
-		writew((val) & 0xffff, ((priv)->iobase) + (offset)); \
-		writew((val) >> 16, ((priv)->iobase) + (offset) + 2); \
-	} while (0)
-#endif /* ACX_IO_WIDTH == 32 */
-#define acx_read_reg16(priv, offset) \
-	readw(((priv)->iobase) + (offset))
-#define acx_write_reg16(priv, offset, val) \
-	writew((val), ((priv)->iobase) + (offset))
-#define acx_read_reg8(priv, offset) \
-	readb(((priv)->iobase) + (offset))
-#define acx_write_reg8(priv, offset, val) \
-	writeb((val), ((priv)->iobase) + (offset))
-#else /* IO_AS_MACROS */
-u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset);
-void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val);
-u16 acx_read_reg16(wlandevice_t *priv, unsigned int offset);
-void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val);
-u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset);
-void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
-#endif /* IO_AS_MACROS */
+#define INLINE_IO static inline /* undefine for out-of-line */
+#include <acx_ioreg.h>
 #endif /* (WLAN_HOSTIF!=WLAN_USB) */
 
 #define ACX_CMD_TIMEOUT_DEFAULT	5000

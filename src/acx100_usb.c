@@ -566,7 +566,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 	res = -EIO;
 #endif
 end:
-	FN_EXIT(1, (int)res);
+	FN_EXIT1((int)res);
 	return res;
 }
 
@@ -903,7 +903,7 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 			priv->stats.rx_bytes += skb->len;
 		}
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT0();
 }
 
 
@@ -952,7 +952,7 @@ static void acx100usb_poll_rx(wlandevice_t *priv,int number) {
 		/* FIXME: evaluate the error code ! */
 		acxlog(L_USBRXTX,"SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",number,inpipe,rxbufsize,errcode);
 	}
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 
@@ -1142,7 +1142,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 	** look for the next rx ...
 	** ---------------------------- */
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) acx100usb_poll_rx(priv,number); /* receive of frame completed, now look for the next one */
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 
@@ -1185,7 +1185,7 @@ void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc)
 	** transmit the frame...
 	** ------------------------------------------- */
 	acx100usb_prepare_tx(priv,desc);
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 
@@ -1314,7 +1314,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 		return;
 	}
 	spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 
@@ -1386,7 +1386,7 @@ static void acx100usb_complete_tx(struct urb *urb, struct pt_regs *regs)
 	priv->bulktx_states[index]=0;
 	spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
 	if (priv->dev_state_mask&ACX_STATE_IFACE_UP) acx100usb_trigger_next_tx(priv);
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 
@@ -1531,7 +1531,7 @@ static int acx100usb_close(struct net_device *dev)
 	** decrease module-in-use count (if necessary)
 	** ----------------------------------------- */
 	if (!already_down) WLAN_MOD_DEC_USE_COUNT;
-	FN_EXIT(1,0);
+	FN_EXIT1(0);
 	return 0;
 }
 
@@ -1573,7 +1573,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** if the device is otherwise locked,
 	** bail-out...
 	** ----------------------------------- */
-	if (0 != acx_lock(priv, &flags))
+	if (acx_lock(priv, &flags))
 		return 1;
 	/* --------------------------------------
 	** if the queue is halted, there is no point
@@ -1612,7 +1612,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	acx_stop_queue(dev, "during Tx");
 #endif
 #if UNUSED
-	if (0 != acx_lock(priv,&flags)) ...
+	if (acx_lock(priv,&flags)) ...
 
 	memset(pb, 0, sizeof(wlan_pb_t) /*0x14*4 */ );
 
@@ -1655,7 +1655,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	priv->stats.tx_bytes += templen;
 end:
 	acx_unlock(priv, &flags);
-	FN_EXIT(1, txresult);
+	FN_EXIT1(txresult);
 	return txresult;
 }
 
@@ -1664,7 +1664,7 @@ end:
 static struct net_device_stats *acx_get_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
-	FN_EXIT(1, (int)&priv->stats);
+	FN_EXIT1((int)&priv->stats);
 	return &priv->stats;
 }
 
@@ -1673,7 +1673,7 @@ static struct net_device_stats *acx_get_stats(netdevice_t *dev) {
 static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
-	FN_EXIT(1, (int)&priv->stats);
+	FN_EXIT1((int)&priv->stats);
 	return &priv->wstats;
 }
 
@@ -1700,7 +1700,7 @@ static void acx100usb_tx_timeout(struct net_device *dev) {
 	/* ------------------------------------
 	** TODO: stats update
 	** --------------------------------- */
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 #endif
 

@@ -317,8 +317,8 @@ typedef struct rxdescriptor {
 	u8	Ctl_8 ACX_PACKED;
 	u8	rate ACX_PACKED;
 	u8	error ACX_PACKED;
-	u8	SNR ACX_PACKED;				/* modulation / preamble; FIXME: huh? SNR is Signal-to-Noise Ratio, which is something entirely different!! */
-	u8   RxLevel ACX_PACKED;
+	u8	SNR ACX_PACKED;				/* Signal-to-Noise Ratio */
+	u8	RxLevel ACX_PACKED;
 	u8	queue_ctrl ACX_PACKED;
 	u16	unknown ACX_PACKED;
 	u32	val0x30 ACX_PACKED;
@@ -336,7 +336,7 @@ typedef struct rxhostdescriptor {
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	rxhostdescriptor *desc_phy ACX_PACKED;	/* 0x18 */
 	struct	rxbuffer *data ACX_PACKED;
-} rxhostdesc_t;		/* size 44 = 0x2c */
+} rxhostdesc_t;		/* size: variable, currently 0x20  */
 
 typedef struct acx100_ie_memblocksize {
 	u16 type ACX_PACKED;

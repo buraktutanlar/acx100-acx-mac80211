@@ -198,7 +198,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,int paramlen,u32
 	result=priv->ctrl_urb->actual_length;
 	acxlog(L_XFER,"read=%d bytes\n",result);
 	if (result<0) {
-		FN_EXIT(0,result);
+		FN_EXIT0();
 		return(0);
 	}
 	if (priv->usbin.status!=1) {
@@ -220,7 +220,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,int paramlen,u32
 			}
 		}
 	}
-	FN_EXIT(0,1);
+	FN_EXIT0();
 	return(1);
 }
 
@@ -231,7 +231,7 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 #endif
 {
 	FN_ENTER;
-	FN_EXIT(0,0);
+	FN_EXIT0();
 }
 
 /*****************************************************************************

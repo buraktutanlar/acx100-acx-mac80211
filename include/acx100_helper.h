@@ -50,8 +50,6 @@
 
 #ifdef ACX_DEBUG
 
-extern int acx_debug_func_indent;
-
 #define acxlog(chan, args...) \
 	do { \
 		if (debug & (chan)) \
@@ -69,14 +67,16 @@ void log_fn_exit_v(const char *funcname, int v);
 		} \
 	} while (0)
 
-#define FN_EXIT(p, v) \
+#define FN_EXIT1(v) \
 	do { \
 		if (unlikely(debug & L_FUNC)) { \
-			if (p) { \
-				log_fn_exit_v(__func__, v); \
-			} else { \
-				log_fn_exit(__func__); \
-			} \
+			log_fn_exit_v(__func__, v); \
+		} \
+	} while (0)
+#define FN_EXIT0() \
+	do { \
+		if (unlikely(debug & L_FUNC)) { \
+			log_fn_exit(__func__); \
 		} \
 	} while (0)
 
@@ -84,7 +84,8 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #define acxlog(chan, args...)
 #define FN_ENTER
-#define FN_EXIT(p, v)
+#define FN_EXIT1(v)
+#define FN_EXIT0()
 
 #endif /* ACX_DEBUG */
 
@@ -155,8 +156,8 @@ typedef struct acx111_ie_memoryconfig {
 	/* start of rx1 block */
 	u8 rx_queue1_count_descs ACX_PACKED;
 	u8 rx_queue1_reserved1 ACX_PACKED;
-	u8 rx_queue1_reserved2 ACX_PACKED; /* must be set to 7 */
-	u8 rx_queue1_reserved3 ACX_PACKED; /* must be set to 0 */
+	u8 rx_queue1_type ACX_PACKED; /* must be set to 7 */
+	u8 rx_queue1_prio ACX_PACKED; /* must be set to 0 */
 	u32 rx_queue1_host_rx_start ACX_PACKED;
 	/* end of rx1 block */
 
@@ -610,10 +611,9 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 void acx_init_task_scheduler(wlandevice_t *priv);
 void acx_flush_task_scheduler(void);
 void acx_schedule_after_interrupt_task(wlandevice_t *priv, unsigned int set_flag);
-void acx100_scan_chan(wlandevice_t *priv);
+void acx_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, acx100_scan_t *s);
 void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
-void acx111_scan_chan(wlandevice_t *priv);
 int acx_upload_radio(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 u16 acx_proc_register_entries(const struct net_device *dev);
@@ -622,8 +622,8 @@ void acx_update_dot11_ratevector(wlandevice_t *priv);
 void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 
 int acx_recalib_radio(wlandevice_t *priv);
-int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
-int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
+int acx111_get_feature_config(wlandevice_t *priv, u32 *feature_options, u32 *data_flow_options);
+int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_flow_options, int mode /* 0 == remove, 1 == add, 2 == set */);
 
 /* acx100_ioctl.c */
 int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);

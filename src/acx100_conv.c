@@ -70,8 +70,8 @@
 #include <acx100_helper.h>
 #include <idma.h>
 
-static const u8 oui_rfc1042[] = { (u8)0x00, (u8)0x00, (u8)0x00 };
-static const u8 oui_8021h[] = { (u8)0x00, (u8)0x00, (u8)0xf8 };
+static const u8 oui_rfc1042[] = { 0x00, 0x00, 0x00 };
+static const u8 oui_8021h[] = { 0x00, 0x00, 0xf8 };
 
 #define COPY_OUI(dst, src) \
 	*(u16 *)dst = *(u16 *)src; \
@@ -209,7 +209,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 
 	if (unlikely(0 == skb->len)) {
 		acxlog(L_DEBUG, "zero-length skb!\n");
-		FN_EXIT(1, NOT_OK);
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
 
@@ -243,13 +243,13 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 		e_snap = (wlan_snap_t*)((u8*)e_llc + sizeof(wlan_llc_t));
 			
 		/* setup the LLC header */
-		e_llc->dsap = (u8)0xaa;	/* SNAP, see IEEE 802 */
-		e_llc->ssap = (u8)0xaa;
-		e_llc->ctl = (u8)0x03;
+		e_llc->dsap = 0xaa;	/* SNAP, see IEEE 802 */
+		e_llc->ssap = 0xaa;
+		e_llc->ctl = 0x03;
 
 		/* setup the SNAP header */
 		e_snap->type = htons(proto);
-		if (0 != acx_stt_findproto(proto)) {
+		if (acx_stt_findproto(proto)) {
 			/* memcpy(e_snap->oui, oui_8021h, WLAN_IEEE_OUI_LEN); */
 			COPY_OUI(e_snap->oui, oui_8021h);
 		} else {
@@ -301,7 +301,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	MAC_COPY(w_hdr->a3.a2, a2);
 	MAC_COPY(w_hdr->a3.a3, a3);
 
-	if ((u8)0 != priv->wep_enabled)
+	if (priv->wep_enabled)
 		SET_BIT(fc, host2ieee16(WLAN_SET_FC_ISWEP(1)));
 		
 	w_hdr->a3.fc = fc;
@@ -328,7 +328,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 #endif
 
 fail:
-	FN_EXIT(0, OK);
+	FN_EXIT0();
 	return OK;
 }
 
@@ -383,7 +383,7 @@ fail:
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
 
 	/* check if additional header is included */
-	if (0 != (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR)) {
+	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
 		w_hdr = (p80211_hdr_t*)(((u8*)w_hdr) + WLAN_CRC_LEN);
 		payload_length -= WLAN_CRC_LEN;
@@ -411,7 +411,7 @@ fail:
 		saddr = w_hdr->a4.a4;
 	}
 	
-	if (0 != WLAN_GET_FC_ISWEP(fc)) {
+	if (WLAN_GET_FC_ISWEP(fc)) {
 		/* chop off the IV+ICV WEP header and footer */
 		acxlog(L_DATA | L_DEBUG, "rx: it's a WEP packet, chopping off IV and ICV.\n");
 		payload_length -= 8;
@@ -434,7 +434,7 @@ fail:
 
 	/* Test for the various encodings */
 	if ( (payload_length >= sizeof(wlan_ethhdr_t)) &&
-	     ((e_llc->dsap != (u8)0xaa) || (e_llc->ssap != (u8)0xaa)) &&
+	     ((e_llc->dsap != 0xaa) || (e_llc->ssap != 0xaa)) &&
 	     ((0 == memcmp(daddr, e_hdr->daddr, ETH_ALEN)) ||
 	      (0 == memcmp(saddr, e_hdr->saddr, ETH_ALEN)))) {
 		acxlog(L_DEBUG | L_DATA, "rx: 802.3 ENCAP len: %d\n", payload_length);
@@ -446,7 +446,7 @@ fail:
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "rx: ENCAP frame too large (%d > %d)\n", 
 				payload_length, WLAN_MAX_ETHFRM_LEN);
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 
@@ -457,7 +457,7 @@ fail:
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "rx: FAILED to allocate skb\n");
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		skb_reserve(skb, 2);
@@ -467,9 +467,9 @@ fail:
 		memcpy(skb->data, e_hdr, payload_length);	/* copy the data */
 
 	} else if ((payload_length >= sizeof(wlan_llc_t) + sizeof(wlan_snap_t)) &&
-		   (e_llc->dsap == (u8)0xaa) &&
-		   (e_llc->ssap == (u8)0xaa) &&
-		   (e_llc->ctl == (u8)0x03) && 
+		   (e_llc->dsap == 0xaa) &&
+		   (e_llc->ssap == 0xaa) &&
+		   (e_llc->ctl == 0x03) && 
 		   (((COMPARE_OUI( e_snap->oui, oui_rfc1042)==0) &&
 /*		    (ethconv == WLAN_ETHCONV_8021h) &&  */
 		    (0 != acx_stt_findproto(ieee2host16(e_snap->type)))) || 
@@ -485,7 +485,7 @@ fail:
 			/* Is someone trying an oflow attack? */
 			acxlog(L_STD, "rx: SNAP frame too large (%d > %d)\n", 
 				payload_length, WLAN_MAX_ETHFRM_LEN);
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		
@@ -494,7 +494,7 @@ fail:
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "rx: FAILED to allocate skb\n");
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		skb_reserve(skb, 2);
@@ -514,9 +514,9 @@ fail:
 		       payload_length);
 		       
 	}  else if ((payload_length >= sizeof(wlan_llc_t) + sizeof(wlan_snap_t)) &&
-		    (e_llc->dsap == (u8)0xaa) &&
-		    (e_llc->ssap == (u8)0xaa) &&
-		    (e_llc->ctl == (u8)0x03) ) {
+		    (e_llc->dsap == 0xaa) &&
+		    (e_llc->ssap == 0xaa) &&
+		    (e_llc->ctl == 0x03) ) {
 		acxlog(L_DEBUG | L_DATA, "rx: 802.1h/RFC1042 len: %d\n", payload_length);
 		/* it's an 802.1h frame || (an RFC1042 && protocol is not in STT) */
 		/* build a DIXII + RFC894 */
@@ -528,7 +528,7 @@ fail:
 			acxlog(L_STD, "rx: DIXII frame too large (%d > %d)\n",
 					payload_length - sizeof(wlan_llc_t) - sizeof(wlan_snap_t),
 					WLAN_MAX_ETHFRM_LEN - WLAN_ETHHDR_LEN);
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 
@@ -537,7 +537,7 @@ fail:
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "rx: FAILED to allocate skb\n");
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		skb_reserve(skb, 2);
@@ -569,7 +569,7 @@ fail:
 			acxlog(L_STD, "rx: OTHER frame too large (%d > %d)\n",
 				payload_length,
 				WLAN_MAX_ETHFRM_LEN - WLAN_ETHHDR_LEN);
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 
@@ -578,7 +578,7 @@ fail:
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
 			acxlog(L_STD, "rx: FAILED to allocate skb\n");
-			FN_EXIT(1, (int)NULL);
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		skb_reserve(skb, 2);
@@ -611,6 +611,6 @@ fail:
 	acxlog(L_DATA, "\n");
 #endif
 
-	FN_EXIT(0, OK);
+	FN_EXIT0();
 	return skb;
 }

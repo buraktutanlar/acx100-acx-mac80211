@@ -137,7 +137,7 @@ Again, the cards mentioned in the listing above will NOT work with this driver
 supporting your card's chipset... (try Google "[CHIPSET] Linux")
 Feel free to send us corrections/additions to this very confusing listing above.
 
-=== STATUS AS OF 040826 ===
+=== STATUS AS OF 050318 ===
 
 Status Matrix:
 
@@ -150,14 +150,17 @@ Auto mode	*			*			*
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
-Sensitivity	* (hardware)		- (no go since USB?)	- (NIY, problems)
+Sensitivity	* (hardware)		- (no go since USB?)	* (various F/W settings)
 
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
 We're still not totally sure about the status of WEP support:
 ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
-ACX111: not working yet.
+ACX111: not working yet, hopefully we'll get it to work soon (very actively
+working on it).
+If you need encryption, you might want to use projects like OpenVPN or others
+instead for now.
 
 Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
@@ -232,8 +235,15 @@ What to NOT do:
 
 === FIRMWARE INSTALLATION ===
 
-You may tell us about your experiences with various firmware versions,
-then we'll add that info to doc/firmware_versions.txt.
+NOTE that there are varying degrees of firmware stability and/or compatibility
+with what *our* driver expects the firmware to do.
+Thus you might want to use a different firmware version (the version number
+can be found in the driver log) in case of problems getting the card to work
+(reliably).
+
+You may tell us about your experiences with various firmware versions
+in combination with certain cards, then we'll add that info to
+doc/firmware_versions.txt.
 
 -- Firmware for ACX100 non-USB cards --
 

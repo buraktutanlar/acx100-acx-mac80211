@@ -185,4 +185,8 @@ download_files
 
 extract_firmware
 
-echo "Finished! (Hopefully!) If something failed, then please report it!"
+echo "FINISHED! (hopefully!) If something failed, then please report it!"
+echo
+echo "Please also note that these firmware files may not work with your"
+echo "particular card! In this case try getting different firmware files for"
+echo "your chipset (preferrably ones provided by the vendor of your card)."

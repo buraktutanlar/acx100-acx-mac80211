@@ -75,14 +75,15 @@ extern void acx_dump_bytes(void *,int);
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
 
-static inline int submit_urb(struct urb *urb, int mem_flags) {
-	        return usb_submit_urb(urb, mem_flags);
+static inline int submit_urb(struct urb *urb, int mem_flags)
+{
+	return usb_submit_urb(urb, mem_flags);
 }
 
 static void acx100usb_control_complete(struct urb *urb)
 {
 	FN_ENTER;
-	FN_EXIT(0,OK);
+	FN_EXIT0();
 }
 
 #else
@@ -92,13 +93,13 @@ static void acx100usb_control_complete(struct urb *urb)
 
 static inline int submit_urb(struct urb *urb, int mem_flags)
 {
-	        return usb_submit_urb(urb);
+	return usb_submit_urb(urb);
 }
 
 static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 {
 	FN_ENTER;
-	FN_EXIT(0,OK);
+	FN_EXIT0();
 }
 
 #endif
@@ -124,148 +125,10 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
  *
  ****************************************************************************/
 
-#ifndef IO_AS_MACROS
-/*----------------------------------------------------------------
-* acx_read_reg32
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset)
-{
-#if ACX_IO_WIDTH == 32
-	return readl(priv->iobase + offset);
-#else 
-	return readw(priv->iobase + offset)
-	    + (readw(priv->iobase + offset + 2) << 16);
-#endif
-}
-
-/*----------------------------------------------------------------
-* acx_read_reg16
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline u16 acx_read_reg16(wlandevice_t *priv, unsigned int offset)
-{
-	return readw(priv->iobase + offset);
-}
-
-/*----------------------------------------------------------------
-* acx_read_reg8
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset)
-{
-	return readb(priv->iobase + offset);
-}
-
-/*----------------------------------------------------------------
-* acx_write_reg32
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
-{
-#if ACX_IO_WIDTH == 32
-	writel(val, priv->iobase + offset);
-#else 
-	writew(val & 0xffff, priv->iobase + offset);
-	writew(val >> 16, priv->iobase + offset + 2);
-#endif
-}
-
-/*----------------------------------------------------------------
-* acx_write_reg16
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val)
-{
-	writew(val, priv->iobase + offset);
-}
-
-/*----------------------------------------------------------------
-* acx_write_reg8
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
-{
-	writeb(val, priv->iobase + offset);
-}
+#ifndef INLINE_IO
+/* Pull in definitions */
+#define INLINE_IO /* defined to nothing. functions will be out-of-line */
+#include <acx_ioreg.h>
 #endif
 
 /*****************************************************************************
@@ -299,20 +162,20 @@ void acx_get_info_state(wlandevice_t *priv)
 {
 	u32 value;
 
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1);
+	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1);
 
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR],
-		acx_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
+		acx_read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS));
 
-	value = acx_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 	priv->info_type = (u16)value;
-	priv->info_status = (u16)(value >> 16);
+	priv->info_status = (value >> 16);
 
 	/* inform hw that we have read this info message */
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_INFOACK); /* now bother hw to notice it */
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, priv->info_type | 0x00010000);
+	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK); /* now bother hw to notice it */
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
@@ -358,16 +221,16 @@ void acx_get_cmd_state(wlandevice_t *priv)
 {
 	u32 value;
 
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
+	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, 
+		acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
 
-	value = acx_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 	priv->cmd_type = (u16)value;
-	priv->cmd_status = (u16)(value >> 16);
+	priv->cmd_status = (value >> 16);
 
 	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x [%s]\n", priv->cmd_type, priv->cmd_status, priv->cmd_status <= 0x10 ? cmd_error_strings[priv->cmd_status] : "UNKNOWN REASON" );
 }
@@ -391,15 +254,15 @@ void acx_get_cmd_state(wlandevice_t *priv)
 *----------------------------------------------------------------*/
 void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_status)
 {
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1); /* FIXME: why auto increment?? */
+	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
-		acx_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, 
+		acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
 
 	if (is_status)
 		val <<= 16;
-	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], val);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
 }
 
 /*----------------------------------------------------------------
@@ -532,7 +395,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	acx_write_cmd_type_or_status(priv, cmd, 0);
 	
 	/*** execute command ***/
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_CMD);
+	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
 
 	/*** wait for IRQ to occur, then ACK it ***/
 
@@ -549,11 +412,13 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 		 * fast here, so better don't schedule away here?
 		 * In theory, yes, but the timeout can be HUGE,
 		 * so better schedule away sometimes */
-		if (!priv->irqs_active && (irqtype =
-		     acx_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & HOST_INT_CMD_COMPLETE) {
+		if (!priv->irqs_active) {
+			irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
+			if (irqtype & HOST_INT_CMD_COMPLETE) {
 
-			acx_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_CMD_COMPLETE);
-			break;
+				acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
+				break;
+			}
 		} 
 		if(priv->irqs_active && (irqtype = priv->irq_status & HOST_INT_CMD_COMPLETE)) {
 			priv->irq_status ^= HOST_INT_CMD_COMPLETE;
@@ -614,7 +479,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	}
 
 done:
-	FN_EXIT(1, result);
+	FN_EXIT1(result);
 	return result;
 }
 #else
@@ -687,7 +552,8 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"WARNING: CTRL MESSAGE FAILED WITH ERRCODE %d\n",ucode);
-		return(NOT_OK);
+		FN_EXIT0();
+		return NOT_OK;
 	}
 	/* ---------------------------------
 	** wait for request to complete...
@@ -697,8 +563,9 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 		udelay(1000);
 		delcount++;
 		if (delcount>USB_CTRL_HARD_TIMEOUT) {
-			acxlog(L_STD,"ERROR, USB device is not responsive!\n");
-			return(NOT_OK);
+			acxlog(L_STD,"ERROR, USB device is not responding!\n");
+			FN_EXIT0();
+			return NOT_OK;
 		}
 	}
 	/* ---------------------------------
@@ -707,7 +574,8 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	result=priv->ctrl_urb->actual_length;
 	acxlog(L_CTL,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
 	if (result<0) {
-		return(NOT_OK);
+		FN_EXIT0();
+		return NOT_OK;
 	}
 	/* --------------------------------------
 	** Check for device acknowledge ...
@@ -721,7 +589,8 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %d\n",ucode);
-		return(NOT_OK);
+		FN_EXIT0();
+		return NOT_OK;
 	}
 	/* ---------------------------------
 	** wait for request to complete...
@@ -732,7 +601,8 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 		delcount++;
 		if (delcount>USB_CTRL_HARD_TIMEOUT) {
 			acxlog(L_STD,"ERROR, USB device is not responsive!\n");
-			return(NOT_OK);
+			FN_EXIT0();
+			return NOT_OK;
 		}
 	}
 	/* ---------------------------------
@@ -740,9 +610,9 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	** ------------------------------ */
 	result=priv->ctrl_urb->actual_length;
 	acxlog(L_CTL,"read=%d bytes\n",result);
-	if (result<0) {
-		FN_EXIT(0,result);
-		return(NOT_OK);
+	if (result < 0) {
+		FN_EXIT0();
+		return NOT_OK;
 	}
 	if (le16_to_cpu(priv->ctrlin.status)!=1) {
 		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %d\n",le16_to_cpu(priv->ctrlin.status));
@@ -765,8 +635,8 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 			}
 		}
 	}
-	FN_EXIT(0,OK);
-	return(OK);
+	FN_EXIT0();
+	return OK;
 }
 #endif
 
@@ -1166,11 +1036,11 @@ void acx_power_led(wlandevice_t *priv, u8 enable)
 	if (rate_limit++ < 3)
 		acxlog(L_IOCTL, "Please report in case toggling the power LED doesn't work for your card!\n");
 	if (enable)
-		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
-			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) & ~gpio_pled);
+		acx_write_reg16(priv, IO_ACX_GPIO_OUT, 
+			acx_read_reg16(priv, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
-		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
-			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) | gpio_pled);
+		acx_write_reg16(priv, IO_ACX_GPIO_OUT, 
+			acx_read_reg16(priv, IO_ACX_GPIO_OUT) | gpio_pled);
 #else
 	acxlog(L_IOCTL, "no power LED support on ACX100 USB (yet)!\n");
 #endif

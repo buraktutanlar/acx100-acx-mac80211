@@ -794,10 +794,10 @@ typedef struct client {
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
 	struct	wlandevice 	*priv;
-	/* This is the pointer to the beginning of the cards tx queue pool.
+	/* This is the pointer to the beginning of the card's tx queue pool.
 	   The address is relative to the internal memory mapping of the card! */
 	u32		ui32ACXTxQueueStart;	/* 0x8, official name */
-	/* This is the pointer to the beginning of the cards rx queue pool.
+	/* This is the pointer to the beginning of the card's rx queue pool.
 	   The address is relative to the internal memory mapping of the card! */
 	u32		ui32ACXRxQueueStart;	/* 0xc */
 	u8		*pTxBufferPool;		/* 0x10 */
@@ -816,7 +816,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	dma_addr_t	FrameHdrQPoolPhyAddr;	/* 0x30 */
 	/* u32 		val0x38; */	/* 0x38, NOT USED */
 
-	/* This is the pointer to the beginning of the hosts tx queue pool.
+	/* This is the pointer to the beginning of the host's tx queue pool.
 	   The address is relative to the cards internal memory mapping */
 	struct txhostdescriptor *pTxHostDescQPool;	/* V3POS 0x3c, V1POS 0x60 */
 	unsigned int	TxHostDescQPoolSize;	/* 0x40 */
@@ -1057,6 +1057,8 @@ typedef struct wlandevice {
 	client_t	sta_list[32];		/* should those two be of */
 	client_t	*sta_hash_tab[64];	/* equal size? */
 
+	u16		last_seq_ctrl;		/* duplicate packet detection */
+
 	/* 802.11 power save mode */
 	u8		ps_wakeup_cfg;
 	u8		ps_listen_interval;
@@ -1169,7 +1171,7 @@ typedef struct wlandevice {
  *     1   include additional header (802.11 phy?)
  *     0   ???
  */
-#define RX_CFG1_PLUS_ADDIT_HDR		0x2000
+#define RX_CFG1_PLUS_ADDIT_HDR		0x2000 /* ACX100 only!! */
 #define RX_CFG1_FILTER_SSID		0x0400
 #define RX_CFG1_FILTER_BCAST		0x0200
 #define RX_CFG1_RCV_MC_ADDR1		0x0100
@@ -1186,7 +1188,7 @@ typedef struct wlandevice {
  *    11   receive association requests etc.
  *    10   receive authentication frames
  *     9   receive beacon frames
- *     8   ?? filter on some bit in 802.11 header ??
+ *     8   receive contention free packets
  *     7   receive control frames
  *     6   receive data frames
  *     5   receive broken frames
@@ -1199,7 +1201,7 @@ typedef struct wlandevice {
 #define RX_CFG2_RCV_ASSOC_REQ		0x0800
 #define RX_CFG2_RCV_AUTH_FRAMES		0x0400
 #define RX_CFG2_RCV_BEACON_FRAMES	0x0200
-#define RX_CFG2_FILTER_ON_SOME_BIT	0x0100
+#define RX_CFG2_RCV_CONTENTION_FREE	0x0100
 #define RX_CFG2_RCV_CTRL_FRAMES		0x0080
 #define RX_CFG2_RCV_DATA_FRAMES		0x0040
 #define RX_CFG2_RCV_BROKEN_FRAMES	0x0020
