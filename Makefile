@@ -1,7 +1,7 @@
 # set to 0 if you don't want any debugging code to be compiled in
 export ACX_DEBUG=1
 
-.PHONY: all extract_firmware fetch_firmware driver install clean
+.PHONY: all extract_firmware fetch_firmware driver install uninstall clean
 
 all: driver
 
@@ -18,7 +18,10 @@ driver: config.mk
 	make -C src
 
 install:
-	@echo "Sorry, we don't provide a system installation mechanism, since it would need to be distribution specific. Maybe you didn't read the part in the README file mentioning the installation details?"
+	make -C src install
+
+uninstall:
+	make -C src uninstall
 
 clean:
 	make -C src clean

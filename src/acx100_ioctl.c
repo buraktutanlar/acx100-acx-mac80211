@@ -39,14 +39,11 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
-#include <linux/module.h>
 #include <linux/kernel.h>
 
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
@@ -56,17 +53,10 @@
 #include <linux/netdevice.h>
 #include <asm/uaccess.h>
 
-#include <wlan_compat.h>
-
 #include <linux/ioport.h>
-#include <linux/pci.h>
 
 #include <linux/pm.h>
 
-#include <linux/dcache.h>
-#include <linux/highmem.h>
-#include <linux/sched.h>
-#include <linux/skbuff.h>
 #include <linux/etherdevice.h>
 
 
@@ -103,9 +93,8 @@
 #define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0a
 #define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0b
 #define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_SET_MAC		ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0e
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -171,10 +160,6 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "set_led_power" },
-{ cmd : ACX100_IOCTL_SET_MAC,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 6,
-	get_args : 0,
-	name : "set_mac_addr" },
 { cmd : ACX100_IOCTL_MONITOR,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
@@ -278,12 +263,12 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 	priv->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
-	if (priv->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
+	if (priv->macmode == ACX_MODE_3_MANAGED_AP) {
 		/* hmm, AP mode? So simply set channel... */
 		acxlog(L_IOCTL, "Changing to channel %d\n", priv->channel);
 		priv->set_mask |= GETSET_TX|GETSET_RX;
-	} else if (priv->macmode == WLAN_MACMODE_ESS_STA	/* 2 */
-		|| priv->macmode == WLAN_MACMODE_NONE /* 0 */ ) {
+	} else if (priv->macmode == ACX_MODE_2_MANAGED_STA
+		|| priv->macmode == ACX_MODE_0_IBSS_ADHOC) {
 		/* trigger scanning... */
 		priv->set_mask |= GETSET_CHANNEL;
 	}
@@ -335,10 +320,14 @@ static inline int acx100_ioctl_set_mode(struct net_device *dev, struct iw_reques
 	}
 
 	if (*uwrq == IW_MODE_ADHOC)
-		priv->mode = 0;
+		priv->mode = ACX_MODE_0_IBSS_ADHOC;
 	else if (*uwrq == IW_MODE_INFRA)
-		priv->mode = 2;
-	else {
+		priv->mode = ACX_MODE_2_MANAGED_STA;
+	else if (*uwrq == IW_MODE_MASTER) {
+		priv->mode = ACX_MODE_3_MANAGED_AP;
+		priv->macmode = priv->mode; /* Master (AP) is just sitting there and waiting for others to connect, so the MAC mode we're currently "in" is AP, right? */
+		/* FIXME: we also have to set the BSSID to the card's MAC address somewhere, right? */
+	} else {
 		result = -EOPNOTSUPP;
 		goto end_unlock;
 	}
@@ -360,20 +349,24 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 	acxlog(L_IOCTL, "Get Mode => %d\n", priv->macmode);
 
 	if (priv->status != ISTATUS_4_ASSOCIATED)
-	/* if (!priv->ifup) */
+	/* if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) */
 	{ /* connection not up yet, so for now indicate the mode we want,
 	     not the one we are in */
-		if (priv->mode == 0)
+		if (priv->mode == ACX_MODE_0_IBSS_ADHOC)
 			*uwrq = IW_MODE_ADHOC;
-		else if (priv->mode == 2)
+		else if (priv->mode == ACX_MODE_2_MANAGED_STA)
 			*uwrq = IW_MODE_INFRA;
+		else if (priv->mode == ACX_MODE_3_MANAGED_AP)
+			*uwrq = IW_MODE_MASTER;
 	}
 	else
 	{
-		if (priv->macmode == WLAN_MACMODE_NONE /* 0 */ )
+		if (priv->macmode == ACX_MODE_0_IBSS_ADHOC)
 			*uwrq = IW_MODE_ADHOC;
-		else if (priv->macmode == WLAN_MACMODE_ESS_STA /* 2 */ )
+		else if (priv->macmode == ACX_MODE_2_MANAGED_STA)
 			*uwrq = IW_MODE_INFRA;
+		else if (priv->macmode == ACX_MODE_3_MANAGED_AP)
+			*uwrq = IW_MODE_MASTER;
 	}
 	return 0;
 }
@@ -418,7 +411,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
                ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
 
-	if (priv->macmode != WLAN_MACMODE_ESS_STA) {
+	if (priv->macmode != ACX_MODE_2_MANAGED_STA) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -497,7 +490,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 		goto end;
 	}
 
-	if (priv->macmode != WLAN_MACMODE_ESS_AP /* 3 */ )
+	if (priv->macmode != ACX_MODE_3_MANAGED_AP)
 	{
 		result = -EOPNOTSUPP;
 		goto end;
@@ -614,7 +607,7 @@ static inline int acx100_ioctl_set_scan(struct net_device *dev, struct iw_reques
 	FN_ENTER;
 
 	/* don't start scan if device is not up yet */
-	if (priv->open == 0) {
+	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		result = -EAGAIN;
 		goto end;
 	}
@@ -673,10 +666,13 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 
 	/* Add link quality */
 	iwe.cmd = IWEVQUAL;
-	/* FIXME: are these values being correctly calculated? */
-	iwe.u.qual.level = bss->sir;
-	iwe.u.qual.noise = bss->snr;
-	iwe.u.qual.qual = 0;
+	/* FIXME: these values should be expressed in dBm, but we don't know
+	 * how to calibrate it yet */
+	iwe.u.qual.level = bss->sir * 100 / 255;
+	iwe.u.qual.noise = bss->snr * 100 / 255;
+	iwe.u.qual.qual = (iwe.u.qual.noise <= 100) ?
+				100 - iwe.u.qual.noise : 0;
+	iwe.u.qual.updated = 7;
 	acxlog(L_IOCTL, "scan, link quality: %d/%d/%d\n", iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_QUAL_LEN);
 
@@ -714,23 +710,31 @@ static inline int acx100_ioctl_get_scan(struct net_device *dev, struct iw_reques
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	char *ptr = extra;
 	int i;
+	int result = 0;
 
 	FN_ENTER;
 
 	/* no scan available if device is not up yet */
-	if (priv->open == 0)
-		return -EAGAIN;
+	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP))
+	{
+		result = -EAGAIN;
+		goto end;
+	}
 
 	if (priv->scan_start && time_before(jiffies, priv->scan_start + 3*HZ))
 	{
 		/* scan still in progress, so no results yet, sorry */
-		return -EAGAIN;
+		result = -EAGAIN;
+		goto end;
 	}
 	priv->scan_start = 0;
 
 	if (priv->bss_table_count == 0)
+	{
 		/* no stations found */
-		return -ENODATA;
+		result = -ENODATA;
+		goto end;
+	}
 
 	for (i = 0; i < priv->bss_table_count; i++)
 	{
@@ -741,8 +745,9 @@ static inline int acx100_ioctl_get_scan(struct net_device *dev, struct iw_reques
 	dwrq->length = ptr - extra;
 	dwrq->flags = 0;
 
-	FN_EXIT(1, 0);
-	return 0;
+end:
+	FN_EXIT(1, result);
+	return result;
 }
 #endif /* WIRELESS_EXT > 13 */
 
@@ -1160,7 +1165,7 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	if (priv->macmode == WLAN_MACMODE_NONE /* 0 */ ) {
+	if (priv->mode == ACX_MODE_0_IBSS_ADHOC) {
 		/* ok, let's pretend it's supported, but print a
 		 * warning message
 		 * FIXME: should be removed once it's definitely working. */
@@ -1325,18 +1330,29 @@ static inline int acx100_ioctl_set_txpow(struct net_device *dev, struct iw_reque
 	int result = -EINVAL;
 
 	FN_ENTER;
+	acxlog(L_IOCTL, "Set Tx power <= %d, disabled %d, flags 0x%04x\n", vwrq->value, vwrq->disabled, vwrq->flags);
 	if ((err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
-	if (vwrq->value == 255)
-		priv->tx_level_auto = 1;
-	else
-	{
+	if (vwrq->disabled != priv->tx_disabled) {
+		priv->set_mask |= GETSET_TX; /* Tx status needs update later */
+	}
+
+	priv->tx_disabled = vwrq->disabled;
+	if (vwrq->value == -1) {
+		if (vwrq->disabled) {
+			priv->tx_level_dbm = 0;
+			acxlog(L_IOCTL, "Disable radio Tx\n");
+		} else {
+			priv->tx_level_auto = 1;
+			acxlog(L_IOCTL, "Set Tx power auto (NIY)\n");
+		}
+	} else {
 		priv->tx_level_dbm = vwrq->value <= 20 ? vwrq->value : 20;
 		priv->tx_level_auto = 0;
+		acxlog(L_IOCTL, "Set Tx power = %d dBm\n", priv->tx_level_dbm);
 	}
-	acxlog(L_IOCTL, "Set transmit power = %d dBm\n", priv->tx_level_dbm);
 	priv->set_mask |= GETSET_TXPOWER;
 	acx100_unlock(priv, &flags);
 	result = -EINPROGRESS;
@@ -1755,7 +1771,7 @@ static inline int acx100_ioctl_set_reg_domain(struct net_device *dev, struct iw_
 		goto end;
 	}
 
-	if ((*extra < 1) || (*extra > sizeof(reg_domain_ids))) {
+	if ((*extra < 1) || ((size_t)*extra > sizeof(reg_domain_ids))) {
 		result = -EINVAL;
 		goto end_unlock;
 	}
@@ -2234,38 +2250,8 @@ end:
 	return result;
 }
 
-static inline int acx100_ioctl_set_mac_address(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
-{
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	unsigned long flags;
-	UINT8 *mac = (unsigned char *)extra;
-	UINT8 *a;
-	int err;
-	int result = -EINVAL;
-
-	if ((err = acx100_lock(priv, &flags))) {
-		result = err;
-		goto end;
-	}
-	a = dev->dev_addr;
-	printk("current MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-			a[0], a[1], a[2], a[3], a[4], a[5]);
-	
-	acx100_copy_mac_address(priv->dev_addr, mac);
-	acx100_copy_mac_address(dev->dev_addr, priv->dev_addr);
-
-	printk("new MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-			a[0], a[1], a[2], a[3], a[4], a[5]);
-	
-	acx100_unlock(priv, &flags);
-	result = 0;
-
-end:
-	return result;
-}
-
 #if WIRELESS_EXT >= 13
-#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for newer wireless extension interface version (>= 13)"
+#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for NEWER wireless extension interface version (>= 13)"
 static const iw_handler acx100_ioctl_handler[] =
 {
 	(iw_handler) acx100_ioctl_commit,	/* SIOCSIWCOMMIT */
@@ -2352,7 +2338,6 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
 	(iw_handler) acx100_ioctl_set_led_power,
-	(iw_handler) acx100_ioctl_set_mac_address,
 	(iw_handler) acx100_ioctl_wlansniff,
 	(iw_handler) acx100_ioctl_unknown11
 };
@@ -2397,7 +2382,7 @@ const struct iw_handler_def acx100_ioctl_handler_def =
 * in the new one (acx100_ioctl_handler[])!
 *
 *----------------------------------------------------------------*/
-int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
+int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	int result = 0;
@@ -2418,8 +2403,8 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 /* WE 13 and higher will use acx100_ioctl_handler_def */
 #if WIRELESS_EXT < 13
-#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for older wireless extension interface version (< 13)"
-#warning "This is untested, please report if it works for you"
+#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for OLDER wireless extension interface version (< 13)"
+#warning "This support is not perfectly tested, please report any problems! Upgrading to relatively current Linux kernel package recommended (will also fix some security issues which older ones have)"
 	case SIOCGIWNAME:
 		/* get name == wireless protocol */
 		result = acx100_ioctl_get_name(dev, NULL,
@@ -2533,18 +2518,49 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 
 	case SIOCGIWESSID:
 		/* get ESSID */
-		result = acx100_ioctl_get_essid(dev, NULL, &(iwr->u.essid),
-						NULL);
+		{
+			char essid[IW_ESSID_MAX_SIZE+1];
+			if (iwr->u.essid.pointer)
+				result = acx100_ioctl_get_essid(dev, NULL,
+					&(iwr->u.essid), essid);
+			if (copy_to_user(iwr->u.essid.pointer, essid,
+						iwr->u.essid.length))
+				result = -EFAULT;
+		}
 		break;
 
 	case SIOCSIWNICKN:
-		result = acx100_ioctl_set_nick(dev, NULL, &(iwr->u.data),
-					       NULL);
+		/* set nick */
+		{
+			char nick[IW_ESSID_MAX_SIZE+1];
+
+			if (iwr->u.data.length > IW_ESSID_MAX_SIZE)
+			{
+				result = -E2BIG;
+				break;
+			}
+			if (copy_from_user(nick, iwr->u.data.pointer,
+						iwr->u.data.length))
+			{
+				result = -EFAULT;
+				break;
+			}
+			result = acx100_ioctl_set_nick(dev, NULL,
+					&(iwr->u.data), nick);
+		}
 		break;
 
 	case SIOCGIWNICKN:
-		result = acx100_ioctl_get_nick(dev, NULL, &(iwr->u.data),
-					       NULL);
+		/* get nick */
+		{
+			char nick[IW_ESSID_MAX_SIZE+1];
+			if (iwr->u.data.pointer)
+				result = acx100_ioctl_get_nick(dev, NULL,
+						&(iwr->u.data), nick);
+			if (copy_to_user(iwr->u.data.pointer, nick,
+						iwr->u.data.length))
+				result = -EFAULT;
+		}
 		break;
 
 	case SIOCSIWRATE:
@@ -2653,10 +2669,6 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		acx100_ioctl_set_led_power(dev, NULL, NULL, iwr->u.name);
 		break;
 		
-	case ACX100_IOCTL_SET_MAC:
-		acx100_ioctl_set_mac_address(dev, NULL, NULL, iwr->u.name);
-		break;
-		
 	case ACX100_IOCTL_MONITOR:	/* set sniff (monitor) mode */
 		acxlog(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
 
@@ -2687,11 +2699,18 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		break;
 	}
 
-	if (priv->open && priv->set_mask)
+	if ((priv->dev_state_mask & ACX_STATE_IFACE_UP) && priv->set_mask)
 		acx100_update_card_settings(priv, 0, 0, 0);
 
+#if WIRELESS_EXT < 13
+	/* older WEs don't have a commit handler,
+	 * so we need to fix return code in this case */
+	if (-EINPROGRESS == result)
+		result = 0;
+#endif
+
 #if THIS_LEADS_TO_CRASHES
-	if (priv->mode != 2 && reinit == 1) {
+	if (priv->mode != ACX_MODE_2_MANAGED_STA && reinit == 1) {
 		if (result = acx100_lock(priv, &flags))
 			return result;
 
@@ -2707,7 +2726,7 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 			result = -EFAULT;
 		}
 
-		acx100_client_sta_list_init();
+		acx100_sta_list_init();
 
 		acx100_unlock(priv, &flags);
 	}

@@ -191,10 +191,11 @@ extern int acx100_debug_func_indent;
 #define ACX100_RATEBIT_5dot5			((UINT16)4)
 #define ACX100_RATEBIT_11			((UINT16)8)
 
-
+/* Radio type names, found in Win98 driver's TIACXLN.INF */
 #define RADIO_MAXIM_0D		0x0d
 #define RADIO_RFMD_11		0x11
-#define RADIO_UNKNOWN_15	0x15
+#define RADIO_RALINK_15		0x15
+#define RADIO_UNKNOWN_16	0x16	/* used in ACX111 cards */
 
 /*--- IRQ Constants ----------------------------------------------------------*/
 #define HOST_INT_TIMER			0x40
@@ -1743,6 +1744,21 @@ typedef struct acx100_InfFrame {
 	acx100_infodata_t info __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_InfFrame_t;
 
+
+/* Descriptor Control Bits */
+
+#define ACX100_CTL_PREAMBLE   0x01	/* Preable type: 0 = long; 1 = short */
+#define ACX100_CTL_FIRSTFRAG  0x02	/* This is the 1st frag of the frame */
+#define ACX100_CTL_AUTODMA    0x04
+#define ACX100_CTL_RECLAIM    0x08	/* ready to reuse */
+#define ACX100_CTL_HOSTDONE   0x20	/* host has finished processing */
+#define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
+#define ACX100_CTL_OWN        0x80	/* host owns the desc */
+
+
+
+
+
 #if (WLAN_HOSTIF == WLAN_USB)
 
 /*============================================================================*
@@ -1781,13 +1797,6 @@ typedef struct acx100_InfFrame {
 #define ACX100_USB_TXHI_DIRECTED   0x2
 #define ACX100_USB_TXHI_BROADCAST  0x4
 
-#define ACX100_USB_CTL_PREAMBLE   0x01
-#define ACX100_USB_CTL_FIRSTFRAG  0x02
-#define ACX100_USB_CTL_AUTODMA    0x04
-#define ACX100_USB_CTL_RECLAIM    0x08
-#define ACX100_USB_CTL_HOSTDONE   0x20
-#define ACX100_USB_CTL_ACXDONE    0x40
-#define ACX100_USB_CTL_OWN        0x80
 
 #define ACX100_USB_CTL2_FCS       0x02
 #define ACX100_USB_CTL2_MORE_FRAG 0x04
@@ -2335,9 +2344,19 @@ typedef struct bss_info {
  * Main acx100 per-device data structure (netdev->priv)                       *
  *============================================================================*/
 
+#define ACX_STATE_FW_LOADED	0x01
+#define ACX_STATE_IFACE_UP	0x02
+
+/* MAC mode (BSS type) defines for ACX100.
+ * Note that they shouldn't be redefined, since they are also used
+ * during communication with firmware */
+#define ACX_MODE_0_IBSS_ADHOC	0
+#define ACX_MODE_1_UNUSED	1
+#define ACX_MODE_2_MANAGED_STA	2
+#define ACX_MODE_3_MANAGED_AP	3
+
 /* FIXME: this should be named something like struct acx100_priv (typedef'd to
  * acx100_priv_t) */
-
 typedef struct wlandevice {
 	/*** Device chain ***/
 	struct wlandevice *next;	/* link for list of devices */
@@ -2361,12 +2380,15 @@ typedef struct wlandevice {
 	/*** USB stuff ***/
 #if (WLAN_HOSTIF==WLAN_USB)
 	struct usb_device *usbdev;
-	acx100_usbout_t usbout;
 	acx100_usbin_t usbin;
 	acx100_usbin_t bulkin;
+	acx100_usbout_t usbout;
+	acx100_usbout_t bulkout;
 	struct urb *urb;
 	struct urb *bulkrx_urb;
-	struct usb_ctrlrequest usb_setup;
+	struct urb *bulktx_urb;
+	/* struct usb_ctrlrequest usb_setup; not needed and not
+	 * available in older kernel versions */
 #endif
 
 	/*** Procfs support ***/
@@ -2400,11 +2422,10 @@ typedef struct wlandevice {
 	char *chip_name;
 	UINT *io;
 
-	/*** Device status ***/
+	/*** Device state ***/
 	int hw_unavailable;	/* indicates whether the hardware has been
-				 * suspended or ejected */
-	int open;
-	UINT8 ifup;		/* whether the device is up */
+				 * suspended or ejected. actually a counter. */
+	int dev_state_mask;
 	int monitor;		/* whether the device is in monitor mode */
 	int monitor_setting;
 	char led_power;		/* power led status */
@@ -2412,7 +2433,7 @@ typedef struct wlandevice {
 	UINT32 set_mask;	/* mask of settings to write to the card */
 
 	/*** Wireless network settings ***/
-	UINT8 dev_addr[MAX_ADDR_LEN];
+	UINT8 dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over when it makes sense only */
 	UINT8 address[WLAN_ADDR_LEN];
 	UINT8 bssid[WLAN_ADDR_LEN];
 	UINT8 ap[ETH_ALEN];	/* The AP we want, FF:FF:FF:FF:FF:FF is any */
@@ -2448,6 +2469,7 @@ typedef struct wlandevice {
 	UINT16 ps_enhanced_transition_time;
 
 	/*** PHY settings ***/
+	unsigned char tx_disabled;
 	unsigned char tx_level_dbm;
 	unsigned char tx_level_val;
 	char tx_level_auto; /* whether to do automatic power adjustment */
@@ -2510,6 +2532,9 @@ typedef struct wlandevice {
 	char dtim_interval;	/* V3POS 2302 */
 	char val0x2324[0x8];	/* V3POS 2324 */
 } wlandevice_t __WLAN_ATTRIB_PACK__;
+/* DON'T optimize this struct by scaling variables down to their actual size!
+ * It will take even MORE memory, probably due to register loading
+ * issues (bigger code size) */
 
 /*-- MAC modes --*/
 #define WLAN_MACMODE_NONE	0
@@ -2588,6 +2613,9 @@ typedef struct wlandevice {
 #define GETSET_LED_POWER	0x00020000
 #define GETSET_POWER_80211	0x00040000
 #define GETSET_ALL		0x80000000
+
+void acx100_disable_irq(wlandevice_t *priv);
+void acx100_enable_irq(wlandevice_t *priv);
 
 /*============================================================================*
  * Locking and synchronization functions                                      *

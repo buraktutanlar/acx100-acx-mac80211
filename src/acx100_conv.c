@@ -59,27 +59,20 @@
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
 
-#include <wlan_compat.h>
-
 #include <linux/ioport.h>
-#include <linux/pci.h>
 
 #include <linux/dcache.h>
 #include <linux/highmem.h>
-#include <linux/sched.h>
-#include <linux/skbuff.h>
 #include <linux/etherdevice.h>
-#include <version.h>
 
-#include <p80211hdr.h>
+#include <wlan_compat.h>
+
 #include <p80211mgmt.h>
 #include <acx100.h>
 #include <acx100_conv.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
-#include <acx100_helper2.h>
 #include <idma.h>
-#include <ihw.h>
 
 static UINT8 oui_rfc1042[] = { 0x00, 0x00, 0x00 };
 static UINT8 oui_8021h[] = { 0x00, 0x00, 0xf8 };
@@ -237,19 +230,19 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	acxlog(L_DEBUG, "MODE: %d\n", priv->macmode);
 	switch (priv->macmode) {
-	case WLAN_MACMODE_NONE:		/* 0 */
-	case WLAN_MACMODE_IBSS_STA:	/* 1 */
+	case ACX_MODE_0_IBSS_ADHOC:
+	case ACX_MODE_1_UNUSED:
 		a1 = e_hdr->daddr;
 		a2 = priv->netdev->dev_addr;
 		a3 = priv->bssid;
 		break;
-	case WLAN_MACMODE_ESS_STA:	/* 2 */
+	case ACX_MODE_2_MANAGED_STA:
 		fc |= host2ieee16(WLAN_SET_FC_TODS(1));
 		a1 = priv->bssid;
 		a2 = priv->netdev->dev_addr;
 		a3 = e_hdr->daddr;
 		break;
-	case WLAN_MACMODE_ESS_AP:	/* 3 */
+	case ACX_MODE_3_MANAGED_AP:
 		fc |= host2ieee16(WLAN_SET_FC_FROMDS(1));
 		a1 = e_hdr->daddr;
 		a2 = priv->bssid;

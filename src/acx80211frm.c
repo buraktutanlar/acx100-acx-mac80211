@@ -50,35 +50,16 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
-#include <linux/module.h>
-#include <linux/kernel.h>
-
-#include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/skbuff.h>
-#include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#include <linux/netdevice.h>
 
 #include <wlan_compat.h>
-
-#include <linux/ioport.h>
-#include <linux/pci.h>
-
-#include <linux/dcache.h>
-#include <linux/highmem.h>
-#include <linux/sched.h>
-#include <linux/skbuff.h>
-#include <linux/etherdevice.h>
 
 
 /*================================================================*/
 /* Project Includes */
 
-#include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100.h>

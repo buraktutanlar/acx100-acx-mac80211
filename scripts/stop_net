@@ -11,6 +11,6 @@ unload module."; else $IFCONF $DEV down; fi
 
 sleep 1
 if test -z "$RMMOD"; then echo "rmmod not found. Go get a sane Linux system. Bailing..."; exit 1; fi 
-$RMMOD acx100_pci
+$RMMOD acx_pci
 if test "$?" = "0"; then echo "$DEV deconfigured, module unloaded."; else echo "Module not unloaded, or wasn't loaded."; fi
 

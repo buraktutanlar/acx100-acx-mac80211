@@ -50,51 +50,22 @@ extern void acx100usb_dump_bytes(void *,int);
 #include <linux/kernel.h>
 
 #include <linux/usb.h>
-#include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/skbuff.h>
-#include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
-#include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/pm.h>
-#include <asm/pci.h>
-#include <linux/dcache.h>
-#include <linux/highmem.h>
-#include <linux/sched.h>
-#include <linux/skbuff.h>
-#include <linux/etherdevice.h>
 
 
 /*================================================================*/
 /* Project Includes */
 
-#include <version.h>
 #include <p80211hdr.h>
-#include <p80211mgmt.h>
-#include <acx100_conv.h>
-#include <p80211msg.h>
-//#include <p80211ioctl.h>
 #include <acx100.h>
-//#include <p80211req.h>
-#include <p80211types.h>
 #include <acx100_helper.h>
-#include <acx100_helper2.h>
-#include <idma.h>
 #include <ihw.h>
-//#include <acx100mgmt.h>
 #include <acx100.h>
 
 

@@ -37,10 +37,6 @@ set_led_power - change power LED setting (save power)
 Default: on
 "iwpriv wlan0 set_led_power 0", "dmesg"
 
-set_mac_addr - change the MAC address
-Default: card-dependent
-"iwpriv wlan0 set_mac_addr 0x11 0x22 0x33 0x44 0x55 0x66", "dmesg"
-
 monitor - activate Kismet monitor mode (Orinoco card type)
 Default: off
 "iwpriv wlan0 monitor 2 4"

@@ -3,10 +3,12 @@
 DL_DIR=/tmp/acx100_driver_download
 ACX100_FILE_LOCATIONS="
 ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_drivers_307.zip
-http://www.d-link.de/docs/driver/dwl520+/AirPlus_v3.06.zip
+ftp://ftp.dlink.co.uk/wireless/dwl-520+/dwl-520+_drv_v3.06_1007_inc_utility.zip
+ftp://ftp.dlink.de/dwl-products/dwl-520PLUS/Treiber_Firmware/dwl520+_driver_eng_3.07.zip
 "
 ACX111_FILE_LOCATIONS="
-http://www.d-link.de/docs/driver/dwlg650+/DWL-G650+Utility+Driver.zip
+ftp://ftp.dlink.co.uk/wireless/dwl-g650+/dwl-g650+_drv_v1.0.zip
+ftp://ftp.dlink.de/dwl-products/dwl-g650PLUS/Treiber_Firmware/DWLG650plus_driver_eu_v.1.0.zip
 "
 
 find_driver_dir()

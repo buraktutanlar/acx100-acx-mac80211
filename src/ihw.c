@@ -42,41 +42,22 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-#include <linux/sched.h>
-#include <linux/types.h>
-#include <linux/skbuff.h>
-#include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#include <linux/netdevice.h>
 
 #include <wlan_compat.h>
 
-#include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/pm.h>
 
-#include <linux/dcache.h>
-#include <linux/highmem.h>
-#include <linux/sched.h>
-#include <linux/skbuff.h>
 #include <linux/etherdevice.h>
 
 
 /*================================================================*/
 /* Project Includes */
 
-#include <version.h>
 #include <p80211hdr.h>
-#include <p80211mgmt.h>
-#include <acx100_conv.h>
 #include <acx100.h>
-#include <p80211types.h>
 #include <acx100_helper.h>
-#include <acx100_helper2.h>
-#include <idma.h>
 #include <ihw.h>
 
 void acx100_dump_bytes(void *,int);
@@ -459,6 +440,12 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);
 
+	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED))
+	{
+		acxlog(L_CTL, "firmware not loaded yet, cannot execute command!!\n");
+		goto done;
+	}
+	
 	if (cmd!=ACX100_CMD_INTERROGATE) {
 		acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
 		acx100_dump_bytes(pcmdparam,paramlen);
@@ -566,7 +553,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		result = 1;
 	}
 
-      done:
+done:
 	FN_EXIT(1, result);
 	return result;
 }

@@ -200,7 +200,7 @@ typedef struct TxData {
 	} body;
 } TxData;			/* size: 2400 */
 
-void acx100_client_sta_list_init(void);
+void acx100_sta_list_init(void);
 int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
 int acx100_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
 int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
@@ -242,4 +242,4 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
 
 client_t *acx100_sta_list_alloc(UINT8 *address);
 client_t *acx100_sta_list_add(UINT8 *address);
-client_t *acx100_get_sta_list(char *address);
+client_t *acx100_sta_list_get(char *address);

@@ -53,9 +53,9 @@ case $ANSWER in  ( y | Y | Yes | YES | yes | j | J | ja | Ja | JA ) ;;
 esac
 fi
 
-MODULE_AT="${SCRIPT_AT}/../src/acx100_pci.o"
+MODULE_AT="${SCRIPT_AT}/../src/acx_pci.o"
 
-if test ! -r "$MODULE_AT"; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx100_pci.o, relative to the script's location. Bailing..."; exit 1; fi
+if test ! -r "$MODULE_AT"; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx_pci.o, relative to the script's location. Bailing..."; exit 1; fi
 
 # FIRMWARE_AT has to be given as an absolute path!!
 FIRMWARE_AT="${SCRIPT_AT}/../firmware"
@@ -76,7 +76,7 @@ if test "$RATE" != "11M"; then echo "Transfer rate is not 11 Mbps, but $RATE. If
 $SYNC
 sleep 1
 
-if test -n "`lsmod |grep acx100_pci`"; then ${SCRIPT_AT}/stop_net; fi
+if test -n "`lsmod |grep acx_pci`"; then ${SCRIPT_AT}/stop_net; fi
 
 $INSMOD $MODULE_AT debug=$DEBUG firmware_dir=$FIRMWARE_AT
 if test "$?" = "0"; then echo "Module successfully inserted."; else echo "Error while inserting module! Bailing..."; exit 1; fi

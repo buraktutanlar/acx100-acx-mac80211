@@ -2,12 +2,22 @@
 *             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
-WARNING: this driver may still cause your box to lockup!
+WARNING: this driver may still cause your box to lockup in rare cases!
 If this happens, then please report at/create a bug report!
 
 Please NEVER consider using the NDIS driver loader cludge instead of our driver.
 For bazillions of reasons against it, please see
 http://acx100.sourceforge.net/ndis_cludge.html
+If for some or another reason you're unhappy with the performance of our
+current driver version, then either fix it if you're capable of doing that
+or immediately think of returning to the shop or, if that is not possible,
+of selling your very poorly supported Taxed Sinstruments based card in
+exchange for a wireless card that is well-supported under Linux.
+Buying the very problematic DriverLoader product instead in an attempt
+to "fix" missing driver Linux support will send the entirely wrong message to
+wireless card manufacturers, so please never choose to do that.
+There are many commercial products very much worth buying; but this is
+certainly not one of those...
 
 --- CARD COMPATIBILITY (aka "OUCH!!") ---
 
@@ -47,13 +57,13 @@ DWL-AG520 (Atheros AR5212)
 DWL-AB650 (Atheros AR5211)
 DWL-AG650 (Atheros AR5212)
 DWL-G520+ (ACX111: not fully supported yet, but it's being worked on!)
-DWL-G650+ (ACX111)
+DWL-G650+ (ACX111: dito)
 Netgear WG311 "v2" (ACX111, as opposed to v1, which is Atheros!)
 
 When looking at the DWL-G650 mess, I could puke again...
 Again, the cards mentioned in the listing above will NOT work with this driver,
-you will hopefully be able to find a different Linux driver supporting
-your card's chipset...
+in most cases you will need to be able to find a different Linux driver
+supporting your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
 --- STATUS AS OF 031101 ---
@@ -94,13 +104,13 @@ since this seeks to list all requirements in full):
 * a make package has to be installed
 * a gcc package has to be installed
 * The /bin/bash shell is required for the start_net/stop_net scripts
+* module packages: modutils for Linux 2.4.x, module-init-tools for 2.5.x/2.6.x
 * firmware image and radio image for your ACX100 card
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
-* the Linux hotplug package is useful (required??) for CardBus cards
+* the Linux hotplug package is required for automatic setup of CardBus cards
 
 What to NOT do:
-* download the driver via Windows CVS (may insert bogus end-of-line chars)
 * believe that this has much to do with PCMCIA. The ACX100 cards are
   CardBus cards, and thus PCI-based, NOT ISA-based (PCMCIA).
   You probably need the pcmcia-cs package for certain CardBus functions,
@@ -187,7 +197,7 @@ SMCSN.BIN - combined(?) firmware for SMC2435W
 Several drivers are available on the internet, and they all seem to
 work. But since the firmware is embedded in the binary driver, it needs
 to be extracted. Place the driver in the firmware directory and make
-sure it is called acx100_pci.o. Then run 'make extract_firmware', and
+sure it is called acx_pci.o. Then run 'make extract_firmware', and
 you are set. Make sure that no radio modules (RADIO*.BIN) files are
 placed in the firmware directory when using a linux firmware, otherwise
 the driver will attempt to load and initialise the radio module for your
@@ -199,10 +209,10 @@ The firmware version which this Linux driver contains is 1.5.0,
 as printed during our driver initialisation.
 
 
-You may tell us about your experiences with various firmware versions on
-our Wiki page FirmwareExperiences.
+You may tell us about your experiences with various firmware versions,
+then we'll add that info to doc/firmware_versions.txt.
 
---- "NORMAL" INSTALLATION ---
+--- "NORMAL" DRIVER INSTALLATION ---
 
 This is the usual way to get the driver running on Linux 2.4.x.
 
@@ -210,7 +220,8 @@ You have two choices:
 
 The fast way:
   Just run "make" in the main directory, and your driver will be ready
-  in a second. It is located in src/acx100_pci.o .
+  in a second. It is located in src/acx_pci.o .
+  (NOTE: changed from acx100_pci.o!!)
 
   In case the build fails, then please make sure that the symbolic link
   /lib/modules/`uname -r`/build exists and points to the matching
@@ -223,40 +234,66 @@ The slow way:
   Then you type "make driver". This will compile a driver for
   Linux 2.4.x (for 2.5 / 2.6 see below)
 
-No install option has yet been provided (because the driver is still a bit
-experimental anyway :)
-
 To run the driver, you can use the script scripts/start_net (and adapt it).
 Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
 Further system configuration can be found at SYSTEM CUSTOMIZATION below.
 
-DON'T FORGET that debugging/logging options can be changed in a pretty
-powerful way by setting the module's "debug" parameter and/or its
-preinitialisation value in acx100.c and/or via the iwpriv set_debug setting.
-A good default value after having managed to get the driver to run would be
-0xb (L_STD|L_INIT|L_ASSOC debug channels). Your hard disk will certainly
-thank you a lot for having saved it from the horror of heaps of logs once
-you got the driver running...
-To check out further module parameters and options, please use modinfo
-and iwpriv.
+"make install" will copy the driver modules to the current kernel's
+module directory and will run depmod. If successful, the system should
+attempt to auto load the driver on card insert.
 
-The module itself can be loaded e.g. like:
-insmod src/acx100_pci.o firmware_dir=firmware
+In order to get the driver to autoload properly (with a proper
+firmware_dir), you could add e.g. to /etc/modprobe.d/acx_wlan
+(or /etc/modprobe.conf):
+options acx_pci firmware_dir=/absolute/path/to/firmware_files debug=0x0
+options acx_usb firmware_dir=/absolute/path/to/firmware_files debug=0x0
+and run update-modules (this will be added to "make install" soon).
+
+Once you insert the card, the driver will then load automatically
+without error (and will shut down the interface once you eject the card).
+Note that the spinlocks inside the driver are still problematic,
+so you should avoid ejecting the card in the middle of a data transfer
+(OOPS may happen!). A completely safe way to eject is to ifconfig down
+the interface, THEN eject the card.
+
+Automatic networking configuration of such a setup can be achieved by
+reading the guidelines at
+http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/HOTPLUG.txt
+However, this seems to still be a bit static.
+A more mobile approach might be the ifplugd/waproamd programs
+(configuration dependent on stations in reach).
+
+DON'T FORGET that debugging/logging options can be changed in a pretty
+powerful way (see DEBUGGING / LOGGING).
+Your hard disk will certainly thank you a lot for having saved it from
+the horror of heaps of logs once you got the driver running...
+To check out further module parameters and options, please use modinfo
+and iwpriv (see also doc/iwpriv.txt).
+
+The module itself can be loaded manually e.g. like:
+insmod src/acx_pci.o firmware_dir=firmware
 
 NOTE that firmware_dir has to be given as an absolute path; a relative
-path will cause trouble during card reinit operations!!
+path will cause trouble during card reinit operations!! (suspend/resume etc.)
 
 If you want the driver to use eth0 device name instead of wlan0,
 then load with an activated use_eth_name option, like:
-insmod src/acx100_pci.o firmware_dir=firmware use_eth_name=1
+insmod src/acx_pci.o firmware_dir=firmware use_eth_name=1
 
 For troubleshooting, see below.
 
---- LINUX 2.6 INSTALLATION ---
+--- LINUX 2.6 DRIVER INSTALLATION ---
 
 In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
-source tree and have to build the module "in-tree" (i.e. not in a separate
-acx100 module directory!). You'll have to:
+source tree.
+
+In order to build the module outside of a 2.6 kernel tree, just use the
+normal method as described for 2.4.x above (you'll most likely need to
+compile it as root since it needs write access in your kernel source
+directory).
+
+If instead you want to build the module "in-tree" (i.e. not in a separate
+acx100 module directory!), you'll have to:
 
 1. Create a directory drivers/net/wireless/acx100 in your 2.6 source tree.
 2. Copy the files
@@ -267,12 +304,13 @@ acx100 module directory!). You'll have to:
 3. Add a line reading "obj-m += acx100/" to the bottom of
    drivers/net/wireless/Makefile .
 4. Then build your kernel as usual, the acx100 driver will be built as module
-   (acx100_pci.ko). Make sure you have the required 2.6 module userspace
+   (acx_pci.ko). Make sure you have the required 2.6 module userspace
    package (module-init-tools) and enjoy ;-)
 
 --- USAGE HINTS ---
 
-iwpriv commands? See doc/iwpriv.txt
+Want to use driver as BUILTIN kernel driver, but then driver fails to know
+where the firmware files are? Use kernel boot parameter acx_firmware_dir=XXX.
 
 Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
@@ -284,30 +322,59 @@ Wired-Wireless bridging? Driver would perhaps need to support WDS
 (whatever that is). For now, proxy ARP should do:
 http://www.hazard.maks.net/parprouted/
 
+--- DEBUGGING / LOGGING ---
+
+Debug/log levels can be adapted by setting the module's "debug" load parameter
+and/or via the "iwpriv set_debug" command and/or the default log value
+(variable "debug") in src/acx100.c.
+A good default value after having managed to get the driver to run would be
+0xb (thus using L_STD|L_INIT|L_ASSOC debug channels, see include/acx100.h).
+
+Example:
+insmod src/acx_pci.o ... debug=0xffff
+iwpriv wlan0 set_debug 0xffff
+
+-- log file --
+
+Log output of the driver gets written to the file which the
+KERN_WARNING channel gets written to (somewhere in /var/log/).
+The exact file name used for this log file is configured in the syslog
+configuration file which is called /etc/sysklogd.conf or similar.
+
+-- log console --
+
+A log console (e.g. /dev/tty8) may be configured in /etc/syslog*.conf
+(don't forget to restart syslogd).
+Change to the logging console (Ctrl-Alt-F8) to view the kernel log messages
+instantly (useful in case of driver crash debugging).
+
 --- TROUBLESHOOTING / WORKAROUNDS ---
 
 Don't forget to set the driver debug/log level (see above) to 0xffff in case
 normal message logging is insufficient to resolve your card problem!
-Also, cat /proc/driver/acx100* might give some clues...
+Also, cat /proc/driver/acx* might give some clues...
 
 -- Driver build problems --
+
 If the driver compile or loading keeps failing, then it might be caused
 by a module version conflict of your current kernel, such as:
 
-./../src/acx100_pci.o: unresolved symbol unregister_netdev_Rdbdb76d4
+./../src/acx_pci.o: unresolved symbol unregister_netdev_Rdbdb76d4
 
 Consider completely recompiling the kernel (make sure to keep any old
 .config file with previous config settings!), then removing the WHOLE
 /lib/modules/KERNELVERSION/ directory tree, then reinstalling this kernel and
 rebooting. Hopefully the driver compiling works then.
 
+Also, I hope you haven't downloaded the driver via Windows CVS (since it
+may insert bogus end-of-line chars).
+  
 -- Driver init failure --
 
 - CardBus specific -
-You need to make sure you're having
-CardBus support (otherwise you'll have strange PCI init failures),
-and it should be kernel CardBus support, not pcmcia-cs CardBus modules!
-(yenta socket module instead of e.g. i82365 module)
+You need to make sure you're having CardBus support (otherwise you'll have
+strange PCI init failures), and it should be kernel CardBus support, not
+pcmcia-cs CardBus modules! (yenta socket module instead of e.g. i82365 module)
 On SUSE: "kernel" type instead of "external".
 Thinkpad notebook? Make sure your CardBus feature is enabled in the
 configuration utility...
@@ -317,7 +384,7 @@ further memory and port areas in /etc/pcmcia/config.opts (restart
 pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
 And of course also trying the other CardBus slot in case you are lucky
-enough to have 2 slots sometimes helps to fix IRQ problems...
+enough to have 2 slots sometimes actually helped to fix IRQ problems...
 
 - General -
 If the system detects your card, but the driver is unable to initialize the
@@ -332,17 +399,18 @@ at all or not in certain crippled PCI slots.
 And of course there are also cases where it is PCI interrupt sharing which
 causes init trouble. A log message like "PCI: Sharing IRQ 3 with 00:01.1"
 indicates that sharing is happening, which might cause trouble.
-Using APM instead of ACPI has also been reported as fixing init problems, so
-reconfigure your kernel to use the other one...
+Using APM instead of ACPI has also been reported several times as fixing
+init problems, so reconfigure your kernel to use the other one...
+(kernel boot parameter "pci=noacpi" might be useful here, and it also
+helped several times!)
 
 -- Driver locked up the box --
 Umm... ouch!
 First, use newest driver version.
-Then please configure a logging console (e.g. /dev/tty8) in
-/etc/syslog*.conf, restart syslogd, then do:
-sleep 10 && insmod acx100_pci ......
-Then change to the logging console (Ctrl-Alt-F8), wait 10 seconds
-and write down the crash dump.
+Then please configure a log console (see DEBUGGING / LOGGING).
+Run
+sleep 10 && insmod acx_pci ......
+Then change to the log console, wait 10 seconds and write down the crash dump.
 Then please file a bug report. Thanks!
 
 This could also happen due to some PCI bus incompatibility (the ACX100
@@ -363,12 +431,7 @@ Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a card set to Peer).
 Further, the ESSID is CaSe SEnsITivE!
 
-Then read the file containing the driver log (the file where
-the KERN_WARNING channel gets written to, somewhere in /var/log),
-as given in the syslog configuration file which is called /etc/sysklogd.conf
-or similar.
-debug level can be changed by doing e.g.
-iwpriv wlan0 set_debug 0xffff
+Then read the file containing the driver log (see DEBUGGING / LOGGING).
 
 Make sure that network association is working properly!
 (all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
@@ -397,11 +460,24 @@ Signal level 21/100 (anything less: connection lost @1Mbps)
 Noise level 0/100 (anything more can be problematic, > 10 is deadly)
 Link Quality == reverse of Noise level
 
+Note that these signal levels are *NOT* expressed in dBm (contrary to
+what too many people think, since in Windows it is in dBm), instead it's a
+percentage value (of course, since xx/100 is percentage). Hopefully
+we'll be able to calibrate our driver soon to show dBm values :-\
+
 Also try other channel values to reduce interference by cordless phones,
 microwaves etc.
 
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
+
+If you experience complete traffic lockups after some random time,
+then maybe consider temperature issues. At least one time an overheated
+ACX100 CardBus led to IRQ loss and thus an accumulation of busy ring
+buffers. But of course we're quite certain several traffic lockups
+are NOT related to temperature...
+Especially, don't use hdparm -u1, since it may lockup/delay driver IRQ
+operation for some yet unknown reason
 
 If you still have trouble getting a connection, or if the connection is
 problematic, then try
@@ -419,10 +495,10 @@ since this severely degrades tracking quality.
 
 ****************************************
 A useful report would include:
-- the acx100_log.txt file created via
-    "cat /proc/driver/acx100* > /tmp/acx100_log.txt"
+- the acx_proc.txt file created via
+    "cat /proc/driver/acx* > /tmp/acx_proc.txt"
 - in case you're experiencing connection issues or similar:
-    the output log files of the debug=XXXX parameter (see above)
+    the output log files of the debug=XXXX parameter (see DEBUGGING / LOGGING)
 ****************************************
 
 Thanks for listening!
@@ -472,6 +548,12 @@ that script as a properly executed init script in /etc/[rc.d]/init.d/
 Then create e.g. runlevel 2 symlinks ("ln -s") from K* and S* scripts in e.g.
 /etc/rc2.d/ to your init script in /etc/init.d/ and it should hopefully
 get loaded automatically on system bootup.
+
+module autoloading configuration (e.g. in /etc/modprobe.conf or
+/etc/modules.conf) could be:
+
+options acx_pci firmware_dir=/home/ivor/cvs/acx100-0_1a-rc1/firmware
+alias wlan0 acx_pci
 
 --- AND FINALLY... ---
 

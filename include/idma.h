@@ -36,23 +36,19 @@
  * --------------------------------------------------------------------
  */
 
-/* for a description of this, see doc/acx100! */
-void acx100_disable_irq(wlandevice_t *hw);
-void acx100_enable_irq(wlandevice_t *hw);
-
-int acx100_create_dma_regions(wlandevice_t *hw);
-int acx111_create_dma_regions(wlandevice_t *hw);
+int acx100_create_dma_regions(wlandevice_t *priv);
+int acx111_create_dma_regions(wlandevice_t *priv);
 int acx100_delete_dma_region(wlandevice_t *wlandev);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
-void acx100_clean_tx_desc(wlandevice_t *hw);
-void acx100_process_rx_desc(wlandevice_t *hw);
+void acx100_clean_tx_desc(wlandevice_t *priv);
+void acx100_process_rx_desc(wlandevice_t *priv);
 int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc);
 int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc);
 void acx100_create_tx_desc_queue(TIWLAN_DC *pDc);
 void acx100_create_rx_desc_queue(TIWLAN_DC *pDc);
 void acx100_free_desc_queues(TIWLAN_DC *pDc);
-int acx100_init_memory_pools(wlandevice_t *hw, memmap_t *vala);
-struct txdescriptor *acx100_get_tx_desc(wlandevice_t *hw);
+int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *vala);
+struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv);
 
 char *acx100_get_packet_type_string(UINT16 fc);
 
@@ -87,17 +83,10 @@ typedef struct framehdr {
  * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
  */
 
-#define	DESC_CTL_SHORT_PREAMBLE	0x01
-#define	DESC_CTL_FIRST_MPDU	0x02
-#define	DESC_CTL_AUTODMA	0x04
-#define	DESC_CTL_RECLAIM	0x08
-#define	DESC_CTL_USED_FOR_TX	0x40	/* owned */
-#define	DESC_CTL_FREE		0x80	/* tx finished */
+#define	DESC_CTL_INIT		(ACX100_CTL_OWN | ACX100_CTL_RECLAIM | \
+				 ACX100_CTL_AUTODMA | ACX100_CTL_FIRSTFRAG)
 
-#define	DESC_CTL_INIT		(DESC_CTL_FREE | DESC_CTL_RECLAIM | \
-				 DESC_CTL_AUTODMA | DESC_CTL_FIRST_MPDU)
-
-#define	DESC_CTL_DONE		(DESC_CTL_USED_FOR_TX | DESC_CTL_FREE)
+#define	DESC_CTL_DONE		(ACX100_CTL_ACXDONE | ACX100_CTL_OWN)
 
 #define DESC_CTL2_RTS		0x20
 
@@ -181,5 +170,11 @@ typedef struct rxhostdescriptor {
 	char val0x2a;		/* 0x2a; rate */
 	char val0x2b;		/* 0x2b */
 } rxhostdesc_t;			/* size 44 = 0x2c */
+
+typedef struct MemoryBlockSizeStruct {
+	UINT16 val0x0;
+	UINT16 val0x2;
+	UINT16 size;
+} memblocksize_t;
 
 #define ETH_P_80211_RAW		(ETH_P_ECONET + 1)

@@ -70,7 +70,7 @@ typedef struct InitPacket2 {
 //              UINT PacketTemplateEnd;  //0x18
 } InitPacket2_t;
 
-typedef struct acx100usb_memmap {
+typedef struct acx100_memmap {
 	UINT16	rid;
 	UINT16	length;
 	UINT32	CodeStart;
@@ -83,7 +83,18 @@ typedef struct acx100usb_memmap {
 	UINT32	QueueEnd;
 	UINT32	PoolStart;
 	UINT32	PoolEnd;
-} acx100usb_memmap_t;
+} acx100_memmap_t;
+
+typedef struct acx100_memconfigoption {
+	UINT16 vala;
+	UINT16 valb;
+	UINT32 DMA_config;
+	struct rxhostdescriptor *val0x8;
+	UINT32 rx_mem;
+	UINT32 tx_mem;
+	UINT16 TxBlockNum;
+	UINT16 RxBlockNum;
+} acx100_memconfigoption_t;
 
 #ifdef V1_VERSION
 typedef struct ConfigWrite {
@@ -385,9 +396,9 @@ typedef struct {
 } radioinit_t;
 
 void acx100_schedule(UINT32 timeout);
-int acx100_reset_dev(netdevice_t *priv);
+int acx100_reset_dev(netdevice_t *dev);
 void acx100_join_bssid(wlandevice_t *priv);
-int acx100_init_mac(netdevice_t *priv);
+int acx100_init_mac(netdevice_t *dev);
 int acx100_set_defaults(wlandevice_t *priv);
 void acx100_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 int acx100_set_probe_response_template(wlandevice_t *priv);
@@ -416,7 +427,7 @@ int acx100_set_tim_template(wlandevice_t *priv);
 int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 						   struct acxp80211_beacon_prb_resp *bcn);
 void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all);
-int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd);
+int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd);
 void acx100_set_probe_request_template(wlandevice_t *priv);
 void acx100_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);
