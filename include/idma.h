@@ -89,6 +89,13 @@ typedef struct framehdr {
 	char data[0x26];
 } frmhdr_t;
 
+/* figure out tx descriptor pointer, depending on different acx100 or acx111
+ * tx descriptor length */
+#define GET_TX_DESC_PTR(dc, index) \
+	(struct txdescriptor *) (((UINT32)dc->pTxDescQPool) + (index * dc->TxDescrSize))
+#define GET_NEXT_TX_DESC_PTR(dc, txdesc) \
+	(struct txdescriptor *) (((UINT32)txdesc) + dc->TxDescrSize)
+
 /* flags:
  * 0x01 - short preamble
  * 0x02 - first packet in a row?? fragmentation??? (sorry)

@@ -47,8 +47,7 @@
 #define __ACX_IOREGISTER_H
 
 /* functions */
-UINT16* acx100_get_io_register_array(void);
-UINT16* acx111_get_io_register_array(void);
-void acx_free_io_register_arrays(void);
+const UINT16* acx100_get_io_register_array(void);
+const UINT16* acx111_get_io_register_array(void);
 
 #endif /* __ACX_IOREGISTER_H */

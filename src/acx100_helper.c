@@ -286,13 +286,14 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	}
 	p += sprintf(p, "\n");
 	p += sprintf(p, "*** Tx buf ***\n");
+	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
-		pTxDesc = &pDc->pTxDescQPool[i];
 		if ((UINT8)DESC_CTL_DONE == (pTxDesc->Ctl & (UINT8)DESC_CTL_DONE))
 			p += sprintf(p, "%02u DONE\n", i);
 		else
 			p += sprintf(p, "%02u empty\n", i);
+		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
 	p += sprintf(p, "\n");
 	p += sprintf(p, "*** network status ***\n");
@@ -3413,7 +3414,9 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 
 	FN_ENTER;
 
+#ifdef BROKEN_KILLS_TRAFFIC
 	acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x0); /* disable Rx/Tx */
+#endif
 
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], (UINT32)reg);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], 2);
@@ -3431,7 +3434,9 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 			result = 0;
 			acxlog(L_BINSTD, "%s: timeout waiting for read phy cmd\n", __func__);
 			*charbuf = 0;
+#ifdef BROKEN_KILLS_TRAFFIC
 			acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
+#endif
 			goto done;
 		}
 	}
@@ -3439,7 +3444,9 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 	acxlog(L_DEBUG, "count was %d\n", count);
 	*charbuf = (UINT8)acx100_read_reg8(priv, priv->io[IO_ACX_PHY_DATA]);
 	
+#ifdef BROKEN_KILLS_TRAFFIC
 	acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
+#endif
 #else
 	mem_read_write_t mem;
 

@@ -159,7 +159,7 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_SET_PHY_AMP_BIAS,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "SetPHYAmpBias"},
+	name : "SetPhyAmpBias"},
 { cmd : ACX100_IOCTL_SET_ED,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -2576,7 +2576,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "next 0x%X\n", (UINT32)rx_host_desc->desc_phy_next);
 		acxlog(L_STD, "Status 0x%X\n", rx_host_desc->Status);
 
-		rx_host_desc ++;
+		rx_host_desc++;
 
 	}
 
@@ -2598,11 +2598,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "Status (dynamic) 0x%X\n", tx_desc->error);
 		acxlog(L_STD, "Rate (dynamic) 0x%X\n", tx_desc->rate);
 
-		tx_desc++;
-		if(priv->chip_type == CHIPTYPE_ACX111) {
-			/* the acx111 txdescriptor is 4 byte larger = 0x34 */
-			tx_desc = (struct txdescriptor *) (((UINT32)tx_desc) + 4);
-		}
+		tx_desc = GET_NEXT_TX_DESC_PTR(pDc, tx_desc);
 	}
 
 
@@ -2622,7 +2618,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "next 0x%X\n", (UINT32)tx_host_desc->desc_phy_next);
 		acxlog(L_STD, "Status 0x%X\n", tx_host_desc->Status);
 
-		tx_host_desc ++;
+		tx_host_desc++;
 
 	}
 

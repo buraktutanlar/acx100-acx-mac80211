@@ -2121,8 +2121,6 @@ static void __exit acx100_cleanup_module(void)
 		dev = priv->prev_nd;
 	}
 
-	acx_free_io_register_arrays();
-
 	/* now let the pci layer recursively remove all PCI related things
 	 * (acx100_remove_pci()) */
 	pci_unregister_driver(&acx100_pci_drv_id);

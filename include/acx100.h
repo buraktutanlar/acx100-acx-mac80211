@@ -229,10 +229,6 @@ typedef enum {
 
 	IO_ACX_FEMR,		/* Function Event Mask */
 
-	IO_ACX_ECPU_CTRL,
-	IO_ACX_SOR_CFG,
-	IO_ACX_EE_START,
-
 	IO_ACX_INT_TRIG,
 	IO_ACX_IRQ_MASK,
 	IO_ACX_IRQ_STATUS_NON_DES,
@@ -243,9 +239,9 @@ typedef enum {
 	IO_ACX_ENABLE,
 
 	IO_ACX_EEPROM_CTL,
-	IO_ACX_EEPROM_CFG,
 	IO_ACX_EEPROM_ADDR,
 	IO_ACX_EEPROM_DATA,
+	IO_ACX_EEPROM_CFG,
 
 	IO_ACX_PHY_ADDR,
 	IO_ACX_PHY_DATA,
@@ -258,6 +254,10 @@ typedef enum {
 	IO_ACX_CMD_MAILBOX_OFFS,
 	IO_ACX_INFO_MAILBOX_OFFS,
 	IO_ACX_EEPROM_INFORMATION,
+
+	IO_ACX_EE_START,
+	IO_ACX_SOR_CFG,
+	IO_ACX_ECPU_CTRL,
 
 	END_OF_IO_ENUM /* LEAVE THIS AT THE END, USED TO FIGURE OUT THE LENGTH */
 
@@ -1069,6 +1069,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT8		*pTxBufferPool;		/* 0x10 */
 	dma_addr_t	TxBufferPoolPhyAddr;	/* 0x14 */
 	UINT32		TxBufferPoolSize;	/* 0x18 */
+	UINT16		TxDescrSize;		/* size per tx descr; ACX111 = ACX100 + 4 */
 	struct	txdescriptor	*pTxDescQPool;	/* V13POS 0x1c, official name */
 	UINT32		tx_pool_count;		/* 0x20 indicates # of ring buffer pool entries */
 	UINT32		tx_head;		/* 0x24 current ring buffer pool member index */
@@ -1223,7 +1224,7 @@ typedef struct wlandevice {
 	UINT		chip_type;
 	const char	*chip_name;
 	UINT8		bus_type;
-	UINT16		*io;
+	const UINT16		*io;
 
 	/*** Device state ***/
 	u32		pci_state[16];		/* saved PCI state for suspend/resume */

@@ -554,6 +554,11 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 				cmd_status);
 		if (debug & L_CTL)
 			dump_stack();
+
+		/* zero out result buffer */
+		if (pcmdparam != NULL && paramlen != 0) {
+			memset(pcmdparam, 0, paramlen);
+		}
 	} else	{
 		/*** read in result parameters if needed ***/
 		if (pcmdparam != NULL && paramlen != 0) {
