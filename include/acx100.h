@@ -101,14 +101,14 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #define FN_ENTER \
 	do { \
-		if (debug & L_FUNC) { \
+		if (unlikely(debug & L_FUNC)) { \
 			log_fn_enter(__func__); \
 		} \
 	} while (0)
 
 #define FN_EXIT(p, v) \
 	do { \
-		if (debug & L_FUNC) { \
+		if (unlikely(debug & L_FUNC)) { \
 			if (p) { \
 				log_fn_exit_v(__func__, v); \
 			} else { \
@@ -1363,12 +1363,13 @@ typedef struct wlandevice {
 	UINT8		tx_level_dbm;
 	UINT8		tx_level_val;
 	UINT8		tx_level_auto;		/* whether to do automatic power adjustment */
+	unsigned long	time_last_recalib;
+	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
+
 	UINT8		sensitivity;
 	UINT8		antenna;		/* antenna settings */
 	UINT8		ed_threshold;		/* energy detect threshold */
 	UINT8		cca;			/* clear channel assessment */
-	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
-	unsigned long	time_last_recalib;
 
 	UINT16		rts_threshold;
 	UINT32		short_retry;		/* V3POS 204, V1POS 20c */

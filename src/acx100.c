@@ -1904,9 +1904,10 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 /*	if (acx_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
-  if (jiffies != last_irq_jiffies)
+  if (jiffies != last_irq_jiffies) {
       loops_this_jiffy = 0;
-  last_irq_jiffies = jiffies;
+      last_irq_jiffies = jiffies;
+  }
 
   while ((irqtype != 0) && (irqcount-- > 0)) {
     if (unlikely(++loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
@@ -2147,12 +2148,14 @@ static void acx_after_interrupt_task(void *data)
 			}
 			else {
 				static INT issue_cmd_failed = 0;
+				INT res = NOT_OK;
 
 				/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
-				if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
-				&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000))
-				&& */ (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
-				&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)) )
+				if (CHIPTYPE_ACX111 == priv->chip_type)
+					res = acx111_recalib_radio(priv);
+				else if (CHIPTYPE_ACX100 == priv->chip_type)
+					res = acx100_recalib_radio(priv);
+				if (res == OK)
 				{
 					acxlog(L_STD, "successfully recalibrated radio\n");
 					CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);

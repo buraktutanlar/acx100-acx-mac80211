@@ -250,6 +250,10 @@ typedef struct acx111_scan {
 	UINT8 channel_list[26] ACX_PACKED;
 } acx111_scan_t;
 
+typedef struct acx111_cmd_radiocalib {
+	UINT32 methods ACX_PACKED; /* 0x80000000 == automatic calibration by firmware, according to interval; Bits 0..3: select calibration methods to go through: calib based on DC, AfeDC, Tx mismatch, Tx equilization */
+	UINT32 interval ACX_PACKED;
+} acx111_cmd_radiocalib_t;
 
 typedef struct acx_tim {
 	UINT16 size ACX_PACKED;
@@ -567,7 +571,8 @@ UINT16 acx_proc_unregister_entries(struct net_device *dev);
 void acx_update_dot11_ratevector(wlandevice_t *priv);
 void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 
-
+int acx111_recalib_radio(wlandevice_t *priv);
+int acx100_recalib_radio(wlandevice_t *priv);
 int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 

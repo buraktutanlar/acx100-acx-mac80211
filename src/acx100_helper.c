@@ -1265,9 +1265,7 @@ int acx_upload_fw(wlandevice_t *priv)
 	filename = kmalloc(PATH_MAX, GFP_USER);
 	if (!filename)
 		return -ENOMEM;
-	if(priv->chip_type == CHIPTYPE_ACX100) {
-		sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
-	} else if(priv->chip_type == CHIPTYPE_ACX111) {
+	if (priv->chip_type == CHIPTYPE_ACX111) {
 		sprintf(filename,"%s/TIACX111.BIN", firmware_dir); /* combined firmware */
 		if (OK != acx_check_file(filename)) {
 			acxlog(L_INIT, "Firmware: '%s' not found. Trying alternative firmware.\n", filename);
@@ -1277,7 +1275,8 @@ int acx_upload_fw(wlandevice_t *priv)
 				sprintf(filename,"%s/FW1130.BIN", firmware_dir); /* NON-combined firmware! */
 			}
 		}
-
+	} else if (priv->chip_type == CHIPTYPE_ACX100) {
+		sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
 	}
 	
 	acxlog(L_INIT, "Trying to load firmware: '%s'\n", filename);
@@ -1597,8 +1596,15 @@ int acx_init_wep(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "CodeEnd:%X\n", pt.CodeEnd);
 
-	if(priv->chip_type == CHIPTYPE_ACX100) {
+	if (priv->chip_type == CHIPTYPE_ACX111) {
+		acx111_set_wepkey( priv );
 
+		if (priv->wep_keys[priv->wep_current_index].size != 0) {
+		acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
+		dk.KeyID = priv->wep_current_index;
+		acx_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
+	    }
+	} else if (priv->chip_type == CHIPTYPE_ACX100) {
 		pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 		pt.WEPCacheEnd   = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 
@@ -1647,14 +1653,6 @@ int acx_init_wep(wlandevice_t *priv)
 			acxlog(L_STD, "ctlMemoryMapWrite #2 FAILED\n");
 			goto fail;
 		}
-	} else {
-	    acx111_set_wepkey( priv );
-
-	    if (priv->wep_keys[priv->wep_current_index].size != 0) {
-		acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
-		dk.KeyID = priv->wep_current_index;
-		acx_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
-	    }
 	}
 	res = OK;
 
@@ -2239,6 +2237,27 @@ int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *co
 	return OK;
 }
 
+int acx111_recalib_radio(wlandevice_t *priv)
+{
+	acx111_cmd_radiocalib_t cal;
+
+	acxlog(L_STD, "recalibrating ACX111 radio. Not tested yet, please report status!!\n");
+	cal.methods = 0x0f; /* manual single recalibration, choose all methods */
+	cal.interval = 0;
+
+	return acx_issue_cmd(priv, ACX111_CMD_RADIOCALIB, &cal, sizeof(cal), 5000);
+}
+
+int acx100_recalib_radio(wlandevice_t *priv)
+{
+	if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000)) &&
+	       (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000)) && */
+	    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000)) &&
+	    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)) )
+		return OK;
+	return NOT_OK;
+}
+
 int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config)
 {
 	if(priv->chip_type != CHIPTYPE_ACX111) {
@@ -2257,6 +2276,54 @@ int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *co
 	}
 
 	return OK;
+}
+
+int acx111_set_low_power_packets(wlandevice_t *priv, int enable)
+{
+	struct ACX111FeatureConfig config;
+
+	if(acx111_get_feature_config(priv, &config) != 0) {
+		acxlog(L_STD, "Error getting feature config\n");
+		return NOT_OK;
+	}
+
+	if (enable) {
+		acxlog(L_STD, "Enable low power packets\n");
+
+		/* set bit 3 */
+		SET_BIT(config.feature_options, cpu_to_le32(0x04));
+	} else {
+		acxlog(L_STD, "Disable low power packets\n");
+
+		/* clear bit 3 */
+		CLEAR_BIT(config.feature_options, cpu_to_le32(0x04));
+	}
+
+	return acx111_set_feature_config(priv, &config);
+}
+
+int acx111_set_ex_low_power_packets(wlandevice_t *priv, int enable)
+{
+	struct ACX111FeatureConfig config;
+
+	if(acx111_get_feature_config(priv, &config) != 0) {
+		acxlog(L_STD, "Error getting feature config\n");
+		return NOT_OK;
+	}
+
+	if(enable) {
+		acxlog(L_STD, "Enable Rx of extremely low power packets\n");
+
+		/* set bit 1 */
+		SET_BIT(config.feature_options, cpu_to_le32(0x01));
+	} else {
+		acxlog(L_STD, "Disable Rx of extremely low power packets\n");
+
+		/* clear bit 1 */
+		CLEAR_BIT(config.feature_options, cpu_to_le32(0x01));
+	}
+
+	return acx111_set_feature_config(priv, &config);
 }
 
 /* AcxScanWithParam()
@@ -2312,8 +2379,8 @@ void acx100_scan_chan(wlandevice_t *priv)
 	FN_ENTER;
 	acxlog(L_INIT, "Starting radio scan\n");
 
-	if(priv->chip_type == CHIPTYPE_ACX111) {
-		acxlog(L_STD, "ERROR: trying to invoke acx100_scan_chan, but wlandevice == acx111!\n");
+	if(priv->chip_type != CHIPTYPE_ACX100) {
+		acxlog(L_STD, "ERROR: trying to invoke acx100_scan_chan with non-ACX100 chip!\n");
 		FN_EXIT(0, 0);
 		return;
 	}
@@ -2448,7 +2515,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		}
 
 		if (0 != (priv->get_mask & (GETSET_SENSITIVITY|GETSET_ALL))) {
-                       if ((RADIO_RFMD_11 == priv->radio_type)
+			if ((RADIO_RFMD_11 == priv->radio_type)
 			|| (RADIO_MAXIM_0D == priv->radio_type)
 			|| (RADIO_RALINK_15 == priv->radio_type)) {
 				acx_read_phy_reg(priv, 0x30, &priv->sensitivity);
@@ -2554,11 +2621,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 		    ie_dot11WEPDefaultKeyID_t dkey;
 
-		    if ( priv->chip_type == CHIPTYPE_ACX100 ) {
-			acx100_set_wepkey( priv );
-		    } else 
 		    if ( priv->chip_type == CHIPTYPE_ACX111 ) {
 			acx111_set_wepkey( priv );
+		    } else if ( priv->chip_type == CHIPTYPE_ACX100 ) {
+			acx100_set_wepkey( priv );
 		    }
 
 		    dkey.KeyID = priv->wep_current_index;
@@ -2571,10 +2637,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (0 != (priv->set_mask & (GETSET_TXPOWER|GETSET_ALL))) {
 		acxlog(L_INIT, "Updating transmit power: %d dBm\n",
 					priv->tx_level_dbm);
-		if(priv->chip_type == CHIPTYPE_ACX100) {
-			acx100_set_tx_level(priv, priv->tx_level_dbm);
-		} else if(priv->chip_type == CHIPTYPE_ACX111) {
+		if (priv->chip_type == CHIPTYPE_ACX111) {
 			acx111_set_tx_level(priv, priv->tx_level_dbm);
+		} else if (priv->chip_type == CHIPTYPE_ACX100) {
+			acx100_set_tx_level(priv, priv->tx_level_dbm);
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_TXPOWER);
 	}
@@ -2586,6 +2652,15 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		|| (RADIO_MAXIM_0D == priv->radio_type)
 		|| (RADIO_RALINK_15 == priv->radio_type)) {
 			acx_write_phy_reg(priv, 0x30, priv->sensitivity);
+		} else
+		if ((RADIO_RADIA_16 == priv->radio_type)
+		|| (RADIO_UNKNOWN_17 == priv->radio_type)) {
+			if ((priv->sensitivity < 1) || (priv->sensitivity > 3)) {
+				acxlog(L_STD, "invalid sensitivity setting (1..3), setting to 1.\n");
+				priv->sensitivity = 1;
+			}
+			acx111_set_low_power_packets(priv, (priv->sensitivity > 1));
+			acx111_set_ex_low_power_packets(priv, (priv->sensitivity > 2));
 		} else {
 			acxlog(L_STD, "Don't know how to modify sensitivity for radio type 0x%02x, please try to add that!\n", priv->radio_type);
 		}
@@ -2756,10 +2831,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		} else {
 			if (0 == scanning)
 			{
-				if(priv->chip_type == CHIPTYPE_ACX100) {
-					acx100_scan_chan(priv);
-				} else if(priv->chip_type == CHIPTYPE_ACX111) {
+				if (priv->chip_type == CHIPTYPE_ACX111) {
 					acx111_scan_chan(priv);
+				} else if (priv->chip_type == CHIPTYPE_ACX100) {
+					acx100_scan_chan(priv);
 				}
 				scanning = 1;
 			}
@@ -2779,7 +2854,9 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 				/* stop any previous scan */
 				acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
 #warning Is this used anymore?
-				if(priv->chip_type == CHIPTYPE_ACX100) {
+				if(priv->chip_type == CHIPTYPE_ACX111) {
+					acx111_scan_chan(priv);
+				} else if(priv->chip_type == CHIPTYPE_ACX100) {
 					acx100_scan_t s;
 					s.count = cpu_to_le16(1);
 					s.start_chan = priv->channel;
@@ -2790,8 +2867,6 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 					s.max_probe_delay = 100;
 
 					acx100_scan_chan_p(priv, &s);
-				} else if(priv->chip_type == CHIPTYPE_ACX111) {
-					acx111_scan_chan(priv);
 				}
 				scanning = 1;
 			} 
@@ -2805,10 +2880,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			/* if we aren't scanning already, then start scanning now */
 			if (0 == scanning)
 			{
-				if(priv->chip_type == CHIPTYPE_ACX100) {
-					acx100_scan_chan(priv);
-				} else if(priv->chip_type == CHIPTYPE_ACX111) {
+				if (priv->chip_type == CHIPTYPE_ACX111) {
 					acx111_scan_chan(priv);
+				} else if (priv->chip_type == CHIPTYPE_ACX100) {
+					acx100_scan_chan(priv);
 				}
 				scanning = 1;
 			}
@@ -2927,17 +3002,7 @@ static int acx_set_defaults(wlandevice_t *priv)
 	acx_update_card_settings(priv, 1, 0, 0);
 
 	/* set our global interrupt mask */
-	if(priv->chip_type == CHIPTYPE_ACX100) {
-		/* priv->irq_mask = 0xdbb5; not longer used anymore! */
-		priv->irq_mask = (UINT16)
-			         ~( HOST_INT_SCAN_COMPLETE
-				  | HOST_INT_INFO
-				  | HOST_INT_CMD_COMPLETE
-				  | HOST_INT_TIMER
-				  | HOST_INT_RX_COMPLETE
-				  | HOST_INT_TX_COMPLETE ); /* 0xd9b5 */
-		priv->irq_mask_off = (UINT16)~( HOST_INT_UNKNOWN ); /* 0x7fff */
-	} else if(priv->chip_type == CHIPTYPE_ACX111) {
+	if (priv->chip_type == CHIPTYPE_ACX111) {
 		priv->irq_mask = (UINT16)
 				 ~( HOST_INT_FCS_THRESHOLD
 				  | HOST_INT_SCAN_COMPLETE
@@ -2948,6 +3013,16 @@ static int acx_set_defaults(wlandevice_t *priv)
 				  | HOST_INT_RX_COMPLETE
 				  | HOST_INT_TX_COMPLETE ); /* 0x98e5 */
 		priv->irq_mask_off = (UINT16)~( HOST_INT_CMD_COMPLETE ); /* 0xfdff */
+	} else if (priv->chip_type == CHIPTYPE_ACX100) {
+		/* priv->irq_mask = 0xdbb5; not longer used anymore! */
+		priv->irq_mask = (UINT16)
+			         ~( HOST_INT_SCAN_COMPLETE
+				  | HOST_INT_INFO
+				  | HOST_INT_CMD_COMPLETE
+				  | HOST_INT_TIMER
+				  | HOST_INT_RX_COMPLETE
+				  | HOST_INT_TX_COMPLETE ); /* 0xd9b5 */
+		priv->irq_mask_off = (UINT16)~( HOST_INT_UNKNOWN ); /* 0x7fff */
 	}
 
 	priv->led_power = (UINT8)1; /* LED is active on startup */
@@ -2965,15 +3040,15 @@ static int acx_set_defaults(wlandevice_t *priv)
 	strncpy(priv->nick, "acx100 ", IW_ESSID_MAX_SIZE);
 	strncat(priv->nick, WLAN_RELEASE_SUB, IW_ESSID_MAX_SIZE);
 
-	if ( priv->chip_type != CHIPTYPE_ACX111 ) { 
+	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
+		/* Hope this is correct, only tested with domain 0x30 */
+		acx_read_eeprom_offset(priv, 0x16F, &priv->reg_dom_id);
+	} else if ( priv->chip_type == CHIPTYPE_ACX100 ) {
 		if (priv->eeprom_version < (UINT8)5) {
 			acx_read_eeprom_offset(priv, 0x16F, &priv->reg_dom_id);
 		} else {
 			acx_read_eeprom_offset(priv, 0x171, &priv->reg_dom_id);
 		}
-	} else {
-		/* Hope this is correct, only tested with domain 0x30 */
-		acx_read_eeprom_offset(priv, 0x16F, &priv->reg_dom_id);
 	}
 
 	priv->channel = 1;
@@ -3004,11 +3079,11 @@ static int acx_set_defaults(wlandevice_t *priv)
 	priv->defpeer.txrate.pbcc511 = 0;
 	priv->defpeer.txrate.fallback_threshold = 12;
 	priv->defpeer.txrate.stepup_threshold = 3;
-	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
-		priv->defpeer.txrate.cfg = RATE111_ALL & RATE111_ACX100_COMPAT; /* allow all available rates */
+	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
+		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
 		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
 	} else {
-		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
+		priv->defpeer.txrate.cfg = RATE111_ALL & RATE111_ACX100_COMPAT; /* allow all available rates */
 		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
 	}
 	priv->defpeer.txbase = priv->defpeer.txrate;
@@ -3043,13 +3118,17 @@ static int acx_set_defaults(wlandevice_t *priv)
 #endif
 
 	/* set some more defaults */
-	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
-	    priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
-	} else {
+	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
 	    priv->tx_level_dbm = (UINT8)15; /* 30mW (15dBm) is default, at least in my acx111 card */
+	} else {
+	    priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
 	}
 	priv->tx_level_auto = (UINT8)1;
 	SET_BIT(priv->set_mask, GETSET_TXPOWER);
+
+	if ( priv->chip_type == CHIPTYPE_ACX111 ) {
+		priv->sensitivity = 1; /* start with sensitivity level 1 out of 3 */
+	}
 
 #if BETTER_DO_NOT_DO_IT
 	/* should we overwrite the value we gained above with our own
@@ -3332,18 +3411,18 @@ acx_join_bssid(wlandevice_t *priv)
 
 	/* basic rate set. Control frame responses (such as ACK or CTS frames)
 	** are sent with one of these rates */
-	if ( CHIPTYPE_ACX100 == priv->chip_type ) {
-		tmp.u.acx100.dtim_interval = dtim_interval;
-		tmp.u.acx100.rates_basic = rate111to5bits(priv->defpeer.txbase.cfg);
-		tmp.u.acx100.rates_supported = rate111to5bits(priv->defpeer.txrate.cfg);
-		acxlog(L_DEBUG, "rates_basic 0x%04x --> 0x%02x rates_supported 0x%04x --> 0x%02x\n", priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
-	} else {
+	if ( CHIPTYPE_ACX111 == priv->chip_type ) {
 		/* It was experimentally determined that rates_basic
 		** can take 11g rates as well, not only rates
 		** defined with JOINBSS_RATES_BASIC111_nnn.
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
 		tmp.u.acx111.rates_basic = priv->defpeer.txbase.cfg;
+	} else {
+		tmp.u.acx100.dtim_interval = dtim_interval;
+		tmp.u.acx100.rates_basic = rate111to5bits(priv->defpeer.txbase.cfg);
+		tmp.u.acx100.rates_supported = rate111to5bits(priv->defpeer.txrate.cfg);
+		acxlog(L_DEBUG, "rates_basic 0x%04x --> 0x%02x rates_supported 0x%04x --> 0x%02x\n", priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
 	}
 
 	/* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
@@ -3432,20 +3511,8 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 	acx_load_radio(priv);
 #endif
 
-	if(priv->chip_type == CHIPTYPE_ACX100) {
-		if (OK != acx_init_wep(priv)) 
-		    goto fail;
-		acxlog(L_DEBUG,"between init_wep and init_packet_templates\n");
-		if (OK != acx100_init_packet_templates(priv,&pkt)) 
-		    goto fail;
-
-		if (OK != acx100_create_dma_regions(priv)) {
-			acxlog(L_STD, "acx100_create_dma_regions FAILED\n");
-			goto fail;
-		}
-
-	} else if(priv->chip_type == CHIPTYPE_ACX111) {
-		/* here the order is different
+	if(priv->chip_type == CHIPTYPE_ACX111) {
+		/* for ACX111, the order is different from ACX100
 		   1. init packet templates
 		   2. create station context and create dma regions
 		   3. init wep default keys 
@@ -3457,9 +3524,19 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 			acxlog(L_STD, "acx111_create_dma_regions FAILED\n");
 			goto fail;
 		}
-
+	} else if(priv->chip_type == CHIPTYPE_ACX100) {
 		/* if (OK != acx_init_wep(priv, &pkt)) 
 		    goto fail; */
+		if (OK != acx_init_wep(priv)) 
+		    goto fail;
+		acxlog(L_DEBUG,"between init_wep and init_packet_templates\n");
+		if (OK != acx100_init_packet_templates(priv,&pkt)) 
+		    goto fail;
+
+		if (OK != acx100_create_dma_regions(priv)) {
+			acxlog(L_STD, "acx100_create_dma_regions FAILED\n");
+			goto fail;
+		}
 	} else {
 		acxlog(L_DEBUG,"unknown chip type\n");
 		goto fail;
@@ -3737,7 +3814,7 @@ UINT16 acx_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, UINT
 	UINT8 *data_verify = NULL;
 	UINT32 count = 0;
 	
-	acxlog(L_STD, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing, I will abort that now.\n");
+	acxlog(0xffff, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing (THIS HAS NEVER BEEN TESTED!), I will abort that now.\n");
 	return 0;
 	
 	FN_ENTER;

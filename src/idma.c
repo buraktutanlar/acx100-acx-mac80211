@@ -983,8 +983,8 @@ static inline void acx_log_rxbuffer(TIWLAN_DC *pDc)
 	unsigned int i;
 	struct rxhostdescriptor *pRxDesc;
 
-	FN_ENTER;
-	if (debug & L_BUFR)
+	/* no FN_ENTER here, we don't want that */
+	if (unlikely(debug & L_BUFR))
 	{
 		/* no locks here, since it's entirely non-critical code */
 		pRxDesc = pDc->pRxHostDescQPool;
@@ -998,7 +998,6 @@ static inline void acx_log_rxbuffer(TIWLAN_DC *pDc)
 			pRxDesc++;
 		}
 	}
-	FN_EXIT(0, 0);
 }
 
 /* currently we don't need to lock anything, since we access Rx

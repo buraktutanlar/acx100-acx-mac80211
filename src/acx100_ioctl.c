@@ -106,8 +106,6 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x1c
 #define ACX111_IOCTL_INFO		ACX100_IOCTL + 0x1d
 #define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x1e
-#define ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS	ACX100_IOCTL + 0x1f
-#define ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS	ACX100_IOCTL + 0x20
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -217,16 +215,6 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_CHAR | 256,
 	get_args : 0,
 	name : "SetRates" },
-
-{ cmd : ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetLowPkgRx" },
-
-{ cmd : ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetExLowPkgRx" },
 
 };
 
@@ -474,7 +462,9 @@ static inline int acx_ioctl_set_sens(struct net_device *dev, struct iw_request_i
 
 	if ((RADIO_RFMD_11 == priv->radio_type)
 	|| (RADIO_MAXIM_0D == priv->radio_type)
-	|| (RADIO_RALINK_15 == priv->radio_type)) {
+	|| (RADIO_RALINK_15 == priv->radio_type)
+	|| (RADIO_RADIA_16 == priv->radio_type)
+	|| (RADIO_UNKNOWN_17 == priv->radio_type)) {
 		priv->sensitivity = (1 == vwrq->disabled) ? 0 : vwrq->value;
 		SET_BIT(priv->set_mask, GETSET_SENSITIVITY);
 		return -EINPROGRESS;
@@ -490,7 +480,9 @@ static inline int acx_ioctl_get_sens(struct net_device *dev, struct iw_request_i
 
 	if ((RADIO_RFMD_11 == priv->radio_type)
 	|| (RADIO_MAXIM_0D == priv->radio_type)
-	|| (RADIO_RALINK_15 == priv->radio_type)) {
+	|| (RADIO_RALINK_15 == priv->radio_type)
+	|| (RADIO_RADIA_16 == priv->radio_type)
+	|| (RADIO_UNKNOWN_17 == priv->radio_type)) {
 		acxlog(L_IOCTL, "Get Sensitivity ==> %d\n", priv->sensitivity);
 
 		vwrq->value = priv->sensitivity;
@@ -1552,7 +1544,11 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 		range->min_r_time = 0;
 		range->max_r_time = 65535; /* FIXME: lifetime ranges and orders of magnitude are strange?? */
 
-		range->sensitivity = 255;
+		if (CHIPTYPE_ACX111 == priv->chip_type)
+			range->sensitivity = 3;
+		else
+		if (CHIPTYPE_ACX100 == priv->chip_type)
+			range->sensitivity = 255;
 
 		for (i=0; i < priv->rate_supported_len; i++) {
 			range->bitrate[i] = (priv->rate_supported[i] & ~0x80) * 500000;
@@ -2753,72 +2749,6 @@ static inline int acx111_ioctl_info(struct net_device *dev, struct iw_request_in
 }
 
 
-
-static inline int 
-acx111_ioctl_enable_low_power_packets(
-		struct net_device *dev, 
-		struct iw_request_info *info, 
-		struct iw_param *vwrq, char *extra)
-{
-	int value = (int)*extra;
-
-
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	struct ACX111FeatureConfig config;
-
-	if(acx111_get_feature_config(priv, &config) != 0) {
-		acxlog(L_STD, "Error getting feature config\n");
-		return NOT_OK;
-	}
-
-	if(value != 0) {
-		acxlog(L_STD, "Enable low power packets\n");
-
-		/* set bit 3 */
-		SET_BIT(config.feature_options, cpu_to_le32(0x04));
-	} else {
-		acxlog(L_STD, "Disable low power packets\n");
-
-		/* clear bit 3 */
-		CLEAR_BIT(config.feature_options, cpu_to_le32(0x04));
-	}
-
-	return acx111_set_feature_config(priv, &config);
-}
-
-static inline int 
-acx111_ioctl_enable_ex_low_power_packets(
-		struct net_device *dev, 
-		struct iw_request_info *info, 
-		struct iw_param *vwrq, char *extra)
-
-{
-	int value = (int)*extra;
-
-	
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	struct ACX111FeatureConfig config;
-
-	if(acx111_get_feature_config(priv, &config) != 0) {
-		acxlog(L_STD, "Error getting feature config\n");
-		return NOT_OK;
-	}
-
-	if(value != 0) {
-		acxlog(L_STD, "Enable Rx of extremely low power packets\n");
-
-		/* set bit 1 */
-		SET_BIT(config.feature_options, cpu_to_le32(0x01));
-	} else {
-		acxlog(L_STD, "Disable Rx of extremely low power packets\n");
-
-		/* clear bit 1 */
-		CLEAR_BIT(config.feature_options, cpu_to_le32(0x01));
-	}
-
-	return acx111_set_feature_config(priv, &config);
-}
-
 /*----------------------------------------------------------------
 * acx_ioctl_set_rates
 *
@@ -3283,8 +3213,6 @@ static const iw_handler acx_ioctl_private_handler[] =
 [ACX100_IOCTL_DBG_SET_IO         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_set_io,
 [ACX111_IOCTL_INFO			- ACX100_IOCTL] = (iw_handler) acx111_ioctl_info,
 [ACX100_IOCTL_SET_RATES          	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_rates,
-[ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS  - ACX100_IOCTL] = (iw_handler) acx111_ioctl_enable_low_power_packets,
-[ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS-ACX100_IOCTL] = (iw_handler) acx111_ioctl_enable_ex_low_power_packets,
 };
 
 const struct iw_handler_def acx_ioctl_handler_def =
@@ -3678,14 +3606,6 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 
 	case ACX111_IOCTL_INFO:
 		acx111_ioctl_info(dev, NULL, NULL, NULL);
-		break;
-
-	case ACX111_IOCTL_ENABLE_LOW_POWER_PACKETS
-		acx111_ioctl_enable_low_power_packets(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX111_IOCTL_ENABLE_EX_LOW_POWER_PACKETS
-		acx111_ioctl_enable_ex_low_power_packets(dev, NULL, NULL, iwr->u.name);
 		break;
 
 #endif
