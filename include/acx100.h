@@ -46,13 +46,9 @@
 #ifndef _acx100_H
 #define _acx100_H
 
-/* set to 1 to compile in experimental code for next minor version */
-#define EXPERIMENTAL_VER_0_3	0
-
 /*** MTU SIZE ***/
 /* For the time being, the only way to set mtu is before the card is 
 	brought up. As of right now it is a compile issue. */
-
 #define MTUSIZE 1500
 
 /*** DEBUG / LOG functionality ***/
@@ -2251,6 +2247,48 @@ typedef struct acx100_proberesp {
 	int vala;
 	acx100_pdr_mac_address_t *mac;
 } acx100_proberesp_t;
+
+typedef struct fw_stats {
+	UINT val0x0;		 /* hdr; */
+	UINT val0x4;
+	UINT tx_desc_of;
+	UINT rx_oom;
+	UINT rx_hdr_of;
+	UINT rx_hdr_use_next;
+	UINT rx_dropped_frame;
+	UINT rx_frame_ptr_err;
+
+	UINT rx_dma_req;	/* val0x1c */
+	UINT rx_dma_err;	/* val0x20 */
+	UINT tx_dma_req;
+	UINT tx_dma_err;	/* val0x28 */
+
+	UINT cmd_cplt;
+	UINT fiq;
+	UINT rx_hdrs;		/* val0x34 */
+	UINT rx_cmplt;		/* val0x38 */
+	UINT rx_mem_of;		/* val0x3c */
+	UINT rx_rdys;
+	UINT irqs;
+	UINT acx_trans_procs;
+	UINT decrypt_done;	/* val0x48 */
+	UINT dma_0_done;
+	UINT dma_1_done;
+	UINT tx_exch_complet;
+	UINT commands;
+	UINT acx_rx_procs;
+	UINT hw_pm_mode_changes;
+	UINT host_acks;
+	UINT pci_pm;
+	UINT acm_wakeups;
+
+	UINT wep_key_count;
+	UINT wep_default_key_count;
+	UINT dot11_def_key_mib;
+	UINT wep_key_not_found;
+	UINT wep_decrypt_fail;
+} fw_stats_t;
+
 /*=============================================================*/
 /*--- Function Declarations -----------------------------------*/
 /*=============================================================*/

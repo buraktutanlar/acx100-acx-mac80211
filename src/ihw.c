@@ -73,7 +73,6 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
-#include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
 #include <p80211netdev.h>

@@ -1,12 +1,17 @@
 This is the current list of ToDos, in order of importance:
 
 - grep for TODO and FIXME in the src directory
+- see Bug reports
+- implement proper packet fragmentation instead of the stupid mtu 576
+  setting, which when not set will cause the system to become unstable
+  even!! (probably by doing some very strange buffer overflows or so)
+  This also seems to cause certain services (such as VPN) to fail due to
+  small packet size
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)
   Note: locking for the ioctl's is finished
   Note: locking for packet transfer is finished
-- add further iwconfig/iwpriv support: signal quality indicators (SIR/SNR),
-  channel traffic percentage indicator, AP lists/scanning, iwspy, ...
+- add further iwconfig/iwpriv support: channel traffic percentage indicator, iwspy, ...
 - further improve firmware management. Detect embedded linux radio 
   modules, etc...
 - implement packet fragmentation (to get rid of stupid hacks like
@@ -16,7 +21,8 @@ This is the current list of ToDos, in order of importance:
 - clean up and unify return value handling. Right now the driver seems to have
   a mess of different functions returning 0 as success, 1 as success, or some
   functions use -1 etc. pp.
-- add missing endianness correction functions (host2ieee16() etc. - byte swapping) to allow for non-x86 use of the driver
+- add missing endianness correction functions (host2ieee16() etc. - byte
+  swapping) to allow for non-x86 use of the driver
 - distribute the functions properly over various files, organize header files
   properly (yep, it's a real mess! :)
   consider putting all of ihw.c and idma.c p80211conv.c into single file
@@ -43,6 +49,8 @@ This is the current list of ToDos, in order of importance:
   to actually hang the machine!)
 - clean up the BSS list (iStable) for old stations that are no longer
   valid in order to prevent hitting the limit of the registered stations list
+  (by adding a "found at" timestamp and check it) or maybe reimplement
+  it as a linked list
 - upgrade driver to support 4X mode (also called "54Mbps" operation, which is
   not quite right - and of course it doesn't mean that we suddenly
   become compatible with 54Mbps 802.11g cards!). However, this would
@@ -55,3 +63,5 @@ This is the current list of ToDos, in order of importance:
   support it
 - Fix SMP hangups (hyperthreading might be the problem, but does not 
   appear to be)
+- Use ieee802_11.h from drivers/net/wireless of 2.6 and newer 2.4 kernels for
+  the 802.11 defines instead of the wlan-ng p80211* headers.

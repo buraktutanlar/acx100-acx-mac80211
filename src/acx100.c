@@ -91,7 +91,6 @@
 #include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
 #include <acx100_conv.h>
@@ -155,13 +154,15 @@ int use_eth_name = 0;
 
 char *firmware_dir;
 
+extern const struct iw_handler_def acx100_ioctl_handler_def;
+
 typedef struct device_id {
 	unsigned char id[6];
 	char *descr;
 	char *type;
 } device_id_t;
 
-device_id_t device_ids[] =
+static device_id_t device_ids[] =
 {
 	{
 		"Global",
@@ -261,6 +262,8 @@ static void acx100_get_firmware_version(wlandevice_t *wlandev)
 	} fw;
 	char fw_major = 0, fw_minor = 0, fw_sub = 0, fw_extra = 0;
 
+	FN_ENTER;
+	
 	acx100_interrogate(wlandev, &fw, ACX100_RID_FWREV);
 	memcpy(wlandev->firmware_version, fw.fw_id, 20);
 	if (strncmp(fw.fw_id, "Rev ", 4))
@@ -284,6 +287,8 @@ static void acx100_get_firmware_version(wlandevice_t *wlandev)
 	acxlog(L_DEBUG, "firmware_numver %08lx\n", wlandev->firmware_numver);
 
 	wlandev->firmware_id = fw.val0x14;
+
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -310,6 +315,8 @@ static void acx100_get_firmware_version(wlandevice_t *wlandev)
 void acx100_display_hardware_details(wlandevice_t *wlandev)
 {
 	char *radio_str, *form_str;
+
+	FN_ENTER;
 
 	switch(wlandev->radio_type) {
 		case 0x11:
@@ -342,6 +349,8 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 	}
 
 	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%04x. Uploaded firmware '%s' (0x%08lx).\n", wlandev->form_factor, form_str, wlandev->radio_type, radio_str, wlandev->eeprom_version, wlandev->firmware_version, wlandev->firmware_id);
+
+	FN_EXIT(0, 0);
 }
 /*----------------------------------------------------------------
 * acx100_probe_pci
@@ -391,7 +400,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandevice_t *wlandev = NULL;
 	struct net_device *netdev = NULL;
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
-	int i;
+	unsigned int i;
 	UINT32 hardware_info;
 	char *devname_mask;
 
@@ -430,7 +439,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!request_mem_region
 	    (phymem1, pci_resource_len(pdev, 1), "Acx100_1")) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: acx100: Cannot reserve PCI memory region 1\n", __func__);
+		       "%s: acx100: Cannot reserve PCI memory region 1 (or also: are you sure you have CardBus support in kernel?)\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -489,6 +498,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->membase2 = phymem2;
 	wlandev->iobase2 = mem2;
 	wlandev->pvMemBaseAddr2 = mem2;
+
+	wlandev->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
 	spin_lock_init(&wlandev->lock);
 
@@ -575,7 +586,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * reinit packet templates etc. */
 	netdev->get_stats = &acx100_get_stats;
 	netdev->get_wireless_stats = &acx100_get_wireless_stats;
-	netdev->do_ioctl = &acx100_ioctl;
+#if WIRELESS_EXT >= 13
+	netdev->wireless_handlers = (struct iw_handler_def *)&acx100_ioctl_handler_def;
+#endif
+	netdev->do_ioctl = &acx100_ioctl_main;
 	netdev->set_multicast_list = &acx100_set_rx_mode;
 	netdev->tx_timeout = &acx100_tx_timeout;
 	netdev->watchdog_timeo = 4 * HZ;	/* 400 */
@@ -619,6 +633,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
 			&acx100_pm_callback);
 
+        create_proc_read_entry("driver/acx100", 0, 0, acx100_read_proc, wlandev);
+
 	result = 0;
 	goto done;
 
@@ -626,8 +642,6 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail_registered:
 	unregister_netdev(netdev);
 fail:
-	acxlog(L_INIT, "fail hw_unavailable++\n");
-	wlandev->hw_unavailable++;
 	if (wlandev)
 	{
 		if (wlandev->pm)
@@ -690,7 +704,8 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	netdev = (struct net_device *) pci_get_drvdata(pdev);
 	hw = (struct wlandevice *) netdev->priv;
 
-	/* first, unregister the device to not let the kernel
+        remove_proc_entry("driver/acx100", NULL);
+	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device */
 	netif_device_detach(netdev);
 	unregister_netdev(netdev);
@@ -787,6 +802,8 @@ static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	wlandevice_t *wlandev = (wlandevice_t*)ndev->priv;
 	client_t client;
 
+	FN_ENTER;
+	
 	switch(rqst)
 	{
 		case PM_SUSPEND: /* OK, we got a suspend request */
@@ -852,6 +869,7 @@ static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 			result = -EINVAL;
 			break;
 	}
+	FN_EXIT(1, result);
 	return result;
 }
 
@@ -893,7 +911,6 @@ static void acx100_up(netdevice_t * dev)
 	acx100_start(wlandev);
 	acxlog(L_XFER, "start queue on startup.\n");
 	netif_start_queue(dev);
-
 
 	FN_EXIT(0, 0);
 }
@@ -1081,7 +1098,9 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 	int templen;
 
 //	pb = &pb1;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+
+	FN_ENTER;
+
 	if (!skb) {
 		return 0;
 	}
@@ -1207,6 +1226,7 @@ static void acx100_tx_timeout(netdevice_t * dev)
 	FN_ENTER;
 	acxlog(L_STD, "Tx timeout!\n");
 	((wlandevice_t *)dev->priv)->stats.tx_errors++;
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -1232,6 +1252,7 @@ static void acx100_tx_timeout(netdevice_t * dev)
  */
 static struct net_device_stats *acx100_get_stats(netdevice_t * dev)
 {
+	FN_ENTER;
 	return &((wlandevice_t *) dev->priv)->stats;
 }
 /*----------------------------------------------------------------
@@ -1254,9 +1275,10 @@ static struct net_device_stats *acx100_get_stats(netdevice_t * dev)
 
 static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev)
 {
-	wlandevice_t *hw = (wlandevice_t *)dev->priv;
+	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
 
-	return &hw->wstats;
+	FN_ENTER;
+	return &wlandev->wstats;
 }
 
 /*----------------------------------------------------------------
@@ -1303,14 +1325,15 @@ static void acx100_set_rx_mode(netdevice_t * netdev)
 irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	wlandevice_t *wlandev = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
+	UINT16 irqtype;
 	int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	static unsigned long entry_count = 0;
 	static int loops_this_jiffy = 0;
-	static int last_irq_jiffies = 0;
-
-	UINT16 irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
-
+	static unsigned long last_irq_jiffies = 0;
+	
 	FN_ENTER;
+
+	irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
 	pm_access(wlandev->pm);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
@@ -1360,7 +1383,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (irqtype & HOST_INT_SCAN_COMPLETE /* 0x2000 */ ) {
 		/* V1_3CHANGE: dbg msg only in V1 */
 		acxlog(L_IRQ,
-		       "<acx100_interrupt> HOST_INT_SCAN_COMPLETE\n");
+		       "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
 
 		if (wlandev->iStatus == ISTATUS_5_UNKNOWN) {
 			acx100_set_status(wlandev, wlandev->unknown0x2350);
@@ -1527,7 +1550,7 @@ static int __init acx100_init_module(void)
 	acxlog(L_STD,
 	       "acx100: thus your mileage may vary. Visit http://acx100.sf.net for support.\n");
 
-	acxlog(L_BINDEBUG, "%s: %s Loaded\n", __func__, version);
+	acxlog(L_BINSTD, "%s: %s Loaded\n", __func__, version);
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
 	//.data(0xc)=dev_info
 

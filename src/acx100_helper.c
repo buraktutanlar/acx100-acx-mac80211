@@ -78,15 +78,9 @@
 /* Project Includes */
 
 #include <version.h>
-#include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <acx100_conv.h>
-#include <p80211msg.h>
-#include <p80211ioctl.h>
 #include <acx100.h>
 #include <p80211netdev.h>
-#include <p80211req.h>
-#include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
 #include <idma.h>
@@ -101,8 +95,84 @@ extern char *firmware_dir; /* declared in acx100.c, to keep together with other 
  */
 void acx100_schedule(UINT32 timeout)
 {
+	FN_ENTER;
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(timeout);
+	FN_EXIT(0, 0);
+}
+
+/*------------------------------------------------------------------------------
+ * acx100_read_proc
+ * Handle our /proc entry
+ *
+ * Arguments:
+ *	standard kernel read_proc interface
+ * Returns:
+ *	number of bytes written to buf
+ * Side effects:
+ *	none
+ * Call context:
+ *	
+ * Status:
+ *	should be okay, non-critical
+ * Comment:
+ *	I'm not quite sure whether I got the housekeeping right - sheim
+ *----------------------------------------------------------------------------*/
+int acx100_read_proc(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *wlandev = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx100_proc_output(buf, wlandev);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(0, 0);
+	return length;
+}
+
+/*------------------------------------------------------------------------------
+ * acx100_proc_output
+ * Generate content for our /proc entry
+ *
+ * Arguments:
+ *	buf is a pointer to write output to
+ *	hw is the usual pointer to our private struct wlandevice
+ * Returns:
+ *	number of bytes actually written to buf
+ * Side effects:
+ *	none
+ * Call context:
+ *	
+ * Status:
+ *	should be okay, non-critical
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
+int acx100_proc_output(char *buf, wlandevice_t *hw)
+{
+	char *p = buf;
+
+	FN_ENTER;
+	p += sprintf(p, "acx100 driver version:\t%s\n", WLAN_RELEASE_SUB);
+	p += sprintf(p, "form factor:\t\t0x%02x\n", hw->form_factor);
+	/* TODO: add form factor string from acx100_display_hardware_details */
+	p += sprintf(p, "radio type:\t\t0x%02x\n", hw->radio_type);
+	/* TODO: add radio type string from acx100_display_hardware_details */
+	p += sprintf(p, "EEPROM version:\t\t0x%04x\n", hw->eeprom_version);
+	p += sprintf(p, "firmware version:\t%s (0x%08lx)\n",
+		     hw->firmware_version, hw->firmware_id);
+	/* TODO: add more interesting stuff (current state, essid, ...) here */
+	FN_EXIT(0, 0);
+	return p - buf;
 }
 
 /*----------------------------------------------------------------
@@ -257,6 +327,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 	firmware_image_t* apfw_image;
 	char filename[PATH_MAX];
 
+	FN_ENTER;
 	if (!firmware_dir)
 	{
 		/* since the log will be flooded with other log messages after
@@ -281,6 +352,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 
 	acxlog(L_DEBUG | L_INIT,
 	   "acx100_write_fw (firmware): %d, acx100_validate_fw: %d\n", res1, res2);
+	FN_EXIT(1, res1 && res2);
 	return (res1 && res2);
 }
 
@@ -396,7 +468,8 @@ firmware_image_t* acx100_read_fw(const char *file)
 	unsigned long page;
 	char *buffer;
 	struct file *inf;
-	int retval, offset = 0;
+	int retval;
+	unsigned int offset = 0;
 
 	orgfs = get_fs(); /* store original fs */
 	set_fs(KERNEL_DS);
@@ -1263,11 +1336,16 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	unsigned char dbm2val_maxim[21] = { 60, 57, 54, 51, 48, 45, 42, 39, 36, 33, 30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 0};
 	
-	if (wlandev->radio_type == 0x11)
-	{
-	  table = &dbm2val_rfmd[0];
-	} else {
-	  table = &dbm2val_maxim[0];
+	switch (wlandev->radio_type) {
+		case 0x11:
+			table = &dbm2val_rfmd[0];
+			break;
+		case 0x15:
+			table = &dbm2val_maxim[0];
+			break;
+		default:
+			acxlog(L_STD, "FIXME: unknown/unsupported radio type, cannot modify Tx power level yet!\n");
+			return 0;
 	}
 	acxlog(L_STD, "changing radio power level to %d dBm (0x%02x)\n", level, table[level]);
 	acx100_write_reg16(wlandev, 0x268, 0x11);
@@ -1699,6 +1777,13 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 		wlandev->dev_addr[3], wlandev->dev_addr[4], wlandev->dev_addr[5]);
 	wlandev->essid_active = 1;
 
+	wlandev->channel = 1;
+	
+	/* we have a nick field to waste, so why not abuse it
+	 * to announce the driver version? ;-) */
+	strcpy(wlandev->nick, "acx100 ");
+	strcat(wlandev->nick, WLAN_RELEASE_SUB);
+
 	wlandev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
 	wlandev->preamble_mode = 2;
 	wlandev->preamble_flag = 0;
@@ -1707,8 +1792,6 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->mode = 0x0;
 	wlandev->unknown0x2350 = 0;
 	*(UINT16 *) &wlandev->val0x2302[0] = 0x2;
-
-	wlandev->channel = 1;
 
 	if ( wlandev->eeprom_version < 5 ) {
 	  acx100_read_eeprom_offset(wlandev, 0x16F, &wlandev->reg_dom_id);

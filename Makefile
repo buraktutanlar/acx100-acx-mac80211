@@ -1,4 +1,4 @@
-.PHONY: config driver all
+.PHONY: all config extract_firmware driver install clean
 
 all:	config driver
 

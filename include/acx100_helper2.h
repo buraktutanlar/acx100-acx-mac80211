@@ -203,14 +203,7 @@ typedef struct TxData {
 void acx_client_sta_list_init(void);
 int acx80211_rx(rxhostdescriptor_t * skb,/* wlan_pb_t * a,*/
 		wlandevice_t * wlandev);
-UINT32 process_mgmt_frame(struct rxhostdescriptor *skb, 
-		/* wlan_pb_t * a,*/ wlandevice_t * wlandev);
-int process_data_frame_master(struct rxhostdescriptor *skb,
-		/* wlan_pb_t * a,*/ wlandevice_t * wlandev);
-int process_data_frame_client(struct rxhostdescriptor *skb, 
-		/* wlan_pb_t * a,*/ wlandevice_t * wlandev);
 int process_disassoc(wlan_fr_disassoc_t * req, wlandevice_t * hw);
-void ActivatePowerSaveMode(wlandevice_t * hw, int vala);
 int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw);
 int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw);
 int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw);
@@ -218,14 +211,11 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw);
 int process_authen(wlan_fr_authen_t * req, wlandevice_t * hw);
 
 int process_deauthen(wlan_fr_deauthen_t * req, wlandevice_t * hw);
-int process_class_frame(struct rxhostdescriptor * a, 
-		wlandevice_t * wlandev, int vala);
-int process_NULL_frame(struct rxhostdescriptor * a, 
-		wlandevice_t * hw, int vala);
+void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
+			  acxp80211_hdr_t * hdr);
+void ActivatePowerSaveMode(wlandevice_t * hw, int vala);
 void acx100_timer(unsigned long a);
 void d11CompleteScan(wlandevice_t * wlandev);
-void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
-			  acxp80211_hdr_t * hdr);
 void acx100_set_status(wlandevice_t *hw, int vala);
 void IBSSIDGen(wlandevice_t * wlandev, unsigned char *p_out);
 

@@ -2,6 +2,21 @@ Changes:
 ========
 
 
+2003.11.16 - 0.2.0pre6 released
+- fix kernel OOPS on driver init failure
+- add support for new wireless extension ioctl implementation format,
+  move set_retry from iwpriv to standard ioctl
+- add support for scanning ioctls (needed for apradar etc.)
+- add /proc entry for acx100
+- change iwconfig name from driver version to 802.11 ID string,
+  move driver version into default nick name
+- change channel in start_net to a non-overlapping channel
+- add human-readable ACX100 explanations for reasons of failure codes
+- don't try to modify Tx level for unknown radio types
+- fix compiler warnings
+- README updates
+- remove unnecessary includes
+
 2003.11.07 - 0.2.0pre5 released
 - fix problem causing all sorts of machine lockups:
   implemented centralized card settings management

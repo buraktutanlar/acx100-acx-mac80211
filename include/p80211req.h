@@ -46,6 +46,8 @@
 #ifndef _LINUX_P80211REQ_H
 #define _LINUX_P80211REQ_H
 
+#include <p80211msg.h>
+
 #ifndef CONFIG_NETLINK
 #ifdef CONFIG_NETLINK_DEV
 #define CONFIG_NETLINK 1

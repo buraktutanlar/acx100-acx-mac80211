@@ -420,6 +420,8 @@ typedef struct wlandevice {
 	/*** wireless settings ***/
 	UINT32 get_mask;	/* mask of settings to fetch from the card */
 	UINT32 set_mask;	/* mask of settings to write to the card */
+	unsigned long scan_start;
+	char scan_running;
 	UINT32 mode;		/* V3POS 80; that's the MAC mode we want */
 	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
 	UINT8 rate_fallback_retries;

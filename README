@@ -58,9 +58,14 @@ due to strict 802.11b compliance checks in their firmware.
 
 HostAP support has not been implemented yet, but it's definitely possible.
 
+4x mode (aka "44Mbps") is NOT supported yet and will need several
+driver changes.
+
 Many other things haven't been tested (properly) yet.
 
 Skillful testers and BSD driver writers welcome!!
+(for FreeBSD development, please contact mochaspirit AT users DOT
+sourceforge DOT net)
 There is a free download of the 802.11b spec at
 http://standards.ieee.org/getieee802/
 
@@ -190,7 +195,7 @@ the module's "debug" parameter and/or its preinitialisation value in
 acx100.c and/or via the iwpriv set_debug setting. A good default value
 after having managed to get the driver to run would be 0xb
 (L_STD|L_INIT|L_ASSOC debug channels).
-Your harddisk will certainly thank you a lot for having saved it
+Your hard disk will certainly thank you a lot for having saved it
 from the horror of heaps of logs once you got the driver running...
 To check out further module parameters and options, please use modinfo
 and iwpriv.
@@ -201,11 +206,11 @@ insmod src/acx100_pci.o firmware_dir=firmware
 NOTE that firmware_dir has to be given as an absolute path; a relative
 path will cause trouble!!
 
-For troubleshooting, see below.
+If you want the driver to use eth0 device name instead of wlan0,
+then e.g. load as:
+insmod src/acx100_pci.o firmware_dir=firmware use_eth_name=1
 
-Once you got the driver running, you could set EXPERIMENTAL_VER_x_y in
-include/acx100.h to 1, recompile and enjoy (or not) some new features
-to be released in the next minor version. (no warranty!)
+For troubleshooting, see below.
 
 --- "CRAZY" INSTALLATION ---
 
@@ -225,6 +230,9 @@ need to adapt it...)
 with linux-2.6 ;-)
 
 --- USAGE HINTS ---
+
+Card insertion driver autoloading? You need to configure PCI hotplug layer,
+*NOT* pcmcia-cs layer!
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf.
 
@@ -249,8 +257,9 @@ Consider completely recompiling the kernel (make sure to keep any old
 rebooting. Hopefully the driver compiling works then.
 
 -- Driver init failure --
-In case of ACX100 CardBus, you need to make sure you're using
-kernel CardBus support, not pcmcia-cs CardBus modules!
+In case of ACX100 CardBus, you need to make sure you're having
+CardBus support (otherwise you'll have strange PCI init failures),
+and it should be kernel CardBus support, not pcmcia-cs CardBus modules!
 (yenta socket instead of e.g. i82365)
 On SUSE: "kernel" type instead of "external".
 Thinkpad notebook? Make sure your CardBus feature is enabled in the
@@ -262,6 +271,16 @@ pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
 fails to detect a card if there are large amounts of ranges to be probed.
 Please tell us if this managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
+
+-- Driver locked up the box --
+Umm... ouch!
+First, use newest driver version.
+Then please configure a logging console (e.g. /dev/tty8) in
+/etc/syslog*.conf, restart syslogd, then do:
+sleep 10 && insmod acx100_pci ......
+Then change to the logging console (Ctrl-Alt-F8), wait 10 seconds
+and write down the crash dump.
+Then please file a bug report. Thanks!
 
 -- Network failure --
 First, make absolutely sure you're using correct settings for
@@ -321,7 +340,7 @@ falling through the cracks.
            We'll have to implement auto rate adaptation properly soon.
 - many advanced features are not implemented yet
 
-For current tasks, please read TODO.
+For current tasks, please read TODO (or grep driver for FIXME and TODO).
 
 In case of bugs that didn't exist in previous versions,
 PLEASE do regression testing via CVS:
@@ -351,7 +370,12 @@ name their cards containing DIFFERENT chipsets!!
 One of these vendors is SpeedStream/Siemens: a card that uses the same
 name "SS1021" is available in both Orinoco chip and ACX100 chip versions.
 
-Another one is D-Link: they have "DWL-650" and "DWL-650+".
+USRobotics also just started to enjoy these despicable acts:
+the USR2210 usually has the ACX100, however newer versions with UNCHANGED
+naming (e.g. at tigerdirect.com) contain a newer incompatible 802.11g
+TI chipset.
+
+But the worst offender is D-Link: they have "DWL-650" and "DWL-650+".
 "DWL-650+" is simply an improved version of the "DWL-650", right?
 WRONG!
 The standard versions use Prism2.5, whereas the "+" versions use ACX100
@@ -359,6 +383,8 @@ chipset. Good luck in finding a (correct) driver!!
 And it's even WORSE: I just found out that there is some newer
 version of the "DWL-650" out that also contains the ACX100
 (it uses the same hardware as the "+" versions).
+Not to mention that D-Link now uses the DWL*650* naming for about 5 or 6
+different products!
 This BRAINDEAD STUPIDITY in device naming easily entitles D-Link
 for the "Most Braindead Hardware Vendor 2003" award. And of course
 they were also talking about developing another Linux driver for some time,
@@ -375,8 +401,7 @@ Also, we just learned that D-Link tech support can be very clueless, too:
 one guy, after having been advised that his DWL-120+ uses an Atmel
 chipset, spent considerable time trying to get this card to work with an
 incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
-the DWL-120+ most definitely likely is using an ACX100, since it cannot
-be an Atmel due to 22Mbps operation!).
+the DWL-120+ is using an ACX100 in USB mode!).
 This proves that D-Link really deserves my "Most Braindead Hardware
 Vendor 2003" award, and it also shows that one should avoid D-Link like
 the plague from now on (at least until they get rid of their stupid

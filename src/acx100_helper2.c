@@ -37,7 +37,6 @@
  */
 
 #include <linux/config.h>
-#define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
 
 #include <linux/module.h>
@@ -79,7 +78,6 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
-#include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
 #include <p80211netdev.h>
@@ -90,6 +88,19 @@
 #include <acx100_helper2.h>
 #include <ihw.h>
 #include <acx80211frm.h>
+
+static UINT32 process_mgmt_frame(struct rxhostdescriptor *skb,
+		                /* wlan_pb_t * a,*/ wlandevice_t *
+				wlandev);
+static int process_data_frame_master(struct rxhostdescriptor *skb,
+		                /* wlan_pb_t * a,*/ wlandevice_t *
+				wlandev);
+static int process_data_frame_client(struct rxhostdescriptor *skb,
+		                /* wlan_pb_t * a,*/ wlandevice_t *
+				wlandev);
+static int process_NULL_frame(struct rxhostdescriptor * a, 
+		                wlandevice_t * hw, int vala);
+
 
 static client_t sta_list[32];
 
@@ -205,10 +216,12 @@ static inline client_t *acx_get_client_from_sta_hash_tab(UINT8 * address)
 {
 	int index;
 
+	FN_ENTER;
 	/* computing hash table index */
 	index = ((address[4] << 8) + address[5]);
 	index -= index & 0x3ffc0;
 
+	FN_EXIT(0, 0);
 	return sta_hash_tab[index];
 }
 
@@ -280,6 +293,7 @@ client_t *sta_list_alloc(UINT8 *address)
 {
 	int i = 0;
 
+	FN_ENTER;
 	for (i = 0; i <= 31; i++) {
 		if (sta_list[i].used == 0) {
 			sta_list[i].used = 1;
@@ -288,6 +302,7 @@ client_t *sta_list_alloc(UINT8 *address)
 			return &(sta_list[i]);
 		}
 	}
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -321,6 +336,7 @@ void acx100_set_status(wlandevice_t *hw, int status)
 	static int associated = 0;
 #endif
 
+	FN_ENTER;
 	if (status <= ISTATUS_5_UNKNOWN)
 		stat = state_str[status];
 	else
@@ -367,6 +383,7 @@ void acx100_set_status(wlandevice_t *hw, int status)
 		associated = 0;
 	}
 #endif
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -397,6 +414,7 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	p80211_hdr_t *p80211_hdr;
 	int result = 0;
 
+	FN_ENTER;
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf ;
 
 	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
@@ -407,7 +425,6 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	/* see IEEE 802.11-1999.pdf chapter 7 "MAC frame formats" */
 	ftype = WLAN_GET_FC_FTYPE(p80211_hdr->a3.fc);
 	fstype = WLAN_GET_FC_FSTYPE(p80211_hdr->a3.fc);
-	acxlog(L_STATE, "%s: UNVERIFIED\n", __func__);
 
 	switch (ftype) {
 		case WLAN_FTYPE_MGMT:
@@ -453,6 +470,7 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 		default:
 			break;
 	}
+	FN_EXIT(1, result);
 	return result;
 }
 
@@ -492,6 +510,7 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 	struct txhostdescriptor *hdesc_payload;
 	client_t *clt;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	// FIXME: or is the order the other way round ??
 	var_1c[0] = 0;
@@ -501,7 +520,6 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 	var_1c[4] = 0xf;
 	var_1c[5] = 0x1f;
 
-	FN_ENTER;
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "<transmit_assocresp 1>\n");
 
 	// FIXME: is this correct, should it just test for toDS and fromDS
@@ -619,6 +637,7 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 	client_t *clt;
 	TxData *fr;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if ((arg_0->hdr->a3.fc == 0x100) && (arg_0->hdr->a3.fc == 0x200)) {
 		sa = arg_0->hdr->a3.a1;
@@ -705,6 +724,7 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 
 		acx100_dma_tx_data(hw, tx_desc);
 	}
+	FN_EXIT(0, 0);
 
 	return 0;
 }
@@ -737,6 +757,7 @@ int process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *hw)
 	UINT8 *TA = NULL;
 	client_t *clts;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = arg_0->hdr;
 
@@ -757,6 +778,7 @@ int process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *hw)
 		} else
 			res = 1;
 	}
+	FN_EXIT(0, 0);
 	return res;
 }
 
@@ -786,6 +808,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 	p80211_hdr_t *hdr;
 	int res = 0;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
@@ -806,6 +829,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 		} else
 			res = 1;
 	}
+	FN_EXIT(0, 0);
 	return res;
 }
 
@@ -837,7 +861,7 @@ int is_broadcast_address(UINT8 *address)
 
 
 	/* IPv6 broadcast address */
-	if (address[0] == 0x33  &&  address[1] == 0x33)
+	if ((address[0] == 0x33) && (address[1] == 0x33))
 		return 1;
 
 	return 0;
@@ -861,7 +885,7 @@ int is_broadcast_address(UINT8 *address)
 *
 *----------------------------------------------------------------*/
 
-int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
+static int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 {
 	client_t *clt;
 	UINT8 bcast_addr[WLAN_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
@@ -875,8 +899,8 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 	UINT8 *sa = NULL;
 	UINT8 *bssid = NULL;
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	FN_ENTER;
+	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
@@ -969,9 +993,9 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 			acx100_rx(rxdesc, hw);
 		}
 	}
-      done:
+done:
 	result = 1;
-      fail:
+fail:
 	FN_EXIT(1, result);
 	return result;
 }
@@ -996,7 +1020,7 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 /* process_data_frame_client()
  * STATUS: FINISHED, UNVERIFIED.
  */
-int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
+static int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 {
 	UINT8 bcast_addr[WLAN_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	UINT8 *da = NULL;
@@ -1069,7 +1093,7 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 	/* packet is from our bssid, and is either broadcast or destined for us, so process it */
 	acx100_rx(rxdesc, hw);
 
-      done:
+done:
 	result = 1;
 	FN_EXIT(1, result);
 	return result;
@@ -1096,13 +1120,15 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 /* process_mgmt_frame()
  * STATUS: FINISHED, UNVERIFIED. namechange!! (from process_mgnt_frame())
  */
-UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
+static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 {
 	static UINT8 reassoc_b;
 	UINT8 *a;
 	p80211_hdr_t *p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 	int wep_offset = 0;
 
+	FN_ENTER;
+	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if(WLAN_GET_FC_ISWEP(p80211_hdr->a3.fc)){
 		wep_offset = 0x10;
 	}
@@ -1111,7 +1137,6 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
 	}
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	switch (WLAN_GET_FC_FSTYPE(p80211_hdr->a3.fc)) {
 	case WLAN_FSTYPE_ASSOCREQ /* 0x00 */ :
 		if (hw->macmode != WLAN_MACMODE_ESS_STA /* 2 */ ) {
@@ -1192,7 +1217,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
 			if (hw->iStatus == ISTATUS_1_SCANNING)
-				ProcessProbeResponse(rxdesc->data,
+				acx100_process_probe_response(rxdesc->data,
 						     hw,
 						     (acxp80211_hdr_t *)
 						     alloc_p80211mgmt_req.
@@ -1234,7 +1259,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 				       p80211_hdr->a3.seq);
 				acx_mgmt_decode_beacon
 				    (&alloc_p80211mgmt_req.a.beacon);
-				ProcessProbeResponse(rxdesc->data,
+				acx100_process_probe_response(rxdesc->data,
 						     hw,
 						     (acxp80211_hdr_t *)
 						     alloc_p80211mgmt_req.
@@ -1302,10 +1327,12 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		}
 		break;
 	}
+	FN_EXIT(0, 0);
 
 	return 0;
 }
 
+#if UNUSED
 /*----------------------------------------------------------------
 * process_class_frame
 * FIXME: rename to acx100_process_class_frame
@@ -1328,10 +1355,11 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 /* process_class_frame()
  * STATUS: FINISHED.
  */
-int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw, int vala)
+static int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw, int vala)
 {
 	return 1;
 }
+#endif
 
 /*----------------------------------------------------------------
 * process_NULL_fame
@@ -1354,7 +1382,7 @@ int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw, int va
 /* process_NULL_frame()
  * STATUS: FINISHED, UNVERIFIED.
  */
-int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala)
+static int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala)
 {
 	UINT16 fc;
 	signed char *esi;
@@ -1411,8 +1439,7 @@ int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala
 }
 
 /*----------------------------------------------------------------
-* ProcessProbeResponse
-* FIXME: rename to acx100_process_probe_response
+* acx100_process_probe_response
 *
 * Arguments:
 *
@@ -1422,19 +1449,12 @@ int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala
 *
 * Call context:
 *
-* STATUS:
+* STATUS: working on it.  UNVERIFIED.
 *
 * Comment:
 *
 *----------------------------------------------------------------*/
-
-/* ProcessProbeResponse()
- * STATUS: working on it.  UNVERIFIED.
- *
- *
- *
- */
-void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
+void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 			  acxp80211_hdr_t * hdr)
 {
 	UINT8 *pSuppRates;
@@ -1514,13 +1534,22 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 	a = hw->val0x126c[hw->iStable].address;
 	ss = &hw->val0x126c[hw->iStable];
 
+	acxlog(L_DEBUG, "Supported Rates: ");
 	/* find max. transfer rate */
 	for (i=0; i < pSuppRates[1]; i++)
+	{
+		acxlog(L_DEBUG, "%s Rate: %d%sMbps, ",
+			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
+			(int)(pSuppRates[2+i] & ~0x80 / 2),
+			(pSuppRates[2+i] & 1) ? ".5" : "");
 		if ((pSuppRates[2+i] & ~0x80) > max_rate)
 			max_rate = pSuppRates[2+i] & ~0x80;
+	}
+	acxlog(L_DEBUG, ".\n");
 
 	acxlog(L_STD | L_ASSOC,
-	       "ProcessProbeResponse: found and registered station %d: ESSID \"%s\" on channel %ld, BSSID %02X %02X %02X %02X %02X %02X (%s, %d%sMbps), SIR %ld, SNR %ld.\n",
+	       "%s: found and registered station %d: ESSID \"%s\" on channel %ld, BSSID %02X %02X %02X %02X %02X %02X (%s, %d%sMbps), SIR %ld, SNR %ld.\n",
+	       __func__,
 	       hw->iStable,
 	       ss->essid, ss->channel,
 	       a[0], a[1], a[2], a[3], a[4], a[5],
@@ -1530,26 +1559,28 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 
 	/* found one station --> increment counter */
 	hw->iStable++;
+	FN_EXIT(0, 0);
 }
 
 char *get_status_string(int status)
 {
 	char *status_str[22] =
 	{ "Successful", "Unspecified failure",
-	  "Reserved", "Reserved", "Reserved", "Reserved",
-	  "Reserved", "Reserved", "Reserved", "Reserved",
-	  "Cannot support all requested capabilities in the Capability Information field",
-	  "Reassociation denied due to reason outside the scope of 802.11b standard",
-	  "Association denied due to reason outside the scope of 802.11b standard",
-	  "Responding station does not support the specified authentication algorithm",
-	  "Received an Authentication frame with transaction sequence number out of expected sequence",
-	  "Authentication rejected because of challenge failure",
-	  "Authentication rejected due to timeout waiting for next frame in sequence",
+	  "Reserved error code", "Reserved error code", "Reserved erro code",
+	  "Reserved error code", "Reserved error code", "Reserved erro code",
+	  "Reserved error code", "Reserved error code",
+	  "Cannot support all requested capabilities in the Capability Information field. TRANSLATION: Bug in ACX100 driver?",
+	  "Reassociation denied due to reason outside the scope of 802.11b standard. TRANSLATION: Bug in ACX100 driver?",
+	  "Association denied due to reason outside the scope of 802.11b standard. TRANSLATION: peer station probably has MAC filtering enabled, FIX IT!",
+	  "Responding station does not support the specified authentication algorithm. TRANSLATION: Bug in ACX100 driver?",
+	  "Received an Authentication frame with transaction sequence number out of expected sequence. TRANSLATION: Bug in ACX100 driver?",
+	  "Authentication rejected because of challenge failure. TRANSLATION: Bug in ACX100 driver?",
+	  "Authentication rejected due to timeout waiting for next frame in sequence. TRANSLATION: Bug in ACX100 driver?",
 	  "Association denied because AP is unable to handle additional associated stations",
-	  "Association denied due to requesting station not supporting all of the data rates in the BSSBasicRateSet parameter",
-	  "Association denied due to requesting station not supporting the Short Preamble option",
-	  "Association denied due to requesting station not supporting the PBCC Modulation option",
-	  "Association denied due to requesting station not supporting the Channel Agility option."};
+	  "Association denied due to requesting station not supporting all of the data rates in the BSSBasicRateSet parameter. TRANSLATION: peer station has an incompatible set of data rates configured, FIX IT!",
+	  "Association denied due to requesting station not supporting the Short Preamble option. TRANSLATION: Bug in ACX100 driver?",
+	  "Association denied due to requesting station not supporting the PBCC Modulation option. TRANSLATION: Bug in ACX100 driver?",
+	  "Association denied due to requesting station not supporting the Channel Agility option. TRANSLATION: Bug in ACX100 driver?"};
 
 	  return status <= 21 ? status_str[status] : "Reserved";
 }
@@ -1581,6 +1612,7 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 	int res = 0;
 	memmap_t pdr;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
@@ -1597,11 +1629,12 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 				       "ASSOCIATED!\n");
 			}
 			else
-				acxlog(L_STD | L_ASSOC, "Association FAILED: response status code %d: \"%s\"!\n", req->status[0], get_status_string(req->status[0]));
+				acxlog(L_STD | L_ASSOC, "Association FAILED: peer station sent response status code %d: \"%s\"!\n", req->status[0], get_status_string(req->status[0]));
 			res = 0;
 		} else
 			res = 1;
 	}
+	FN_EXIT(0, 0);
 	return res;
 }
 
@@ -1630,6 +1663,7 @@ int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 {
 	p80211_hdr_t *hdr;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
@@ -1649,6 +1683,7 @@ int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 		} else
 			return 1;
 	}
+	FN_EXIT(0, 0);
 }
 
 /* process_authen()
@@ -1660,6 +1695,7 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 	client_t *clt;
 	client_t *currclt;
 
+	FN_ENTER;
 	acxlog(L_STATE|L_ASSOC, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 	if (WLAN_GET_FC_TODS(hdr->a3.fc) || WLAN_GET_FC_FROMDS(hdr->a3.fc))
@@ -1763,6 +1799,7 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 		transmit_assoc_req(hw);
 		break;
 	}
+	FN_EXIT(0, 0);
 	return 0;
 }
 /*----------------------------------------------------------------
@@ -1796,9 +1833,10 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 	client_t *client;
 	client_t *resclt = NULL;
 
-
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	printk("Entering process_deauthen\n");
+	acxlog(L_STD, "Processing deauthen packet. Hmm, should this have happened?\n");
+
 	hdr = arg_0->hdr;
 
 	if (hdr->a3.fc & 0x300)
@@ -1841,6 +1879,7 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 	} else
 		result = 1;
 
+	FN_EXIT(0, 0);
 	return result;
 }
 /*----------------------------------------------------------------
@@ -1869,7 +1908,9 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 {
 	p80211_hdr_t *hdr;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+	acxlog(L_STD, "processing deauthenticate packet. Hmm, should this have happened?\n");
 	hdr = req->hdr;
 	if (hdr->a3.fc & 0x300)
 		return 1;
@@ -1883,6 +1924,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 			}
 		}
 	}
+	FN_EXIT(0, 0);
 	return 1;
 }
 /*----------------------------------------------------------------
@@ -1915,6 +1957,7 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 	struct txhostdescriptor *hdesc_header;
 	struct txhostdescriptor *hdesc_payload;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if ((tx_desc = acx100_get_tx_desc(wlandev)) == NULL) {
@@ -1961,6 +2004,7 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 
 	acx100_dma_tx_data(wlandev, tx_desc);
 
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2031,6 +2075,7 @@ int transmit_authen1(wlandevice_t *wlandev)
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
 	acx100_dma_tx_data(wlandev, tx_desc);
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2065,6 +2110,7 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 	struct txhostdescriptor *hdesc_payload;
 	TxData *hd;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	packet_len = WLAN_HDR_A3_LEN;
 
@@ -2122,6 +2168,7 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 
 		acx100_dma_tx_data(hw, tx_desc);
 	}
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2155,6 +2202,7 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 	TxData *hd;
 	struct auth_frame_body *payload;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 		return 1;
@@ -2199,6 +2247,7 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_auth3!\n");
 
 	acx100_dma_tx_data(hw, tx_desc);
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2231,6 +2280,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 	TxData *hd;
 	struct auth_frame_body *payload;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
@@ -2264,6 +2314,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
 	acx100_dma_tx_data(hw, tx_desc);
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2297,8 +2348,8 @@ int transmit_assoc_req(wlandevice_t *hw)
 	TxData *hd;
 	UINT8 *pCurrPos;
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	FN_ENTER;
+	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending association request, awaiting response! NOT ASSOCIATED YET.\n");
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
@@ -2377,6 +2428,7 @@ int transmit_assoc_req(wlandevice_t *hw)
 	tx_desc->total_length = payload->length + header->length;
 
 	acx100_dma_tx_data(hw, tx_desc);
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2411,6 +2463,7 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 	struct txhostdescriptor *hdesc_payload;
 	TxData *hd;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 //	if (clt != NULL) {
 		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
@@ -2447,6 +2500,7 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 		acx100_dma_tx_data(hw, tx_desc);
 		return 1;
 //	}
+	FN_EXIT(0, 0);
 	return 0;
 }
 
@@ -2775,6 +2829,7 @@ void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
 {
 	memmap_t pm;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT);
@@ -2784,6 +2839,7 @@ void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
 	pm.m.power.b = 0;
 	pm.m.power.c = 0;
 	acx100_configure(hw, &pm, ACX100_RID_POWER_MGMT);
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -2813,6 +2869,7 @@ void acx100_timer(unsigned long a)
 	wlandevice_t *hw = (wlandevice_t *)ndev->priv;
 	unsigned long flags;
 	
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acxlog(L_BINDEBUG | L_ASSOC, "<acx_timer> iStatus = %d\n",
@@ -2823,17 +2880,6 @@ void acx100_timer(unsigned long a)
 	switch (hw->iStatus) {
 	case ISTATUS_1_SCANNING:
 		if (hw->scan_retries++ <= 4) {
-#if V3_EXPERIMENTATION
-			char var_2C[0x24];
-			int len;
-
-			/* NONBINARY: huh, why does it store the len
-			 * and the ESSID copy in stack nirvana??
-			 * This seems to have been unfinished or
-			 * experimental code... */
-			len = strlen(hw->essid);
-			memcpy(&var_2C[0x4], hw->essid, sizeof(hw->essid));
-#endif
 			acx100_set_timer(hw, 2000000);
 		}
 		break;
@@ -2877,4 +2923,5 @@ void acx100_timer(unsigned long a)
 		break;
 	}
 	acx100_unlock(hw, &flags);
+	FN_EXIT(0, 0);
 }

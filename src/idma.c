@@ -73,7 +73,6 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100_conv.h>
-#include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
 #include <p80211netdev.h>
@@ -401,15 +400,15 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 
 void acx100_log_txbuffer(TIWLAN_DC *pDc)
 {
-	int i;
+	unsigned int i;
 	txdesc_t *pTxDesc;
 
-	for (i=0; i < pDc->tx_pool_count; i++)
+	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
 		pTxDesc = &pDc->pTxDescQPool[i];
 
 		if ((pTxDesc->Ctl & DESC_CTL_DONE) == DESC_CTL_DONE)
-			acxlog(L_BUF, "txbuf %d done.\n", i);
+			acxlog(L_BUF, "txbuf %d done\n", i);
 	}
 }
 
@@ -682,15 +681,15 @@ void acx100_rxmonitor(wlandevice_t * wlandev, struct rxbuffer *buf)
 
 void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 {
-	int i;
+	unsigned int i;
 	struct rxhostdescriptor *pDesc;
 
-	for (i=0; i < pDc->rx_pool_count; i++)
+	for (i = 0; i < pDc->rx_pool_count; i++)
 	{
 		pDesc = &pDc->pRxHostDescQPool[i];
 
 		if ((pDesc->Ctl & DESC_CTL_FREE) && (pDesc->val0x14 < 0))
-			acxlog(L_BUF, "rxbuf %d full.\n", i);
+			acxlog(L_BUF, "rxbuf %d full\n", i);
 	}
 }
 
@@ -720,7 +719,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 	UINT16 buf_len;
 	unsigned long flags;
 	int curr_idx;
-	int count = 0;
+	unsigned int count = 0;
 	p80211_hdr_t *buf;
 
 	pDc = &wlandev->dc;
@@ -755,7 +754,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 
 	while (1)
 	{
-		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %d.\n", __func__, curr_idx, pDc->rx_tail);
+		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %d\n", __func__, curr_idx, pDc->rx_tail);
 
 		buf = (p80211_hdr_t *)&pDesc->data->buf;
 		if (wlandev->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
@@ -799,7 +798,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 	                }
 		}
 
-		pDesc->Ctl &= ~DESC_CTL_FREE; //Host no longer owns this
+		pDesc->Ctl &= ~DESC_CTL_FREE; /* Host no longer owns this */
 		pDesc->val0x14 = 0;
 
 		/* ok, descriptor is handled, now check the next descriptor */
@@ -901,7 +900,7 @@ int acx100_create_tx_host_desc_queue(TIWLAN_DC * pDc)
 	/* check for proper alignment of TX host descriptor pool */
 	alignment = (UINT) pDc->pTxHostDescQPool & 3;
 	if (alignment) {
-		acxlog(L_BINSTD, "acx100_create_tx_host_desc_queue: TxHostDescQPool not aligned properly\n");
+		acxlog(L_BINSTD, "%s: TxHostDescQPool not aligned properly\n", __func__);
 		align_offs = 4 - alignment;
 	} else {
 		align_offs = 0;
@@ -1053,7 +1052,7 @@ int acx100_create_rx_host_desc_queue(TIWLAN_DC * pDc)
 
 			/* FIXME: what do these mean ? */
 			host_desc->val0x28 = 2;
-			host_desc->Ctl &= 0xff7f;
+			host_desc->Ctl &= ~0x80;
 
 			host_desc->desc_phy = host_desc_phy;
 			host_desc->desc_phy_next = (struct rxhostdescriptor *)((UINT8 *) host_desc_phy + sizeof(struct rxhostdescriptor));
