@@ -45,6 +45,7 @@ int acx111_create_dma_regions(wlandevice_t *priv);
 int acx_delete_dma_regions(wlandevice_t *priv);
 void acx_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
 void acx_clean_tx_desc(wlandevice_t *priv);
+void acx_clean_tx_desc_emergency(wlandevice_t *priv);
 UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
 void acx_process_rx_desc(wlandevice_t *priv);
 struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv);

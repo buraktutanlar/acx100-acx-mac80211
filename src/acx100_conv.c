@@ -460,7 +460,7 @@ fail:
 		 * xircom_tulip_cb.c? */
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (skb == NULL) {
-			acxlog(L_STD, "rx: failed to allocate skb\n");
+			acxlog(L_STD, "rx: FAILED to allocate skb\n");
 			FN_EXIT(1, (int)NULL);
 			return NULL;
 		}
@@ -497,7 +497,7 @@ fail:
 		buflen = payload_length + WLAN_ETHHDR_LEN;
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
-			acxlog(L_STD, "rx: failed to allocate skb\n");
+			acxlog(L_STD, "rx: FAILED to allocate skb\n");
 			FN_EXIT(1, (int)NULL);
 			return NULL;
 		}
@@ -540,7 +540,7 @@ fail:
 		buflen = payload_length + WLAN_ETHHDR_LEN - sizeof(wlan_llc_t) - sizeof(wlan_snap_t);
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
-			acxlog(L_STD, "rx: failed to allocate skb\n");
+			acxlog(L_STD, "rx: FAILED to allocate skb\n");
 			FN_EXIT(1, (int)NULL);
 			return NULL;
 		}
@@ -581,7 +581,7 @@ fail:
 		buflen = payload_length + WLAN_ETHHDR_LEN;
 		skb = dev_alloc_skb(buflen + 2);	/* +2 is attempt to align IP header */
 		if (unlikely(NULL == skb)) {
-			acxlog(L_STD, "rx: failed to allocate skb\n");
+			acxlog(L_STD, "rx: FAILED to allocate skb\n");
 			FN_EXIT(1, (int)NULL);
 			return NULL;
 		}

@@ -156,7 +156,7 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	priv->ctrl_urb->timeout=timeout;
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message FAILED with errcode %d\n",ucode);
 		return(0);
 	}
 	/* ---------------------------------
@@ -183,7 +183,7 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	priv->ctrl_urb->timeout=timeout;
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message (ack) failed with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %d\n",ucode);
 		return(0);
 	}
 	/* ---------------------------------

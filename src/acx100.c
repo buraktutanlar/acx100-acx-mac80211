@@ -514,7 +514,7 @@ void acx_show_card_eeprom_id(wlandevice_t *priv)
 					 (UINT16)(ACX100_EEPROM_ID_OFFSET + i),
 					 &buffer[i]))
 		{
-			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
+			acxlog(L_STD, "huh, reading EEPROM FAILED!?\n");
 			break;
 		}
 	}
@@ -651,7 +651,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Enable the PCI device */
 	if (0 != pci_enable_device(pdev)) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: pci_enable_device() failed\n",
+		       "%s: %s: pci_enable_device() FAILED\n",
 		       __func__, dev_info);
 		result = -ENODEV;
 		goto fail_pci_enable_device;
@@ -707,7 +707,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem1 = ioremap(phymem1, mem_region1_size);
 	if (NULL == mem1) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: ioremap() failed\n",
+		       "%s: %s: ioremap() FAILED\n",
 		       __func__, dev_info);
 		result = -EIO;
 		goto fail_ioremap1;
@@ -716,7 +716,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem2 = ioremap(phymem2, mem_region2_size);
 	if (NULL == mem2) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: ioremap() failed\n",
+		       "%s: %s: ioremap() FAILED\n",
 		       __func__, dev_info);
 		result = -EIO;
 		goto fail_ioremap2;
@@ -883,7 +883,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	err = register_netdev(dev);
 	if (OK != err) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: Register net device of %s failed: %d\n",
+		       "%s: %s: Register net device of %s FAILED: %d\n",
 		       __func__, dev_info, dev->name, err);
 		result = -EIO;
 		goto fail_register_netdev;
@@ -996,9 +996,6 @@ static void acx_cleanup_card_and_resources(
 		if (NULL != priv->pm)
 			pm_unregister(priv->pm);
 #endif
-		acx_delete_dma_regions(priv);
-
-		kfree(priv);
 	}
 
 	if (dev != NULL)
@@ -1009,6 +1006,13 @@ static void acx_cleanup_card_and_resources(
 		/* don't use free_netdev() here,
 		 * supported by newer kernels only */
 		kfree(dev);
+	}
+
+	if (priv != NULL)
+	{
+		acx_delete_dma_regions(priv);
+
+		kfree(priv);
 	}
 
 	/* finally, clean up PCI bus state */
@@ -1205,8 +1209,8 @@ static int acx_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *data)
 #else
 			acx_issue_cmd(priv, ACX100_CMD_WAKE, NULL, 0, 5000);
 
-			acx_issue_cmd(priv, ACX100_CMD_ENABLE_TX, NULL, 0, 5000);
-			acx_issue_cmd(priv, ACX100_CMD_ENABLE_RX, NULL, 0, 5000);
+			acx_issue_cmd(priv, ACX100_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000);
+			acx_issue_cmd(priv, ACX100_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000);
 #endif
 
 			acx_enable_irq(priv);
@@ -1340,6 +1344,9 @@ static int acx_open(netdevice_t *dev)
 
 	FN_ENTER;
 
+	acxlog(L_INIT, "module count ++\n");
+	WLAN_MOD_INC_USE_COUNT;
+
 	acxlog(L_STD, "OPENING DEVICE\n");
 	if (OK != acx_lock(priv, &flags)) {
 		acxlog(L_INIT, "card unavailable, bailing\n");
@@ -1350,24 +1357,22 @@ static int acx_open(netdevice_t *dev)
 	/* configure task scheduler */
 #ifdef USE_QUEUE_TASKS
 	priv->after_interrupt_task.routine = acx_after_interrupt_task;
-	priv->after_interrupt_task.data = priv;
+	priv->after_interrupt_task.data = dev;
 #else
-	INIT_WORK(&priv->after_interrupt_task, acx_after_interrupt_task, priv);
+	INIT_WORK(&priv->after_interrupt_task, acx_after_interrupt_task, dev);
 #endif
 
 	/* request shared IRQ handler */
 	if (0 != request_irq(dev->irq, acx_interrupt, SA_SHIRQ, dev->name, dev)) {
-		acxlog(L_BINSTD | L_INIT | L_IRQ, "request_irq failed\n");
+		acxlog(L_BINSTD | L_INIT | L_IRQ, "request_irq FAILED\n");
 		result = -EAGAIN;
 		goto done;
 	}
 	acxlog(L_DEBUG | L_IRQ, "%s: request_irq %d successful\n", __func__, dev->irq);
+
+	/* ifup device */
 	acx_up(dev);
-
 	SET_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	acxlog(L_INIT, "module count ++\n");
-	WLAN_MOD_INC_USE_COUNT;
 
 	/* We don't currently have to do anything else.
 	 * The setup of the MAC should be subsequently completed via
@@ -1419,12 +1424,13 @@ static int acx_close(netdevice_t *dev)
 	spin_lock_irq(&priv->lock);
 #endif
 
+	/* ifdown device */
 	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
-
 	if (0 != netif_device_present(dev)) {
 		acx_down(dev);
 	}
 
+	/* release shared IRQ handler */
 	free_irq(dev->irq, dev);
 	/* priv->val0x240c = 0; */
 
@@ -1433,6 +1439,13 @@ static int acx_close(netdevice_t *dev)
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
+
+	/* remove task scheduler */
+#ifdef USE_QUEUE_TASKS
+	acxlog(L_STD, "FIXME: how to kill queue tasks on 2.4.x?\n");
+#else
+	flush_scheduled_work();
+#endif
 
 	acxlog(L_INIT, "module count --\n");
 	WLAN_MOD_DEC_USE_COUNT;
@@ -1577,13 +1590,15 @@ static void acx_tx_timeout(netdevice_t *dev)
 
 	FN_ENTER;
 	
-	/* clean tx descs, they may have been completely full */
-	acx_clean_tx_desc(priv);
+	acxlog(L_DEBUG, "FIXME: for some very strange reason timeout may get called even after partial driver shutdown, OOPSing due to priv already freed!? I really don't know right now why this would happen...\n");
+	/* clean all tx descs, they may have been completely full */
+	acx_clean_tx_desc_emergency(priv);
 	
-	/* better also reset TxQueueFree, you never know... */
-	priv->TxQueueFree = priv->TxQueueCnt;
-
 	priv->stats.tx_errors++;
+	
+	if ((netif_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
+		netif_wake_queue(dev);
+			
 	printk("acx100: Tx timeout!\n");
 
 	FN_EXIT(0, OK);
@@ -2001,7 +2016,8 @@ void acx_schedule_after_interrupt_task(wlandevice_t *priv)
 *
 *----------------------------------------------------------------*/
 void acx_after_interrupt_task(void *data) {
-	wlandevice_t *priv = (wlandevice_t *) data;
+	netdevice_t *dev = (netdevice_t *) data;
+	wlandevice_t *priv;
 
 	FN_ENTER;
 
@@ -2010,6 +2026,8 @@ void acx_after_interrupt_task(void *data) {
 		return;
 	}
 			
+	priv = (struct wlandevice *) dev->priv;
+
 	if (priv->irq_status & HOST_INT_SCAN_COMPLETE) {
 
 		if (priv->status == ISTATUS_1_SCANNING) {
@@ -2041,11 +2059,16 @@ void acx_after_interrupt_task(void *data) {
 			/* this helps with ACX100 at least;
 			 * hopefully ACX111 also does a
 			 * recalibration here */
-			acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000);
-			acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000);
-			acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000);
-			acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000);
-			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+
+			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
+			if ((OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
+			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000))
+			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
+			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)))
+				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+			else
+				/* failed: resubmit */
+				acx_schedule_after_interrupt_task(priv);
 		}
 	}
 

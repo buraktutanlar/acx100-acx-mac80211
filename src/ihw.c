@@ -567,7 +567,7 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 
 	if (!(irqtype & HOST_INT_CMD_COMPLETE)) {
 		acxlog(L_CTL,
-			"Polling for an IRQ failed with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
+			"Polling for an IRQ FAILED with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
 			irqtype, cmd_status, priv->irqs_active, priv->irq_status);
 		if (debug & L_CTL)
 			dump_stack();
@@ -575,7 +575,7 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 	}
 
 	if (1 != cmd_status) {
-		acxlog(L_STD | L_CTL, "%s failed: %s [%d uSec] Cmd: %Xh, Result: %Xh\n",
+		acxlog(L_STD | L_CTL, "%s FAILED: %s [%d uSec] Cmd: %Xh, Result: %Xh\n",
 				__func__,
 				cmd_status <= 0x10 ?
 				cmd_error_strings[cmd_status] : "UNKNOWN REASON",
@@ -668,7 +668,7 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	priv->ctrl_urb->timeout=timeout;
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message FAILED with errcode %d\n",ucode);
 		return(NOT_OK);
 	}
 	/* ---------------------------------
@@ -695,7 +695,7 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	priv->ctrl_urb->timeout=timeout;
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message (ack) failed with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %d\n",ucode);
 		return(NOT_OK);
 	}
 	/* ---------------------------------

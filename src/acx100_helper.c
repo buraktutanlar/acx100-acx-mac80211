@@ -257,7 +257,7 @@ int acx_proc_output(char *buf, wlandevice_t *priv)
 		"radio type:\t\t\t0x%02x\n" /* TODO: add radio type string from acx_display_hardware_details */
 		"form factor:\t\t\t0x%02x\n" /* TODO: add form factor string from acx_display_hardware_details */
 		"EEPROM version:\t\t\t0x%02x\n"
-		"firmware version:\t\t%s\n"
+		"firmware version:\t\t%s (%u)\n"
 		"BSS table has %u entries:\n",
 		WLAN_RELEASE_SUB,
 		WIRELESS_EXT,
@@ -265,7 +265,7 @@ int acx_proc_output(char *buf, wlandevice_t *priv)
 		priv->radio_type,
 		priv->form_factor,
 		priv->eeprom_version,
-		(char *)priv->firmware_version,
+		(char *)priv->firmware_version, priv->firmware_numver,
 		priv->bss_table_count);
 
 	for (i = 0; i < priv->bss_table_count; i++) {
@@ -1194,7 +1194,7 @@ int acx_upload_fw(wlandevice_t *priv)
 	apfw_image = acx_read_fw( filename, &size );
 	if (NULL == apfw_image)
 	{
-		acxlog(L_STD, "acx_read_fw failed.\n");
+		acxlog(L_STD, "acx_read_fw FAILED\n");
 		kfree(filename);
 		FN_EXIT(1, -EIO);
 		return NOT_OK;
@@ -1501,7 +1501,7 @@ int acx_init_wep(wlandevice_t *priv)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if (OK != acx_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		acxlog(L_STD, "ctlMemoryMapRead failed!\n");
+		acxlog(L_STD, "ctlMemoryMapRead FAILED!\n");
 		goto fail;
 	}
 
@@ -1513,7 +1513,7 @@ int acx_init_wep(wlandevice_t *priv)
 		pt.WEPCacheEnd   = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 
 		if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "%s: ctlMemoryMapWrite failed!\n", __func__);
+			acxlog(L_STD, "%s: ctlMemoryMapWrite FAILED!\n", __func__);
 			goto fail;
 		}
 
@@ -1547,14 +1547,14 @@ int acx_init_wep(wlandevice_t *priv)
 
 		/* now retrieve the updated WEPCacheEnd pointer... */
 		if (OK != acx_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
+			acxlog(L_STD, "ctlMemoryMapRead #2 FAILED!\n");
 			goto fail;
 		}
 		/* ...and tell it to start allocating templates at that location */
 		pt.PacketTemplateStart = pt.WEPCacheEnd; /* no endianness conversion needed */
 
 		if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
+			acxlog(L_STD, "ctlMemoryMapWrite #2 FAILED!\n");
 			goto fail;
 		}
 	} else {
@@ -1947,13 +1947,13 @@ int acx100_init_packet_templates(wlandevice_t *priv, acx_ie_memmap_t *mm)
 		goto failed;
 
 	if (OK != acx_interrogate(priv, mm, ACX1xx_IE_MEMORY_MAP)) {
-		acxlog(L_BINDEBUG | L_INIT, "interrogate failed\n");
+		acxlog(L_BINDEBUG | L_INIT, "interrogate FAILED\n");
 		goto failed;
 	}
 
 	mm->QueueStart = cpu_to_le32(le32_to_cpu(mm->PacketTemplateEnd) + 4);
 	if (OK != acx_configure(priv, mm, ACX1xx_IE_MEMORY_MAP)) {
-		acxlog(L_BINDEBUG | L_INIT, "configure failed\n");
+		acxlog(L_BINDEBUG | L_INIT, "configure FAILED\n");
 		goto failed;
 	}
 
@@ -2014,7 +2014,7 @@ int acx111_init_packet_templates(wlandevice_t *priv)
 	goto success;
 
 	failed:
-	acxlog(L_BINDEBUG | L_INIT, "%s: packet template configuration failed\n", __func__);
+	acxlog(L_BINDEBUG | L_INIT, "%s: packet template configuration FAILED\n", __func__);
 
 	success:
 
@@ -2430,11 +2430,11 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			acxlog(L_INIT, "Updating packet templates\n");
 			if (OK != acx_set_beacon_template(priv)) {
 				acxlog(L_STD,
-					   "acx_set_beacon_template failed.\n");
+					   "acx_set_beacon_template FAILED\n");
 			}
 			if (OK != acx_set_probe_response_template(priv)) {
 				acxlog(L_STD,
-					   "acx_set_probe_response_template failed.\n");
+					   "acx_set_probe_response_template FAILED\n");
 			}
 		}
 		CLEAR_BIT(priv->set_mask, SET_TEMPLATES);
@@ -3332,7 +3332,7 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 		    goto fail;
 
 		if (OK != acx100_create_dma_regions(priv)) {
-			acxlog(L_STD, "acx100_create_dma_regions failed.\n");
+			acxlog(L_STD, "acx100_create_dma_regions FAILED\n");
 			goto fail;
 		}
 
@@ -3346,7 +3346,7 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 		    goto fail;
 
 		if (OK != acx111_create_dma_regions(priv)) {
-			acxlog(L_STD, "acx111_create_dma_regions failed.\n");
+			acxlog(L_STD, "acx111_create_dma_regions FAILED\n");
 			goto fail;
 		}
 
@@ -3359,7 +3359,7 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 
 	if (1 == init)
 		if (OK != acx_set_defaults(priv)) {
-			acxlog(L_STD, "acx_set_defaults failed.\n");
+			acxlog(L_STD, "acx_set_defaults FAILED\n");
 			goto fail;
 		}
 
@@ -3368,10 +3368,10 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 
 	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 		if (OK != acx_set_beacon_template(priv)) {
-		    acxlog(L_STD, "acx_set_beacon_template failed.\n");
+		    acxlog(L_STD, "acx_set_beacon_template FAILED\n");
 		}
 		if (OK != acx_set_probe_response_template(priv)) {
-		    acxlog(L_STD, "acx_set_probe_response_template failed.\n");
+		    acxlog(L_STD, "acx_set_probe_response_template FAILED\n");
 		    goto fail;
 		}
 	}
@@ -3418,7 +3418,7 @@ void acx_start(wlandevice_t *priv)
 	if (0 == dont_lock_up)
 		if ( OK != acx_lock(priv, &flags))
 		{
-			acxlog(L_STD, "ERROR: lock failed!\n");
+			acxlog(L_STD, "ERROR: lock FAILED!\n");
 			FN_EXIT(0, NOT_OK);
 			return;
 		}
