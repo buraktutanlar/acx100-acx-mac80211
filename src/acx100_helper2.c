@@ -813,7 +813,9 @@ int acx100_process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 			if (hw->status > ISTATUS_3_AUTHENTICATED) {
 				/* hw->val0x240 = req->reason[0]; Unused, so removed */
 				acx100_set_status(hw, ISTATUS_3_AUTHENTICATED);
-				/* FIXME??? ActivatePowerSaveMode(hw, 2); */
+#if (POWER_SAVE_80211 == 0)
+				ActivatePowerSaveMode(hw, 2);
+#endif
 			}
 			res = 0;
 		} else
@@ -2826,6 +2828,48 @@ void acx100_complete_dot11_scan(wlandevice_t *wlandev)
 	}
 	FN_EXIT(0, 0);
 }
+
+#if (POWER_SAVE_80211 == 0)
+/*----------------------------------------------------------------
+* ActivatePowerSaveMode
+* FIXME: rename to acx100_activate_power_save_mode
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+
+/* ActivatePowerSaveMode()
+ * STATUS: FINISHED, UNVERIFIED.
+ */
+void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
+{
+       memmap_t pm;
+
+       FN_ENTER;
+       acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+
+       acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT);
+       if (pm.m.power.wakeup_cfg != 0x81) {
+               FN_EXIT(0, 0);
+               return;
+       }
+       pm.m.power.wakeup_cfg = 0;
+       pm.m.power.options = 0;
+       pm.m.power.hangover_period = 0;
+       acx100_configure(hw, &pm, ACX100_RID_POWER_MGMT);
+       FN_EXIT(0, 0);
+}
+#endif
 
 /*------------------------------------------------------------------------------
  * acx100_timer

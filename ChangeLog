@@ -2,6 +2,38 @@ Changes:
 ========
 
 
+2004.01.27 - 0.2.0pre7 released
+- "fix" lockups of pre6, caused by improper locking
+- fix MSDU stuff, gets rid of Tx 0x10 errors (MSDU)
+- reduce RX/TXBUFFERNO from 32 to 16 (several people had malloc issues)
+- workaround for firmware loading problems of various cards: don't use
+  auto-increment writing... (also retry 5 times on failure)
+- fix for "incompatible rates" error
+- fix the driver to accept multicast packets
+- add some acx111 (TNETW1130) code bits (NOT fully functional yet)
+- fix overflow due to wrong handling of 802.11g stations
+- don't include modversions.h, since it seems we're not supposed to do that
+- acx100 USB now able to receive data, sending still not working
+- add new Israel regulatory domain 0x51
+- reduce stack footprint of several functions
+- don't force-configure an antenna selection byte value
+- add proc/driver/acx100* diagnostic files
+- fix ESSID overflow issues
+- only log Beacon frames if L_XFER_BEACON (0x2000) is set
+- fix some Beacon and Probe Response issues
+- fix some HORRIBLE mistakes in code, effects unknown
+- fix broken capability patching
+- fix Maxim radio Tx level
+- fix wrong radio type ID in table check...
+- HUGE README update
+- improve scripts a bit
+- add preliminary support bits for 802.11 power save mode
+- fix ioctls for old WE versions
+- small fixes for multi-card setup, not finished yet
+- enable readout of Info Mailbox
+- improve logging
+- beautify logging by indenting
+
 2003.11.16 - 0.2.0pre6 released
 - fix kernel OOPS on driver init failure
 - add support for new wireless extension ioctl implementation format,

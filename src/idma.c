@@ -375,6 +375,7 @@ int acx111_create_dma_regions(wlandevice_t * wlandev)
 		UINT val0x2c;
 	} MemMap;
 	struct TIWLAN_DC *pDc;
+	QueueConfig_t qcfg;
 
 	FN_ENTER;
 
@@ -384,8 +385,6 @@ int acx111_create_dma_regions(wlandevice_t * wlandev)
 	spin_lock_init(&rx_lock);
 	spin_lock_init(&tx_lock);
 
-	QueueConfig_t qcfg;
-	
 	/* FIXME: which memmap is read here, acx100_init_memory_pools did not get called yet ? */
 	/* read out the acx100 physical start address for the queues */
 	if (!acx100_interrogate(wlandev, &MemMap, ACX100_RID_MEMORY_MAP)) {

@@ -1953,6 +1953,9 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 		wlandev->set_mask &= ~GETSET_LED_POWER;
 	}
 
+/* this seems to cause Tx lockup after some random time (Tx error 0x20),
+ * so let's disable it for now until further investigation */
+#if POWER_SAVE_80211
 	if (wlandev->set_mask & (GETSET_POWER_80211|GETSET_ALL))
 	{
 		memmap_t pm;
@@ -1979,6 +1982,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 		 * a NULL frame then). Does this need locking?? */
 		wlandev->set_mask &= ~GETSET_POWER_80211;
 	}
+#endif
 	
 	if (wlandev->set_mask & (GETSET_TX|GETSET_ALL))
 	{
