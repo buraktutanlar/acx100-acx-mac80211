@@ -364,7 +364,7 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 
 	acxlog(L_IOCTL, "Get Mode => %ld\n", wlandev->macmode);
 
-	if (wlandev->iStatus != ISTATUS_4_ASSOCIATED)
+	if (wlandev->status != ISTATUS_4_ASSOCIATED)
 	/* if (!wlandev->ifup) */
 	{ /* connection not up yet, so for now indicate the mode we want,
 	     not the one we are in */
@@ -516,9 +516,9 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	};
 
 	acxlog(L_IOCTL, "after site survey status = %d\n",
-	       wlandev->iStatus);
+	       wlandev->status);
 
-	if (wlandev->iStatus == ISTATUS_5_UNKNOWN) {
+	if (wlandev->status == ISTATUS_5_UNKNOWN) {
 		acx100_set_status(wlandev, wlandev->unknown0x2350);
 		wlandev->unknown0x2350 = 0;
 	}
@@ -1175,6 +1175,77 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 	return 0;
 }
 
+static inline int acx100_ioctl_set_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
+
+	acxlog(L_IOCTL, "Set 802.11 Power Save flags = 0x%04x\n", vwrq->flags);
+	if (vwrq->disabled) {
+		wlandev->ps_wakeup_cfg &= ~PS_CFG_ENABLE;
+		wlandev->set_mask |= GETSET_POWER_80211;
+		return -EINPROGRESS;
+	}
+	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {
+		UINT16 ps_timeout = (vwrq->value * 1024) / 1000;
+
+		if (ps_timeout > 255)
+			ps_timeout = 255;
+		acxlog(L_IOCTL, "setting PS timeout value to %d time units due to %dus\n", ps_timeout, vwrq->value);
+		wlandev->ps_hangover_period = ps_timeout;
+	} else if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_PERIOD) {
+		UINT16 ps_periods = vwrq->value / 1000000;
+
+		if (ps_periods > 255)
+			ps_periods = 255;
+		acxlog(L_IOCTL, "setting PS period value to %d periods due to %dus\n", ps_periods, vwrq->value);
+		wlandev->ps_listen_interval = ps_periods;
+	}
+	switch (vwrq->flags & IW_POWER_MODE) {
+		/* FIXME: are we doing the right thing here? */
+		case IW_POWER_UNICAST_R:
+			wlandev->ps_options &= ~PS_OPT_STILL_RCV_BCASTS;
+			break;
+		case IW_POWER_MULTICAST_R:
+			wlandev->ps_options |= PS_OPT_STILL_RCV_BCASTS;
+			break;
+		case IW_POWER_ALL_R:
+			wlandev->ps_options |= PS_OPT_STILL_RCV_BCASTS;
+			break;
+		case IW_POWER_ON:
+			break;
+		default:
+			acxlog(L_IOCTL, "unknown PS mode\n");
+			return -EINVAL;
+	}
+	wlandev->ps_wakeup_cfg |= PS_CFG_ENABLE;
+	wlandev->set_mask |= GETSET_POWER_80211;
+	return -EINPROGRESS;
+			
+}
+
+static inline int acx100_ioctl_get_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
+
+	acxlog(L_IOCTL, "Get 802.11 Power Save flags = 0x%04x\n", vwrq->flags);
+	vwrq->disabled = ((wlandev->ps_wakeup_cfg & PS_CFG_ENABLE) == 0);
+	if (vwrq->disabled)
+		return 0;
+	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {
+		vwrq->value = wlandev->ps_hangover_period * 1000 / 1024;
+		vwrq->flags = IW_POWER_TIMEOUT;
+	} else {
+		vwrq->value = wlandev->ps_listen_interval * 1000000;
+		vwrq->flags = IW_POWER_PERIOD|IW_POWER_RELATIVE;
+	}
+	if (wlandev->ps_options & PS_OPT_STILL_RCV_BCASTS)
+		vwrq->flags |= IW_POWER_ALL_R;
+	else
+		vwrq->flags |= IW_POWER_UNICAST_R;
+
+	return 0;
+}
+
 /*----------------------------------------------------------------
 * acx100_ioctl_get_txpow
 *
@@ -1275,6 +1346,14 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 
 		dwrq->length = sizeof(struct iw_range);
 		memset(range, 0, sizeof(struct iw_range));
+
+		range->min_pmp = 0;
+		range->max_pmp = 5000000;
+		range->min_pmt = 0;
+		range->max_pmt = 65535 * 1000;
+		range->pmp_flags = IW_POWER_PERIOD;
+		range->pmt_flags = IW_POWER_TIMEOUT;
+		range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
 
 		range->we_version_compiled = WIRELESS_EXT;
 		range->we_version_source = 0x9;
@@ -2295,8 +2374,8 @@ static const iw_handler acx100_ioctl_handler[] =
 	(iw_handler) acx100_ioctl_get_retry,	/* SIOCGIWRETRY */
 	(iw_handler) acx100_ioctl_set_encode,	/* SIOCSIWENCODE */
 	(iw_handler) acx100_ioctl_get_encode,	/* SIOCGIWENCODE */
-	(iw_handler) NULL /* acx100_ioctl_set_power FIXME */,	/* SIOCSIWPOWER */
-	(iw_handler) NULL /* acx100_ioctl_get_power FIXME */,	/* SIOCGIWPOWER */
+	(iw_handler) acx100_ioctl_set_power,	/* SIOCSIWPOWER */
+	(iw_handler) acx100_ioctl_get_power,	/* SIOCGIWPOWER */
 };
 
 static const iw_handler acx100_ioctl_private_handler[] =

@@ -336,22 +336,22 @@ void acx100_set_status(wlandevice_t *hw, int status)
 	else
 		stat = "INVALID??";
 
-	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting iStatus = %d (%s)\n",
+	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting status = %d (%s)\n",
 	       __func__, status, stat);
 
 	if (hw->unknown0x2350 == ISTATUS_5_UNKNOWN) {
-		hw->unknown0x2350 = hw->iStatus;
-		hw->iStatus = ISTATUS_5_UNKNOWN;
+		hw->unknown0x2350 = hw->status;
+		hw->status = ISTATUS_5_UNKNOWN;
 	} else {
-		hw->iStatus = status;
+		hw->status = status;
 	}
-	if ((hw->iStatus == ISTATUS_1_SCANNING)
-	    || (hw->iStatus == ISTATUS_5_UNKNOWN)) {
+	if ((hw->status == ISTATUS_1_SCANNING)
+	    || (hw->status == ISTATUS_5_UNKNOWN)) {
 		hw->scan_retries = 0;
-		acx100_set_timer(hw, 3000000);
-	} else if (hw->iStatus <= ISTATUS_3_AUTHENTICATED) {
+		acx100_set_timer(hw, 3000000); /* 3 s */
+	} else if (hw->status <= ISTATUS_3_AUTHENTICATED) {
 		hw->auth_assoc_retries = 0;
-		acx100_set_timer(hw, 1500000);
+		acx100_set_timer(hw, 1500000); /* 1.5 s */
 	}
 
 #if QUEUE_OPEN_AFTER_ASSOC
@@ -437,7 +437,7 @@ int acx100_rx_ieee802_11_frame(wlandevice_t *hw, rxhostdescriptor_t *rxdesc)
 			{
 				if (hw->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
 					result = process_data_frame_master(rxdesc, hw);
-				} else if (hw->iStatus == ISTATUS_4_ASSOCIATED) {
+				} else if (hw->status == ISTATUS_4_ASSOCIATED) {
 					result = process_data_frame_client(rxdesc, hw); 				}
 			} else switch (ftype) {
 				case WLAN_FSTYPE_DATA_CFACK:
@@ -808,10 +808,10 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 			res = 1;
 		else if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
 			res = 1;
-			if (hw->iStatus > ISTATUS_3_AUTHENTICATED) {
+			if (hw->status > ISTATUS_3_AUTHENTICATED) {
 				/* hw->val0x240 = req->reason[0]; Unused, so removed */
 				acx100_set_status(hw, ISTATUS_3_AUTHENTICATED);
-				ActivatePowerSaveMode(hw, 2);
+				/* FIXME??? ActivatePowerSaveMode(hw, 2); */
 			}
 			res = 0;
 		} else
@@ -1201,7 +1201,7 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 			    (rxdesc->data->status & 0xfff) - wep_offset;
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
-			if (hw->iStatus == ISTATUS_1_SCANNING)
+			if (hw->status == ISTATUS_1_SCANNING)
 				acx100_process_probe_response(rxdesc->data,
 						     hw,
 						     (acxp80211_hdr_t *)
@@ -1215,7 +1215,7 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 		break;
 	case WLAN_FSTYPE_BEACON /* 0x08 */ :
 		if (hw->mode != 3) {
-			switch (hw->iStatus){
+			switch (hw->status){
 			   case ISTATUS_1_SCANNING:
 			   case ISTATUS_5_UNKNOWN:
 				memset(&alloc_p80211mgmt_req.a.beacon, 0,
@@ -1252,8 +1252,8 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 				break;
 			default:
 				/* acxlog(L_ASSOC | L_DEBUG,
-				   "Incoming beacon message not handled during iStatus %i.\n",
-				   hw->iStatus); */
+				   "Incoming beacon message not handled during status %i.\n",
+				   hw->status); */
 			break;
 			}
 		} else {
@@ -1465,7 +1465,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 
 		acxlog(L_BINDEBUG | L_ASSOC,
 		       "<Scan Beacon> bss_table_count > MAX_NUMBER_OF_SITE\n");
-
+		FN_EXIT(0, 0);
 		return;
 	}
 
@@ -1485,6 +1485,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 		     hw->bss_table[station].bssid)) {
 			acxlog(L_DEBUG,
 			       "station already in our list, no need to add.\n");
+			FN_EXIT(0, 0);
 			return;
 		}
 	}
@@ -1926,7 +1927,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ )
 			return 1;
 		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1)) {
-			if (hw->iStatus > ISTATUS_2_WAIT_AUTH) {
+			if (hw->status > ISTATUS_2_WAIT_AUTH) {
 				acx100_set_status(hw, ISTATUS_2_WAIT_AUTH);
 				return 0;
 			}
@@ -2840,82 +2841,38 @@ void d11CompleteScan(wlandevice_t *wlandev)
 	FN_EXIT(0, 0);
 }
 
-/*----------------------------------------------------------------
-* ActivatePowerSaveMode
-* FIXME: rename to acx100_activate_power_save_mode
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-/* ActivatePowerSaveMode()
- * STATUS: FINISHED, UNVERIFIED.
- */
-void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
-{
-	memmap_t pm;
-
-	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-
-	acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT);
-	if (pm.m.power.a != 0x81) {
-		FN_EXIT(0, 0);
-		return;
-	}
-	pm.m.power.a = 0;
-	pm.m.power.b = 0;
-	pm.m.power.c = 0;
-	acx100_configure(hw, &pm, ACX100_RID_POWER_MGMT);
-	FN_EXIT(0, 0);
-}
-
-/*----------------------------------------------------------------
-* acx100_timer
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-/* acx100_timer()
+/*------------------------------------------------------------------------------
+ * acx100_timer
+ *
+ *
+ * Arguments:
+ *	@address: a pointer to the private acx100 per-device struct
+ *
+ * Returns:
+ *
+ * Side effects:
+ *
+ * Call context:
+ *
  * STATUS: should be ok, but UNVERIFIED.
- */
-void acx100_timer(unsigned long a)
+ *
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
+void acx100_timer(unsigned long address)
 {
-	netdevice_t *ndev = (netdevice_t *)a;
-	wlandevice_t *hw = (wlandevice_t *)ndev->priv;
+	wlandevice_t *hw = (wlandevice_t *)address;
 	unsigned long flags;
 	
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	acxlog(L_BINDEBUG | L_ASSOC, "<acx_timer> iStatus = %d\n",
-	       hw->iStatus);
+	acxlog(L_BINDEBUG | L_ASSOC, "%s: status = %d\n", __func__,
+	       hw->status);
 	if (acx100_lock(hw, &flags))
 		return;
 
-	switch (hw->iStatus) {
+	switch (hw->status) {
 	case ISTATUS_1_SCANNING:
 		if (hw->scan_retries++ <= 4) {
 			acx100_set_timer(hw, 2000000);

@@ -2315,7 +2315,6 @@ typedef struct wlandevice {
 	UINT32 firmware_id;
 
 	/*** Hardware resources ***/
-	UINT irq;		/* interrupt request number */
 	UINT16 irq_mask;	/* interrupts types to mask out (not wanted) */
 
 	UINT membase;		/* 10 */
@@ -2352,7 +2351,7 @@ typedef struct wlandevice {
 	UINT8 rate_fallback_retries;
 	unsigned char reg_dom_id;	/* reg domain setting */
 	UINT16 reg_dom_chanmask;
-	UINT iStatus;		/* association status */
+	UINT status;		/* 802.11 association status */
 	UINT unknown0x2350;	/* FIXME: old status ?? */
 	UINT8 auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
@@ -2362,6 +2361,13 @@ typedef struct wlandevice {
 	char scan_running;
 	unsigned long scan_start;
 	UINT8 scan_retries;	/* V3POS 2826, V1POS 27fe */
+
+	/* 802.11 power save mode */
+	UINT8 ps_wakeup_cfg;
+	UINT8 ps_listen_interval;
+	UINT8 ps_options;
+	UINT8 ps_hangover_period;
+	UINT16 ps_enhanced_transition_time;
 
 	/*** PHY settings ***/
 	unsigned char tx_level_dbm;
@@ -2498,6 +2504,7 @@ typedef struct wlandevice {
 #define SET_RXCONFIG		0x00008000
 #define SET_WEP_OPTIONS		0x00010000
 #define GETSET_LED_POWER	0x00020000
+#define GETSET_POWER_80211	0x00040000
 #define GETSET_ALL		0x80000000
 
 /*============================================================================*

@@ -901,7 +901,7 @@ static void acx100_up(netdevice_t * dev)
 		acxlog(L_INIT, "firmware version >= 1.9.3.e --> using software timer\n");
 		init_timer(&wlandev->mgmt_timer);
 		wlandev->mgmt_timer.function = acx100_timer;
-		wlandev->mgmt_timer.data = (unsigned long)dev;
+		wlandev->mgmt_timer.data = (unsigned long)wlandev;
 	}
 	else
 		acxlog(L_INIT, "firmware version < 1.9.3.e --> using hardware timer\n");
@@ -1122,7 +1122,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 		goto end;
 	}
 
-	if (hw->iStatus != ISTATUS_4_ASSOCIATED) {
+	if (hw->status != ISTATUS_4_ASSOCIATED) {
 		acxlog(L_XFER, "Trying to xmit, but not associated yet: aborting...\n");
 		/* silently drop the packet, since we're not connected yet */
 		dev_kfree_skb(skb);
@@ -1391,10 +1391,10 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		acxlog(L_IRQ,
 		       "<%s> HOST_INT_SCAN_COMPLETE\n", __func__);
 
-		if (wlandev->iStatus == ISTATUS_5_UNKNOWN) {
+		if (wlandev->status == ISTATUS_5_UNKNOWN) {
 			acx100_set_status(wlandev, wlandev->unknown0x2350);
 			wlandev->unknown0x2350 = 0;
-		} else if (wlandev->iStatus == ISTATUS_1_SCANNING) {
+		} else if (wlandev->status == ISTATUS_1_SCANNING) {
 
 			/* FIXME: this shouldn't be done in IRQ context !!! */
 			d11CompleteScan(wlandev);
@@ -1402,7 +1402,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, HOST_INT_SCAN_COMPLETE);
 	}
 	if (irqtype & HOST_INT_TIMER /* 0x40 */ ) {
-		acx100_timer((u_long)wlandev->netdev);
+		acx100_timer((unsigned long)wlandev);
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, HOST_INT_TIMER);
 	}
 	if (irqtype & 0x10) {

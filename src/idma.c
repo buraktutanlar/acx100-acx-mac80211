@@ -356,13 +356,13 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 	}
 
 	acxlog(L_XFER | L_DATA,
-		"Tx packet (%s): len %i, hdr_len %i, pyld_len %i, mode %lX, iStatus %X\n",
+		"Tx packet (%s): len %i, hdr_len %i, pyld_len %i, mode %lX, status %X\n",
 		acx100_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
 		tx_desc->total_length,
 		header->length,
 		payload->length,
 		wlandev->mode,
-		wlandev->iStatus);
+		wlandev->status);
 
 	acxlog(L_DATA, "802.11 header[%d]: ", header->length);
 	for (i = 0; i < header->length; i++)
@@ -504,7 +504,7 @@ void acx100_clean_tx_desc(wlandevice_t *wlandev)
 			wlandev->TxQueueFree++;
 
 			if ((wlandev->TxQueueFree >= MINFREE_TX + 3)
-			&& (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
+			&& (wlandev->status == ISTATUS_4_ASSOCIATED)
 			&& (netif_queue_stopped(wlandev->netdev)))
 			{
 				/* FIXME: if construct is ugly:
@@ -794,7 +794,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 		}
 
 		buf_len = pDesc->data->status & 0xfff;      /* somelength */
-		acxlog(L_XFER|L_DATA, "Rx packet %02d (%s): time %lu, len %i, signal %d, SNR %d, mode %lX, iStatus %X\n",
+		acxlog(L_XFER|L_DATA, "Rx packet %02d (%s): time %lu, len %i, signal %d, SNR %d, mode %lX, status %X\n",
 			curr_idx,
 			acx100_get_packet_type_string(buf->a3.fc),
 			pDesc->data->time,
@@ -802,7 +802,7 @@ void acx100_process_rx_desc(wlandevice_t *wlandev)
 			pDesc->data->level,
 			pDesc->data->snr,
 			wlandev->mode,
-			wlandev->iStatus);
+			wlandev->status);
 
 		/* I tried to figure out how to map these levels to dBm
 		 * values, but for the life of me I really didn't
@@ -1148,8 +1148,7 @@ void acx100_create_tx_desc_queue(TIWLAN_DC * pDc)
 				     pDc->ui32ACXTxQueueStart);
 	pDc->tx_pool_count = wlandev->TxQueueNo;
 
-	acxlog(L_BINDEBUG, "wlandev->rHwInfo.pvMemBaseAddr2 = 0x%08x\n",
-	       wlandev->iobase2);
+	acxlog(L_BINDEBUG, "wlandev->iobase2 = 0x%08x\n", wlandev->iobase2);
 	acxlog(L_BINDEBUG, "pDc->ui32ACXTxQueueStart = 0x%08x\n",
 	       pDc->ui32ACXTxQueueStart);
 	acxlog(L_BINDEBUG, "pDc->pTxDescQPool = 0x%08x\n",

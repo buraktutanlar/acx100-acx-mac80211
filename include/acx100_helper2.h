@@ -212,7 +212,6 @@ int process_authen(wlan_fr_authen_t * req, wlandevice_t * hw);
 int process_deauthen(wlan_fr_deauthen_t * req, wlandevice_t * hw);
 void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 			  acxp80211_hdr_t * hdr);
-void ActivatePowerSaveMode(wlandevice_t * hw, int vala);
 void acx100_timer(unsigned long a);
 void d11CompleteScan(wlandevice_t * wlandev);
 void acx100_set_status(wlandevice_t *hw, int vala);

@@ -183,12 +183,23 @@ typedef struct associd {
 	UINT16 vala;
 } associd_t;
 
+#define PS_CFG_ENABLE		0x80
+#define PS_CFG_PENDING		0x40 /* status flag when entering PS */
+#define PS_CFG_WAKEUP_MODE_MASK	0x07
+#define PS_CFG_WAKEUP_BY_HOST	0x03
+#define PS_CFG_WAKEUP_EACH_ITVL	0x02
+#define PS_CFG_WAKEUP_ON_DTIM	0x01
+#define PS_CFG_WAKEUP_ALL_BEAC	0x00
+
+#define PS_OPT_ENA_ENHANCED_PS	0x04 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set in the TIM; newer firmwares only(?) */
+#define PS_OPT_STILL_RCV_BCASTS	0x01
+
 typedef struct powermgmt {
-	UINT8 a;
-	UINT8 nul1;
-	UINT8 b;
-	UINT8 c;
-	UINT16 nul2;
+	UINT8 wakeup_cfg;
+	UINT8 listen_interval; /* for EACH_ITVL: wake up every "beacon units" interval */
+	UINT8 options;
+	UINT8 hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
+	UINT16 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
 } powermgmt_t;
 
 typedef struct defaultkey {

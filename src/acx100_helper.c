@@ -1029,6 +1029,8 @@ int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * mm)
 		goto failed;
 	len += sizeof(struct acxp80211_packet);
 
+	/* TODO: beautify code by moving init_tim down just before
+	 * set_tim */
 	if (!acx100_init_max_tim_template(hw))
 		goto failed;
 	len += sizeof(struct tim);
@@ -1453,9 +1455,9 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	/* send a disassoc request in case it's required */
 	if (wlandev->set_mask & (GETSET_MODE|GETSET_ESSID|GETSET_CHANNEL))
 	{
-		if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
+		if (wlandev->status == ISTATUS_4_ASSOCIATED)
 		{
-			acxlog(L_ASSOC, "iStatus was ASSOCIATED -> sending disassoc request.\n");
+			acxlog(L_ASSOC, "status was ASSOCIATED -> sending disassoc request.\n");
 			transmit_disassoc(NULL,wlandev);
 		}
 		acx100_set_status(wlandev, ISTATUS_0_STARTED);
@@ -1623,6 +1625,30 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 		wlandev->set_mask &= ~GETSET_LED_POWER;
 	}
 
+	if (wlandev->set_mask & (GETSET_POWER_80211|GETSET_ALL))
+	{
+		memmap_t pm;
+
+		/* change 802.11 power save mode settings */
+		acxlog(L_INIT, "Updating 802.11 power save mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", wlandev->ps_wakeup_cfg, wlandev->ps_listen_interval, wlandev->ps_options, wlandev->ps_hangover_period, wlandev->ps_enhanced_transition_time);
+		/* acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT); */
+		pm.m.power.wakeup_cfg = wlandev->ps_wakeup_cfg;
+		pm.m.power.listen_interval = wlandev->ps_listen_interval;
+		pm.m.power.options = wlandev->ps_options;
+		pm.m.power.hangover_period = wlandev->ps_hangover_period;
+		pm.m.power.enhanced_ps_transition_time = wlandev->ps_enhanced_transition_time;
+		acx100_configure(wlandev, &pm, ACX100_RID_POWER_MGMT);
+		acx100_schedule(HZ / 25);
+		acx100_interrogate(wlandev, &pm, ACX100_RID_POWER_MGMT);
+		acxlog(L_INIT, "power save mode change %s\n", (pm.m.power.wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
+		/* FIXME: maybe verify via PS_CFG_PENDING bit here
+		 * that power save mode change was successful. */
+		/* FIXME: we shouldn't trigger a scan immediately after
+		 * fiddling with power save mode (since the firmware is sending
+		 * a NULL frame then). Does this need locking?? */
+		wlandev->set_mask &= ~GETSET_POWER_80211;
+	}
+	
 	if (wlandev->set_mask & (GETSET_TX|GETSET_ALL))
 	{
 		/* Enable Tx */
@@ -1944,6 +1970,13 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->set_mask |= GETSET_CCA;
 
 	wlandev->set_mask |= SET_RXCONFIG;
+
+	wlandev->ps_wakeup_cfg = 0;
+	wlandev->ps_listen_interval = 0;
+	wlandev->ps_options = 0;
+	wlandev->ps_hangover_period = 0;
+	wlandev->ps_enhanced_transition_time = 0;
+	wlandev->set_mask |= GETSET_POWER_80211;
 
 	acx100_set_mac_address_broadcast(wlandev->ap);
 
@@ -2391,27 +2424,26 @@ void acx100_start(wlandevice_t *wlandev)
 	FN_EXIT(0, 0);
 }
 
-/*----------------------------------------------------------------
-* acx100_set_timer
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-/* AcxSetTimer()
+/*------------------------------------------------------------------------------
+ * acx100_set_timer
+ *
+ * Sets the 802.11 state management timer's timeout.
+ *
+ * Arguments:
+ *	@wlandev: per-device struct containing the management timer
+ *	@timeout: timeout in us
+ *
+ * Returns: -
+ *
+ * Side effects:
+ *
+ * Call context:
+ *
  * STATUS: FINISHED, but struct undefined.
- */
+ *
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
 void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 {
 	UINT32 tmp[5];
@@ -2421,8 +2453,7 @@ void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 	/* newer firmware versions abandoned timer configuration
 	 * FIXME: any other versions between 1.8.3 (working) and
 	 * 1.9.3.e (removed)? */
-	if (wlandev->firmware_numver < 0x0109030e)
-	{
+	if (wlandev->firmware_numver < 0x0109030e) {
 		acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %d\n",
 		   (int) time);
 
@@ -2430,9 +2461,7 @@ void acx100_set_timer(wlandevice_t *wlandev, UINT32 time)
 		tmp[1] = time;
 		tmp[4] = 0;
 		acx100_configure(wlandev, &tmp, ACX100_RID_ACX_TIMER);
-	}
-	else
-	{
+	} else {
 		mod_timer(&wlandev->mgmt_timer, jiffies + (time / 1000000)*HZ);
 	}
 	FN_EXIT(0, 0);
