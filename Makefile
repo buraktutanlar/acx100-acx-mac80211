@@ -1,3 +1,6 @@
+# set to 0 if you don't want any debugging code to be compiled in
+export ACX_DEBUG=1
+
 .PHONY: all config extract_firmware driver install clean
 
 all:	config driver

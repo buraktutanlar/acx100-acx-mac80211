@@ -50,7 +50,6 @@
  *
 */
 
-
 /* -------------------------------------------------------------------------
 **                      Linux Kernel Header Files
 ** ---------------------------------------------------------------------- */
@@ -72,13 +71,17 @@
 **                         Project Header Files
 ** ---------------------------------------------------------------------- */
 
+/* FIXME: integrate nicely into src/Makefile at the time it is clear which
+ * other source files from the PCI / CardBus driver have to be linked with this
+ * one and therefore _also_ need this define - until then this hack is ok */
+#undef WLAN_HOSTIF
+#define WLAN_HOSTIF WLAN_USB
+
 #include <wlan_compat.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211ioctl.h>
 #include <p80211netdev.h>
 #include <acx100.h>
-
 
 /* -------------------------------------------------------------------------
 **                             Module Stuff
@@ -163,9 +166,9 @@ static void acx100usb_get_wireless_stats(struct net_device *);
 static int acx100usb_ioctl(struct net_device *);
 static void acx100usb_set_rx_mode(struct net_device *);
 static void init_network_device(struct net_device *);
-static void init_usb_device(struct usb_device *);
+static void init_usb_device(struct usb_device *) __attribute__((__unused__));
 /* static void acx100usb_printsetup(devrequest *); */
-static void acx100usb_complete(struct urb *);
+static void acx100usb_complete(struct urb *) __attribute__((__unused__));
 static void * acx100usb_read_firmware(const char *,unsigned int *);
 static int acx100usb_boot(struct usb_device *);
 static int acx100usb_exec_cmd(short,short,int,short parms[],struct acx100usb_context *);
@@ -176,16 +179,16 @@ void cleanup_module(void);
 static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 static char * acx100usb_pstatus(int);
-static void acx100usb_dump_bytes(void *,int);
+static void acx100usb_dump_bytes(void *,int) __attribute__((__unused__));
 static void dump_interface_descriptor(struct usb_interface_descriptor *);
 static void dump_device(struct usb_device *);
 static void dump_device_descriptor(struct usb_device_descriptor *);
 static void dump_endpoint_descriptor(struct usb_endpoint_descriptor *);
 static void dump_config_descriptor(struct usb_config_descriptor *);
 /* static void acx100usb_printsetup(devrequest *); */
-static void acx100usb_printcmdreq(struct acx100_usb_cmdreq *);
+static void acx100usb_printcmdreq(struct acx100_usb_cmdreq *) __attribute__((__unused__));
 #endif
 
 
@@ -200,7 +203,7 @@ static struct usb_device_id acx100usb_ids[] = {
 };
 
 
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 static int debug=L_DEBUG|L_FUNC;
 #endif
 
@@ -281,7 +284,7 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
     config = dev->actconfig;
     numfaces=config->bNumInterfaces;
     if (numfaces!=1) printk(KERN_WARNING SHORTNAME ": number of interfaces is %d, this version of the driver only knows how to handle 1, be prepared for surprises\n",numfaces);
-#ifdef DEBUG
+#ifdef ACX_DEBUG
     dump_device(dev);
 #endif
     /* ---------------------------------------------
@@ -353,7 +356,8 @@ static void * acx100usb_probe(struct usb_device *dev,unsigned int ifNum,const st
 */
 
 static void acx100usb_disconnect(struct usb_device *dev,void *devContext) {
-  int i,result;
+  unsigned int i;
+  int result;
   struct acx100usb_context *context;
   context = (struct acx100usb_context *)devContext;
   /* --------------------------------------
@@ -433,7 +437,11 @@ static int acx100usb_boot(struct usb_device *usbdev) {
     result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,(UINT16)(size-8),0,usbbuf,len,3000);
     offset+=len;
     if (result<0) {
+#ifdef ACX_DEBUG
       printk(KERN_ERR "error %d (%s) during upload of firmware, aborting\n",result,acx100usb_pstatus(result));
+#else
+      printk(KERN_ERR "error %d during upload of firmware, aborting\n", result);
+#endif
       kfree(usbbuf);
       vfree(firmware);
       return(result);
@@ -489,7 +497,9 @@ static void * acx100usb_read_firmware(const char *filename,unsigned int *size) {
   unsigned long page;
   char *buffer;
   struct file *inf;
-  int retval,offset=0;
+  int retval;
+  unsigned int offset = 0;
+
   orgfs=get_fs(); /* store original fs */
   set_fs(KERNEL_DS);
   /* Read in whole file then check the size */
@@ -823,7 +833,7 @@ void cleanup_module() {
 **                                   DEBUG STUFF
 ** --------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 static char * acx100usb_pstatus(int val) {
   switch (val) {
     case USB_ST_NOERROR:return("USB_ST_NOERROR");

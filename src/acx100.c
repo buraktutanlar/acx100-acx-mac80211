@@ -91,11 +91,9 @@
 #include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211ioctl.h>
 #include <acx100.h>
 #include <acx100_conv.h>
 #include <p80211netdev.h>
-#include <p80211req.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
@@ -476,7 +474,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	       (unsigned int) phymem1, (unsigned int) phymem2, pdev->irq,
 	       (unsigned int) mem1, (unsigned int) mem2);
 
-	printk("Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
+	acxlog(L_INIT, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
 	if ((wlandev = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: Memory allocation failure\n",
@@ -486,6 +484,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	memset(wlandev, 0, sizeof(wlandevice_t));
+
+	spin_lock_init(&wlandev->lock);
 
 	wlandev->open = 0;
 	acxlog(L_INIT, "hw_unavailable = 1\n");
@@ -500,8 +500,6 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->pvMemBaseAddr2 = mem2;
 
 	wlandev->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
-
-	spin_lock_init(&wlandev->lock);
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
@@ -1146,7 +1144,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 	acxlog(L_XFER, "stop queue during Tx.\n");
 	netif_stop_queue(dev);
 #endif
-//	acx100_lock(hw,&flags);
+//	if (acx100_lock(hw,&flags)) ...
 
 //	memset(pb, 0, sizeof(wlan_pb_t) /*0x14*4 */ );
 
@@ -1347,7 +1345,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		entry_count++;
 		acxlog(L_IRQ, "IRQTYPE: %X, irq_mask: %X, entry count: %ld\n", irqtype, wlandev->irq_mask, entry_count);
 	}
-//	acx100_lock(wlandev,&flags);
+//	if (acx100_lock(wlandev,&flags)) ...
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
   if (jiffies != last_irq_jiffies)
@@ -1521,14 +1519,13 @@ void acx100_rx(struct rxhostdescriptor *rxdesc/* wlan_pb_t * pb */,
 
 #ifdef DEBUG
 MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug level mask: 0x01 - 0x0800");
+MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x1fff");
 #endif
 
 MODULE_PARM(use_eth_name, "i");
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
 MODULE_PARM(firmware_dir, "s");
 MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware files from");
-
 
 static int __init acx100_init_module(void)
 {
@@ -1586,8 +1583,6 @@ static void __exit acx100_cleanup_module(void)
 	pci_unregister_driver(&acx100_pci_drv_id);
 	FN_EXIT(0, 0);
 }
-
-/* This should init the device and all settings. */
 
 /* For kernels 2.5.* where modutils>=4.2.22, we must have a module_init and module_exit like so: */
 module_init(acx100_init_module);

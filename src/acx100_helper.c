@@ -116,7 +116,7 @@ void acx100_schedule(UINT32 timeout)
  * Status:
  *	should be okay, non-critical
  * Comment:
- *	I'm not quite sure whether I got the housekeeping right - sheim
+ *
  *----------------------------------------------------------------------------*/
 int acx100_read_proc(char *buf, char **start, off_t offset, int count,
 		     int *eof, void *data)
@@ -135,7 +135,7 @@ int acx100_read_proc(char *buf, char **start, off_t offset, int count,
 		length = count;
 	if (length < 0)
 		length = 0;
-	FN_EXIT(0, 0);
+	FN_EXIT(1, length);
 	return length;
 }
 
@@ -157,21 +157,21 @@ int acx100_read_proc(char *buf, char **start, off_t offset, int count,
  * Comment:
  *
  *----------------------------------------------------------------------------*/
-int acx100_proc_output(char *buf, wlandevice_t *hw)
+int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 {
 	char *p = buf;
 
 	FN_ENTER;
 	p += sprintf(p, "acx100 driver version:\t%s\n", WLAN_RELEASE_SUB);
-	p += sprintf(p, "form factor:\t\t0x%02x\n", hw->form_factor);
+	p += sprintf(p, "form factor:\t\t0x%02x\n", wlandev->form_factor);
 	/* TODO: add form factor string from acx100_display_hardware_details */
-	p += sprintf(p, "radio type:\t\t0x%02x\n", hw->radio_type);
+	p += sprintf(p, "radio type:\t\t0x%02x\n", wlandev->radio_type);
 	/* TODO: add radio type string from acx100_display_hardware_details */
-	p += sprintf(p, "EEPROM version:\t\t0x%04x\n", hw->eeprom_version);
+	p += sprintf(p, "EEPROM version:\t\t0x%04x\n", wlandev->eeprom_version);
 	p += sprintf(p, "firmware version:\t%s (0x%08lx)\n",
-		     hw->firmware_version, hw->firmware_id);
+		     wlandev->firmware_version, wlandev->firmware_id);
 	/* TODO: add more interesting stuff (current state, essid, ...) here */
-	FN_EXIT(0, 0);
+	FN_EXIT(1, p - buf);
 	return p - buf;
 }
 
@@ -1414,7 +1414,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			memset(antenna, 0, sizeof(antenna));
 			acx100_interrogate(wlandev, antenna, ACX100_RID_DOT11_CURRENT_ANTENNA);
 			wlandev->antenna = antenna[4];
-			acxlog(L_INIT, "Got antenna value 0x%02x.\n", wlandev->antenna);
+			acxlog(L_INIT, "Got antenna value 0x%02x\n", wlandev->antenna);
 			wlandev->get_mask &= ~GETSET_ANTENNA;
 		}
 
@@ -1425,7 +1425,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			memset(ed_threshold, 0, sizeof(ed_threshold));
 			acx100_interrogate(wlandev, ed_threshold, ACX100_RID_DOT11_ED_THRESHOLD);
 			wlandev->ed_threshold = ed_threshold[4];
-			acxlog(L_INIT, "Got energy detect threshold %d.\n", wlandev->ed_threshold);
+			acxlog(L_INIT, "Got energy detect threshold %d\n", wlandev->ed_threshold);
 			wlandev->get_mask &= ~GETSET_ED_THRESH;
 		}
 
@@ -1436,7 +1436,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			memset(cca, 0, sizeof(wlandev->cca));
 			acx100_interrogate(wlandev, cca, ACX100_RID_DOT11_CURRENT_CCA_MODE);
 			wlandev->cca = cca[4];
-			acxlog(L_INIT, "Got Channel Clear Assessment value: %d\n", wlandev->cca);
+			acxlog(L_INIT, "Got Channel Clear Assessment value %d\n", wlandev->cca);
 			wlandev->get_mask &= ~GETSET_CCA;
 		}
 
@@ -1447,7 +1447,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			acx100_interrogate(wlandev, &dom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
 			wlandev->reg_dom_id = dom.m.gp.bytes[0];
 			/* FIXME: should also set chanmask somehow */
-			acxlog(L_INIT, "Got regulatory domain: %d.\n", wlandev->reg_dom_id);
+			acxlog(L_INIT, "Got regulatory domain %d\n", wlandev->reg_dom_id);
 			wlandev->get_mask &= ~GETSET_REG_DOMAIN;
 		}
 	}
@@ -1781,8 +1781,8 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	
 	/* we have a nick field to waste, so why not abuse it
 	 * to announce the driver version? ;-) */
-	strcpy(wlandev->nick, "acx100 ");
-	strcat(wlandev->nick, WLAN_RELEASE_SUB);
+	strncpy(wlandev->nick, "acx100 ", IW_ESSID_MAX_SIZE);
+	strncat(wlandev->nick, WLAN_RELEASE_SUB, IW_ESSID_MAX_SIZE);
 
 	wlandev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
 	wlandev->preamble_mode = 2;
@@ -2236,9 +2236,13 @@ void acx100_start(wlandevice_t *wlandev)
 	unsigned long flags;
 	static int init = 1;
 
-	acx100_lock(wlandev, &flags);
-
 	FN_ENTER;
+
+	if (acx100_lock(wlandev, &flags))
+	{
+		acxlog(L_STD, "ERROR: lock failed!\n");
+		return;
+	}
 
 	/* This is the reinit phase, why only run this for mode 0 ? */
 	if (init)

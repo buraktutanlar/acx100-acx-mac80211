@@ -72,18 +72,13 @@
 
 #define L_ALL (L_STD|L_INIT|L_IRQ|L_ASSOC|L_BIN|L_FUNC|L_STATE|L_XFER|L_DATA|L_DEBUG|L_IOCTL|L_CTL)
 
-/* Undefine this to remove debug messages. This define should
-   actually be set in a configuration script, and then passed
-   via make to gcc. */
-#define DEBUG
-
-/* NOTE: if we still want basic logging of driver info if DEBUG
+/* NOTE: if we still want basic logging of driver info if ACX_DEBUG
    is not defined, we should provide an acxlog variant that is
    never turned off. We could make a acx_msg, and rename acxlog
    to acx_debug to make the difference very clear. Any comment
    on this ?? */
 
-#ifdef DEBUG	/* we want debug info */
+#ifdef ACX_DEBUG	/* we want debug info */
 	extern int debug;
 
 	#define acxlog(chan, args...) \

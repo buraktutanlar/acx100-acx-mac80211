@@ -46,7 +46,6 @@
 #ifndef _acx100MGMT_H
 #define _acx100MGMT_H
 
-
 /*=============================================================*/
 /*------ Constants --------------------------------------------*/
 
@@ -95,7 +94,7 @@ typedef struct acx100_priv {
 	dev_node_t node;
 	dev_link_t *cs_link;
 #elif (WLAN_HOSTIF==WLAN_PLX || WLAN_HOSTIF==WLAN_PCI || WLAN_HOSTIF==WLAN_USB)
-	char name[WLAN_DEVNAMELEN_MAX];
+	char name[IFNAMSIZ];
 #endif
 
 	/* Timer to allow for the deferred processing of linkstatus messages */
