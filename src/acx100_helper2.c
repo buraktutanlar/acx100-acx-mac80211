@@ -2973,6 +2973,10 @@ void acx100_timer(unsigned long address)
 			/* stop the scan when we leave the interrupt context */
 			SET_BIT(priv->after_interrupt_jobs, ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN);
 			acx_schedule_after_interrupt_task(priv);
+			/* HACK: set the IRQ bit, since we won't get a
+			 * scan complete IRQ any more on ACX111 (works on ACX100!),
+			 * since we will have stopped the scan */
+			SET_BIT(priv->irq_status, HOST_INT_SCAN_COMPLETE);
 #endif
 		}
 		break;
