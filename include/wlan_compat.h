@@ -367,13 +367,6 @@ typedef signed long long INT64;
 #define WLAN_INT_DISABLE(n)		{ save_flags((n)); cli(); }
 #define WLAN_INT_ENABLE(n)		{ sti(); restore_flags((n)); }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1))	//I think
-#ifdef CONFIG_MODVERSIONS
-#define MODVERSIONS		1
-#include <linux/modversions.h>
-#endif
-#endif
-
 #ifdef CONFIG_SMP
 #define __SMP__			1
 #endif
