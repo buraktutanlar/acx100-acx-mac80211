@@ -698,7 +698,7 @@ static void * acx100usb_read_firmware(const char *filename,unsigned int *size)
 					if (retval > 0) {
 						if (!res) {
 							res = vmalloc(8+*(UINT32*)(4+buffer));
-							acxlog(L_INIT,"Allocated %ld bytes for firmware module loading.\n", 8+(*(UINT32*)(4+buffer)));
+							acxlog(L_INIT,"Allocated %d bytes for firmware module loading.\n", 8+(*(UINT32*)(4+buffer)));
 							*size=8+(*(UINT32*)(buffer+4));
 						}
 						if (!res) {
@@ -1038,7 +1038,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 
 void acx100usb_tx_data(wlandevice_t *priv,struct txdescriptor *desc)
 {
-	int flags;
+	unsigned long flags;
 	FN_ENTER;
 	/* ------------------------------------
 	** some sanity checks...
@@ -1311,7 +1311,7 @@ static void acx100usb_complete_tx(struct urb *urb, struct pt_regs *regs)
 	** --------------------------------------------- */
 	acxlog(L_XFER,"transfer_buffer: %p  priv->bulkout: %p\n",urb->transfer_buffer,&(priv->bulkout));
 	acxlog(L_XFER,"actual length: %d  status: %d\n",urb->actual_length,urb->status);
-	acxlog(L_XFER,"bulk xmt completed (status=%d, len=%d) TxQueueFree=%ld\n",urb->status,urb->actual_length,priv->TxQueueFree);
+	acxlog(L_XFER,"bulk xmt completed (status=%d, len=%d) TxQueueFree=%d\n",urb->status,urb->actual_length,priv->TxQueueFree);
 	if (priv->usb_txoffset<priv->usb_txsize) {
 		acx100usb_send_tx_frags(priv);
 	} else {
@@ -1351,7 +1351,8 @@ static void acx100usb_complete_tx(struct urb *urb, struct pt_regs *regs)
 static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	struct txdescriptor *txdesc;
 	struct txhostdescriptor *header,*payload;
-	int descnum,flags;
+	int descnum;
+	unsigned long flags;
 	struct TIWLAN_DC *ticontext;
 	/* ----------------------------
 	** grab the TI device context

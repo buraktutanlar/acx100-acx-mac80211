@@ -1703,8 +1703,8 @@ typedef struct wlandevice {
 
 	unsigned long	membase;		/* 10 */
 	unsigned long	membase2;		/* 14 */
-	unsigned long	iobase;			/* 18 */
-	unsigned long	iobase2;		/* 1c */
+	void 		*iobase;		/* 18 */
+	void		*iobase2;		/* 1c */
 	UINT		chip_type;
 	char		*chip_name;
 	UINT8		bus_type;
@@ -1755,14 +1755,14 @@ typedef struct wlandevice {
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */
-	UINT16		unknown0x2350;		/* FIXME: old status ?? */
+	UINT16		unknown0x2350;		/* FIXME: old status?? */
 	UINT16		auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	UINT16		bss_table_count;	/* # of active BSS scan table entries */
 	struct		bss_info bss_table[32];	/* BSS scan table */
 	struct		bss_info station_assoc;	/* the station we're currently associated to */
 	UINT8		scan_running;
-	UINT32		scan_start;
+	unsigned long	scan_start;		/* FIXME type?? */
 	UINT16		scan_retries;		/* V3POS 2826, V1POS 27fe */
 
 	client_t	sta_list[32];		/* should those two be of */
@@ -1828,14 +1828,14 @@ typedef struct wlandevice {
 	/*** ACX100 command interface ***/
 	UINT16		cmd_type;		/* V3POS 2508, V1POS 24e0 */
 	UINT16		cmd_status;		/* V3POS 250a, V1POS 24e2 */
-	UINT32		CommandParameters;	/* FIXME: used to be an array UINT*0x88,
+	void		*CommandParameters;	/* FIXME: used to be an array UINT*0x88,
 						 * but it should most likely be *one*
 						 * UINT32 instead, pointing to the cmd
 						 * param memory. V3POS 268c, V1POS 2664 */
 
 	UINT16		info_type;		/* V3POS 2508, V1POS 24e0 */
 	UINT16		info_status;		/* V3POS 250a, V1POS 24e2 */
-	UINT32		InfoParameters;		/* V3POS 2814, V1POS 27ec */
+	void		*InfoParameters;		/* V3POS 2814, V1POS 27ec */
 
 	/*** Unknown ***/
 	UINT8		dtim_interval;		/* V3POS 2302 */

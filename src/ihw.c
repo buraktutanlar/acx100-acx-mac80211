@@ -345,7 +345,7 @@ void acx100_write_cmd_status(wlandevice_t *priv, UINT vala)
 *----------------------------------------------------------------*/
 static inline void acx100_write_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
 {
-	memcpy((UINT32 *) priv->CommandParameters, cmd, len);
+	memcpy(priv->CommandParameters, cmd, len);
 }
 
 /*----------------------------------------------------------------
@@ -367,7 +367,7 @@ static inline void acx100_write_cmd_param(wlandevice_t *priv, memmap_t *cmd, int
 *----------------------------------------------------------------*/
 static inline void acx100_read_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
 {
-	memcpy(cmd, (UINT *) priv->CommandParameters, len);
+	memcpy(cmd, priv->CommandParameters, len);
 }
 
 static const char * const cmd_error_strings[] = {
@@ -415,7 +415,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	UINT16 cmd_status;
 
 	FN_ENTER;
-	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);
+	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
 
 	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED))
 	{
@@ -511,7 +511,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	}
 
 	if (1 != cmd_status) {
-		acxlog(L_STD | L_CTL, "%s failed: %s [%ld uSec] Cmd: %Xh, Result: %Xh\n",
+		acxlog(L_STD | L_CTL, "%s failed: %s [%d uSec] Cmd: %Xh, Result: %Xh\n",
 				__func__,
 				cmd_status <= 0x0f ?
 				cmd_error_strings[cmd_status] : "UNKNOWN REASON",

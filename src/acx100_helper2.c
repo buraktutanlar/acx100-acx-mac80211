@@ -1483,7 +1483,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	for (station = 0; station < priv->bss_table_count; station++) {
 		UINT8 *a = priv->bss_table[station].bssid;
 		acxlog(L_DEBUG,
-		       "checking station %ld [%02X %02X %02X %02X %02X %02X]\n",
+		       "checking station %d [%02X %02X %02X %02X %02X %02X]\n",
 		       station, a[0], a[1], a[2], a[3], a[4], a[5]);
 		if (acx100_is_mac_address_equal
 		    (hdr->a4.a3,
@@ -1551,7 +1551,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	acxlog(L_DEBUG, ".\n");
 
 	acxlog(L_STD | L_ASSOC,
-	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, BSSID %02X %02X %02X %02X %02X %02X, %s/%d%sMbps, Caps 0x%04x, SIR %ld, SNR %ld.\n",
+	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, BSSID %02X %02X %02X %02X %02X %02X, %s/%d%sMbps, Caps 0x%04x, SIR %d, SNR %d.\n",
 	       __func__,
 	       priv->bss_table_count,
 	       ss->essid, ss->channel,
@@ -1729,7 +1729,7 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 	if (priv->auth_alg <= 1) {
 		if (priv->auth_alg != *(req->auth_alg))
 		{
-			acxlog(L_ASSOC, "authentication algorithm mismatch: want: %ld, req: %d\n", priv->auth_alg, *(req->auth_alg));
+			acxlog(L_ASSOC, "authentication algorithm mismatch: want: %d, req: %d\n", priv->auth_alg, *(req->auth_alg));
 			result = 0;
 			goto end;
 		}
@@ -2753,7 +2753,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 
 		if (!(priv->reg_dom_chanmask & (1 << (this_bss->channel - 1) ) ))
 		{
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %d, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, this_bss->channel);
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %d is using channel %d, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, this_bss->channel);
 			continue; /* keep looking */
 		}
 
@@ -2821,7 +2821,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 
 		a = priv->address;
 		acxlog(L_STD | L_ASSOC,
-		       "%s: matching station FOUND (idx %ld), JOINING (%02X %02X %02X %02X %02X %02X).\n",
+		       "%s: matching station FOUND (idx %d), JOINING (%02X %02X %02X %02X %02X %02X).\n",
 		       __func__, idx_found, a[0], a[1], a[2], a[3], a[4], a[5]);
 		acx100_join_bssid(priv);
 

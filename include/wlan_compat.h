@@ -57,6 +57,9 @@
 #define WLAN_ALPHA			5
 #define WLAN_MIPS			6
 #define WLAN_HPPA			7
+#define WLAN_SPARC			8
+#define WLAN_SH				9
+#define WLAN_x86_64			10
 /* WLAN_CPU_CORE */
 #define WLAN_I386CORE			1
 #define WLAN_PPCCORE			2
@@ -121,7 +124,10 @@
 #endif
 
 #if defined(__KERNEL__)
-#if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#if defined(__x86_64__)
+#define WLAN_CPU_FAMILY		WLAN_x86_64
+#define WLAN_SYSARCH		WLAN_PCAT
+#elif defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
 #define WLAN_CPU_FAMILY		WLAN_Ix86
 #define WLAN_CPU_CORE		WLAN_I386CORE
 #define WLAN_CPU_PART		WLAN_I386PART
@@ -162,6 +168,15 @@
 #define WLAN_CPU_CORE		WLAN_HPPACORE
 #define WLAN_CPU_PART		WLAN_HPPAPART
 #define WLAN_SYSARCH		WLAN_HPPAARCH
+#elif defined(__sparc__)
+#define WLAN_CPU_FAMILY		WLAN_SPARC
+#define WLAN_SYSARCH		WLAN_SPARC
+#elif defined(__sh__)
+#define WLAN_CPU_FAMILY		WLAN_SH
+#define WLAN_SYSARCH		WLAN_SHARCH
+#ifndef __LITTLE_ENDIAN__
+#define __LITTLE_ENDIAN__
+#endif
 #else
 #error "No CPU identified!"
 #endif
@@ -221,19 +236,19 @@
 #define BIT30	0x40000000
 #define BIT31	0x80000000
 
-typedef unsigned char UINT8;
-typedef unsigned short UINT16;
-typedef unsigned long UINT32;
+typedef __u8 UINT8;
+typedef __u16 UINT16;
+typedef __u32 UINT32;
 
-typedef signed char INT8;
-typedef signed short INT16;
-typedef signed long INT32;
+typedef __s8 INT8;
+typedef __s16 INT16;
+typedef __s32 INT32;
 
-typedef unsigned int UINT;
-typedef signed int INT;
+typedef __u32 UINT;
+typedef __s32 INT;
 
-typedef unsigned long long UINT64;
-typedef signed long long INT64;
+typedef __u64 UINT64;
+typedef __s64 INT64;
 
 #define UINT8_MAX	(0xffUL)
 #define UINT16_MAX	(0xffffUL)

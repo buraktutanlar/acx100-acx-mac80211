@@ -1690,7 +1690,7 @@ static inline int acx100_ioctl_set_retry(struct net_device *dev,
 		goto end;
 	}
 	if (IW_RETRY_LIMIT == (vwrq->flags & IW_RETRY_TYPE)) {
-		(void)printk("current retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
+		(void)printk("current retry limits: short %d long %d\n", priv->short_retry, priv->long_retry);
                 if (0 != (vwrq->flags & IW_RETRY_MAX)) {
                         priv->long_retry = vwrq->value;
                 } else if (0 != (vwrq->flags & IW_RETRY_MIN)) {
@@ -1700,7 +1700,7 @@ static inline int acx100_ioctl_set_retry(struct net_device *dev,
                         priv->long_retry = vwrq->value;
                         priv->short_retry = vwrq->value;
                 }
-		(void)printk("new retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
+		(void)printk("new retry limits: short %d long %d\n", priv->short_retry, priv->long_retry);
 		priv->set_mask |= GETSET_RETRY;
 		result = -EINPROGRESS;
 	}

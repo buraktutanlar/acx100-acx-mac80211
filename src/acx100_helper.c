@@ -243,12 +243,12 @@ int acx100_proc_output(char *buf, wlandevice_t *priv)
 	p += sprintf(p, "form factor:\t\t\t0x%02x\n", priv->form_factor);
 	/* TODO: add form factor string from acx100_display_hardware_details */
 	p += sprintf(p, "EEPROM version:\t\t\t0x%02x\n", priv->eeprom_version);
-	p += sprintf(p, "firmware version:\t\t%s (0x%08lx)\n",
+	p += sprintf(p, "firmware version:\t\t%s (0x%08x)\n",
 		     (char *)priv->firmware_version, priv->firmware_id);
 	p += sprintf(p, "BSS table has %d entries:\n", priv->bss_table_count);
 	for (i = 0; i < priv->bss_table_count; i++) {
 		struct bss_info *bss = &priv->bss_table[i];
-		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %u  WEP %s  Cap 0x%x  SIR %lu  SNR %lu\n", 
+		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %u  WEP %s  Cap 0x%x  SIR %u  SNR %u\n", 
 			     i, bss->bssid[0], bss->bssid[1],
 			     bss->bssid[2], bss->bssid[3], bss->bssid[4],
 			     bss->bssid[5], (char *)bss->essid, bss->channel,
@@ -876,11 +876,11 @@ int acx100_load_radio(wlandevice_t *priv)
 
 				res = vmalloc(to_alloc);
 				if (NULL == res) {
-					acxlog(L_STD, "ERROR: Unable to allocate %lu bytes for firmware module loading.\n", to_alloc);
+					acxlog(L_STD, "ERROR: Unable to allocate %u bytes for firmware module loading.\n", to_alloc);
 					retval = 0;
 					goto fail_close;
 				}
-				acxlog(L_STD, "Allocated %lu bytes for firmware module loading.\n", to_alloc);
+				acxlog(L_STD, "Allocated %u bytes for firmware module loading.\n", to_alloc);
 			}
 			memcpy((UINT8*)res + offset, buffer, retval);
 			offset += retval;
@@ -895,7 +895,7 @@ fail_close:
 	}
 
 	if ((NULL != res) && (offset != le32_to_cpu(res->size) + 8)) {
-		acxlog(L_STD,"Firmware is reporting a different size 0x%08x to read 0x%08lx\n", le32_to_cpu(res->size) + 8, offset);
+		acxlog(L_STD,"Firmware is reporting a different size 0x%08x to read 0x%08x\n", le32_to_cpu(res->size) + 8, offset);
 		vfree(res);
 		res = NULL;
 	}
@@ -1069,7 +1069,7 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, U
 #endif
 
 			if (acc2 != acc1) {
-				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %ld don't match!! (0x%08lx vs. 0x%08lx). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
+				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %d don't match!! (0x%08x vs. 0x%08x). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
 				result = 0;
 				break;
 			}
@@ -1185,15 +1185,15 @@ void acx100_init_mboxes(wlandevice_t *priv)
 	cmd_offs = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 	info_offs = le32_to_cpu(acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
 	
-	acxlog(L_BINDEBUG, "CmdMailboxOffset = %lx\n", cmd_offs);
-	acxlog(L_BINDEBUG, "InfoMailboxOffset = %lx\n", info_offs);
+	acxlog(L_BINDEBUG, "CmdMailboxOffset = %x\n", cmd_offs);
+	acxlog(L_BINDEBUG, "InfoMailboxOffset = %x\n", info_offs);
 	acxlog(L_BINDEBUG,
 		   "<== Get the mailbox pointers from the scratch pad registers\n");
 	priv->CommandParameters = priv->iobase2 + cmd_offs + 0x4;
 	priv->InfoParameters = priv->iobase2 + info_offs + 0x4;
-	acxlog(L_BINDEBUG, "CommandParameters = [ 0x%08lX ]\n",
+	acxlog(L_BINDEBUG, "CommandParameters = [ 0x%p ]\n",
 		   priv->CommandParameters);
-	acxlog(L_BINDEBUG, "InfoParameters = [ 0x%08lX ]\n",
+	acxlog(L_BINDEBUG, "InfoParameters = [ 0x%p ]\n",
 		   priv->InfoParameters);
 	FN_EXIT(0, 0);
 #endif
@@ -1281,7 +1281,7 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 		return 0;
 	}
 
-	acxlog(L_BINDEBUG, "CodeEnd:%lX\n", pt->CodeEnd);
+	acxlog(L_BINDEBUG, "CodeEnd:%X\n", pt->CodeEnd);
 
 	if(priv->chip_type == CHIPTYPE_ACX100) {
 
@@ -1921,7 +1921,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	if (0 != set_all)
 		priv->set_mask |= GETSET_ALL;
 
-	acxlog(L_INIT, "get_mask 0x%08lx, set_mask 0x%08lx\n",
+	acxlog(L_INIT, "get_mask 0x%08x, set_mask 0x%08x\n",
 			priv->get_mask, priv->set_mask);
 
 	/* send a disassoc request in case it's required */
@@ -2180,7 +2180,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		UINT8 short_retry[4 + ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN];
 		UINT8 long_retry[4 + ACX100_RID_DOT11_LONG_RETRY_LIMIT_LEN];
 
-		acxlog(L_INIT, "Updating short retry limit: %ld, long retry limit: %ld\n",
+		acxlog(L_INIT, "Updating short retry limit: %d, long retry limit: %d\n",
 					priv->short_retry, priv->long_retry);
 		short_retry[0x4] = priv->short_retry;
 		long_retry[0x4] = priv->long_retry;
@@ -2366,7 +2366,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	priv->get_mask &= ~GETSET_ALL;
 	priv->set_mask &= ~GETSET_ALL;
 
-	acxlog(L_INIT, "get_mask 0x%08lx, set_mask 0x%08lx - after update\n",
+	acxlog(L_INIT, "get_mask 0x%08x, set_mask 0x%08x - after update\n",
 			priv->get_mask, priv->set_mask);
 
 #ifdef BROKEN_LOCKING
@@ -2930,7 +2930,7 @@ void acx100_set_timer(wlandevice_t *priv, UINT32 timeout)
 
 	FN_ENTER;
 
-	acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %ld\n", timeout);
+	acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %d\n", timeout);
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		acxlog(L_STD, "ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!!\n");
 		return;

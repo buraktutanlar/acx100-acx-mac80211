@@ -802,7 +802,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 	FN_ENTER;
 
 	acx100_log_txbuffer(pDc);
-	acxlog(L_BUF, "cleaning up Tx bufs from %ld\n", pDc->tx_tail);
+	acxlog(L_BUF, "cleaning up Tx bufs from %d\n", pDc->tx_tail);
 
 	spin_lock(&tx_lock);
 
@@ -836,7 +836,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 				 * should have functions acx100_stop_queue
 				 * etc. which set flag priv->tx_stopped
 				 * to be checked here. */
-				acxlog(L_XFER, "wake queue (avail. Tx desc %ld).\n", priv->TxQueueFree);
+				acxlog(L_XFER, "wake queue (avail. Tx desc %d).\n", priv->TxQueueFree);
 				netif_wake_queue(priv->netdev);
 			}
 		}
@@ -1071,7 +1071,7 @@ inline void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 		{
 			pDesc = &pDc->pRxHostDescQPool[i];
 #if (WLAN_HOSTIF==WLAN_USB)
-			acxlog(L_DEBUG,"rxbuf %d Ctl=%X  val0x14=%lX\n",i,pDesc->Ctl,pDesc->Status);
+			acxlog(L_DEBUG,"rxbuf %d Ctl=%X val0x14=%X\n",i,pDesc->Ctl,pDesc->Status);
 #endif
 			if ((pDesc->Ctl & ACX100_CTL_OWN) && (pDesc->Status & BIT31))
 				acxlog(L_BUF, "rxbuf %d full\n", i);
@@ -1174,7 +1174,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 
 	while (1)
 	{
-		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %ld\n", __func__, curr_idx, pDc->rx_tail);
+		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %d\n", __func__, curr_idx, pDc->rx_tail);
 
 		if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 			/* take into account additional header in front of packet */
@@ -1188,7 +1188,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		buf_len = pDesc->data->mac_cnt_rcvd & 0xfff;      /* somelength */
 		if ((WLAN_GET_FC_FSTYPE(buf->a3.fc) != WLAN_FSTYPE_BEACON)
 		||  (debug & L_XFER_BEACON))
-			acxlog(L_XFER|L_DATA, "Rx pkt %02d (%s): time %lu, len %i, signal %d, SNR %d, macstat %02x, phystat %02x, phyrate %u, mode %d, status %d\n",
+			acxlog(L_XFER|L_DATA, "Rx pkt %02d (%s): time %u, len %i, signal %d, SNR %d, macstat %02x, phystat %02x, phyrate %u, mode %d, status %d\n",
 				curr_idx,
 				acx100_get_packet_type_string(buf->a3.fc),
 				pDesc->data->time,
@@ -1364,7 +1364,7 @@ int acx100_create_tx_host_desc_queue(TIWLAN_DC * pDc)
 		return 2;
 	}
 	acxlog(L_BINDEBUG, "pDc->pTxHostDescQPool = 0x%08x\n", (UINT) pDc->pTxHostDescQPool);
-	acxlog(L_BINDEBUG, "pDc->TxHostDescQPoolPhyAddr = 0x%08lx\n", pDc->TxHostDescQPoolPhyAddr);
+	acxlog(L_BINDEBUG, "pDc->TxHostDescQPoolPhyAddr = 0x%08x\n", pDc->TxHostDescQPoolPhyAddr);
 #else
 	if ((pDc->pTxHostDescQPool=kmalloc(pDc->TxHostDescQPoolSize,GFP_KERNEL))==NULL) {
 		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue\n");
@@ -1630,8 +1630,8 @@ void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 	pDc->pTxDescQPool = (struct txdescriptor *) (priv->iobase2 +
 				     pDc->ui32ACXTxQueueStart);
 
-	acxlog(L_BINDEBUG, "priv->iobase2 = 0x%08lx\n", priv->iobase2);
-	acxlog(L_BINDEBUG, "pDc->ui32ACXTxQueueStart = 0x%08lx\n",
+	acxlog(L_BINDEBUG, "priv->iobase2 = 0x%p\n", priv->iobase2);
+	acxlog(L_BINDEBUG, "pDc->ui32ACXTxQueueStart = 0x%08x\n",
 	       pDc->ui32ACXTxQueueStart);
 	acxlog(L_BINDEBUG, "pDc->pTxDescQPool = 0x%08x\n",
 	       (UINT) pDc->pTxDescQPool);
@@ -1791,7 +1791,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	   memory pointers. IE. end-start/size */
 	TotalMemoryBlocks = (le32_to_cpu(mmt->PoolEnd) - le32_to_cpu(mmt->PoolStart)) / priv->memblocksize;
 
-	acxlog(L_DEBUG,"TotalMemoryBlocks=%ld (%ld bytes)\n",TotalMemoryBlocks,TotalMemoryBlocks*priv->memblocksize);
+	acxlog(L_DEBUG,"TotalMemoryBlocks=%d (%d bytes)\n",TotalMemoryBlocks,TotalMemoryBlocks*priv->memblocksize);
 
 	/* This one I have no idea on */
 	/* block-transfer=0x20000
@@ -1889,7 +1889,7 @@ struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv)
 	}
 
 	priv->TxQueueFree--;
-	acxlog(L_BUF, "got Tx desc %ld, %ld remain.\n", pDc->tx_head, priv->TxQueueFree);
+	acxlog(L_BUF, "got Tx desc %d, %d remain.\n", pDc->tx_head, priv->TxQueueFree);
 
 /*
  * This comment is probably not entirely correct, needs further discussion
@@ -1905,7 +1905,7 @@ struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv)
  */
 	if (priv->TxQueueFree < MINFREE_TX)
 	{
-		acxlog(L_XFER, "stop queue (avail. Tx desc %ld).\n", priv->TxQueueFree);
+		acxlog(L_XFER, "stop queue (avail. Tx desc %d).\n", priv->TxQueueFree);
 		netif_stop_queue(priv->netdev);
 	}
 

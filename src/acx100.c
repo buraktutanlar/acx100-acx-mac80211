@@ -325,7 +325,7 @@ static void acx100_get_firmware_version(wlandevice_t *priv)
 	}
 	priv->firmware_numver =
 		(UINT32)((fw_major << 24) + (fw_minor << 16) + (fw_sub << 8) + fw_extra);
-	acxlog(L_DEBUG, "firmware_numver %08lx\n", priv->firmware_numver);
+	acxlog(L_DEBUG, "firmware_numver %08x\n", priv->firmware_numver);
 
 	priv->firmware_id = fw.hw_id;
 
@@ -393,7 +393,7 @@ void acx100_display_hardware_details(wlandevice_t *priv)
 			break;
 	}
 
-	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%04x. Uploaded firmware '%s' (0x%08lx).\n", priv->form_factor, form_str, priv->radio_type, radio_str, priv->eeprom_version, priv->firmware_version, priv->firmware_id);
+	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%04x. Uploaded firmware '%s' (0x%08x).\n", priv->form_factor, form_str, priv->radio_type, radio_str, priv->eeprom_version, priv->firmware_version, priv->firmware_id);
 
 	FN_EXIT(0, 0);
 }
@@ -530,8 +530,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	unsigned long phymem1;
 	unsigned long phymem2;
-	unsigned long mem1 = 0;
-	unsigned long mem2 = 0;
+	void *mem1 = NULL;
+	void *mem2 = NULL;
 
 	wlandevice_t *priv = NULL;
 	struct net_device *dev = NULL;
@@ -612,8 +612,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail;
 	}
 
-	mem1 = (unsigned long) ioremap(phymem1, mem_region1_size);
-	if (0 == mem1) {
+	mem1 = ioremap(phymem1, mem_region1_size);
+	if (NULL == mem1) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
 		       __func__, dev_info);
@@ -621,8 +621,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail;
 	}
 
-	mem2 = (unsigned long) ioremap(phymem2, mem_region2_size);
-	if (0 == mem2) {
+	mem2 = ioremap(phymem2, mem_region2_size);
+	if (NULL == mem2) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: ioremap() failed.\n",
 		       __func__, dev_info);
@@ -632,7 +632,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
-	       "Found %s-based wireless network card at %s, irq:%d, phymem1:0x%lx, phymem2:0x%lx, mem1:0x%lx, mem1_size:%ld, mem2:0x%lx, mem2_size:%ld.\n",
+	       "Found %s-based wireless network card at %s, irq:%d, phymem1:0x%lx, phymem2:0x%lx, mem1:0x%p, mem1_size:%ld, mem2:0x%p, mem2_size:%ld.\n",
 	       chip_name, (char *)pdev->slot_name /* was: pci_name(pdev) */, pdev->irq, phymem1, phymem2,
 	       mem1, mem_region1_size,
 	       mem2, mem_region2_size);
@@ -714,7 +714,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev->priv = priv;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 70)
+	/* this define and its netdev member exist since 2.5.70 */
 	SET_NETDEV_DEV(dev, &pdev->dev);
+#endif
 
 	/* register new dev in linked list */
 	acx100_device_chain_add(dev);
@@ -1838,14 +1841,14 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 #ifdef MODULE
 
 #ifdef ACX_DEBUG
-MODULE_PARM(debug, "i")
+MODULE_PARM(debug, "i"); /* doh, 2.6.x screwed up big time: here the define has its own ";" ("double ; detected"), yet in 2.4.x it DOESN'T (the sane thing to do), grrrrr! */
 MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include/acx100.h)");
 #endif
 
 /*@-fullinitblock@*/
-MODULE_PARM(use_eth_name, "i")
+MODULE_PARM(use_eth_name, "i");
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
-MODULE_PARM(firmware_dir, "s")
+MODULE_PARM(firmware_dir, "s");
 MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware files from");
 /*@=fullinitblock@*/
 
