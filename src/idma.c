@@ -948,7 +948,8 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
  */
 inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
 {
-	UINT8 winlevel = (UINT8) (0.5 + 0.625 * rawlevel);
+	/* UINT8 winlevel = (UINT8) (0.5 + 0.625 * rawlevel); */
+	UINT8 winlevel = (UINT8) ((4 + (rawlevel * 5)) / 8);
 
 	if(winlevel>100)
 		winlevel=100;

@@ -288,7 +288,7 @@ A more mobile approach might be the ifplugd/waproamd programs
 (see below; configuration dependent on stations in reach).
 
 DON'T FORGET that debugging/logging options can be changed in a pretty
-powerful way (see DEBUGGING / LOGGING).
+powerful way (see "DEBUGGING / LOGGING").
 Your hard disk will certainly thank you a lot for having saved it from
 the horror of heaps of logs once you got the driver running...
 To check out further module parameters and options, please use modinfo
@@ -319,23 +319,28 @@ directory).
 If instead you want to build the module "in-tree" (i.e. not in a separate
 acx100 module directory!), you'll have to:
 
-Either:
-run "make inject" to add the driver to an existing Linux 2.6.x source tree.
-or (this may be outdated):
+> SOLUTION ONE
+Run "make inject" to add the driver to an existing Linux 2.6.x source tree.
+By default, the kernel source is assumed to be in /usr/src/linux/, while if
+you want to specify another path, you should use the parameter KSRC, so
+¨make inject KSRC=[path to your kernel source].
 
-1. Create a directory drivers/net/wireless/acx100 in your 2.6 source tree.
+> SOLUTION TWO (this may be outdated)
+1. Create a directory drivers/net/wireless/acx in your 2.6 source tree.
 2. Copy the files
       - src/Makefile
       - src/*.c
       - include/*.h
-   from the acx100 sources into drivers/net/wireless/acx100 in your 2.6 tree.
-3. uncomment line "#EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI" in Makefile you just copied. (line 142)
-4. Add a line reading "obj-m += acx100/" to the bottom of
+   from the acx100 sources into drivers/net/wireless/acx in your 2.6 tree.
+3. uncomment line "#EXTRA_CFLAGS += -Idrivers/net/wireless/acx -DWLAN_HOSTIF=WLAN_PCI"
+   in Makefile you just copied. (line 142)
+4. Add a line reading "obj-m += acx/" to the bottom of
    drivers/net/wireless/Makefile .
 5. Then build your kernel as usual, the acx100 driver will be built as module
    (acx_pci.ko). Make sure you have the required 2.6 module userspace
    package (module-init-tools) and enjoy ;-)
 
+> SOLUTION THREE (only for version before 0.2.0pre8)
 Other 2.6.x kernel patches can be found at http://luca.pca.it/projects/acx100/
 
 --- USAGE HINTS ---
@@ -445,7 +450,7 @@ helped several times!)
 -- Driver locked up the box --
 Umm... ouch!
 First, use newest driver version.
-Then please configure a log console (see DEBUGGING / LOGGING).
+Then please configure a log console (see "DEBUGGING / LOGGING").
 Run
 sleep 10 && insmod acx_pci ......
 Then change to the log console, wait 10 seconds and write down the crash dump.
@@ -477,7 +482,7 @@ Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a card set to Peer).
 Further, the ESSID is CaSe SEnsITivE!
 
-Then read the file containing the driver log (see DEBUGGING / LOGGING).
+Then read the file containing the driver log (see "DEBUGGING / LOGGING").
 
 Make sure that network association is working properly!
 (all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
@@ -552,7 +557,7 @@ A useful report would include:
 - the acx_proc.txt file created via
     "cat /proc/driver/acx* > /tmp/acx_proc.txt"
 - in case you're experiencing connection issues or similar:
-    the output log files of the debug=XXXX parameter (see DEBUGGING / LOGGING)
+    the output log files of the debug=XXXX parameter (see "DEBUGGING / LOGGING")
 ****************************************
 
 Thanks for listening!

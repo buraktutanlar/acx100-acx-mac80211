@@ -2784,8 +2784,10 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 
 	acx100_init_mboxes(priv);
 #if (WLAN_HOSTIF!=WLAN_USB)	
-	if (priv->chip_type == CHIPTYPE_ACX100) /* ACX111: combined firmware */
-		acx100_load_radio(priv);
+	/* try to load radio for both ACX100 and ACX111, since both
+	 * chips have at least some firmware versions making use of an
+	 * external radio module */
+	acx100_load_radio(priv);
 #endif
 
 	if(priv->chip_type == CHIPTYPE_ACX100) {

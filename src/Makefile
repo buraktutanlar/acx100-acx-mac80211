@@ -16,6 +16,9 @@ INSTALL = /usr/bin/install -c
 # work around issues with sudo users lacking /sbin in their path
 DEPMOD = $(shell test -f /sbin/depmod && echo /sbin/depmod || which depmod)
 LN = $(shell which ln)
+# driver flags common to all kernel versions and configurations
+#COMMON_DRIVER_FLAGS = -msoft-float -pedantic -Werror
+COMMON_DRIVER_FLAGS = -msoft-float
 
 export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)
 
@@ -174,7 +177,7 @@ uninstall:
 # 2.6 in-tree (kbuild)
 else # ifeq PATCHLEVEL
 
-EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF)
+EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF) $(COMMON_DRIVER_FLAGS)
 #EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=$(WLAN_HOSTIF)
 
 ifeq ($(WLAN_HOSTIF),WLAN_PCI)
