@@ -160,23 +160,21 @@ MODULE_LICENSE("Dual MPL/GPL");
 /*================================================================*/
 /* Local Static Definitions */
 #define DRIVER_SUFFIX	"_pci"
+#define DEV_INFO	"TI acx" DRIVER_SUFFIX
+#define VERSION		"TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE
 
 #define CARD_EEPROM_ID_SIZE 6
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) /* a la orinoco.c */
 
-typedef char *dev_info_t;
-static dev_info_t dev_info = "TI acx" DRIVER_SUFFIX;
-
-/* this one should NOT be __devinitdata, otherwise memory section conflict in some kernel versions! */
-static char version[] = "TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
-
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 unsigned int debug = L_BIN|L_ASSOC|L_INIT|L_STD;
 #endif
 
 unsigned int use_eth_name = 0;
 
+#ifdef USE_FW_LOADER_LEGACY
 char *firmware_dir;
+#endif
 
 extern const struct iw_handler_def acx_ioctl_handler_def;
 
@@ -266,8 +264,6 @@ static void acx_disable_irq(wlandevice_t *priv);
 static void acx_enable_irq(wlandevice_t *priv);
 static int acx_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
-static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *dev, wlandevice_t *priv,
-	unsigned long mem_region1, void *mem1, unsigned long mem_region2, void *mem2);
 static void acx_remove_pci(struct pci_dev *pdev);
 
 #ifdef CONFIG_PM
@@ -343,10 +339,9 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 
 	FN_ENTER;
 	
-	(void)acx_interrogate(priv, &fw, ACX1xx_IE_FWREV);
+	acx_interrogate(priv, &fw, ACX1xx_IE_FWREV);
 	memcpy(priv->firmware_version, &fw.fw_id, 20);
-	if (strncmp((char *)fw.fw_id, "Rev ", 4) != 0)
-	{
+	if (strncmp((char *)fw.fw_id, "Rev ", 4) != 0) {
 		acxlog(L_STD|L_INIT, "Huh, strange firmware version string \"%s\" without leading \"Rev \" string detected, please report!\n", fw.fw_id);
 		priv->firmware_numver = 0x01090407; /* assume 1.9.4.7 */
 		FN_EXIT0();
@@ -363,12 +358,11 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 		acxlog(L_DEBUG, "num: %c\n", c);
 		if ((c != '.') && (c))
 			val <<= 4;
-		else
-		{
+		else {
 			hexarr[hexidx] = val;
 			hexidx++;
-			if (hexidx > 3)
-			{ /* reached end */
+			if (hexidx > 3) {
+				/* reached end */
 				break;
 			}
 			val = 0;
@@ -388,8 +382,7 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 	fw_major = (u8)(fw.fw_id[4] - '0');
 	fw_minor = (u8)(fw.fw_id[6] - '0');
 	fw_sub = (u8)(fw.fw_id[8] - '0');
-	if (strlen((char *)fw.fw_id) >= 11)
-	{
+	if (strlen((char *)fw.fw_id) >= 11) {
 		if ((fw.fw_id[10] >= '0') && (fw.fw_id[10] <= '9'))
 			fw_extra = (u8)(fw.fw_id[10] - '0');
 		else
@@ -520,18 +513,15 @@ static void acx_show_card_eeprom_id(wlandevice_t *priv)
 		}
 	}
 	
-	for (i = 0; i < (sizeof(device_ids) / sizeof(struct device_id)); i++)
-	{
-		if (0 == memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE))
-		{
+	for (i = 0; i < (sizeof(device_ids) / sizeof(struct device_id)); i++) {
+		if (0 == memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
 			if (NULL != device_ids[i].descr) {
 				acxlog(L_STD, "%s: EEPROM card ID string check found %s card ID: this is a %s, no??\n", __func__, device_ids[i].descr, device_ids[i].type);
 			}
 			break;
 		}
 	}
-	if (i == (sizeof(device_ids) / sizeof(device_id_t)))
-	{
+	if (i == (sizeof(device_ids) / sizeof(device_id_t))) {
 		acxlog(L_STD,
 	       "%s: EEPROM card ID string check found unknown card: expected \"Global\", got \"%.*s\"! Please report!\n", __func__, CARD_EEPROM_ID_SIZE, buffer);
 	}
@@ -651,8 +641,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Enable the PCI device */
 	if (pci_enable_device(pdev)) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: pci_enable_device() FAILED\n",
-		       __func__, dev_info);
+		       "%s: " DEV_INFO ": pci_enable_device() FAILED\n",
+		       __func__);
 		result = -ENODEV;
 		goto fail_pci_enable_device;
 	}
@@ -707,8 +697,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem1 = ioremap(phymem1, mem_region1_size);
 	if (NULL == mem1) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: ioremap() FAILED\n",
-		       __func__, dev_info);
+		       "%s: " DEV_INFO ": ioremap() FAILED\n",
+		       __func__);
 		result = -EIO;
 		goto fail_ioremap1;
 	}
@@ -716,8 +706,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem2 = ioremap(phymem2, mem_region2_size);
 	if (NULL == mem2) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: ioremap() FAILED\n",
-		       __func__, dev_info);
+		       "%s: " DEV_INFO ": ioremap() FAILED\n",
+		       __func__);
 		result = -EIO;
 		goto fail_ioremap2;
 	}
@@ -731,8 +721,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	acxlog(0xffff, "initial debug setting is 0x%04x\n", debug);
 
 	if (0 == pdev->irq) {
-		acxlog(L_BINSTD | L_IRQ | L_INIT, "%s: %s: Can't get IRQ %d\n",
-		       __func__, dev_info, 0);
+		acxlog(L_BINSTD | L_IRQ | L_INIT, "%s: " DEV_INFO ": Can't get IRQ 0\n",
+		       __func__);
 		result = -EIO;
 		goto fail_irq;
 	}
@@ -742,8 +732,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv = kmalloc(sizeof(wlandevice_t), GFP_KERNEL);
 	if (NULL == priv) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: Memory allocation failure\n",
-		       __func__, dev_info);
+		       "%s: " DEV_INFO ": Memory allocation failure\n",
+		       __func__);
 		result = -EIO;
 		goto fail_alloc_priv;
 	}
@@ -808,8 +798,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	acx_device_chain_add(dev);
 
 	acxlog(L_BINSTD | L_IRQ | L_INIT,
-		       "%s: %s: Using IRQ %d\n",
-		       __func__, dev_info, pdev->irq);
+		       "%s: " DEV_INFO ": Using IRQ %d\n",
+		       __func__, pdev->irq);
 
 	dev->irq = pdev->irq;
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
@@ -825,15 +815,14 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (OK != acx_reset_dev(dev)) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: MAC initialize failure!\n",
-		       __func__, dev_info);
+		       "%s: " DEV_INFO ": MAC initialize failure!\n",
+		       __func__);
 		result = -EIO;
 		goto fail_reset;
 	}
 
 	devname_template = (1 == use_eth_name) ? "eth%d" : "wlan%d";
-	if (dev_alloc_name(dev, devname_template) < 0)
-	{
+	if (dev_alloc_name(dev, devname_template) < 0) {
 		result = -EIO;
 		goto fail_alloc_name;
 	}
@@ -889,8 +878,8 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	err = register_netdev(dev);
 	if (OK != err) {
 		acxlog(L_BINSTD | L_INIT,
-		       "%s: %s: Register net device of %s FAILED: %d\n",
-		       __func__, dev_info, dev->name, err);
+		       "%s: " DEV_INFO ": Register net device of %s FAILED: %d\n",
+		       __func__, dev->name, err);
 		result = -EIO;
 		goto fail_register_netdev;
 	}
@@ -903,7 +892,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 #endif
 
-	acxlog(L_STD|L_INIT, "%s: %s Loaded Successfully\n", __func__, version);
+	acxlog(L_STD|L_INIT, "%s: " VERSION " loaded successfully\n", __func__);
 	result = OK;
 	goto done;
 
@@ -917,10 +906,6 @@ fail_proc_register_entries:
 		acx_down(dev);
 	unregister_netdev(dev);
 	
-	/* FIXME: try to find a way to re-unify error code path with
-	 * acx_cleanup_card_and_resources(), which it used to simply call,
-	 * but error handling was too sophisticated for such a simple function call,
-	 * so we had to give it up again... */
 fail_register_netdev:
 
 	acx_delete_dma_regions(priv);
@@ -959,86 +944,12 @@ fail_unknown_chiptype:
 fail_pci_enable_device:
 
 	pci_set_power_state(pdev, 3);
-	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
+	acxlog(L_STD|L_INIT, "%s: " VERSION " loading FAILED\n", __func__);
 
 done:
 	FN_EXIT1(result);
 	return result;
 } /* acx_probe_pci() */
-
-static void acx_cleanup_card_and_resources(
-	struct pci_dev *pdev,
-	netdevice_t *dev,
-	wlandevice_t *priv,
-	unsigned long mem_region1, void *mem1,
-	unsigned long mem_region2, void *mem2)
-{
-	/* unregister the device to not let the kernel
-	 * (e.g. ioctls) access a half-deconfigured device */
-
-	if (dev != NULL)
-	{
-		acxlog(L_INIT, "Removing device %s!\n", dev->name);
-		unregister_netdev(dev);
-
-#ifdef CONFIG_PROC_FS
-		acx_proc_unregister_entries(dev);
-#endif
-
-		/* find our PCI device in the global acx list and remove it */
-		acx_device_chain_remove(dev);
-	}
-
-	if (priv != NULL)
-	{
-		if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
-			acx_down(dev);
-
-		CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
-
-		priv->hw_unavailable++;
-		acxlog(L_STD, "hw_unavailable++\n");
-	}
-
-	if (priv != NULL)
-	{
-		acx_delete_dma_regions(priv);
-
-		kfree(priv);
-	}
-
-	/* finally, clean up PCI bus state */
-
-	if (NULL != mem1)
-		iounmap(mem1);
-	if (NULL != mem2)
-		iounmap(mem2);
-
-	release_mem_region(pci_resource_start(pdev, mem_region1),
-			   pci_resource_len(pdev, mem_region1));
-
-	release_mem_region(pci_resource_start(pdev, mem_region2),
-			   pci_resource_len(pdev, mem_region2));
-
-	pci_disable_device(pdev);
-
-	if (dev != NULL)
-	{
-		/* remove dev registration */
-		pci_set_drvdata(pdev, NULL);
-
-		/* Free netdev (quite late,
-		 * since otherwise we might get caught off-guard
-		 * by a netdev timeout handler execution
-		 * expecting to see a working dev...)
-		 * But don't use free_netdev() here,
-		 * it's supported by newer kernels only */
-		kfree(dev);
-	}
-
-	/* put device into ACPI D3 mode (shutdown) */
-	pci_set_power_state(pdev, 3);
-}
 
 
 /*----------------------------------------------------------------
@@ -1074,9 +985,13 @@ static void __devexit acx_remove_pci(struct pci_dev *pdev)
 	FN_ENTER;
 
 	dev = (struct net_device *) pci_get_drvdata(pdev);
+	if (!dev) {
+		acxlog(L_STD, "%s: card not used. Skipping any release code\n", __func__);
+		goto end;
+	}
+
 	priv = (struct wlandevice *) dev->priv;
-	
-	if (dev == NULL || priv == NULL) {
+	if (!priv) {
 		acxlog(L_STD, "%s: card not used. Skipping any release code\n", __func__);
 		goto end;
 	}
@@ -1084,16 +999,59 @@ static void __devexit acx_remove_pci(struct pci_dev *pdev)
 	if (priv->chip_type == CHIPTYPE_ACX100) {
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region2 = PCI_ACX100_REGION2;
-	}
-	else
-	if (priv->chip_type == CHIPTYPE_ACX111) {
+	} else {
 		mem_region1 = PCI_ACX111_REGION1;
 		mem_region2 = PCI_ACX111_REGION2;
 	}
-	else
-		acxlog(L_INIT, "unknown chip type!\n");
 
-	acx_cleanup_card_and_resources(pdev, dev, priv, mem_region1, priv->iobase, mem_region2, priv->iobase2);
+	/* unregister the device to not let the kernel
+	 * (e.g. ioctls) access a half-deconfigured device */
+	acxlog(L_INIT, "Removing device %s!\n", dev->name);
+	unregister_netdev(dev);
+
+#ifdef CONFIG_PROC_FS
+	acx_proc_unregister_entries(dev);
+#endif
+
+	/* find our PCI device in the global acx list and remove it */
+	acx_device_chain_remove(dev);
+
+	if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
+		acx_down(dev);
+
+	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	priv->hw_unavailable++;
+	acxlog(L_STD, "hw_unavailable++\n");
+
+	acx_delete_dma_regions(priv);
+
+	/* finally, clean up PCI bus state */
+	if (priv->iobase) iounmap(priv->iobase);
+	if (priv->iobase2) iounmap(priv->iobase2);
+
+	release_mem_region(pci_resource_start(pdev, mem_region1),
+			   pci_resource_len(pdev, mem_region1));
+
+	release_mem_region(pci_resource_start(pdev, mem_region2),
+			   pci_resource_len(pdev, mem_region2));
+
+	pci_disable_device(pdev);
+
+	/* remove dev registration */
+	pci_set_drvdata(pdev, NULL);
+
+	/* Free netdev (quite late,
+	 * since otherwise we might get caught off-guard
+	 * by a netdev timeout handler execution
+	 * expecting to see a working dev...)
+	 * But don't use free_netdev() here,
+	 * it's supported by newer kernels only */
+	kfree(priv);
+	kfree(dev);
+
+	/* put device into ACPI D3 mode (shutdown) */
+	pci_set_power_state(pdev, 3);
 
 end:
 	FN_EXIT0();
@@ -1150,8 +1108,7 @@ static int acx_resume(struct pci_dev *pdev)
 	acx_reset_dev(dev);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
-	if (OK != acx_init_mac(dev, 0))
-	{
+	if (OK != acx_init_mac(dev, 0)) {
 		acxlog(L_DEBUG, "rsm: init_mac FAILED\n");
 		goto fail;
 	}
@@ -1249,8 +1206,8 @@ static void acx_down(netdevice_t *dev)
 
 	acx_set_status(priv, ISTATUS_0_STARTED);
 
-	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111)) /* FIXME: first version? */
-	{ /* newer firmware versions don't use a hardware timer any more */
+	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111)) { /* FIXME: first version? */
+		/* newer firmware versions don't use a hardware timer any more */
 		del_timer_sync(&priv->mgmt_timer);
 	}
 	acx_disable_irq(priv);
@@ -1428,19 +1385,15 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		txresult = NOT_OK;
 		goto fail_no_unlock;
 	}
-
-	if (unlikely(0 != acx_lock(priv, &flags)))
-	{
+	if (unlikely(acx_lock(priv, &flags))) {
 		txresult = NOT_OK;
 		goto fail_no_unlock;
 	}
-
-	if (unlikely(0 != acx_queue_stopped(dev))) {
+	if (unlikely(acx_queue_stopped(dev))) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
 		txresult = NOT_OK;
 		goto fail;
 	}
-
 	if (unlikely(ISTATUS_4_ASSOCIATED != priv->status)) {
 		acxlog(L_XFER, "Trying to xmit, but not associated yet: aborting...\n");
 		/* silently drop the packet, since we're not connected yet */
@@ -1466,7 +1419,8 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
 	acx_stop_queue(dev, "during Tx");
 #endif
-	if (unlikely((tx_desc = acx_get_tx_desc(priv)) == NULL)) {
+	tx_desc = acx_get_tx_desc(priv);
+	if (unlikely(!tx_desc)) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = NOT_OK;
 		goto fail;
@@ -1793,8 +1747,7 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 
 	priv = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
 	irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR);
-	if (unlikely(0xffff == irqtype))
-	{
+	if (unlikely(0xffff == irqtype)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * FIXME: that's not very clean - maybe we are able to
@@ -1817,14 +1770,14 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
-  if (jiffies != last_irq_jiffies) {
-      loops_this_jiffy = 0;
-      last_irq_jiffies = jiffies;
-  }
+if (jiffies != last_irq_jiffies) {
+	loops_this_jiffy = 0;
+	last_irq_jiffies = jiffies;
+}
 
-  /* safety condition; we'll normally abort loop below
-   * in case no IRQ type occurred */
-  while (irqcount-- > 0) {
+/* safety condition; we'll normally abort loop below
+ * in case no IRQ type occurred */
+while (irqcount-- > 0) {
 #endif
 
         /* do most important IRQ types first */
@@ -1860,9 +1813,9 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
  * xmit for management packets, which we really DON'T want */
 /* BS: disabling this caused my card to stop working after a few 
  * seconds when floodpinging. This should be reinvestigated! */
-		  if (acx_queue_stopped(dev_id)) {
-			  acx_wake_queue(dev_id, "after Tx complete");
-		  }
+		if (acx_queue_stopped(dev_id)) {
+			acx_wake_queue(dev_id, "after Tx complete");
+		}
 #endif
 	}
 	/* group all further IRQ types to improve performance */
@@ -1963,14 +1916,14 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 	irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR) & ~(priv->irq_mask);
 	if (0 == irqtype)
 		break;
-    if (unlikely(++loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
-      acxlog(-1, "HARD ERROR: Too many interrupts this jiffy\n");
-      priv->irq_mask = 0;
-        break;
+	if (unlikely(++loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
+		acxlog(-1, "HARD ERROR: Too many interrupts this jiffy\n");
+		priv->irq_mask = 0;
+		break;
         }
-    	/* log irqtype going to be used during new iteration */
+	/* log irqtype going to be used during new iteration */
 	acxlog(L_IRQ, "IRQTYPE: %X\n", irqtype);
-   }
+}
 #endif
 	/* Routine to perform blink with range */
 	if (unlikely(priv->led_power == 2))
@@ -2005,11 +1958,11 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
 	FN_ENTER;
-	if (likely(0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
+	if (likely(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		struct sk_buff *skb;
 		skb = acx_rxdesc_to_ether(priv, rxdesc);
-		if (likely(NULL != skb)) {
-			(void)netif_rx(skb);
+		if (likely(skb)) {
+			netif_rx(skb);
 			priv->netdev->last_rx = jiffies;
 			priv->stats.rx_packets++;
 			priv->stats.rx_bytes += skb->len;
@@ -2044,33 +1997,34 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 /* introduced earlier than 2.6.10, but takes more memory, so don't use it
  * if there's no compile warning by kernel */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 module_param(debug, uint, 0);
 #endif
 module_param(use_eth_name, uint, 0);
+#ifdef USE_FW_LOADER_LEGACY
 module_param(firmware_dir, charp, 0);
+#endif
 #else
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 MODULE_PARM(debug, "i"); /* doh, 2.6.x screwed up big time: here the define has its own ";" ("double ; detected"), yet in 2.4.x it DOESN'T (the sane thing to do), grrrrr! */
 #endif
 MODULE_PARM(use_eth_name, "i");
+#ifdef USE_FW_LOADER_LEGACY
 MODULE_PARM(firmware_dir, "s");
+#endif
 #endif
 
 /*@-fullinitblock@*/
 MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include/acx100.h)");
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
+#ifdef USE_FW_LOADER_LEGACY
 MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
+#endif
 /*@=fullinitblock@*/
 
 static int __init acx_init_module(void)
 {
 	int res;
-#ifdef __LITTLE_ENDIAN
-	const char *endianness = "little-endian";
-#else
-	const char *endianness = "BIG-ENDIAN";
-#endif
 
 	FN_ENTER;
 
@@ -2090,12 +2044,16 @@ static int __init acx_init_module(void)
 #if (ACX_IO_WIDTH==32)
 	acxlog(L_STD, "acx100: Compiled to use 32bit I/O access (faster, however I/O timing issues might occur, such as firmware upload failure!) instead of 16bit access\n");
 #else
-	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode.\n");
+	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode\n");
 #endif
 
-	acxlog(L_STD, "Running on a %s CPU.\n", endianness);
-	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
-	acxlog(L_STD|L_INIT, "%s: %s Driver initialized, waiting for cards to probe...\n", __func__, version);
+#ifdef __LITTLE_ENDIAN
+	acxlog(L_STD, "Running on a little-endian CPU\n");
+#else
+	acxlog(L_STD, "Running on a BIG-ENDIAN CPU\n");
+#endif
+	acxlog(L_BINDEBUG, "%s: dev_info is: " DEV_INFO "\n", __func__);
+	acxlog(L_STD|L_INIT, "%s: " VERSION " driver initialized, waiting for cards to probe...\n", __func__);
 
 	res = pci_module_init(&acx_pci_drv_id);
 	FN_EXIT1(res);
@@ -2186,6 +2144,7 @@ module_init(acx_init_module)
 module_exit(acx_cleanup_module)
 
 #else
+#ifdef USE_FW_LOADER_LEGACY
 static int __init acx_get_firmware_dir(const char *str)
 {
 	/* I've seen other drivers just pass the string pointer,
@@ -2195,4 +2154,5 @@ static int __init acx_get_firmware_dir(const char *str)
 }
 
 __setup("acx_firmware_dir=", acx_get_firmware_dir);
+#endif
 #endif /* MODULE */

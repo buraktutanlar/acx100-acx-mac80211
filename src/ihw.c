@@ -340,8 +340,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
 
-	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED))
-	{
+	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		acxlog(L_CTL, "firmware not loaded yet, cannot execute command!!\n");
 		goto done;
 	}
@@ -402,8 +401,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	/*** make sure we have at least *some* timeout value ***/
 	if (unlikely(timeout == 0)) {
 		timeout = 1;
-	}
-	if (unlikely(timeout > 120000)) {
+	} else if (unlikely(timeout > 120000)) {
 		timeout = 120000;
 	}
 	timeout *= 20;
@@ -415,14 +413,16 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 		if (!priv->irqs_active) {
 			irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
 			if (irqtype & HOST_INT_CMD_COMPLETE) {
-
 				acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
 				break;
 			}
 		} 
-		if(priv->irqs_active && (irqtype = priv->irq_status & HOST_INT_CMD_COMPLETE)) {
-			priv->irq_status ^= HOST_INT_CMD_COMPLETE;
-			break;
+		if (priv->irqs_active) {
+			irqtype = priv->irq_status & HOST_INT_CMD_COMPLETE;
+			if (irqtype) {
+				priv->irq_status ^= HOST_INT_CMD_COMPLETE;
+				break;
+			}
 		}
 
 		/* reschedule after some time has been spent in this loop */
@@ -538,7 +538,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	outpipe=usb_sndctrlpipe(usbdev,0);
 	inpipe =usb_rcvctrlpipe(usbdev,0);
 	acxlog(L_CTL,"ctrl inpipe=0x%X outpipe=0x%X\n",inpipe,outpipe);
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 	acxlog(L_CTL,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
 	if (debug&L_DATA) acx_dump_bytes(&(priv->ctrlout),blocklen);
 #endif
@@ -720,8 +720,8 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 
 	/* TODO implement and check other acx111 commands */
 	if ((priv->chip_type == CHIPTYPE_ACX111) &&
-		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA)) /* acx111 has differing struct size */
-	{
+		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA)) {
+		/* acx111 has differing struct size */
 		acxlog(L_CTL, "Configure Command 0x%02X not supported under acx111 (yet)\n", type);
 
 		return NOT_OK;
@@ -824,162 +824,6 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
  * MAC Address Stuff
  *
  ****************************************************************************/
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_zero
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_zero(const mac_t *mac)
-{
-	if ((mac->vala == 0) && (mac->valb == 0)) {
-		return OK;
-	}
-	return NOT_OK;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_equal
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_equal(const u8 *one, const u8 *two)
-{
-	return (unsigned int)memcmp(one, two, ETH_ALEN);
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_group
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_group(const mac_t *mac)
-{
-	if (mac->vala & 1) {
-		return OK;
-	}
-	return NOT_OK;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_directed
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_directed(const mac_t *mac)
-{
-	if (mac->vala & 1) {
-		return NOT_OK;
-	}
-	return OK;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_broadcast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_broadcast(const u8 *address)
-{
-	static const unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
-	if (OK == acx_is_mac_address_equal(address, bcast_addr))
-		return OK;
-
-	/* IPv6 broadcast address */
-	if ((address[0] == 0x33) && (address[1] == 0x33))
-		return OK;
-
-	return NOT_OK;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_multicast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline unsigned int acx_is_mac_address_multicast(const mac_t *mac)
-{
-	if (mac->vala & 1) {
-		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
-			return NOT_OK;
-		else
-			return OK;
-	}
-	return NOT_OK;
-}
 
 /*----------------------------------------------------------------
 * acx_log_mac_address

@@ -59,7 +59,7 @@
  * Debug / log functionality                                                  *
  *============================================================================*/
 
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 
 #define L_STD		0x01	/* standard logging that really should be there,
 				   like error messages etc. */
@@ -87,6 +87,33 @@
 			 L_STATE | L_XFER | L_DATA | L_DEBUG | L_IOCTL | L_CTL)
 
 extern unsigned int debug;
+
+#else
+
+/* We want if(debug & something) to be always false */
+enum {
+	L_STD		= 0,
+	L_INIT		= 0,
+	L_IRQ		= 0,
+	L_ASSOC		= 0,
+	L_BIN		= 0,
+	L_FUNC		= 0,
+	L_UNUSED1	= 0,
+	L_XFER		= 0,
+	L_DATA		= 0,
+	L_DEBUG		= 0,
+	L_IOCTL		= 0,
+	L_CTL		= 0,
+	L_BUFR		= 0,
+	L_XFER_BEACON	= 0,
+	L_BUFT		= 0,
+	L_BUF 		= 0,
+	L_USBRXTX	= 0,
+	L_BINDEBUG	= 0,
+	L_BINSTD	= 0,
+	L_ALL		= 0,
+	debug = 0
+};
 
 #endif /* ACX_DEBUG */
 
@@ -1237,6 +1264,23 @@ typedef struct wlandevice {
 #define GETSET_ALL		0x80000000L
 
 void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
+
+/*============================================================================*
+ * Firmware loading                                                           *
+ *============================================================================*/
+#if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
+#define USE_FW_LOADER_26 1
+#endif
+#define USE_FW_LOADER_LEGACY 1
+
+#ifdef USE_FW_LOADER_26
+#include <linux/firmware.h>	/* request_firmware() */
+#include <linux/pci.h>		/* struct pci_device */
+#endif
+
+#ifdef USE_FW_LOADER_LEGACY
+extern char *firmware_dir;
+#endif
 
 /*============================================================================*
  * Locking and synchronization functions                                      *

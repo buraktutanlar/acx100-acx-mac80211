@@ -168,12 +168,12 @@ MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>");
 MODULE_DESCRIPTION("TI ACX100 WLAN USB Driver");
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 module_param(debug, uint, 0);
 #endif
 module_param(firmware_dir, charp, 0);
 #else
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 MODULE_PARM(debug, "i");
 #endif
 MODULE_PARM(firmware_dir, "s");
@@ -248,7 +248,7 @@ void cleanup_module(void);
 static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 int txbufsize;
 int rxbufsize;
 static char * acx100usb_pstatus(int);
@@ -446,7 +446,8 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		/* ---------------------------------------------
 		** Allocate memory for a network device
 		** --------------------------------------------- */
-		if ((dev = kmalloc(sizeof(struct net_device),GFP_ATOMIC))==NULL) {
+		dev = kmalloc(sizeof(struct net_device),GFP_ATOMIC);
+		if (!dev) {
 			printk(KERN_WARNING SHORTNAME ": failed to alloc netdev\n");
 			kfree(priv);
 			res = OUTOFMEM;
@@ -704,7 +705,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	if (firmware_dir) sprintf(filename,"%s/ACX100_USB.bin",firmware_dir);
 	else sprintf(filename,"/usr/share/acx/ACX100_USB.bin");
 	acxlog(L_INIT,"loading firmware %s\n",filename);
-	firmware=(char *)acx_read_fw(filename, &size);
+	firmware=(char *)acx_read_fw(&usbdev->dev, filename, &size);
 	if (!firmware) {
 		kfree(usbbuf);
 		return(-EIO);
@@ -728,7 +729,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,(u16)(size-8),0,usbbuf,len,3000);
 		offset+=len;
 		if (result<0) {
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 			printk(KERN_ERR SHORTNAME "error %d (%s) during upload of firmware, aborting\n",result,acx100usb_pstatus(result));
 #else
 			printk(KERN_ERR SHORTNAME "error %d during upload of firmware, aborting\n", result);
@@ -896,7 +897,8 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 
 	FN_ENTER;
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) {
-		if ((skb = acx_rxdesc_to_ether(priv, rxdesc))) {
+		skb = acx_rxdesc_to_ether(priv, rxdesc);
+		if (skb) {
 			netif_rx(skb);
 			dev->last_rx = jiffies;
 			priv->stats.rx_packets++;
@@ -1045,7 +1047,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			SET_BIT(rxdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 			rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
 			acxlog(L_USBRXTX,"handling truncated frame (truncsize=%d usbsize=%d packetsize(from trunc)=%d)\n",priv->rxtruncsize,size,packetsize);
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 			if (debug&L_USBRXTX) acx_dump_bytes(ptr,12);
 			if (debug&L_USBRXTX) acx_dump_bytes(&(priv->bulkins[number]),12);
 #endif
@@ -1067,7 +1069,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				memcpy(rxdesc->data,ptr,priv->rxtruncsize);	/* first copy the previously truncated part */
 				ptr=(rxbuffer_t *)&(priv->bulkins[number]);
 				memcpy(((char *)(rxdesc->data))+priv->rxtruncsize,(char *)ptr,packetsize-priv->rxtruncsize);
-#ifdef ACX_DEBUG			
+#if ACX_DEBUG			
 				acxlog(L_USBRXTX,"full trailing packet + 12 bytes:\n");
 				if (debug&L_USBRXTX) acx_dump_bytes(ptr,(packetsize-priv->rxtruncsize)+ACX100_RXBUF_HDRSIZE);
 #endif
@@ -1093,7 +1095,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				offset+=ACX100_RXBUF_HDRSIZE;
 				remsize-=ACX100_RXBUF_HDRSIZE;
 				acxlog(L_USBRXTX,"packetsize=0, new offs=%d new rem=%d header follows:\n",offset,remsize);
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 				if (debug&L_USBRXTX) acx_dump_bytes(ptr,12);
 #endif
 				ptr=(rxbuffer_t *)(((char *)ptr)+ACX100_RXBUF_HDRSIZE);
@@ -1110,7 +1112,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				 * frame truncation handling...
 				 * --------------------------------- */
 				acxlog(L_USBRXTX,"need to truncate this packet , packetsize=%d remain=%d offset=%d usbsize=%d\n",packetsize,remsize,offset,size);
-#ifdef ACX_DEBUG				
+#if ACX_DEBUG				
 				if (debug&L_USBRXTX) acx_dump_bytes(ptr,12);
 #endif				
 				priv->rxtruncation=1;
@@ -1129,7 +1131,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				ptr=(rxbuffer_t *)(((char *)ptr)+packetsize);
 				offset+=packetsize;
 				remsize-=packetsize;
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 				if ((remsize)&&(debug&L_USBRXTX)) {
 					acxlog(L_USBRXTX,"more than one packet in buffer, second packet hdr follows\n");
 					if (debug&L_USBRXTX) acx_dump_bytes(ptr,12);
@@ -1623,7 +1625,8 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	/* ------------------------------------
 	** get the next free tx descriptor...
 	** -------------------------------- */
-	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
+	tx_desc = acx_get_tx_desc(priv);
+	if (!tx_desc) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
 		goto end;
@@ -1759,7 +1762,7 @@ void cleanup_module() {
 **                                   DEBUG STUFF
 ** --------------------------------------------------------------------------- */
 
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 #if USB_24
 static char *acx100usb_pstatus(int val)
 {

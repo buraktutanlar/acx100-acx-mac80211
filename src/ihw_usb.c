@@ -38,7 +38,7 @@
 
 #if (WLAN_HOSTIF==WLAN_USB)
 
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 extern void acx_dump_bytes(void *,int);
 #endif
 
@@ -144,7 +144,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,int paramlen,u32
 	** ------------------------------------------------- */
 	outpipe=usb_sndctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
 	inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 	acxlog(L_XFER,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
 	if (debug&L_DATA) acx_dump_bytes(&(priv->usbout),blocklen);
 #endif
@@ -380,157 +380,6 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
  * MAC Address Stuff
  *
  ****************************************************************************/
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_zero
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-inline int acx_is_mac_address_zero(mac_t *mac)
-{
-  if ((mac->vala == 0) && (mac->valb == 0)) {
-    return(1);
-  }
-  return 0;
-}
-
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_equal
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline int acx_is_mac_address_equal(u8 *one, u8 *two)
-{
-	if (memcmp(one, two, WLAN_ADDR_LEN))
-		return NOT_OK; /* no match */
-	else
-		return OK; /* matched */
-}
-
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_group
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline u8 acx_is_mac_address_group(mac_t *mac)
-{
-	return mac->vala & 1;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_directed
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-u8 acx_is_mac_address_directed(mac_t *mac)
-{
-	if (mac->vala & 1) {
-		return 0;
-	}
-	return 1;
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_broadcast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-static const unsigned char bcast[ETH_ALEN] ={ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-inline int acx_is_mac_address_broadcast(const u8 * const address)
-{
-	return !memcmp(address, bcast, ETH_ALEN);
-}
-
-/*----------------------------------------------------------------
-* acx_is_mac_address_multicast
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: FINISHED
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-inline int acx_is_mac_address_multicast(mac_t *mac)
-{
-	if (mac->vala & 1) {
-		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
-			return 0;
-		else
-			return 1;
-	}
-	return 0;
-}
 
 /*----------------------------------------------------------------
 * acx_log_mac_address

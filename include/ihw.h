@@ -70,13 +70,62 @@ int acx_configure_length(wlandevice_t *priv, void *pdr, short type,
 int acx_interrogate(wlandevice_t *priv, void *pdr, short type);
 
 void acx_clear_mac_address(const mac_t *mac);
-unsigned int acx_is_mac_address_zero(const mac_t *mac);
-unsigned int acx_is_mac_address_equal(const u8 *one, const u8 *two);
-unsigned int acx_is_mac_address_group(const mac_t *mac);
-unsigned int acx_is_mac_address_directed(const mac_t *mac);
-void acx_set_mac_address_broadcast(u8 *address);
-unsigned int acx_is_mac_address_broadcast(const u8 *address);
-unsigned int acx_is_mac_address_multicast(const mac_t *mac);
+
+static inline int acx_is_mac_address_zero(const mac_t *mac)
+{
+	if ((mac->vala == 0) && (mac->valb == 0)) {
+		return OK;
+	}
+	return NOT_OK;
+}
+
+static inline int acx_is_mac_address_equal(const u8 *one, const u8 *two)
+{
+	return memcmp(one, two, ETH_ALEN);
+}
+
+static inline int acx_is_mac_address_group(const mac_t *mac)
+{
+	if (mac->vala & 1) {
+		return OK;
+	}
+	return NOT_OK;
+}
+
+static inline int acx_is_mac_address_directed(const mac_t *mac)
+{
+	if (mac->vala & 1) {
+		return NOT_OK;
+	}
+	return OK;
+}
+
+static inline int acx_is_mac_address_broadcast(const u8 *address)
+{
+	static const unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+	if (OK == acx_is_mac_address_equal(address, bcast_addr))
+		return OK;
+
+	/* IPv6 broadcast address */
+	if ((address[0] == 0x33) && (address[1] == 0x33))
+		return OK;
+
+	return NOT_OK;
+}
+
+static inline int acx_is_mac_address_multicast(const mac_t *mac)
+{
+	if (mac->vala & 1) {
+		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
+			return NOT_OK;
+		else
+			return OK;
+	}
+	return NOT_OK;
+}
+
+
 void acx_log_mac_address(int level, const u8 *mac, const char *tail);
 
 void acx_power_led(wlandevice_t *priv, u8 enable);

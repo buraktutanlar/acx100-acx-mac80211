@@ -48,7 +48,7 @@
  * difference very clear.
  */
 
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 
 #define acxlog(chan, args...) \
 	do { \
@@ -578,14 +578,48 @@ typedef struct acx_configoption {
     co_manuf_t			manufacturer ACX_PACKED;
 } acx_configoption_t;
 
+static inline void acx_stop_queue(netdevice_t *dev, const char *msg)
+{
+	netif_stop_queue(dev);
+	if (msg)
+		acxlog(L_BUFT, "tx: stop queue %s\n", msg);
+}
+
+static inline int acx_queue_stopped(netdevice_t *dev)
+{
+	return netif_queue_stopped(dev);
+}
+
+static inline void acx_start_queue(netdevice_t *dev, const char *msg)
+{
+	netif_start_queue(dev);
+	if (msg)
+		acxlog(L_BUFT, "tx: start queue %s\n", msg);
+}
+
+static inline void acx_wake_queue(netdevice_t *dev, const char *msg)
+{
+	netif_wake_queue(dev);
+	if (msg)
+		acxlog(L_BUFT, "tx: wake queue %s\n", msg);
+}
+
+static inline void acx_carrier_off(netdevice_t *dev, const char *msg)
+{
+	netif_carrier_off(dev);
+	if (msg)
+		acxlog(L_BUFT, "tx: carrier off %s\n", msg);
+}
+
+static inline void acx_carrier_on(netdevice_t *dev, const char *msg)
+{
+	netif_carrier_on(dev);
+	if (msg)
+		acxlog(L_BUFT, "tx: carrier on %s\n", msg);
+}
 
 
-void acx_stop_queue(netdevice_t *dev, const char *msg);
-int acx_queue_stopped(netdevice_t *dev);
-void acx_start_queue(netdevice_t *dev, const char *msg);
-void acx_wake_queue(netdevice_t *dev, const char *msg);
-void acx_carrier_off(netdevice_t *dev, const char *msg);
-void acx_carrier_on(netdevice_t *dev, const char *msg);
+
 void acx_schedule(long timeout);
 int acx_reset_dev(netdevice_t *dev);
 void acx_join_bssid(wlandevice_t *priv);
@@ -602,7 +636,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf);
 u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value);
 void acx_start(wlandevice_t *priv);
 void acx_reset_mac(wlandevice_t *priv);
-/*@null@*/ firmware_image_t *acx_read_fw( const char *file, u32 *size);
+firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 *size);
 void acx100_set_wepkey(wlandevice_t *priv);
 void acx111_set_wepkey(wlandevice_t *priv);
 int acx100_init_wep(wlandevice_t *priv);

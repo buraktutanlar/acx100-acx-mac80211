@@ -189,21 +189,16 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 			 struct txdescriptor *tx_desc,
 			 const struct sk_buff *skb)
 {
-	unsigned short proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
-	u16 fc;
 	struct txhostdescriptor *header;
 	struct txhostdescriptor *payload;
-	p80211_hdr_t * w_hdr;
-
+	p80211_hdr_t *w_hdr;
 	wlan_ethhdr_t *e_hdr; 
 	struct wlan_llc *e_llc;
 	struct wlan_snap *e_snap;
-
-	const u8 *a1 = NULL;
-	const u8 *a2 = NULL;
-	const u8 *a3 = NULL;
-	
-/*	int i; */
+	const u8 *a1,*a2,*a3;
+	int header_len,payload_len;
+	u16 proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
+	u16 fc;
 
 	FN_ENTER;
 
@@ -216,7 +211,8 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	header = tx_desc->fixed_size.s.host_desc;
 	if ((unsigned long)0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
 		return NOT_OK;
-	payload = tx_desc->fixed_size.s.host_desc + 1;
+
+	payload = header + 1;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
 	/* step 1: classify ether frame, DIX or 802.3? */
@@ -224,11 +220,12 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	if (proto <= 1500) {
 	        acxlog(L_DEBUG, "tx: 802.3 len: %d\n", skb->len);
                 /* codes <= 1500 reserved for 802.3 lengths */
-		/* it's 802.3, pass ether payload unchanged,  */
-
+		/* it's 802.3, pass ether payload unchanged, */
 		/* trim off ethernet header and copy payload to tx_desc */
-		payload->length = cpu_to_le16(proto);
-		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), le16_to_cpu(payload->length));
+		header_len = WLAN_HDR_A3_LEN;
+		/* TODO: must be equal to skb->len - sizeof(wlan_ethhdr_t), no? */
+		/* then we can do payload_len = ... after this big if() */
+		payload_len = proto;
 	} else {
 		/* it's DIXII, time for some conversion */
 		/* Create 802.11 packet. Header also contains llc and snap. */
@@ -236,7 +233,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 		acxlog(L_DEBUG, "tx: DIXII len: %d\n", skb->len);
 
 		/* size of header is 802.11 header + llc + snap */
-		header->length = cpu_to_le16(WLAN_HDR_A3_LEN + sizeof(wlan_llc_t) + sizeof(wlan_snap_t));
+		header_len = WLAN_HDR_A3_LEN + sizeof(wlan_llc_t) + sizeof(wlan_snap_t);
 		/* llc is located behind the 802.11 header */
 		e_llc = (wlan_llc_t*)(header->data + WLAN_HDR_A3_LEN);
 		/* snap is located behind the llc */
@@ -257,15 +254,17 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 			COPY_OUI(e_snap->oui, oui_rfc1042);
 		}
 		/* trim off ethernet header and copy payload to tx_desc */
-		payload->length = cpu_to_le16(skb->len - sizeof(wlan_ethhdr_t));
-		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), le16_to_cpu(payload->length));
+		payload_len = skb->len - sizeof(wlan_ethhdr_t);
 	}
-	
+	/* TODO: can we just let acx DMA payload from skb instead? */
+	memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), payload_len);
+	payload->length = cpu_to_le16(payload_len);
+	header->length = cpu_to_le16(header_len);
 	payload->data_offset = 0;
 	header->data_offset = 0;
 	
 	/* calculate total tx_desc length */
-	tx_desc->total_length = cpu_to_le16(le16_to_cpu(payload->length) + le16_to_cpu(header->length));
+	tx_desc->total_length = cpu_to_le16(payload_len + header_len);
 
 	/* Set up the 802.11 header */
 	w_hdr = (p80211_hdr_t*)header->data;
@@ -308,23 +307,24 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	w_hdr->a3.dur = 0;
 	w_hdr->a3.seq = 0;
 
-	/* the "<6>" output is from the KERN_INFO channel value */
-	/* Can be used to debug conversion process */
 #if DEBUG_CONVERT
-	acxlog(L_DATA, "Original eth frame [%d]: ", skb->len);
-	for (i = 0; i < skb->len; i++)
-		acxlog(L_DATA, "%02x ", ((u8 *) skb->data)[i]);
-	acxlog(L_DATA, "\n");
+	if (debug & L_DATA) {
+		int i;
+		printk("Original eth frame [%d]: ", skb->len);
+		for (i = 0; i < skb->len; i++)
+			printk(" %02x", ((u8 *) skb->data)[i]);
+			printk("\n");
 
-	acxlog(L_DATA, "802.11 header [%d]: ", le16_to_cpu(header->length));
-	for (i = 0; i < le16_to_cpu(header->length); i++)
-		acxlog(L_DATA, "%02x ", ((u8 *) header->data)[i]);
-	acxlog(L_DATA, "\n");
+		printk("802.11 header [%d]: ", header_len));
+		for (i = 0; i < header_len; i++)
+			printk(" %02x", header->data[i]);
+		printk("\n");
 
-	acxlog(L_DATA, "802.11 payload [%d]: ", le16_to_cpu(payload->length));
-	for (i = 0; i < le16_to_cpu(payload->length); i++)
-		acxlog(L_DATA, "%02x ", ((u8 *) payload->data)[i]);
-	acxlog(L_DATA, "\n");
+		printk("802.11 payload [%d]: ", payload_len);
+		for (i = 0; i < payload_len); i++)
+			printk(" %02x", payload->data[i]);
+		printk("\n");
+	}
 #endif
 
 fail:
@@ -360,8 +360,8 @@ fail:
 /*@null@*/ struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, const struct
 		rxhostdescriptor *rx_desc)
 {
-	const u8 *daddr = NULL;
-	const u8 *saddr = NULL;
+	const u8 *daddr;
+	const u8 *saddr;
 	wlan_ethhdr_t *e_hdr;
 	wlan_llc_t *e_llc;
 	wlan_snap_t *e_snap;
@@ -371,9 +371,7 @@ fail:
 	u16 fc;
 	int payload_length;
 	unsigned int payload_offset;
-/*	int i; */
-
-	struct sk_buff *skb = NULL;
+	struct sk_buff *skb;
 
 	FN_ENTER;
 
@@ -405,6 +403,7 @@ fail:
 		payload_length -= ( WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN );
 		if (0 > payload_length) {
 			acxlog(L_STD, "A4 frame too short!\n");
+			FN_EXIT1((int)NULL);
 			return NULL;
 		}
 		daddr = w_hdr->a4.a3;
@@ -597,18 +596,19 @@ fail:
 	skb->dev = priv->netdev;
 	skb->protocol = eth_type_trans(skb, priv->netdev);
 	
-	/* the "<6>" output is from the KERN_INFO channel value */
-/* Can be used to debug conversion process */
 #if DEBUG_CONVERT
-	acxlog(L_DATA, "p802.11 frame [%d]: ", (MAC_CNT_RCVD(rx_desc->data)));
-	for (i = 0; i < MAC_CNT_RCVD(rx_desc->data); i++)
-		acxlog(L_DATA, "%02x ", ((u8 *) w_hdr)[i]);
-	acxlog(L_DATA, "\n");
+	if (debug & L_DATA) {
+		int i;
+		printk("p802.11 frame [%d]:", MAC_CNT_RCVD(rx_desc->data));
+		for (i = 0; i < MAC_CNT_RCVD(rx_desc->data); i++)
+			printk(" %02x", ((u8 *) w_hdr)[i]);
+		printk("\n");
 
-	acxlog(L_DATA, "eth frame [%d]: ", skb->len);
-	for (i = 0; i < skb->len; i++)
-		acxlog(L_DATA, "%02x ", ((u8 *) skb->data)[i]);
-	acxlog(L_DATA, "\n");
+		printk("eth frame [%d]:", skb->len);
+		for (i = 0; i < skb->len; i++)
+			printk(" %02x", ((u8 *) skb->data)[i]);
+		printk("\n");
+	}
 #endif
 
 	FN_EXIT0();

@@ -78,9 +78,7 @@
 
 #include <linux/pm.h>
 
-#include <linux/dcache.h>
 #include <linux/highmem.h>
-
 
 /*================================================================*/
 /* Project Includes */
@@ -101,8 +99,6 @@
 u8 DTIM_count;
 #endif
 
-extern char *firmware_dir; /* declared in acx100.c, to keep together with other MODULE_PARMs */
-
 const u8 reg_domain_ids[] =
 		{0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51};
 /* stupid workaround for the fact that in C the size of an external array
@@ -114,7 +110,7 @@ const u16 reg_domain_channel_masks[] =
 /*----------------------------------------------------------------
     Debugging support
 *----------------------------------------------------------------*/
-#ifdef ACX_DEBUG
+#if ACX_DEBUG
 
 static int acx_debug_func_indent = 0;
 #define DEBUG_TSC 0
@@ -134,7 +130,7 @@ void log_fn_enter(const char *funcname)
 	TIMESTAMP(d);
 
 	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
+	if (indent >= sizeof(spaces))
 		indent = sizeof(spaces)-1;
 
 	printk("%lx %s==> %s\n",
@@ -154,7 +150,7 @@ void log_fn_exit(const char *funcname)
 	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
 
 	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
+	if (indent >= sizeof(spaces))
 		indent = sizeof(spaces)-1;
 		
 	printk("%lx %s<== %s\n",
@@ -172,7 +168,7 @@ void log_fn_exit_v(const char *funcname, int v)
 	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
  
 	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
+	if (indent >= sizeof(spaces))
 		indent = sizeof(spaces)-1;
  
 	printk("%lx %s<== %s: %08x\n",
@@ -193,50 +189,8 @@ void acx_schedule(long timeout)
 {
 	FN_ENTER;
 	current->state = TASK_UNINTERRUPTIBLE;
-	(void)schedule_timeout(timeout);
+	schedule_timeout(timeout);
 	FN_EXIT0();
-}
-
-/* FIXME: should be moved into acx100.c once USB support
- * is in there, too */
-inline void acx_stop_queue(netdevice_t *dev, const char *msg)
-{
-	netif_stop_queue(dev);
-	if (msg)
-		acxlog(L_BUFT, "tx: stop queue %s\n", msg);
-}
-
-inline int acx_queue_stopped(netdevice_t *dev)
-{
-	return netif_queue_stopped(dev);
-}
-
-inline void acx_start_queue(netdevice_t *dev, const char *msg)
-{
-	netif_start_queue(dev);
-	if (msg)
-		acxlog(L_BUFT, "tx: start queue %s\n", msg);
-}
-
-inline void acx_wake_queue(netdevice_t *dev, const char *msg)
-{
-	netif_wake_queue(dev);
-	if (msg)
-		acxlog(L_BUFT, "tx: wake queue %s\n", msg);
-}
-
-inline void acx_carrier_off(netdevice_t *dev, const char *msg)
-{
-	netif_carrier_off(dev);
-	if (msg)
-		acxlog(L_BUFT, "tx: carrier off %s\n", msg);
-}
-
-inline void acx_carrier_on(netdevice_t *dev, const char *msg)
-{
-	netif_carrier_on(dev);
-	if (msg)
-		acxlog(L_BUFT, "tx: carrier on %s\n", msg);
 }
 
 /*----------------------------------------------------------------
@@ -264,8 +218,8 @@ static int
 find_pos(const u8 *p, int size, u8 v)
 {
 	int i;
-	for(i=0; i<size; i++)
-		if(p[i] == v)
+	for (i = 0; i < size; i++)
+		if (p[i] == v)
 			return i;
 	/* printk a message about strange byte? */
 	return 0;
@@ -280,16 +234,16 @@ acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *
 
 	FN_ENTER;
 
-	if((priv->preamble_mode == 2) /* auto mode? */
-	&& (bss_peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE)
+	if ((priv->preamble_mode == 2) /* auto mode? */
+	 && (bss_peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE)
 	) {
 		peerinfo->shortpre =
 		((bss_peer->caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
 	}
 
-	while(*peer_rate) {
+	while (*peer_rate) {
 		int n = find_pos(dot11ratebyte, sizeof(dot11ratebyte), *peer_rate & 0x7f);
-		if(*peer_rate & 0x80)
+		if (*peer_rate & 0x80)
 			bmask |= 1<<n;
 		else
 			omask |= 1<<n;
@@ -299,11 +253,11 @@ acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *
 
 	bmask &= priv->defpeer.txbase.cfg;
 	omask &= priv->defpeer.txrate.cfg;
-	if(bmask)
+	if (bmask)
 		peerinfo->txbase.cfg = bmask;
 	else
 		printk(KERN_WARNING "Incompatible basic rates\n");
-	if(omask)
+	if (omask)
 		peerinfo->txrate.cfg = omask;
 	else
 		printk(KERN_WARNING "Incompatible operational rates\n");
@@ -323,10 +277,10 @@ acx_update_dot11_ratevector(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	while(ocfg) {
-		if(ocfg & 1) {
+	while (ocfg) {
+		if (ocfg & 1) {
 			*supp = *dot11;
-			if(bcfg & 1) {
+			if (bcfg & 1) {
 				*supp |= 0x80;
 			}
 			supp++;
@@ -337,11 +291,11 @@ acx_update_dot11_ratevector(wlandevice_t *priv)
 	}
 	priv->rate_supported_len = supp - priv->rate_supported;
 #if ACX_DEBUG
-	if(debug & L_ASSOC) {
+	if (debug & L_ASSOC) {
 		int i = priv->rate_supported_len;
 		printk(KERN_WARNING "new ratevector:");
 		supp = priv->rate_supported;
-		while(i--)
+		while (i--)
 			printk(" %02x", *supp++);
 		printk("\n");
 	}
@@ -398,7 +352,7 @@ static int acx_proc_output(char *buf, wlandevice_t *priv)
 			     i, bss->bssid[0], bss->bssid[1],
 			     bss->bssid[2], bss->bssid[3], bss->bssid[4],
 			     bss->bssid[5], (char *)bss->essid, bss->channel,
-			     (0 != bss->wep) ? "yes" : "no", bss->caps,
+			     bss->wep ? "yes" : "no", bss->caps,
 			     bss->sir, bss->snr);
 	}
 	p += sprintf(p, "status:\t\t\t%u (%s)\n",
@@ -424,11 +378,11 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 
 	p += sprintf(p, "*** Rx buf ***\n");
 	spin_lock_irqsave(&pDc->rx_lock, flags);
-	for (i = 0; i < pDc->rx_pool_count; i++)
-	{
+	for (i = 0; i < pDc->rx_pool_count; i++) {
 		rtl = (i == pDc->rx_tail) ? " [tail]" : "";
 		pRxDesc = &pDc->pRxHostDescQPool[i];
-		if ((0 != (le16_to_cpu(pRxDesc->Ctl_16) & DESC_CTL_HOSTOWN)) && (0 != (le32_to_cpu(pRxDesc->Status) & BIT31)))
+		if ((le16_to_cpu(pRxDesc->Ctl_16) & DESC_CTL_HOSTOWN)
+		 && (le32_to_cpu(pRxDesc->Status) & BIT31) )
 			p += sprintf(p, "%02u FULL%s\n", i, rtl);
 		else
 			p += sprintf(p, "%02u empty%s\n", i, rtl);
@@ -436,10 +390,10 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	spin_unlock_irqrestore(&pDc->rx_lock, flags);
 	p += sprintf(p, "\n");
 	spin_lock_irqsave(&pDc->tx_lock, flags);
-	p += sprintf(p, "*** Tx buf (free %d, Linux netqueue %s) ***\n", priv->TxQueueFree, acx_queue_stopped(priv->netdev) ? "STOPPED" : "running");
+	p += sprintf(p, "*** Tx buf (free %d, Linux netqueue %s) ***\n", priv->TxQueueFree,
+				acx_queue_stopped(priv->netdev) ? "STOPPED" : "running");
 	pTxDesc = pDc->pTxDescQPool;
-	for (i = 0; i < pDc->tx_pool_count; i++)
-	{
+	for (i = 0; i < pDc->tx_pool_count; i++) {
 		thd = (i == pDc->tx_head) ? " [head]" : "";
 		ttl = (i == pDc->tx_tail) ? " [tail]" : "";
 		if (pTxDesc->Ctl_8 & DESC_CTL_ACXDONE)
@@ -523,7 +477,9 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		pDc->pRxHostDescQPool, pDc->RxHostDescQPoolSize, (u64)pDc->RxHostDescQPoolPhyAddr,
 		pDc->pRxBufferPool, pDc->RxBufferPoolSize, (u64)pDc->RxBufferPoolPhyAddr);
 
-        if ((fw_stats = kmalloc(sizeof(fw_stats_t), GFP_KERNEL)) == NULL) {
+        fw_stats = kmalloc(sizeof(fw_stats_t), GFP_KERNEL);
+        if (!fw_stats) {
+		FN_EXIT1(0);
                 return 0;
         }
 	memset(fw_stats, 0, sizeof(fw_stats_t));
@@ -563,18 +519,16 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
+static int acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
-	u16 i;
-	u8 ch;
+	int i;
 
 	FN_ENTER;
 
-	for (i = 0; i < 0x400; i++)
-	{
-		acx_read_eeprom_offset(priv, i, &ch);
-		p += sprintf(p, "%c", ch);
+	for (i = 0; i < 0x400; i++) {
+		acx_read_eeprom_offset(priv, i, p);
+		p++;
 	}
 
 	FN_EXIT1(p - buf);
@@ -584,8 +538,7 @@ int acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 static int acx_proc_phy_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
-	u16 i;
-	u8 ch;
+	int i;
 
 	FN_ENTER;
 
@@ -599,10 +552,9 @@ static int acx_proc_phy_output(char *buf, wlandevice_t *priv)
 	/* The PHY area is only 0x80 bytes long; further pages after that
 	 * only have some page number registers with altered value,
 	 * all other registers remain the same. */
-	for (i = 0; i < 0x80; i++)
-	{
-		acx_read_phy_reg(priv, i, &ch);
-		p += sprintf(p, "%c", ch);
+	for (i = 0; i < 0x80; i++) {
+		acx_read_phy_reg(priv, i, p);
+		p++;
 	}
 	
 	FN_EXIT1(p - buf);
@@ -718,17 +670,14 @@ u16 manage_proc_entries(const struct net_device *dev, int remove)
 	char procbuf[80];
 	int i;
 
-	for (i = 0; i < 4; i++)
-	{
+	for (i = 0; i < 4; i++)	{
 		sprintf(procbuf, "driver/acx_%s", dev->name);
 		strcat(procbuf, proc_files[i]);
 		if (!remove) {
 			acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
 			if (!create_proc_read_entry(procbuf, 0, 0, acx_proc_funcs[i], priv))
 				return NOT_OK;
-		}
-		else
-		{
+		} else {
 			acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
 			remove_proc_entry(procbuf, NULL);
 		}
@@ -806,40 +755,6 @@ void acx_reset_mac(wlandevice_t *priv)
 	FN_EXIT0();
 }
 
-#if (WLAN_HOSTIF!=WLAN_USB)
-/*----------------------------------------------------------------
-* acx_check_file
-*
-* Checks if a file exists.
-*
-* Arguments:
-*
-* Returns:
-* OK = File can be openend
-* NOT_OK = Error open file
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-static int acx_check_file(const char *file)
-{
-	struct file *inf;
-	inf = filp_open(file, O_RDONLY, 0);
-	if (OK != IS_ERR(inf)) {
-		return NOT_OK;
-	}
-
-	filp_close(inf, NULL);
-	return OK;
-}
-#endif
-
 
 /*----------------------------------------------------------------
 * acx_read_fw
@@ -871,25 +786,68 @@ static int acx_check_file(const char *file)
  *  0				unable to load file
  *  pointer to firmware		success
  */
-/*@null@*/ firmware_image_t* acx_read_fw(const char *file, u32 *size)
+#ifdef USE_FW_LOADER_LEGACY
+static char default_firmware_dir[] = "/usr/share/acx";
+#endif
+firmware_image_t* acx_read_fw(struct device *dev, const char *file, u32 *size)
 {
 	firmware_image_t *res = NULL;
+
+#ifdef USE_FW_LOADER_LEGACY
 	mm_segment_t orgfs;
 	unsigned long page;
 	char *buffer;
 	struct file *inf;
 	int retval;
 	u32 offset = 0;
+	char *filename;
+#endif
 
+#ifdef USE_FW_LOADER_26
+	const struct firmware *fw_entry;
+
+	acxlog(L_STD, "Requesting firmware image '%s'\n", file);
+	if (!request_firmware(&fw_entry, file, dev)) {
+		*size = 8 + le32_to_cpu(*(u32 *)(fw_entry->data + 4));
+		if (fw_entry->size != *size) {
+			acxlog(L_STD, "firmware size does not match firmware header: %d != %d\n", fw_entry->size, *size);
+		}
+		res = vmalloc(*size);
+		if (!res) {
+			acxlog(L_STD, "ERROR: Unable to allocate %u bytes for firmware\n", *size);
+			goto ret;
+		}
+		memcpy(res, fw_entry->data, fw_entry->size);
+		release_firmware(fw_entry);
+		goto ret;
+	}
+	acxlog(L_STD, "No firmware image was provided. Check your hotplug scripts\n");
+#endif
+
+#ifdef USE_FW_LOADER_LEGACY
 	orgfs = get_fs(); /* store original fs */
 	set_fs(KERNEL_DS);
 
 	/* Read in whole file then check the size */
 	page = __get_free_page(GFP_KERNEL);
 	if (0 == page) {
-		acxlog(L_STD, "Unable to allocate memory for firmware loading.\n");
+		acxlog(L_STD, "Unable to allocate memory for firmware loading\n");
 		goto fail;
 	}
+
+	filename = kmalloc(PATH_MAX, GFP_KERNEL);
+	if (!filename) {
+		acxlog(L_STD, "Unable to allocate memory for firmware loading\n");
+		goto fail;
+	}
+	if (!firmware_dir) {
+		firmware_dir = default_firmware_dir;
+		acxlog(L_STD, "Attention: no firmware directory specified "
+			"via module parameter firmware_dir, using default "
+			"firmware directory %s\n", firmware_dir);
+	}
+	sprintf(filename,"%s/%s", firmware_dir, file);
+	acxlog(L_STD, "Reading firmware image '%s'\n", filename);
 
 	buffer = (char*)page;
 	
@@ -903,7 +861,8 @@ static int acx_check_file(const char *file)
 	 * probably happens in kernel space where you don't have
 	 * a current directory to be able to figure out an
 	 * absolute path from a relative path... */
-	inf = filp_open(file, O_RDONLY, 0);
+	inf = filp_open(filename, O_RDONLY, 0);
+	kfree(filename);
 	if (OK != IS_ERR(inf)) {
 		char *err;
 
@@ -925,7 +884,6 @@ static int acx_check_file(const char *file)
 
 	offset = 0;
 	do {
-
 		retval = inf->f_op->read(inf, buffer, PAGE_SIZE, &inf->f_pos);
 
 		if (0 > retval) {
@@ -948,7 +906,6 @@ static int acx_check_file(const char *file)
 				res = vmalloc(*size);
 				if (NULL == res) {
 					acxlog(L_STD, "ERROR: Unable to allocate %u bytes for firmware module loading.\n", *size);
-					retval = 0;
 					goto fail_close;
 				}
 				acxlog(L_STD, "Allocated %u bytes for firmware module loading.\n", *size);
@@ -975,7 +932,9 @@ fail:
 	if (page)
 		free_page(page);
 	set_fs(orgfs);
+#endif
 
+ret:
 	/* checksum will be verified in write_fw, so don't bother here */
 
 	return res;
@@ -1005,58 +964,44 @@ fail:
 
 static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
 {
-	int counter;
-	unsigned int i;
-	u32 len, sum, acc;
-	/* we skip the first four bytes which contain the control sum. */
+	int len,size;
+	u32 sum,v32;
+	/* we skip the first four bytes which contain the control sum */
 	const u8 *image = (u8*)apfw_image + 4;
 
-	/* start the image checksum by adding the image size value. */
-	sum = 0;
-	for (i = 0; i <= 3; i++, image++)
-		sum += *image;
+	/* start the image checksum by adding the image size value */
+	sum = image[0]+image[1]+image[2]+image[3];
+	image += 4;
 
 	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	acxlog(L_INIT, "not using auto increment for firmware loading.\n");
+	acxlog(L_INIT, "not using auto increment for firmware loading\n");
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
 #endif
 
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure host indirect memory access address ?? */
-
-	/* the next four bytes contain the image size. */
-	/* image = apfw_image; */
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure host indirect memory access address?? */
 
 	len = 0;
-	counter = 3;
-	acc = 0;
-	while (len < le32_to_cpu(apfw_image->size)) {
+	size = le32_to_cpu(apfw_image->size) & (~3);
 
-		int byte = *image;
-		SET_BIT(acc, byte << (counter * 8));
-		sum += byte;
+	while (len < size) {
+		v32 = be32_to_cpu(*(u32*)image);
+		sum += image[0]+image[1]+image[2]+image[3];
+		image += 4;
+		len += 4;
 
-		image++;
-		len++;
-
-		counter--;
-		/* we upload the image by blocks of four bytes */
-		if (counter < 0) {
-			/* this could probably also be done by doing
-			 * 32bit write to register priv->io[IO_ACX_SLV_MEM_DATA]...
-			 * But maybe there are cards with 16bit interface
-			 * only */
+		/* this could probably also be done by doing
+		 * 32bit write to register priv->io[IO_ACX_SLV_MEM_DATA]...
+		 * But maybe there are cards with 16bit interface
+		 * only */
 #if NO_AUTO_INCREMENT
-			acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 #endif
-			
-			acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, acc);
-			acc = 0;
-			counter = 3;
-		}
+		acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, v32);
+
 		/* reschedule after some time has been spent in this loop!
 		 * cond_resched() doesn't seem to work here,
 		 * since we're probably uploading the firmware
@@ -1064,14 +1009,12 @@ static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, 
 		 * kicking off this operation which can have its
 		 * time slice expired (and thus having need_resched())
 		 */
-		if (unlikely(len % 16384 == 8192))
-		{
+		if (unlikely(len % 16384 == 8192)) {
 			acx_schedule(HZ / 50);
 		}
 	}
 
-	
-	acxlog(L_STD,"%s: Firmware written.\n", __func__);
+	acxlog(L_STD,"%s: firmware written\n", __func__);
 
 	/* compare our checksum with the stored image checksum */
 	return (int)(sum != le32_to_cpu(apfw_image->chksum));
@@ -1097,18 +1040,15 @@ static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, 
 
 static int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
 {
+	u32 v32,w32,sum;
+	int len,size;
 	int result = OK;
-	/* we skip the first four bytes which contain the control sum. */
+	/* we skip the first four bytes which contain the control sum */
 	const u8 *image = (u8*)apfw_image + 4;
-	u32 sum = 0;
-	unsigned int i;
-	unsigned int len;
-	int counter;
-	u32 acc1, acc2;
 
-	/* start the image checksum by adding the image size value. */
-	for (i = 0; i <= 3; i++, image++)
-		sum += *image;
+	/* start the image checksum by adding the image size value */
+	sum = image[0]+image[1]+image[2]+image[3];
+	image += 4;
 
 	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
 
@@ -1121,54 +1061,42 @@ static int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_imag
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset);
 
 	len = 0;
-	counter = 3;
-	acc1 = 0;
-	while (len < le32_to_cpu(apfw_image->size)) {
-		SET_BIT(acc1, *image << (counter * 8));
+	size = le32_to_cpu(apfw_image->size) & (~3);
 
-		/* acxlog(L_DEBUG, "acc1 %08lx *image %02x len %ld ctr %d\n", acc1, *image, len, counter); */
+	while (len < size) {
+		v32 = be32_to_cpu(*(u32*)image);
+		image += 4;
+		len += 4;
 
-		image++;
-		len++;
-
-		counter--;
-
-		if (counter < 0) {
 #if NO_AUTO_INCREMENT
-			acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
-
+		acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 #endif
-			acc2 = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+		w32 = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
-			if (unlikely(acc2 != acc1)) {
-				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %d don't match!! (0x%08x vs. 0x%08x). I/O timing issues or memory defective, with DWL-xx0+?? Makefile: ACX_IO_WIDTH=16 should help... Please report!!\n", len, acc1, acc2);
-				result = NOT_OK;
-				break;
-			}
-
-			sum += ((acc2 & 0x000000ff));
-			sum += ((acc2 & 0x0000ff00) >> 8);
-			sum += ((acc2 & 0x00ff0000) >> 16);
-			sum += ((acc2 >> 24));
-			/* acxlog(L_DEBUG, "acc1 %08lx acc2 %08lx sum %08lx\n", acc1, acc2, sum); */
-
-			acc1 = 0;
-			counter = 3;
+		if (unlikely(w32 != v32)) {
+			acxlog(L_STD, "FATAL: firmware upload: "
+			"data parts at offset %d don't match (0x%08x vs. 0x%08x)! "
+			"I/O timing issues or defective memory, with DWL-xx0+? "
+			"Makefile: ACX_IO_WIDTH=16 should help. Please report!\n",
+				len, v32, w32);
+			result = NOT_OK;
+			break;
 		}
-		if (unlikely(len % 16384 == 8192))
-		{
+
+		sum += (u8)w32 + (u8)(w32>>8) + (u8)(w32>>16) + (u8)(w32>>24);
+
+		if (unlikely(len % 16384 == 8192)) {
 			acx_schedule(HZ / 50);
 		}
 	}
 
 	/* sum control verification */
-	if (result != NOT_OK)
-		if (sum != le32_to_cpu(apfw_image->chksum))
-		{
-			/* acxlog(L_DEBUG, "sum 0x%08lx chksum 0x%08x\n", sum, le32_to_cpu(apfw_image->chksum)); */
-			acxlog(L_STD, "FATAL: firmware upload: checksums don't match!!\n");
+	if (result != NOT_OK) {
+		if (sum != le32_to_cpu(apfw_image->chksum)) {
+			acxlog(L_STD, "FATAL: firmware upload: checksums don't match!\n");
 			result = NOT_OK;
 		}
+	}
 
 	return result;
 }
@@ -1192,7 +1120,6 @@ static int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_imag
 *
 *----------------------------------------------------------------*/
 
-static char default_firmware_dir[] = "/usr/share/acx";
 static int acx_upload_fw(wlandevice_t *priv)
 {
 	int res1 = NOT_OK;
@@ -1203,43 +1130,32 @@ static int acx_upload_fw(wlandevice_t *priv)
 	u32 size;
 
 	FN_ENTER;
-	if (NULL == firmware_dir)
-	{
-		firmware_dir = default_firmware_dir;
-		acxlog(L_STD, "Attention: no custom firmware directory specified (via module parameter firmware_dir), thus using our default firmware directory %s\n", firmware_dir);
-	}
 
-	filename = kmalloc(PATH_MAX, GFP_USER);
-	if (!filename)
-		return -ENOMEM;
 	if (priv->chip_type == CHIPTYPE_ACX111) {
-		sprintf(filename,"%s/TIACX111.BIN", firmware_dir); /* combined firmware */
+		filename = "TIACX111.BIN"; /* combined firmware */
+#if DISABLED_USER_SHALL_SYMLINK_IT_TO_TIACX111
 		if (OK != acx_check_file(filename)) {
 			acxlog(L_INIT, "Firmware: '%s' not found. Trying alternative firmware.\n", filename);
-			sprintf(filename,"%s/FwRad16.bin", firmware_dir); /* combined firmware */
+			filename = "FwRad16.bin" /* combined firmware */
+			/* FIXME: why radio #16 is hardcoded in above?! */
 			if (OK != acx_check_file(filename)) {
 				acxlog(L_INIT, "Firmware: '%s' not found. Trying alternative firmware.\n", filename);
-				sprintf(filename,"%s/FW1130.BIN", firmware_dir); /* NON-combined firmware! */
+				filename = "FW1130.BIN"; /* NON-combined firmware! */
 			}
 		}
-	} else if (priv->chip_type == CHIPTYPE_ACX100) {
-		sprintf(filename,"%s/WLANGEN.BIN", firmware_dir);
-	}
+#endif
+	} else
+		filename = "WLANGEN.BIN";
 	
-	acxlog(L_INIT, "Trying to load firmware: '%s'\n", filename);
-	apfw_image = acx_read_fw( filename, &size );
-	if (NULL == apfw_image)
-	{
+	apfw_image = acx_read_fw(&priv->pdev->dev, filename, &size);
+	if (NULL == apfw_image) {
 		acxlog(L_STD, "acx_read_fw FAILED\n");
-		kfree(filename);
-		FN_EXIT1(-EIO);
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
 
-	for (try = 1; try <= 5; try++)
-	{
+	for (try = 1; try <= 5; try++) {
 		res1 = acx_write_fw(priv, apfw_image, 0);
-
 		res2 = acx_validate_fw(priv, apfw_image, 0);
 
 		acxlog(L_DEBUG | L_INIT,
@@ -1252,11 +1168,10 @@ static int acx_upload_fw(wlandevice_t *priv)
 
 	vfree(apfw_image);
 
-	kfree(filename);
 	if ((OK == res1) && (OK == res2))
 		SET_BIT(priv->dev_state_mask, ACX_STATE_FW_LOADED);
-	FN_EXIT1((OK == res1) && (OK == res2));
-	return (int)(res1 || res2);
+	FN_EXIT1(res1 || res2);
+	return (res1 || res2);
 }
 #endif /* (WLAN_HOSTIF!=WLAN_USB) */
 
@@ -1291,7 +1206,10 @@ int acx_upload_radio(wlandevice_t *priv)
 	int res = NOT_OK, res1 = NOT_OK, res2 = NOT_OK;
 	firmware_image_t *radio_image=NULL;
 	acx_cmd_radioinit_t radioinit;
-	char *filename;
+/* FIXME: name RADIOnn.BIN is too generic. We'll need to use
+** something like TIACX1nn_nn.BIN for Linux 2.6 style fw upload
+** via hotplug */
+	char filename[sizeof("RADIOnn.BIN")];
 	int try;
 	u32 size;
 
@@ -1299,15 +1217,8 @@ int acx_upload_radio(wlandevice_t *priv)
 	acx_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
-	filename = kmalloc(PATH_MAX, GFP_USER);
-	if (!filename) {
-		acxlog(L_STD, "ALERT: can't allocate filename\n");
-		goto fail;
-	}
-
-	sprintf(filename,"%s/RADIO%02x.BIN", firmware_dir, priv->radio_type);
-	acxlog(L_DEBUG,"trying to read %s\n",filename);
-	radio_image = acx_read_fw(filename, &size);
+	sprintf(filename,"RADIO%02x.BIN", priv->radio_type);
+	radio_image = acx_read_fw(&priv->pdev->dev, filename, &size);
 
 /*
  * 0d = RADIO0d.BIN = Maxim chipset
@@ -1317,17 +1228,18 @@ int acx_upload_radio(wlandevice_t *priv)
  * 17 = RADIO17.BIN = UNKNOWN chipset
  */
 
-	if (NULL == radio_image)
-	{
-		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of a combined firmware, FATAL when using a separated firmware (base firmware / radio image).\n",filename);
+	if (NULL == radio_image) {
+		acxlog(L_STD,"WARNING: no suitable radio module (%s) found "
+			"to load. No problem in case of a combined firmware, "
+			"FATAL when using a separated firmware "
+			"(base firmware / radio image).\n", filename);
 		res = OK; /* Doesn't need to be fatal, we might be using a combined image */
 		goto fail;
 	}
 
 	acx_issue_cmd(priv, ACX1xx_CMD_SLEEP, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
 
-	for (try = 1; try <= 5; try++)
-	{
+	for (try = 1; try <= 5; try++) {
 		res1 = acx_write_fw(priv, radio_image, offset);
 		res2 = acx_validate_fw(priv, radio_image, offset);
 		acxlog(L_DEBUG | L_INIT, "acx_write_fw (radio): %d, acx_validate_fw: %d\n", res1, res2);
@@ -1349,15 +1261,12 @@ int acx_upload_radio(wlandevice_t *priv)
 	/* will take a moment so let's have a big timeout */
 	acx_issue_cmd(priv, ACX1xx_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
 
-	if (OK != acx_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP))
-	{
+	if (OK != acx_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_STD, "Error reading memory map\n");
 		goto fail;
 	}
 	res = OK;
 fail:
-	if (filename)
-		kfree(filename);
 	FN_EXIT1(res);
 	return res;
 }
@@ -1392,7 +1301,6 @@ static int acx_verify_init(wlandevice_t *priv)
 	FN_ENTER;
 
 	for (timer = 40; timer > 0; timer--) {
-
 		if (acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES) & HOST_INT_FCS_THRESHOLD) {
 			result = OK;
 			acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
@@ -1488,7 +1396,7 @@ int acx_reset_dev(netdevice_t *dev)
 		acxlog(L_BINSTD, "%s: Clean up cmd mailbox access area\n", __func__);
 		acx_write_cmd_type_or_status(priv, 0, 1);
 		acx_get_cmd_state(priv);
-		if(priv->cmd_status != 0) {
+		if (priv->cmd_status) {
 			acxlog(L_BINSTD, "Error cleaning cmd mailbox area\n");
 			goto fail;
 		}
@@ -2399,13 +2307,10 @@ static inline int acx111_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 	 * For now, just assume all other acx111 cards have the same.
 	 * Ideally we would query it here, but we first need a
 	 * standard way to query individual configoptions easily. */
-	if (level_dbm <= 12)
-	{
+	if (level_dbm <= 12) {
 		tx_level.level = 2; /* 10 dBm */
 		priv->tx_level_dbm = 10;
-	}
-	else
-	{
+	} else {
 		tx_level.level = 1; /* 15 dBm */
 		priv->tx_level_dbm = 15;
 	}
@@ -2678,8 +2583,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	/* send a disassoc request in case it's required */
 	if (priv->set_mask & (GETSET_MODE|GETSET_ESSID|GETSET_CHANNEL|GETSET_WEP|GETSET_ALL)) {
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
-			if (ISTATUS_4_ASSOCIATED == priv->status)
-			{
+			if (ISTATUS_4_ASSOCIATED == priv->status) {
 				acxlog(L_ASSOC, "status was ASSOCIATED -> sending disassoc request.\n");
 				acx_transmit_disassoc(NULL, priv);
 			}
@@ -2734,16 +2638,13 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		}
 
 		if (priv->get_mask & (GETSET_ED_THRESH|GETSET_ALL)) {
-			if (priv->chip_type == CHIPTYPE_ACX100)
-			{
+			if (priv->chip_type == CHIPTYPE_ACX100)	{
 				u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
 
 				memset(ed_threshold, 0, sizeof(ed_threshold));
 				acx_interrogate(priv, ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
 				priv->ed_threshold = ed_threshold[4];
-			}
-			else
-			{
+			} else {
 				acxlog(L_INIT, "acx111 doesn't support ED\n");
 				priv->ed_threshold = 0;
 			}
@@ -2752,16 +2653,13 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		}
 
 		if (priv->get_mask & (GETSET_CCA|GETSET_ALL)) {
-			if (priv->chip_type == CHIPTYPE_ACX100)
-			{
+			if (priv->chip_type == CHIPTYPE_ACX100)	{
 				u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
 				memset(cca, 0, sizeof(priv->cca));
 				acx_interrogate(priv, cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 				priv->cca = cca[4];
-			}
-			else
-			{
+			} else {
 				acxlog(L_INIT, "acx111 doesn't support CCA\n");
 				priv->cca = 0;
 			}
@@ -2880,8 +2778,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		/* ed_threshold */
 		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %d\n",
 					priv->ed_threshold);
-		if (CHIPTYPE_ACX100 == priv->chip_type)
-		{
+		if (CHIPTYPE_ACX100 == priv->chip_type) {
 			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
 
 			memset(ed_threshold, 0, sizeof(ed_threshold));
@@ -2896,8 +2793,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (GETSET_CCA|GETSET_ALL)) {
 		/* CCA value */
 		acxlog(L_INIT, "Updating Channel Clear Assessment (CCA) value: 0x%02X\n", priv->cca);
-		if (CHIPTYPE_ACX100 == priv->chip_type)
-		{
+		if (CHIPTYPE_ACX100 == priv->chip_type)	{
 			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
 			memset(cca, 0, sizeof(cca));
@@ -3072,9 +2968,9 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 				/* stop any previous scan */
 				acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
 #warning Is this used anymore?
-				if(priv->chip_type == CHIPTYPE_ACX111) {
+				if (priv->chip_type == CHIPTYPE_ACX111) {
 					acx111_scan_chan(priv);
-				} else if(priv->chip_type == CHIPTYPE_ACX100) {
+				} else {
 					acx100_scan_t s;
 					s.count = cpu_to_le16(1);
 					s.start_chan = priv->channel;
@@ -3096,8 +2992,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		/* not needed in AP mode */
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
 			/* if we aren't scanning already, then start scanning now */
-			if (0 == scanning)
-			{
+			if (0 == scanning) {
 				acx_scan_chan(priv);
 				scanning = 1;
 			}
@@ -3132,8 +3027,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		acx_configure(priv, &keyindic, ACX111_IE_KEY_CHOOSE);
 #endif
 		/* if we aren't scanning already, then start scanning now */
-		if (0 == scanning)
-		{
+		if (0 == scanning) {
 			acx_scan_chan(priv);
 			scanning = 1;
 		}
@@ -3143,7 +3037,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (SET_WEP_OPTIONS|GETSET_ALL)) {
 		acx100_ie_wep_options_t options;
 
-		if(priv->chip_type == CHIPTYPE_ACX111) {
+		if (priv->chip_type == CHIPTYPE_ACX111) {
 			acxlog(L_DEBUG, "Setting WEP Options for ACX111 not supported!\n");
 		} else {
 			acxlog(L_INIT, "Setting WEP Options\n");
@@ -3466,7 +3360,7 @@ static void acx_after_interrupt_task(void *data)
 
 	FN_ENTER;
 
-	if(unlikely(in_interrupt())) {
+	if (unlikely(in_interrupt())) {
 		acxlog(L_IRQ, "Don't call this in IRQ context!\n");
 		return;
 	}
@@ -3508,22 +3402,18 @@ static void acx_after_interrupt_task(void *data)
 			if (++silence_msg <= 5)
 				acxlog(L_STD, "less than " GET_STRING(RECALIB_PAUSE) " minutes since last radio recalibration (maybe card too hot?): not recalibrating!\n");
 			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-		}
-		else {
+		} else {
 			static unsigned int recalib_failure_count = 0;
 			int res = NOT_OK;
 
 			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
 			res = acx_recalib_radio(priv);
-			if (res == OK)
-			{
+			if (res == OK) {
 				acxlog(L_STD, "successfully recalibrated radio\n");
 				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 				priv->time_last_recalib_success = jiffies;
 				recalib_failure_count = 0;
-			}
-			else
-			{
+			} else {
 				/* failed: resubmit, but only limited
 				 * amount of times within some time range
 				 * to prevent endless loop */
@@ -3538,8 +3428,7 @@ static void acx_after_interrupt_task(void *data)
 				if (time_after(jiffies, time_last_recalib_attempt + HZ))
 					recalib_failure_count = 0;
 
-				if (++recalib_failure_count <= 5)
-				{
+				if (++recalib_failure_count <= 5) {
 					time_last_recalib_attempt = jiffies;
 					acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 				}
@@ -3658,7 +3547,7 @@ acx_join_bssid(wlandevice_t *priv)
 	acx_joinbss_t tmp;
 	u8 dtim_interval;
 	
-	if(sizeof(acx_joinbss_t)!=0x30)
+	if (sizeof(acx_joinbss_t) != 0x30)
 		error_joinbss_must_be_0x30_bytes_in_length();
 	
 	FN_ENTER;
@@ -3700,7 +3589,7 @@ acx_join_bssid(wlandevice_t *priv)
 		/* calculate number of highest bit set in t */
 		while(t>1) { t>>=1; n++; }
 	}
-	if(n >= sizeof(bitpos2genframe_txrate)) {
+	if (n >= sizeof(bitpos2genframe_txrate)) {
 		printk(KERN_ERR "acx_join_bssid: driver BUG! n=%d. please report\n", n);
 		n = 0;
 	}
@@ -3928,9 +3817,8 @@ void acx_set_timer(wlandevice_t *priv, u32 timeout)
 	 * FIXME: any other versions between 1.8.3 (working) and
 	 * 1.9.3.e (removed)? */
 #if (WLAN_HOSTIF!=WLAN_USB)
-	if (priv->firmware_numver < 0x0109030e &&
-		priv->chip_type != CHIPTYPE_ACX111)
-	{
+	if (priv->firmware_numver < 0x0109030e
+	 && priv->chip_type != CHIPTYPE_ACX111) {
 		u32 tmp[5];
 
 		/* first two 16-bit words reserved for type and length */
@@ -3941,11 +3829,9 @@ void acx_set_timer(wlandevice_t *priv, u32 timeout)
 #endif
 	{
 		/* first check if the timer was already initialized, THEN modify it */
-		if (priv->mgmt_timer.function)
-	       	{
+		if (priv->mgmt_timer.function) {
 			mod_timer(&(priv->mgmt_timer), jiffies + (timeout * HZ / 1000000));
 		}
-
 	}
 	FN_EXIT0();
 }
@@ -4020,8 +3906,7 @@ u16 acx_read_eeprom_offset(wlandevice_t *priv,
 	acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr);
 	acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
-	while (0 != acx_read_reg16(priv, IO_ACX_EEPROM_CTL))
-	{
+	while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -4082,14 +3967,12 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 	
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
-
 		acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
 		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
 		acx_write_reg32(priv, IO_ACX_EEPROM_DATA, *(charbuf + i));
 		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 1);
 
-		while (0 != acx_read_reg16(priv, IO_ACX_EEPROM_CTL))
-		{
+		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 			/* scheduling away instead of CPU burning loop
 			 * doesn't seem to work here at all:
 			 * awful delay, sometimes also failure.
@@ -4105,7 +3988,8 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 	acx_write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig);
 
 	/* now start a verification run */
-	if ((NULL == (data_verify = kmalloc(len, GFP_KERNEL)))) {
+	data_verify = kmalloc(len, GFP_KERNEL);
+	if (!data_verify) {
 		goto fail;
 	}
 
@@ -4115,8 +3999,7 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
 		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
-		while (0 != acx_read_reg16(priv, IO_ACX_EEPROM_CTL))
-		{
+		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 			/* scheduling away instead of CPU burning loop
 			 * doesn't seem to work here at all:
 			 * awful delay, sometimes also failure.
@@ -4127,15 +4010,14 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 			}
 		}
 
-		*(data_verify + i) = (u8)acx_read_reg16(priv, IO_ACX_EEPROM_DATA);
+		data_verify[i] = acx_read_reg16(priv, IO_ACX_EEPROM_DATA);
 	}
 
 	if (0 == memcmp(charbuf, data_verify, len))
 		result = OK; /* read data matches, success */
 	
 fail:
-	if (NULL != data_verify)
-        	kfree(data_verify);
+	kfree(data_verify);
 	
 	FN_EXIT1(result);
 #endif
@@ -4157,8 +4039,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
 	acx_write_reg32(priv, IO_ACX_PHY_CTL, 2);
 
-	while (0 != acx_read_reg32(priv, IO_ACX_PHY_CTL))
-	{
+	while (acx_read_reg32(priv, IO_ACX_PHY_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -4186,7 +4067,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	mem.type = cpu_to_le16(0x82);
 	mem.len = cpu_to_le32(4);
 	acx_issue_cmd(priv, ACX1xx_CMD_MEM_READ, &mem, 8, ACX_CMD_TIMEOUT_DEFAULT);
-	*charbuf = (u8)mem.data;
+	*charbuf = mem.data;
 #endif
 	acxlog(L_DEBUG, "radio PHY read 0x%02x from 0x%04x\n", *charbuf, reg); 
 	result = OK;
@@ -4198,9 +4079,8 @@ fail:
 
 u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 {
-#if (WLAN_HOSTIF!=WLAN_USB)
 	FN_ENTER;
-
+#if (WLAN_HOSTIF!=WLAN_USB)
 	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
 	/* FIXME: we don't use 32bit access here since mprusko said that
 	 * it results in distorted sensitivity on his card (huh!?!?
@@ -4239,8 +4119,8 @@ void acx111_read_configoption(wlandevice_t *priv)
 	FN_ENTER;
 	
 	if (OK != acx_interrogate(priv, &co, ACX111_IE_CONFIG_OPTIONS) ) {
-	    acxlog(L_STD, "Reading ConfigOption FAILED\n");
-	    return;
+		acxlog(L_STD, "Reading ConfigOption FAILED\n");
+		return;
 	};
 
 	memcpy(&co2, &co, sizeof(co_fixed_t));
@@ -4252,8 +4132,8 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.antennas.len = pEle[1];
 	acxlog(L_DEBUG, "AntennaID : %02X  Length: %02X, Data: ", co2.antennas.type, co2.antennas.len);
 	for (i=0;i<pEle[1];i++) {
-	    co2.antennas.list[i] = pEle[i+2];
-	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+		co2.antennas.list[i] = pEle[i+2];
+		acxlog(L_DEBUG, " %02X", pEle[i+2]);
 	}
 	acxlog(L_DEBUG, "\n");
 
@@ -4262,8 +4142,8 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.power_levels.len = pEle[1];
 	acxlog(L_DEBUG, "PowerLevelID : %02X  Length: %02X, Data: ", co2.power_levels.type, co2.power_levels.len);
 	for (i=0;i<pEle[1]*2;i++) {
-	    co2.power_levels.list[i] = pEle[i+2];
-	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+		co2.power_levels.list[i] = pEle[i+2];
+		acxlog(L_DEBUG, " %02X", pEle[i+2]);
 	}
 	acxlog(L_DEBUG, "\n");
 
@@ -4272,8 +4152,8 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.data_rates.len = pEle[1];
 	acxlog(L_DEBUG, "DataRatesID : %02X  Length: %02X, Data: ", co2.data_rates.type, co2.data_rates.len);
 	for (i=0;i<pEle[1];i++) {
-	    co2.data_rates.list[i] = pEle[i+2];
-	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+		co2.data_rates.list[i] = pEle[i+2];
+		acxlog(L_DEBUG, " %02X", pEle[i+2]);
 	}
 	acxlog(L_DEBUG, "\n");
 	
@@ -4282,8 +4162,8 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.domains.len = pEle[1];
 	acxlog(L_DEBUG, "DomainID : %02X  Length: %02X, Data: ", co2.domains.type, co2.domains.len);
 	for (i=0;i<pEle[1];i++) {
-	    co2.domains.list[i] = pEle[i+2];
-	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+		co2.domains.list[i] = pEle[i+2];
+		acxlog(L_DEBUG, " %02X", pEle[i+2]);
 	}
 	acxlog(L_DEBUG, "\n");
 	
@@ -4291,7 +4171,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.product_id.type = pEle[0];
 	co2.product_id.len = pEle[1];
 	for (i=0;i<pEle[1];i++) {
-	    co2.product_id.list[i] = pEle[i+2];
+		co2.product_id.list[i] = pEle[i+2];
 	}
 	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %.*s\n", co2.product_id.type, co2.product_id.len, co2.product_id.len, (char *)co2.product_id.list);
 
@@ -4299,7 +4179,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	co2.manufacturer.type = pEle[0];
 	co2.manufacturer.len = pEle[1];
 	for (i=0;i<pEle[1];i++) {
-	    co2.manufacturer.list[i] = pEle[i+2];
+		co2.manufacturer.list[i] = pEle[i+2];
 	}
 	acxlog(L_DEBUG, "ManufacturerID : %02X  Length: %02X, Data: %.*s\n", co2.manufacturer.type, co2.manufacturer.len, co2.manufacturer.len, (char *)co2.manufacturer.list);
 
