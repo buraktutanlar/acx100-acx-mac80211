@@ -303,7 +303,7 @@ typedef struct MemoryBlockSizeStruct {
 	UINT16 rid;
 	UINT16 len;
 	UINT16 size;
-} memblocksize_t;
+} acx100_memblocksize_t;
 
 #define ETH_P_80211_RAW		(ETH_P_ECONET + 1)
 #endif /* __ACX_IDMA_H */

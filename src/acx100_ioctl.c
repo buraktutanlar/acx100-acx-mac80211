@@ -2439,8 +2439,8 @@ static inline int acx111_ioctl_info(struct net_device *dev, struct iw_request_in
 	struct rxdescriptor *pRxDesc = pDc->pRxDescQPool;
 	int i;
 	int result = -EINVAL;
-	struct ACX111MemoryConfig memconf;
-	struct ACX111QueueConfig queueconf;
+	struct acx111_ie_memoryconfig memconf;
+	struct acx111_ie_queueconfig queueconf;
 	char memmap[0x34];
 	char rxconfig[0x8];
 	char fcserror[0x8];
@@ -2679,12 +2679,12 @@ acx111_ioctl_enable_low_power_packets(
 		acxlog(L_STD, "Enable low power packets\n");
 
 		/* set bit 3 */
-		SET_BIT(config.feature_options, 0x04);
+		SET_BIT(config.feature_options, cpu_to_le32(0x04));
 	} else {
 		acxlog(L_STD, "Disable low power packets\n");
 
 		/* clear bit 3 */
-		CLEAR_BIT(config.feature_options, 0x04);
+		CLEAR_BIT(config.feature_options, cpu_to_le32(0x04));
 	}
 
 	return acx111_set_feature_config(priv, &config);
@@ -2712,12 +2712,12 @@ acx111_ioctl_enable_ex_low_power_packets(
 		acxlog(L_STD, "Enable extremely low power packets\n");
 
 		/* set bit 1 */
-		SET_BIT(config.feature_options, 0x01);
+		SET_BIT(config.feature_options, cpu_to_le32(0x01));
 	} else {
 		acxlog(L_STD, "Disable extremely low power packets\n");
 
 		/* clear bit 1 */
-		CLEAR_BIT(config.feature_options, 0x01);
+		CLEAR_BIT(config.feature_options, cpu_to_le32(0x01));
 	}
 
 	return acx111_set_feature_config(priv, &config);
@@ -2889,9 +2889,11 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 	UINT16 gpio_old;
 
 	if (priv->chip_type != CHIPTYPE_ACX100) {
-		/* WARNING!!! removing this check *might* damage
+		/* WARNING!!!
+		 * Removing this check *might* damage
 		 * hardware, since we're tweaking GPIOs here after all!!!
-		 * You've been warned... */
+		 * You've been warned...
+		 * WARNING!!! */
 		acxlog(L_IOCTL, "sorry, setting bias level for non-ACX100 not supported yet.\n");
 		return 0;
 	}
@@ -2931,7 +2933,7 @@ static inline int acx100_ioctl_get_phy_chan_busy_percentage(struct net_device *d
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	struct {
-		UINT16 rid;
+		UINT16 type;
 		UINT16 len;
 		UINT32 busytime;
 		UINT32 totaltime;
@@ -2939,7 +2941,7 @@ static inline int acx100_ioctl_get_phy_chan_busy_percentage(struct net_device *d
 
 	if (OK != acx100_interrogate(priv, &usage, ACX1xx_IE_MEDIUM_USAGE))
 		return NOT_OK;
-	(void)printk("Medium busy percentage since last invocation: %d%% (microseconds: %u of %u)\n", 100 * (usage.busytime / 100) / (usage.totaltime / 100), usage.busytime, usage.totaltime); /* prevent calculation overflow */
+	(void)printk("Medium busy percentage since last invocation: %d%% (microseconds: %u of %u)\n", 100 * (le32_to_cpu(usage.busytime) / 100) / (le32_to_cpu(usage.totaltime) / 100), le32_to_cpu(usage.busytime), le32_to_cpu(usage.totaltime)); /* prevent calculation overflow */
 	return OK;
 }
 

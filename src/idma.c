@@ -217,16 +217,18 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	else
 		tx_desc->Ctl2_8 = 0;
 
-	peer = &priv->defpeer;
 	/* TODO: we really need ASSOCIATED_TO_AP/_TO_IBSS */
 	if(priv->status == ISTATUS_4_ASSOCIATED
 	&& priv->station_assoc.bssid[0] == 0
-	) {
+	)
 		peer = &priv->ap_peer;
-	}
-	txrate = &peer->txrate;
+	else
+		peer = &priv->defpeer;
+
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT)
 		txrate = &peer->txbase;
+	else
+		txrate = &peer->txrate;
  
 	tx_desc->fixed_size.s.txc = txrate; /* used in tx cleanup routine for auto rate and accounting */
  
@@ -373,7 +375,7 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.retries++;
 			/* FIXME: set (GETSET_TX|GETSET_RX) here
 			 * (this seems to recalib radio on ACX100)
-			 * after 10 more errors??
+			 * after some more jiffies passed??
 			 * But OTOH Tx error 0x20 also seems to occur on
 			 * overheating, so I'm not sure whether we
 			 * actually want that, since people maybe won't notice
@@ -1766,12 +1768,12 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 *	FIXME: This function still needs a cleanup
 *----------------------------------------------------------------*/
 
-static int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
+static int acx100_init_memory_pools(wlandevice_t *priv, acx100_ie_memmap_t *mmt)
 {
 	UINT32 TotalMemoryBlocks;
-        memblocksize_t MemoryBlockSize;
+        acx100_memblocksize_t MemoryBlockSize;
 
-        acx100_memconfigoption_t MemoryConfigOption;
+        acx100_ie_memconfigoption_t MemoryConfigOption;
 
 	FN_ENTER;
 
@@ -1907,9 +1909,9 @@ int acx100_delete_dma_regions(wlandevice_t *priv)
 
 int acx100_create_dma_regions(wlandevice_t *priv)
 {
-	QueueConfig_t qcfg;
+	acx100_ie_queueconfig_t qcfg;
 	
-	acx100_memmap_t MemMap;
+	acx100_ie_memmap_t MemMap;
 	struct TIWLAN_DC *pDc;
 	int res = NOT_OK;
 
@@ -1961,7 +1963,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
-	if (OK != acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ /* 0x14 + (qcfg.vale * 8))) { */
+	if (OK != acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(acx100_ie_queueconfig_t)-4)){ /* 0x14 + (qcfg.vale * 8))) { */
 		acxlog(L_BINSTD, "ctlQueueConfigurationWrite returns fail\n");
 		goto fail;
 	}
@@ -1999,7 +2001,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 		goto fail;
 	}
 
-	if (OK != acx100_init_memory_pools(priv, (acx100_memmap_t *) &MemMap)) {
+	if (OK != acx100_init_memory_pools(priv, (acx100_ie_memmap_t *) &MemMap)) {
 		acxlog(L_BINSTD, "acx100_init_memory_pools returns fail\n");
 		goto fail;
 	}
@@ -2038,8 +2040,8 @@ ok:
 
 int acx111_create_dma_regions(wlandevice_t *priv)
 {
-	struct ACX111MemoryConfig memconf;
-	struct ACX111QueueConfig queueconf;
+	struct acx111_ie_memoryconfig memconf;
+	struct acx111_ie_queueconfig queueconf;
 	struct TIWLAN_DC *pDc;
 
 	FN_ENTER;
@@ -2082,9 +2084,7 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 		goto fail;
 	}
 
-	/* uhoh, hope this is correct-> BusMaster Indirect Memory Organization = 0 */
-	/* other option is to set to Generic Bus Slave = 2 */
-	memconf.options = 0;
+	memconf.options = 0; /* 0 == Busmaster Indirect Memory Organization, which is what we want (using linked host descs with their allocated mem). 2 == Generic Bus Slave */
 
 	/* let's use 25% for fragmentations and 75% for frame transfers */
 	memconf.fragmentation = 0x0f; 

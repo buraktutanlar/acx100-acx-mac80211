@@ -623,7 +623,7 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 			payload->rates.element_ID = 1;
 			payload->rates.length = priv->rate_supported_len;
-			memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len); //
+			memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len);
 			hdesc_payload->length = cpu_to_le16(priv->rate_supported_len + 8);
 			hdesc_payload->data_offset = 0;
 
@@ -744,7 +744,7 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 
 		payload->rates.element_ID = 1;
 		payload->rates.length = priv->rate_supported_len;
-		memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len); //
+		memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len);
 		hdesc_payload->data_offset = 0;
 		hdesc_payload->length = cpu_to_le16(priv->rate_supported_len + 8);
 
@@ -1614,7 +1614,7 @@ int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int res = NOT_OK;
-/*	memmap_t pdr; */
+/*	acx_ie_generic_t pdr; */
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
@@ -1630,7 +1630,7 @@ int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 				/* FIXME!! need to do this here since
 				 * USB doesn't support our task handler yet */
 				{
-				memmap_t pdr;
+				acx_ie_generic_t pdr;
 				pdr.m.asid.vala = req->aid[0];
 				acx100_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
 				acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
@@ -2761,7 +2761,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
 			SET_BIT(this_bss->caps, IEEE802_11_MGMT_CAP_IBSS);
 		}
-		acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
+		acxlog(L_ASSOC, "peer_cap 0x%04x, needed_cap 0x%04x\n",
 		       this_bss->caps, needed_cap);
 
 		/* peer station doesn't support what we need? */
@@ -2894,7 +2894,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
  */
 void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala)
 {
-       acx100_powermgmt_t pm;
+       acx100_ie_powermgmt_t pm;
 
        FN_ENTER;
        acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);

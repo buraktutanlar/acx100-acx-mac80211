@@ -212,7 +212,7 @@ acx_update_ratevector(wlandevice_t *priv)
 	}
 	priv->rate_supported_len = supp - priv->rate_supported;
 #if ACX_DEBUG
-	if(debug & L_IOCTL) {
+	if(debug & L_ASSOC) {
 		int i = priv->rate_supported_len;
 		printk(KERN_DEBUG "new ratevector:");
 		supp = priv->rate_supported;
@@ -224,108 +224,7 @@ acx_update_ratevector(wlandevice_t *priv)
 }
 
 /*------------------------------------------------------------------------------
- * acx100_read_proc
- * Handle our /proc entry
- *
- * Arguments:
- *	standard kernel read_proc interface
- * Returns:
- *	number of bytes written to buf
- * Side effects:
- *	none
- * Call context:
- *	
- * Status:
- *	should be okay, non-critical
- * Comment:
- *
- *----------------------------------------------------------------------------*/
-int acx100_read_proc(char *buf, char **start, off_t offset, int count,
-		     int *eof, void *data)
-{
-	wlandevice_t *priv = (wlandevice_t *)data;
-	/* fill buf */
-	int length = acx100_proc_output(buf, priv);
-
-	FN_ENTER;
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT(1, length);
-	return length;
-}
-
-int acx100_read_proc_diag(char *buf, char **start, off_t offset, int count,
-		     int *eof, void *data)
-{
-	wlandevice_t *priv = (wlandevice_t *)data;
-	/* fill buf */
-	int length = acx100_proc_diag_output(buf, priv);
-
-	FN_ENTER;
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT(1, length);
-	return length;
-}
-
-int acx100_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
-		     int *eof, void *data)
-{
-	wlandevice_t *priv = (wlandevice_t *)data;
-	/* fill buf */
-	int length = acx100_proc_eeprom_output(buf, priv);
-
-	FN_ENTER;
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT(1, length);
-	return length;
-}
-
-int acx100_read_proc_phy(char *buf, char **start, off_t offset, int count,
-		     int *eof, void *data)
-{
-	wlandevice_t *priv = (wlandevice_t *)data;
-	/* fill buf */
-	int length = acx100_proc_phy_output(buf, priv);
-
-	FN_ENTER;
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT(1, length);
-	return length;
-}
-
-/*------------------------------------------------------------------------------
- * acx100_proc_output
+ * acx_proc_output
  * Generate content for our /proc entry
  *
  * Arguments:
@@ -342,7 +241,7 @@ int acx100_read_proc_phy(char *buf, char **start, off_t offset, int count,
  * Comment:
  *
  *----------------------------------------------------------------------------*/
-int acx100_proc_output(char *buf, wlandevice_t *priv)
+int acx_proc_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	UINT16 i;
@@ -374,7 +273,7 @@ int acx100_proc_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
+int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	unsigned int i;
@@ -492,7 +391,7 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv)
+int acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	UINT16 i;
@@ -510,7 +409,7 @@ int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx100_proc_phy_output(char *buf, wlandevice_t *priv)
+int acx_proc_phy_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	UINT16 i;
@@ -536,6 +435,153 @@ int acx100_proc_phy_output(char *buf, wlandevice_t *priv)
 	
 	FN_EXIT(1, p - buf);
 	return p - buf;
+}
+
+/*------------------------------------------------------------------------------
+ * acx_read_proc
+ * Handle our /proc entry
+ *
+ * Arguments:
+ *	standard kernel read_proc interface
+ * Returns:
+ *	number of bytes written to buf
+ * Side effects:
+ *	none
+ * Call context:
+ *	
+ * Status:
+ *	should be okay, non-critical
+ * Comment:
+ *
+ *----------------------------------------------------------------------------*/
+int acx_read_proc(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx_proc_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
+int acx_read_proc_diag(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx_proc_diag_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
+int acx_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx_proc_eeprom_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
+int acx_read_proc_phy(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx_proc_phy_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
+UINT16 acx_proc_register_entries(struct net_device *dev)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	char procbuf[80];
+
+	sprintf(procbuf, "driver/acx_%s", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc, priv))
+		return NOT_OK;
+
+	sprintf(procbuf, "driver/acx_%s_diag", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_diag, priv))
+		return NOT_OK;
+
+	sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_eeprom, priv))
+		return NOT_OK;
+	sprintf(procbuf, "driver/acx_%s_phy", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_phy, priv))
+		return NOT_OK;
+	
+	return OK;
+}
+
+UINT16 acx_proc_unregister_entries(struct net_device *dev)
+{
+	char procbuf[80];
+
+	sprintf(procbuf, "driver/acx_%s_phy", dev->name);
+	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+       	remove_proc_entry(procbuf, NULL);
+	sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
+	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+       	remove_proc_entry(procbuf, NULL);
+	sprintf(procbuf, "driver/acx_%s_diag", dev->name);
+	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+       	remove_proc_entry(procbuf, NULL);
+	sprintf(procbuf, "driver/acx_%s", dev->name);
+	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+       	remove_proc_entry(procbuf, NULL);
+	return OK;
 }
 
 /*----------------------------------------------------------------
@@ -1185,7 +1231,7 @@ int acx100_upload_fw(wlandevice_t *priv)
 int acx100_load_radio(wlandevice_t *priv)
 {
 	UINT32 offset;
-	acx100_memmap_t mm;
+	acx100_ie_memmap_t mm;
 	int res = NOT_OK, res1 = NOT_OK, res2 = NOT_OK;
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
@@ -1357,10 +1403,10 @@ void acx100_init_mboxes(wlandevice_t *priv)
 
 void acx100_set_wepkey( wlandevice_t *priv )
 {
-  dot11WEPDefaultKey_t dk;
+  ie_dot11WEPDefaultKey_t dk;
   int i;
    
-  for ( i = 0; i < NUM_WEPKEYS; i++ ) {
+  for ( i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++ ) {
     if ( priv->wep_keys[i].size != 0 ) {
       acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
       dk.action = 1;
@@ -1377,7 +1423,7 @@ void acx111_set_wepkey( wlandevice_t *priv )
   acx111WEPDefaultKey_t dk;
   int i;
                                                                                 
-  for ( i = 0; i < NUM_WEPKEYS; i++ ) {
+  for ( i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++ ) {
     if ( priv->wep_keys[i].size != 0 ) {
       acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
       memset(&dk, 0, sizeof(dk));
@@ -1385,7 +1431,7 @@ void acx111_set_wepkey( wlandevice_t *priv )
       dk.keySize = priv->wep_keys[i].size;
 
     /* are these two lines neccessary? */
-      dk.type = 0;              /* default wep key */
+      dk.type = 0;              /* default WEP key */
       dk.index = 0;             /* ignored when setting default key */
 
 
@@ -1423,10 +1469,10 @@ void acx111_set_wepkey( wlandevice_t *priv )
 int acx100_init_wep(wlandevice_t *priv)
 {
 	int i;
-	acx100_wep_options_t options;
-	dot11WEPDefaultKeyID_t dk;
+	acx100_ie_wep_options_t options;
+	ie_dot11WEPDefaultKeyID_t dk;
 	acx100_wep_mgmt_t wep_mgmt; /* size = 37 bytes */
-	acx100_memmap_t pt;
+	acx100_ie_memmap_t pt;
 	int res = NOT_OK;
 
 	FN_ENTER;
@@ -1450,7 +1496,7 @@ int acx100_init_wep(wlandevice_t *priv)
 			goto fail;
 		}
 
-		options.NumKeys = cpu_to_le16(NUM_WEPKEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
+		options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
 		options.WEPOption = (UINT8)0x00;
 
 		acxlog(L_ASSOC, "%s: writing WEP options.\n", __func__);
@@ -1561,11 +1607,11 @@ int acx100_init_max_beacon_template(wlandevice_t *priv)
  */
 int acx100_init_max_tim_template(wlandevice_t *priv)
 {
-	tim_t t;
+	acx_tim_t t;
 
-	memset(&t, 0, sizeof(struct tim));
-	t.size = cpu_to_le16(sizeof(struct tim) - 0x2);	/* subtract size of size field */
-	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
+	memset(&t, 0, sizeof(struct acx_tim));
+	t.size = cpu_to_le16(sizeof(struct acx_tim) - 0x2);	/* subtract size of size field */
+	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(struct acx_tim), 5000);
 }
 
 /*----------------------------------------------------------------
@@ -1624,13 +1670,13 @@ int acx100_init_max_probe_response_template(wlandevice_t *priv)
  */
 int acx100_init_max_probe_request_template(wlandevice_t *priv)
 {
-	probereq_t pr;
+	acx_probereq_t pr;
 	int res;
 
 	FN_ENTER;
-	memset(&pr, 0, sizeof(struct probereq));
-	pr.size = cpu_to_le16(sizeof(struct probereq) - 0x2);	/* subtract size of size field */
-	res = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct probereq), 5000);
+	memset(&pr, 0, sizeof(struct acx_probereq));
+	pr.size = cpu_to_le16(sizeof(struct acx_probereq) - 0x2);	/* subtract size of size field */
+	res = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct acx_probereq), 5000);
 	FN_EXIT(1, res);
 	return res;
 }
@@ -1659,7 +1705,7 @@ int acx100_init_max_probe_request_template(wlandevice_t *priv)
  */
 int acx100_set_tim_template(wlandevice_t *priv)
 {
-	tim_t t;
+	acx_tim_t t;
 	int result;
 
 	FN_ENTER;
@@ -1674,7 +1720,7 @@ int acx100_set_tim_template(wlandevice_t *priv)
 	t.buf[0x8] = (UINT8)0x0;
 	t.buf[0x9] = (UINT8)0x0;
 	t.buf[0xa] = (UINT8)0x0;
-	result = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
+	result = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(struct acx_tim), 5000);
 #if BOGUS
 	if (++DTIM_count == priv->dtim_interval) {
 		DTIM_count = (UINT8)0;
@@ -1839,7 +1885,7 @@ int acx100_set_beacon_template(wlandevice_t *priv)
  * acxInitPacketTemplates()
  * STATUS: almost ok, except for struct definitions.
  */
-int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *mm)
+int acx100_init_packet_templates(wlandevice_t *priv, acx100_ie_memmap_t *mm)
 {
 	int len = 0; /* not important, only for logging */
 	int result = NOT_OK;
@@ -1863,7 +1909,7 @@ int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *mm)
 	 * set_tim */
 	if (OK != acx100_init_max_tim_template(priv))
 		goto failed;
-	len += sizeof(struct tim);
+	len += sizeof(struct acx_tim);
 
 	if (OK != acx100_init_max_probe_response_template(priv))
 		goto failed;
@@ -2314,7 +2360,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		}
 
 		if (0 != (priv->get_mask & (GETSET_REG_DOMAIN|GETSET_ALL))) {
-			memmap_t dom;
+			acx_ie_generic_t dom;
 
 			acx100_interrogate(priv, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 			priv->reg_dom_id = dom.m.gp.bytes[0];
@@ -2376,7 +2422,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		acxlog(L_INIT, "Updating WEP key settings\n");
 		{
 
-		    memmap_t dkey;
+		    ie_dot11WEPDefaultKeyID_t dkey;
 
 		    if ( priv->chip_type == CHIPTYPE_ACX100 ) {
 			acx100_set_wepkey( priv );
@@ -2385,8 +2431,8 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			acx111_set_wepkey( priv );
 		    }
 
-		    dkey.m.dkey.num = priv->wep_current_index;
-		    acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.m.dkey.num);
+		    dkey.KeyID = priv->wep_current_index;
+		    acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.KeyID);
 		    acx100_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_WEP);
@@ -2462,7 +2508,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
  * so let's disable it for now until further investigation */
 #if POWER_SAVE_80211
 	if (0 != (priv->set_mask & (GETSET_POWER_80211|GETSET_ALL))) {
-		acx100_powermgmt_t pm;
+		acx100_ie_powermgmt_t pm;
 
 		/* change 802.11 power save mode settings */
 		acxlog(L_INIT, "Updating 802.11 power save mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", priv->ps_wakeup_cfg, priv->ps_listen_interval, priv->ps_options, priv->ps_hangover_period, priv->ps_enhanced_transition_time);
@@ -2531,7 +2577,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 	if (0 != (priv->set_mask & (GETSET_REG_DOMAIN|GETSET_ALL))) {
 		/* reg_domain */
-		memmap_t dom;
+		acx_ie_generic_t dom;
 		UINT16 i;
 
 		acxlog(L_INIT, "Updating regulatory domain: 0x%02X\n",
@@ -2689,14 +2735,14 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	}
 
 	if (0 != (priv->set_mask & (SET_WEP_OPTIONS|GETSET_ALL))) {
-		acx100_wep_options_t options;
+		acx100_ie_wep_options_t options;
 
 		if(priv->chip_type == CHIPTYPE_ACX111) {
 			acxlog(L_DEBUG, "Setting WEP Options for ACX111 not supported!\n");
 		} else {
 			acxlog(L_INIT, "Setting WEP Options\n");
 				
-			options.NumKeys = cpu_to_le16(NUM_WEPKEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
+			options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
 			options.WEPOption = priv->monitor_setting;
 
 			acx100_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
@@ -2753,11 +2799,25 @@ int acx100_set_defaults(wlandevice_t *priv)
 	/* set our global interrupt mask */
 	if(priv->chip_type == CHIPTYPE_ACX100) {
 		/* priv->irq_mask = 0xdbb5; not longer used anymore! */
-		priv->irq_mask = 0xd9b5;
-		priv->irq_mask_off = 0x7fff;
+		priv->irq_mask = (UINT16)
+			         ~( HOST_INT_SCAN_COMPLETE
+				  | HOST_INT_INFO
+				  | HOST_INT_CMD_COMPLETE
+				  | HOST_INT_TIMER
+				  | HOST_INT_RX_COMPLETE
+				  | HOST_INT_TX_COMPLETE ); /* 0xd9b5 */
+		priv->irq_mask_off = (UINT16)~( HOST_INT_UNKNOWN ); /* 0x7fff */
 	} else if(priv->chip_type == CHIPTYPE_ACX111) {
-		priv->irq_mask = 0x98e5;
-		priv->irq_mask_off = 0xfdff;
+		priv->irq_mask = (UINT16)
+				 ~( HOST_INT_FCS_THRESHOLD
+				  | HOST_INT_SCAN_COMPLETE
+				  | HOST_INT_INFO
+				  | HOST_INT_CMD_COMPLETE
+				  | HOST_INT_IV_ICV_FAILURE
+				  | HOST_INT_DTIM
+				  | HOST_INT_RX_COMPLETE
+				  | HOST_INT_TX_COMPLETE ); /* 0x98e5 */
+		priv->irq_mask_off = (UINT16)~( HOST_INT_CMD_COMPLETE ); /* 0xfdff */
 	}
 
 	priv->led_power = (UINT8)1; /* LED is active on startup */
@@ -3203,7 +3263,7 @@ acx_join_bssid(wlandevice_t *priv)
 int acx100_init_mac(netdevice_t *dev, UINT16 init)
 {
 	int result = NOT_OK;
-	acx100_memmap_t pkt;
+	acx100_ie_memmap_t pkt;
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	acxlog(L_DEBUG,"sizeof(memmap)=%d bytes\n",sizeof(pkt));
@@ -3693,8 +3753,8 @@ UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
  * rename ALL relevant definitions to indicate actual card scope! */
 void acx111_read_configoption(wlandevice_t *priv)
 {
-	acx1xx_configoption_t	co;
-	acx1xx_configoption_t	co2;
+	acx_configoption_t	co;
+	acx_configoption_t	co2;
 	int	i;
 	UINT8	*pEle;
 	
@@ -3710,9 +3770,9 @@ void acx111_read_configoption(wlandevice_t *priv)
 	pEle = (UINT8 *)&co;
 	pEle += (UINT8 *)sizeof(co_fixed_t) - (UINT8 *)4;
 	
-	co2.antennas.rid = pEle[0];
+	co2.antennas.type = pEle[0];
 	co2.antennas.len = pEle[1];
-	acxlog(L_DEBUG, "AntennaID : %02X  Length: %02X, Data: ", co2.antennas.rid, co2.antennas.len);
+	acxlog(L_DEBUG, "AntennaID : %02X  Length: %02X, Data: ", co2.antennas.type, co2.antennas.len);
 	for (i=0;i<pEle[1];i++) {
 	    co2.antennas.list[i] = pEle[i+2];
 	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3720,9 +3780,9 @@ void acx111_read_configoption(wlandevice_t *priv)
 	acxlog(L_DEBUG, "\n");
 
 	pEle += pEle[1] + 2;	
-	co2.power_levels.rid = pEle[0];
+	co2.power_levels.type = pEle[0];
 	co2.power_levels.len = pEle[1];
-	acxlog(L_DEBUG, "PowerLevelID : %02X  Length: %02X, Data: ", co2.power_levels.rid, co2.power_levels.len);
+	acxlog(L_DEBUG, "PowerLevelID : %02X  Length: %02X, Data: ", co2.power_levels.type, co2.power_levels.len);
 	for (i=0;i<pEle[1]*2;i++) {
 	    co2.power_levels.list[i] = pEle[i+2];
 	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3730,9 +3790,9 @@ void acx111_read_configoption(wlandevice_t *priv)
 	acxlog(L_DEBUG, "\n");
 
 	pEle += pEle[1]*2 + 2;	
-	co2.data_rates.rid = pEle[0];
+	co2.data_rates.type = pEle[0];
 	co2.data_rates.len = pEle[1];
-	acxlog(L_DEBUG, "DataRatesID : %02X  Length: %02X, Data: ", co2.data_rates.rid, co2.data_rates.len);
+	acxlog(L_DEBUG, "DataRatesID : %02X  Length: %02X, Data: ", co2.data_rates.type, co2.data_rates.len);
 	for (i=0;i<pEle[1];i++) {
 	    co2.data_rates.list[i] = pEle[i+2];
 	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3740,9 +3800,9 @@ void acx111_read_configoption(wlandevice_t *priv)
 	acxlog(L_DEBUG, "\n");
 	
 	pEle += pEle[1] + 2;
-	co2.domains.rid = pEle[0];
+	co2.domains.type = pEle[0];
 	co2.domains.len = pEle[1];
-	acxlog(L_DEBUG, "DomainID : %02X  Length: %02X, Data: ", co2.domains.rid, co2.domains.len);
+	acxlog(L_DEBUG, "DomainID : %02X  Length: %02X, Data: ", co2.domains.type, co2.domains.len);
 	for (i=0;i<pEle[1];i++) {
 	    co2.domains.list[i] = pEle[i+2];
 	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3750,20 +3810,20 @@ void acx111_read_configoption(wlandevice_t *priv)
 	acxlog(L_DEBUG, "\n");
 	
 	pEle += pEle[1] + 2;
-	co2.product_id.rid = pEle[0];
+	co2.product_id.type = pEle[0];
 	co2.product_id.len = pEle[1];
 	for (i=0;i<pEle[1];i++) {
 	    co2.product_id.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %s\n", co2.product_id.rid, co2.product_id.len, (char *)co2.product_id.list);
+	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %s\n", co2.product_id.type, co2.product_id.len, (char *)co2.product_id.list);
 
 	pEle += pEle[1] + 2;	
-	co2.manufactor.rid = pEle[0];
+	co2.manufactor.type = pEle[0];
 	co2.manufactor.len = pEle[1];
 	for (i=0;i<pEle[1];i++) {
 	    co2.manufactor.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %s\n", co2.manufactor.rid, co2.manufactor.len, (char *)co2.manufactor.list);
+	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %s\n", co2.manufactor.type, co2.manufactor.len, (char *)co2.manufactor.list);
 
 /*
 	acxlog(L_DEBUG, "EEPROM part : \n");

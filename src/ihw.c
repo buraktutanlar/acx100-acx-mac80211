@@ -412,7 +412,7 @@ void acx100_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx100_write_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
+static inline void acx100_write_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd, int len)
 {
 	memcpy(priv->CommandParameters, cmd, len);
 }
@@ -434,7 +434,7 @@ static inline void acx100_write_cmd_param(wlandevice_t *priv, memmap_t *cmd, int
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline void acx100_read_cmd_param(wlandevice_t *priv, memmap_t *cmd, int len)
+static inline void acx100_read_cmd_param(wlandevice_t *priv, acx_ie_generic_t *cmd, int len)
 {
 	memcpy(cmd, priv->CommandParameters, len);
 }
@@ -625,7 +625,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	priv->usbout.cmd=cmd;
 	priv->usbout.status=0;
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
-		priv->usbout.u.rridreq.rid=((memmap_t *)pdr)->type;
+		priv->usbout.u.rridreq.rid=((acx_ie_generic_t *)pdr)->type;
 		priv->usbout.u.rridreq.frmlen=paramlen-4;
 		blocklen=8;
 		switch (priv->usbout.u.rridreq.rid) {
@@ -635,9 +635,9 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 		else acklen=4+paramlen;
 		acxlog(L_XFER,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbout.cmd,priv->usbout.status,priv->usbout.u.rridreq.rid,priv->usbout.u.rridreq.frmlen);
 	} else if (cmd==ACX1xx_CMD_CONFIGURE) {
-		priv->usbout.u.wridreq.rid=((memmap_t *)pdr)->type;
+		priv->usbout.u.wridreq.rid=((acx_ie_generic_t *)pdr)->type;
 		priv->usbout.u.wridreq.frmlen=paramlen-4;
-		memcpy(priv->usbout.u.wridreq.data,&(((memmap_t *)pdr)->m),paramlen-4);
+		memcpy(priv->usbout.u.wridreq.data,&(((acx_ie_generic_t *)pdr)->m),paramlen-4);
 		blocklen=paramlen+4;
 	} else if ((cmd==ACX1xx_CMD_ENABLE_RX)||(cmd==ACX1xx_CMD_ENABLE_TX)||(cmd==ACX1xx_CMD_SLEEP)) {
 		priv->usbout.u.rxtx.data=1;		/* just for testing */
@@ -832,16 +832,16 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 		len=CtlLengthDot11[type-0x1000];
 
 	if (unlikely(len==0)) {
-		acxlog(L_DEBUG,"WARNING: ENCOUNTERED ZEROLENGTH RID (%x)\n",type);
+		acxlog(L_DEBUG,"WARNING: ENCOUNTERED ZEROLENGTH TYPE (%x)\n",type);
 	}
-	acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
+	acxlog(L_XFER,"configuring: type=0x%X len=%d\n",type,len);
 	
-	((memmap_t *)pdr)->type = cpu_to_le16(type);
+	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((memmap_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
 	offs = 0; /* FIXME: really?? */
 #else
-	((memmap_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
 	offs = 4;
 #endif
 	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, len + offs, 5000);
@@ -866,11 +866,11 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 *----------------------------------------------------------------*/
 inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, short len)
 {
-	((memmap_t *)pdr)->type = cpu_to_le16(type);
+	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((memmap_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
 #else
-	((memmap_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
 #endif
 	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, 
 		len + 4, 5000);
@@ -904,14 +904,14 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 	else
 		len=CtlLengthDot11[type-0x1000];
 
-	((memmap_t *)pdr)->type = cpu_to_le16(type);
+	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((memmap_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
 #else
-	((memmap_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
 #endif
 
-	acxlog(L_CTL,"interrogating: type(rid)=0x%X len=%d\n",type,len);
+	acxlog(L_CTL,"interrogating: type=0x%X len=%d\n",type,len);
 
 	return acx100_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr,
 		len + 4, 5000);

@@ -48,42 +48,9 @@
 
 
 
-/* a helper struct for quick implementation of commands */
-typedef struct GenericPacket {
-	UINT8 bytes[32];
-} GenericPacket_t;
-
-
-typedef struct acx100_memmap {
-	UINT16	rid;
+typedef struct acx100_ie_queueconfig {
+	UINT16	type;
 	UINT16	len;
-	UINT32	CodeStart;
-	UINT32	CodeEnd;
-	UINT32	WEPCacheStart;
-	UINT32	WEPCacheEnd;
-	UINT32	PacketTemplateStart;
-	UINT32	PacketTemplateEnd;
-	UINT32	QueueStart;
-	UINT32	QueueEnd;
-	UINT32	PoolStart;
-	UINT32	PoolEnd;
-} acx100_memmap_t;
-
-typedef struct acx100_memconfigoption {
-	UINT16	rid;
-	UINT16	len;
-	UINT32	DMA_config;
-	UINT32  pRxHostDesc;        /* val0x8 */
-	UINT32	rx_mem;
-	UINT32	tx_mem;
-	UINT16	TxBlockNum;
-	UINT16	RxBlockNum;
-} acx100_memconfigoption_t;
-
-
-typedef struct QueueConfig {
-	UINT16	rid;			/* rid */
-	UINT16	len;			/* length */
 	UINT32	AreaSize;
 	UINT32	RxQueueStart;
 	UINT8	QueueOptions;		/* queue options, val0xd */
@@ -96,11 +63,11 @@ typedef struct QueueConfig {
 	UINT8	TxQueuePri;
 	UINT8	NumTxDesc;
 	UINT16	pad;
-} QueueConfig_t;
+} acx100_ie_queueconfig_t;
 
-typedef struct ACX111QueueConfig {
+typedef struct acx111_ie_queueconfig {
 
-	UINT16 rid;
+	UINT16 type;
 	UINT16 len;
 	UINT32 tx_memory_block_address;
 	UINT32 rx_memory_block_address;
@@ -111,11 +78,22 @@ typedef struct ACX111QueueConfig {
 	UINT16 reserved2;
 	UINT8  reserved3;
 
-} __WLAN_ATTRIB_PACK__ ACX111QueueConfig_t;
+} __WLAN_ATTRIB_PACK__ acx111_ie_queueconfig_t;
 
-typedef struct ACX111MemoryConfig {
+typedef struct acx100_ie_memconfigoption {
+	UINT16	type;
+	UINT16	len;
+	UINT32	DMA_config;
+	UINT32  pRxHostDesc;        /* val0x8 */
+	UINT32	rx_mem;
+	UINT32	tx_mem;
+	UINT16	TxBlockNum;
+	UINT16	RxBlockNum;
+} acx100_ie_memconfigoption_t;
 
-	UINT16 rid;
+typedef struct acx111_ie_memoryconfig {
+
+	UINT16 type;
 	UINT16 len;
 	UINT16 no_of_stations;
 	UINT16 memory_block_size;
@@ -142,7 +120,22 @@ typedef struct ACX111MemoryConfig {
 	UINT8 tx_queue1_attributes;
 	/* end of tx1 block */
 
-}  __WLAN_ATTRIB_PACK__ ACX111MemoryConfig_t;
+}  __WLAN_ATTRIB_PACK__ acx111_ie_memoryconfig_t;
+
+typedef struct acx100_ie_memmap {
+	UINT16	type;
+	UINT16	len;
+	UINT32	CodeStart;
+	UINT32	CodeEnd;
+	UINT32	WEPCacheStart;
+	UINT32	WEPCacheEnd;
+	UINT32	PacketTemplateStart;
+	UINT32	PacketTemplateEnd;
+	UINT32	QueueStart;
+	UINT32	QueueEnd;
+	UINT32	PoolStart;
+	UINT32	PoolEnd;
+} acx100_ie_memmap_t;
 
 typedef struct ACX111FeatureConfig {
 
@@ -185,18 +178,18 @@ typedef struct associd {
 #define PS_OPT_ENA_ENHANCED_PS	0x04 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set in the TIM; newer firmwares only(?) */
 #define PS_OPT_STILL_RCV_BCASTS	0x01
 
-typedef struct acx100_powermgmt {
-	UINT32	rid;
+typedef struct acx100_ie_powermgmt {
+	UINT32	type;
 	UINT32	len;
 	UINT8 wakeup_cfg;
 	UINT8 listen_interval; /* for EACH_ITVL: wake up every "beacon units" interval */
 	UINT8 options;
 	UINT8 hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	UINT16 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} acx100_powermgmt_t;
+} acx100_ie_powermgmt_t;
 
-typedef struct acx111_powermgmt {
-	UINT32	rid;
+typedef struct acx111_ie_powermgmt {
+	UINT32	type;
 	UINT32	len;
 	UINT8	wakeup_cfg;
 	UINT8	listen_interval; /* for EACH_ITVL: wake up every "beacon units" interval */
@@ -204,22 +197,7 @@ typedef struct acx111_powermgmt {
 	UINT8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	UINT32	beaconRxTime;
 	UINT32 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} acx111_powermgmt_t;
-
-typedef struct defaultkey {
-	UINT8 num;
-} defaultkey_t;
-
-typedef struct memmap {
-	UINT16 type;
-	UINT16 length;
-	union data {
-		struct GenericPacket gp;
-		/* struct wep wp; */
-		struct associd asid;
-		struct defaultkey dkey;
-	} m;
-} memmap_t;
+} acx111_ie_powermgmt_t;
 
 typedef struct sub3info {
 	UINT8 size;
@@ -282,20 +260,20 @@ typedef struct acx111_scan {
 } __WLAN_ATTRIB_PACK__ acx111_scan_t;
 
 
-typedef struct tim {
+typedef struct acx_tim {
 	UINT16 size;
 	UINT8 buf[0x100];
-} tim_t;
+} acx_tim_t;
 
-typedef struct proberesp {
+typedef struct acx_proberesp {
 	UINT16 size;
 	char buf[0x54];
-} __WLAN_ATTRIB_PACK__ proberesp_t;
+} __WLAN_ATTRIB_PACK__ acx_proberesp_t;
 
-typedef struct probereq {
+typedef struct acx_probereq {
 	UINT16 size;
 	char buf[0x44];
-} __WLAN_ATTRIB_PACK__ probereq_t;
+} __WLAN_ATTRIB_PACK__ acx_probereq_t;
 
 /* as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
  * NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
@@ -424,22 +402,22 @@ typedef struct {
 } radioinit_t;
 
 
-typedef struct acx100_wep_options {
-    UINT16	rid;
+typedef struct acx100_ie_wep_options {
+    UINT16	type;
     UINT16	len;
     UINT16	NumKeys;	/* max # of keys */
     UINT8	WEPOption;	/* 0 == decrypt default key only, 1 == override decrypt */
     UINT8	Pad;		/* used only for acx111 */
-} acx100_wep_options_t;
+} acx100_ie_wep_options_t;
 
-typedef struct dot11WEPDefaultKey {
-    UINT16	rid;
+typedef struct ie_dot11WEPDefaultKey {
+    UINT16	type;
     UINT16	len;
     UINT8	action;
     UINT8	keySize;
     UINT8	defaultKeyNum;
     UINT8	key[29];	/* check this! was Key[19]. */
-} dot11WEPDefaultKey_t;
+} ie_dot11WEPDefaultKey_t;
 
 typedef struct acx111WEPDefaultKey {
     UINT8	MacAddr[ETH_ALEN];
@@ -453,11 +431,11 @@ typedef struct acx111WEPDefaultKey {
     UINT8	key[29];	/* check this! was Key[19]. */
 } acx111WEPDefaultKey_t;
 
-typedef struct dot11WEPDefaultKeyID {
-    UINT16	rid;
+typedef struct ie_dot11WEPDefaultKeyID {
+    UINT16	type;
     UINT16	len;
     UINT8	KeyID;
-} dot11WEPDefaultKeyID_t;
+} ie_dot11WEPDefaultKeyID_t;
 
 typedef struct acx100_wep_mgmt {
     UINT8	MacAddr[ETH_ALEN];
@@ -466,46 +444,66 @@ typedef struct acx100_wep_mgmt {
     UINT8	Key[29];	/* 29*8 == 232bits == WEP256 */
 } acx100_wep_mgmt_t;
 
+/* a helper struct for quick implementation of commands */
+typedef struct GenericPacket {
+	UINT8 bytes[32];
+} GenericPacket_t;
+
+typedef struct defaultkey {
+	UINT8 num;
+} defaultkey_t;
+
+typedef struct acx_ie_generic {
+	UINT16 type;
+	UINT16 length;
+	union data {
+		struct GenericPacket gp;
+		/* struct wep wp; */
+		struct associd asid;
+		struct defaultkey dkey;
+	} m;
+} acx_ie_generic_t;
+
 /* Config Option structs */
 
 typedef struct co_antennas {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT8	list[2];
 } co_antennas_t;
 
 typedef struct co_powerlevels {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT16	list[8];
 } co_powerlevels_t;
 
 typedef struct co_datarates {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT8	list[8];
 } co_datarates_t;
 
 typedef struct co_domains {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT8	list[6];
 } co_domains_t;
 
 typedef struct co_product_id {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT8	list[128];
 } co_product_id_t;
 
 typedef struct co_manuf_id {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     UINT8	list[128];
 } co_manuf_t;
 
 typedef struct co_fixed {
-    UINT8	rid;
+    UINT8	type;
     UINT8	len;
     char	NVSv[8];
     UINT8	MAC[6];
@@ -522,7 +520,7 @@ typedef struct co_fixed {
 } co_fixed_t;
 
 
-typedef struct acx1xx_configoption {
+typedef struct acx_configoption {
     co_fixed_t			configoption_fixed;
     co_antennas_t		antennas;
     co_powerlevels_t		power_levels;
@@ -530,7 +528,7 @@ typedef struct acx1xx_configoption {
     co_domains_t		domains;
     co_product_id_t		product_id;
     co_manuf_t			manufactor;
-} acx1xx_configoption_t;
+} acx_configoption_t;
 
 
 
@@ -563,7 +561,7 @@ void acx100_init_mboxes(wlandevice_t *priv);
 void acx100_set_wepkey(wlandevice_t *priv);
 void acx111_set_wepkey(wlandevice_t *priv);
 int acx100_init_wep(wlandevice_t *priv);
-int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *pt);
+int acx100_init_packet_templates(wlandevice_t *priv, acx100_ie_memmap_t *pt);
 int acx100_init_max_probe_request_template(wlandevice_t *priv);
 int acx100_init_max_null_data_template(wlandevice_t *priv);
 int acx100_init_max_beacon_template(wlandevice_t *priv);
@@ -581,19 +579,9 @@ void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
 void acx111_scan_chan(wlandevice_t *priv);
 int acx100_set_rxconfig(wlandevice_t *priv);
 int acx100_load_radio(wlandevice_t *priv);
-int acx100_read_proc(char *page, char **start, off_t offset, int count,
-		     int *eof, void *data);
-int acx100_read_proc_diag(char *page, char **start, off_t offset, int count,
-		     int *eof, void *data);
-int acx100_read_proc_eeprom(char *page, char **start, off_t offset, int count,
-		     int *eof, void *data);
-int acx100_read_proc_phy(char *page, char **start, off_t offset, int count,
-		     int *eof, void *data);
-int acx100_proc_output(char *buf, wlandevice_t *priv);
-int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
-int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
-int acx100_proc_phy_output(char *buf, wlandevice_t *priv);
 void acx100_read_configoption(wlandevice_t *priv);
+UINT16 acx_proc_register_entries(struct net_device *dev);
+UINT16 acx_proc_unregister_entries(struct net_device *dev);
 void acx_update_ratevector(wlandevice_t *priv);
 void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 

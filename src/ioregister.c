@@ -144,12 +144,13 @@ const UINT16 IO_ACX111[] =
 	0x0108, /* IO_ACX_ECPU_CTRL */
 };
 
-const UINT16* acx100_get_io_register_array() 
+void acx_select_io_register_set(wlandevice_t *priv, UINT16 chip_type)
 {
-	return IO_ACX100;
-}
-
-const UINT16* acx111_get_io_register_array() 
-{
-	return IO_ACX111;
+	/* set the correct io resource list for the active chip */
+	if (CHIPTYPE_ACX100 == chip_type) {
+		priv->io = IO_ACX100;
+	} else if (CHIPTYPE_ACX111 == chip_type) {
+		priv->io = IO_ACX111;
+	}
+	acxlog(L_STD, "%s: using %s io resource addresses (size: %d)\n", __func__, priv->chip_name, IO_INDICES_SIZE);
 }

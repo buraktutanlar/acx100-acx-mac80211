@@ -47,7 +47,7 @@
 #define __ACX_IOREGISTER_H
 
 /* functions */
-const UINT16* acx100_get_io_register_array(void);
-const UINT16* acx111_get_io_register_array(void);
+
+void acx_select_io_register_set(wlandevice_t *priv, UINT16 chip_type);
 
 #endif /* __ACX_IOREGISTER_H */

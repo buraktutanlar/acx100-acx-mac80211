@@ -1061,7 +1061,7 @@ typedef struct acx100_addr3 {
 } acx100_addr3_t;
 
 /*--- WEP stuff --------------------------------------------------------------*/
-#define NUM_WEPKEYS			4
+#define DOT11_MAX_DEFAULT_WEP_KEYS	4
 #define MAX_KEYLEN			32
 
 #define HOSTWEP_DEFAULTKEY_MASK		(BIT1 | BIT0)
@@ -1293,7 +1293,7 @@ typedef struct wlandevice {
 	UINT		chip_type;
 	const char	*chip_name;
 	UINT8		bus_type;
-	const UINT16		*io;
+	const UINT16		*io;		/* points to ACX100 or ACX111 I/O register address set */
 
 	/*** Device state ***/
 	u32		pci_state[16];		/* saved PCI state for suspend/resume */
@@ -1395,7 +1395,7 @@ typedef struct wlandevice {
 	UINT8		wep_enabled;
 	UINT8		wep_restricted;		/* V3POS c0 */
 	UINT8		wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
-	wep_key_t	wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
+	wep_key_t	wep_keys[DOT11_MAX_DEFAULT_WEP_KEYS];	/* the default WEP keys */
 	key_struct_t	wep_key_struct[10];	/* V3POS 688 */
 
 	/*** Card Rx/Tx management ***/
