@@ -744,7 +744,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
  *
  ****************************************************************************/
 
-static const short CtlLength[0x16] = {
+static const short CtlLength[0x17] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
 	ACX1xx_IE_POWER_MGMT_LEN,
@@ -766,7 +766,8 @@ static const short CtlLength[0x16] = {
 	0,
 	ACX1xx_IE_FIRMWARE_STATISTICS_LEN,
 	0,
-	ACX1xx_IE_FEATURE_CONFIG_LEN
+	ACX1xx_IE_FEATURE_CONFIG_LEN,
+	ACX111_IE_KEY_CHOOSE_LEN
 	
 	};
 
@@ -838,10 +839,10 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 	
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->len = 0; /* FIXME: is that correct? */
 	offs = 0; /* FIXME: really?? */
 #else
-	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 	offs = 4;
 #endif
 	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, len + offs, 5000);
@@ -868,9 +869,9 @@ inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, sh
 {
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->len = 0; /* FIXME: is that correct? */
 #else
-	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 #endif
 	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, 
 		len + 4, 5000);
@@ -906,9 +907,9 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
-	((acx_ie_generic_t *)pdr)->length = 0; /* FIXME: is that correct? */
+	((acx_ie_generic_t *)pdr)->len = 0; /* FIXME: is that correct? */
 #else
-	((acx_ie_generic_t *)pdr)->length = cpu_to_le16(len);
+	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 #endif
 
 	acxlog(L_CTL,"interrogating: type=0x%X len=%d\n",type,len);

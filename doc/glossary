@@ -84,6 +84,8 @@ SSID		Service Set Identifier
 			in plain text from a packet it does not supply
 			any security to the network
 TIM		Traffic Indication Map
+TKIP		Temporal Key Integrity Protocol
+		TKIP is an enhancement of WEP, in order to resolve some of its weaknesses
 TU		Time Unit
 			One TU is 1024 microseconds long.
 WEP		Wired Equivalent Privacy

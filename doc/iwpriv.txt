@@ -2,7 +2,7 @@ Usage: iwpriv wlan0/eth0 COMMAND OPTION1 [OPTION2] [...]
 
 Commands ("iwpriv wlan0"):
 
-SetSebug - sets debugging/logging level (see L_* #defines in include/acx100.h)
+SetDebug - sets debugging/logging level (see L_* #defines in include/acx100.h)
 Default: 0x009b
 "iwpriv wlan0 SetDebug 0x000b" (L_STD | L_INIT | L_ASSOC)
 
@@ -21,8 +21,9 @@ SetScanMode - sets scan mode (0 == active, 1 == passive, 2 == background)
 
 SetScanDelay - sets time (in ms) to wait per channel on a scan
 
-SetSPreamble - Activates the Short Preamble transfer (slightly faster rates)
-Default: 0, off (better compatibility, slower)
+SetSPreamble - Activates the Short Preamble transfer for slightly faster
+rates (0 == off, 1 == on, 2 == auto, depending on peer support)
+Default: 2, auto
 "iwpriv wlan0 SetSPreamble 1", "dmesg"
 
 GetSPreamble - returns the Short Preamble transfer setting

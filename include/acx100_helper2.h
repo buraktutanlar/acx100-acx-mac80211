@@ -64,19 +64,19 @@ typedef struct rxbuffer rxbuffer_t;
 
 #define MAX_NUMBER_OF_SITE 31
 
-typedef struct ssid {
+typedef struct __WLAN_ATTRIB_PACK__ ssid {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT8 inf[32];
 } ssid_t;
 
-typedef struct rates {
+typedef struct __WLAN_ATTRIB_PACK__ rates {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT8 sup_rates[8];
 } rates_t;
 
-typedef struct fhps {
+typedef struct __WLAN_ATTRIB_PACK__ fhps {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT16 dwell_time;
@@ -85,13 +85,13 @@ typedef struct fhps {
 	UINT8 hop_index;
 } fhps_t;
 
-typedef struct dsps {
+typedef struct __WLAN_ATTRIB_PACK__ dsps {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT8 curr_channel;
 } dsps_t;
 
-typedef struct cfps {
+typedef struct __WLAN_ATTRIB_PACK__ cfps {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT8 cfp_count;
@@ -100,7 +100,7 @@ typedef struct cfps {
 	UINT16 cfp_dur_rem;
 } cfps_t;
 
-typedef struct challenge_text {
+typedef struct __WLAN_ATTRIB_PACK__ challenge_text {
 	UINT8 element_ID;
 	UINT8 length;
 	UINT8 text[253];
@@ -108,21 +108,21 @@ typedef struct challenge_text {
 
 
 
-typedef struct auth_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ auth_frame_body {
 	UINT16 auth_alg;
 	UINT16 auth_seq;
 	UINT16 status;
 	challenge_text_t challenge;
 } auth_frame_body_t;
 
-typedef struct assocresp_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ assocresp_frame_body {
 	UINT16 cap_info;
 	UINT16 status;
 	UINT16 aid;
 	rates_t rates;
 } assocresp_frame_body_t;
 
-typedef struct reassocreq_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ reassocreq_frame_body {
 	UINT16 cap_info;
 	UINT16 listen_int;
 	UINT8 current_ap[6];
@@ -130,27 +130,27 @@ typedef struct reassocreq_frame_body {
 	rates_t rates;
 } reassocreq_frame_body_t;
 
-typedef struct reassocresp_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ reassocresp_frame_body {
 	UINT16 cap_info;
 	UINT16 status;
 	UINT16 aid;
 	rates_t rates;
 } reassocresp_frame_body_t;
 
-typedef struct deauthen_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ deauthen_frame_body {
 	UINT16 reason;
 } deauthen_frame_body_t;
 
-typedef struct disassoc_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ disassoc_frame_body {
 	UINT16 reason;
 } disassoc_frame_body_t;
 
-typedef struct probereq_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ probereq_frame_body {
 	ssid_t ssid;
 	rates_t rates;
 } probereq_frame_body_t;
 
-typedef struct proberesp_frame_body {
+typedef struct __WLAN_ATTRIB_PACK__ proberesp_frame_body {
 	UINT8 timestamp[8];
 	UINT16 beacon_int;
 	UINT16 cap_info;
@@ -161,7 +161,7 @@ typedef struct proberesp_frame_body {
 	cfps_t cfps;
 } proberesp_frame_body_t;
 
-typedef struct TxData {
+typedef struct __WLAN_ATTRIB_PACK__ TxData {
 	UINT16 frame_control;	/* 0x0 */
 	UINT16 duration_id;	/* 0x2 */
 	UINT8 da[ETH_ALEN];	/* 0x4 */

@@ -106,7 +106,7 @@ alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
 UINT16 CurrentAID = 1;
 
-const char *state_str[7] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN", "INVALID??" };
+const char *state_str[] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "INVALID??" };
 
 const UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
@@ -296,12 +296,14 @@ client_t *acx100_sta_list_get(wlandevice_t *priv, const UINT8 *address)
 	return result;
 }
 
+#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
+
 inline const char *acx100_get_status_name(UINT16 status)
 {
-	if (ISTATUS_5_UNKNOWN >= status)
+	if (status < VEC_SIZE(state_str))
 		return state_str[status];
 	else
-		return state_str[6];
+		return state_str[VEC_SIZE(state_str)-1];
 }
 
 /*----------------------------------------------------------------
@@ -378,14 +380,9 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	}
 #endif
 
-	if (priv->unknown0x2350 == ISTATUS_5_UNKNOWN) {
-		priv->unknown0x2350 = priv->status;
-		priv->status = ISTATUS_5_UNKNOWN;
-	} else {
-		priv->status = status;
-	}
-	if ((priv->status == ISTATUS_1_SCANNING)
-	    || (priv->status == ISTATUS_5_UNKNOWN)) {
+	priv->status = status;
+
+	if (priv->status == ISTATUS_1_SCANNING) {
 		priv->scan_retries = 0;
 		acx100_set_timer(priv, 2500000); /* 2.5s initial scan time (used to be 1.5s, but failed to find WEP APs!) */
 	} else if (priv->status <= ISTATUS_3_AUTHENTICATED) {
@@ -1131,7 +1128,6 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			switch (priv->status) {
 			   case ISTATUS_1_SCANNING:
-			   case ISTATUS_5_UNKNOWN:
 				memset(&alloc_p80211mgmt_req.a.beacon, 0,
 				       0xe * 4);
 				alloc_p80211mgmt_req.a.beacon.buf =
@@ -1576,7 +1572,7 @@ const char * const status_str[22] =
   "Reserved error code", "Reserved error code",
   "Cannot support all requested capabilities in the Capability Information field. TRANSLATION: Bug in ACX100 driver?",
   "Reassociation denied due to reason outside the scope of 802.11b standard. TRANSLATION: Bug in ACX100 driver?",
-  "Association denied due to reason outside the scope of 802.11b standard. TRANSLATION: peer station probably has MAC filtering enabled, FIX IT!",
+  "Association denied due to reason outside the scope of 802.11b standard. TRANSLATION: peer station perhaps has MAC filtering enabled, FIX IT!",
   "Responding station does not support the specified authentication algorithm. TRANSLATION: invalid network data or bug in ACX100 driver?",
   "Received an Authentication frame with transaction sequence number out of expected sequence. TRANSLATION: Bug in ACX100 driver?",
   "Authentication rejected because of challenge failure. TRANSLATION: Bug in ACX100 driver?",
@@ -2995,7 +2991,7 @@ void acx100_timer(unsigned long address)
 			acx100_set_status(priv, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(priv, 2500000); /* used to be 1500000, but some other driver uses 2.5s wait time  */
-    break;
+		break;
 	case ISTATUS_3_AUTHENTICATED:
 		if (++priv->auth_assoc_retries < 10) {
 			acxlog(L_ASSOC,
@@ -3010,10 +3006,6 @@ void acx100_timer(unsigned long address)
 			acx100_set_status(priv, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(priv, 2500000); /* see above */
-		break;
-	case ISTATUS_5_UNKNOWN:
-		acx100_set_status(priv, priv->unknown0x2350);
-		priv->unknown0x2350 = 0;
 		break;
 	case ISTATUS_0_STARTED:
 	case ISTATUS_4_ASSOCIATED:

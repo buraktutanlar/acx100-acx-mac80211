@@ -1776,7 +1776,7 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 static int acx100_init_memory_pools(wlandevice_t *priv, acx100_ie_memmap_t *mmt)
 {
 	UINT32 TotalMemoryBlocks;
-        acx100_memblocksize_t MemoryBlockSize;
+        acx100_ie_memblocksize_t MemoryBlockSize;
 
         acx100_ie_memconfigoption_t MemoryConfigOption;
 

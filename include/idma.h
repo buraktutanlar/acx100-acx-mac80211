@@ -57,7 +57,7 @@ char *acx100_get_packet_type_string(UINT16 fc);
 
 #define ACX100_RXBUF_HDRSIZE 12
 
-typedef struct rxbuffer {
+typedef struct __WLAN_ATTRIB_PACK__ rxbuffer {
 	UINT16	mac_cnt_rcvd;	/* 0x0, only 12 bits are len! (0xfff) */
 	UINT8	mac_cnt_mblks;	/* 0x2 */
 	UINT8	mac_status;	/* 0x3 */
@@ -68,15 +68,15 @@ typedef struct rxbuffer {
 	UINT32	time;		/* 0x8  timestamp upon MAC rcv first byte */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8	data[ACX100_BAP_DATALEN_MAX];
-} rxb_t;			/* 0x956 */
+} rxb_t;	/* 0x956 */
 
-typedef struct txbuffer {
+typedef struct __WLAN_ATTRIB_PACK__ txbuffer {
 	UINT8 data[WLAN_MAX_ETHFRM_LEN-WLAN_ETHHDR_LEN];
 } txb_t;
 
 /* This struct must contain the header of a packet. A header can maximally
  * contain a type 4 802.11 header + a LLC + a SNAP, amounting to 38 bytes */
-typedef struct framehdr {
+typedef struct __WLAN_ATTRIB_PACK__ framehdr {
 	char data[0x26];
 } frmhdr_t;
 
@@ -227,7 +227,7 @@ modulation from the start and thus easily identifiable.
 Not shown here.
 */
 
-typedef struct txdescriptor {
+typedef struct __WLAN_ATTRIB_PACK__ txdescriptor {
 	UINT32	pNextDesc;		/* pointer to the next txdescriptor */
 	UINT32	HostMemPtr;
 	UINT32	AcxMemPtr;
@@ -235,12 +235,12 @@ typedef struct txdescriptor {
 	UINT16	total_length;
 	UINT16	Reserved;
 	/* the following 16 bytes do not change when acx100 owns the descriptor */
-	union { /* we need to add a union here with a *fixed* size of 16, since ptrlen AMD64 (8) != ptrlen x86 (4) */
-		struct {
+	union __WLAN_ATTRIB_PACK__ { /* we need to add a union here with a *fixed* size of 16, since ptrlen AMD64 (8) != ptrlen x86 (4) */
+		struct __WLAN_ATTRIB_PACK__ {
 			struct  txrate_ctrl *txc;
 			struct txhostdescriptor *host_desc;
 		} s;
-		struct {
+		struct __WLAN_ATTRIB_PACK__ {
 			UINT32 d1;
 			UINT32 d2;
 			UINT32 d3;
@@ -253,18 +253,17 @@ typedef struct txdescriptor {
 	UINT8	ack_failures;			/* 0x27 */
 	UINT8	rts_failures;			/* 0x28 */
 	UINT8	rts_ok;				/* 0x29 */
-	union {
-    		struct {
+	union __WLAN_ATTRIB_PACK__ {
+    		struct __WLAN_ATTRIB_PACK__ {
 			UINT8	rate;		/* 0x2a */
 			UINT8	queue_ctrl;	/* 0x2b */
-    		} r1 __attribute__((packed));
-    		struct {
+    		} r1;
+    		struct __WLAN_ATTRIB_PACK__ {
 			UINT16  rate111;
-    		} r2 __attribute__((packed));
-	} u __attribute__((packed));
+    		} r2;
+	} u;
 	UINT32	queue_info;			/* 0x2c (acx100, 'reserved' on acx111) */
-
-} txdesc_t __attribute__((packed));		/* size : 48 = 0x30 */
+} txdesc_t;		/* size : 48 = 0x30 */
 /* NOTE: The acx111 txdescriptor structure is 4 byte larger */
 /* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
 
@@ -277,7 +276,7 @@ typedef struct txdescriptor {
  * (address value needs <= 4 bytes) on 64bit
  * (alternatively we need to cope with the shorted value somehow) */
 typedef UINT32 ACX_PTR;
-typedef struct txhostdescriptor {
+typedef struct __WLAN_ATTRIB_PACK__ txhostdescriptor {
 	ACX_PTR	data_phy;			/* 0x00 [UINT8 *] */
 	UINT16	data_offset;			/* 0x04 */
 	UINT16	reserved;			/* 0x06 */
@@ -289,9 +288,9 @@ typedef struct txhostdescriptor {
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	txhostdescriptor *desc_phy;	/* 0x18 [txhostdescriptor *] */
 	UINT8	*data;
-} txhostdesc_t;			/* size: 0x2c */
+} txhostdesc_t;		/* size: variable, currently 0x20 */
 
-typedef struct rxdescriptor {
+typedef struct __WLAN_ATTRIB_PACK__ rxdescriptor {
 	UINT32	pNextDesc;			/* 0x00 */
 	UINT32	HostMemPtr;			/* 0x04 */
 	UINT32	ACXMemPtr;			/* 0x08 */
@@ -315,9 +314,9 @@ typedef struct rxdescriptor {
 	UINT8	queue_ctrl;
 	UINT16	unknown;
 	UINT32	val0x30;
-} rxdesc_t;			/* size 52 = 0x34 */
+} rxdesc_t;		/* size 52 = 0x34 */
 
-typedef struct rxhostdescriptor {
+typedef struct __WLAN_ATTRIB_PACK__ rxhostdescriptor {
 	ACX_PTR	data_phy;			/* 0x00 [struct rxbuffer *] */
 	UINT16	data_offset;			/* 0x04 */
 	UINT16	reserved;			/* 0x06 */
@@ -329,13 +328,13 @@ typedef struct rxhostdescriptor {
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	rxhostdescriptor *desc_phy;	/* 0x18 */
 	struct	rxbuffer *data;
-} rxhostdesc_t;			/* size 44 = 0x2c */
+} rxhostdesc_t;		/* size 44 = 0x2c */
 
-typedef struct MemoryBlockSizeStruct {
-	UINT16 rid;
+typedef struct __WLAN_ATTRIB_PACK__ MemoryBlockSizeStruct {
+	UINT16 type;
 	UINT16 len;
 	UINT16 size;
-} acx100_memblocksize_t;
+} acx100_ie_memblocksize_t;
 
 #define ETH_P_80211_RAW		(ETH_P_ECONET + 1)
 #endif /* __ACX_IDMA_H */

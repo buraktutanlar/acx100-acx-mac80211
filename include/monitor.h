@@ -16,7 +16,7 @@
 #define DIDmsg_lnxind_wlansniffrm_istx		0x9041
 #define DIDmsg_lnxind_wlansniffrm_frmlen	0xA041
 
-typedef struct p80211msg_lnxind_wlansniffrm {
+typedef struct __WLAN_ATTRIB_PACK__ p80211msg_lnxind_wlansniffrm {
 	uint32_t msgcode;
 	uint32_t msglen;
 	uint8_t devname[WLAN_DEVNAMELEN_MAX];
@@ -30,7 +30,7 @@ typedef struct p80211msg_lnxind_wlansniffrm {
 	p80211item_uint32_t rate;
 	p80211item_uint32_t istx;
 	p80211item_uint32_t frmlen;
-} __attribute__ ((packed)) p80211msg_lnxind_wlansniffrm_t;
+} p80211msg_lnxind_wlansniffrm_t;
 
 #define P80211ENUM_truth_false				0
 #define P80211ENUM_truth_true				1

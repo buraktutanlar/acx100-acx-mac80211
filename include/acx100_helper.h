@@ -44,7 +44,6 @@
 #define ISTATUS_3_AUTHENTICATED	3
 #define ISTATUS_4_ASSOCIATED	4
 /* TODO: ISTATUS_4_ASSOCIATED_IBSS, ISTATUS_4_ASSOCIATED_AP */
-#define ISTATUS_5_UNKNOWN	5
 
 
 
@@ -80,7 +79,7 @@ typedef struct acx111_ie_queueconfig {
 
 } __WLAN_ATTRIB_PACK__ acx111_ie_queueconfig_t;
 
-typedef struct acx100_ie_memconfigoption {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_ie_memconfigoption {
 	UINT16	type;
 	UINT16	len;
 	UINT32	DMA_config;
@@ -91,7 +90,7 @@ typedef struct acx100_ie_memconfigoption {
 	UINT16	RxBlockNum;
 } acx100_ie_memconfigoption_t;
 
-typedef struct acx111_ie_memoryconfig {
+typedef struct __WLAN_ATTRIB_PACK__ acx111_ie_memoryconfig {
 
 	UINT16 type;
 	UINT16 len;
@@ -120,9 +119,9 @@ typedef struct acx111_ie_memoryconfig {
 	UINT8 tx_queue1_attributes;
 	/* end of tx1 block */
 
-}  __WLAN_ATTRIB_PACK__ acx111_ie_memoryconfig_t;
+} acx111_ie_memoryconfig_t;
 
-typedef struct acx100_ie_memmap {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_ie_memmap {
 	UINT16	type;
 	UINT16	len;
 	UINT32	CodeStart;
@@ -137,25 +136,25 @@ typedef struct acx100_ie_memmap {
 	UINT32	PoolEnd;
 } acx100_ie_memmap_t;
 
-typedef struct ACX111FeatureConfig {
+typedef struct __WLAN_ATTRIB_PACK__ ACX111FeatureConfig {
 
-	UINT16 id;
-	UINT16 length;
+	UINT16 type;
+	UINT16 len;
 	UINT32 feature_options;
 	UINT32 data_flow_options;
 	
-} __WLAN_ATTRIB_PACK__ ACX111FeatureConfig_t;
+} ACX111FeatureConfig_t;
 
-typedef struct ACX111TxLevel {
+typedef struct __WLAN_ATTRIB_PACK__ ACX111TxLevel {
 
-	UINT16 id;
-	UINT16 length;
+	UINT16 type;
+	UINT16 len;
 	UINT8 level;
 	
-} __WLAN_ATTRIB_PACK__ ACX111TxLevel_t;
+} ACX111TxLevel_t;
 
 #if MAYBE_BOGUS
-typedef struct wep {
+typedef struct __WLAN_ATTRIB_PACK__ wep {
 	UINT16 vala;
 
 	UINT8 wep_key[MAX_KEYLEN];
@@ -163,7 +162,7 @@ typedef struct wep {
 } wep_t;
 #endif
 
-typedef struct associd {
+typedef struct __WLAN_ATTRIB_PACK__ associd {
 	UINT16 vala;
 } associd_t;
 
@@ -178,7 +177,7 @@ typedef struct associd {
 #define PS_OPT_ENA_ENHANCED_PS	0x04 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set in the TIM; newer firmwares only(?) */
 #define PS_OPT_STILL_RCV_BCASTS	0x01
 
-typedef struct acx100_ie_powermgmt {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_ie_powermgmt {
 	UINT32	type;
 	UINT32	len;
 	UINT8 wakeup_cfg;
@@ -188,7 +187,7 @@ typedef struct acx100_ie_powermgmt {
 	UINT16 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
 } acx100_ie_powermgmt_t;
 
-typedef struct acx111_ie_powermgmt {
+typedef struct __WLAN_ATTRIB_PACK__ acx111_ie_powermgmt {
 	UINT32	type;
 	UINT32	len;
 	UINT8	wakeup_cfg;
@@ -199,24 +198,24 @@ typedef struct acx111_ie_powermgmt {
 	UINT32 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
 } acx111_ie_powermgmt_t;
 
-typedef struct sub3info {
+typedef struct __WLAN_ATTRIB_PACK__ sub3info {
 	UINT8 size;
 	UINT8 buf[0x4];
 } sub3info_t;
 
-typedef struct subsubinfo {
+typedef struct __WLAN_ATTRIB_PACK__ subsubinfo {
 	UINT8 size;
 	struct sub3info buf;
 } subsubinfo_t;
 
-typedef struct subinfo {
+typedef struct __WLAN_ATTRIB_PACK__ subinfo {
 	UINT16 size;
 	char buf[0x8];
 	struct subsubinfo buf2;
 	char buf3[0x8];
 } subinfo_t;
 
-typedef struct beaconinfo {
+typedef struct __WLAN_ATTRIB_PACK__ beaconinfo {
 	UINT16 size;
 	UINT16 status;
 	UINT8 addr1[0x6];
@@ -226,7 +225,7 @@ typedef struct beaconinfo {
 	UINT8 buf[0x1c];
 } beaconinfo_t;
 
-typedef struct beacon {
+typedef struct __WLAN_ATTRIB_PACK__ beacon {
 	UINT16 size;
 	struct beaconinfo inf;
 /*  UINT16 vala; */
@@ -236,7 +235,7 @@ typedef struct beacon {
 #define ACX_SCAN_PASSIVE	1
 #define ACX_SCAN_BACKGROUND	2
 
-typedef struct acx100_scan {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_scan {
 	UINT16 count; /* number of scans to do, 0xffff == continuous */
 	UINT16 start_chan;
 	UINT16 flags; /* channel list mask; 0x8000 == all channels? */
@@ -246,7 +245,7 @@ typedef struct acx100_scan {
 	UINT16 max_probe_delay;
 } acx100_scan_t;			/* length 0xc */
 
-typedef struct acx111_scan {
+typedef struct __WLAN_ATTRIB_PACK__ acx111_scan {
 	UINT16 count; /* number of scans to do */
 	UINT8 channel_list_select;
 	UINT16 reserved1;
@@ -257,47 +256,47 @@ typedef struct acx111_scan {
 	UINT16 max_probe_delay;
 	UINT8 modulation;
 	UINT8 channel_list[26];
-} __WLAN_ATTRIB_PACK__ acx111_scan_t;
+} acx111_scan_t;
 
 
-typedef struct acx_tim {
+typedef struct __WLAN_ATTRIB_PACK__ acx_tim {
 	UINT16 size;
 	UINT8 buf[0x100];
 } acx_tim_t;
 
-typedef struct acx_proberesp {
+typedef struct __WLAN_ATTRIB_PACK__ acx_proberesp {
 	UINT16 size;
 	char buf[0x54];
-} __WLAN_ATTRIB_PACK__ acx_proberesp_t;
+} acx_proberesp_t;
 
-typedef struct acx_probereq {
+typedef struct __WLAN_ATTRIB_PACK__ acx_probereq {
 	UINT16 size;
 	char buf[0x44];
-} __WLAN_ATTRIB_PACK__ acx_probereq_t;
+} acx_probereq_t;
 
 /* as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
  * NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
 typedef struct __WLAN_ATTRIB_PACK__ acx_joinbss {
 	UINT8 bssid[ETH_ALEN];
 	UINT16 beacon_interval;
-union __WLAN_ATTRIB_PACK__ {
- struct __WLAN_ATTRIB_PACK__ {
-	UINT8 dtim_interval;
-	UINT8 rates_basic;
-	UINT8 rates_supported;
- } acx100 __WLAN_ATTRIB_PACK__;
- struct __WLAN_ATTRIB_PACK__ {
-	UINT16 rates_basic;
-	UINT8 dtim_interval;
- } acx111 __WLAN_ATTRIB_PACK__;
-} u __WLAN_ATTRIB_PACK__;
+	union __WLAN_ATTRIB_PACK__ {
+		struct __WLAN_ATTRIB_PACK__ {
+			UINT8 dtim_interval;
+			UINT8 rates_basic;
+			UINT8 rates_supported;
+		} acx100;
+		struct __WLAN_ATTRIB_PACK__ {
+			UINT16 rates_basic;
+			UINT8 dtim_interval;
+		} acx111;
+	} u;
 	UINT8 txrate_val;
 	UINT8 preamble_type;
 	UINT8 macmode;
 	UINT8 channel;
 	UINT8 essid_len;
 	char essid[IW_ESSID_MAX_SIZE];	
-} __WLAN_ATTRIB_PACK__ acx_joinbss_t;
+} acx_joinbss_t;
 
 #define JOINBSS_RATES_1		0x01
 #define JOINBSS_RATES_2		0x02
@@ -335,7 +334,7 @@ union __WLAN_ATTRIB_PACK__ {
  * for now and then redefine it later. Or maybe change it now to have a
  * better struct layout for all sorts of management packets?
  */
-typedef struct acxp80211_hdr {
+typedef struct __WLAN_ATTRIB_PACK__ acxp80211_hdr {
 	p80211_hdr_a3_t a4;
 	UINT8 timestamp[8];	/* this contains the Logical Link Control data
 				   the first three bytes are the dsap, ssap and control
@@ -354,7 +353,7 @@ typedef struct acxp80211_hdr {
 } acxp80211_hdr_t;		/* size: 0x54 */
 
 /* struct used for Beacon and for Probe Response frames */
-typedef struct acxp80211_beacon_prb_resp {
+typedef struct __WLAN_ATTRIB_PACK__ acxp80211_beacon_prb_resp {
 	p80211_hdr_a3_t hdr;     /* 24 Bytes */
 	UINT8 timestamp[8];      /* 8 Bytes */
 	UINT16 beacon_interval;  /* 2 Bytes */
@@ -368,41 +367,41 @@ typedef struct acxp80211_beacon_prb_resp {
 #endif
 } acxp80211_beacon_prb_resp_t;
 
-typedef struct acxp80211_packet {
+typedef struct __WLAN_ATTRIB_PACK__ acxp80211_packet {
 	UINT16 size; /* packet len indicator for firmware */
 	struct acxp80211_hdr hdr; /* actual packet */
 } acxp80211_packet_t;		/* size: 0x56 */
 
-typedef struct {
+typedef struct __WLAN_ATTRIB_PACK__ mem_read_write {
     UINT16 addr;
     UINT16 type; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg. */
     UINT32 len;
     UINT32 data;
 } mem_read_write_t;
 
-typedef struct acxp80211_beacon_prb_resp_template {
+typedef struct __WLAN_ATTRIB_PACK__ acxp80211_beacon_prb_resp_template {
 	UINT16 size; /* packet len indicator for firmware */
 	struct acxp80211_beacon_prb_resp pkt;
 } acxp80211_beacon_prb_resp_template_t;
 
-typedef struct acxp80211_nullframe {
+typedef struct __WLAN_ATTRIB_PACK__ acxp80211_nullframe {
 	UINT16 size;
 	struct p80211_hdr_a3 hdr;
 } acxp80211_nullframe_t;
 
-typedef struct {
+typedef struct __WLAN_ATTRIB_PACK__ {
     UINT32 chksum;
     UINT32 size;
     UINT8 data[1]; /* the byte array of the actual firmware... */
 } firmware_image_t;
 
-typedef struct {
+typedef struct __WLAN_ATTRIB_PACK__ {
     UINT32 offset;
     UINT32 len;
 } radioinit_t;
 
 
-typedef struct acx100_ie_wep_options {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_ie_wep_options {
     UINT16	type;
     UINT16	len;
     UINT16	NumKeys;	/* max # of keys */
@@ -410,7 +409,7 @@ typedef struct acx100_ie_wep_options {
     UINT8	Pad;		/* used only for acx111 */
 } acx100_ie_wep_options_t;
 
-typedef struct ie_dot11WEPDefaultKey {
+typedef struct __WLAN_ATTRIB_PACK__ ie_dot11WEPDefaultKey {
     UINT16	type;
     UINT16	len;
     UINT8	action;
@@ -419,7 +418,7 @@ typedef struct ie_dot11WEPDefaultKey {
     UINT8	key[29];	/* check this! was Key[19]. */
 } ie_dot11WEPDefaultKey_t;
 
-typedef struct acx111WEPDefaultKey {
+typedef struct __WLAN_ATTRIB_PACK__ acx111WEPDefaultKey {
     UINT8	MacAddr[ETH_ALEN];
     UINT8	action;
     UINT16	reserved;
@@ -431,13 +430,13 @@ typedef struct acx111WEPDefaultKey {
     UINT8	key[29];	/* check this! was Key[19]. */
 } acx111WEPDefaultKey_t;
 
-typedef struct ie_dot11WEPDefaultKeyID {
+typedef struct __WLAN_ATTRIB_PACK__ ie_dot11WEPDefaultKeyID {
     UINT16	type;
     UINT16	len;
     UINT8	KeyID;
 } ie_dot11WEPDefaultKeyID_t;
 
-typedef struct acx100_wep_mgmt {
+typedef struct __WLAN_ATTRIB_PACK__ acx100_wep_mgmt {
     UINT8	MacAddr[ETH_ALEN];
     UINT16	Action;
     UINT16	KeySize;
@@ -445,17 +444,17 @@ typedef struct acx100_wep_mgmt {
 } acx100_wep_mgmt_t;
 
 /* a helper struct for quick implementation of commands */
-typedef struct GenericPacket {
+typedef struct __WLAN_ATTRIB_PACK__ GenericPacket {
 	UINT8 bytes[32];
 } GenericPacket_t;
 
-typedef struct defaultkey {
+typedef struct __WLAN_ATTRIB_PACK__ defaultkey {
 	UINT8 num;
 } defaultkey_t;
 
-typedef struct acx_ie_generic {
+typedef struct __WLAN_ATTRIB_PACK__ acx_ie_generic {
 	UINT16 type;
-	UINT16 length;
+	UINT16 len;
 	union data {
 		struct GenericPacket gp;
 		/* struct wep wp; */
@@ -466,43 +465,43 @@ typedef struct acx_ie_generic {
 
 /* Config Option structs */
 
-typedef struct co_antennas {
+typedef struct __WLAN_ATTRIB_PACK__ co_antennas {
     UINT8	type;
     UINT8	len;
     UINT8	list[2];
 } co_antennas_t;
 
-typedef struct co_powerlevels {
+typedef struct __WLAN_ATTRIB_PACK__ co_powerlevels {
     UINT8	type;
     UINT8	len;
     UINT16	list[8];
 } co_powerlevels_t;
 
-typedef struct co_datarates {
+typedef struct __WLAN_ATTRIB_PACK__ co_datarates {
     UINT8	type;
     UINT8	len;
     UINT8	list[8];
 } co_datarates_t;
 
-typedef struct co_domains {
+typedef struct __WLAN_ATTRIB_PACK__ co_domains {
     UINT8	type;
     UINT8	len;
     UINT8	list[6];
 } co_domains_t;
 
-typedef struct co_product_id {
+typedef struct __WLAN_ATTRIB_PACK__ co_product_id {
     UINT8	type;
     UINT8	len;
     UINT8	list[128];
 } co_product_id_t;
 
-typedef struct co_manuf_id {
+typedef struct __WLAN_ATTRIB_PACK__ co_manuf_id {
     UINT8	type;
     UINT8	len;
     UINT8	list[128];
 } co_manuf_t;
 
-typedef struct co_fixed {
+typedef struct __WLAN_ATTRIB_PACK__ co_fixed {
     UINT8	type;
     UINT8	len;
     char	NVSv[8];
@@ -511,7 +510,7 @@ typedef struct co_fixed {
     UINT32	eof_memory;
     UINT8	dot11CCAModes;
     UINT8	dot11Diversity;
-    UINT8	dot11ShortPeambleOption;
+    UINT8	dot11ShortPreambleOption;
     UINT8	dot11PBCCOption;
     UINT8	dot11ChannelAgility;
     UINT8	dot11PhyType;
@@ -520,7 +519,7 @@ typedef struct co_fixed {
 } co_fixed_t;
 
 
-typedef struct acx_configoption {
+typedef struct __WLAN_ATTRIB_PACK__ acx_configoption {
     co_fixed_t			configoption_fixed;
     co_antennas_t		antennas;
     co_powerlevels_t		power_levels;

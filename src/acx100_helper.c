@@ -1472,10 +1472,10 @@ void acx111_set_wepkey( wlandevice_t *priv )
  */
 int acx100_init_wep(wlandevice_t *priv)
 {
-	int i;
+/*	int i;
+	acx100_wep_mgmt_t wep_mgmt;           size = 37 bytes */
 	acx100_ie_wep_options_t options;
 	ie_dot11WEPDefaultKeyID_t dk;
-	acx100_wep_mgmt_t wep_mgmt; /* size = 37 bytes */
 	acx100_ie_memmap_t pt;
 	int res = NOT_OK;
 
@@ -2111,9 +2111,6 @@ int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *co
 		return NOT_OK;
 	}
 
-	config->id = ACX1xx_IE_FEATURE_CONFIG;
-	config->length = 8;
-
 	if (OK != acx100_interrogate(priv, config, ACX1xx_IE_FEATURE_CONFIG)) {
 		acxlog(L_INIT, "Error reading acx111 feature config\n");
 		return NOT_OK;
@@ -2129,9 +2126,6 @@ int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *co
 	if(priv->chip_type != CHIPTYPE_ACX111) {
 		return NOT_OK;
 	}
-
-	config->id = ACX1xx_IE_FEATURE_CONFIG;
-	config->length = 8;
 
 	acxlog(L_DEBUG, "Setting feature option: 0x%X\n", config->feature_options);
 	acxlog(L_DEBUG, "Setting DataFlow option: 0x%X\n", config->data_flow_options);
@@ -2867,14 +2861,13 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->scan_mode = ACX_SCAN_PASSIVE;
 	priv->scan_duration = 100;
 	priv->scan_probe_delay = 200;
-	
+
 	priv->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
 	priv->preamble_mode = 2; /* auto */
 	priv->listen_interval = 100;
 	priv->beacon_interval = DEFAULT_BEACON_INTERVAL;
 	priv->macmode_wanted = ACX_MODE_FF_AUTO; /* associate to either Ad-Hoc or Managed */
 	priv->macmode_joined = 0xaa; /* make sure we know that we didn't join anything */
-	priv->unknown0x2350 = 0;
 	priv->dtim_interval = (UINT8)DEFAULT_DTIM_INTERVAL;
 
 	priv->msdu_lifetime = DEFAULT_MSDU_LIFETIME;

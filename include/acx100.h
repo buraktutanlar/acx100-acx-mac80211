@@ -429,6 +429,7 @@ typedef enum {
 #define ACX1xx_IE_RXCONFIG_LEN				0x04
 #define ACX1xx_IE_FIRMWARE_STATISTICS_LEN		0x9c
 #define ACX1xx_IE_FEATURE_CONFIG_LEN			0x08
+#define ACX111_IE_KEY_CHOOSE_LEN			0x04	/* really 4?? */
 #define ACX1xx_IE_DOT11_STATION_ID_LEN			0x06
 #define ACX100_IE_DOT11_BEACON_PERIOD_LEN		0x02
 #define ACX1xx_IE_DOT11_DTIM_PERIOD_LEN			0x01
@@ -1326,7 +1327,6 @@ typedef struct wlandevice {
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */
-	UINT16		unknown0x2350;		/* FIXME: old status?? */
 	UINT16		auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	UINT16		bss_table_count;	/* # of active BSS scan table entries */

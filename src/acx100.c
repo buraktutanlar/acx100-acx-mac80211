@@ -135,11 +135,11 @@ MODULE_LICENSE("Dual MPL/GPL");
 #define PCI_VENDOR_ID_TI		0x104c
 
 /* ACX100 22Mb/s WLAN controller */
-#define PCI_DEVICE_ID_TI_ACX100		0x8400
-#define PCI_DEVICE_ID_TI_ACX100_CB	0x8401
+#define PCI_DEVICE_ID_TI_TNETW1100A	0x8400
+#define PCI_DEVICE_ID_TI_TNETW1100B	0x8401
 
 /* ACX111 54Mb/s WLAN controller */
-#define PCI_DEVICE_ID_TI_ACX111		0x9066
+#define PCI_DEVICE_ID_TI_TNETW1130	0x9066
 
 /* PCI Class & Sub-Class code, Network-'Other controller' */
 #define PCI_CLASS_NETWORK_OTHERS 	0x280
@@ -184,21 +184,21 @@ const char name_tnetw1130[] = "TNETW1130";
 static const struct pci_device_id acx100_pci_id_tbl[] __devinitdata = {
 	{
 		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_ACX100,
+		.device = PCI_DEVICE_ID_TI_TNETW1100A,
 		.subvendor = PCI_ANY_ID,
 		.subdevice = PCI_ANY_ID,
 		.driver_data = CHIPTYPE_ACX100,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_ACX100_CB,
+		.device = PCI_DEVICE_ID_TI_TNETW1100B,
 		.subvendor = PCI_ANY_ID,
 		.subdevice = PCI_ANY_ID,
 		.driver_data = CHIPTYPE_ACX100,
 	},
 	{
 		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_ACX111,
+		.device = PCI_DEVICE_ID_TI_TNETW1130,
 		.subvendor = PCI_ANY_ID,
 		.subdevice = PCI_ANY_ID,
 		.driver_data = CHIPTYPE_ACX111,
@@ -651,7 +651,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		       "%s: %s: pci_enable_device() failed\n",
 		       __func__, dev_info);
 		result = -ENODEV;
-		goto fail;
+		goto fail_pci_enable_device;
 	}
 
 	/* enable busmastering (required for CardBus) */
@@ -678,7 +678,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	} else {
 		acxlog(L_BINSTD, "%s: unknown or bad chip??\n", __func__);
 		result = -EIO;
-		goto fail;
+		goto fail_unknown_chiptype;
 	}
 
 	/* Figure out our resources */
@@ -690,7 +690,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 1 (or also: are you sure you have CardBus support in kernel?)\n", __func__);
 		result = -EIO;
-		goto fail;
+		goto fail_request_mem_region1;
 	}
 
 	if (!request_mem_region
@@ -698,7 +698,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 2\n", __func__);
 		result = -EIO;
-		goto fail;
+		goto fail_request_mem_region2;
 	}
 
 	mem1 = ioremap(phymem1, mem_region1_size);
@@ -707,7 +707,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		       "%s: %s: ioremap() failed\n",
 		       __func__, dev_info);
 		result = -EIO;
-		goto fail;
+		goto fail_ioremap1;
 	}
 
 	mem2 = ioremap(phymem2, mem_region2_size);
@@ -716,7 +716,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		       "%s: %s: ioremap() failed\n",
 		       __func__, dev_info);
 		result = -EIO;
-		goto fail;
+		goto fail_ioremap2;
 	}
 
 	/* Log the device */
@@ -731,17 +731,18 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		acxlog(L_BINSTD | L_IRQ | L_INIT, "%s: %s: Can't get IRQ %d\n",
 		       __func__, dev_info, 0);
 		result = -EIO;
-		goto fail;
+		goto fail_irq;
 	}
 
 	acxlog(L_DEBUG, "Allocating %d, %Xh bytes for wlandevice_t\n",
 			sizeof(wlandevice_t), sizeof(wlandevice_t));
-	if (NULL == (priv = kmalloc(sizeof(wlandevice_t), GFP_KERNEL))) {
+	priv = kmalloc(sizeof(wlandevice_t), GFP_KERNEL);
+	if (NULL == priv) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: Memory allocation failure\n",
 		       __func__, dev_info);
 		result = -EIO;
-		goto fail;
+		goto fail_alloc_priv;
 	}
 
 	memset(priv, 0, sizeof(wlandevice_t));
@@ -775,11 +776,12 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	acx_show_card_eeprom_id(priv);
 
-	if (NULL == (dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL))) {
+	dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+	if (NULL == dev) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: Failed to alloc netdev\n", __func__);
 		result = -EIO;
-		goto fail;
+		goto fail_alloc_netdev;
 	}
 
 	memset(dev, 0, sizeof(netdevice_t));
@@ -817,14 +819,14 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		       "%s: %s: MAC initialize failure!\n",
 		       __func__, dev_info);
 		result = -EIO;
-		goto fail;
+		goto fail_reset;
 	}
 
 	devname_mask = (1 == use_eth_name) ? "eth%d" : "wlan%d";
 	if (dev_alloc_name(dev, devname_mask) < 0)
 	{
 		result = -EIO;
-		goto fail;
+		goto fail_alloc_name;
 	}
 	acxlog(L_STD, "acx100: allocated net device %s, driver compiled against wireless extensions v%d and Linux %s\n", dev->name, WIRELESS_EXT, UTS_RELEASE);
 
@@ -851,14 +853,14 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 /*	priv->eeprom_version = hardware_info >> 16; */
 	if (OK != acx100_read_eeprom_offset(priv, 0x05, &priv->eeprom_version)) {
 		result = -EIO;
-		goto fail;
+		goto fail_read_eeprom_version;
 	}
 
 	if (OK != acx100_init_mac(dev, 1)) {
 		acxlog(L_DEBUG | L_INIT,
 		       "Danger Will Robinson, MAC did not come back\n");
 		result = -EIO;
-		goto fail;
+		goto fail_init_mac;
 	}
 
 	/* card initialized, so let's release hardware */
@@ -881,7 +883,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		       "%s: %s: Register net device of %s failed: %d\n",
 		       __func__, dev_info, dev->name, err);
 		result = -EIO;
-		goto fail;
+		goto fail_register_netdev;
 	}
 
 #if THIS_IS_OLD_PM_STUFF_ISNT_IT
@@ -890,26 +892,80 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 	if (OK != acx_proc_register_entries(dev)) {
 		result = -EIO;
-		goto fail;
+		goto fail_proc_register_entries;
 	}
 
 	acxlog(L_STD|L_INIT, "%s: %s Loaded Successfully\n", __func__, version);
 	result = OK;
 	goto done;
 
-/* fail_registered:
-	unregister_netdev(dev); */
-fail:
-	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
+	/* error paths: undo everything in reverse order... */
 
-	acx_cleanup_card_and_resources(pdev, dev, priv, mem_region1, mem1, mem_region2, mem2);
+fail_proc_register_entries:
+
+#if THIS_IS_OLD_PM_STUFF_ISNT_IT
+	if (NULL != priv->pm)
+		pm_unregister(priv->pm);
+#endif
+	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))
+		acx100_down(dev);
+	unregister_netdev(dev);
+	
+	/* FIXME: try to find a way to re-unify error code path with
+	 * acx_cleanup_card_and_resources(), which it used to simply call,
+	 * but error handling was too sophisticated for such a simple function call,
+	 * so we had to give it up again... */
+fail_register_netdev:
+
+	acx100_delete_dma_regions(priv);
+	pci_set_drvdata(pdev, NULL);
+	acxlog(L_STD, "hw_unavailable++\n");
+	priv->hw_unavailable++;
+fail_init_mac:
+fail_read_eeprom_version:
+fail_alloc_name:
+fail_reset:
+
+	acx100_device_chain_remove(dev);
+	kfree(dev);
+fail_alloc_netdev:
+
+	kfree(priv);
+fail_alloc_priv:
+fail_irq:
+
+	iounmap(mem2);
+fail_ioremap2:
+
+	iounmap(mem1);
+fail_ioremap1:
+
+	release_mem_region(pci_resource_start(pdev, mem_region2),
+			   pci_resource_len(pdev, mem_region2));
+fail_request_mem_region2:
+
+	release_mem_region(pci_resource_start(pdev, mem_region1),
+			   pci_resource_len(pdev, mem_region1));
+fail_request_mem_region1:
+fail_unknown_chiptype:
+
+	pci_disable_device(pdev);
+fail_pci_enable_device:
+
+	pci_set_power_state(pdev, 3);
+	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
 
 done:
 	FN_EXIT(1, result);
 	return result;
 } /* acx100_probe_pci() */
 
-static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *dev, wlandevice_t *priv, unsigned long mem_region1, void *mem1, unsigned long mem_region2, void *mem2)
+static void acx_cleanup_card_and_resources(
+	struct pci_dev *pdev,
+	netdevice_t *dev,
+	wlandevice_t *priv,
+	unsigned long mem_region1, void *mem1,
+	unsigned long mem_region2, void *mem2)
 {
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device */
@@ -917,9 +973,6 @@ static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *de
 	if (dev != NULL)
 	{
 		acxlog(L_INIT, "Removing device %s!\n", dev->name);
-		/* BUG: acx100_probe_pci() -> acx100_reset_dev(dev)
-		-> fw load fails -> we come here with dev->name[0] = '\0'
-		and with non-registered dev!! */
 		unregister_netdev(dev);
 
 		/* find our PCI device in the global acx list and remove it */
@@ -1944,10 +1997,7 @@ void acx100_after_interrupt_task(void *data) {
 			
 	if (priv->irq_status & HOST_INT_SCAN_COMPLETE) {
 
-		if (priv->status == ISTATUS_5_UNKNOWN) {
-			acx100_set_status(priv, priv->unknown0x2350);
-			priv->unknown0x2350 = 0;
-		} else if (priv->status == ISTATUS_1_SCANNING) {
+		if (priv->status == ISTATUS_1_SCANNING) {
 			acx100_complete_dot11_scan(priv);
 		}
 		priv->irq_status ^= HOST_INT_SCAN_COMPLETE; /* clear the bit */
