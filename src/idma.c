@@ -316,6 +316,8 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	return 0;
 
 error:
+	acxlog(0xffff, "dma error!!\n");
+	acx100_schedule(60 * HZ);
 	acx100_free_desc_queues(pDc);
 
 	FN_EXIT(1, 1);
@@ -678,7 +680,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 	acxlog(L_STD, "Tx error occurred (error 0x%02X)!! (%s)\n", pTxDesc->error, err);
 	priv->stats.tx_errors++;
 
-#if WIRELESS_EXT > 13 /* wireless_send_event() is WE12, IWEVTXDROP is WE13 */
+#if WIRELESS_EXT > 13 /* wireless_send_event() and IWEVTXDROP are WE13 */
 	if (0x30 & pTxDesc->error) {
 		/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 		 * all other errors mean we screwed up locally */
@@ -1016,7 +1018,7 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 /*
  * Calculate level like the feb 2003 windows driver seems to do
  */
-inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
+UINT8 acx_signal_to_winlevel(UINT8 rawlevel)
 {
 	/* UINT8 winlevel = (UINT8) (0.5 + 0.625 * rawlevel); */
 	UINT8 winlevel = (UINT8) ((4 + (rawlevel * 5)) / 8);
@@ -1805,7 +1807,8 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 
 
 	/* Declare start of the Rx host pool */
-	MemoryConfigOption.RxHostDesc = (struct rxhostdescriptor *)cpu_to_le32(priv->RxHostDescPoolStart);
+	MemoryConfigOption.pRxHostDesc = (UINT32)cpu_to_le32(priv->RxHostDescPoolStart);
+	acxlog(L_DEBUG, "pRxHostDesc %08x, RxHostDescPoolStart %p\n", MemoryConfigOption.pRxHostDesc, priv->RxHostDescPoolStart);
 
 	/* 50% of the allotment of memory blocks go to tx descriptors */
 	MemoryConfigOption.TxBlockNum = cpu_to_le16(TotalMemoryBlocks / 2);
@@ -1823,6 +1826,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	/* size of the tx and rx descriptor queues */
 	priv->TotalTxBlockSize = le16_to_cpu(MemoryConfigOption.TxBlockNum) * priv->memblocksize;
 	priv->TotalRxBlockSize = le16_to_cpu(MemoryConfigOption.RxBlockNum) * priv->memblocksize;
+	acxlog(L_DEBUG, "TxBlockNum %d RxBlockNum %d TotalTxBlockSize %d TotalTxBlockSize %d\n", MemoryConfigOption.TxBlockNum, MemoryConfigOption.RxBlockNum, priv->TotalTxBlockSize, priv->TotalRxBlockSize);
 
 
 	/* align the tx descriptor queue to an alignment of 0x20 (32 bytes) */
@@ -1833,6 +1837,7 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	   by the tx descriptor queue */
 	MemoryConfigOption.tx_mem =
 	    cpu_to_le32((0x1f + le32_to_cpu(mmt->PoolStart) + priv->TotalRxBlockSize) & 0xffffffe0);
+	acxlog(L_DEBUG, "rx_mem %08x rx_mem %08x\n", MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
 	if (!acx100_configure(priv, &MemoryConfigOption, ACX100_RID_MEMORY_CONFIG_OPTIONS)) {

@@ -585,7 +585,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		return(-EINVAL);
 	}
 	if (firmware_dir) sprintf(filename,"%s/ACX100.bin",firmware_dir);
-	else sprintf(filename,"/etc/acx100/ACX100.bin");
+	else sprintf(filename,"/usr/share/acx/ACX100.bin");
 	acxlog(L_INIT,"loading firmware %s\n",filename);
 	firmware=acx100usb_read_firmware(filename,&size);
 	if (!firmware) {

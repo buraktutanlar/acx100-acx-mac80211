@@ -49,7 +49,7 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc);
 int acx100_delete_dma_regions(wlandevice_t *priv);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
 void acx100_clean_tx_desc(wlandevice_t *priv);
-inline UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
+UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
 void acx100_process_rx_desc(wlandevice_t *priv);
 int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *vala);
 struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv);

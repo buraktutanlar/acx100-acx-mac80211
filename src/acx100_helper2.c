@@ -337,15 +337,13 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting status = %d (%s)\n",
 	       __func__, status, stat);
 
-#if WIRELESS_EXT > 12 /* wireless_send_event() */
+#if WIRELESS_EXT > 13 /* wireless_send_event() and SIOCGIWSCAN */
 	if (ISTATUS_4_ASSOCIATED == status) {
 		union iwreq_data wrqu;
 
-#if WIRELESS_EXT > 13 /* SIOCGIWSCAN */
 		wrqu.data.length = 0;
 		wrqu.data.flags = 0;
 		wireless_send_event(priv->netdev, SIOCGIWSCAN, &wrqu, NULL);
-#endif
 
 		wrqu.data.length = 0;
 		wrqu.data.flags = 0;

@@ -828,11 +828,16 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail:
 	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
 
+	/* FIXME: that stuff from here on should be merged with remove_pci */
+
 	/* remove new failed dev from linked list */
 	acx100_device_chain_remove(dev);
 
 	if (NULL != dev)
+	{
+		pci_set_drvdata(pdev, NULL);
 		kfree(dev);
+	}
 
 	if (NULL != priv)
 	{
@@ -920,20 +925,21 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	acxlog(L_STD, "hw_unavailable++\n");
 	priv->hw_unavailable++;
 
-	acx100_delete_dma_regions(priv);
-
 #if NEWER_KERNELS_ONLY
 	free_netdev(dev);
 #else
 	if (dev)
 		kfree(dev);
 #endif
+	pci_set_drvdata(pdev, NULL);
 
-	chip_type = priv->chip_type;
-	
+	acx100_delete_dma_regions(priv);
+
 	iounmap((void *) priv->iobase);
 	iounmap((void *) priv->iobase2);
 
+	chip_type = priv->chip_type;
+	
 	/* don't free priv->io here, this *global* resource
 	 * will be freed on module unload */
 	kfree(priv);
@@ -959,8 +965,6 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 
 	/* put device into ACPI D3 mode (shutdown) */
 	pci_set_power_state(pdev, 3);
-
-	pci_set_drvdata(pdev, NULL);
 
 	FN_EXIT(0, 0);
 }

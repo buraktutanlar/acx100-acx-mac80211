@@ -72,7 +72,7 @@ typedef struct acx100_memconfigoption {
 	UINT16	rid;
 	UINT16	len;
 	UINT32	DMA_config;
-	struct	rxhostdescriptor *RxHostDesc;        /* val0x8 */
+	UINT32  pRxHostDesc;        /* val0x8 */
 	UINT32	rx_mem;
 	UINT32	tx_mem;
 	UINT16	TxBlockNum;
