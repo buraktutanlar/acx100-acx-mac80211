@@ -213,12 +213,12 @@ static void acx100usb_prepare_tx(wlandevice_t *,struct txdescriptor *);
 static void acx100usb_flush_tx(wlandevice_t *);
 static void acx100usb_trigger_next_tx(wlandevice_t *);
 
-static struct net_device_stats * acx100_get_stats(struct net_device *);
-static struct iw_statistics *acx100_get_wireless_stats(struct net_device *);
+static struct net_device_stats * acx_get_stats(struct net_device *);
+static struct iw_statistics *acx_get_wireless_stats(struct net_device *);
 
 
 static void acx100usb_poll_rx(wlandevice_t *);
-void acx100_rx(struct rxhostdescriptor *,wlandevice_t *);
+void acx_rx(struct rxhostdescriptor *,wlandevice_t *);
 
 int init_module(void);
 void cleanup_module(void);
@@ -231,9 +231,9 @@ static void acx100usb_tx_timeout(struct net_device *);
 /* int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD; */
 /* int debug = L_ALL; */
 int debug = L_STD;
-int acx100_debug_func_indent=0;
+int acx_debug_func_indent=0;
 static char * acx100usb_pstatus(int);
-extern void acx100_dump_bytes(void *,int) __attribute__((__unused__));
+extern void acx_dump_bytes(void *,int);
 static void dump_device(struct usb_device *);
 static void dump_device_descriptor(struct usb_device_descriptor *);
 #if USB_24
@@ -253,7 +253,7 @@ static int disconnected=0;
 
 char *firmware_dir;
 
-extern const struct iw_handler_def acx100_ioctl_handler_def;
+extern const struct iw_handler_def acx_ioctl_handler_def;
 
 static const struct usb_device_id acx100usb_ids[] = {
    { USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED) },
@@ -294,7 +294,7 @@ log_fn_enter(const char *funcname) {
 	int indent;
 	TIMESTAMP(d);
 
-	indent = acx100_debug_func_indent;
+	indent = acx_debug_func_indent;
 	if(indent>=sizeof(spaces))
 		indent = sizeof(spaces)-1;
 		
@@ -304,7 +304,7 @@ log_fn_enter(const char *funcname) {
 		funcname
 	);
 
-	acx100_debug_func_indent += FUNC_INDENT_INCREMENT;
+	acx_debug_func_indent += FUNC_INDENT_INCREMENT;
 }
 
 void
@@ -312,9 +312,9 @@ log_fn_exit(const char *funcname) {
 	int indent;
 	TIMESTAMP(d);
 
-	acx100_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
 
-	indent = acx100_debug_func_indent;
+	indent = acx_debug_func_indent;
 	if(indent>=sizeof(spaces))
 		indent = sizeof(spaces)-1;
 		
@@ -330,9 +330,9 @@ log_fn_exit_v(const char *funcname, int v) {
 	int indent;
 	TIMESTAMP(d);
 
-	acx100_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
 
-	indent = acx100_debug_func_indent;
+	indent = acx_debug_func_indent;
 	if(indent>=sizeof(spaces))
 		indent = sizeof(spaces)-1;
 		
@@ -756,7 +756,7 @@ static void init_network_device(struct net_device *dev) {
 	** put the ACX100 out of sleep mode
 	** ----------------------------------- */
 	priv=dev->priv;
-	acx100_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
 	/* --------------------------------------
 	** Register the callbacks for the network
 	** device functions.
@@ -764,10 +764,10 @@ static void init_network_device(struct net_device *dev) {
 	dev->open = &acx100usb_open;
 	dev->stop = &acx100usb_stop;
 	dev->hard_start_xmit = (void *)&acx100usb_start_xmit;
-	dev->get_stats = (void *)&acx100_get_stats;
-	dev->get_wireless_stats = (void *)&acx100_get_wireless_stats;
+	dev->get_stats = (void *)&acx_get_stats;
+	dev->get_wireless_stats = (void *)&acx_get_wireless_stats;
 #if WIRELESS_EXT >= 13
-	dev->wireless_handlers = (struct iw_handler_def *)&acx100_ioctl_handler_def;
+	dev->wireless_handlers = (struct iw_handler_def *)&acx_ioctl_handler_def;
 #else
 	dev->do_ioctl = (void *)&acx_ioctl_old;
 #endif
@@ -776,7 +776,7 @@ static void init_network_device(struct net_device *dev) {
 	dev->tx_timeout = &acx100usb_tx_timeout;
 	dev->watchdog_timeo = 4 * HZ;        /* 400 */
 #endif
-	result=acx100_init_mac(dev, 1);
+	result=acx_init_mac(dev, 1);
 	if (!result) {
 	  SET_MODULE_OWNER(dev);
 	}
@@ -809,16 +809,16 @@ static int acx100usb_open(struct net_device *dev)
 	/* ---------------------------------
 	** put the ACX100 out of sleep mode
 	** ------------------------------ */
-	acx100_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
 
 	init_timer(&(priv->mgmt_timer));
-	priv->mgmt_timer.function=acx100_timer;
+	priv->mgmt_timer.function=acx_timer;
 	priv->mgmt_timer.data=(unsigned long)priv;
 
-	/* set ifup to 1, since acx100_start needs it (FIXME: ugly) */
+	/* set ifup to 1, since acx_start needs it (FIXME: ugly) */
 
 	SET_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
-	acx100_start(priv);
+	acx_start(priv);
 
 
 	netif_start_queue(dev);
@@ -832,7 +832,7 @@ static int acx100usb_open(struct net_device *dev)
 
 
 /* ---------------------------------------------------------------------------
-** acx100_rx():
+** acx_rx():
 ** Inputs:
 **    dev -> Pointer to network device
 ** ---------------------------------------------------------------------------
@@ -845,13 +845,13 @@ static int acx100usb_open(struct net_device *dev)
 **  then commits the data to the network stack.
 ** ------------------------------------------------------------------------ */
 
-void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
+void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
 	netdevice_t *dev = priv->netdev;
 	struct sk_buff *skb;
 	FN_ENTER;
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) {
-		if ((skb = acx100_rxdesc_to_ether(priv, rxdesc))) {
+		if ((skb = acx_rxdesc_to_ether(priv, rxdesc))) {
 			skb->dev = dev;
 			skb->protocol = eth_type_trans(skb, dev);
 			dev->last_rx = jiffies;
@@ -989,14 +989,14 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			if (debug&L_DATA) {
 				if ((packetsize>0)&&(packetsize<1024)) {
 					acxlog(L_DATA,"received data:\n");
-					acx100_dump_bytes(ptr,packetsize);
+					acx_dump_bytes(ptr,packetsize);
 				}
 			}
 #endif
 			/* ---------------------------------------------
 			** now handle the received data....
 			** ------------------------------------------ */
-			acx100_process_rx_desc(priv);
+			acx_process_rx_desc(priv);
 			ptr=(rxbuffer_t *)(((char *)ptr)+packetsize);
 			offset+=packetsize;
 		}
@@ -1021,7 +1021,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 **  <NOTHING>
 **
 ** Description:
-**  This function is called by acx100_dma_tx_data() and is responsible for
+**  This function is called by acx_dma_tx_data() and is responsible for
 **  sending out the data within the given txdescriptor to the USB device.
 **  In order to avoid inconsistency on SMP systems, a Mutex is checked
 **  that forbids other packets to disturb the USB queue when there is
@@ -1123,12 +1123,12 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 		SET_BIT(buf->hdr.hostData, (ACX100_USB_TXHI_ISDATA<<16));
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
-	if (acx100_is_mac_address_directed((mac_t *)addr)) 
+	if (acx_is_mac_address_directed((mac_t *)addr)) 
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16)));
-	if (acx100_is_mac_address_broadcast(addr)) 
+	if (acx_is_mac_address_broadcast(addr)) 
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16)));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
-	if (debug&L_DATA) acx100_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
+	if (debug&L_DATA) acx_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
 	/* ---------------------------------------------
 	** check whether we need to send the data in
 	** fragments (block larger than max bulkout
@@ -1366,10 +1366,10 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	SET_BIT(header->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
 	SET_BIT(payload->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
 	SET_BIT(txdesc->Ctl_8, DESC_CTL_DONE);
-	acx100_clean_tx_desc(priv);
+	acx_clean_tx_desc(priv);
 	/* ----------------------------------------------
 	** check if there are still descriptors that have
-	** to be sent. acx100_clean_tx_desc() should
+	** to be sent. acx_clean_tx_desc() should
 	** have set the next non-free descriptor position
 	** in tx_tail...
 	** ------------------------------------------- */
@@ -1420,7 +1420,7 @@ static int acx100usb_stop(struct net_device *dev)
 	/* ------------------------------
 	** Transmit a disassociate frame
 	** --------------------------- */
-	acx100_transmit_disassoc(&client,priv);
+	acx_transmit_disassoc(&client,priv);
 	/* --------------------------------
 	* stop the transmit queue...
 	* ------------------------------ */
@@ -1445,12 +1445,12 @@ static int acx100usb_stop(struct net_device *dev)
 	/* ------------------------
 	** disable rx and tx ...
 	** --------------------- */
-	acx100_issue_cmd(priv,ACX1xx_CMD_DISABLE_TX,NULL,0,5000);
-	acx100_issue_cmd(priv,ACX1xx_CMD_DISABLE_RX,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_TX,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_RX,NULL,0,5000);
 	/* -------------------------
 	** power down the device...
 	** ---------------------- */
-	acx100_issue_cmd(priv,ACX1xx_CMD_SLEEP,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_SLEEP,NULL,0,5000);
 	/* --------------------------------------------
 	** decrease module-in-use count (if necessary)
 	** ----------------------------------------- */
@@ -1497,7 +1497,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** if the device is otherwise locked,
 	** bail-out...
 	** ----------------------------------- */
-	if (acx100_lock(priv, &flags))
+	if (acx_lock(priv, &flags))
 		return 1;
 	/* --------------------------------------
 	** if the queue is halted, there is no point
@@ -1537,7 +1537,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	netif_stop_queue(dev);
 #endif
 #if UNUSED
-	if (acx100_lock(priv,&flags)) ...
+	if (acx_lock(priv,&flags)) ...
 
 	memset(pb, 0, sizeof(wlan_pb_t) /*0x14*4 */ );
 
@@ -1548,7 +1548,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	/* ------------------------------------
 	** get the next free tx descriptor...
 	** -------------------------------- */
-	if ((tx_desc = acx100_get_tx_desc(priv)) == NULL) {
+	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
 		goto end;
@@ -1557,7 +1557,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** convert the ethernet frame into our
 	** own tx descriptor type...
 	** -------------------------------- */
-	acx100_ether_to_txdesc(priv,tx_desc,skb);
+	acx_ether_to_txdesc(priv,tx_desc,skb);
 	/* -------------------------
 	** free the skb
 	** ---------------------- */
@@ -1571,7 +1571,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	/* -----------------------------------
 	** transmit the data...
 	** -------------------------------- */
-	acx100_dma_tx_data(priv, tx_desc);  /* this function finally calls acx100usb_tx_data() */
+	acx_dma_tx_data(priv, tx_desc);  /* this function finally calls acx100usb_tx_data() */
 	txresult=0;
 	/* -----------------------------------
 	** statistical bookkeeping...
@@ -1579,14 +1579,14 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	priv->stats.tx_packets++;
 	priv->stats.tx_bytes += templen;
 end:
-	acx100_unlock(priv, &flags);
+	acx_unlock(priv, &flags);
 	FN_EXIT(1, txresult);
 	return txresult;
 }
 
 
 
-static struct net_device_stats *acx100_get_stats(netdevice_t *dev) {
+static struct net_device_stats *acx_get_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
 	FN_EXIT(1, (int)&priv->stats);
@@ -1595,7 +1595,7 @@ static struct net_device_stats *acx100_get_stats(netdevice_t *dev) {
 
 
 
-static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev) {
+static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev) {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	FN_ENTER;
 	FN_EXIT(1, (int)&priv->stats);
@@ -1733,7 +1733,7 @@ static void dump_device(struct usb_device *usbdev)
   printk(KERN_INFO "  tt: 0x%X\n",(unsigned int)(usbdev->tt));
   printk(KERN_INFO "  ttport: %d\n",(unsigned int)(usbdev->ttport));
   printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",(unsigned int)(usbdev->toggle[0]),(unsigned int)(usbdev->toggle[1]));
-  printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]);
+  /* printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]); halted removed in 2.6.9-rc1 */
   printk(KERN_INFO "  epmaxpacketin: ");
   for (i=0;i<16;i++) printk("%d ",usbdev->epmaxpacketin[i]);
   printk("\n");

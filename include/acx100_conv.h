@@ -93,11 +93,11 @@ struct rxhostdescriptor;
  * Function Declarations                                                      *
  *============================================================================*/
 
-int acx100_ether_to_txdesc(struct wlandevice *priv,
+int acx_ether_to_txdesc(struct wlandevice *priv,
 			   struct txdescriptor *txdesc, struct sk_buff *skb);
-/*@null@*/ struct sk_buff *acx100_rxdesc_to_ether(struct wlandevice *priv,
+/*@null@*/ struct sk_buff *acx_rxdesc_to_ether(struct wlandevice *priv,
 				       struct rxhostdescriptor *rxdesc);
-void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
+void acx_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 			     struct txdescriptor *txdesc);
 
 #endif /* __ACX_ACX100_CONV_H */

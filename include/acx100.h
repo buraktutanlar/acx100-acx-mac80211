@@ -87,7 +87,7 @@
 			 L_STATE | L_XFER | L_DATA | L_DEBUG | L_IOCTL | L_CTL)
 
 extern int debug;
-extern int acx100_debug_func_indent;
+extern int acx_debug_func_indent;
 
 #define acxlog(chan, args...) \
 	do { \
@@ -330,8 +330,9 @@ typedef enum {
 #define ACX111_CMD_RADIOCALIB		0x19
 
 /*--- After Interrupt Commands -----------------------------------------------*/
-#define ACX100_AFTER_INTERRUPT_CMD_STOP_SCAN		0x01
-#define ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE		0x02
+#define ACX_AFTER_IRQ_CMD_STOP_SCAN		0x01
+#define ACX_AFTER_IRQ_CMD_ASSOCIATE		0x02
+#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB		0x04
 
 /*--- Buffer Management Commands ---------------------------------------------*/
 
@@ -1029,10 +1030,10 @@ typedef struct fw_ver {
 } fw_ver_t;
 
 /*--- IEEE 802.11 header -----------------------------------------------------*/
-/* FIXME: acx100_addr3_t should probably actually be discarded in favour of the
+/* FIXME: acx_addr3_t should probably actually be discarded in favour of the
  * identical linux-wlan-ng p80211_hdr_t. An even better choice would be to use
  * the kernel's struct ieee80_11_hdr from driver/net/wireless/ieee802_11.h */
-typedef struct acx100_addr3 {
+typedef struct acx_addr3 {
 	/* IEEE 802.11-1999.pdf chapter 7 might help */
 	UINT16 frame_control __WLAN_ATTRIB_PACK__;	/* 0x00, wlan-ng name */
 	UINT16 duration_id __WLAN_ATTRIB_PACK__;	/* 0x02, wlan-ng name */
@@ -1043,7 +1044,7 @@ typedef struct acx100_addr3 {
 	UINT8 *val0x18;
 	struct sk_buff *val0x1c;
 	struct sk_buff *val0x20;
-} acx100_addr3_t;
+} acx_addr3_t;
 
 /*--- WEP stuff --------------------------------------------------------------*/
 #define DOT11_MAX_DEFAULT_WEP_KEYS	4
@@ -1084,7 +1085,7 @@ typedef struct client {
 	UINT16 val0xe;
 	UINT8 *val0x10;		/* points to some data, don't know what yet */
 	UINT32 unkn0x14;
-	UINT8 val0x18[0x80];	/* 0x18, used by acx100_process_authen() */
+	UINT8 val0x18[0x80];	/* 0x18, used by acx_process_authen() */
 	UINT16 val0x98;
 	UINT16 val0x9a;
 	UINT8 pad5[8];		/* 0x9c */
@@ -1208,8 +1209,8 @@ struct peer {
 	UINT8   shortpre;		 /* 0 == Long Preamble, 1 == Short */
 };
 
-/* FIXME: this should be named something like struct acx100_priv (typedef'd to
- * acx100_priv_t) */
+/* FIXME: this should be named something like struct acx_priv (typedef'd to
+ * acx_priv_t) */
 
 typedef struct wlandevice {
 	/*** Device chain ***/
@@ -1293,7 +1294,7 @@ typedef struct wlandevice {
 
 	UINT8		irqs_active;	/* whether irq sending is activated */
 	UINT16		irq_status;
-	UINT8		after_interrupt_jobs; /* mini job list for doing actions after an interrupt occured */
+	UINT8		after_interrupt_jobs; /* mini job list for doing actions after an interrupt occurred */
 #ifdef USE_QUEUE_TASKS
 	struct tq_struct after_interrupt_task; /* our task for after interrupt actions */
 #else
@@ -1499,10 +1500,10 @@ typedef struct wlandevice {
 #define SET_RATE_FALLBACK	0x00200000L
 #define GETSET_ALL		0x80000000L
 
-void acx100_disable_irq(wlandevice_t *priv);
-void acx100_enable_irq(wlandevice_t *priv);
+void acx_disable_irq(wlandevice_t *priv);
+void acx_enable_irq(wlandevice_t *priv);
 void acx_schedule_after_interrupt_task(wlandevice_t *priv);
-void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
+void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 /*============================================================================*
  * Locking and synchronization functions                                      *
@@ -1513,7 +1514,7 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
  * the kernel from linking or module from loading if they are not inlined. */
 
 #ifdef BROKEN_LOCKING
-extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
+extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	local_irq_save(*flags);
 	if (!spin_trylock(&priv->lock)) {
@@ -1525,7 +1526,7 @@ extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 	}
 	if (priv->hw_unavailable) {
 		printk(KERN_WARNING
-		       "acx100_lock() called with hw_unavailable (dev=%p)\n",
+		       "acx_lock() called with hw_unavailable (dev=%p)\n",
 		       priv->netdev);
 		spin_unlock_irqrestore(&priv->lock, *flags);
 		return -EBUSY;
@@ -1533,7 +1534,7 @@ extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 	return OK;
 }
 
-extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
+extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* printk(KERN_WARNING "unlock\n"); */
 	spin_unlock_irqrestore(&priv->lock, *flags);
@@ -1542,7 +1543,7 @@ extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 
 #else /* BROKEN_LOCKING */
 
-extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
+extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
 	/*@-noeffect@*/
@@ -1552,7 +1553,7 @@ extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 	return OK;
 }
 
-extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
+extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
 	/*@-noeffect@*/

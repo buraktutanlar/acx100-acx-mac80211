@@ -81,7 +81,7 @@ static const UINT8 oui_8021h[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0xf8 };
 	!((*(UINT16 *)dst == *(UINT16 *)src) && (dst[2] == src[2]))
 
 /*----------------------------------------------------------------
-* acx100_rxdesc_to_txdesc
+* acx_rxdesc_to_txdesc
 *
 * Converts a rx descriptor to a tx descriptor.
 *
@@ -100,7 +100,7 @@ static const UINT8 oui_8021h[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0xf8 };
 *
 *----------------------------------------------------------------*/
 
-void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxhostdesc,
+void acx_rxdesc_to_txdesc(struct rxhostdescriptor *rxhostdesc,
 				struct txdescriptor *txdesc)
 {
 	struct txhostdescriptor *payload;
@@ -119,7 +119,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxhostdesc,
 }
 
 /*----------------------------------------------------------------
-* acx100_stt_findproto
+* acx_stt_findproto
 *
 * Searches the 802.1h Selective Translation Table for a given 
 * protocol.
@@ -143,7 +143,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxhostdesc,
 *
 *----------------------------------------------------------------*/
 
-static inline int acx100_stt_findproto(unsigned int proto)
+static inline int acx_stt_findproto(unsigned int proto)
 {
 	/* Always return found for now.  This is the behavior used by the */
 	/*  Zoom Win95 driver when 802.1h mode is selected */
@@ -160,7 +160,7 @@ static inline int acx100_stt_findproto(unsigned int proto)
 }
 
 /*----------------------------------------------------------------
-* acx100_ether_to_txdesc
+* acx_ether_to_txdesc
 *
 * Uses the contents of the ether frame to build the elements of 
 * the 802.11 frame.
@@ -185,7 +185,7 @@ static inline int acx100_stt_findproto(unsigned int proto)
 *
 *----------------------------------------------------------------*/
 
-int acx100_ether_to_txdesc(wlandevice_t *priv,
+int acx_ether_to_txdesc(wlandevice_t *priv,
 			 struct txdescriptor *tx_desc,
 			 struct sk_buff *skb)
 {
@@ -249,7 +249,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 		/* setup the SNAP header */
 		e_snap->type = htons(proto);
-		if (0 != acx100_stt_findproto(proto)) {
+		if (0 != acx_stt_findproto(proto)) {
 			/* memcpy(e_snap->oui, oui_8021h, WLAN_IEEE_OUI_LEN); */
 			COPY_OUI(e_snap->oui, oui_8021h);
 		} else {
@@ -337,7 +337,7 @@ fail:
 }
 
 /*----------------------------------------------------------------
-* acx100_rxdesc_to_ether
+* acx_rxdesc_to_ether
 *
 * Uses the contents of a received 802.11 frame to build an ether
 * frame.
@@ -361,7 +361,7 @@ fail:
 *
 *----------------------------------------------------------------*/
 
-/*@null@*/ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
+/*@null@*/ struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, struct
 		rxhostdescriptor *rx_desc)
 {
 	UINT8 *daddr = NULL;
@@ -476,7 +476,7 @@ fail:
 		   (e_llc->ctl == (UINT8)0x03) && 
 		   (((COMPARE_OUI( e_snap->oui, oui_rfc1042)==0) &&
 /*		    (ethconv == WLAN_ETHCONV_8021h) &&  */
-		    (0 != acx100_stt_findproto(ieee2host16(e_snap->type)))) || 
+		    (0 != acx_stt_findproto(ieee2host16(e_snap->type)))) || 
 		    (0 != COMPARE_OUI( e_snap->oui, oui_rfc1042))))
 	{
 		acxlog(L_DEBUG | L_DATA, "rx: SNAP+RFC1042 len: %d\n", payload_length);

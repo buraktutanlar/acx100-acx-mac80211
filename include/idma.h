@@ -42,14 +42,14 @@
 
 int acx100_create_dma_regions(wlandevice_t *priv);
 int acx111_create_dma_regions(wlandevice_t *priv);
-int acx100_delete_dma_regions(wlandevice_t *priv);
-void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
-void acx100_clean_tx_desc(wlandevice_t *priv);
+int acx_delete_dma_regions(wlandevice_t *priv);
+void acx_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
+void acx_clean_tx_desc(wlandevice_t *priv);
 UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
-void acx100_process_rx_desc(wlandevice_t *priv);
-struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv);
+void acx_process_rx_desc(wlandevice_t *priv);
+struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv);
 
-char *acx100_get_packet_type_string(UINT16 fc);
+char *acx_get_packet_type_string(UINT16 fc);
 
 /* seems to be a bit similar to hfa384x_rx_frame.
  * These fields are still not quite obvious, though.
@@ -66,7 +66,7 @@ typedef struct __WLAN_ATTRIB_PACK__ rxbuffer {
 	UINT8	phy_level;		/* 0x6 PHY stat */
 	UINT8	phy_snr;		/* 0x7  PHY stat */
 	UINT32	time;		/* 0x8  timestamp upon MAC rcv first byte */
-	acx100_addr3_t buf;	/* 0x0c 0x18 */
+	acx_addr3_t buf;	/* 0x0c 0x18 */
 	UINT8	data[ACX100_BAP_DATALEN_MAX];
 } rxb_t;	/* 0x956 */
 
@@ -322,8 +322,8 @@ typedef struct __WLAN_ATTRIB_PACK__ rxhostdescriptor {
 	UINT16	reserved;			/* 0x06 */
 	UINT16	Ctl_16;				/* 0x08; 16bit value, endianness!! */
 	UINT16	length;				/* 0x0a */
-	ACX_PTR	desc_phy_next;			/* 0x0c [struct  rxhostdescriptor *] */
-	ACX_PTR	pNext;				/* 0x10 [struct  rxhostdescriptor *] */
+	ACX_PTR	desc_phy_next;			/* 0x0c [struct rxhostdescriptor *] */
+	ACX_PTR	pNext;				/* 0x10 [struct rxhostdescriptor *] */
 	UINT32	Status;				/* 0x14 */
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	rxhostdescriptor *desc_phy;	/* 0x18 */

@@ -150,6 +150,7 @@ since this seeks to list all requirements in full):
 * x86 box preferrably
   (minimum reported working so far: ACX100 - 486@100MHz, 16MB)
   Other architectures:
+  AMD64 should work now.
   PPC (Powerbooks) may work since they have been tested from time to time,
   but please report IMMEDIATELY if they have any trouble,
   I'm very interested in that!

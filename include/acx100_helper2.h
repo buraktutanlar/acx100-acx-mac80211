@@ -38,11 +38,11 @@
 #ifndef __ACX_ACX100_HELPER2_H
 #define __ACX_ACX100_HELPER2_H
 
-typedef struct acx100_frame {
+typedef struct acx_frame {
 	char val0x0[0x26];
 	UINT16 val0x26;
-	acx100_addr3_t fr;
-} acx100_frame_t;
+	acx_addr3_t fr;
+} acx_frame_t;
 
 typedef struct alloc_p80211mgmt_req_t {
 	union {
@@ -184,43 +184,39 @@ typedef struct __WLAN_ATTRIB_PACK__ TxData {
 	} body;
 } TxData;			/* size: 2400 */
 
-void acx100_sta_list_init(wlandevice_t *priv);
-client_t *acx100_sta_list_alloc(wlandevice_t *priv, const UINT8 *address);
-client_t *acx100_sta_list_add(wlandevice_t *priv, const UINT8 *address);
-client_t *acx100_sta_list_get(wlandevice_t *priv, const UINT8 *address);
-const char *acx100_get_status_name(UINT16 status);
-void acx100_set_status(wlandevice_t *priv, UINT16 status);
-int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
-UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
+void acx_sta_list_init(wlandevice_t *priv);
+client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address);
+client_t *acx_sta_list_add(wlandevice_t *priv, const UINT8 *address);
+client_t *acx_sta_list_get(wlandevice_t *priv, const UINT8 *address);
+const char *acx_get_status_name(UINT16 status);
+void acx_set_status(wlandevice_t *priv, UINT16 status);
+int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
+UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			  wlandevice_t *priv);
-UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
+UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
 			    wlandevice_t *priv);
-int acx100_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
-int acx100_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv);
-void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
+int acx_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
+int acx_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv);
+void acx_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 			  acxp80211_hdr_t *hdr);
-int acx100_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
-int acx100_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv);
-int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
+int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
+int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv);
+int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
 
-int acx100_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
-int acx100_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
-int acx100_transmit_deauthen(const UINT8 *addr, client_t *arg_4, wlandevice_t *priv,
+int acx_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+int acx_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+int acx_transmit_deauthen(const UINT8 *addr, client_t *arg_4, wlandevice_t *priv,
 		      UINT16 reason);
-int acx100_transmit_authen1(wlandevice_t *priv);
-int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
+int acx_transmit_authen1(wlandevice_t *priv);
+int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 		      wlandevice_t *priv);
-int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
-int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
-int acx100_transmit_assoc_req(wlandevice_t *priv);
-UINT32 acx100_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
+int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+int acx_transmit_assoc_req(wlandevice_t *priv);
+UINT32 acx_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
 #if (POWER_SAVE_80211 == 0)
 void ActivatePowerSaveMode(wlandevice_t *priv, int vala);
 #endif
-void acx100_timer(unsigned long a);
-void acx100_complete_dot11_scan(wlandevice_t *priv);
-
-void acx100_gen_challenge(challenge_text_t *);
-void acx100_get_random(UINT8 *, UINT16);
-void acx100_ibssid_gen(wlandevice_t *priv, unsigned char *p_out);
+void acx_timer(unsigned long a);
+void acx_complete_dot11_scan(wlandevice_t *priv);
 #endif /* __ACX_ACX100_HELPER2_H */

@@ -39,7 +39,7 @@
 #if (WLAN_HOSTIF==WLAN_USB)
 
 #ifdef ACX_DEBUG
-extern void acx100_dump_bytes(void *,int);
+extern void acx_dump_bytes(void *,int);
 #endif
 
 #include <linux/config.h>
@@ -99,7 +99,7 @@ static void acx100usb_control_complete(struct urb *);
 static void acx100usb_control_complete(struct urb *, struct pt_regs *);
 #endif
 
-int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
+int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
 	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->usbin);
 	int ucode;
 	struct usb_device *usbdev;
@@ -146,7 +146,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
 #ifdef ACX_DEBUG
 	acxlog(L_XFER,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
-	if (debug&L_DATA) acx100_dump_bytes(&(priv->usbout),blocklen);
+	if (debug&L_DATA) acx_dump_bytes(&(priv->usbout),blocklen);
 #endif
 	/* --------------------------------------
 	** fill setup packet and control urb
@@ -210,13 +210,13 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 				memcpy(pdr,&(priv->usbin.u.rmemresp.data),paramlen);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",priv->usbin.cmd,priv->usbin.status);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
-				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen);
+				if (debug&L_DATA) acx_dump_bytes(pdr,paramlen);
 			}
 			else {
 				memcpy(pdr,&(priv->usbin.u.rridresp.rid),paramlen+4);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbin.cmd,priv->usbin.status,priv->usbin.u.rridresp.rid,priv->usbin.u.rridresp.frmlen);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen+4);
-				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen+4);
+				if (debug&L_DATA) acx_dump_bytes(pdr,paramlen+4);
 			}
 		}
 	}
@@ -291,7 +291,7 @@ static short CtlLengthDot11[0x14] = {
 
 
 /*----------------------------------------------------------------
-** acx100_configure():
+** acx_configure():
 **
 **  Inputs:
 **     priv -> Pointer to wlandevice structure
@@ -304,7 +304,7 @@ static short CtlLengthDot11[0x14] = {
 ** Description:
 *----------------------------------------------------------------*/
 
-int acx100_configure(wlandevice_t *priv, void *pdr, short type)
+int acx_configure(wlandevice_t *priv, void *pdr, short type)
 {
   UINT16 len;
   /* ----------------------------------------------------
@@ -317,13 +317,13 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 	}
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx100_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
 }
 
 
 
 /*----------------------------------------------------------------
-** acx100_configure_length():
+** acx_configure_length():
 **
 **  Inputs:
 **     priv -> Pointer to wlandevice structure
@@ -336,16 +336,16 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 ** Description:
 ** ----------------------------------------------------------------*/
 
-int acx100_configure_length(wlandevice_t *priv, void *pdr,short type,short len) {
+int acx_configure_length(wlandevice_t *priv, void *pdr,short type,short len) {
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx100_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
 }
 
 
 
 /*----------------------------------------------------------------
-** acx100_interrogate():
+** acx_interrogate():
 **  Inputs:
 **     priv -> Pointer to wlandevice structure
 **    pdr -> Field for parameter data
@@ -357,7 +357,7 @@ int acx100_configure_length(wlandevice_t *priv, void *pdr,short type,short len) 
 ** Description:
 **--------------------------------------------------------------*/
 
-int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
+int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 {
   UINT16 len;
   /* ----------------------------------------------------
@@ -370,7 +370,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 	}
   acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d pdr=%p\n",type,len,pdr);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx100_issue_cmd(priv,ACX100_CMD_INTERROGATE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_INTERROGATE,pdr,len,5000));
 }
 
 
@@ -382,7 +382,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
  ****************************************************************************/
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_zero
+* acx_is_mac_address_zero
 *
 *
 * Arguments:
@@ -399,7 +399,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 *
 *----------------------------------------------------------------*/
 
-inline int acx100_is_mac_address_zero(mac_t *mac)
+inline int acx_is_mac_address_zero(mac_t *mac)
 {
   if ((mac->vala == 0) && (mac->valb == 0)) {
     return(1);
@@ -409,7 +409,7 @@ inline int acx100_is_mac_address_zero(mac_t *mac)
 
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_equal
+* acx_is_mac_address_equal
 *
 *
 * Arguments:
@@ -425,7 +425,7 @@ inline int acx100_is_mac_address_zero(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
+inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
 		return NOT_OK; /* no match */
@@ -435,7 +435,7 @@ inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_group
+* acx_is_mac_address_group
 *
 *
 * Arguments:
@@ -451,13 +451,13 @@ inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline UINT8 acx100_is_mac_address_group(mac_t *mac)
+inline UINT8 acx_is_mac_address_group(mac_t *mac)
 {
 	return mac->vala & 1;
 }
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_directed
+* acx_is_mac_address_directed
 *
 *
 * Arguments:
@@ -473,7 +473,7 @@ inline UINT8 acx100_is_mac_address_group(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-UINT8 acx100_is_mac_address_directed(mac_t *mac)
+UINT8 acx_is_mac_address_directed(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		return 0;
@@ -482,7 +482,7 @@ UINT8 acx100_is_mac_address_directed(mac_t *mac)
 }
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_broadcast
+* acx_is_mac_address_broadcast
 *
 *
 * Arguments:
@@ -499,13 +499,13 @@ UINT8 acx100_is_mac_address_directed(mac_t *mac)
 *
 *----------------------------------------------------------------*/
 static const unsigned char bcast[ETH_ALEN] ={ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
+inline int acx_is_mac_address_broadcast(const UINT8 * const address)
 {
 	return !memcmp(address, bcast, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
-* acx100_is_mac_address_multicast
+* acx_is_mac_address_multicast
 *
 *
 * Arguments:
@@ -521,7 +521,7 @@ inline int acx100_is_mac_address_broadcast(const UINT8 * const address)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline int acx100_is_mac_address_multicast(mac_t *mac)
+inline int acx_is_mac_address_multicast(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
@@ -533,7 +533,7 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 }
 
 /*----------------------------------------------------------------
-* acx100_log_mac_address
+* acx_log_mac_address
 *
 *
 * Arguments:
@@ -550,7 +550,7 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 *
 *----------------------------------------------------------------*/
 
-void acx100_log_mac_address(int level, UINT8 * mac, const char* tail) {
+void acx_log_mac_address(int level, UINT8 * mac, const char* tail) {
 	if (debug & level) {
 		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
@@ -580,9 +580,9 @@ void acx100_log_mac_address(int level, UINT8 * mac, const char* tail) {
 void acx100_power_led(wlandevice_t *priv, UINT8 enable) {
   /*
   if (enable)
-    acx100_write_reg16(priv, 0x290, acx100_read_reg16(priv, 0x290) & ~0x0800);
+    acx_write_reg16(priv, 0x290, acx_read_reg16(priv, 0x290) & ~0x0800);
   else
-    acx100_write_reg16(priv, 0x290, acx100_read_reg16(priv, 0x290) | 0x0800);
+    acx_write_reg16(priv, 0x290, acx_read_reg16(priv, 0x290) | 0x0800);
   */
 }
 

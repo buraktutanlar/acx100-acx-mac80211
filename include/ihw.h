@@ -53,58 +53,58 @@ typedef struct mac {
 #define IO_AS_MACROS
 #ifdef IO_AS_MACROS
 #if ACX_IO_WIDTH == 32
-#define acx100_read_reg32(priv, offset) \
+#define acx_read_reg32(priv, offset) \
 	readl((priv->iobase) + (offset))
-#define acx100_write_reg32(priv, offset, val) \
+#define acx_write_reg32(priv, offset, val) \
 	writel((val), (priv->iobase) + (offset))
 #else
-#define acx100_read_reg32(priv, offset) \
+#define acx_read_reg32(priv, offset) \
 	readw((priv->iobase) + (offset)) \
 	+ (readw((priv->iobase) + (offset) + 2) << 16)
-#define acx100_write_reg32(priv, offset, val) \
+#define acx_write_reg32(priv, offset, val) \
 	do { \
 		writew((val) & 0xffff, (priv->iobase) + (offset)); \
 		writew((val) >> 16, (priv->iobase) + (offset) + 2); \
 	} while (0)
 #endif
-#define acx100_read_reg16(priv, offset) \
+#define acx_read_reg16(priv, offset) \
 	readw((priv->iobase) + (offset))
-#define acx100_write_reg16(priv, offset, val) \
+#define acx_write_reg16(priv, offset, val) \
 	writew((val), (priv->iobase) + (offset))
-#define acx100_read_reg8(priv, offset) \
+#define acx_read_reg8(priv, offset) \
 	readb((priv->iobase) + (offset))
-#define acx100_write_reg8(priv, offset, val) \
+#define acx_write_reg8(priv, offset, val) \
 	writeb((val), (priv->iobase) + (offset))
 #else
-UINT32 acx100_read_reg32(wlandevice_t *priv, UINT valb);
-void acx100_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
-UINT16 acx100_read_reg16(wlandevice_t *priv, UINT valb);
-void acx100_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
-UINT8 acx100_read_reg8(wlandevice_t *priv, UINT valb);
-void acx100_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
+UINT32 acx_read_reg32(wlandevice_t *priv, UINT valb);
+void acx_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
+UINT16 acx_read_reg16(wlandevice_t *priv, UINT valb);
+void acx_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
+UINT8 acx_read_reg8(wlandevice_t *priv, UINT valb);
+void acx_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
 #endif
 
-void acx100_get_info_state(wlandevice_t *priv);
-void acx100_get_cmd_state(wlandevice_t *priv);
-void acx100_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status);
+void acx_get_info_state(wlandevice_t *priv);
+void acx_get_cmd_state(wlandevice_t *priv);
+void acx_write_cmd_type_or_status(wlandevice_t *priv, UINT val, INT is_status);
 
-int acx100_issue_cmd(wlandevice_t *priv, UINT cmd, /*@null@*/ void *pcmdparam,
+int acx_issue_cmd(wlandevice_t *priv, UINT cmd, /*@null@*/ void *pcmdparam,
 		     int paramlen, UINT32 timeout);
 
-int acx100_configure(wlandevice_t *priv, void *pdr, short type);
-int acx100_configure_length(wlandevice_t *priv, void *pdr, short type,
+int acx_configure(wlandevice_t *priv, void *pdr, short type);
+int acx_configure_length(wlandevice_t *priv, void *pdr, short type,
 			    short length);
-int acx100_interrogate(wlandevice_t *priv, void *pdr, short type);
+int acx_interrogate(wlandevice_t *priv, void *pdr, short type);
 
-int acx100_is_mac_address_zero(mac_t *mac);
-void acx100_clear_mac_address(mac_t *mac);
-int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two);
-UINT8 acx100_is_mac_address_group(mac_t *mac);
-UINT8 acx100_is_mac_address_directed(mac_t *mac);
-void acx100_set_mac_address_broadcast(UINT8 *address);
-int acx100_is_mac_address_broadcast(const UINT8 * const address);
-int acx100_is_mac_address_multicast(mac_t *mac);
-void acx100_log_mac_address(int level, const UINT8 *mac, const char* tail);
+int acx_is_mac_address_zero(mac_t *mac);
+void acx_clear_mac_address(mac_t *mac);
+int acx_is_mac_address_equal(UINT8 *one, UINT8 *two);
+UINT8 acx_is_mac_address_group(mac_t *mac);
+UINT8 acx_is_mac_address_directed(mac_t *mac);
+void acx_set_mac_address_broadcast(UINT8 *address);
+int acx_is_mac_address_broadcast(const UINT8 * const address);
+int acx_is_mac_address_multicast(mac_t *mac);
+void acx_log_mac_address(int level, const UINT8 *mac, const char* tail);
 
 void acx100_power_led(wlandevice_t *priv, UINT8 enable);
 #endif /* __ACX_IHW_H */
