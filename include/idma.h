@@ -153,22 +153,24 @@ typedef struct txdescriptor {
 /* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
 
 /* Bit values for rate111 field */
-#define RATE111_1		0x0001
-#define RATE111_2		0x0002
-#define RATE111_5		0x0004
-#define RATE111_6		0x0008
-#define RATE111_9		0x0010
-#define RATE111_11		0x0020
-#define RATE111_12		0x0040
-#define RATE111_18		0x0080
-#define RATE111_22		0x0100
-#define RATE111_24		0x0200
-#define RATE111_36		0x0400
-#define RATE111_48		0x0800
-#define RATE111_54		0x1000
+#define RATE111_1		0x0001	/* DBPSK */
+#define RATE111_2		0x0002	/* DQPSK */
+#define RATE111_5		0x0004	/* CCK or PBCC */
+#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
+#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
+#define RATE111_11		0x0020	/* CCK or PBCC */
+#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
+#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
+#define RATE111_22		0x0100	/* PBCC */
+#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
+#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
+#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
+#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
 #define RATE111_RESERVED	0x2000
 #define RATE111_PBCC_5_11	0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
 #define RATE111_SHORTPRE	0x8000  /* short preamble */
+/* Special 'try everything' value */
+#define RATE111_ALL		0x1fff
 
 /* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
      11b  11g  11a
@@ -196,7 +198,7 @@ Mandatory:
 Optional:
  o - OFDM
  p - PBCC
- d - CCK-OFDM (also known as DSSS-ODFM)
+ d - CCK-OFDM (also known as DSSS-OFDM)
 
 DBPSK = Differential Binary Phase Shift Keying
 DQPSK = Differential Quaternary Phase Shift Keying
@@ -209,6 +211,13 @@ The term CCK-OFDM may be used interchangeably with DSSS-OFDM
 (the IEEE 802.11g-2003 standard uses the latter terminology).
 In the CCK-OFDM, the PLCP header of the frame uses the CCK form of DSSS,
 while the PLCP payload (the MAC frame) is modulated using OFDM.
+
+Basically, you must use CCK-OFDM if you have mixed 11b/11g environment,
+or else (pure OFDM) 11b equipment may not realize that AP
+is sending a packet and start sending its own one.
+
+Re PBCC: avoid using it. It makes sense only if you have
+TI "11b+" hardware. You _must_ use PBCC in order to reach 22Mbps on it.
 */
 
 typedef struct txhostdescriptor {

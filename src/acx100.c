@@ -1641,13 +1641,29 @@ void acx100_disable_irq(wlandevice_t *priv)
 	FN_EXIT(0, 0);
 }
 
+#define INFO_SCAN_COMPLETE      0x0001  /* scan is complete. all frames now on the receive queue are valid */
+#define INFO_WEP_KEY_NOT_FOUND  0x0002
+#define INFO_WATCH_DOG_RESET    0x0003  /* hw has been reset as the result of a watchdog timer timeout */
+#define INFO_PS_FAIL            0x0004  /* failed to send out NULL frame from PS mode notification to AP */
+                                        /* recommended action: try entering 802.11 PS mode again */
+#define INFO_IV_ICV_FAILURE     0x0005  /* encryption/decryption proces s on a packet failed */
+
+static char *info_type_msg[] = {
+    "<unknown)",
+    "scan complete",
+    "WEP key not found",
+    "internal watchdog reset was done",
+    "failed to send powersave (NULL frame) notification to AP",
+    "encrypt/decrypt on a packet has failed",
+};
+
 void acx100_handle_info_irq(wlandevice_t *priv)
 {
 	acx100_get_info_state(priv);
-	acxlog(L_STD | L_IRQ, "Got Info IRQ: type 0x%04x, status 0x%04x\n", priv->info_type, priv->info_status);
-
-	priv->info_status = 0x0001; /* we received it */
-	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], 0x2); /* notify ACX1xx */
+	acxlog(L_STD | L_IRQ, "Got Info IRQ: status 0x%04x, type 0x%04x: %s\n",
+		priv->info_status, priv->info_type,
+		info_type_msg[(priv->info_type>5) ? 0 : priv->info_type]
+	);
 }
 
 /*----------------------------------------------------------------

@@ -2667,12 +2667,20 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->set_mask |= GETSET_RETRY;
 
 	priv->txrate_auto = (UINT8)0; /* FIXME: disable it by default, implementation not very good yet. */
-	priv->txrate_auto_idx = (UINT8)1; /* 2Mbps */
-	priv->txrate_cfg = (UINT8)ACX_TXRATE_11; /* Don't start with max. rate of 22Mbps, since very many APs only support up to 11Mbps */
-	if (1 == priv->txrate_auto)
-		priv->txrate_curr = (UINT8)ACX_TXRATE_2; /* 2Mbps, play it safe at the beginning */
-	else
-		priv->txrate_curr = priv->txrate_cfg;
+	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
+		priv->txrate_auto_idx = (UINT8)1; /* 2Mbps */
+		priv->txrate_cfg = (UINT8)ACX_TXRATE_11; /* Don't start with max. rate of 22Mbps, since very many APs only support up to 11Mbps */
+		if (1 == priv->txrate_auto)
+			priv->txrate_curr = (UINT8)ACX_TXRATE_2; /* 2Mbps, play it safe at the beginning */
+		else
+			priv->txrate_curr = priv->txrate_cfg;
+	} else {
+		priv->txrate_cfg = RATE111_ALL;
+		if (1 == priv->txrate_auto)
+			priv->txrate_curr = RATE111_ALL; //TODO: RATE111_1 + RATE111_2; /* 2Mbps, play it safe at the beginning */
+		else
+			priv->txrate_curr = priv->txrate_cfg;
+	}
 
 	/* # of retries to use when in auto rate mode.
 	 * Setting it higher will cause higher ping times due to retries. */

@@ -75,8 +75,10 @@
 #define L_DEBUG		0x200	/* log of debug info */
 #define L_IOCTL		0x400	/* log ioctl calls */
 #define L_CTL		0x800	/* log of low-level ctl commands */
-#define L_BUF		0x1000	/* debug buffer mgmt (ring buffer etc.) */
+#define L_BUFR		0x1000	/* debug rx buffer mgmt (ring buffer etc.) */
 #define L_XFER_BEACON	0x2000	/* also log beacon packets */
+#define L_BUFT		0x4000	/* debug tx buffer mgmt (ring buffer etc.) */
+#define L_BUF (L_BUFR+L_BUFT)	/* debug buffer mgmt (ring buffer etc.) */
 
 #define L_BINDEBUG	(L_BIN | L_DEBUG)
 #define L_BINSTD	(L_BIN | L_STD)
@@ -311,6 +313,12 @@ typedef enum {
 	END_OF_IO_ENUM /* LEAVE THIS AT THE END, USED TO FIGURE OUT THE LENGTH */
 
 } IO_INDICES;
+
+/* Values for IO_ACX_INT_TRIG register */
+#define INT_TRIG_RXPRC	0x08	/* inform hw that rx descriptor in queue needs processing */
+#define INT_TRIG_TXPRC	0x04	/* inform hw that tx descriptor in queue needs processing */
+#define INT_TRIG_ACK	0x02	/* ack that we received info from info mailbox */
+#define INT_TRIG_CMD	0x01	/* inform hw that we have filled command mailbox */
 
 #define IO_INDICES_SIZE END_OF_IO_ENUM * sizeof(UINT16)
 
@@ -771,21 +779,6 @@ typedef struct acx100_InfFrame {
 #define ACX_TXRATE_36_G		0x0B
 #define ACX_TXRATE_48_G		0x01
 #define ACX_TXRATE_54_G		0x03
-
-/* Values for acx111 tx descr rate field */
-#define ACX111_TXRATE_1		0x0001
-#define ACX111_TXRATE_2		0x0003
-#define ACX111_TXRATE_5		0x0007
-#define ACX111_TXRATE_6		0x000f
-#define ACX111_TXRATE_9		0x001f
-#define ACX111_TXRATE_11	0x003f
-#define ACX111_TXRATE_12	0x007f
-#define ACX111_TXRATE_18	0x00ff
-#define ACX111_TXRATE_22	0x01ff
-#define ACX111_TXRATE_24	0x03ff
-#define ACX111_TXRATE_36	0x07ff
-#define ACX111_TXRATE_48	0x0fff
-#define ACX111_TXRATE_54	0x1fff
 
 #define ACX_RXRATE_1		0x82
 #define ACX_RXRATE_2		0x84

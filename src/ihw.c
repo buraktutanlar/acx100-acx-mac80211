@@ -264,6 +264,27 @@ inline void acx100_write_reg8(wlandevice_t *priv, UINT offset, UINT val)
  *
  ****************************************************************************/
 
+/* Info mailbox format:
+2 bytes: type
+2 bytes: status
+more bytes may follow
+    docs say about status:
+	0x0000 info available (set by hw)
+	0x0001 information received (must be set by host)
+	0x1000 info available, mailbox overflowed (messages lost) (set by hw)
+    but in practice we've seen:
+	0x9000 when we did not set status to 0x0001 on prev message
+	0x1001 when we did set it
+	0x0000 was never seen
+    conclusion: this is really a bitfield:
+    0x1000 is 'info available' bit
+    'mailbox overflowed' bit is 0x8000, not 0x1000
+    value of 0x0000 probably means that there is no message at all
+    P.S. I dunno how in hell hw is supposed to notice that messages are lost -
+    it does NOT clear bit 0x0001, and this bit will probably stay forever set
+    after we set it once. Let's hope this will be fixed in firmware someday
+*/
+
 void acx100_get_info_state(wlandevice_t *priv)
 {
 	UINT32 value;
@@ -271,13 +292,17 @@ void acx100_get_info_state(wlandevice_t *priv)
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_END_CTL], 0x0);
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_CTL], 0x1);
 
-	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], 
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR],
 		acx100_read_reg32(priv, priv->io[IO_ACX_INFO_MAILBOX_OFFS]));
 
 	value = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 
 	priv->info_type = value & 0xffff;
 	priv->info_status = value >> 16;
+
+	/* inform hw that we have read this info message */
+	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
+	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_ACK); /* now bug hw to notice it */
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }

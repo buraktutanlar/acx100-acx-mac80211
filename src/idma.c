@@ -521,10 +521,18 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	} else if(priv->chip_type == CHIPTYPE_ACX111) {
 		if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
 			tx_desc->rate111 = RATE111_2;	/* 2Mbps for MGMT pkt compatibility */
+			/*
+			NB: my acx111 frequently has great difficulties
+			sending 2Mbit frames, up to complete inability
+			to associate with AP. Seems like hw problem,
+			because 11Mbit and 5.5 rates work at the same time.
+			Maybe we shall allow RATE111_1 here too?
+			*/
 		} else {
-			tx_desc->rate111 = RATE111_1 + RATE111_2; // TODO: = priv->txrate_curr;
+			tx_desc->rate111 = priv->txrate_curr +
+				((1 == priv->preamble_flag) ? RATE111_SHORTPRE : 0);
 		}
-		//TODO:if (1 == priv->preamble_flag) tx_desc->rate111 += RATE111_SHORTPRE;
+
                 tx_desc->ack_failures = 0;
 		tx_desc->rts_failures = 0;
 		tx_desc->rts_ok = 0;
@@ -652,7 +660,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 static UINT8 txrate_auto_table[] = { (UINT8)ACX_TXRATE_1, (UINT8)ACX_TXRATE_2,
 	(UINT8)ACX_TXRATE_5_5, (UINT8)ACX_TXRATE_11, (UINT8)ACX_TXRATE_22PBCC };
 
-static inline void acx_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
+static void acx100_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
 {
 	acxlog(L_DEBUG, "rate %d/%d, fallback %d/%d, stepup %d/%d\n", pTxDesc->rate, priv->txrate_curr, priv->txrate_fallback_count, priv->txrate_fallback_threshold, priv->txrate_stepup_count, priv->txrate_stepup_threshold);
 	if ((pTxDesc->rate < priv->txrate_curr) || (0x0 != (pTxDesc->error & 0x30))) {
@@ -680,6 +688,71 @@ static inline void acx_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
 	}
 }
 
+/* Theory of operation:
+priv->txrate_cfg is a bitmask of allowed (configured) rates.
+It is set as a result of iwconfig rate N [auto] command.
+Currently it can be either fixed (e.g. 0x0080 == 18Mbit only)
+or auto (0x00ff == 18Mbit or any lower value), although
+code will handle any bitmask (0x1081 == try 54Mbit,18Mbit,1Mbit _only_).
+An iwpriv need to be added to be able to set such setups. TODO.
+
+priv->txrate_curr is a value for rate111 field in tx descriptor.
+It is always set to txrate_cfg sans zero or more most significant
+bits. This routine handles selection of txrate_curr depending on
+outcome of last tx event.
+
+5.5 and 11Mbit rates with PBCC modulation are not supported.
+*/
+static void acx111_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
+	UINT16 rate;
+	//TODO: performance hack: UINT16 txrate_curr = priv->txrate_curr;
+	int slower_rate_was_used;
+	int n;
+
+	n=0;
+	rate = pTxDesc->rate111 & 0x1fff;
+	while( (rate>>=1) != 0) n++;
+	rate = 1<<n;
+	/* rate has only one bit set now, corresponding to actual tx rate used */
+
+	acxlog(L_DEBUG, "rate %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
+		rate, priv->txrate_curr, priv->txrate_cfg,
+		priv->txrate_fallback_count, priv->txrate_fallback_threshold,
+		priv->txrate_stepup_count, priv->txrate_stepup_threshold
+	);
+
+	/* 
+	txrate_curr >= rate: always true
+	(txrate_curr^rate) >= rate: true only if highest set bit
+	in txrate_curr is more signficant than highest set bit in rate
+	*/
+	slower_rate_was_used = ((priv->txrate_curr ^ rate) >= rate);
+	
+	if (slower_rate_was_used || (0 != (pTxDesc->error & 0x30))) {
+		if (++priv->txrate_fallback_count <= priv->txrate_fallback_threshold) return;
+		priv->txrate_fallback_count = 0;
+		if(priv->txrate_curr == 0x0001) return;	/* 1 Mbit is a rock bottom */
+		/* clear highest 1 bit in txrate_curr */
+		rate=0x1000;
+		while(0 == (priv->txrate_curr & rate))
+			rate >>= 1;
+		priv->txrate_curr &= ~rate;
+		acxlog(L_XFER, "falling back to Tx rate %04x\n", priv->txrate_curr);
+	}
+	else
+	if (!slower_rate_was_used) {
+		if (++priv->txrate_stepup_count	<= priv->txrate_stepup_threshold) return;
+		priv->txrate_stepup_count = 0;
+		/* try to find higher allowed rate */
+		do
+			rate<<=1;
+		while( rate && ((priv->txrate_cfg & rate) == 0));
+		if(!rate) return; /* no higher rates allowed by config */
+		priv->txrate_curr |= rate;
+		acxlog(L_DEBUG|L_XFER, "stepping up to Tx rate %04x\n", priv->txrate_curr);
+	}
+}
+
 /*----------------------------------------------------------------
 * acx100_log_txbuffer
 *
@@ -704,14 +777,14 @@ inline void acx100_log_txbuffer(TIWLAN_DC *pDc)
 	txdesc_t *pTxDesc;
 
 	FN_ENTER;
-	if (debug & L_BUF)
+	if (debug & L_BUFT)
 	{
 		/* no locks here, since it's entirely non-critical code */
 		pTxDesc = pDc->pTxDescQPool;
 		for (i = 0; i < pDc->tx_pool_count; i++)
 		{
 			if ((pTxDesc->Ctl & DESC_CTL_DONE) == DESC_CTL_DONE)
-				acxlog(L_BUF, "txbuf %d done\n", i);
+				acxlog(L_BUFT, "txbuf %d done\n", i);
 			pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 		}
 	}
@@ -757,7 +830,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 	TIWLAN_DC *pDc = &priv->dc;
 	txdesc_t *pTxDesc;
 	UINT finger, watch;
-	UINT8 ack_failures, rts_failures, rts_ok;
+	UINT8 ack_failures, rts_failures, rts_ok; /* keep old desc status */
 	UINT16 r111;
 	UINT16 num_cleaned = 0;
 	UINT16 num_processed = 0;
@@ -765,7 +838,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 	FN_ENTER;
 
 	acx100_log_txbuffer(pDc);
-	acxlog(L_BUF, "cleaning up Tx bufs from %d\n", pDc->tx_tail);
+	acxlog(L_BUFT, "cleaning up Tx bufs from %d\n", pDc->tx_tail);
 
 	spin_lock(&pDc->tx_lock);
 
@@ -793,8 +866,12 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 		if (unlikely(0 != pTxDesc->error))
 			acx_handle_tx_error(priv, pTxDesc);
 
-		if (1 == priv->txrate_auto)
-			acx_handle_txrate_auto(priv, pTxDesc);
+		if (1 == priv->txrate_auto) {
+			if (CHIPTYPE_ACX100 == priv->chip_type)
+				acx100_handle_txrate_auto(priv, pTxDesc);
+			else
+				acx111_handle_txrate_auto(priv, pTxDesc);
+		}
 
 		ack_failures = pTxDesc->ack_failures;
 		rts_failures = pTxDesc->rts_failures;
@@ -819,7 +896,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 			netif_wake_queue(priv->netdev);
 		}
 		/* log AFTER having done the work, faster */
-		acxlog(L_BUF, "cleaned %d, ack_failures=%d, rts_failures=%d, rts_ok=%d r111=%04x\n", finger, ack_failures, rts_failures, rts_ok, r111);
+		acxlog(L_BUFT, "cleaned %d, ack_fail=%d, rts_fail=%d, rts_ok=%d r111=%04x\n", finger, ack_failures, rts_failures, rts_ok, r111);
 
 next:
 		/* update pointer for descr to be cleaned next */
@@ -1044,7 +1121,7 @@ inline void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 	struct rxhostdescriptor *pDesc;
 
 	FN_ENTER;
-	if (debug & L_BUF)
+	if (debug & L_BUFR)
 	{
 		/* no locks here, since it's entirely non-critical code */
 		pDesc = pDc->pRxHostDescQPool;
@@ -1054,7 +1131,7 @@ inline void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 			acxlog(L_DEBUG,"rxbuf %d Ctl=%X val0x14=%X\n",i,pDesc->Ctl,pDesc->Status);
 #endif
 			if ((pDesc->Ctl & ACX100_CTL_OWN) && (pDesc->Status & BIT31))
-				acxlog(L_BUF, "rxbuf %d full\n", i);
+				acxlog(L_BUFR, "rxbuf %d full\n", i);
 			pDesc++;
 		}
 	}
@@ -1137,7 +1214,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	/* now process descriptors, starting with the first we figured out */
 	while (1)
 	{
-		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %d\n", __func__, curr_idx, pDc->rx_tail);
+		acxlog(L_BUFR, "%s: using curr_idx %d, rx_tail is now %d\n", __func__, curr_idx, pDc->rx_tail);
 
 		/* enable for a sweet dump of the frame */
 		/* acx100_dump_bytes(buf,buf_len); */
@@ -2007,7 +2084,7 @@ struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv)
 	}
 
 	priv->TxQueueFree--;
-	acxlog(L_BUF, "got Tx desc %d, %d remain.\n", pDc->tx_head, priv->TxQueueFree);
+	acxlog(L_BUFT, "got Tx desc %d, %d remain.\n", pDc->tx_head, priv->TxQueueFree);
 
 /*
  * This comment is probably not entirely correct, needs further discussion

@@ -125,7 +125,8 @@ Furthermore, associating with some access points might still be problematic
 due to strict 802.11 compliance checks in their firmware.
 
 Master mode support (aka HostAP) has not really been implemented yet,
-but at least it can be configured now.
+but at least it can be configured now. It won't be supported for quite a while
+(only with new generic Linux 802.11 stack), don't hold your breath. [040725]
 
 The non-standard 4x (4X) mode (aka "44Mbps") is not supported yet and will need
 several driver changes. Don't hold your breath, this is really low priority.

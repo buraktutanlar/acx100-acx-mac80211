@@ -912,6 +912,85 @@ static inline int acx100_ioctl_get_essid(struct net_device *dev, struct iw_reque
 * Comment:
 *
 *----------------------------------------------------------------*/
+static int acx111_rate_tbl[] = {
+     1000000,
+     2000000,
+     5500000,
+     6000000,
+     9000000,
+    11000000,
+    12000000,
+    18000000,
+    22000000,
+    24000000,
+    36000000,
+    48000000,
+    54000000,
+};
+#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
+
+static int acx111_ioctl_set_rate(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra) {
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	UINT16 txrate_cfg = 1;
+	unsigned long flags;
+	int err;
+	int result = -EINVAL;
+
+	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
+		int i;
+		if(vwrq->value == -1) vwrq->value = 54000000;
+		i = VEC_SIZE(acx111_rate_tbl)-1;
+		while(i >= 0) {
+			if(vwrq->value == acx111_rate_tbl[i]) {
+				while(i--)
+					txrate_cfg <<= 1;
+				if(vwrq->fixed==0)
+					txrate_cfg = (txrate_cfg<<1)-1;
+				i = 0;
+				break;
+			}
+			i--;
+		}
+		if(i == -1) { /* no matching rate */
+			result = -EINVAL;
+			goto end;
+		}
+	} else {	/* rate N, N<1000 (driver specific): we don't use this */
+		result = -EOPNOTSUPP;
+		goto end;
+	}
+	
+	err = acx100_lock(priv, &flags);
+	if (err) {
+		result = err;
+		goto end;
+	}
+
+	priv->txrate_cfg = txrate_cfg;
+	priv->txrate_auto = (vwrq->fixed == 0);
+	if (priv->txrate_auto)
+	{
+		if (RATE111_1 == txrate_cfg) { /* auto rate with 1Mbps max. useless */
+			priv->txrate_auto = 0;
+			priv->txrate_curr = priv->txrate_cfg;
+		} else {
+			priv->txrate_curr = priv->txrate_cfg; //TODO: = RATE111_1 + RATE111_2; /* 2Mbps, play it safe at the beginning */
+			priv->txrate_fallback_count = 0;
+			priv->txrate_stepup_count = 0;
+		}
+	}
+	else
+		priv->txrate_curr = priv->txrate_cfg;
+	
+	acx100_unlock(priv, &flags);
+
+	acxlog(L_IOCTL, "Tx rate = %04x, auto rate %d, current rate %04x\n", priv->txrate_cfg, priv->txrate_auto, priv->txrate_curr);
+	priv->set_mask |= SET_RATE_FALLBACK;
+	result = -EINPROGRESS;
+end:
+	return result;
+}
+
 static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
@@ -924,6 +1003,11 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 	acxlog(L_IOCTL,
 	       "rate = %d, fixed = 0x%x, disabled = 0x%x, flags = 0x%x\n",
 	       vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
+
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
+		result = acx111_ioctl_set_rate(dev, info, vwrq, extra);
+		goto end;
+	}
 
 #define BITRATE_AUTO 1
 #if BITRATE_AUTO
@@ -1088,7 +1172,17 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	vwrq->value = priv->txrate_curr * 100000;
+	if (CHIPTYPE_ACX100 == priv->chip_type) {
+		vwrq->value = priv->txrate_curr * 100000;
+	} else {
+		int i = 0;
+		UINT16 cfg = priv->txrate_cfg;
+		while(cfg>1) {
+			i++;
+			cfg>>=1;
+		}
+		vwrq->value = acx111_rate_tbl[i];
+	}
 #if BITRATE_AUTO
 	vwrq->fixed = (__u8)(priv->txrate_auto == (UINT8)0);
 #else
