@@ -56,6 +56,7 @@ struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv);
 
 #define ACX100_RXBUF_HDRSIZE 12
 
+#define MAC_CNT_RCVD(desc) (le16_to_cpu(desc->mac_cnt_rcvd) & 0xfff)
 typedef struct rxbuffer {
 	u16	mac_cnt_rcvd ACX_PACKED;	/* 0x0, only 12 bits are len! (0xfff) */
 	u8	mac_cnt_mblks ACX_PACKED;	/* 0x2 */
@@ -89,17 +90,18 @@ typedef struct framehdr {
 /* flags:
  * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
  */
-#define DESC_CTL_SHORT_PREAMBLE 0x01
-#define DESC_CTL_FIRST_MPDU     0x02
-#define DESC_CTL_AUTODMA        0x04
-#define DESC_CTL_RECLAIM        0x08
-#define DESC_CTL_USED_FOR_TX    0x40    /* owned */
-#define DESC_CTL_FREE           0x80    /* tx finished */
+#define DESC_CTL_SHORT_PREAMBLE 0x01	/* Preamble type: 0 = long; 1 = short */
+#define DESC_CTL_FIRSTFRAG      0x02	/* This is the 1st frag of the frame */
+#define DESC_CTL_AUTODMA        0x04	
+#define DESC_CTL_RECLAIM        0x08	/* ready to reuse */
+#define DESC_CTL_HOSTDONE       0x20	/* host has finished processing */
+#define DESC_CTL_ACXDONE        0x40    /* acx1xx has finished processing */
+#define DESC_CTL_HOSTOWN        0x80    /* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
 
-#define	DESC_CTL_INIT		(ACX100_CTL_OWN | ACX100_CTL_RECLAIM | \
-				 ACX100_CTL_AUTODMA | ACX100_CTL_FIRSTFRAG)
+#define	DESC_CTL_INIT		(DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM | \
+				 DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG)
 
-#define	DESC_CTL_DONE		(ACX100_CTL_ACXDONE | ACX100_CTL_OWN)
+#define	DESC_CTL_DONE		(DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
 
 #define DESC_CTL2_FCS		0x02
 #define DESC_CTL2_MORE_FRAG	0x04

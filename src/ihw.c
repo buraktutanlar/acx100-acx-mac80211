@@ -576,10 +576,10 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	acx_write_cmd_type_or_status(priv, 0, 1);
 
 	if (!(irqtype & HOST_INT_CMD_COMPLETE)) {
-		acxlog(L_CTL,
+		acxlog(0xffff,
 			"Polling for an IRQ FAILED with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
 			irqtype, cmd_status, priv->irqs_active, priv->irq_status);
-		if (debug & L_CTL)
+		if (debug & 0xffff)
 			dump_stack();
 		goto done;
 	}
@@ -877,7 +877,7 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 	offs = 4;
 #endif
-	return acx_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, len + offs, 5000);
+	return acx_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, len + offs, ACX_CMD_TIMEOUT_DEFAULT);
 }
 
 /*----------------------------------------------------------------
@@ -906,7 +906,7 @@ inline int acx_configure_length(wlandevice_t *priv, void *pdr, short type, short
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 #endif
 	return acx_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, 
-		len + 4, 5000);
+		len + 4, ACX_CMD_TIMEOUT_DEFAULT);
 }
 
 /*----------------------------------------------------------------
@@ -947,7 +947,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 	acxlog(L_CTL,"interrogating: type=0x%X len=%d\n",type,len);
 
 	return acx_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr,
-		len + 4, 5000);
+		len + 4, ACX_CMD_TIMEOUT_DEFAULT);
 }
 
 
@@ -1135,7 +1135,7 @@ void acx_log_mac_address(int level, const u8 *mac, const char* tail)
 	if (!(debug & level))
 		return;
 
-	printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
+	printk(KERN_WARNING "%02X:%02X:%02X:%02X:%02X:%02X%s",
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
 		tail
 	);

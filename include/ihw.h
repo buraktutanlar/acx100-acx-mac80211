@@ -86,6 +86,8 @@ void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
 #endif /* IO_AS_MACROS */
 #endif /* (WLAN_HOSTIF!=WLAN_USB) */
 
+#define ACX_CMD_TIMEOUT_DEFAULT	5000
+
 void acx_get_info_state(wlandevice_t *priv);
 void acx_get_cmd_state(wlandevice_t *priv);
 void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_status);

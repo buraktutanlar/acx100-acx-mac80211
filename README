@@ -96,6 +96,11 @@ which are very rare). USB support exists for both 2.6.x and 2.4.x,
 however it may be not completely "stable" yet, and Linux 2.4.x USB stack
 is buggy (both uhci and usb-uhci; ohci and ehci should be ok, though),
 so better use 2.6.x for USB! [041203]
+
+Determining whether your wireless card is supported by this driver can
+be done by running "lspci". This should give you an idea whether it should
+be ok or not.
+
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
@@ -168,6 +173,8 @@ Linux 802.11 stack), don't hold your breath. [041111]
 
 The non-standard 4x (4X) mode (aka "44Mbps") is not supported yet and will need
 several driver changes. Don't hold your breath, this is really low priority.
+You might want to disable 4x mode support in your AP, since it is suspected
+to cause problems sometimes.
 
 Many other things haven't been tested (properly) yet.
 
@@ -704,6 +711,9 @@ If you get some "link failed" message or similar, try using
 MII_NOT_SUPPORTED=yes in your /etc/sysconfig/network-scripts/ifcfg-wlan0
 or similar file.
 
+Disable packet fragmentation on your AP, since our driver doesn't
+support Rx and Tx (de-)fragmentation yet, so this may cause problems.
+
 Disable any 4X mode feature on your 22Mbps AP, since our driver doesn't support
 4X mode yet and 4X mode is known to cause problems sometimes.
 
@@ -713,6 +723,9 @@ the address will fail with an obscure "not enough buffer space" kernel error!
 If your transfer speed is very low in auto rate mode, then make sure to use
 a maximum rate that's compatible with the maximum rate of your peer
 (non-auto-rate mode wouldn't get any connection in that case, BTW...).
+
+If traffic is problematic in case other peers are active, then fiddling with
+iwconfig rts might help.
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-(

@@ -317,7 +317,7 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 	}
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,ACX_CMD_TIMEOUT_DEFAULT));
 }
 
 
@@ -339,7 +339,7 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 int acx_configure_length(wlandevice_t *priv, void *pdr,short type,short len) {
   acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_CONFIGURE,pdr,len,ACX_CMD_TIMEOUT_DEFAULT));
 }
 
 
@@ -370,7 +370,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 	}
   acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d pdr=%p\n",type,len,pdr);
   ((memmap_t *)pdr)->type = cpu_to_le16(type);
-  return(acx_issue_cmd(priv,ACX100_CMD_INTERROGATE,pdr,len,5000));
+  return(acx_issue_cmd(priv,ACX100_CMD_INTERROGATE,pdr,len,ACX_CMD_TIMEOUT_DEFAULT));
 }
 
 

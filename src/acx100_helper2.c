@@ -1157,7 +1157,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 				alloc_p80211mgmt_req.a.beacon.buf =
 				    (char *) p80211_hdr;
 				alloc_p80211mgmt_req.a.beacon.len =
-				    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+				    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 				if (debug & L_DATA)
 				{
 					acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
@@ -1201,7 +1201,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (u8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1220,7 +1220,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (u8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
 			acx_process_assocresp(&alloc_p80211mgmt_req.a.
@@ -1233,7 +1233,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (u8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1250,7 +1250,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (u8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
@@ -1270,7 +1270,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 			alloc_p80211mgmt_req.a.proberesp.buf =
 			    (u8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.proberesp.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
 			if (priv->status == ISTATUS_1_SCANNING)
@@ -1293,7 +1293,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		alloc_p80211mgmt_req.a.disassoc.buf =
 		    (u8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.disassoc.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 		acx_mgmt_decode_disassoc(&alloc_p80211mgmt_req.a.disassoc);
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			acx_process_disassoc(&alloc_p80211mgmt_req.a.disassoc,
@@ -1311,7 +1311,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		alloc_p80211mgmt_req.a.authen.buf =
 		    (u8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.authen.len =
-			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+			    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 		acx_mgmt_decode_authen(&alloc_p80211mgmt_req.a.authen);
 		if (!memcmp(priv->bssid,
 			    alloc_p80211mgmt_req.a.authen.hdr->a3.a2,
@@ -1325,7 +1325,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		alloc_p80211mgmt_req.a.deauthen.buf =
 		    (u8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.deauthen.len =
-		    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
+		    MAC_CNT_RCVD(rxdesc->data) - wep_offset;
 		acx_mgmt_decode_deauthen(&alloc_p80211mgmt_req.a.deauthen);
 		/* FIXME: this check is buggy: it should be ==,
 		 * but then our complete deauthen handling would have to be
@@ -1487,7 +1487,7 @@ static void acx_process_probe_response(const struct rxbuffer *mmt, wlandevice_t 
 	/* uh oh, we found more sites/stations than we can handle with
 	 * our current setup: pull the emergency brake and stop scanning! */
 	if (priv->bss_table_count > MAX_NUMBER_OF_SITE) {
-		acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
+		acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
 		acx_set_status(priv, ISTATUS_2_WAIT_AUTH);
 
 		acxlog(L_BINDEBUG | L_ASSOC,

@@ -318,7 +318,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		while(t>1) { t>>=1; n++; }
 		/* Now n == highest set bit number */
 		if(n>=sizeof(bitpos2rate100) || bitpos2rate100[n]==0) {
-			printk(KERN_ERR "acx_dma_tx_data: driver BUG! n=%d. please report\n", n);
+			printk(KERN_ERR "%s: driver BUG! n=%d. please report\n", __func__, n);
 			n = 0;
 		}
 
@@ -330,18 +330,18 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		tx_desc->u.r1.rate = n;
  
 		if(peer->shortpre && (txrate->cur != RATE111_1))
-			SET_BIT(Ctl_8, ACX100_CTL_PREAMBLE); /* set Short Preamble */
+			SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE); /* set Short Preamble */
 
 		/* set autodma and reclaim and 1st mpdu */
-		SET_BIT(Ctl_8, ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG);
+		SET_BIT(Ctl_8, DESC_CTL_AUTODMA | DESC_CTL_RECLAIM | DESC_CTL_FIRSTFRAG);
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	/* clears Ctl ACX100_CTL_OWN bit, thus telling that the descriptors are now owned by the acx100; do this as LAST operation */
+	/* clears Ctl DESC_CTL_HOSTOWN bit, thus telling that the descriptors are now owned by the acx100; do this as LAST operation */
+	CLEAR_BIT(Ctl_8, DESC_CTL_HOSTOWN);
 	wmb(); /* make sure everything else is written */
-	CLEAR_BIT(header->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
-	CLEAR_BIT(payload->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
-	CLEAR_BIT(Ctl_8, ACX100_CTL_OWN);
+	CLEAR_BIT(header->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+	CLEAR_BIT(payload->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
 	/* write back modified flags */
 	tx_desc->Ctl2_8 = Ctl2_8;
@@ -383,7 +383,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 				payload->length,
 				priv->macmode_joined,
 				tx_desc->u.r1.rate,
-				(Ctl_8 & ACX100_CTL_PREAMBLE) ? "(SPr)" : "",
+				(Ctl_8 & DESC_CTL_SHORT_PREAMBLE) ? "(SPr)" : "",
 				priv->status);
 
 		if (debug & L_DATA) {
@@ -636,7 +636,7 @@ static inline void acx_log_txbuffer(const TIWLAN_DC *pDc)
 	unsigned int i;
 	const txdesc_t *pTxDesc;
 
-	FN_ENTER;
+	/* no FN_ENTER here, we don't want that */
 	/* no locks here, since it's entirely non-critical code */
 	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++)
@@ -645,7 +645,6 @@ static inline void acx_log_txbuffer(const TIWLAN_DC *pDc)
 			acxlog(L_DEBUG, "tx: buf %d done\n", i);
 		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
-	FN_EXIT(0, OK);
 }
 
 /*----------------------------------------------------------------
@@ -693,7 +692,7 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	if (debug & L_DEBUG)
+	if (unlikely(debug & L_DEBUG))
 		acx_log_txbuffer(pDc);
 	acxlog(L_BUFT, "tx: cleaning up bufs from %d\n", pDc->tx_tail);
 
@@ -756,7 +755,12 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 		pTxDesc->rts_failures = 0;
 		pTxDesc->rts_ok = 0;
 		pTxDesc->error = 0;
-		pTxDesc->Ctl_8 = ACX100_CTL_OWN;
+		/* signal host owning it LAST, since ACX already knows that this
+		 * descriptor is finished since it set Ctl_8 accordingly:
+		 * if _OWN is set at the beginning instead, our own get_tx
+		 * might choose a Tx desc that isn't fully cleared
+		 * (in case of bad locking) */
+		pTxDesc->Ctl_8 = DESC_CTL_HOSTOWN;
 		priv->TxQueueFree++;
 		num_cleaned++;
 
@@ -817,7 +821,7 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 		pTxDesc->rts_failures = 0;
 		pTxDesc->rts_ok = 0;
 		pTxDesc->error = 0;
-		pTxDesc->Ctl_8 = ACX100_CTL_OWN;
+		pTxDesc->Ctl_8 = DESC_CTL_HOSTOWN;
 	}
 
 	priv->TxQueueFree = pDc->tx_pool_count;
@@ -847,7 +851,7 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 
 static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
 {
-	unsigned int packet_len = le16_to_cpu(buf->mac_cnt_rcvd) & 0xfff;
+	unsigned int packet_len = MAC_CNT_RCVD(buf);
 	p80211msg_lnxind_wlansniffrm_t *msg;
 
 	int payload_offset = 0;
@@ -1042,7 +1046,7 @@ static inline void acx_log_rxbuffer(const TIWLAN_DC *pDc)
 #if (WLAN_HOSTIF==WLAN_USB)
 			acxlog(L_DEBUG,"rx: buf %d Ctl=%X val0x14=%X\n",i,le16_to_cpu(pRxDesc->Ctl_16),pRxDesc->Status);
 #endif
-			if ((le16_to_cpu(pRxDesc->Ctl_16) & ACX100_CTL_OWN) && (le32_to_cpu(pRxDesc->Status) & BIT31))
+			if ((le16_to_cpu(pRxDesc->Ctl_16) & DESC_CTL_HOSTOWN) && (le32_to_cpu(pRxDesc->Status) & BIT31))
 				acxlog(L_BUFR, "rx: buf %d full\n", i);
 			pRxDesc++;
 		}
@@ -1110,7 +1114,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		pRxHostDesc = &RxHostPool[pDc->rx_tail];
 		pDc->rx_tail = (pDc->rx_tail + 1) % pDc->rx_pool_count;
 		rmb();
-		if ((le16_to_cpu(pRxHostDesc->Ctl_16) & ACX100_CTL_OWN) && (le32_to_cpu(pRxHostDesc->Status) & BIT31)) {
+		if ((le16_to_cpu(pRxHostDesc->Ctl_16) & DESC_CTL_HOSTOWN) && (le32_to_cpu(pRxHostDesc->Status) & BIT31)) {
 			RX_SPIN_UNLOCK(&pDc->rx_lock);
 			break;
 		}
@@ -1143,7 +1147,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		}
 
 		rmb();
-		buf_len = le16_to_cpu(pRxHostDesc->data->mac_cnt_rcvd) & 0xfff;      /* somelength */
+		buf_len = MAC_CNT_RCVD(pRxHostDesc->data);
 		if ((WLAN_GET_FC_FSTYPE(le16_to_cpu(buf->a3.fc)) != WLAN_FSTYPE_BEACON)
 		||  (debug & L_XFER_BEACON))
 			acxlog(L_XFER|L_DATA, "rx: pkt %02d (%s): "
@@ -1211,7 +1215,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		RX_SPIN_LOCK(&pDc->rx_lock);
 		pRxHostDesc->Status = 0;
 		wmb(); /* DON'T reorder mem access here, CTL_OWN LAST! */
-		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN)); /* Host no longer owns this */
+		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN)); /* Host no longer owns this */
 
 		/* ok, descriptor is handled, now check the next descriptor */
 		curr_idx = pDc->rx_tail;
@@ -1220,7 +1224,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 		/* if next descriptor is empty, then bail out */
 		/* FIXME: is this check really entirely correct?? */
 		rmb();
-		/* if (!((le16_to_cpu(pRxHostDesc->Ctl) & ACX100_CTL_OWN) && (!(le32_to_cpu(pRxHostDesc->Status) & BIT31)))) */
+		/* if (!((le16_to_cpu(pRxHostDesc->Ctl) & DESC_CTL_HOSTOWN) && (!(le32_to_cpu(pRxHostDesc->Status) & BIT31)))) */
 		if (!(le32_to_cpu(pRxHostDesc->Status) & BIT31))
 		{
 			RX_SPIN_UNLOCK(&pDc->rx_lock);
@@ -1375,7 +1379,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 			host_desc->pNext = (ACX_PTR)NULL;
 		}
 
-		host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
+		host_desc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
 		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) host_desc_phy + sizeof(struct txhostdescriptor)));
@@ -1385,7 +1389,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	}
 	host_desc->data = frame_payload;
 	host_desc->pNext = (ACX_PTR)NULL;
-	host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
+	host_desc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->data_phy = (ACX_PTR)cpu_to_le32(frame_payload_phy);
@@ -1514,7 +1518,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 			host_desc->pNext = (ACX_PTR)NULL;
 		}
 
-		host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
+		host_desc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
@@ -1526,7 +1530,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	/* now fill in the last 2nd buffer type (frame body) pointing back to first ring entry */
 	host_desc->data = frame_buffer;
 	host_desc->pNext = (ACX_PTR)NULL;
-	host_desc->Ctl_16 = cpu_to_le16(ACX100_CTL_OWN);
+	host_desc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->data_phy = (ACX_PTR)frame_buffer_phy;
@@ -1657,7 +1661,7 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 #endif
 		host_desc->length = cpu_to_le16(RX_BUFFER_SIZE);
 
-		CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
+		CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 #if (WLAN_HOSTIF!=WLAN_USB)
 		host_desc->desc_phy = host_desc_phy;
 		host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) host_desc_phy + sizeof(struct rxhostdescriptor)));
@@ -1671,7 +1675,7 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 #endif
 	host_desc->length = cpu_to_le16(RX_BUFFER_SIZE);
 
-	CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
+	CLEAR_BIT(host_desc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->desc_phy = host_desc_phy;
 	host_desc->desc_phy_next = (ACX_PTR)cpu_to_le32(((u8 *) pDc->RxHostDescQPoolPhyAddr + align_offs));
@@ -1835,7 +1839,7 @@ static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 	if (priv->chip_type == CHIPTYPE_ACX111) {
 		ctl_init = 0x0;
 	} else if (priv->chip_type == CHIPTYPE_ACX100) {
-		ctl_init = ACX100_CTL_RECLAIM | ACX100_CTL_AUTODMA;
+		ctl_init = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 	}
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if(pDc->pRxDescQPool == NULL) { /* calculate it */
@@ -1968,7 +1972,7 @@ static int acx100_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *m
 	}
 
 	/* and tell the device to kick it into gear */
-	if (OK != acx_issue_cmd(priv, ACX100_CMD_INIT_MEMORY, NULL, 0, 5000)) {
+	if (OK != acx_issue_cmd(priv, ACX100_CMD_INIT_MEMORY, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT)) {
 		acxlog(L_DEBUG,"%s: init memory FAILED\n", __func__);
 		FN_EXIT(1, NOT_OK);
 		return NOT_OK;
@@ -2313,7 +2317,7 @@ struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv)
 	tx_desc = GET_TX_DESC_PTR(pDc, pDc->tx_head);
 
 	rmb();
-	if (unlikely(0 == (tx_desc->Ctl_8 & ACX100_CTL_OWN))) {
+	if (unlikely(DESC_CTL_HOSTOWN != (tx_desc->Ctl_8 & DESC_CTL_DONE))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
 		/* FIXME: this causes a deadlock situation (endless

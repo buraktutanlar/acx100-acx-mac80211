@@ -114,7 +114,7 @@ void acx_rxdesc_to_txdesc(const struct rxhostdescriptor *rxhostdesc,
 	
 	memcpy(header->data, &rxhostdesc->data->buf, WLAN_HDR_A3_LEN);
 	memcpy(payload->data, &rxhostdesc->data->data,
-		(le16_to_cpu(rxhostdesc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN);
+		MAC_CNT_RCVD(rxhostdesc->data) - WLAN_HDR_A3_LEN);
 
 }
 
@@ -377,7 +377,7 @@ fail:
 
 	FN_ENTER;
 
-	payload_length = (le16_to_cpu(rx_desc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN;
+	payload_length = MAC_CNT_RCVD(rx_desc->data) - WLAN_HDR_A3_LEN;
 	payload_offset = WLAN_HDR_A3_LEN;
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
@@ -600,8 +600,8 @@ fail:
 	/* the "<6>" output is from the KERN_INFO channel value */
 /* Can be used to debug conversion process */
 #if DEBUG_CONVERT
-	acxlog(L_DATA, "p802.11 frame [%d]: ", (rx_desc->data->status & 0xfff));
-	for (i = 0; i < (rx_desc->data->status & 0xfff); i++)
+	acxlog(L_DATA, "p802.11 frame [%d]: ", (MAC_CNT_RCVD(rx_desc->data)));
+	for (i = 0; i < MAC_CNT_RCVD(rx_desc->data); i++)
 		acxlog(L_DATA, "%02x ", ((u8 *) w_hdr)[i]);
 	acxlog(L_DATA, "\n");
 

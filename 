@@ -1,0 +1,732 @@
+If this doesn't manage to fix some things reported here or if it has some
+new bugs as compared to the last version, then please notify me
+immediately at andi@lisas.de
+
+44 (USB still working, ACX111 WEP not functional yet):
+NOTE that ACX100 USB still has a nasty hang on unload if you don't do an
+ifconfig wlan0 down beforehand, so take care! (I plan to fix it soon)
+
+RELIABILITY FEEDBACK: none yet, 5 TONS of changes, very experimental, but
+exceptionally well tested (ACX100/111/USB/2.6/2.4), Works For Me (famous last
+words)
+Please report on AMD64 and PPC, since there were large important changes
+in that area and I didn't have any way to verify correctness!
+
+- fix potentially fatal bug with uninitialized Association ID during AP assoc.
+- Better don't set CCA and ED and antenna settings on initialization
+(and especially not with arbitrary values possibly not matching config
+EEPROM settings!)
+Doh, completely removing that initialization of CCA and ED with custom
+values broke traffic completely. It turned out that the card requires an
+initial query of those values to get initialized correctly, so do just
+that and nothing more.
+This important initialization improvement might fix 5 tons of communication
+problems...
+acx100_usb.c:
+- Many USB endianness fixes done together with Julien PERVILLE.
+- The dev->init function should DEFINITELY have a return value, otherwise
+an undefined return value can easily cause an error abort (as reported).
+- Add missing FN_EXIT() as reported by Julien PERVILLE.
+Inspired by bug #1098219 from Hugo Herbelin:
+fixed a large number of remaining endianness issues in the 802.11 protocol
+code.
+- Improve radio recalibration code to not eternally disable recalibration
+in case of too many consecutive radio recalibration failures (in tight loop).
+Instead, try another round of recalib attempts after one second has passed.
+Large work queue related cleanup (now ACX100 USB is using work queues, too),
+some general driver files cleanups,
+- Slightly modified patch by Luca Melette:
+we were announcing too many rates in case of extended rates present,
+put them into the extended rates area instead.
+Fix Tx power display to show fixed output, not auto power.
+- Fix one inversed return value check (argh!), better NEVER use OK/NON_OK
+for non-boolean return values.
+Don't clear all bits - this is what the debug output right after it
+is for!!
+
+- MUCH improved IRQ handler performance (haven't tested it, but an
+astonishing amount of optimizations was still possible), some other
+improvements.
+- Keep an external copy of descriptor Ctl bytes to be able to write back
+the modifications in one step, which is both more thread-safe and faster.
+- Slightly adapted patch by Luca Melette to get Master mode/HostAP a little
+further...
+Don't do /proc stuff in case CONFIG_PROC_FS isn't defined.
+Change IEEE 802.11g/b+ into IEEE 802.11b+/g+, since cards are often
+named in the 802.11a/b/g order (is this useful? I think it is, but maybe
+we should use a different protocol name??)
+- Change all UINTxx variable types into commonly used Linux kernel uxx
+types.
+- Don't forget proper macro bracketing
+- Constify and staticize two tons of parameters and variables,
+move loop variable initialization directly in front of loop,
+change loop counter to use 1 to 5,
+rename acx_load_radio() to acx_upload_radio().
+Further variable type cleanup, remove some non-ACX1xx header file stuff.
+Improve init messages about documentation and 32bit/16bit I/O access.
+Make pause between recalibrations easily configurable.
+We don't support sensitivity for ACX100 USB yet, so don't offer it, too...
+Workaround for Linux <= 2.4.20 not having a generic dump_stack().
+Change check to use 2.4.22, since it seems that 2.4.20 didn't add it yet.
+
+README:
+Mention EEPROM content backup copy, add Rx level blurb
+Mention that firmware upload is non-permanent, small depmod update
+Monitor mode additions.
+More detailed 32bit/16bit I/O explanation.
+All things considered, D-Link seems to care more about us than some
+other companies, so mention that properly.
+
+43 (USB now working, ACX111 WEP not functional yet):
+RELIABILITY FEEDBACK: seems to work very well ("works like a charm")
+Don't assign brange_max_quality if parameter wasn't specified, in order
+to avoid division by zero OOPS.
+Largish acx_start_xmit() cleanup, some other cleanups.
+Move power LED link quality update to end of IRQ handler,
+add unlikely(), correct #ifdef, misc. stuff
+Use IEEE 802.11g/b+ protocol name for ACX111 (and fixed segfault caused by
+stupid mistake in this very change).
+Disable non-essential and potentially misleading features (EEPROM ID check)
+by default.
+Add another unlikely(), add #ifdef
+constify *_is_mac_address_*()
+"manufactor" -> "manufacturer"
+Remove obsolete comment, improve log message
+Replace memcmp() by acx_is_mac_address_equal()
+Add unlikely()
+USB: Remove obsolete functions
+README: Add depmod -a hint, More info about USB support status,
+update card status matrix, prefer Linux 2.6.x to 2.4.x.
+iwpriv.txt: Fix broken SetLEDPower/GetLEDPower information
+general_info: Add very detailed info about Radia radios.
+
+42 (USB now working, ACX111 WEP not functional yet):
+RELIABILITY FEEDBACK: "very good"
+ACX100 USB really shouldn't try to set the power LED (as reported by
+akabeavis)
+Fix places with direct register access in USB case (will cause OOPS),
+undefine register functions to make sure people will get warnings if they add
+more register accesses which will be used in USB mode, too.
+Disable non-essential and potentially misleading features (EEPROM ID check)
+by default.
+start_net: Check for some other allowed firmware names, too.
+
+41 (USB **FIXED** by Martin Wawro, ACX111 WEP not functional yet): 
+RELIABILITY FEEDBACK: "very good"
+Martin Wawro:
+Corrected a bunch of bugs in the USB subsystem. Should work now (at least
+it does on my machines). Added support for multiple URBs to gain some speed,
+was able to get around 1MB/s transfer rate.
+Fixed USB support. Code is now able to handle fragmented packets from the
+USB bus (main source of error). I noticed that under 2.4.x kernels, it seems
+that the UHCI host controller drivers are buggy (both of them). The
+standard uhci driver simply trashes the host controller when confronted with
+queueing and the usb-uhci driver seems to have bug in its list handling
+(an entry appears more than once in the freespace list). The code runs well
+with EHCI and OHCI drivers on 2.4.x and also on UHCI under 2.6.9.
+Fixed USB support. Also introduced something like a "hard timeout" for
+control transfers (5.5s).
+Fixed USB support. Introduced several new defines to facilitate debugging
+of some of the USB resources. Also substantially extended some of the
+USB data structures in the wlandevice_t type.
+
+Andreas Mohr:
+Reenable USB compilation now that USB support is fixed. :)
+Merged LED link quality blinking into Get/SetLEDPower.
+Merged SetScanDelay/SetScanMode into much better Get/SetScanParams.
+Revert ill-committed re-enabling of Tx timeout ring buffer reinit.
+start_net: Reverse key and algorithm order, since the current order supposedly
+makes setting the key fail. (huh?? this is documented as working in either
+order; maybe specific iwconfig versions only have problems with this)
+A lot of cleanup to iwpriv code.
+Fix some return value documentation
+(UGH, don't you hate overly verbose documentation of simple facts that
+will then be faster out of date than you can say "outdated"??)
+Update USB code to use new module_param() stuff.
+
+40 (USB still broken, ACX111 WEP not functional yet):
+Hopefully resolve those all too popular DMA memory alloc issues...
+(use a wrapper for both pci_alloc_consistent() and the improved
+dma_alloc_consistent()).
+Don't update the Rx config in atomic context, do it in after_interrupt_task
+part instead.
+Another endianness fix.
+Include linux/moduleparam.h as suggested for new module_param().
+Small optimization of the link quality blinking code as suggested by
+Pierre Dumuid.
+Fix format string.
+README: Add missing "promiscuous" keyword. Transfer speed hint. Some changes.
+Some small updates.
+
+39 (USB still broken, ACX111 WEP not functional yet):
+Readd asm/uaccess.h, since it's required for 2.4.x (doh!)
+Change ring buffer count for ACX111 from 32 down to 16 due to memory
+allocation issues.
+Add support for 2.6.10 module_param() change
+Change/improve some WIRELESS_EXT ifdefs
+
+38 (USB still broken, ACX111 WEP not functional yet):
+** NOTE ** grave slowdowns have been reported with pf35+ and 2.6.x,
+but I couldn't reproduce that with pf38 and 2.6.10-rc1-mm5...
+
+We were often allocating twice as much ring buffer memory as actually
+needed!
+This led to some frequent out of memory issues, especially with current
+kernels. (!?!?)
+Add some wmb() and rmb() memory barriers (maybe that helps to avoid ring
+buffer sync issues?).
+With default "easy" rate setup, make sure to not specify basic rates
+other than standard 802.11b, since otherwise 22Mbps settings or 802.11g
+rates won't be able to establish a proper Ad-Hoc "master" (other
+clients won't connect).
+Pierre Marc Dumuid: Patch to blinking the Power LED at a rate related to
+the quality (plus some changes of mine)
+Add some more missing endianness conversions required to get ARM big-endian
+to work.
+Set default rate stepup slightly higher, since we were too aggressive here.
+Fix firmware version parsing
+2.4.7 doesn't even know __devexit_p, so attempt a workaround
+fetch_firmware: Add another ACX111 URL
+Rename acx100_power_led() to acx_power_led() as it should be,
+add another unlikely(), another rmb(), add comment about Tx ring buffer
+deadlock
+Reverse struct framehdr error message arguments, since it makes more
+sense that way.
+Add acx_ioctl_set_scan_mode invocation.
+Add some log messages, fix some comments.
+README: Detail kernel version requirements, small update.
+
+37 (USB still broken, ACX111 WEP not functional yet):
+Remove iwpriv SetLowPkgRx, SetExLowPkgRx in favour of acx111 sensitivity
+ioctl setting (range 1 to 3).
+Add special radio recalibration support for ACX111, not tested! (please
+report).
+Reorder many ACX100/ACX111 chip type branches to have ACX111 first,
+since this is the dominant chip now market-wise.
+Tiny IRQ handler optimization.
+Add some unlikely().
+Slightly stronger EEPROM writing warning message.
+Reorder some wlandevice_t members.
+
+36 (USB still broken, ACX111 WEP not functional yet):
+Get rid of static variable to hopefully fix issues when using two cards
+with this driver.
+Update pci_save/restore_state check to assume that it will be changed in
+stock 2.6.10, since stock 2.6.9 didn't contain the update yet.
+Maciek Gajewski: fix off-by-1 error when setting current WEP key.
+Alessandro Suardi: Remove bogus inline's that gcc 3.4.2 is complaining about.
+The USB timeout member has been removed before 2.6.9.
+Make sure people won't try the broken USB driver any more...
+README: Add blurb about wireless-tools version issues.
+
+35 (USB still broken, ACX111 WEP not functional yet):
+First attempt to fix promiscuous/multicast support in order to
+not always let the card capture all packets.
+Improve recalibration by only recalibrating in 5-minute intervals to
+avoid excessive recalibration which might perhaps lead to excessive
+temperature due to keeping the card running permanently.
+Completely revised net queue handling (use netif_carrier_xxx() functions,
+too). Not too much testing, seems to work for me.
+Fix firmware version parsing.
+scripts/start_net: Usability improvements by Craig Fields.
+Make power LED toggling work on acx111, too (PLEASE REPORT WHETHER IT STILL
+WORKS ON AN EXTERNAL ACX100 CARD!).
+Revise state handling, since it was broken.
+Fix error on "iwconfig rate auto" on acx100.
+On joining, the DTIM interval had been set slightly incorrectly.
+Clear CTL_OWN bit AFTER having set the Status field.
+Fix incorrect rx filter config bits.
+Remove queue task flushing, caused hang on shutdown by itself, and it
+was useless, too.
+Fix potential calculation error due to endianness conversion issues,
+add some missing endianness corrections.
+Disable setting of Master mode for now, since it's totally not working
+anyway.
+Add Short Preamble Tx logging for ACX111.
+IO_ACX_INT_TRIG should simply have individual bits set, not the ones
+read back from IO_ACX_INT_TRIG plus the one I want to notify.
+Introduce more aggressive locking possibility in clean_tx_desc, but
+this might break things, deactivated.
+Add a cond_resched() at some places when useful and supported.
+Shorten log messages.
+Comment out some struct members.
+Add some more unlikely()/likely().
+Add notification about limited acx111 power level capability
+README: 5 tons of updates.
+TODO: Update.
+
+34 (USB still broken, ACX111 WEP not functional yet):
+Free netdev at the very end only to avoid timeout handler OOPS due to
+invalid dev (appears to have fixed it!).
+Don't keep recalibrating endlessly, since it led to an endless loop.
+Calibrate the radio in the timeout handler, too.
+Make sure to use low rates initially on Tx rate auto in order to not
+have transfer problems with distant/slow peers.
+static'ize some functions and ifdef out several unused functions,
+thus saving 5kB file/memory size :-)
+Don't disable the radio Tx/Rx before enabling it, since I suspect it
+might confuse the firmware during packet handling.
+Fix struct packing to do the same as other kernel drivers do and to
+get rid of gcc 3.4.x warnings.
+More accurate PCI device ID defines.
+Add more diag output to /proc (struct TIWLAN_DC).
+Remove some bogus struct length initialization.
+Slight logging improvements.
+README update.
+
+33 (USB still broken, ACX111 WEP not functional yet):
+Wake net queue on timeout if needed.
+Use an emergency Tx descriptor cleanup handler in Tx timeout handler,
+because the standard Tx descriptor cleanup handler expects
+the ring buffer to be in a certain state, which is a bad thing.
+Retry radio calibration in case a calib operation failed (e.g. Tx busy
+error)
+We forgot to remove the task scheduler, which caused an OOPS on
+unloading in case the task scheduler got called after vital resources
+had already been freed...
+Make acx_after_interrupt_task use dev instead of priv.
+Add FIXME for problematic mysterious OOPS.
+"failed" --> "FAILED"
+Log firmware_numver, too.
+
+32 (USB still broken, ACX111 WEP not functional yet):
+[sorry, forgot cvs update, pf32 now updated to be the REAL pf32]
+Get rid of repeated calibration notification messages by disabling
+them after some time.
+Dynamic scaling of Tx cleanup period depending on number of
+Tx buffers (rather boring feature).
+Tell people to go to README on out of memory situations.
+Several README updates.
+Add some error text.
+Small logging fix.
+
+31 (USB still broken):
+- do implement radio recalib on Tx error 0x20, since it much improves
+availability for me on acx100. Watch out for possible side-effects which *might* happen such as prolonged card operation into fatal temperature levels!!
+- fix *HORRIBLE* bug in host memory allocation for Rx buffers:
+  we only allocated a struct size instead of sufficient space for many
+  Rx packet bodies (who changed that for the worse?)
+- halted member of struct usb_device got removed in 2.6.9-rc1
+- fix acx100_ie_memconfigoption_t reversed TxBlockNum/RxBlockNum
+- merge acxlog(), printk, sprintf into single statements(saves 5K(!) o
+f RAM)
+- much improved driver startup speed (improved scheduling)
+- Rename many functions from acx100_XXX to acx_XXX
+- Makefile: Don't pretend that compile succeeded when we don't actuall
+y know it for sure
+- add some more unlikely()
+- move some debug logs after the stuff has been done that they're talk
+ing about
+- changes in the acx100_dump_bytes area
+- slightly improve acx100_rxmonitor
+- add debugging of Rx data
+- add debugging to resume handler
+- remove some bogus casts
+
+30 (AMD64 should work now, please test! USB still broken):
+andi:
+- Clean up structure naming and packing (should fix AMD64 problems).
+- Fix kernel version dependent __devinitdata problem, change
+radio status text.
+- default acx111 ring buffers to 32 entries, remove some bogus casts.
+- Improve beacon frame creation, improve error message
+- Fix my max_rate screwup.
+- fetch_firmware: Add 20 second timeout to avoid eternally hanging on first URL in list.
+- Makefile: Less confusing firmware directory message.
+- More accurate PCI device ID defines.
+- Remove some bogus struct length initialization.
+- README and docu updates.
+Fix variable naming: erate -> orate, emask -> omask, ...
+("operational")
+Denis Vlasenko:
+- Remove ISTATUS_5_UNKNOWN and unknown0x2350.
+- add some comments and TODOs and rename fields to more understandable names.
+- fix cases where we print MAC addresses 'smashed together'
+like this:
+  00.E0.98.BA.20.C300.E0.98.BA.20.C300.04.E2.64.23.C200.04.E2.64.23.C200.04.E2.64.23.C2<4>
+
+29 (mainly cleanup, some AMD64 fixes, USB still broken):
+andi:
+Clean up structure naming and packing (should fix AMD64 problems, too,
+hopefully).
+More accurate PCI device ID defines.
+Remove some bogus struct length initialization.
+
+Denis Vlasenko:
+Remove ISTATUS_5_UNKNOWN and unknown0x2350.
+acx100_probe_pci() has far too many error cases,
+cannot be handled by acx_cleanup_card_and_resources().
+I actually hit a bug when fw upload fails due to
+missing file. I am sure there are other cases.
+
+Patch takes care of that by reworking error
+handling.
+
+28 (this one should be much better; USB still broken):
+andi:
+Don't comment out card rate fallback activation, since we need it
+for proper auto rate support (otherwise e.g. we're stuck with the
+card staying at the same *unsupportedly* high rate during the same
+Tx attempt round, which is bad if we only attempt to send once,
+e.g. for MGMT frames...).
+in iwconfig rate, make sure to fill up all lower rates, too,
+since APs *expect* to have full support for all rates, not just the
+highest, and we cannot configure this aspect in iwconfig rate,
+only in iwpriv set_rates. This implies we need to restrict acx111
+rate mask to highest rate on Tx if not in auto mode, so added support
+for that, too.
+Indicate proper acx111 Tx power levels (according to the two levels
+the card usually supports).
+Revert default safe 16bit I/O to faster 32bit and instead make sure
+that people notice the problem and know what to do then.
+start_net: Make sure to use auto rate by default.
+Fix configoptions output.
+Rename some variables to useful names, add some hopefully helpful comments.
+
+Denis Vlasenko:
+* Eliminate ACX_TXRATE (replace with RATE100)
+* Add an explanation about preambles
+* const char *str => const char str[]
+* untangle if (OK != (err = register_netdev(dev)))
+* missing FN_EXIT
+* 6 => ETH_ALEN
+
+Not so much trivial:
+* someone broke SET/GET convention, fix it.
+  You may need to test that I didn't accidentally broke
+  ENABLE_[EX_]LOW_POWER_PACKETS ioctl with this.
+
+
+27 (USB still broken):
+andi:
+Revert to 16bit I/O access as default, since it appears to fix some
+firmware upload failure cases.
+Several cleanups, mainly towards better WEP support for ACX111 (not done yet!).
+Cleanup patch, e.g. to enable me to debug the rmmod OOPS a bit better:
+Move /proc handling to acx100_helper.c.
+Move some functions around, renaming.
+Shorten many log messages.
+Move more I/O register init stuff to ioregister.c
+Remove bogus netif_device_detach()
+capability is a 16bit value, so print it accordingly.
+
+26 (USB still broken):
+andi:
+- hack to make acx111 actually attempt to authenticate with an AP
+  in case we explicitly stop the scan (I've still got issues with connecting
+  to my WRT54GS-DE, though, maybe spec compliance of auth frames?)
+  When connecting, I get assoc req error 18 (invalid basic rate set).
+  Seems we've got some fixup to do after the recent rate patch...
+
+25 (USB still broken, sorry):
+Denis Vlasenko:
+- large Tx auto rate patch (improvements, work towards per-peer auto rate)
+andi:
+- AMD64 fixes (is it better now?)
+- add many more fields to /proc/driver/acx_wlanX_diag
+- Some acx111 scanning updates. Hopefully this will only improve stuff
+- more endianness fixes
+- TONS of cleanups in the driver
+- Makefile: clean up some temp files
+- README and TODO updates
+
+24 (USB still fatally broken - no time AT ALL! this release took **WAY** too
+much time anyway...):
+csucsu:
+- init_wep cleanup.
+- fix (unify) return values
+- use CLEAR_BIT/SET_BIT macro
+olli:
+- acx111 features - (extremely) low power packet receive
+andi:
+- Fix an endless amount of buggy commits.
+- Reinit the templates whenever an important parameter changes (doh!).
+- Reopen netdev queue on assoc, hopefully fixes all remaining
+- NETDEV WATCHODG issues.
+- Unify acx100 and acx111 reset_dev code.
+- Correct /proc/driver/acx_wlanX output.
+- Remove "wrong" kmalloc result casts.
+Denis Vlasenko (sorry, didn't commit your enhanced 23.1 patch due to conflicts
+from previous commit):
+- moves logging code out of line - 50kb saved
+- speed optimizes it
+- removes return's at end of void functions
+- brings sanity to p802addr_to_str
+- As a bonus, it fixes a bug: '/* Driver defaults */' were defined inside #ifdef ACX_DEBUG.
+Benjamin Schrauwen:
+- some scripts/fetch_firmware fixes
+
+23:
+Denis Vlasenko:
+  improve acx100 auto rate support, interfacing to the acx111
+  auto rate layer. (ed. note: works beautifully!)
+  Fix problem with leftover acx111 code causing acx111 oops
+
+22 (note: acx111 still awkward for me - rate setting):
+DON'T reset Ctl field to 0, this caused ring buffer lockup after some 30
+minutes or some hours due to timing issues and thus TxQueueFree drift
+down to 0 (note: will disrupt traffic for acx111, so don't do that here for
+now).
+Reset rts/ack counters in Tx clean handler, not during the precious time
+when we want to send something.
+Reset error byte, too.
+Improve ring buffer printout (also display Linux netdev queue status).
+Reset TxQueueFree in Tx timeout helper to original value to improve
+repair probability.
+Rename pDesc to pRxDesc/pTxDesc.
+Several endianness fixes (especially USB).
+Rename descriptors' Ctl values to x_8 and x_16 to directly indicate
+byte or word width (endianness!!).
+
+21 (20 tons of new fixes, ChangeLog is... yawn... ok, sorry, too tired, will do
+tomorrow...)
+
+20 (USB still not fixed, ACX111 is now (much?) more reliable, for me at least):
+Denis Vlasenko:
+- add support for 802.11g rates
+- Improve/fix info mailbox management
+- split buffer debugging into tx/rx
+Gabor Csuri:
+- Makefile clean target fix
+- add more WEP keys to start_net
+Small log change.
+Some README updates.
+
+19 (USB still not fixed, ACX111 is still flaky, probably a bit less):
+Ring buffer improvements to fix recent fatal NETDEV WATCHDOG deadlock issue
+caused by a ring buffer weakness exposed by recent optimization.
+Peter 'p2' De Schrijver: Many endianness fixes for PPC.
+Partial AMD64 fixes.
+HUGE dma queue cleanup (much simplified, plugged several leaks, saves
+>= 1.5kB driver size!), rename GetPhyMediumBusy to GetPhyChanBusy
+(that name turned out to be too long for some very strange reason),
+try to prevent GetPhyChanBusy calculation overflow.
+Gabor Csuri: wep ioctl fixes, preparation for 802.11g rates
+Denis Vlasenko: add missing FN_EXIT statements
+
+18 (USB still not fixed, ACX111 is quite flaky at least since pf13,
+will do more fixing/testing soon :-\):
+Sascha Sommer: brown paper bag fix (-> Andreas) breaking acx111 cards.
+(NOTE: acx111 still doesn't really work for me in any recent tar file
+for some reason, dma errors)
+Fix "IRQ xx: nobody cared" fatal card deactivation message with help from
+Denis Vlasenko (turned out we used a slightly wrong I/O register,
+so we had to do problematic IRQ activation).
+Cleaned up ACX111 reset procedure considerably (now basically identical
+to ACX100!).
+Implement iwpriv GetPhyMediumBusy (determine busy percentage of phy medium).
+Add priv->irq_mask_off to store the "all IRQs off" mask for ACX100/ACX111.
+Add position indicators to ring buffer printout in acx_wlan0_diag.
+The Rx descriptor full/empty flag (BIT31) was actually REVERSED!
+(tested, works, and maybe it even works better now...)
+Add some more hardware IDs.
+Optimization:
+Add unlikely(), clean Tx descriptor queue on Tx timeout,
+don't clean Tx descriptors on every IRQ,
+set dev->last_rx at the correct moment, use macros instead of memcpy() /
+memcmp().
+Updated iwpriv docu doc/iwpriv.txt.
+
+17 (doh!!! Not even ACX100 worked in plus_fixes_15!):
+(I disabled and re-enabled radio Rx/Tx, but this broke ACX100 Rx completely!)
+Huge ring buffer cleanup/speedup.
+Replace I/O register management by much more memory saving static version.
+Some ACX100/ACX111 Tx descriptor size differences fixup (not too important).
+Small descriptor speedup.
+Rename SetPHYAmpBias to SetPhyAmpBias.
+pci_free_consistent pTxHostDescQPool copy&paste(?) / USB support bug fix.
+General cleanup.
+Zero out issue_cmd result buffer on failure.
+
+16 (the "embarrassing bug fix release"; sorry, USB still not fixed):
+Denis Vlasenko: fix fatal typo in acx111_get_io_register_array()
+		killing all ACX111 cards dead (the box, that is...)
+
+15 (sorry, USB still not fixed):
+Implement iwpriv SetPHYAmpBias. YAY! :)
+Fix USB compile on 2.4.x. My bad! (USB does NOT work currently...)
+Figure out exact chip names according to firmware ID.
+Make sure we don't list our own MAC when scanning.
+Proper documentation of antenna diversity settings.
+separate set_wepkey()
+Tried fixing ACX111 phy reg access, no luck.
+Disable Rx/Tx when modifying PHY stuff.
+Fix compiler warnings.
+Change acxlog() to use more sane syntax.
+Clean up TIWLAN_DC.
+Unify ACX100 USB and non-USB descriptor flag defines.
+Updated README, TODO.
+Add some firmware documentation.
+
+14 (ACX100 USB does NOT work in this tar any more, will fix soon):
+Olli: ACX111 changes:
+- Added support to change tx power level
+- Added support to receive low power packets but not enabled yet.
+- Removed setting of WEP options (not available on ACX111)
+- Added ACX111_IE_RADIO_BAND
+- Added two structures: ACX111TxLevel, ACX111FeatureConfig
+Denis Vlasenko: Fixed my (Andreas's) 16-bit acx100_write_reg32() screwup.
+Fix compile for users attempting a make in src/
+Fix two horrible WEP bugs:
+- two WEP config cmds were REVERSED!
+- off-by-1 struct addressing bug
+Do dump_stack in L_CTL case only.
+Allow set_ap in Auto mode, too (LinuxTag relevant ;-).
+Dr. Olaf Flebbe: The Ralink radio appears to have the same PHY register layout, so add support for Tx level and sensitivity for it.
+fix bug in acx100_write_cmd_type, unify to acx100_write_cmd_type_or_status
+unify ihw_usb.c into ihw.c (most likely broke USB operation, will fix
+soon, should also be able to achieve MUCH more unification)
+Finally found out that radio type 0x16 must be Radia!
+Add verbose message to explain set_ap failure reason.
+Add DbgGetIo and DbgSetIo to be able to debug lockups more closely
+fetch_firmware: Update yet again outdated URLs. Ask people to report any broken links. More detailed error message.
+Rename all commands to indicate their chip suitability (ACX100 / ACX111).
+Unify some redundant struct definitions into one authoritative one.
+Remove annoying log output.
+Add FW1130.BIN to the firmware names we attempt to find.
+Endianness fixes done on LinuxTag! :-) (not fully finished yet!)
+  (with LOTS of help from Linux ports expert Peter De Schrijver using his
+  Powerbook G3, a VERY capable guy :-)
+  Memory access functions already do byte-swapping themselves!! (undid
+  many changes, doh! :-\)
+  Many fixes in 802.11 stack.
+  Remove many non-acx defines.
+  PowerPC fix: PPC seems to have char defined as unsigned.
+Fixup USB code to use more sane packet format, just like the normal
+ACX100 stuff does.
+Improve assoc logging, add comment about buggy code.
+More experiments with memory read/write via firmware. No luck.
+Remove oldish Makefile messages
+replace acx111 command numeric values by their names
+Small README update.
+
+13:
+RENAME ALL IWPRIV COMMANDS TO Upper-Lower-Case TO MAKE THEM SHORTER.
+Added acx111 scan functions.
+Fix Ad-Hoc "master" mode (we were sending out Beacon frames with an
+outdated ESSID since we forgot to reinit Beacon templates on config
+change).
+Add iwpriv SetScanDelay to set the per-channel wait time.
+Use macros instead of inlined functions for I/O access (faster/smaller).
+Do dump_stack in L_CTL case only.
+Print jiffies for profiling.
+Set iwconfig name to "IEEE 802.11g+" for acx111 cards.
+Message fixes.
+removed unneeded parameter from acx111_init_packet_templates
+
+12 (no acx111-specific fixes):
+Use standard default values for short and long retry limits (7 and 4 instead
+of 5 and 3).
+Reduce default Tx power level to 18dBm everywhere due to WRT54G radio damage
+stories...
+Fix iwlist scan to not output an error if we found 0 stations.
+Many optimizations: always log AFTER the dirty work, add likely/unlikely
+branch prediction tunings, slightly speed up IRQ handler.
+Fix WEP variable size bug.
+Fix slight auto increment bug.
+Fix use of incorrect size for wep_mgmt cmd transfer.
+Fix incorrect use of "1" parameter for 0 parameters at ACX100_CMD_DISABLE_TX.
+Add read/write memory access by firmware capability.
+README updates: warning about Tx power level, "link failed" issue.
+TODO updates.
+
+11:
+ACX111 scanning fixes.
+Mention how to disable console flooding.
+
+10 (aka the "where are the non-x86 architecture ports, dammit!?" version):
+More fixes for triggering a scan in Auto mode.
+Fix macro compile error with certain compilers.
+Small memory and speed fixes.
+Improve logging.
+Improve info mailbox support.
+Big README update.
+Fix Israel regulatory domain parameters.
+Makefile fix.
+
+9:
+Fix scan broken in mode Auto.
+Fix sensitivity update (timing?) problem.
+Fix/improve bus access width log.
+README updates.
+At least do make clean for make distclean.
+
+8:
+Fix gcc 2.95 c++ism screwups.
+Fix sensitivity setting failure. Thanks to Paisa Seeluangsawat.
+Document ACX100 USB status.
+
+7:
+Merge final pieces of ACX111 support!!! (untested for lack of hardware, though)
+Disable power save mode again (broke scanning).
+Fix *.o/*.ko handling in scripts/start_net
+Another gcc 3.4.x fix.
+More endianness fixes.
+Much more user-friendly installation.
+USB updates, make driver load /usr/share/acx/ACX100_USB.bin.
+Add task handler (IRQ BH handling).
+Add iwpriv DbgSetMasks (for debugging only).
+Kill compiler warnings.
+Splint fixes.
+
+6:
+Fix broken acx_signal_to_winlevel inlining breaking gcc 3.4.x compile.
+It looks a lot like wireless_send_event is actually only available with
+WIRELESS_EXT > 13.
+ACX USB should also use /usr/share/acx/ as default firmware directory.
+Fix another AMD64 issue.
+Reorder probe_pci failure cleanup, hopefully fix annoying
+"unregister_netdevice: device wlan0/XXXXXXXX never was registered" message.
+
+5 (aka the "sorry, 4 was too broken" version):
+Fix problems caused by Linux 2.6.x define screwup.
+Fix SET_NETDEV_DEV symbol non-existing in 2.4.x.
+Fix some pointers to be real pointers, not integers (for AMD64).
+Fix variable defines in order to fix broken variable lengths.
+This causes > 100 bytes less memory use :)
+Should fix AMD64 firmware loading issue.
+Fix some USB compile warnings.
+All in all I'm a happy camper, should make AMD64 work a lot better now. :)
+
+4:
+Fix DMA memory leak on suspend/resume.
+Improve locking (optimize for speed), some small locking fix.
+Actually install the acx_usb.ko module on 2.6.x, since it's compiling
+(and working!) properly now.
+Add the device and driver symlinks in /sys/class/net/<ifname>
+More detailed Tx error output.
+Many -pedantic fixes.
+Remove some foreign information from acx100.h.
+Remove wireless extension version info warning from acx100_ioctl.c.
+Update TODO.
+
+3:
+Fix floating point use in driver, add warning infrastructure.
+Newer ACX111 firmware versions seem to have switched to using an
+external radio module, so reenable radio module loading for ACX111.
+inject_kernel_tree updates.
+README updates.
+
+2:
+IMPLEMENT ACTUALLY RATHER WELL-WORKING POWER MANAGEMENT!! :-)
+Now I can fully suspend/resume the card and can actually continue with the
+OLD connection if it hasn't timed out yet :)
+Use default firmware directory /usr/share/acx in case no custom
+firmware_dir has been specified and tell the user we did that.
+Calling iwconfig commit before ifup led to OOPS since the timer wasn't
+initialized yet. Make sure we only update card settings if the interface
+is up.
+Increment initial scan time from 1.5s to 2.5s: short scan time
+missed some upper channels :-\
+reg_domain_ids cleanup; hopefully fix array corruption.
+Fix screwed up wireless extensions version checks.
+Fix off-by-1 error in iwlist scan channel frequency calculation.
+Do some further ACX_IO_WIDTH work that I missed.
+Fix DEPMOD lookup for users lacking /sbin in PATH.
+Fix some small variable size issue.
+
+1:
+Fix pci_name() screwup for kernels < 2.4.21. Doh, not again!
+Add define ACX_IO_WIDTH, use 32bit access everywhere per default now.
+Some small USB driver updates.
+More useful signal quality calculation.

@@ -270,8 +270,10 @@ static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *de
 	unsigned long mem_region1, void *mem1, unsigned long mem_region2, void *mem2);
 static void acx_remove_pci(struct pci_dev *pdev);
 
+#ifdef CONFIG_PM
 static int acx_suspend(struct pci_dev *pdev, u32 state);
 static int acx_resume(struct pci_dev *pdev);
+#endif
 
 #ifndef __devexit_p
 /* FIXME: check should be removed once driver is included in the kernel */
@@ -285,8 +287,10 @@ static struct pci_driver acx_pci_drv_id = {
 	.id_table    = acx_pci_id_tbl,
 	.probe       = acx_probe_pci,
 	.remove      = __devexit_p(acx_remove_pci),
+#ifdef CONFIG_PM
 	.suspend     = acx_suspend,
 	.resume      = acx_resume
+#endif /* CONFIG_PM */
 };
 /*@=fullinitblock@*/
 
@@ -302,9 +306,6 @@ static struct acx_device root_acx_dev = {
 	.newest        = NULL,
 };
 
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-static int acx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
-#endif
 static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev);
 static void acx_tx_timeout(netdevice_t *dev);
 static struct net_device_stats *acx_get_stats(netdevice_t *dev);
@@ -324,79 +325,6 @@ static void acx_down(netdevice_t *dev);
 *----------------------------------------------------------------*/
 
 extern u8 acx_signal_determine_quality(u8 signal, u8 noise);
-
-/*----------------------------------------------------------------
-    Debugging support
-*----------------------------------------------------------------*/
-#ifdef ACX_DEBUG
-
-static int acx_debug_func_indent = 0;
-#define DEBUG_TSC 0
-#define FUNC_INDENT_INCREMENT 2
-
-#if DEBUG_TSC
-#define TIMESTAMP(d) unsigned long d; rdtscl(d)
-#else
-#define TIMESTAMP(d) unsigned long d = jiffies
-#endif
-
-static const char spaces[] = "          " "          "; /* Nx10 spaces */
-
-void log_fn_enter(const char *funcname)
-{
-	int indent;
-	TIMESTAMP(d);
-
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
-
-	printk("%lx %s==> %s\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname
-	);
-
-	acx_debug_func_indent += FUNC_INDENT_INCREMENT;
-}
-
-void log_fn_exit(const char *funcname)
-{
-	int indent;
-	TIMESTAMP(d);
-
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
-
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
-		
-	printk("%lx %s<== %s\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname
-	);
-}
-
-void log_fn_exit_v(const char *funcname, int v)
-{
-	int indent;
-	TIMESTAMP(d);
- 
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
- 
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
- 
-	printk("%lx %s<== %s: %08x\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname,
-		v
-	);
-}
-#endif /* ACX_DEBUG */
 
 static void acx_get_firmware_version(wlandevice_t *priv)
 {
@@ -881,7 +809,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* need to be able to restore PCI state after a suspend */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
-	   so assume it will find its way into 2.6.10 */
+	   then it made its way into 2.6.10 */
 	pci_save_state(pdev);
 #else
 	pci_save_state(pdev, priv->pci_state);
@@ -960,10 +888,6 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	acx_carrier_off(dev, "on probe");
 
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-	priv->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
-			&acx_pm_callback);
-#endif
 #ifdef CONFIG_PROC_FS
 	if (OK != acx_proc_register_entries(dev)) {
 		result = -EIO;
@@ -981,10 +905,6 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail_proc_register_entries:
 #endif
 
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-	if (NULL != priv->pm)
-		pm_unregister(priv->pm);
-#endif
 	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))
 		acx_down(dev);
 	unregister_netdev(dev);
@@ -1053,6 +973,10 @@ static void acx_cleanup_card_and_resources(
 		acxlog(L_INIT, "Removing device %s!\n", dev->name);
 		unregister_netdev(dev);
 
+#ifdef CONFIG_PROC_FS
+		acx_proc_unregister_entries(dev);
+#endif
+
 		/* find our PCI device in the global acx list and remove it */
 		acx_device_chain_remove(dev);
 	}
@@ -1066,11 +990,6 @@ static void acx_cleanup_card_and_resources(
 
 		priv->hw_unavailable++;
 		acxlog(L_STD, "hw_unavailable++\n");
-
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-		if (NULL != priv->pm)
-			pm_unregister(priv->pm);
-#endif
 	}
 
 	if (priv != NULL)
@@ -1172,7 +1091,8 @@ end:
 	FN_EXIT(0, 0);
 }
 
-static int if_was_up = 0;
+#ifdef CONFIG_PM
+static int if_was_up = 0; /* FIXME: HACK, do it correctly sometime instead */
 static int acx_suspend(struct pci_dev *pdev, /*@unused@*/ u32 state)
 {
 	/*@unused@*/ struct net_device *dev = pci_get_drvdata(pdev);
@@ -1201,6 +1121,10 @@ static int acx_resume(struct pci_dev *pdev)
 	printk(KERN_WARNING "rsm: resume\n");
 	dev = pci_get_drvdata(pdev);
 	printk(KERN_WARNING "rsm: got dev\n");
+
+	if (!netif_running(dev))
+		return 0;
+
 	priv = dev->priv;
 	printk(KERN_WARNING "rsm: got priv\n");
 	FN_ENTER;
@@ -1209,7 +1133,7 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: power state set\n");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
-	   so assume it will find its way into 2.6.10 */
+	   then it made its way into 2.6.10 */
 	pci_restore_state(pdev);
 #else
 	pci_restore_state(pdev, priv->pci_state);
@@ -1230,7 +1154,8 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: acx up\n");
 	
 	/* now even reload all card parameters as they were before suspend,
-	 * and possibly be back in the network again already :-) */
+	 * and possibly be back in the network again already :-)
+	 * FIXME: should this be done in that scheduled task instead?? */
 	acx_update_card_settings(priv, 0, 0, 1);
 	acxlog(L_DEBUG, "rsm: settings updated\n");
 	netif_device_attach(dev);
@@ -1239,85 +1164,7 @@ fail: /* we need to return OK here anyway, right? */
 	FN_EXIT(0, OK);
 	return OK;
 }
-
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-static int acx_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *data)
-{
-	int result = OK;
-	netdevice_t *dev = root_acx_dev.newest;
-	wlandevice_t *priv = (wlandevice_t*)dev->priv;
-	client_t client;
-
-	FN_ENTER;
-	
-	switch(rqst)
-	{
-		case PM_SUSPEND: /* OK, we got a suspend request */
-			if (netif_running(dev) && netif_device_present(dev))
-				netif_device_detach(dev);
-			
-			/* Cancel our association */
-			if (NOT_OK == acx_transmit_disassoc(&client, priv)) {
-				result = -EINVAL;
-			}
-			/* better wait for some time to make sure Tx is
-			 * finished */
-			acx_schedule(HZ / 4);
-
-			/* Then we set our flag */
-			acx_set_status(priv, ISTATUS_0_STARTED);
-
-			/* Close off IRQs */
-			acx_disable_irq(priv);
-
-			/* Disable the Rx/Tx queues */
-			acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000);
-			acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000);
-/*			acx_issue_cmd(priv, ACX100_CMD_FLUSH_QUEUE, NULL, 0, 5000); */
-
-			/* disable power LED to save power */
-			acxlog(L_INIT, "switching off power LED to save power :-)\n");
-			acx_power_led(priv, 0);
-	
-			printk("Asked to suspend: %X\n", rqst);
-			/* Now shut off everything else */
-			if (NOT_OK == acx_issue_cmd(priv, ACX100_CMD_SLEEP, NULL, 0, 5000))
-			{
-				result = -EBUSY;
-			} else
-			{
-				result = OK;
-				break;
-			}
-		case PM_RESUME:
-			pm_access(priv->pm);
-#ifndef RESUME_STANDBY_ONLY
-			/* not sure whether we actually had our power
-			 * removed or not, so let's do a full reset! */
-			acx_reset_dev(dev);
-#else
-			acx_issue_cmd(priv, ACX100_CMD_WAKE, NULL, 0, 5000);
-
-			acx_issue_cmd(priv, ACX100_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000);
-			acx_issue_cmd(priv, ACX100_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000);
-#endif
-
-			acx_enable_irq(priv);
-/*			acx_join_bssid(priv); */
-			acx_set_status(priv, ISTATUS_0_STARTED);
-			printk("Asked to resume: %X\n", rqst);
-			if (netif_running(dev) && !netif_device_present(dev))
-				netif_device_attach(dev);
-			break;
-		default:
-			printk("Asked for PM: %X\n", rqst);
-			result = -EINVAL;
-			break;
-	}
-	FN_EXIT(1, result);
-	return result;
-}
-#endif
+#endif /* CONFIG_PM */
 
 /*----------------------------------------------------------------
 * acx_up
@@ -1626,12 +1473,6 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	acx_dma_tx_data(priv, tx_desc);
 	dev->trans_start = jiffies;
 
-#if 0
-	tx_desc = &priv->dc.pTxDescQPool[priv->dc.pool_idx];
-	if((tx_desc->Ctl & 0x80) != 0) {
-		acx_wake_queue(dev, "after Tx start");
-	}
-#endif
 	txresult = OK;
 	priv->stats.tx_packets++;
 	priv->stats.tx_bytes += templen;
@@ -1941,7 +1782,7 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 		 * FIXME: that's not very clean - maybe we are able to
 		 * establish a flag which definitely tells us that some
 		 * hardware is absent and which we could check here? */
-		FN_EXIT(0, 0);
+		FN_EXIT(0, NOT_OK);
 		return IRQ_NONE;
 	}
 		
@@ -1952,7 +1793,7 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 	 * has occurred that we are interested in (interrupt sharing
 	 * with other cards!) */
 	if (0 == irqtype) {
-		FN_EXIT(0, OK);
+		FN_EXIT(0, NOT_OK);
 		return IRQ_NONE;
 	}
 
@@ -1977,7 +1818,17 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
 		/* don't clean up on each Tx complete, wait a bit */
 		if (++priv->tx_cnt_done % (priv->TxQueueCnt >> 2) == 0)
+		{
+#if TX_CLEANUP_IN_SOFTIRQ
+			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_TX_CLEANUP);
+#else
 			acx_clean_tx_desc(priv);
+#endif
+
+			/* no need to set tx_cnt_done back to 0 here, since
+			 * an overflow cannot cause counter misalignment on
+			 * check above */
+		}
 		acx_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");
 #if 0
@@ -2260,13 +2111,9 @@ static void __exit acx_cleanup_module(void)
 	while (dev != NULL) {
 		wlandevice_t *priv = (struct wlandevice *) dev->priv;
 
-#ifdef CONFIG_PROC_FS
-		acx_proc_unregister_entries(dev);
-#endif
-
 		/* disable both Tx and Rx to shut radio down properly */
-		acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000);
-		acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000);
+		acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
+		acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
 	
 		/* disable power LED to save power :-) */
 		acxlog(L_INIT, "switching off power LED to save power :-)\n");
@@ -2276,7 +2123,7 @@ static void __exit acx_cleanup_module(void)
 		/* put the eCPU to sleep to save power
 		 * Halting is not possible currently,
 		 * since not supported by all firmware versions */
-		acx_issue_cmd(priv, ACX100_CMD_SLEEP, NULL, 0, 5000);
+		acx_issue_cmd(priv, ACX100_CMD_SLEEP, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
 #endif
 
 		/* stop our eCPU */

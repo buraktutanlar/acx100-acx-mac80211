@@ -53,6 +53,7 @@
 
 #include <p80211mgmt.h>
 #include <acx100.h>
+#include <acx100_helper.h>
 #include <ioregister.h>
 
 /* we re-decided to go with statically created arrays,

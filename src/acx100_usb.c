@@ -225,7 +225,7 @@ static void acx100usb_complete_tx(struct urb *, struct pt_regs *);
 static void acx100usb_complete_rx(struct urb *, struct pt_regs *);
 #endif
 static int acx100usb_open(struct net_device *);
-static int acx100usb_stop(struct net_device *);
+static int acx100usb_close(struct net_device *);
 static int acx100usb_start_xmit(struct sk_buff *,struct net_device *);
 static void acx100usb_set_rx_mode(struct net_device *);
 static int init_network_device(struct net_device *);
@@ -249,7 +249,6 @@ static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
 #ifdef ACX_DEBUG
-int acx_debug_func_indent=0;
 int txbufsize;
 int rxbufsize;
 static char * acx100usb_pstatus(int);
@@ -269,6 +268,8 @@ static void dump_config_descriptor(struct usb_config_descriptor *);
 **                             Module Data
 ** ---------------------------------------------------------------------- */
 
+/* FIXME: static variable, big no-no!! might disrupt operation of two USB
+ * adapters at the same time! */
 static int disconnected=0;
 
 extern const struct iw_handler_def acx_ioctl_handler_def;
@@ -292,81 +293,6 @@ static struct usb_driver acx100usb_driver = {
 
 acx_usb_bulk_context_t rxcons[ACX100_USB_NUM_BULK_URBS];
 acx_usb_bulk_context_t txcons[ACX100_USB_NUM_BULK_URBS];
-
-
-/*----------------------------------------------------------------
-    Debugging support
-*----------------------------------------------------------------*/
-#ifdef ACX_DEBUG
-
-#define DEBUG_TSC 0
-#define FUNC_INDENT_INCREMENT 2
-
-#if DEBUG_TSC
-#define TIMESTAMP(d) unsigned long d; rdtscl(d)
-#else
-#define TIMESTAMP(d) unsigned long d = jiffies
-#endif
-
-static const char spaces[] = "          " "          "; /* Nx10 spaces */
-
-void
-log_fn_enter(const char *funcname) {
-	int indent;
-	TIMESTAMP(d);
-
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
-		
-	printk("%lx %s==> %s\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname
-	);
-
-	acx_debug_func_indent += FUNC_INDENT_INCREMENT;
-}
-
-void
-log_fn_exit(const char *funcname) {
-	int indent;
-	TIMESTAMP(d);
-
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
-
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
-		
-	printk("%lx %s<== %s\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname
-	);
-}
-
-void
-log_fn_exit_v(const char *funcname, int v) {
-	int indent;
-	TIMESTAMP(d);
-
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
-
-	indent = acx_debug_func_indent;
-	if(indent>=sizeof(spaces))
-		indent = sizeof(spaces)-1;
-		
-	printk("%lx %s<== %s: %08x\n",
-		d,
-		spaces + (sizeof(spaces)-1) - indent,
-		funcname,
-		v
-	);
-}
-#endif /* ACX_DEBUG */
-
-
 
 
 /* ---------------------------------------------------------------------------
@@ -451,7 +377,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		/* ---------------------------------------------
 		** Initialize the device context and also check
 		** if this is really the hardware we know about.
-		** If not sure, atleast notify the user that he
+		** If not sure, at least notify the user that he
 		** may be in trouble...
 		** --------------------------------------------- */
 		numconfigs=(int)(usbdev->descriptor.bNumConfigurations);
@@ -606,6 +532,12 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 			res = OUTOFMEM;
 			goto end;
 		}
+#ifdef CONFIG_PROC_FS
+		if (OK != acx_proc_register_entries(dev)) {
+			acxlog(L_INIT, "/proc registration failed\n");
+		}
+#endif
+
 		/* --------------------------------------
 		** Everything went OK, we are happy now
 		** ----------------------------------- */
@@ -674,9 +606,13 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 			acx_stop_queue(priv->netdev,"on USB disconnect");
 		}
 		rtnl_unlock();
+#ifdef CONFIG_PROC_FS
+		acx_proc_unregister_entries(priv->netdev);
+#endif
+
 	}	
 	/* ---------------------------------------
-	** now abort pending URBs and free them..
+	** now abort pending URBs and free them...
 	** ------------------------------------ */
 	if (priv->ctrl_urb) {
 		if (priv->ctrl_urb->status==-EINPROGRESS) usb_unlink_urb(priv->ctrl_urb);
@@ -849,13 +785,13 @@ static int init_network_device(struct net_device *dev) {
 	** put the ACX100 out of sleep mode
 	** ----------------------------------- */
 	priv=dev->priv;
-	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,ACX_CMD_TIMEOUT_DEFAULT);
 	/* --------------------------------------
 	** Register the callbacks for the network
 	** device functions.
 	** -------------------------------------- */
 	dev->open = &acx100usb_open;
-	dev->stop = &acx100usb_stop;
+	dev->stop = &acx100usb_close;
 	dev->hard_start_xmit = (void *)&acx100usb_start_xmit;
 	dev->get_stats = (void *)&acx_get_stats;
 	dev->get_wireless_stats = (void *)&acx_get_wireless_stats;
@@ -904,7 +840,7 @@ static int acx100usb_open(struct net_device *dev)
 	/* ---------------------------------
 	** put the ACX100 out of sleep mode
 	** ------------------------------ */
-	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_WAKE,NULL,0,ACX_CMD_TIMEOUT_DEFAULT);
 
 	acx_init_task_scheduler(priv);
 
@@ -1064,7 +1000,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				break;
 			case -EOVERFLOW:
 				printk(KERN_ERR SHORTNAME "error in rx, data overrun -> emergency stop\n");
-				acx100usb_stop(priv->netdev);
+				acx100usb_close(priv->netdev);
 				return;
 			default:
 				priv->stats.rx_errors++;
@@ -1095,9 +1031,9 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 		 * ---------------------------------------- */
 		if (priv->rxtruncation) {
 			ptr=(rxbuffer_t *)&(priv->rxtruncbuf);
-			packetsize=(le16_to_cpu(ptr->mac_cnt_rcvd)&0xFFF)+ACX100_RXBUF_HDRSIZE;
+			packetsize=MAC_CNT_RCVD(ptr)+ACX100_RXBUF_HDRSIZE;
 			rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
-			SET_BIT(rxdesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
+			SET_BIT(rxdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 			rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
 			acxlog(L_USBRXTX,"handling truncated frame (truncsize=%d usbsize=%d packetsize(from trunc)=%d)\n",priv->rxtruncsize,size,packetsize);
 #ifdef ACX_DEBUG
@@ -1135,7 +1071,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			acxlog(L_USBRXTX,"post-merge offset: %d usbsize: %d remsize=%d\n",offset,size,remsize);
 		}
 		while (offset<size) {
-			packetsize=(le16_to_cpu(ptr->mac_cnt_rcvd)&0xFFF)+ACX100_RXBUF_HDRSIZE;
+			packetsize=MAC_CNT_RCVD(ptr)+ACX100_RXBUF_HDRSIZE;
 			acxlog(L_USBRXTX,"packet with packetsize=%d\n",packetsize);
 			if (packetsize>sizeof(rxbuffer_t)) {
 				printk(KERN_ERR "packetsize exceeded (got %d , max %d, usbsize=%d)\n",packetsize,sizeof(rxbuffer_t),size);
@@ -1174,7 +1110,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				offset=size;
 			} else {
 				rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
-				SET_BIT(rxdesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
+				SET_BIT(rxdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 				rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
 				memcpy(rxdesc->data,ptr,packetsize);
 				/* ---------------------------------------------
@@ -1317,7 +1253,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.hostData=cpu_to_le32(size|(desc->u.r1.rate)<<24);
 	if (1 == priv->defpeer.shortpre) /* vda: TODO: when to use ap_peer? */
 		SET_BIT(buf->hdr.ctrl1, DESC_CTL_SHORT_PREAMBLE);
-	SET_BIT(buf->hdr.ctrl1, DESC_CTL_FIRST_MPDU);
+	SET_BIT(buf->hdr.ctrl1, DESC_CTL_FIRSTFRAG);
 	buf->hdr.txRate=desc->u.r1.rate;
 	buf->hdr.index=1;
 	buf->hdr.dataLength=cpu_to_le16(size|((buf->hdr.txRate)<<24));
@@ -1490,7 +1426,7 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	** ------------------------------------------- */
 	descnum=ticontext->tx_tail;
 	txdesc=&(ticontext->pTxDescQPool[descnum]);
-	if (!(txdesc->Ctl_8 & ACX100_CTL_OWN)) {
+	if (!(txdesc->Ctl_8 & DESC_CTL_HOSTOWN)) {
 		acx100usb_prepare_tx(priv,txdesc);
 	} else {
 		/* ----------------------------------------------
@@ -1502,7 +1438,7 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 
 
 /* ---------------------------------------------------------------------------
-** acx100usb_stop():
+** acx100usb_close():
 ** Inputs:
 **    dev -> Pointer to network device structure
 ** ---------------------------------------------------------------------------
@@ -1512,18 +1448,18 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 ** Description:
 **  This function stops the network functionality of the interface (invoked
 **  when the user calls ifconfig <wlan> down). The tx queue is halted and
-**  the device is markes as down. In case there were any pending USB bulk
+**  the device is marked as down. In case there were any pending USB bulk
 **  transfers, these are unlinked (asynchronously). The module in-use count
 **  is also decreased in this function.
 ** ------------------------------------------------------------------------- */
 
-static int acx100usb_stop(struct net_device *dev)
+static int acx100usb_close(struct net_device *dev)
 {
 	wlandevice_t *priv;
 	client_t client;
 	int i,already_down;
 	if (!(dev->priv)) {
-		printk(KERN_ERR SHORTNAME "no pointer to acx context in network device, cannot operate.\n");
+		printk(KERN_ERR SHORTNAME "dev->priv empty, FAILED.\n");
 		return -ENODEV;
 	}
 	priv=dev->priv;
@@ -1542,8 +1478,11 @@ static int acx100usb_stop(struct net_device *dev)
 	/* --------------------------------
 	** mark the device as DOWN
 	** ----------------------------- */
-	if (priv->dev_state_mask&ACX_STATE_IFACE_UP) already_down=0; else already_down=1;
-	priv->dev_state_mask&=~ACX_STATE_IFACE_UP;
+	if (priv->dev_state_mask&ACX_STATE_IFACE_UP) {
+		already_down=0;
+		CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
+	} else
+		already_down=1;
 	/* --------------------------------------
 	 * wait until all tx are out...
 	 * ----------------------------------- */
@@ -1573,12 +1512,12 @@ static int acx100usb_stop(struct net_device *dev)
 	/* ------------------------
 	** disable rx and tx ...
 	** --------------------- */
-	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_TX,NULL,0,5000);
-	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_RX,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_TX,NULL,0,ACX_CMD_TIMEOUT_DEFAULT);
+	acx_issue_cmd(priv,ACX1xx_CMD_DISABLE_RX,NULL,0,ACX_CMD_TIMEOUT_DEFAULT);
 	/* -------------------------
 	** power down the device...
 	** ---------------------- */
-	acx_issue_cmd(priv,ACX1xx_CMD_SLEEP,NULL,0,5000);
+	acx_issue_cmd(priv,ACX1xx_CMD_SLEEP,NULL,0,ACX_CMD_TIMEOUT_DEFAULT);
 	/* --------------------------------------------
 	** decrease module-in-use count (if necessary)
 	** ----------------------------------------- */

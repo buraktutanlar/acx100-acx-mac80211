@@ -66,6 +66,7 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100.h>
+#include <acx100_helper.h>
 
 /*================================================================*/
 /* Local Constants */

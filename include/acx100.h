@@ -45,20 +45,19 @@
 #ifndef __ACX_ACX100_H
 #define __ACX_ACX100_H
 
-
 #if (WLAN_HOSTIF==WLAN_USB)
 #include <linux/usb.h>
 #endif
 
+/* whether to do Tx descriptor cleanup in softirq (i.e. not in IRQ
+ * handler) or not. Note that doing it later does slightly increase
+ * system load, so still do that stuff in the IRQ handler for now,
+ * even if that probably means worse latency */
+#define TX_CLEANUP_IN_SOFTIRQ 0
+
 /*============================================================================*
  * Debug / log functionality                                                  *
  *============================================================================*/
-
-/* NOTE: If we still want basic logging of driver info if ACX_DEBUG is not
- * defined, we should provide an acxlog variant that is never turned off. We
- * should make a acx_msg(), and rename acxlog() to acx_debug() to make the
- * difference very clear.
- */
 
 #ifdef ACX_DEBUG
 
@@ -88,41 +87,6 @@
 			 L_STATE | L_XFER | L_DATA | L_DEBUG | L_IOCTL | L_CTL)
 
 extern unsigned int debug;
-extern int acx_debug_func_indent;
-
-#define acxlog(chan, args...) \
-	do { \
-		if (debug & (chan)) \
-			printk(KERN_WARNING args); \
-	} while (0)
-
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
-
-#define FN_ENTER \
-	do { \
-		if (unlikely(debug & L_FUNC)) { \
-			log_fn_enter(__func__); \
-		} \
-	} while (0)
-
-#define FN_EXIT(p, v) \
-	do { \
-		if (unlikely(debug & L_FUNC)) { \
-			if (p) { \
-				log_fn_exit_v(__func__, v); \
-			} else { \
-				log_fn_exit(__func__); \
-			} \
-		} \
-	} while (0)
-
-#else /* ACX_DEBUG */
-
-#define acxlog(chan, args...)
-#define FN_ENTER
-#define FN_EXIT(p, v)
 
 #endif /* ACX_DEBUG */
 
@@ -317,6 +281,7 @@ typedef enum {
 #define ACX_AFTER_IRQ_CMD_ASSOCIATE		0x02
 #define ACX_AFTER_IRQ_CMD_RADIO_RECALIB		0x04
 #define ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG	0x08
+#define ACX_AFTER_IRQ_CMD_TX_CLEANUP	0x10
 
 /*--- Buffer Management Commands ---------------------------------------------*/
 
@@ -407,7 +372,7 @@ typedef enum {
 #define ACX100_IE_SSID_LEN				0x20
 #define ACX1xx_IE_SCAN_STATUS_LEN			0x04
 #define ACX1xx_IE_ASSOC_ID_LEN				0x02
-#define ACX1xx_IE_CONFIG_OPTIONS_LEN			0x14C
+#define ACX1xx_IE_CONFIG_OPTIONS_LEN			0x14c
 #define ACX1xx_IE_FWREV_LEN				0x18
 #define ACX1xx_IE_FCS_ERROR_COUNT_LEN			0x04
 #define ACX1xx_IE_MEDIUM_USAGE_LEN			0x08
@@ -436,17 +401,6 @@ typedef enum {
 /*============================================================================*
  * Types and their related constants                                          *
  *============================================================================*/
-
-/*--- Commonly used basic types ----------------------------------------------*/
-typedef struct acx100_bytestr {
-	u16 len ACX_PACKED;
-	u8 data[0] ACX_PACKED;
-} acx100_bytestr_t;
-
-typedef struct acx100_bytestr32 {
-	u16 len ACX_PACKED;
-	u8 data[32] ACX_PACKED;
-} acx100_bytestr32_t;
 
 /*--- Communication Frames: Receive Frame Structure --------------------------*/
 typedef struct acx100_rx_frame {
@@ -481,18 +435,6 @@ typedef struct acx100_rx_frame {
  * Information Frames Structures                                              *
  *============================================================================*/
 
-
-
-
-/* Descriptor Control Bits */
-
-#define ACX100_CTL_PREAMBLE   0x01	/* Preable type: 0 = long; 1 = short */
-#define ACX100_CTL_FIRSTFRAG  0x02	/* This is the 1st frag of the frame */
-#define ACX100_CTL_AUTODMA    0x04
-#define ACX100_CTL_RECLAIM    0x08	/* ready to reuse */
-#define ACX100_CTL_HOSTDONE   0x20	/* host has finished processing */
-#define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
-#define ACX100_CTL_OWN        0x80	/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
 
 /* Used in beacon frames and the like */
 #define DOT11RATEBYTE_1		(1*2)
@@ -530,10 +472,10 @@ typedef struct acx100_rx_frame {
 #define ACX100_USB_RRIDREQ	3
 #define ACX100_USB_WMEMREQ	4
 #define ACX100_USB_RMEMREQ	5
-#define ACX100_USB_UPLOAD_FW 0x10
-#define ACX100_USB_ACK_CS 0x11
-#define ACX100_USB_UNKNOWN_REQ1 0x12
-#define ACX100_USB_TX_DESC 0xA
+#define ACX100_USB_UPLOAD_FW	0x10
+#define ACX100_USB_ACK_CS	0x11
+#define ACX100_USB_UNKNOWN_REQ1	0x12
+#define ACX100_USB_TX_DESC	0xA
 
 /* Received from the bulkin endpoint */
 #define ACX100_USB_ISFRM(a)	((a) < 0x7fff)
@@ -832,10 +774,10 @@ typedef struct key_struct {
 
 /* non-firmware struct --> no packing necessary */
 typedef struct client {
+	u8 used;		/* 0x0 */
 	u16 aid;		/* association ID */
-	char address[ETH_ALEN];	/* 0x2 */
+	char address[ETH_ALEN];	/* 0x3 */
 	u8 val0x8;
-	u8 used;		/* 0x9 */
 	u16 val0xa;
 	u16 auth_alg;
 	u16 val0xe;
@@ -852,10 +794,10 @@ typedef struct client {
 typedef struct TIWLAN_DC {	/* V3 version */
 	struct	wlandevice 	*priv;
 	/* This is the pointer to the beginning of the cards tx queue pool.
-	   The Adress is relative to the internal memory mapping of the card! */
+	   The address is relative to the internal memory mapping of the card! */
 	u32		ui32ACXTxQueueStart;	/* 0x8, official name */
 	/* This is the pointer to the beginning of the cards rx queue pool.
-	   The Adress is relative to the internal memory mapping of the card! */
+	   The address is relative to the internal memory mapping of the card! */
 	u32		ui32ACXRxQueueStart;	/* 0xc */
 	u8		*pTxBufferPool;		/* 0x10 */
 	u32		TxBufferPoolSize;	/* 0x18 */
@@ -972,7 +914,7 @@ struct peer {
 
 /* non-firmware struct --> no packing necessary */
 typedef struct wlandevice {
-	/* most often accessed parameters at first position to avoid dereferencing penalty */
+	/* !!! keep most often accessed parameters at first position to avoid dereferencing penalty !!! */
 	const u16		*io;		/* points to ACX100 or ACX111 I/O register address set */
 
 	/*** Device chain ***/
@@ -1050,7 +992,11 @@ typedef struct wlandevice {
 	u8		bus_type;
 
 	/*** Device state ***/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 10)
+	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced a shorter API version,
+	   then it made its way into 2.6.10 */
 	u32		pci_state[16];		/* saved PCI state for suspend/resume */
+#endif
 	int		hw_unavailable;		/* indicates whether the hardware has been
 						 * suspended or ejected. actually a counter. */
 	u16		dev_state_mask;

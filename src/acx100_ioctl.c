@@ -388,11 +388,13 @@ static inline int acx_ioctl_set_mode(struct net_device *dev, struct iw_request_i
 			priv->macmode_wanted = ACX_MODE_2_MANAGED_STA;
 			break;
 		case IW_MODE_MASTER:
-#if MASTER_MODE_SUPPORTED
+#define USE_OWN_MASTER_MODE_CODE 1
+#if USE_OWN_MASTER_MODE_CODE
+			acxlog(0xffff, "Master mode (HostAP) is very, very experimental! It might work partially, but better get prepared for nasty surprises at any time... ;-)\n");
 			priv->macmode_wanted = ACX_MODE_3_MANAGED_AP;
 			break;
 #else
-			acxlog(0xffff, "Master mode (AP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under development...\n");
+			acxlog(0xffff, "Master mode (HostAP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under development...\n");
 			/* fall through */
 #endif
 		default:
@@ -2508,42 +2510,42 @@ static inline int acx111_ioctl_info(struct net_device *dev, struct iw_request_in
 	memset(&memconf, 0x00, sizeof(memconf));
 
 	if (OK != acx_interrogate(priv, &memconf, ACX1xx_IE_QUEUE_CONFIG)) {
-		acxlog(L_BINSTD, "read memconf returns error\n");
+		acxlog(L_STD, "read memconf returns error\n");
 	}
 
 	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0x00, sizeof(queueconf));
 
 	if (OK != acx_interrogate(priv, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
-		acxlog(L_BINSTD, "read queuehead returns error\n");
+		acxlog(L_STD, "read queuehead returns error\n");
 	}
 
 	/* get Acx111 Memory Map */
 	memset(memmap, 0x00, sizeof(memmap));
 
 	if (OK != acx_interrogate(priv, &memmap, ACX1xx_IE_MEMORY_MAP)) {
-		acxlog(L_BINSTD, "read mem map returns error\n");
+		acxlog(L_STD, "read mem map returns error\n");
 	}
 
 	/* get Acx111 Rx Config */
 	memset(rxconfig, 0x00, sizeof(rxconfig));
 
 	if (OK != acx_interrogate(priv, &rxconfig, ACX1xx_IE_RXCONFIG)) {
-		acxlog(L_BINSTD, "read rxconfig returns error\n");
+		acxlog(L_STD, "read rxconfig returns error\n");
 	}
 	
 	/* get Acx111 fcs error count */
 	memset(fcserror, 0x00, sizeof(fcserror));
 
 	if (OK != acx_interrogate(priv, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT)) {
-		acxlog(L_BINSTD, "read fcserror returns error\n");
+		acxlog(L_STD, "read fcserror returns error\n");
 	}
 	
 	/* get Acx111 rate fallback */
 	memset(ratefallback, 0x00, sizeof(ratefallback));
 
 	if (OK != acx_interrogate(priv, &ratefallback, ACX1xx_IE_RATE_FALLBACK)) {
-		acxlog(L_BINSTD, "read ratefallback returns error\n");
+		acxlog(L_STD, "read ratefallback returns error\n");
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)

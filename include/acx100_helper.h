@@ -38,6 +38,57 @@
 #ifndef __ACX_ACX100_HELPER_H
 #define __ACX_ACX100_HELPER_H
 
+/*============================================================================*
+ * Debug / log functionality                                                  *
+ *============================================================================*/
+
+/* NOTE: If we still want basic logging of driver info if ACX_DEBUG is not
+ * defined, we should provide an acxlog variant that is never turned off. We
+ * should make a acx_msg(), and rename acxlog() to acx_debug() to make the
+ * difference very clear.
+ */
+
+#ifdef ACX_DEBUG
+
+extern int acx_debug_func_indent;
+
+#define acxlog(chan, args...) \
+	do { \
+		if (debug & (chan)) \
+			printk(KERN_WARNING args); \
+	} while (0)
+
+void log_fn_enter(const char *funcname);
+void log_fn_exit(const char *funcname);
+void log_fn_exit_v(const char *funcname, int v);
+
+#define FN_ENTER \
+	do { \
+		if (unlikely(debug & L_FUNC)) { \
+			log_fn_enter(__func__); \
+		} \
+	} while (0)
+
+#define FN_EXIT(p, v) \
+	do { \
+		if (unlikely(debug & L_FUNC)) { \
+			if (p) { \
+				log_fn_exit_v(__func__, v); \
+			} else { \
+				log_fn_exit(__func__); \
+			} \
+		} \
+	} while (0)
+
+#else
+
+#define acxlog(chan, args...)
+#define FN_ENTER
+#define FN_EXIT(p, v)
+
+#endif /* ACX_DEBUG */
+
+
 #define ISTATUS_0_STARTED	0
 #define ISTATUS_1_SCANNING	1
 #define ISTATUS_2_WAIT_AUTH	2
@@ -541,13 +592,13 @@ int acx_init_mac(netdevice_t *dev, u16 init);
 void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 void acx_set_timer(wlandevice_t *priv, u32 time);
 void acx_update_capabilities(wlandevice_t *priv);
-u16 acx_read_eeprom_offset(wlandevice_t *priv, u16 addr,
+u16 acx_read_eeprom_offset(wlandevice_t *priv, u32 addr,
 					u8 *charbuf);
 u16 acx_read_eeprom_area(wlandevice_t *priv);
-u16 acx_write_eeprom_offset(wlandevice_t *priv, u16 addr,
-					u16 len, const u8 *charbuf);
-u16 acx_read_phy_reg(wlandevice_t *priv, u16 reg, u8 *charbuf);
-u16 acx_write_phy_reg(wlandevice_t *priv, u16 reg, u8 value);
+u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr,
+					u32 len, const u8 *charbuf);
+u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf);
+u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value);
 void acx_start(wlandevice_t *priv);
 void acx_reset_mac(wlandevice_t *priv);
 /*@null@*/ firmware_image_t *acx_read_fw( const char *file, u32 *size);
