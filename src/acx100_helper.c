@@ -1076,7 +1076,7 @@ int acx100_load_radio(wlandevice_t *priv)
 {
 	UINT32 offset;
 	acx100_memmap_t mm;
-	int res1, res2;
+	int res1 = 0, res2 = 0;
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
 	char *filename;

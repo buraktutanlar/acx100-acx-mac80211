@@ -420,7 +420,7 @@ static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_reques
 	acxlog(L_IOCTL, "Set Sensitivity <== %d\n", vwrq->value);
 
 	if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
-		priv->sensitivity = (0 == vwrq->disabled) ? 0 : vwrq->value;
+		priv->sensitivity = (1 == vwrq->disabled) ? 0 : vwrq->value;
 		priv->set_mask |= GETSET_SENSITIVITY;
 		return -EINPROGRESS;
 	} else {
@@ -2275,8 +2275,20 @@ static inline int acx100_ioctl_dbg_set_masks(struct net_device *dev, struct iw_r
 static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	TIWLAN_DC *pDc = &priv->dc;
+	struct rxdescriptor *rx_desc = (struct rxdescriptor *) pDc->pRxDescQPool;
 	int i;
 	int result = -EINVAL;
+	struct ACX111MemoryConfig memconf;
+	struct ACX111QueueConfig queueconf;
+	char memmap[0x34];
+	char rxconfig[0x8];
+	char fcserror[0x8];
+	char ratefallback[0x5];
+	struct rxhostdescriptor *rx_host_desc;
+	struct txdescriptor *tx_desc;
+	struct txhostdescriptor *tx_host_desc;
+
 /*
 	if ((err = acx100_lock(priv, &flags))) {
 		result = err;
@@ -2288,48 +2300,42 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		return 0;
 	}
 
-	//get Acx111 Memory Configuration
-	struct ACX111MemoryConfig memconf;
+	/* get Acx111 Memory Configuration */
 	memset(&memconf, 0x00, sizeof(memconf));
 
 	if (!acx100_interrogate(priv, &memconf, 0x03)) {
 		acxlog(L_BINSTD, "read memconf returns error\n");
 	}
 
-	//get Acx111 Queue Configuration
-	struct ACX111QueueConfig queueconf;
+	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0x00, sizeof(queueconf));
 
 	if (!acx100_interrogate(priv, &queueconf, 0x05)) {
 		acxlog(L_BINSTD, "read queuehead returns error\n");
 	}
 
-	//get Acx111 Memory Map
-	char memmap[0x34];
-	memset(memmap, 0x00, 34);
+	/* get Acx111 Memory Map */
+	memset(memmap, 0x00, sizeof(memmap));
 
 	if (!acx100_interrogate(priv, &memmap, 0x08)) {
 		acxlog(L_BINSTD, "read mem map returns error\n");
 	}
 
-	//get Acx111 Rx Config
-	char rxconfig[0x8];
+	/* get Acx111 Rx Config */
 	memset(rxconfig, 0x00, sizeof(rxconfig));
 
 	if (!acx100_interrogate(priv, &rxconfig, 0x10)) {
 		acxlog(L_BINSTD, "read rxconfig returns error\n");
 	}
 	
-	//get Acx111 fcs error count
-	char fcserror[0x8];
+	/* get Acx111 fcs error count */
 	memset(fcserror, 0x00, sizeof(fcserror));
 
 	if (!acx100_interrogate(priv, &fcserror, 0x0e)) {
 		acxlog(L_BINSTD, "read fcserror returns error\n");
 	}
 	
-	//get Acx111 rate fallback
-	char ratefallback[0x5];
+	/* get Acx111 rate fallback */
 	memset(ratefallback, 0x00, sizeof(ratefallback));
 
 	if (!acx100_interrogate(priv, &ratefallback, 0x06)) {
@@ -2337,11 +2343,11 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	//force occurance of a beacon interrupt
+	/* force occurrence of a beacon interrupt */
 	acx100_write_reg16(priv, priv->io[IO_ACX_HINT_TRIG], 0x20);
 #endif
 
-	//dump Acx111 Mem Configuration
+	/* dump Acx111 Mem Configuration */
 	acxlog(L_STD, "dump mem config:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", memconf.length, sizeof(memconf));
 	acxlog(L_STD, "Number of stations: %1X\n", memconf.no_of_stations);
@@ -2358,7 +2364,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	acxlog(L_STD, "Tx Queue 1 Attributes: %X\n", memconf.tx_queue1_attributes);
 
 
-	//dump Acx111 Queue Configuration
+	/* dump Acx111 Queue Configuration */
 	acxlog(L_STD, "dump queue head:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", queueconf.length, sizeof(queueconf));
 	acxlog(L_STD, "tx_memory_block_address (from card): %X\n", queueconf.tx_memory_block_address);
@@ -2368,7 +2374,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	acxlog(L_STD, "tx1_queue address (from card): %X\n", queueconf.tx1_queue_address);
 	acxlog(L_STD, "tx1_queue attributes (from card): %X\n", queueconf.tx1_attributes);
 
-	//dump Acx111 Mem Map
+	/* dump Acx111 Mem Map */
 	acxlog(L_STD, "dump mem map:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", *((UINT16 *)&memmap[0x02]), sizeof(memmap));
 	acxlog(L_STD, "Code start: %X\n", *((UINT32 *)&memmap[0x04]));
@@ -2387,25 +2393,23 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	acxlog(L_STD, "iobase: %p\n", priv->iobase);
 	acxlog(L_STD, "iobase2: %p\n", priv->iobase2);
 
-	//dump Acx111 Rx Config
+	/* dump Acx111 Rx Config */
 	acxlog(L_STD, "dump rx config:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", *((UINT16 *)&rxconfig[0x02]), sizeof(rxconfig));
 	acxlog(L_STD, "rx config: %X\n", *((UINT16 *)&rxconfig[0x04]));
 	acxlog(L_STD, "rx filter config: %X\n", *((UINT16 *)&rxconfig[0x06]));
 
-	//dump Acx111 fcs error
+	/* dump Acx111 fcs error */
 	acxlog(L_STD, "dump fcserror:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", *((UINT16 *)&fcserror[0x02]), sizeof(fcserror));
 	acxlog(L_STD, "fcserrors: %X\n", *((UINT32 *)&fcserror[0x04]));
 
-	//dump Acx111 rate fallback
+	/* dump Acx111 rate fallback */
 	acxlog(L_STD, "dump rate fallback:\n");
 	acxlog(L_STD, "data read: %d, struct size: %d\n", *((UINT16 *)&ratefallback[0x02]), sizeof(ratefallback));
 	acxlog(L_STD, "ratefallback: %X\n", *((UINT8 *)&ratefallback[0x04]));
 
-	//dump acx111 internal rx descriptor ring buffer
-	TIWLAN_DC *pDc = &priv->dc;
-	struct rxdescriptor *rx_desc = (struct rxdescriptor *) pDc->pRxDescQPool;
+	/* dump acx111 internal rx descriptor ring buffer */
 
 	/* loop over complete receive pool */
 	for (i = 0; i < pDc->rx_pool_count; i++) {
@@ -2422,9 +2426,9 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		rx_desc++;
 	}
 
-	//dump host rx descriptor ring buffer
+	/* dump host rx descriptor ring buffer */
 
-	struct rxhostdescriptor *rx_host_desc = (struct rxhostdescriptor *) pDc->pRxHostDescQPool;
+	rx_host_desc = (struct rxhostdescriptor *) pDc->pRxHostDescQPool;
 
 	/* loop over complete receive pool */
 	for (i = 0; i < pDc->rx_pool_count; i++) {
@@ -2442,8 +2446,8 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 
 	}
 
-	//dump acx111 internal tx descriptor ring buffer
-	struct txdescriptor *tx_desc = (struct txdescriptor *) pDc->pTxDescQPool;
+	/* dump acx111 internal tx descriptor ring buffer */
+	tx_desc = (struct txdescriptor *) pDc->pTxDescQPool;
 
 	/* loop over complete transmit pool */
 	for (i = 0; i < pDc->tx_pool_count; i++) {
@@ -2468,9 +2472,9 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	}
 
 
-	//dump host tx descriptor ring buffer
+	/* dump host tx descriptor ring buffer */
 
-	struct txhostdescriptor *tx_host_desc = (struct txhostdescriptor *) pDc->pTxHostDescQPool;
+	tx_host_desc = (struct txhostdescriptor *) pDc->pTxHostDescQPool;
 
 	/* loop over complete host send pool */
 	for (i = 0; i < pDc->tx_pool_count * 2; i++) {
