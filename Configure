@@ -1,0 +1,42 @@
+#!/bin/bash
+
+CONFIG_MK=config.mk
+KERNEL_BUILD=/lib/modules/`uname -r`/build
+ECHO="/bin/echo -e "
+
+# What kernel are we compiling for?
+
+version () {
+        expr $1 \* 65536 + $2 \* 256 + $3
+}
+
+write_bool() {
+    value=`eval $ECHO '$'$1`
+    if [ "$value" = "y" ] ; then
+        $ECHO "$1=y" >> $CONFIG_MK
+    else
+        $ECHO "# $1 is not defined" >> $CONFIG_MK
+    fi
+}
+
+write_str () {
+    value=`eval $ECHO '$'$1`
+    $ECHO $1=$value >> $CONFIG_MK
+}
+
+rm -f $CONFIG_MK
+
+VERSION_CODE=`grep LINUX_VERSION_CODE $KERNEL_BUILD/include/linux/version.h | \
+    sed -e 's/[^0-9]//g'`
+
+if [ $VERSION_CODE -ge `version 2 5 0` ]; then
+        $ECHO "Kernel 2.5 support is highly experimental."
+	sleep 2
+        KERN_25=y
+else
+	KERN_25=n
+fi
+write_bool KERN_25
+
+write_str KERNEL_BUILD
+write_str VERSION_CODE

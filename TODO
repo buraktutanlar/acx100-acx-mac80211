@@ -1,0 +1,55 @@
+This is the current list of ToDos, in order of importance:
+
+- grep for TODO and FIXME in the src directory
+- the whole driver needs proper (hardware etc.) locking. The binary driver
+  didn't make use of locking at all (except for masking IRQs sometimes)
+  Note: locking for the ioctl's is finished
+  Note: locking for packet transfer is finished
+- add further iwconfig/iwpriv support: signal quality indicators (SIR/SNR),
+  channel traffic percentage indicator, AP lists/scanning, iwspy, ...
+- further improve firmware management. Detect embedded linux radio 
+  modules, etc...
+- implement packet fragmentation (to get rid of stupid hacks like
+  setting a small MTU)
+- try to make sure the driver doesn't crash if we remove the card when active
+  (hw_unavailable)
+- clean up and unify return value handling. Right now the driver seems to have
+  a mess of different functions returning 0 as success, 1 as success, or some
+  functions use -1 etc. pp.
+- add missing endianness correction functions (host2ieee16() etc. - byte swapping) to allow for non-x86 use of the driver
+- distribute the functions properly over various files, organize header files
+  properly (yep, it's a real mess! :)
+  consider putting all of ihw.c and idma.c p80211conv.c into single file
+	   moving acx100_helper2.c and acx80211frm.c into single file
+	   acx100.c and acx100_helper.c should be in a single file
+- unify function names to acx100_this_is_a_function()
+- add driver to linux-wlan-ng or airjack or ...
+	maybe we can just submit it as is for kernel consideration
+- in the doc/ directory, add an intro and describe chipset details and
+  interesting information about it
+- maybe add dbg msgs to all failure cases to spot any driver problems fast
+- make sure all structures are packed correctly!!! (it really does no good if
+  we transfer wrongly aligned structs to the ACX100...)
+  Note: we seem to be doing well.
+- add a very verbose description to every driver function
+- figure out why on my Dell Inspiron 8000, the notebook refuses to suspend
+  properly (immediate resume after power-off, urks!) when the ACX100 mini-PCI
+  is installed
+- introduce decent device statistics like those in net_device_stats. Now only
+  tx/rx packets and errors are counted.
+- proper power management: implement 802.11b power management,
+  improve standard power management, make sure ACPI states are fully working
+  (suspend/resume handlers; resuming from suspend-to-ram has been reported
+  to actually hang the machine!)
+- clean up the BSS list (iStable) for old stations that are no longer
+  valid in order to prevent hitting the limit of the registered stations list
+- upgrade driver to support 4X mode (also called "54Mbps" operation, which is
+  not quite right - and of course it doesn't mean that we suddenly
+  become compatible with 54Mbps 802.11g cards!). However, this would
+  require a new 4X compatible firmware and a complete upgrade of the
+  driver. http://www.80211-planet.com/news/article.php/2195691 mentions
+  that D-Link and USR 4X implementations might be incompatible. :-((
+  Well, we might want to support both versions if that is the case...
+  Also, 4X support seems to be pretty much a dirty hack; but if Windows
+  supports it and it's a real gain for many users, then we also ought to
+  support it

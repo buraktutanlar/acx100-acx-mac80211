@@ -1,0 +1,65 @@
+#!/bin/sh
+DEV=wlan0
+IP=192.168.0.10
+NETMASK=255.255.255.0
+GATEWAY=192.168.0.254
+ESSID=any # any == associate to any ESSID
+echo Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
+RATE=11M
+#CHAN=10
+#TXPOWER=16 # 16 == 16.5dBm, 18 == 18dBm (default)
+MODE=managed
+#KEY=B401CD21B44CCD21DEADBEEF11 # WEP128
+ALG=open # open == Open System, restricted == Shared Key
+DEBUG=0x9b
+
+# for better debugging
+set -x
+#echo 8 > /proc/sys/kernel/printk
+
+# just in case ;)
+sync
+sleep 1
+
+insmod ../src/acx100_pci.o debug=$DEBUG firmware_dir=../firmware
+
+if [ -n "$RATE" ]; then
+  echo Setting rate to $RATE.
+  iwconfig $DEV rate $RATE
+fi
+if [ -n "$CHAN" ]; then
+  echo Setting channel $CHAN.
+  iwconfig $DEV channel $CHAN
+fi
+if [ -n "$TXPOWER" ]; then
+  echo Setting Tx power level to $TXPOWER dBm.
+  iwconfig $DEV txpower $TXPOWER
+  sleep 1
+fi
+echo Trying to join or setup ESSID $ESSID.
+iwconfig $DEV essid $ESSID
+if [ -n "$MODE" ]; then
+  echo Setting mode to $MODE.
+  iwconfig $DEV mode $MODE
+fi
+
+if [ -n "$KEY" ]; then
+  echo Setting key to $KEY, algorithm $ALG.
+  iwconfig $DEV key $ALG $KEY
+fi
+
+# Hehe, this can be done after iwconfigs now :)
+ifconfig $DEV $IP netmask $NETMASK
+
+route add default gw $GATEWAY
+
+# Finally, let's do some tweaking to make sure we don't have any
+# buffer management problems (yeah, it's an ugly workaround!)
+ifconfig $DEV mtu 576
+
+# # fetch an IP address from DHCP
+# rm -f /etc/dhcpc/dhcpcd-wlan0.pid > /dev/null
+# dhcpcd -d wlan0 -t 5
+
+# just in case ;)
+sync

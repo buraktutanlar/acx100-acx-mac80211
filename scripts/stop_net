@@ -1,0 +1,9 @@
+#!/bin/sh
+DEV=wlan0
+
+# for better debugging
+set -x
+
+ifconfig $DEV down
+sleep 1
+rmmod acx100_pci

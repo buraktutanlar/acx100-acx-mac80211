@@ -1,0 +1,66 @@
+Available cards with Alantro/TI ACX100 chip (seems to also be called
+TNETW1100):
+- mini-PCI adapter GL2422VP PCI card (made by Global Sun Technology Inc.)
+  Distributed by Alloy, Eusso
+  See also http://www.loneguard.de/wlan/gl2422vp/ (WARNING, German! :)
+- mini-PCI -> PCI Level One WNC-0200
+- PCMCIA Level One WPC-0200
+  PCMCIA cards *probably* have a MMCX connector (although it looks a bit
+  strange...) inside the case, like tons of other PCMCIA cards are said
+  to have it...
+
+The successor of the ACX100 chip is TNETW1100B (pin-for-pin
+compatible with ACX100, much lower power consumption)
+
+Transfer quality can be influenced by the following parameters:
+- txpower setting via iwconfig [implemented, 16.5 and 18dB]
+- antenna selection [not implemented yet; ctlDot11CurrentAntenna()]
+- regulatory domain settings (number of channels allowed for use within
+  certain regions, not implemented yet; ctlDot11CurrentRegDomainWrite())
+- sensitivity setting
+- channel agility, to avoid In-Band interference from household appliances, such as microwave ovens and cordless phones.
+- "short retry limit" and "long retry limit" [currently hardcoded in
+  driver, could be exported; see 802.11 spec 9.2.5.3 for details]
+- ED (energy detect) threshold. It detects whether the channel is
+  unusable due to existing energy on the channel (microwave, ...).
+  Setting it to a higher value might still allow for communication
+  (ctlDot11EDThresholdWrite(), ctlDot11CurrentCCAModeWrite())
+- ???
+
+Other tunable parameters (to be implemented via iwpriv):
+- dot11CFPPeriod
+- dot11CFPMaxDuration
+- dot11BeaconPeriod (see ctlDot11BeaconPeriodWrite())
+- max transmit MSDU lifetime (ctlDot11MaxTransmitMSDULifetimeWrite())
+
+According to Luie Matthee, the ACX100 PCI card (DWL-520+?) might have a
+requirement for PCI 2.2 compliant boards, thus PCI 2.1 may not work.
+Problems with IRQ assignment, spontaneous rebooting when "problematic"
+cards from other vendors are being used etc. and people having a hard time
+to get it running at all are pretty well-known, so I suspect it is true.
+
+
+The TI binary drivers have been developed by the following people:
+
+* William F. Alexander (Windows NDIS driver for PCI, USB):
+  http://www.geocities.com/SiliconValley/Haven/4824/Resume.txt
+* Larry A. Cawley (mentioned on Alexander's site)
+* Lancelot Wang (Linux driver)
+
+ACX100 chip specifications are being listed at eupuls.com (maybe we can
+ask them to deliver them??):
+http://www.eupuls.com/product/eu_prod_wireless11.html
+----
+ Eupuls S/W deliverables
+    for Access Points Drivers Development
+
+Drivers development Kit
+
+ Programmers Guide
+   - ACX100 Register I/F Guide
+   - Host Interface Guide
+   - Driver Specification AP
+   - Firmware Behavior
+ Examples Driver Code (C Code)
+ Example PCI Loader
+----

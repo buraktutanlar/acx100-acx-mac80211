@@ -1,0 +1,86 @@
+AP		Access Point
+BSS		Basic Service Sets
+			The name for a number of wireless clients
+			and an access point that are
+			communicating with each other (by sending
+			packets to the AP!) in the same group.
+			Also called "Managed mode" or "Infrastructure
+			mode".
+			IBSS means Independent BSS: peer-to-peer mode
+			with every client sending to each other, no AP used.
+			Also called "Ad-hoc mode".
+BSSID		BSS Identifier
+			The BSSID is a 48bit identity used to identify a
+			particular BSS (Basic Service Set) within an
+			area. In Infrastructure BSS networks, the BSSID
+			is the MAC (Medium Access Control) address of
+			the AP (Access Point) and in Independent BSS or
+			ad hoc networks, the BSSID is generated
+			randomly.
+CSMA/CD		Carrier Sense Media Access/Collision Detection
+			Media access mechanism used by 802.3 wired ethernet
+CSMA/CA		Carrier Sense Media Access/Collision Avoidance
+			Media access mechanism used by 802.11 wireless ethernet
+CCA		Clear Channel Assessment
+			CCA makes sure that the channel you intend to send
+			on is clear (no signal before transmission).
+CTS
+		The Access Point, upon receiving an RTS, transmits a
+		CTS (Clear To Send) signal that is "heard" by all the
+		stations that communicate with it.
+DSSS		Direct Sequence Spread Spectrum
+			Current wireless cards send on several closely
+			aligned 2.4GHz channels at the same time.
+DTIM		Delivery Traffic Indication Message
+			Tells clients about the next window to listen to
+			broadcast/multicast messages. When a client
+			receives a DTIM, it wakes up to receive these
+			messages.
+ED		Energy Detect
+			Threshold to find out whether a channel is
+			carrying energy (the channel is "busy") or not
+			(see also CCA).
+ESSID
+		Extended Service Set ID
+			The ESSID is the name of the network you want to
+			access.  It is used to identify different
+			wireless networks.
+			ESSID is just an extended SSID allowing for more
+			features.
+FHSS		Frequency Hopping Spread Spectrum
+			Outdated - in contrast to DSSS, FHSS hops from
+			2.4GHz channel to 2.4GHz channel during
+			operation.
+IBSS		-> BSS
+ICV		Integrity Check Value
+			aka CRC
+MAC		Media Access Control
+			The MAC Address (6 Bytes) is a globally unique
+			number to tell apart different stations taking
+			part in communication.
+MIB		Managed Information Base
+			A virtual information store to contain Managed
+			Objects, which offer various network relevant
+			data to other network clients.
+MLME		MAC Layer Management Entity
+MPDU		MAC PDU
+PDU		Protocol Data Unit
+RTS		Request To Send
+			When a station wants to transmit, it first sends
+			a RTS (Request To Send) packet to the Access
+			Point with information including how long it
+			wants to transmit.
+SSID		Service Set Identifier
+			A 32-character unique identifier attached to the
+			header of packets sent over a WLAN that acts as
+			a password when a mobile device tries to connect
+			to the BSS. The SSID differentiates one WLAN
+			from another, so all access points and all
+			devices attempting to connect to a specific WLAN
+			must use the same SSID.  A device will not be
+			permitted to join the BSS unless it can provide
+			the unique SSID. Because an SSID can be sniffed
+			in plain text from a packet it does not supply
+			any security to the network
+TIM		Traffic Indication Map
+WEP		Wired Equivalent Privacy

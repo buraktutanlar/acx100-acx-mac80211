@@ -1,0 +1,95 @@
+Changes:
+========
+
+
+2003.09.14 - 0.2.0pre1 released
+- "fix" major bug "association on every other attempt", by adding
+  OS-based retry timer support for newer firmware versions which don't
+  support a hardware timer any more
+- fix short/long preamble compatibility issue causing Tx error 0x20 problems:
+  we were sending packets with short preamble, although short preamble
+  is only an OPTIONAL feature in 802.11b
+- support "iwconfig wlan0 essid any" for automatic association to any station
+  (mode Auto is not yet implemented, however)
+- add support for building outside of Linux 2.6.x kernel tree
+- improve WEP support: print/set open/restricted status
+- fix transmit_deauthen() and other package generation functions
+- add experimental (currently disabled) code for proper pcmcia_cs support
+- convert firmware version string to number, add some checks in the code
+  to adjust support for various firmware versions with different behaviour
+- switch off power LED on driver unloading to save power ;-)
+- add detection strings for some cards
+- clean up scanning code
+
+2003.08.24 - 0.1h released
+- improve ring buffer handling, many locking changes
+  (problematic ping latency with some cards should be a thing of the past)
+- add net queue stop/wake to prevent flood ping from killing the connection
+- fix some disassociation problems / connection hangup
+- recognize IPv6 broadcast address properly
+- print more card details, add DrayTek Vigor 520 ID
+- small Linux 2.6.x fix
+
+2003.08.16 - 0.1g released
+- fix state management
+  this also fixes the multi-second pings
+- fix WEP operation
+- fix ifup/ifdown/ifup broken interrupt reinitialisation
+- fix gcc 2.95.4 compile issues
+- fix crash when loading 0 length firmware file
+- fix net queue problems when not associated yet
+- log association response status in human-readable form
+- replace several CPU burning loops by proper scheduling
+- more detailed EEPROM card ID check
+- add possibility to compile out logging code
+
+2003.08.13 - 0.1f released
+- completely new firmware handling code: loading of newest Windows firmware
+  versions with separate radio module support now possible
+- changed logging from KERN_DEBUG to KERN_WARNING: might log to different file
+  now
+- reorganised the ioctl handling
+- introduced proper ioctl locking
+- ioctl calls prior to opening the device get replayed when device gets 
+  up, enabling calling iwconfig prior to ifconfig
+- completely rewritten ring buffer management
+- stack overflow fixes
+- fix reversed Tx power
+- MAC address is now initialised correctly
+- first attempts to handle APs with hidden SSID
+- added ioctls for retry limit setting
+- correct packet timestamp logging
+- removed irq disabling
+- removed all the small ctl* functions
+
+2003.07.26 - 0.1e released
+- implement net device statistics
+- fix device name allocation, add module parameter use_eth_name to use
+  ethX instead
+- fix broken Capability requesting
+- manage kernel net queue properly to prevent the kernel from sending
+  packets before we're fully associated
+- experimental Linux 2.6.x support (mucho thanks to Andreas Schultz!)
+- disable WEP decryption for WLAN monitoring to be able to monitor
+  foreign traffic
+- when associating, prefer stations sitting on the same channel as our card
+- add PCI device ID for newer ACX100 version
+
+2003.07.22 - 0.1d released
+- fix IRQ handling enabling for CardBus cards (doh!)
+- fix problematic LLC length calculation
+- implement iwprivs for 802.11 CCA and ED values and regulatory domain setting
+- print firmware version and radio type on init
+- fix strange uninitialised reg. domain problem on DWL-650+
+- kill CPU burning loop causing sound skips during card init
+- some smaller fixes
+
+2003.07.19 - 0.1c released
+- fixed infrastructure association issues
+- implemented/fixed/improved WEP handling
+- fix card init: CardBus cards; SS1021 detection
+- much improved iwconfig/iwpriv support
+- implement experimental monitor mode
+- better (hopefully!) ring buffer management
+- fix stack overflow
+

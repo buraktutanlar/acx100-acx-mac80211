@@ -1,0 +1,240 @@
+*******************************************************************************
+*             Open-Source wireless driver for TI ACX100 chipset               *
+*******************************************************************************
+
+
+Let us first mention that this driver is supposed to support EVERY SINGLE CARD
+with ACX100 chip (except for USB implementations, which are extremely rare).
+If it doesn't work with your ACX100 card, then please notify us
+immediately if you followed every installation advice and are at your
+wits end as to what might still make the card fail.
+
+--- STATUS ---
+
+Currently this driver is a pretty experimental release only.
+We're not totally sure about the status of WEP support. In Ad-Hoc
+and Managed mode, using a WEP key works, but there are bugs lurking
+everywhere when you try more "advanced" settings. This needs to be
+cleaned up soon.
+
+Furthermore, associating with some access points might still be problematic
+due to very strict checks in their firmware.
+Many other things haven't been tested (properly) yet.
+HostAP support has not been implemented yet, but it's definitely possible.
+Skillful testers and BSD driver writers welcome!!
+There is a free download of the 802.11b spec at
+http://standards.ieee.org/getieee802/
+
+--- REQUIREMENTS ---
+
+Relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental),
+with CONFIG_NET_RADIO enabled ("Wireless LAN") and CONFIG_NET_WIRELESS,
+for wireless extensions (iwconfig etc.).
+
+Next, a firmware is needed. We cannot ship this with our driver, so you
+will have to get it elsewhere. There are two options: you have a windows
+driver installed or have a zip file with all the necessary windows files
+in it (for example D-Link installer), or you have a binary linux driver.
+
+The firmware used by windows driver consists of several files normally
+named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
+windows/system32, or in the install archive. Place these files in the
+firmware directory, and you are ready to roll.
+MAKE SURE THAT THE CASE SENSITIVITY OF THE FILENAME CHARACTERS IS EXACTLY
+AS WRITTEN ABOVE!! Otherwise the driver will NOT find the image files...
+
+Another option is a binary Linux driver. Several drivers are available
+on the internet, and they all seem to work. But since the firmware is embedded
+in the binary driver, it needs to be extracted. Place the driver in
+the firmware directory and make sure it is called acx100_pci.o. Then
+run 'make extract_firmware', and you are set. Make sure that no radio
+modules (RADIO*.BIN) files are placed in the firmware directory when
+using a linux firmware, otherwise the driver will attempt to load and
+initialise the radio module for your card again, with unpredictable results
+(FIXME: need to check against firmware version on this one, to avoid such
+trouble).
+The linux driver already has the radio module embedded in the firmware.
+The firmware version this Linux driver contains is 1.5.0, as printed during
+our driver initialisation.
+
+Certain DWL-650+ and 520+ cards and Planet cards use a Maxim radio instead of
+the usual RFMD, so these cards will not work with the linux driver firmware
+and so the windows firmware must be used.
+
+Note that earlier versions of the windows driver shipped with individual radio
+files as well as combined versions. Here you have a choice, you can either
+copy the individual files over (which will need to be renamed to the firmware
+names given above) or use the combined file on its own. If you copy
+the combined file it must be renamed to "WLANGEN.BIN".
+
+The files in the recent driver package are:
+WLANGEN.BIN - Generic firmware
+RADIO0d.BIN - Maxim radio module
+RADIO11.BIN - RFMD radio module
+RADIO15.BIN - UNKNOWN radio module, e.g. for DrayTek Vigor 520, found in
+some special drivers
+
+The files in earlier packages are:
+AIRPLUS.BIN  - Firmware with embedded RFMD module
+APLUSMX.BIN  - Firmware with embedded Maxim module
+APLUSGEN.BIN - Generic firmware
+APLUSRFM.BIN - RFMD radio module
+APLUSRMX.BIN - Maxim radio module
+
+Other files:
+SMCSN.BIN - combined(?) firmware for SMC2435W
+
+You may tell us about your experiences with various firmware versions on
+our Wiki page FirmwareExperiences.
+
+--- "NORMAL" INSTALLATION ---
+
+This is the usual installation on Linux 2.4.x.
+
+For installation, you have two choices:
+
+The fast way:
+  Just run "make" in the main directory (make sure to have package
+  "make" installed on your system!), and your driver will be ready
+  in a second. It is located in src/acx100_pci.o .
+
+  In case the build fails, then please make sure that the symbolic link
+  /lib/modules/`uname -r`/build exists and points to the matching
+  kernel source directory. Now copy /boot/vmlinuz.version.h to
+  /lib/modules/`uname -r`/build/include/linux/version.h
+
+The slow way:
+  Type "make config" in the main directory to cause some configuration
+  settings to be checked.
+  Then you type "make driver". This will compile a driver for
+  Linux 2.4.x (2.5.x does NOT work correctly yet, but we're working on it).
+
+No install option has yet been provided (because the driver is still a bit
+experimental anyway :)
+
+The module can be loaded e.g. like:
+insmod src/acx100_pci.o firmware_dir=firmware
+
+Debugging/logging options can be changed in a pretty powerful way by setting
+the module's "debug" parameter and/or its preinitialisation value in
+acx100.c and/or via the iwpriv set_debug setting. A good default value
+after having managed to get the driver to run would be 0xb
+(L_STD|L_INIT|L_ASSOC).
+Your harddisk will certainly thank you a lot for having saved it
+from the horror of heaps of logs once you got the driver running...
+
+To run the driver, you can use the script scripts/start_net (and adapt it).
+Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
+Again, no system installation is provided, since the various Linux
+distributions often differ in their exact network configuration methods.
+Thus maybe simply adapt and use our scripts/start_net script. Or add
+that script as a properly executed init script in /etc/[rc.d]/init.d/
+
+--- "CRAZY" INSTALLATION ---
+
+What, you really intend to use the driver on Linux 2.5.x/2.6.x??
+
+OK, if you really want to do that, then do:
+
+1. create drivers/net/wireless/acx100 in your 2.6 source tree
+2. copy all .c from acx100/src and all .h from acx100.include into
+   drivers/net/wireless/acx100 (DO NOT copy any Makefiles)
+3. apply the patch from
+http://www.cs.uni-magdeburg.de/~aschultz/acx100/linux-2.6.0-test1-acx100-A0.diff
+to adjust/create the Makefiles
+(this may fail for versions other than 2.6.0-test1, of course, so you may
+need to adapt it...)
+4. build your kernel, cross your fingers and hopefully enjoy acx100
+with linux-2.6 ;-)
+
+--- TROUBLESHOOTING / WORKAROUNDS ---
+
+First, make absolutely sure you're using the correct settings for
+association to the wireless network!
+It's of no use to try to associate to a set of access points using
+Ad-Hoc mode, or maybe the other way around (to use Managed mode to
+associate with a peer card).
+Then read the file containing the driver log (the file where
+the KERN_WARNING channel gets written to), as given in the syslog
+configuration, /etc/sysklogd.conf or similar.
+We tried to make the driver log as dumbed down as possible to make sure
+even casual users are able to follow the network association steps
+towards the final successful association.
+When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
+
+If you still have trouble getting a connection, or if the connection is
+problematic, then visit our Wiki HOWTO/troubleshooting pages for more
+info.
+
+--- BUGS / PATCHES ---
+
+Automatic rate adaptation is not implemented yet
+(setting rate to 22M will prevent communication with 11M peers).
+We'll have to implement auto rate adaptation properly soon.
+Many advanced features are not implemented yet.
+For current tasks, please read TODO.
+
+If you manage to fix or implement something, then please immediately
+send patches for inclusion to the acx100-devel@lists.sf.net mailing list.
+
+************************* !!!!!!!!!!!!!!!!!!!!!  *************************
+NOTE that by sending us patches, you implicitly accept that we also publish
+them in BSD licensed form eventually, since we want to keep this driver
+functionality usable by BSD systems and we assume that you've read this note
+about patch submission in this main README file that everybody is
+supposed to read before making use of our project (and projects in general!).
+If you don't want to accept this implicit licensing, then please make
+sure to let us know which code parts are not supposed to be used by BSD
+systems. Thanks!
+************************* !!!!!!!!!!!!!!!!!!!!!  *************************
+
+--- AND FINALLY... ---
+
+Let me mention that we REALLY dislike the way very stupid hardware vendors
+name their cards containing DIFFERENT chipsets!!
+
+One of these vendors is SpeedStream/Siemens: a card that uses the same
+name "SS1021" is available in both Orinoco chip and ACX100 chip versions.
+
+Another one is D-Link: they have "DWL-650" and "DWL-650+".
+"DWL-650+" is simply an improved version of the "DWL-650", right?
+WRONG!
+The standard versions use Prism2.5, whereas the "+" versions use ACX100
+chipset. Good luck in finding a (correct) driver!!
+And it's even WORSE: I just found out that there is some newer
+version of the "DWL-650" out that also contains the ACX100
+(it uses the same hardware as the "+" versions).
+This BRAINDEAD STUPIDITY in device naming easily entitles D-Link
+for the "Most Braindead Hardware Vendor 2003" award. And of course
+they were also talking about developing another Linux driver for some time,
+without any results (although I guess that's because they wanted to
+develop it, but were not allowed to, unfortunately, so it's understandable).
+
+IF you dare to release cards with a different incompatible chipset
+that doesn't even have proper driver support for a popular alternative OS,
+then AT LEAST change the card name in order to let people know and discern
+which hardware to avoid like the plague, for heaven's sake!
+This is such a <CENSORED>, I could <OUCH, CENSORED!>...
+
+Finally, let me mention that we also really dislike the way how
+Texas Instruments handles Linux driver support. It's a really shameful
+pity, with delays to be measured in years versus the Windows driver
+support, and with poor and buggy binary driver support.
+All in all our team would be very grateful to receive proper
+development support and cooperation from TI in order to create
+proper Linux drivers. That would be The Good Way to do it...
+(although admittedly that would still only be the second-best way to do it,
+with the best way being to have paid company developers work on a
+well-working OSS driver, of course)
+After all it's the hardware VENDOR that's earning money via OUR, the
+customers', payment, so it should be the damn responsibility of the
+hardware vendor to ensure good driver support (if by no other means
+than providing sufficient specs to OSS developers), not the other way around!
+Just imagine the weird looks of thousands and thousands of Linux users
+when they discovered the lack of support for the product that they just
+shelled out considerable amounts of money for...
+
+Have fun!
+
+The ACX100 OSS driver project team :-)
+http://acx100.sourceforge.net
