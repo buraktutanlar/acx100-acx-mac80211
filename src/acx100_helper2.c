@@ -457,7 +457,7 @@ int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *rxdesc)
 	FN_ENTER;
 
 	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
-//	printk("Rx_CONFIG_1 = %X\n",priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR);
+/*	printk("Rx_CONFIG_1 = %X\n",priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR); */
 
 	/* see IEEE 802.11-1999.pdf chapter 7 "MAC frame formats" */
 	ftype = WLAN_GET_FC_FTYPE(p80211_hdr->a3.fc);
@@ -547,7 +547,7 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	// FIXME: or is the order the other way round ??
+	/* FIXME: or is the order the other way round ?? */
 	var_1c[0] = 0;
 	var_1c[1] = 1;
 	var_1c[2] = 3;
@@ -1175,7 +1175,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
 
-			//reassocreq and assocreq are equivalent
+			/* reassocreq and assocreq are equivalent */
 			acx100_transmit_reassocresp(&alloc_p80211mgmt_req.a.
 					     reassocreq, priv);
 		}
@@ -1220,7 +1220,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		break;
 	case 6:
 	case 7:
-		// exit
+		/* exit */
 		break;
 	case WLAN_FSTYPE_BEACON /* 0x08 */ :
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
@@ -1268,13 +1268,13 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		}
 		break;
 	case WLAN_FSTYPE_ATIM /* 0x09 */ :
-		// exit
+		/* exit */
 		break;
 	case WLAN_FSTYPE_DISASSOC /* 0x0a */ :
 		memset(&alloc_p80211mgmt_req.a.disassoc, 0, 5 * 4);
 		alloc_p80211mgmt_req.a.disassoc.buf =
 		    (UINT8 *) p80211_hdr;
-		alloc_p80211mgmt_req.a.disassoc.len = //rxdesc->p80211frmlen;
+		alloc_p80211mgmt_req.a.disassoc.len =
 			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 		acx_mgmt_decode_disassoc(&alloc_p80211mgmt_req.a.disassoc);
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
@@ -1292,7 +1292,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		memset(&alloc_p80211mgmt_req.a.authen, 0, 8 * 4);
 		alloc_p80211mgmt_req.a.authen.buf =
 		    (UINT8 *) p80211_hdr;
-		alloc_p80211mgmt_req.a.authen.len = //rxdesc->p80211frmlen;
+		alloc_p80211mgmt_req.a.authen.len =
 			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
 		acx_mgmt_decode_authen(&alloc_p80211mgmt_req.a.authen);
 		if (!memcmp(priv->bssid,
@@ -2486,8 +2486,8 @@ int acx100_transmit_assoc_req(wlandevice_t *priv)
 /* acx100_transmit_disassoc()
  * STATUS: almost ok, but UNVERIFIED.
  */
-// FIXME: type of clt is a guess
-// I'm not sure if clt is needed.
+/* FIXME: type of clt is a guess */
+/* I'm not sure if clt is needed. */
 UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 {
 	struct disassoc_frame_body *payload;
@@ -2498,7 +2498,7 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-//	if (clt != NULL) {
+/*	if (clt != NULL) { */
 		if ((tx_desc = acx100_get_tx_desc(priv)) == NULL) {
 			FN_EXIT(1, 1);
 			return 1;
@@ -2510,7 +2510,7 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 		hd = (TxData *)hdesc_header->data;
 		payload = (struct disassoc_frame_body *)hdesc_payload->data;
 
-//		clt->used = 2;
+/*		clt->used = 2; */
 
 		hd->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DISASSOC);	/* 0xa0 */
 		hd->duration_id = 0;
@@ -2533,7 +2533,7 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 		acx100_dma_tx_data(priv, tx_desc);
 		FN_EXIT(1, 1);
 		return 1;
-//	}
+/*	} */
 	FN_EXIT(1, 0);
 	return 0;
 }

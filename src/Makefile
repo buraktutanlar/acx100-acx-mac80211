@@ -20,7 +20,7 @@ LN = $(shell which ln)
 #COMMON_DRIVER_FLAGS = -msoft-float -pedantic -Werror
 COMMON_DRIVER_FLAGS = -msoft-float
 
-export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)
+export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH) -DPOWER_SAVE_80211=1
 
 -include $(KERNELDIR)/build/.config
 
@@ -48,8 +48,7 @@ endif
 
 # 2.6 in-tree (kbuild)
 ifdef KERN26
-#MODULES = acx_pci.ko acx_usb.ko
-MODULES = acx_pci.ko # sorry, no USB 2.6 compile yet
+MODULES = acx_pci.ko acx_usb.ko
 CLEAN_EXTRA = *.mod *.mod.c *.mod.o
 
 ifeq ($(KERNEL_BUILD),$(KERNEL_OUTPUT))

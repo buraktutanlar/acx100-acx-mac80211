@@ -32,7 +32,7 @@ clean:
 	rm -f config.mk
 
 inject:
-	./scripts/inject_kernel_tree .
+	./scripts/inject_kernel_tree . $(KSRC)
 
 distclean: 
 #	@echo "WARNING this will remove all binaries, including the \

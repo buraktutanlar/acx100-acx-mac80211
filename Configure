@@ -84,8 +84,15 @@ wireless_stats() {
 		$ECHO "$KERNEL_BUILD/include/linux/wireless.h header file doesn't exist!" 
 		fail
 	fi
-	WIRELESS_VERSION=`grep define.*WIRELESS_EXT $KERNEL_BUILD/include/linux/wireless.h|tr '\t' ' '|cut -f3 -d' '`
+	let WIRELESS_VERSION=`grep define.*WIRELESS_EXT $KERNEL_BUILD/include/linux/wireless.h|tr '\t' ' '|cut -f3 -d' '`
 	echo Wireless header file is WIRELESS_EXT version $WIRELESS_VERSION.
+	if [ $WIRELESS_VERSION -lt 13 ]; then
+	  echo "Compile info: will choose to use code infrastructure for OLDER wireless extension interface version (< 13)"
+	  echo "This support is not perfectly tested, please report any problems!"
+	  echo "Upgrading to relatively current Linux kernel package recommended (will also fix some security issues which older ones have)"
+	else
+	  echo "Compile info: will choose to use code infrastructure for NEWER wireless extension interface version (>= 13)"
+	fi
 }
 
 # ---------- main ----------

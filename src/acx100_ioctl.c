@@ -2319,7 +2319,6 @@ end:
 }
 
 #if WIRELESS_EXT >= 13
-#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for NEWER wireless extension interface version (>= 13)"
 static const iw_handler acx100_ioctl_handler[] =
 {
 	(iw_handler) acx100_ioctl_commit,	/* SIOCSIWCOMMIT */
@@ -2472,8 +2471,6 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 /* WE 13 and higher will use acx100_ioctl_handler_def */
 #if WIRELESS_EXT < 13
-#warning "(NOT a warning!) Compile info: choosing to use code infrastructure for OLDER wireless extension interface version (< 13)"
-#warning "This support is not perfectly tested, please report any problems! Upgrading to relatively current Linux kernel package recommended (will also fix some security issues which older ones have)"
 	case SIOCGIWNAME:
 		/* get name == wireless protocol */
 		result = acx100_ioctl_get_name(dev, NULL,

@@ -273,10 +273,10 @@ __WLAN_PRAGMA_PACKDFLT__
 
 /*-- Beacon ---------------------------------------*/
 typedef struct wlan_fr_beacon {
-	UINT16 type;		//0x0
-	UINT16 len;		//0x2
-	UINT8 *buf;		//0x4
-	p80211_hdr_t *hdr;	//0x5
+	UINT16 type;		/* 0x0 */
+	UINT16 len;		/* 0x2 */
+	UINT8 *buf;		/* 0x4 */
+	p80211_hdr_t *hdr;	/* 0x5 */
 	/* used for target specific data, skb in Linux */
 	void *priv;
 	/*-- fixed fields -----------*/

@@ -154,7 +154,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 #define DRIVER_SUFFIX	"_pci"
 
 #define CARD_EEPROM_ID_SIZE 6
-#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) //a la orinoco.c
+#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) /* a la orinoco.c */
 
 typedef char *dev_info_t;
 static dev_info_t dev_info = "TI acx" DRIVER_SUFFIX;
@@ -714,6 +714,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev->priv = priv;
 
+	SET_NETDEV_DEV(dev, &pdev->dev);
+
 	/* register new dev in linked list */
 	acx100_device_chain_add(dev);
 
@@ -761,7 +763,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	hardware_info = acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_INFORMATION]);
 	priv->form_factor = (UINT8)(hardware_info & 0xff);
 	priv->radio_type = (UINT8)(hardware_info >> 8 & 0xff);
-//	priv->eeprom_version = hardware_info >> 16;
+/*	priv->eeprom_version = hardware_info >> 16; */
 	if (0 == acx100_read_eeprom_offset(priv, 0x05, &priv->eeprom_version)) {
 		result = -EIO;
 		goto fail;
@@ -915,7 +917,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	acxlog(L_STD, "hw_unavailable++\n");
 	priv->hw_unavailable++;
 
-	acx100_delete_dma_region(priv);
+	acx100_delete_dma_regions(priv);
 
 #if NEWER_KERNELS_ONLY
 	free_netdev(dev);
@@ -968,7 +970,7 @@ static int acx100_suspend(struct pci_dev *pdev, /*@unused@*/ u32 state)
 	wlandevice_t *priv = dev->priv;
 
 	FN_ENTER;
-	acxlog(L_STD, "acx100: experimental suspend handler called for %p!\n", priv);
+	acxlog(L_STD, "acx100: experimental suspend handler called for %p!\n", (void *)priv);
 	if (0 != netif_device_present(dev)) {
 		if_was_up = 1;
 		acx100_down(dev);
@@ -976,6 +978,8 @@ static int acx100_suspend(struct pci_dev *pdev, /*@unused@*/ u32 state)
 	else
 		if_was_up = 0;
 	netif_device_detach(dev);
+	acx100_delete_dma_regions(priv);
+
 	FN_EXIT(0, 0);
 	return 0;
 }
@@ -986,7 +990,7 @@ static int acx100_resume(struct pci_dev *pdev)
 	/*@unused@*/ wlandevice_t *priv = dev->priv;
 
 	FN_ENTER;
-	acxlog(L_STD, "acx100: experimental resume handler called for %p!\n", priv);
+	acxlog(L_STD, "acx100: experimental resume handler called for %p!\n", (void *)priv);
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, priv->pci_state);
 
@@ -1040,7 +1044,7 @@ static int acx100_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *dat
 			/* Disable the Rx/Tx queues */
 			acx100_issue_cmd(priv, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
 			acx100_issue_cmd(priv, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
-//			acx100_issue_cmd(priv, ACX100_CMD_FLUSH_QUEUE, NULL, 0, 5000);
+/*			acx100_issue_cmd(priv, ACX100_CMD_FLUSH_QUEUE, NULL, 0, 5000); */
 
 			/* disable power LED to save power */
 			acxlog(L_INIT, "switching off power LED to save power. :-)\n");
@@ -1070,7 +1074,7 @@ static int acx100_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *dat
 #endif
 
 			acx100_enable_irq(priv);
-//			acx100_join_bssid(priv);
+/*			acx100_join_bssid(priv); */
 			acx100_set_status(priv, ISTATUS_0_STARTED);
 			printk("Asked to resume: %X\n", rqst);
 			if (netif_running(dev) && !netif_device_present(dev))
@@ -1312,12 +1316,8 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	int txresult = 0;
 	unsigned long flags;
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-//	wlan_pb_t *pb;
-//	wlan_pb_t pb1;
 	struct txdescriptor *tx_desc;
 	unsigned int templen;
-
-//	pb = &pb1;
 
 	FN_ENTER;
 
@@ -1439,12 +1439,12 @@ fail:
  */
 static void acx100_tx_timeout(netdevice_t *dev)
 {
-//	char tmp[4];
+/*	char tmp[4]; */
 /*	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 */
 
-//	ctlCmdFlushTxQueue((wlandevice_t*)dev->priv,(memmap_t*)&tmp);
+/*	ctlCmdFlushTxQueue((wlandevice_t*)dev->priv,(memmap_t*)&tmp); */
 	FN_ENTER;
 	acxlog(L_STD, "Tx timeout!\n");
 	((wlandevice_t *)dev->priv)->stats.tx_errors++;
@@ -1647,7 +1647,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		entry_count++;
 		acxlog(L_IRQ, "IRQTYPE: %X, irq_mask: %X, entry count: %ld\n", irqtype, priv->irq_mask, entry_count);
 	}
-//	if (acx100_lock(priv,&flags)) ...
+/*	if (acx100_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
   if (jiffies != last_irq_jiffies)
@@ -1755,7 +1755,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x8000);
 		}
 	}
-//	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], irqtype);
+/*	acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], irqtype); */
 #if IRQ_ITERATE
 	irqtype = acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_CLEAR]) & ~(priv->irq_mask);
 	if (0 != irqtype) {
@@ -1764,7 +1764,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
    }
 #endif
 
-//	acx100_unlock(priv,&flags);
+/*	acx100_unlock(priv,&flags); */
 	entry_count--;
 	FN_EXIT(0, 0);
 	return IRQ_HANDLED;
@@ -1838,14 +1838,14 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 #ifdef MODULE
 
 #ifdef ACX_DEBUG
-MODULE_PARM(debug, "i");
+MODULE_PARM(debug, "i")
 MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x3fff (see L_xxx in include/acx100.h)");
 #endif
 
 /*@-fullinitblock@*/
-MODULE_PARM(use_eth_name, "i");
+MODULE_PARM(use_eth_name, "i")
 MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
-MODULE_PARM(firmware_dir, "s");
+MODULE_PARM(firmware_dir, "s")
 MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware files from");
 /*@=fullinitblock@*/
 
@@ -1972,8 +1972,8 @@ static void __exit acx100_cleanup_module(void)
 	FN_EXIT(0, 0);
 }
 
-module_init(acx100_init_module);
-module_exit(acx100_cleanup_module);
+module_init(acx100_init_module)
+module_exit(acx100_cleanup_module)
 
 #else
 static int __init acx_get_firmware_dir(char *str)

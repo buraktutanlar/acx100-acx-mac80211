@@ -92,6 +92,110 @@ extern void acx100usb_tx_data(wlandevice_t *,void *);
 
 
 /*----------------------------------------------------------------
+* acx100_free_desc_queues
+*
+*	Releases the queues that have been allocated, the
+*	others have been initialised to NULL in acx100.c so this
+*	function can be used if only part of the queues were
+*	allocated.
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+
+void acx100_free_desc_queues(TIWLAN_DC *pDc)
+{
+	FN_ENTER;
+	if (NULL != pDc->pRxHostDescQPool) {
+		pci_free_consistent(0,
+				    pDc->TxHostDescQPoolSize,
+				    pDc->pTxHostDescQPool,
+				    pDc->TxHostDescQPoolPhyAddr);
+		pDc->pTxHostDescQPool = NULL;
+		pDc->TxHostDescQPoolSize = 0;
+	}
+	if (NULL != pDc->pFrameHdrQPool) {
+		pci_free_consistent(0, pDc->FrameHdrQPoolSize,
+				    pDc->pFrameHdrQPool,
+				    pDc->FrameHdrQPoolPhyAddr);
+		pDc->pFrameHdrQPool = NULL;
+		pDc->FrameHdrQPoolSize = 0;
+	}
+	if (NULL != pDc->pTxBufferPool) {
+		pci_free_consistent(0, pDc->TxBufferPoolSize,
+				    pDc->pTxBufferPool,
+				    pDc->TxBufferPoolPhyAddr);
+		pDc->pTxBufferPool = NULL;
+		pDc->TxBufferPoolSize = 0;
+	}
+
+	pDc->pTxDescQPool = NULL;
+	pDc->tx_pool_count = 0;
+
+	if (NULL != pDc->pRxHostDescQPool) {
+		pci_free_consistent(0, pDc->RxHostDescQPoolSize,
+				    pDc->pRxHostDescQPool,
+				    pDc->RxHostDescQPoolPhyAddr);
+		pDc->pRxHostDescQPool = NULL;
+		pDc->RxHostDescQPoolSize = 0;
+	}
+	if (NULL != pDc->pRxBufferPool) {
+		pci_free_consistent(0, pDc->RxBufferPoolSize,
+				    pDc->pRxBufferPool,
+				    pDc->RxBufferPoolPhyAddr);
+		pDc->pRxBufferPool = NULL;
+		pDc->RxBufferPoolSize = 0;
+	}
+
+	pDc->pRxDescQPool = NULL;
+	pDc->rx_pool_count = 0;
+	FN_EXIT(0, 0);
+}
+
+/*----------------------------------------------------------------
+* acx100_delete_dma_regions
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+
+int acx100_delete_dma_regions(wlandevice_t *priv)
+{
+	FN_ENTER;
+#if (WLAN_HOSTIF!=WLAN_USB)
+	acx100_write_reg16(priv, priv->io[IO_ACX_ENABLE], 0);
+
+	/* used to be a for loop 1000, do scheduled delay instead */
+	acx100_schedule(HZ / 10);
+#endif
+	acx100_free_desc_queues(&priv->dc);
+
+	FN_EXIT(0, 0);
+	return 0;
+}
+
+/*----------------------------------------------------------------
 * acx100_create_dma_regions
 *
 *
@@ -418,42 +522,6 @@ error:
 }
 
 
-
-
-
-/*----------------------------------------------------------------
-* acx100_delete_dma_region
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-int acx100_delete_dma_region(wlandevice_t *priv)
-{
-	FN_ENTER;
-#if (WLAN_HOSTIF!=WLAN_USB)
-	acx100_write_reg16(priv, priv->io[IO_ACX_ENABLE], 0);
-
-	/* used to be a for loop 1000, do scheduled delay instead */
-	acx100_schedule(HZ / 10);
-#endif
-	acx100_free_desc_queues(&priv->dc);
-
-	FN_EXIT(0, 0);
-	return 0;
-}
-
 /*----------------------------------------------------------------
 * acx100_dma_tx_data
 *
@@ -484,24 +552,6 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	header = tx_desc->host_desc;
 	payload = tx_desc->host_desc + 1;
 
-	if (1 == priv->preamble_flag)
-		tx_desc->Ctl |= ACX100_CTL_PREAMBLE; /* set Preamble */
-	/* It seems as if the Preamble setting was actually REVERSED:
-	 * bit 0 should most likely actually be ACTIVATED
-	 * for Short Preamble, not the other way around as before!
-	 * This caused many Tx error 0x20 errors with APs
-	 * that don't support Long Preamble, since we were
-	 * thinking we are setting Long Preamble, when in fact
-	 * it was Short Preamble.
-	 * The flag reversal theory has been sort of confirmed
-	 * by throughput measurements:
-	 * ~ 680K/s with flag disabled
-	 * ~ 760K/s with flag enabled
-	 */
-
-	/* set autodma and reclaim and 1st mpdu */
-	tx_desc->Ctl |= ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG;
-
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
 	if (tx_desc->total_length > priv->rts_threshold)
@@ -515,17 +565,37 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
+	/* need to protect access to Ctl field */
 	spin_lock_irqsave(&tx_lock, flags);
+#endif
 
+	if (1 == priv->preamble_flag)
+		tx_desc->Ctl |= ACX100_CTL_PREAMBLE; /* set Preamble */
+	/* It seems as if the Preamble setting was actually REVERSED:
+	 * bit 0 should most likely actually be ACTIVATED
+	 * for Short Preamble, not the other way around as before!
+	 * This caused many Tx error 0x20 errors with APs
+	 * that don't support Short Preamble, since we were
+	 * thinking we are setting Long Preamble, when in fact
+	 * it was Short Preamble.
+	 * The flag reversal theory has been sort of confirmed
+	 * by throughput measurements:
+	 * ~ 680K/s with flag disabled
+	 * ~ 760K/s with flag enabled
+	 */
+
+	/* set autodma and reclaim and 1st mpdu */
+	tx_desc->Ctl |= ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG;
+
+#if (WLAN_HOSTIF!=WLAN_USB)
 	/* sets Ctl ACX100_CTL_OWN to zero telling that the descriptors are now owned by the acx100 */
 	header->Ctl &= (UINT16) ~ACX100_CTL_OWN;
 	payload->Ctl &= (UINT16) ~ACX100_CTL_OWN;
 	tx_desc->Ctl &= (UINT16) ~ACX100_CTL_OWN;
+	spin_unlock_irqrestore(&tx_lock, flags);
 
 	tx_desc->tx_time = jiffies;
 	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], 0x4);
-
-	spin_unlock_irqrestore(&tx_lock, flags);
 #else
 	tx_desc->tx_time = jiffies;
 	acx100usb_tx_data(priv, tx_desc);
@@ -585,6 +655,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.misc++;
 			break;
 		case 0x08:
+			err = "WEP key not found";
 			priv->wstats.discard.misc++;
 			break;
 		case 0x10:
@@ -592,7 +663,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.misc++;
 			break;
 		case 0x20:
-			err = "maybe distance too high? - change 'iwconfig txpower XXX' or sensitivity";
+			err = "excessive Tx retries due to distance too high, unable to Tx or Tx frame error - change 'iwconfig txpower XXX' or 'sens'itivity or 'retry'";
 			priv->wstats.discard.retries++;
 			break;
 		case 0x40:
@@ -727,14 +798,13 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 	TIWLAN_DC *pDc = &priv->dc;
 	txdesc_t *pTxDesc;
 	UINT finger, watch;
-	unsigned long flags;
 
 	FN_ENTER;
 
 	acx100_log_txbuffer(pDc);
 	acxlog(L_BUF, "cleaning up Tx bufs from %ld\n", pDc->tx_tail);
 
-	spin_lock_irqsave(&tx_lock, flags);
+	spin_lock(&tx_lock);
 
 	finger = pDc->tx_tail;
 	watch = finger;
@@ -780,7 +850,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 	/* remember last position */
 	pDc->tx_tail = finger;
 
-	spin_unlock_irqrestore(&tx_lock, flags);
+	spin_unlock(&tx_lock);
 
 	FN_EXIT(0, 0);
 	return;
@@ -996,6 +1066,7 @@ inline void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 	FN_ENTER;
 	if (debug & L_BUF)
 	{
+		/* no locks here, since it's entirely non-critical code */
 		for (i = 0; i < pDc->rx_pool_count; i++)
 		{
 			pDesc = &pDc->pRxHostDescQPool[i];
@@ -1008,6 +1079,13 @@ inline void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 	}
 	FN_EXIT(0, 0);
 }
+
+/* currently we don't need to lock anything, since we access Rx
+ * descriptors from one IRQ handler only (which is locked), here.
+ * Will need to use spin_lock() when adding user context Rx descriptor
+ * access. */
+#define RX_SPIN_LOCK(lock)
+#define RX_SPIN_UNLOCK(lock)
 
 /*------------------------------------------------------------------------------
  * acx100_process_rx_desc
@@ -1033,7 +1111,6 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	TIWLAN_DC *pDc;
 	struct rxhostdescriptor *pDesc;
 	UINT16 buf_len;
-	unsigned long flags;
 	int curr_idx;
 	unsigned int count = 0;
 	p80211_hdr_t *buf;
@@ -1053,6 +1130,7 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to handle. */
+#if OLD_LOCKING_CODE
 	spin_lock_irqsave(&rx_lock, flags);
 	do {
 		count++;
@@ -1069,6 +1147,30 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 	/* "pDesc->val0x14 < 0" is there to check whether MSB is set or not */
 	/* check whether descriptor full, advance to next one if not */
 	spin_unlock_irqrestore(&rx_lock, flags);
+#else
+	while (1) {
+		count++;
+		if (count > pDc->rx_pool_count)
+		{ /* hmm, no luck: all descriptors empty, bail out */
+			FN_EXIT(0, 0);
+			return;
+		}
+		/* we're not in user context but in IRQ context here,
+		 * so we don't need to use _irqsave() since an IRQ can
+		 * only happen once anyway. user context access DOES
+		 * need to prevent US from having an IRQ, however
+		 * (_irqsave) */
+		RX_SPIN_LOCK(&rx_lock);
+		curr_idx = pDc->rx_tail;
+		pDesc = &RxPool[pDc->rx_tail];
+		pDc->rx_tail = (pDc->rx_tail + 1) % pDc->rx_pool_count;
+		if ((pDesc->Ctl & ACX100_CTL_OWN) || (0 == (pDesc->Status & BIT31))) {
+			RX_SPIN_UNLOCK(&rx_lock);
+			break;
+		}
+		RX_SPIN_UNLOCK(&rx_lock);
+	}
+#endif
 
 	while (1)
 	{
@@ -1141,25 +1243,23 @@ inline void acx100_process_rx_desc(wlandevice_t *priv)
 		}
 #endif
 
+		RX_SPIN_LOCK(&rx_lock);
 		pDesc->Ctl &= ~ACX100_CTL_OWN; /* Host no longer owns this */
 		pDesc->Status = 0;
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		spin_lock_irqsave(&rx_lock, flags);
 		curr_idx = pDc->rx_tail;
 		pDesc = &RxPool[pDc->rx_tail];
 
 		/* if next descriptor is empty, then bail out */
 		if (!((pDesc->Ctl & ACX100_CTL_OWN) && (pDesc->Status & BIT31)))
 		{
-			spin_unlock_irqrestore(&rx_lock, flags);
+			RX_SPIN_UNLOCK(&rx_lock);
 			break;
 		}
 		else
-		{
 			pDc->rx_tail = (pDc->rx_tail + 1) % pDc->rx_pool_count;
-			spin_unlock_irqrestore(&rx_lock, flags);
-		}
+		RX_SPIN_UNLOCK(&rx_lock);
 	}
 	FN_EXIT(0, 0);
 }
@@ -1643,77 +1743,6 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 	/* and point to the first making it a ring buffer */
 	rx_desc->pNextDesc = pDc->ui32ACXRxQueueStart;
 #endif
-	FN_EXIT(0, 0);
-}
-
-/*----------------------------------------------------------------
-* acx100_free_desc_queues
-*
-*	Releases the queues that have been allocated, the
-*	others have been initialised to NULL in acx100.c so this
-*	function can be used if only part of the queues where
-*	allocated.
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-void acx100_free_desc_queues(TIWLAN_DC * pDc)
-{
-	FN_ENTER;
-	if (pDc->pRxHostDescQPool) {
-		pci_free_consistent(0,
-				    pDc->TxHostDescQPoolSize,
-				    pDc->pTxHostDescQPool,
-				    pDc->TxHostDescQPoolPhyAddr);
-		pDc->pTxHostDescQPool = NULL;
-		pDc->TxHostDescQPoolSize = 0;
-	}
-	if (pDc->pFrameHdrQPool) {
-		pci_free_consistent(0, pDc->FrameHdrQPoolSize,
-				    pDc->pFrameHdrQPool,
-				    pDc->FrameHdrQPoolPhyAddr);
-		pDc->pFrameHdrQPool = NULL;
-		pDc->FrameHdrQPoolSize = 0;
-	}
-	if (pDc->pTxBufferPool) {
-		pci_free_consistent(0, pDc->TxBufferPoolSize,
-				    pDc->pTxBufferPool,
-				    pDc->TxBufferPoolPhyAddr);
-		pDc->pTxBufferPool = NULL;
-		pDc->TxBufferPoolSize = 0;
-	}
-
-	pDc->pTxDescQPool = NULL;
-	pDc->tx_pool_count = 0;
-
-	if (pDc->pRxHostDescQPool) {
-		pci_free_consistent(0, pDc->RxHostDescQPoolSize,
-				    pDc->pRxHostDescQPool,
-				    pDc->RxHostDescQPoolPhyAddr);
-		pDc->pRxHostDescQPool = NULL;
-		pDc->RxHostDescQPoolSize = 0;
-	}
-	if (pDc->pRxBufferPool) {
-		pci_free_consistent(0, pDc->RxBufferPoolSize,
-				    pDc->pRxBufferPool,
-				    pDc->RxBufferPoolPhyAddr);
-		pDc->pRxBufferPool = NULL;
-		pDc->RxBufferPoolSize = 0;
-	}
-
-	pDc->pRxDescQPool = NULL;
-	pDc->rx_pool_count = 0;
 	FN_EXIT(0, 0);
 }
 

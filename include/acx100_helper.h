@@ -178,7 +178,7 @@ typedef struct beaconinfo {
 typedef struct beacon {
 	UINT16 size;
 	struct beaconinfo inf;
-//  UINT16 vala;
+/*  UINT16 vala; */
 } beacon_t;
 
 #define ACX_SCAN_ACTIVE		0
@@ -250,7 +250,7 @@ typedef struct acxp80211_hdr {
 	 * FIXME: huh, then sizeof(info) == 0x18 cannot be correct! Adjusting
 	 * to 0x30, which extends to end of this struct
 	 */
-//  p80211_hdr_a4_t b4;
+/*  p80211_hdr_a4_t b4; */
 } acxp80211_hdr_t;		/* size: 0x54 */
 
 /* struct used for Beacon and for Probe Response frames */
@@ -309,7 +309,7 @@ typedef struct dot11WEPDefaultKey {
     UINT8	Action;
     UINT8	KeySize;
     UINT8	defaultKeyNum;
-    UINT8	Key[29];	// check this! was Key[19].
+    UINT8	Key[29];	/* check this! was Key[19]. */
 } dot11WEPDefaultKey_t;
 
 typedef struct dot11WEPDefaultKeyID {

@@ -962,7 +962,7 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_ADDR], cpu_to_le32(offset)); /* configure host indirect memory access address ?? */
 
 	/* the next four bytes contain the image size. */
-	//image = apfw_image;
+	/* image = apfw_image; */
 	while (len < le32_to_cpu(apfw_image->size)) {
 
 		int byte = *image;
@@ -2279,7 +2279,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 						 RX_CFG2_RCV_OTHER);
 			break;
 		}
-	//	printk("setting RXconfig to %x:%x\n", priv->rx_config_1, priv->rx_config_2);
+	/*	printk("setting RXconfig to %x:%x\n", priv->rx_config_1, priv->rx_config_2); */
 		
 		*(UINT16 *) &rx_config[0x4] = cpu_to_le16(priv->rx_config_1);
 		*(UINT16 *) &rx_config[0x6] = cpu_to_le16(priv->rx_config_2);

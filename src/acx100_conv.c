@@ -145,7 +145,7 @@ static inline int acx100_stt_findproto(unsigned int proto)
 		return 1;
 
 	return 0;	
-//	return ((prottype == ETH_P_AARP) || (prottype == ETH_P_IPX));
+/*	return ((prottype == ETH_P_AARP) || (prottype == ETH_P_IPX)); */
 }
 
 /*----------------------------------------------------------------
@@ -192,7 +192,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	UINT8 *a2 = NULL;
 	UINT8 *a3 = NULL;
 	
-//	int i;
+/*	int i; */
 
 	FN_ENTER;
 
@@ -295,7 +295,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	w_hdr->a3.seq = 0;
 
 	/* the "<6>" output is from the KERN_INFO channel value */
-// Can be used to debug conversion process
+/* Can be used to debug conversion process */
 /*	acxlog(L_DATA, "Original eth frame [%d]: ", skb->len);
 	for (i = 0; i < skb->len; i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) skb->data)[i]);
@@ -358,7 +358,7 @@ fail:
 	int payload_length;
 	UINT payload_offset;
 
-//	int i;
+/*	int i; */
 
 	FN_ENTER;
 
@@ -452,7 +452,7 @@ fail:
 		   (e_llc->ssap == (UINT8)0xaa) &&
 		   (e_llc->ctl == (UINT8)0x03) && 
 		   (((memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN)==0) &&
-//		    (ethconv == WLAN_ETHCONV_8021h) && 
+/*		    (ethconv == WLAN_ETHCONV_8021h) &&  */
 		    (0 != acx100_stt_findproto(ieee2host16(e_snap->type)))) || 
 		    (0 != memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN))))
 	{
@@ -569,10 +569,10 @@ fail:
 		memcpy(skb->data + WLAN_ETHHDR_LEN, e_llc, payload_length);
 	}
 
-//	skb->protocol = eth_type_trans(skb, priv->netdev);
+/*	skb->protocol = eth_type_trans(skb, priv->netdev); */
 	
 	/* the "<6>" output is from the KERN_INFO channel value */
-// Can be used to debug conversion process
+/* Can be used to debug conversion process */
 /*	acxlog(L_DATA, "p802.11 frame [%d]: ", (rx_desc->data->status & 0xfff));
 	for (i = 0; i < (rx_desc->data->status & 0xfff); i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) w_hdr)[i]);

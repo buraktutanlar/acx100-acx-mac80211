@@ -380,7 +380,7 @@ typedef signed long long INT64;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0))
 #define kfree_s(a, b)	kfree((a))
-//#define p80211pb_kfree_s(a,b) kfree((a))
+/* #define p80211pb_kfree_s(a,b) kfree((a)) */
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18))
@@ -398,9 +398,9 @@ typedef struct wait_queue wait_queue_t;
 #endif
 
 #ifndef wait_event_interruptible_timeout
-// retval == 0; signal met; we're good.
-// retval < 0; interrupted by signal.
-// retval > 0; timed out.
+/* retval == 0; signal met; we're good. */
+/* retval < 0; interrupted by signal. */
+/* retval > 0; timed out. */
 #define __wait_event_interruptible_timeout(wq, condition, timeout, ret)   \
 do {                                                                      \
         int __ret = 0;                                                    \
@@ -538,7 +538,7 @@ typedef void irqreturn_t;
 #define MODULE_LICENSE(m)       extern int __bogus_decl
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)  // more or less
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)  /* more or less */
 #define WLAN_MOD_INC_USE_COUNT	MOD_INC_USE_COUNT
 #define WLAN_MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT
 #else

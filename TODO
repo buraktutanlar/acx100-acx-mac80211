@@ -1,17 +1,25 @@
 This is the current list of ToDos, in order of importance.
 legend: - means ToDo, + means partially done, * means done, ? means unknown status or problem
 
+KWAVECONTROL (not strictly acx100, but it's related):
+- fix spelling of messages
+- radio levels ok?
+- CPU load??
+- fix i18n name references to use correct names
+
 JANITORIAL/EASY:
+* introduce define for 16bit I/O access (make sure we use 32bit I/O access as
+  much as possible, but have 16bit alternative, e.g. for CompactFlash
+  implementations)
+* add default firmware directory (/usr/share/acx/) in case of unspecified firmware_dir
+- add .lsm file
+- AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!
 - verify correct waproamd operation, partially verified, 040413 [AM]
   (although that's also an issue of fixing waproamd to behave properly)
-- make sure to deactivate traffic packet logging by default
-  in newer driver versions
-- introduce define for 16bit I/O access (make sure we use 32bit I/O access as
-  much as possible, but have 16bit alternative, e.g. for CompactFlash
-  implementations)
+- use test_bit, clear_bit, set_bit in acx100_update_card_settings etc.?
 - Check source code using code checker:
-  splint (DONE!), flawfinder, pscan, smatch/valgrind, freshmeat
+  splint (DONE!), flawfinder, pscan, icc, smatch/valgrind, pc-lint, freshmeat
   cqual/TAU/calltree/Perfometer/Nitro Technologies Memory Checker/MemCheck Deluxe
 - put ACX100/ACX111/TNETW1100/TNETW1130/TNETW1230 strings on project page
   /homepage once the driver has full support...
@@ -30,6 +38,9 @@ JANITORIAL/EASY:
 - ACX100_CTL_PREAMBLE and DESC_CTL_SHORT_PREAMBLE etc. unify
 
 BUGS:
+* modprobe: page allocation failure. order:4, mo de:0x21
+  in ALSA driver after multiple suspend/resume: our driver doesn't free
+  DMA pages upon suspend, yet allocates new DMA pages on resume in init_mac!!
 + switching from XFree86 to console may lead to "dead card" (no IRQs possible).
   Reinit only after eject/reinsert!!!
   IRQ problem!! Does PCI card have that as well? Or only a CardBus issue?
@@ -47,8 +58,9 @@ BUGS:
   https://sourceforge.net/forum/forum.php?thread_id=1049230&forum_id=257272
   IRQ loss has been reported to also happen when switching from text mode
   to frame buffer on Linux bootup
-- TxError0x20 (hint: happens in any case where the firmware cannot send any
-  packets currently, e.g. during station scan etc.)
+- ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!! (not too problematic)
+- TxError0x20 (hint: also happens in any case where the firmware cannot send
+  any packets currently, e.g. during station scan etc.)
 - Problems with different (older) firmware versions, some/many don't work:
   Why You don't mention that only new firmware (Rev. 1.9.8.b) works with
   fix13 driver. My original 1.9.3.e dont start, timer problem (this was
@@ -65,32 +77,36 @@ orum_id=257272)
 - see Bug reports
 
 STANDARD TODO ITEMS:
+* calibrate link quality scaling to display more useful values for kwavecontrol/iwconfig
+* use -pedantic -Werror!
++ support kwavecontrol (new FIXED release after kwavecontrol 0.3 finally out?)
 - finish ACX111 (TNETW1x30) support
 + ACX100 USB 2.6.x
++ implement standard power management, make sure ACPI states are fully working
+  (suspend/resume handlers; resuming from suspend-to-ram has been reported
+  to actually hang the machine!). Working quite nicely, even with
+  network access after resume with all previous settings, 040421 [AM]
+- implement 802.11b power save mode
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)
   Note: locking for packet transfer is finished
 + scan delays higher, configurable? wlandevice_t variables added, 040413 [AM]
+- HostAP (Master) mode support needs to be implemented/finished properly
 + Tx auto rate, crude first implementation done, 040413 [AM]
 - auto power adjustment "iwconfig txpower 20 auto"
 - implement packet fragmentation
 + Working implementation of "ifconfig wlan0 hw ether 112233445566". Partially
   working, exact cause for Tx errors with different MAC unknown, 040413 [AM]
-- are all packets really using correct network addresses?
 - implement #if WE_DONT_WANT_TO_REJECT_MULTICAST part correctly
+- implement iwpriv to switch between percentage and estimated dBm (problematic!) display?
+- abuse power LED to be an error indicator LED (via timer) in case we switched it off
+- add further iwconfig/iwpriv support: channel traffic percentage indicator,
+  iwspy, ...
 - introduce decent device statistics like those in net_device_stats. Now only
   tx/rx packets and errors are counted. further work done, 040413 [AM]
   Rx error counters need implementation (find out flags in Rx descriptor)
-- proper power management: implement 802.11b power save mode,
-  improve standard power management, make sure ACPI states are fully working
-  (suspend/resume handlers; resuming from suspend-to-ram has been reported
-  to actually hang the machine!)
-  After resume on 2.6.x: card I/O == 0xffff (I/O mapping problem?)
+- are all packets really using correct network addresses?
 + iwevent, not fully verified, 040413 [AM]
-- add further iwconfig/iwpriv support: channel traffic percentage indicator,
-  iwspy, ...
-- support kwavecontrol (kwavecontrol 0.6 wireless extensions bug fixed?)
-- abuse power LED to be an error indicator LED (via timer) in case we switched it off
 - netif_carrier_off(dev->netdev); /* disable running netdev watchdog */
 - Proper session management:
   - disassociation/reassociation on suspend/resume
@@ -101,9 +117,9 @@ STANDARD TODO ITEMS:
     it as a linked list
 + try to make sure the driver doesn't crash if we remove the card when active
   (hw_unavailable). more workarounds done on 040413, seems to work rather well now [AM]
+- implement skb queues like in airo.c driver (hmm, does it make any sense at all? we already have an on-card ring buffer...)
 - txpower phy (measure how many dBm and which level values the two
   firmware values are related to)
-- implement skb queues like in airo.c driver
 - upgrade driver to support 4X mode (also called "54Mbps" operation, which is
   not quite right - and of course it doesn't mean that we suddenly
   become compatible with 54Mbps 802.11g cards!). However, this would
@@ -131,6 +147,8 @@ STANDARD TODO ITEMS:
 - make sure all structures are packed correctly!!! (it really does no good if
   we transfer wrongly aligned structs to the ACX100...)
   Note: we seem to be doing well.
+- implement enable_wake function? Card cannot wake up notebook
+  which is switched off anyway, right? (yep, seems it can't...)
 - add a very verbose description to every driver function. I don't want to see
   an overly structured and rigid (and partially unused but space consuming!)
   description here, but instead actually useful comments that detail
