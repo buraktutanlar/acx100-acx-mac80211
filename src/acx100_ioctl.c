@@ -1047,7 +1047,12 @@ acx_ioctl_set_rate(struct net_device *dev,
 		if (RATE111_1 == txrate_cfg) { /* auto rate with 1Mbps max. useless */
 			priv->defpeer.txrate.do_auto = 0;
 		} else {
-			/* needed? curr = RATE111_1 | RATE111_2; */ /* 2Mbps, play it safe at the beginning */
+			/* start with slowest allowed rate, to adapt properly to distant/slow peers */
+			INT i = priv->defpeer.txrate.cur;
+
+			while (priv->defpeer.txrate.cur & (i >> 1)) i>>=1;
+			priv->defpeer.txrate.cur &= i;
+				
 			priv->defpeer.txrate.fallback_count = 0;
 			priv->defpeer.txrate.stepup_count = 0;
 		}
@@ -2898,10 +2903,14 @@ fill_txrate(struct txrate_ctrl *txrate, u32 rate)
  
 	while( !(rate & 0x8000) ) rate<<=1;
 	txrate->do_auto = (rate!=0x8000); /* more than one bit is set? */
-	/* needed?
 	if(txrate->do_auto)
-		txrate->cur = RATE111_1 + RATE111_2; //2Mbps, play it safe at the beginning
-	*/
+	{
+		/* start with slowest allowed rate, to adapt properly to distant/slow peers */
+		INT i = txrate->cur;
+
+		while (txrate->cur & (i >> 1)) i>>=1;
+		txrate->cur &= i;
+	}
 }
 
 static int

@@ -90,6 +90,29 @@
 #include <idma.h>
 #include <ihw.h>
 
+static int acx_check_file(const char *file);
+#if (WLAN_HOSTIF!=WLAN_USB)
+static int acx_verify_init(wlandevice_t *priv);
+#endif
+static void acx_init_mboxes(wlandevice_t *priv);
+
+static int acx_init_max_null_data_template(wlandevice_t *priv);
+static int acx_init_max_beacon_template(wlandevice_t *priv);
+static int acx_init_max_tim_template(wlandevice_t *priv);
+static int acx_init_max_probe_response_template(wlandevice_t *priv);
+static int acx_init_max_probe_request_template(wlandevice_t *priv);
+static int acx_set_tim_template(wlandevice_t *priv);
+static int acx_set_generic_beacon_probe_response_frame(wlandevice_t *priv, struct acxp80211_beacon_prb_resp *bcn);
+static int acx_set_beacon_template(wlandevice_t *priv);
+static int acx100_init_packet_templates(wlandevice_t *priv, acx_ie_memmap_t *pt); 
+static int acx111_init_packet_templates(wlandevice_t *priv);
+static int acx_set_defaults(wlandevice_t *priv);
+static int acx_set_probe_response_template(wlandevice_t *priv);
+#if UNUSED
+static void acx_set_probe_request_template(wlandevice_t *priv);
+static void acx111_set_probe_request_template(wlandevice_t *priv);
+#endif /* UNUSED */
+
 #if BOGUS
 UINT8 DTIM_count;
 #endif
@@ -244,7 +267,7 @@ acx_update_dot11_ratevector(wlandevice_t *priv)
  * Comment:
  *
  *----------------------------------------------------------------------------*/
-int acx_proc_output(char *buf, wlandevice_t *priv)
+static int acx_proc_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	UINT16 i;
@@ -284,7 +307,7 @@ int acx_proc_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx_proc_diag_output(char *buf, wlandevice_t *priv)
+static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	unsigned int i;
@@ -335,7 +358,7 @@ int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		"status %u (%s), "
 		"macmode_wanted %u, macmode_joined %u, channel %u, "
 		"reg_dom_id 0x%02X, reg_dom_chanmask 0x%04x, "
-		"txrate_curr %04x, txrate_auto %d, txrate_cfg %04x, "
+		"txrate_auto %d, txrate_curr %04x, txrate_cfg %04x, "
 		"txrate_fallbacks %d/%d, "
 		"txrate_stepups %d/%d, "
 		"bss_table_count %d\n",
@@ -343,7 +366,7 @@ int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		priv->status, acx_get_status_name(priv->status),
 		priv->macmode_wanted, priv->macmode_joined, priv->channel,
 		priv->reg_dom_id, priv->reg_dom_chanmask,
-		priv->defpeer.txrate.cur, priv->defpeer.txrate.do_auto, priv->defpeer.txrate.cfg,
+		priv->defpeer.txrate.do_auto, priv->defpeer.txrate.cur, priv->defpeer.txrate.cfg,
 		priv->defpeer.txrate.fallback_count, priv->defpeer.txrate.fallback_threshold,
 		priv->defpeer.txrate.stepup_count, priv->defpeer.txrate.stepup_threshold,
 		priv->bss_table_count);
@@ -366,9 +389,6 @@ int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	p += sprintf(p, "ap_filter %02x:%02x:%02x:%02x:%02x:%02x\n",
 		a[0], a[1], a[2], a[3], a[4], a[5]);
 
-        if ((fw_stats = kmalloc(sizeof(fw_stats_t), GFP_KERNEL)) == NULL) {
-                return 0;
-        }
 	p += sprintf(p,
 		"\n"
 		"*** PHY status ***\n"
@@ -378,6 +398,30 @@ int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		priv->tx_disabled, priv->tx_level_dbm, priv->tx_level_val, priv->tx_level_auto,
 		priv->sensitivity, priv->antenna, priv->ed_threshold, priv->cca, priv->preamble_mode,
 		priv->rts_threshold, priv->short_retry, priv->long_retry, priv->msdu_lifetime, priv->listen_interval, priv->beacon_interval);
+
+	p += sprintf(p,
+		"\n"
+		"*** TIWLAN_DC ***\n"
+		"ui32ACXTxQueueStart %u, ui32ACXRxQueueStart %u\n"
+		"pTxBufferPool %p, TxBufferPoolSize %u, TxBufferPoolPhyAddr %08llx\n"
+		"TxDescrSize %u, pTxDescQPool %p, tx_lock %d, tx_pool_count %u\n"
+		"pFrameHdrQPool %p, FrameHdrQPoolSize %u, FrameHdrQPoolPhyAddr %08llx\n"
+		"pTxHostDescQPool %p, TxHostDescQPoolSize %u, TxHostDescQPoolPhyAddr %08llx\n"
+		"pRxDescQPool %p, rx_lock %d, rx_pool_count %d\n"
+		"pRxHostDescQPool %p, RxHostDescQPoolSize %u, RxHostDescQPoolPhyAddr %08llx\n"
+		"pRxBufferPool %p, RxBufferPoolSize %u, RxBufferPoolPhyAddr %08llx\n",
+		pDc->ui32ACXTxQueueStart, pDc->ui32ACXRxQueueStart,
+		pDc->pTxBufferPool, pDc->TxBufferPoolSize, (UINT64)pDc->TxBufferPoolPhyAddr,
+		pDc->TxDescrSize, pDc->pTxDescQPool, spin_is_locked(&pDc->tx_lock), pDc->tx_pool_count,
+		pDc->pFrameHdrQPool, pDc->FrameHdrQPoolSize, (UINT64)pDc->FrameHdrQPoolPhyAddr,
+		pDc->pTxHostDescQPool, pDc->TxHostDescQPoolSize, (UINT64)pDc->TxHostDescQPoolPhyAddr,
+		pDc->pRxDescQPool, spin_is_locked(&pDc->rx_lock), pDc->rx_pool_count,
+		pDc->pRxHostDescQPool, pDc->RxHostDescQPoolSize, (UINT64)pDc->RxHostDescQPoolPhyAddr,
+		pDc->pRxBufferPool, pDc->RxBufferPoolSize, (UINT64)pDc->RxBufferPoolPhyAddr);
+
+        if ((fw_stats = kmalloc(sizeof(fw_stats_t), GFP_KERNEL)) == NULL) {
+                return 0;
+        }
 	acx_interrogate(priv, fw_stats, ACX1xx_IE_FIRMWARE_STATISTICS);
 	p += sprintf(p,
 		"\n"
@@ -426,7 +470,7 @@ int acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 	return p - buf;
 }
 
-int acx_proc_phy_output(char *buf, wlandevice_t *priv)
+static int acx_proc_phy_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	UINT16 i;
@@ -471,7 +515,7 @@ int acx_proc_phy_output(char *buf, wlandevice_t *priv)
  * Comment:
  *
  *----------------------------------------------------------------------------*/
-int acx_read_proc(char *buf, char **start, off_t offset, int count,
+static int acx_read_proc(char *buf, char **start, off_t offset, int count,
 		     int *eof, void *data)
 {
 	wlandevice_t *priv = (wlandevice_t *)data;
@@ -513,7 +557,7 @@ int acx_read_proc_diag(char *buf, char **start, off_t offset, int count,
 	return length;
 }
 
-int acx_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
+static int acx_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
 		     int *eof, void *data)
 {
 	wlandevice_t *priv = (wlandevice_t *)data;
@@ -534,7 +578,7 @@ int acx_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
 	return length;
 }
 
-int acx_read_proc_phy(char *buf, char **start, off_t offset, int count,
+static int acx_read_proc_phy(char *buf, char **start, off_t offset, int count,
 		     int *eof, void *data)
 {
 	wlandevice_t *priv = (wlandevice_t *)data;
@@ -790,7 +834,7 @@ fail:
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx_check_file(const char *file)
+static int acx_check_file(const char *file)
 {
 	struct file *inf;
 	inf = filp_open(file, O_RDONLY, 0);
@@ -1347,7 +1391,7 @@ fail:
  * ACXWaitForInitComplete()
  * STATUS: should be ok.
  */
-int acx_verify_init(wlandevice_t *priv)
+static int acx_verify_init(wlandevice_t *priv)
 {
 	int result = NOT_OK;
 	int timer;
@@ -1392,7 +1436,7 @@ int acx_verify_init(wlandevice_t *priv)
 /* acxInitializeMailboxes
   STATUS: should be ok.
 */
-void acx_init_mboxes(wlandevice_t *priv)
+static void acx_init_mboxes(wlandevice_t *priv)
 {
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1573,7 +1617,7 @@ fail:
 	return res;
 }
 
-int acx_init_max_null_data_template(wlandevice_t *priv)
+static int acx_init_max_null_data_template(wlandevice_t *priv)
 {
 	struct acxp80211_nullframe b;
 	int result;
@@ -1608,7 +1652,7 @@ int acx_init_max_null_data_template(wlandevice_t *priv)
  * InitMaxACXBeaconTemplate()
  * STATUS: should be ok.
  */
-int acx_init_max_beacon_template(wlandevice_t *priv)
+static int acx_init_max_beacon_template(wlandevice_t *priv)
 {
 	struct acxp80211_beacon_prb_resp_template b;
 	int result;
@@ -1626,7 +1670,7 @@ int acx_init_max_beacon_template(wlandevice_t *priv)
  * InitMaxACXTIMTemplate()
  * STATUS: should be ok.
  */
-int acx_init_max_tim_template(wlandevice_t *priv)
+static int acx_init_max_tim_template(wlandevice_t *priv)
 {
 	acx_tim_t t;
 
@@ -1657,7 +1701,7 @@ int acx_init_max_tim_template(wlandevice_t *priv)
  * InitMaxACXProbeResponseTemplate()
  * STATUS: should be ok.
  */
-int acx_init_max_probe_response_template(wlandevice_t *priv)
+static int acx_init_max_probe_response_template(wlandevice_t *priv)
 {
 	struct acxp80211_beacon_prb_resp_template pr;
 	
@@ -1689,7 +1733,7 @@ int acx_init_max_probe_response_template(wlandevice_t *priv)
  * InitMaxACXProbeRequestTemplate()
  * STATUS: should be ok.
  */
-int acx_init_max_probe_request_template(wlandevice_t *priv)
+static int acx_init_max_probe_request_template(wlandevice_t *priv)
 {
 	acx_probereq_t pr;
 	int res;
@@ -1724,7 +1768,7 @@ int acx_init_max_probe_request_template(wlandevice_t *priv)
  * SetACXTIMTemplate()
  * STATUS: should be ok.
  */
-int acx_set_tim_template(wlandevice_t *priv)
+static int acx_set_tim_template(wlandevice_t *priv)
 {
 	acx_tim_t t;
 	int result;
@@ -1769,7 +1813,7 @@ int acx_set_tim_template(wlandevice_t *priv)
  * *any* of the parameters contained in it change!!!
  * fishy status fixed
 */
-int acx_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
+static int acx_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 						   struct acxp80211_beacon_prb_resp *bcn)
 {
 	int frame_len;
@@ -1865,7 +1909,7 @@ int acx_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
  * SetACXBeaconTemplate()
  * STATUS: FINISHED.
  */
-int acx_set_beacon_template(wlandevice_t *priv)
+static int acx_set_beacon_template(wlandevice_t *priv)
 {
 	struct acxp80211_beacon_prb_resp_template bcn;
 	int len, result;
@@ -1913,7 +1957,7 @@ int acx_set_beacon_template(wlandevice_t *priv)
  * acxInitPacketTemplates()
  * STATUS: almost ok, except for struct definitions.
  */
-int acx100_init_packet_templates(wlandevice_t *priv, acx_ie_memmap_t *mm)
+static int acx100_init_packet_templates(wlandevice_t *priv, acx_ie_memmap_t *mm)
 {
 	int len = 0; /* not important, only for logging */
 	int result = NOT_OK;
@@ -1982,7 +2026,7 @@ success:
 	return result;
 }
 
-int acx111_init_packet_templates(wlandevice_t *priv)
+static int acx111_init_packet_templates(wlandevice_t *priv)
 {
 	int result = NOT_OK;
 
@@ -1990,6 +2034,9 @@ int acx111_init_packet_templates(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG | L_INIT, "%s: Init max packet templates\n", __func__);
 
+	/* FIXME: we only init it but don't set it yet!
+	 * Could this cause problems??
+	 * (such as non-working beacon Tx!?!?) */
 	if (OK != acx_init_max_probe_request_template(priv))
 		goto failed;
 
@@ -2822,7 +2869,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 /* acxSetDefaults()
  * STATUS: good
  */
-int acx_set_defaults(wlandevice_t *priv)
+static int acx_set_defaults(wlandevice_t *priv)
 {
 	int result = 0;
 
@@ -2908,14 +2955,14 @@ int acx_set_defaults(wlandevice_t *priv)
 
 	priv->defpeer.txrate.do_auto = 1;
 	priv->defpeer.txrate.pbcc511 = 0;
-	priv->defpeer.txrate.fallback_threshold = 3;
-	priv->defpeer.txrate.stepup_threshold = 12;
+	priv->defpeer.txrate.fallback_threshold = 12;
+	priv->defpeer.txrate.stepup_threshold = 3;
 	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
-		priv->defpeer.txrate.cfg = RATE111_ALL & RATE111_ACX100_COMPAT;
-		priv->defpeer.txrate.cur = RATE111_ALL & RATE111_ACX100_COMPAT;
+		priv->defpeer.txrate.cfg = RATE111_ALL & RATE111_ACX100_COMPAT; /* allow all available rates */
+		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
 	} else {
-		priv->defpeer.txrate.cfg = RATE111_ALL;
-		priv->defpeer.txrate.cur = RATE111_ALL;
+		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
+		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
 	}
 	priv->defpeer.txbase = priv->defpeer.txrate;
 	priv->defpeer.shortpre = 0;
@@ -3000,7 +3047,7 @@ int acx_set_defaults(wlandevice_t *priv)
 /* SetACXProbeResponseTemplate()
  * STATUS: ok.
  */
-int acx_set_probe_response_template(wlandevice_t *priv)
+static int acx_set_probe_response_template(wlandevice_t *priv)
 {
 	UINT8 *pr2;
 	struct acxp80211_beacon_prb_resp_template pr;
@@ -3036,6 +3083,7 @@ int acx_set_probe_response_template(wlandevice_t *priv)
 	return result;
 }
 
+#if UNUSED
 /*----------------------------------------------------------------
 * acx_set_probe_request_template
 *
@@ -3057,7 +3105,7 @@ int acx_set_probe_response_template(wlandevice_t *priv)
 /*
  * STATUS: ok.
  */
-void acx_set_probe_request_template(wlandevice_t *priv)
+static void acx_set_probe_request_template(wlandevice_t *priv)
 {
 	struct acxp80211_packet pt;
 	struct acxp80211_hdr *txf;
@@ -3114,7 +3162,7 @@ void acx_set_probe_request_template(wlandevice_t *priv)
 	FN_EXIT(0, OK);
 }
 
-void acx111_set_probe_request_template(wlandevice_t *priv)
+static void acx111_set_probe_request_template(wlandevice_t *priv)
 {
 	int frame_len;
 	const UINT8 bcast_addr[0x6] = {0xff,0xff,0xff,0xff,0xff,0xff};
@@ -3145,6 +3193,7 @@ void acx111_set_probe_request_template(wlandevice_t *priv)
 	acx_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &template, frame_len, 5000);
 	FN_EXIT(0, OK);
 }
+#endif /* UNUSED */
 
 
 extern void error_joinbss_must_be_0x30_bytes_in_length(void);
@@ -3868,7 +3917,6 @@ void acx111_read_configoption(wlandevice_t *priv)
 	    acxlog(L_DEBUG, "%02X =======>  0x%02x \n", i, (UINT8 *)co.configoption_fixed.NVSv[i-2]);
 	}
 */	
-	
 	
 	FN_EXIT(1, OK);
 

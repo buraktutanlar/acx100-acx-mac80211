@@ -253,6 +253,8 @@ static const device_id_t device_ids[] =
 	/*@=null@*/
 };
 
+static void acx_disable_irq(wlandevice_t *priv);
+static void acx_enable_irq(wlandevice_t *priv);
 static int acx_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
 static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *dev, wlandevice_t *priv,
@@ -293,8 +295,8 @@ static void acx_tx_timeout(netdevice_t *dev);
 static struct net_device_stats *acx_get_stats(netdevice_t *dev);
 static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev);
 
-irqreturn_t acx_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-void acx_after_interrupt_task(void *data);
+static irqreturn_t acx_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static void acx_after_interrupt_task(void *data);
 static void acx_set_rx_mode(netdevice_t *dev);
 void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
@@ -447,7 +449,7 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 * to device form_factor and radio type. It will needed to be 
 *----------------------------------------------------------------*/
 
-void acx_display_hardware_details(wlandevice_t *priv)
+static void acx_display_hardware_details(wlandevice_t *priv)
 {
 	char *radio_str, *form_str;
 
@@ -502,7 +504,7 @@ void acx_display_hardware_details(wlandevice_t *priv)
 	FN_EXIT(0, OK);
 }
 
-void acx_show_card_eeprom_id(wlandevice_t *priv)
+static void acx_show_card_eeprom_id(wlandevice_t *priv)
 {
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
 	UINT16 i;
@@ -547,7 +549,7 @@ static inline void acx_device_chain_add(struct net_device *dev)
 	priv->netdev = dev;
 }
 
-void acx_device_chain_remove(struct net_device *dev)
+static void acx_device_chain_remove(struct net_device *dev)
 {
 	struct net_device *querydev;
 	struct net_device *olderdev;
@@ -998,16 +1000,6 @@ static void acx_cleanup_card_and_resources(
 #endif
 	}
 
-	if (dev != NULL)
-	{
-		/* remove dev registration */
-		pci_set_drvdata(pdev, NULL);
-
-		/* don't use free_netdev() here,
-		 * supported by newer kernels only */
-		kfree(dev);
-	}
-
 	if (priv != NULL)
 	{
 		acx_delete_dma_regions(priv);
@@ -1029,6 +1021,20 @@ static void acx_cleanup_card_and_resources(
 			   pci_resource_len(pdev, mem_region2));
 
 	pci_disable_device(pdev);
+
+	if (dev != NULL)
+	{
+		/* remove dev registration */
+		pci_set_drvdata(pdev, NULL);
+
+		/* Free netdev (quite late,
+		 * since otherwise we might get caught off-guard
+		 * by a netdev timeout handler execution
+		 * expecting to see a working dev...)
+		 * But don't use free_netdev() here,
+		 * it's supported by newer kernels only */
+		kfree(dev);
+	}
 
 	/* put device into ACPI D3 mode (shutdown) */
 	pci_set_power_state(pdev, 3);
@@ -1059,7 +1065,7 @@ static void acx_cleanup_card_and_resources(
 * STATUS: should be pretty much ok. UNVERIFIED.
 *
 ----------------------------------------------------------------*/
-void __devexit acx_remove_pci(struct pci_dev *pdev)
+static void __devexit acx_remove_pci(struct pci_dev *pdev)
 {
 	struct net_device *dev;
 	wlandevice_t *priv;
@@ -1586,20 +1592,31 @@ fail:
  */
 static void acx_tx_timeout(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv;
+
+	/* FIXME: for debugging [041003], remove after some time */
+	printk("dev is %p\n", dev);
 
 	FN_ENTER;
 	
-	acxlog(L_DEBUG, "FIXME: for some very strange reason timeout may get called even after partial driver shutdown, OOPSing due to priv already freed!? I really don't know right now why this would happen...\n");
+	priv = (wlandevice_t *)dev->priv;
+
+#if /* DOH_SEEMS_TO_CONFUSE_FIRMWARE_UNFORTUNATELY */ 1
 	/* clean all tx descs, they may have been completely full */
 	acx_clean_tx_desc_emergency(priv);
 	
-	priv->stats.tx_errors++;
-	
 	if ((netif_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
 		netif_wake_queue(dev);
+#endif
+
+	/* stall may have happened due to radio drift,
+	 * so recalib radio */
+	SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+	acx_schedule_after_interrupt_task(priv);
 			
 	printk("acx100: Tx timeout!\n");
+
+	priv->stats.tx_errors++;
 
 	FN_EXIT(0, OK);
 }
@@ -1703,7 +1720,7 @@ static void acx_set_rx_mode(/*@unused@*/ netdevice_t *netdev)
 *
 *----------------------------------------------------------------*/
 
-void acx_enable_irq(wlandevice_t *priv)
+static void acx_enable_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1732,7 +1749,7 @@ void acx_enable_irq(wlandevice_t *priv)
 *
 *----------------------------------------------------------------*/
 
-void acx_disable_irq(wlandevice_t *priv)
+static void acx_disable_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1789,7 +1806,7 @@ static void acx_handle_info_irq(wlandevice_t *priv)
 *
 *----------------------------------------------------------------*/
 
-irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ struct pt_regs *regs)
+static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ struct pt_regs *regs)
 {
 	wlandevice_t *priv;
 	UINT16 irqtype;
@@ -2015,7 +2032,8 @@ void acx_schedule_after_interrupt_task(wlandevice_t *priv)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_after_interrupt_task(void *data) {
+static void acx_after_interrupt_task(void *data)
+{
 	netdevice_t *dev = (netdevice_t *) data;
 	wlandevice_t *priv;
 
@@ -2056,19 +2074,29 @@ void acx_after_interrupt_task(void *data) {
 			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_ASSOCIATE);
 		}
 		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+			static INT issue_cmd_failed = 0;
 			/* this helps with ACX100 at least;
 			 * hopefully ACX111 also does a
 			 * recalibration here */
 
 			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
-			if ((OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
+			if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
 			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000))
-			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
+			&& */ (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
 			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)))
+			{
 				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+				issue_cmd_failed = 0;
+			}
 			else
-				/* failed: resubmit */
-				acx_schedule_after_interrupt_task(priv);
+			{
+				/* failed: resubmit, but only limited
+				 * amount of times to prevent endless
+				 * loop */
+				if (issue_cmd_failed++ < 3)
+					acx_schedule_after_interrupt_task(priv);
+			}
+			acxlog(L_STD, "recalibrated radio\n");
 		}
 	}
 

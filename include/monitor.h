@@ -16,20 +16,20 @@
 #define DIDmsg_lnxind_wlansniffrm_istx		0x9041
 #define DIDmsg_lnxind_wlansniffrm_frmlen	0xA041
 
-typedef struct __WLAN_ATTRIB_PACK__ p80211msg_lnxind_wlansniffrm {
-	uint32_t msgcode;
-	uint32_t msglen;
-	uint8_t devname[WLAN_DEVNAMELEN_MAX];
-	p80211item_uint32_t hosttime;
-	p80211item_uint32_t mactime;
-	p80211item_uint32_t channel;
-	p80211item_uint32_t rssi;
-	p80211item_uint32_t sq;
-	p80211item_uint32_t signal;
-	p80211item_uint32_t noise;
-	p80211item_uint32_t rate;
-	p80211item_uint32_t istx;
-	p80211item_uint32_t frmlen;
+typedef struct p80211msg_lnxind_wlansniffrm {
+	uint32_t msgcode ACX_PACKED;
+	uint32_t msglen ACX_PACKED;
+	uint8_t devname[WLAN_DEVNAMELEN_MAX] ACX_PACKED;
+	p80211item_uint32_t hosttime ACX_PACKED;
+	p80211item_uint32_t mactime ACX_PACKED;
+	p80211item_uint32_t channel ACX_PACKED;
+	p80211item_uint32_t rssi ACX_PACKED;
+	p80211item_uint32_t sq ACX_PACKED;
+	p80211item_uint32_t signal ACX_PACKED;
+	p80211item_uint32_t noise ACX_PACKED;
+	p80211item_uint32_t rate ACX_PACKED;
+	p80211item_uint32_t istx ACX_PACKED;
+	p80211item_uint32_t frmlen ACX_PACKED;
 } p80211msg_lnxind_wlansniffrm_t;
 
 #define P80211ENUM_truth_false				0

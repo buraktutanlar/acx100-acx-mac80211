@@ -64,159 +64,131 @@ typedef struct rxbuffer rxbuffer_t;
 
 #define MAX_NUMBER_OF_SITE 31
 
-typedef struct __WLAN_ATTRIB_PACK__ ssid {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT8 inf[32];
+typedef struct ssid {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT8 inf[32] ACX_PACKED;
 } ssid_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ rates {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT8 sup_rates[8];
+typedef struct rates {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT8 sup_rates[8] ACX_PACKED;
 } rates_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ fhps {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT16 dwell_time;
-	UINT8 hop_set;
-	UINT8 hop_pattern;
-	UINT8 hop_index;
+typedef struct fhps {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT16 dwell_time ACX_PACKED;
+	UINT8 hop_set ACX_PACKED;
+	UINT8 hop_pattern ACX_PACKED;
+	UINT8 hop_index ACX_PACKED;
 } fhps_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ dsps {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT8 curr_channel;
+typedef struct dsps {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT8 curr_channel ACX_PACKED;
 } dsps_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ cfps {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT8 cfp_count;
-	UINT8 cfp_period;
-	UINT16 cfp_max_dur;
-	UINT16 cfp_dur_rem;
+typedef struct cfps {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT8 cfp_count ACX_PACKED;
+	UINT8 cfp_period ACX_PACKED;
+	UINT16 cfp_max_dur ACX_PACKED;
+	UINT16 cfp_dur_rem ACX_PACKED;
 } cfps_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ challenge_text {
-	UINT8 element_ID;
-	UINT8 length;
-	UINT8 text[253];
+typedef struct challenge_text {
+	UINT8 element_ID ACX_PACKED;
+	UINT8 length ACX_PACKED;
+	UINT8 text[253] ACX_PACKED;
 } challenge_text_t;
 
 
 
-typedef struct __WLAN_ATTRIB_PACK__ auth_frame_body {
-	UINT16 auth_alg;
-	UINT16 auth_seq;
-	UINT16 status;
-	challenge_text_t challenge;
+typedef struct auth_frame_body {
+	UINT16 auth_alg ACX_PACKED;
+	UINT16 auth_seq ACX_PACKED;
+	UINT16 status ACX_PACKED;
+	challenge_text_t challenge ACX_PACKED;
 } auth_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ assocresp_frame_body {
-	UINT16 cap_info;
-	UINT16 status;
-	UINT16 aid;
-	rates_t rates;
+typedef struct assocresp_frame_body {
+	UINT16 cap_info ACX_PACKED;
+	UINT16 status ACX_PACKED;
+	UINT16 aid ACX_PACKED;
+	rates_t rates ACX_PACKED;
 } assocresp_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ reassocreq_frame_body {
-	UINT16 cap_info;
-	UINT16 listen_int;
-	UINT8 current_ap[6];
-	ssid_t ssid;
-	rates_t rates;
+typedef struct reassocreq_frame_body {
+	UINT16 cap_info ACX_PACKED;
+	UINT16 listen_int ACX_PACKED;
+	UINT8 current_ap[6] ACX_PACKED;
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
 } reassocreq_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ reassocresp_frame_body {
-	UINT16 cap_info;
-	UINT16 status;
-	UINT16 aid;
-	rates_t rates;
+typedef struct reassocresp_frame_body {
+	UINT16 cap_info ACX_PACKED;
+	UINT16 status ACX_PACKED;
+	UINT16 aid ACX_PACKED;
+	rates_t rates ACX_PACKED;
 } reassocresp_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ deauthen_frame_body {
-	UINT16 reason;
+typedef struct deauthen_frame_body {
+	UINT16 reason ACX_PACKED;
 } deauthen_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ disassoc_frame_body {
-	UINT16 reason;
+typedef struct disassoc_frame_body {
+	UINT16 reason ACX_PACKED;
 } disassoc_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ probereq_frame_body {
-	ssid_t ssid;
-	rates_t rates;
+typedef struct probereq_frame_body {
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
 } probereq_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ proberesp_frame_body {
-	UINT8 timestamp[8];
-	UINT16 beacon_int;
-	UINT16 cap_info;
-	ssid_t ssid;
-	rates_t rates;
-	fhps_t fhps;
-	dsps_t dsps;
-	cfps_t cfps;
+typedef struct proberesp_frame_body {
+	UINT8 timestamp[8] ACX_PACKED;
+	UINT16 beacon_int ACX_PACKED;
+	UINT16 cap_info ACX_PACKED;
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+	fhps_t fhps ACX_PACKED;
+	dsps_t dsps ACX_PACKED;
+	cfps_t cfps ACX_PACKED;
 } proberesp_frame_body_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ TxData {
-	UINT16 frame_control;	/* 0x0 */
-	UINT16 duration_id;	/* 0x2 */
-	UINT8 da[ETH_ALEN];	/* 0x4 */
-	UINT8 sa[ETH_ALEN];	/* 0xa */
-	UINT8 bssid[ETH_ALEN];	/* 0x10 */
-	UINT16 sequence_control;	/* 0x16 */
+typedef struct TxData {
+	UINT16 frame_control ACX_PACKED;	/* 0x0 */
+	UINT16 duration_id ACX_PACKED;	/* 0x2 */
+	UINT8 da[ETH_ALEN] ACX_PACKED;	/* 0x4 */
+	UINT8 sa[ETH_ALEN] ACX_PACKED;	/* 0xa */
+	UINT8 bssid[ETH_ALEN] ACX_PACKED;	/* 0x10 */
+	UINT16 sequence_control ACX_PACKED;	/* 0x16 */
 	union {
-		auth_frame_body_t auth;
-		deauthen_frame_body_t deauthen;
+		auth_frame_body_t auth ACX_PACKED;
+		deauthen_frame_body_t deauthen ACX_PACKED;
 		/* assocreq_frame_body_t does not exist, since it
 		 * contains variable-length members, thus it's no static
 		 * struct */
-		assocresp_frame_body_t assocresp;
-		reassocresp_frame_body_t reassocreq;
-		reassocresp_frame_body_t reassocresp;
-		disassoc_frame_body_t disassoc;
-		probereq_frame_body_t probereq;
-		proberesp_frame_body_t proberesp;
-		char * raw[2400-24];
-	} body;
+		assocresp_frame_body_t assocresp ACX_PACKED;
+		reassocresp_frame_body_t reassocreq ACX_PACKED;
+		reassocresp_frame_body_t reassocresp ACX_PACKED;
+		disassoc_frame_body_t disassoc ACX_PACKED;
+		probereq_frame_body_t probereq ACX_PACKED;
+		proberesp_frame_body_t proberesp ACX_PACKED;
+		char * raw[2400-24] ACX_PACKED;
+	} body ACX_PACKED;
 } TxData;			/* size: 2400 */
 
 void acx_sta_list_init(wlandevice_t *priv);
-client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address);
-client_t *acx_sta_list_add(wlandevice_t *priv, const UINT8 *address);
-client_t *acx_sta_list_get(wlandevice_t *priv, const UINT8 *address);
 const char *acx_get_status_name(UINT16 status);
 void acx_set_status(wlandevice_t *priv, UINT16 status);
 int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
-UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
-			  wlandevice_t *priv);
-UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
-			    wlandevice_t *priv);
-int acx_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
-int acx_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv);
-void acx_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
-			  acxp80211_hdr_t *hdr);
-int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
-int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv);
-int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
-
-int acx_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
-int acx_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
-int acx_transmit_deauthen(const UINT8 *addr, client_t *arg_4, wlandevice_t *priv,
-		      UINT16 reason);
-int acx_transmit_authen1(wlandevice_t *priv);
-int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
-		      wlandevice_t *priv);
-int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
-int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
-int acx_transmit_assoc_req(wlandevice_t *priv);
 UINT32 acx_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
-#if (POWER_SAVE_80211 == 0)
-void ActivatePowerSaveMode(wlandevice_t *priv, int vala);
-#endif
 void acx_timer(unsigned long a);
 void acx_complete_dot11_scan(wlandevice_t *priv);
 #endif /* __ACX_ACX100_HELPER2_H */

@@ -57,8 +57,8 @@
 
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <acx100_conv.h>
 #include <acx100.h>
+#include <acx100_conv.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <acx100_helper2.h>
@@ -78,6 +78,7 @@
 
 #define MINFREE_TX 3
 
+static char *acx_get_packet_type_string(UINT16 fc);
 void acx_dump_bytes(void *, int);
 #if (WLAN_HOSTIF==WLAN_USB)
 extern void acx100usb_tx_data(wlandevice_t *,void *);
@@ -105,7 +106,7 @@ extern void acx100usb_tx_data(wlandevice_t *,void *);
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_free_desc_queues(TIWLAN_DC *pDc)
+static void acx_free_desc_queues(TIWLAN_DC *pDc)
 {
 #if (WLAN_HOSTIF!=WLAN_USB)
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
@@ -312,13 +313,14 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	 * Do separate logs for acx100/111 to have human-readable rates */
 	if (CHIPTYPE_ACX100 == priv->chip_type)
 		acxlog(L_XFER | L_DATA,
-			"tx: pkt (%s): len %i (%i/%i) mode %d rate %03d status %d\n",
+			"tx: pkt (%s): len %i (%i/%i) mode %d rate %03d%s status %d\n",
 			acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
 			tx_desc->total_length,
 			header->length,
 			payload->length,
 			priv->macmode_joined,
 			tx_desc->u.r1.rate,
+			(tx_desc->Ctl_8 & ACX100_CTL_PREAMBLE) ? "(SPr)" : "",
 			priv->status);
 	else
 		acxlog(L_XFER | L_DATA,
@@ -711,8 +713,12 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 			netif_wake_queue(priv->netdev);
 		}
 		/* log AFTER having done the work, faster */
-		acxlog(L_BUFT, "tx: cleaned %d: ack_fail=%d rts_fail=%d rts_ok=%d r111=%04x\n",
-			finger, ack_failures, rts_failures, rts_ok, r111);
+		if (CHIPTYPE_ACX111 == priv->chip_type)
+			acxlog(L_BUFT, "tx: cleaned %d: ack_fail=%d rts_fail=%d rts_ok=%d r111=%04x\n",
+				finger, ack_failures, rts_failures, rts_ok, r111);
+		else
+			acxlog(L_BUFT, "tx: cleaned %d: ack_fail=%d rts_fail=%d rts_ok=%d rate=%d\n",
+				finger, ack_failures, rts_failures, rts_ok, le16_to_cpu(r111) & 0xff);
 
 next:
 		/* update pointer for descr to be cleaned next */
@@ -2295,7 +2301,7 @@ static char type_string[32];	/* I *really* don't care that this is static,
 *
 *----------------------------------------------------------------*/
 
-char *acx_get_packet_type_string(UINT16 fc)
+static char *acx_get_packet_type_string(UINT16 fc)
 {
 	char *str_ftype = "UNKNOWN", *str_fstype = "UNKNOWN";
 	char *mgmt_arr[] = { "AssocReq", "AssocResp", "ReassocReq", "ReassocResp", "ProbeReq", "ProbeResp", "UNKNOWN", "UNKNOWN", "Beacon", "ATIM", "Disassoc", "Authen", "Deauthen" };

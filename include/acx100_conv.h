@@ -66,23 +66,23 @@
 
 /* local ether header type */
 typedef struct wlan_ethhdr {
-	UINT8 daddr[WLAN_ETHADDR_LEN] __WLAN_ATTRIB_PACK__;
-	UINT8 saddr[WLAN_ETHADDR_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 type __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ wlan_ethhdr_t;
+	UINT8 daddr[WLAN_ETHADDR_LEN] ACX_PACKED;
+	UINT8 saddr[WLAN_ETHADDR_LEN] ACX_PACKED;
+	UINT16 type ACX_PACKED;
+} wlan_ethhdr_t;
 
 /* local llc header type */
 typedef struct wlan_llc {
-	UINT8 dsap __WLAN_ATTRIB_PACK__;
-	UINT8 ssap __WLAN_ATTRIB_PACK__;
-	UINT8 ctl __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ wlan_llc_t;
+	UINT8 dsap ACX_PACKED;
+	UINT8 ssap ACX_PACKED;
+	UINT8 ctl ACX_PACKED;
+} wlan_llc_t;
 
 /* local snap header type */
 typedef struct wlan_snap {
-	UINT8 oui[WLAN_IEEE_OUI_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 type __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ wlan_snap_t;
+	UINT8 oui[WLAN_IEEE_OUI_LEN] ACX_PACKED;
+	UINT16 type ACX_PACKED;
+} wlan_snap_t;
 
 /* FIXME: Circular include trick */
 struct wlandevice;

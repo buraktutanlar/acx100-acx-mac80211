@@ -87,6 +87,7 @@
 /* Local Function Definitions */
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * p80211addr_to_str
 *
@@ -176,6 +177,7 @@ void acx_mgmt_encode_beacon(wlan_fr_beacon_t * f)
 	    WLAN_HDR_A3_LEN + WLAN_BEACON_OFF_CAPINFO +
 	    sizeof(*(f->cap_info));
 }
+#endif /* UNUSED */
 
 /*--------------------------------------------------------------
 * acx_mgmt_decode_beacon
@@ -262,6 +264,7 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_ibssatim
 *
@@ -389,6 +392,7 @@ void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t * f)
 	    WLAN_HDR_A3_LEN + WLAN_DISASSOC_OFF_REASON +
 	    sizeof(*(f->reason));
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------
@@ -432,6 +436,7 @@ void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_assocreq
 *
@@ -477,6 +482,7 @@ void acx_mgmt_encode_assocreq(wlan_fr_assocreq_t * f)
 	f->len = WLAN_HDR_A3_LEN +
 	    WLAN_ASSOCREQ_OFF_LISTEN_INT + sizeof(*(f->listen_int));
 }
+#endif
 
 
 /*--------------------------------------------------------------
@@ -549,6 +555,7 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_assocresp
 *
@@ -596,6 +603,7 @@ void acx_mgmt_encode_assocresp(wlan_fr_assocresp_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_ASSOCRESP_OFF_AID + sizeof(*(f->aid));
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------
@@ -648,6 +656,7 @@ void acx_mgmt_decode_assocresp(wlan_fr_assocresp_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_reassocreq
 *
@@ -696,6 +705,7 @@ void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t * f)
 	    WLAN_HDR_A3_LEN + WLAN_REASSOCREQ_OFF_CURR_AP +
 	    sizeof(*(f->curr_ap));
 }
+#endif
 
 
 /*--------------------------------------------------------------
@@ -770,6 +780,7 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_reassocresp
 *
@@ -817,6 +828,7 @@ void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_REASSOCRESP_OFF_AID + sizeof(*(f->aid));
 }
+#endif
 
 
 /*--------------------------------------------------------------
@@ -869,6 +881,7 @@ void acx_mgmt_decode_reassocresp(wlan_fr_reassocresp_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_probereq
 *
@@ -907,6 +920,7 @@ void acx_mgmt_encode_probereq(wlan_fr_probereq_t * f)
 
 	f->len = WLAN_HDR_A3_LEN;
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------
@@ -975,6 +989,7 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_proberesp
 *
@@ -1021,6 +1036,7 @@ void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t * f)
 	f->len = WLAN_HDR_A3_LEN + WLAN_PROBERESP_OFF_CAP_INFO +
 	    sizeof(*(f->cap_info));
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------
@@ -1107,6 +1123,7 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_authen
 *
@@ -1155,6 +1172,7 @@ void acx_mgmt_encode_authen(wlan_fr_authen_t * f)
 	    WLAN_HDR_A3_LEN + WLAN_AUTHEN_OFF_STATUS +
 	    sizeof(*(f->status));
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------
@@ -1213,6 +1231,7 @@ void acx_mgmt_decode_authen(wlan_fr_authen_t * f)
 }
 
 
+#if UNUSED
 /*--------------------------------------------------------------
 * acx_mgmt_encode_deauthen
 *
@@ -1258,6 +1277,7 @@ void acx_mgmt_encode_deauthen(wlan_fr_deauthen_t * f)
 	    WLAN_HDR_A3_LEN + WLAN_DEAUTHEN_OFF_REASON +
 	    sizeof(*(f->reason));
 }
+#endif /* UNUSED */
 
 
 /*--------------------------------------------------------------

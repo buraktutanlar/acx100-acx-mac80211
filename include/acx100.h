@@ -157,6 +157,8 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #define MAC_BCAST(dst)	MAC_FILL(dst, 0xff)
 
+#define ACX_PACKED __WLAN_ATTRIB_PACK__
+
 /*============================================================================*
  * Constants                                                                  *
  *============================================================================*/
@@ -455,14 +457,14 @@ typedef enum {
 
 /*--- Commonly used basic types ----------------------------------------------*/
 typedef struct acx100_bytestr {
-	UINT16 len __WLAN_ATTRIB_PACK__;
-	UINT8 data[0] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_bytestr_t;
+	UINT16 len ACX_PACKED;
+	UINT8 data[0] ACX_PACKED;
+} acx100_bytestr_t;
 
 typedef struct acx100_bytestr32 {
-	UINT16 len __WLAN_ATTRIB_PACK__;
-	UINT8 data[32] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_bytestr32_t;
+	UINT16 len ACX_PACKED;
+	UINT8 data[32] ACX_PACKED;
+} acx100_bytestr32_t;
 
 /*--- Configuration Record Structures: ---------------------------------------*
  *--- Network Parameters, Static Configuration Entities ----------------------*/
@@ -476,65 +478,65 @@ typedef struct acx100_mem_t {
 } mem_t;
 
 typedef struct acx100_record {
-	UINT16 reclen __WLAN_ATTRIB_PACK__;
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_rec_t;
+	UINT16 reclen ACX_PACKED;
+	UINT16 rid ACX_PACKED;
+} acx100_rec_t;
 
 typedef struct acx100_record16 {
-	UINT16 reclen __WLAN_ATTRIB_PACK__;
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT16 val __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_rec16_t;
+	UINT16 reclen ACX_PACKED;
+	UINT16 rid ACX_PACKED;
+	UINT16 val ACX_PACKED;
+} acx100_rec16_t;
 
 typedef struct acx100_record32 {
-	UINT16 reclen __WLAN_ATTRIB_PACK__;
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT32 val __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_rec32;
+	UINT16 reclen ACX_PACKED;
+	UINT16 rid ACX_PACKED;
+	UINT32 val ACX_PACKED;
+} acx100_rec32;
 
 /*-- Hardware/Firmware Component Information --*/
 typedef struct acx100_compident {
-	UINT16 id __WLAN_ATTRIB_PACK__;
-	UINT16 variant __WLAN_ATTRIB_PACK__;
-	UINT16 major __WLAN_ATTRIB_PACK__;
-	UINT16 minor __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_compident_t;
+	UINT16 id ACX_PACKED;
+	UINT16 variant ACX_PACKED;
+	UINT16 major ACX_PACKED;
+	UINT16 minor ACX_PACKED;
+} acx100_compident_t;
 
 typedef struct acx100_caplevel {
-	UINT16 role __WLAN_ATTRIB_PACK__;
-	UINT16 id __WLAN_ATTRIB_PACK__;
-	UINT16 variant __WLAN_ATTRIB_PACK__;
-	UINT16 bottom __WLAN_ATTRIB_PACK__;
-	UINT16 top __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_caplevel_t;
+	UINT16 role ACX_PACKED;
+	UINT16 id ACX_PACKED;
+	UINT16 variant ACX_PACKED;
+	UINT16 bottom ACX_PACKED;
+	UINT16 top ACX_PACKED;
+} acx100_caplevel_t;
 
 /*--- Communication Frames: Receive Frame Structure --------------------------*/
 typedef struct acx100_rx_frame {
 	/*-- MAC RX descriptor (acx100 byte order) --*/
-	UINT16 status __WLAN_ATTRIB_PACK__;
-	UINT32 time __WLAN_ATTRIB_PACK__;
-	UINT8 silence __WLAN_ATTRIB_PACK__;
-	UINT8 signal __WLAN_ATTRIB_PACK__;
-	UINT8 rate __WLAN_ATTRIB_PACK__;
-	UINT8 rx_flow __WLAN_ATTRIB_PACK__;
-	UINT16 reserved1 __WLAN_ATTRIB_PACK__;
-	UINT16 reserved2 __WLAN_ATTRIB_PACK__;
+	UINT16 status ACX_PACKED;
+	UINT32 time ACX_PACKED;
+	UINT8 silence ACX_PACKED;
+	UINT8 signal ACX_PACKED;
+	UINT8 rate ACX_PACKED;
+	UINT8 rx_flow ACX_PACKED;
+	UINT16 reserved1 ACX_PACKED;
+	UINT16 reserved2 ACX_PACKED;
 
 	/*-- 802.11 Header Information (802.11 byte order) --*/
-	UINT16 frame_control __WLAN_ATTRIB_PACK__;
-	UINT16 duration_id __WLAN_ATTRIB_PACK__;
-	UINT8 address1[6] __WLAN_ATTRIB_PACK__;
-	UINT8 address2[6] __WLAN_ATTRIB_PACK__;
-	UINT8 address3[6] __WLAN_ATTRIB_PACK__;
-	UINT16 sequence_control __WLAN_ATTRIB_PACK__;
-	UINT8 address4[6] __WLAN_ATTRIB_PACK__;
-	UINT16 data_len __WLAN_ATTRIB_PACK__;	/* acx100 (little endian) format */
+	UINT16 frame_control ACX_PACKED;
+	UINT16 duration_id ACX_PACKED;
+	UINT8 address1[6] ACX_PACKED;
+	UINT8 address2[6] ACX_PACKED;
+	UINT8 address3[6] ACX_PACKED;
+	UINT16 sequence_control ACX_PACKED;
+	UINT8 address4[6] ACX_PACKED;
+	UINT16 data_len ACX_PACKED;	/* acx100 (little endian) format */
 
 	/*-- 802.3 Header Information --*/
-	UINT8 dest_addr[6] __WLAN_ATTRIB_PACK__;
-	UINT8 src_addr[6] __WLAN_ATTRIB_PACK__;
-	UINT16 data_length __WLAN_ATTRIB_PACK__;	/* IEEE? (big endian) format */
-} __WLAN_ATTRIB_PACK__ acx100_rx_frame_t;
+	UINT8 dest_addr[6] ACX_PACKED;
+	UINT8 src_addr[6] ACX_PACKED;
+	UINT16 data_length ACX_PACKED;	/* IEEE? (big endian) format */
+} acx100_rx_frame_t;
 
 
 /*============================================================================*
@@ -555,117 +557,117 @@ typedef struct acx100_rx_frame {
 
 /*-- Notification Frame, MAC Mgmt: Handover Address --*/
 typedef struct acx100_HandoverAddr {
-	UINT16 framelen __WLAN_ATTRIB_PACK__;
-	UINT16 infotype __WLAN_ATTRIB_PACK__;
-	UINT8 handover_addr[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_HandoverAddr_t;
+	UINT16 framelen ACX_PACKED;
+	UINT16 infotype ACX_PACKED;
+	UINT8 handover_addr[WLAN_BSSID_LEN] ACX_PACKED;
+} acx100_HandoverAddr_t;
 
 /*-- Inquiry Frame, Diagnose: Communication Tallies --*/
-typedef struct __WLAN_ATTRIB_PACK__ acx100_CommTallies16 {
-	UINT16 txunicastframes __WLAN_ATTRIB_PACK__;
-	UINT16 txmulticastframes __WLAN_ATTRIB_PACK__;
-	UINT16 txfragments __WLAN_ATTRIB_PACK__;
-	UINT16 txunicastoctets __WLAN_ATTRIB_PACK__;
-	UINT16 txmulticastoctets __WLAN_ATTRIB_PACK__;
-	UINT16 txdeferredtrans __WLAN_ATTRIB_PACK__;
-	UINT16 txsingleretryframes __WLAN_ATTRIB_PACK__;
-	UINT16 txmultipleretryframes __WLAN_ATTRIB_PACK__;
-	UINT16 txretrylimitexceeded __WLAN_ATTRIB_PACK__;
-	UINT16 txdiscards __WLAN_ATTRIB_PACK__;
-	UINT16 rxunicastframes __WLAN_ATTRIB_PACK__;
-	UINT16 rxmulticastframes __WLAN_ATTRIB_PACK__;
-	UINT16 rxfragments __WLAN_ATTRIB_PACK__;
-	UINT16 rxunicastoctets __WLAN_ATTRIB_PACK__;
-	UINT16 rxmulticastoctets __WLAN_ATTRIB_PACK__;
-	UINT16 rxfcserrors __WLAN_ATTRIB_PACK__;
-	UINT16 rxdiscardsnobuffer __WLAN_ATTRIB_PACK__;
-	UINT16 txdiscardswrongsa __WLAN_ATTRIB_PACK__;
-	UINT16 rxdiscardswepundecr __WLAN_ATTRIB_PACK__;
-	UINT16 rxmsginmsgfrag __WLAN_ATTRIB_PACK__;
-	UINT16 rxmsginbadmsgfrag __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_CommTallies16_t;
+typedef struct acx100_CommTallies16 {
+	UINT16 txunicastframes ACX_PACKED;
+	UINT16 txmulticastframes ACX_PACKED;
+	UINT16 txfragments ACX_PACKED;
+	UINT16 txunicastoctets ACX_PACKED;
+	UINT16 txmulticastoctets ACX_PACKED;
+	UINT16 txdeferredtrans ACX_PACKED;
+	UINT16 txsingleretryframes ACX_PACKED;
+	UINT16 txmultipleretryframes ACX_PACKED;
+	UINT16 txretrylimitexceeded ACX_PACKED;
+	UINT16 txdiscards ACX_PACKED;
+	UINT16 rxunicastframes ACX_PACKED;
+	UINT16 rxmulticastframes ACX_PACKED;
+	UINT16 rxfragments ACX_PACKED;
+	UINT16 rxunicastoctets ACX_PACKED;
+	UINT16 rxmulticastoctets ACX_PACKED;
+	UINT16 rxfcserrors ACX_PACKED;
+	UINT16 rxdiscardsnobuffer ACX_PACKED;
+	UINT16 txdiscardswrongsa ACX_PACKED;
+	UINT16 rxdiscardswepundecr ACX_PACKED;
+	UINT16 rxmsginmsgfrag ACX_PACKED;
+	UINT16 rxmsginbadmsgfrag ACX_PACKED;
+} acx100_CommTallies16_t;
 
-typedef struct __WLAN_ATTRIB_PACK__ acx100_CommTallies32 {
-	UINT32 txunicastframes __WLAN_ATTRIB_PACK__;
-	UINT32 txmulticastframes __WLAN_ATTRIB_PACK__;
-	UINT32 txfragments __WLAN_ATTRIB_PACK__;
-	UINT32 txunicastoctets __WLAN_ATTRIB_PACK__;
-	UINT32 txmulticastoctets __WLAN_ATTRIB_PACK__;
-	UINT32 txdeferredtrans __WLAN_ATTRIB_PACK__;
-	UINT32 txsingleretryframes __WLAN_ATTRIB_PACK__;
-	UINT32 txmultipleretryframes __WLAN_ATTRIB_PACK__;
-	UINT32 txretrylimitexceeded __WLAN_ATTRIB_PACK__;
-	UINT32 txdiscards __WLAN_ATTRIB_PACK__;
-	UINT32 rxunicastframes __WLAN_ATTRIB_PACK__;
-	UINT32 rxmulticastframes __WLAN_ATTRIB_PACK__;
-	UINT32 rxfragments __WLAN_ATTRIB_PACK__;
-	UINT32 rxunicastoctets __WLAN_ATTRIB_PACK__;
-	UINT32 rxmulticastoctets __WLAN_ATTRIB_PACK__;
-	UINT32 rxfcserrors __WLAN_ATTRIB_PACK__;
-	UINT32 rxdiscardsnobuffer __WLAN_ATTRIB_PACK__;
-	UINT32 txdiscardswrongsa __WLAN_ATTRIB_PACK__;
-	UINT32 rxdiscardswepundecr __WLAN_ATTRIB_PACK__;
-	UINT32 rxmsginmsgfrag __WLAN_ATTRIB_PACK__;
-	UINT32 rxmsginbadmsgfrag __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_CommTallies32_t;
+typedef struct acx100_CommTallies32 {
+	UINT32 txunicastframes ACX_PACKED;
+	UINT32 txmulticastframes ACX_PACKED;
+	UINT32 txfragments ACX_PACKED;
+	UINT32 txunicastoctets ACX_PACKED;
+	UINT32 txmulticastoctets ACX_PACKED;
+	UINT32 txdeferredtrans ACX_PACKED;
+	UINT32 txsingleretryframes ACX_PACKED;
+	UINT32 txmultipleretryframes ACX_PACKED;
+	UINT32 txretrylimitexceeded ACX_PACKED;
+	UINT32 txdiscards ACX_PACKED;
+	UINT32 rxunicastframes ACX_PACKED;
+	UINT32 rxmulticastframes ACX_PACKED;
+	UINT32 rxfragments ACX_PACKED;
+	UINT32 rxunicastoctets ACX_PACKED;
+	UINT32 rxmulticastoctets ACX_PACKED;
+	UINT32 rxfcserrors ACX_PACKED;
+	UINT32 rxdiscardsnobuffer ACX_PACKED;
+	UINT32 txdiscardswrongsa ACX_PACKED;
+	UINT32 rxdiscardswepundecr ACX_PACKED;
+	UINT32 rxmsginmsgfrag ACX_PACKED;
+	UINT32 rxmsginbadmsgfrag ACX_PACKED;
+} acx100_CommTallies32_t;
 
 /*-- Inquiry Frame, Diagnose: Scan Results & Subfields --*/
 typedef struct acx100_ScanResultSub {
-	UINT16 chid __WLAN_ATTRIB_PACK__;
-	UINT16 anl __WLAN_ATTRIB_PACK__;
-	UINT16 sl __WLAN_ATTRIB_PACK__;
-	UINT8 bssid[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 bcnint __WLAN_ATTRIB_PACK__;
-	UINT16 capinfo __WLAN_ATTRIB_PACK__;
-	acx100_bytestr32_t ssid __WLAN_ATTRIB_PACK__;
-	UINT8 supprates[10] __WLAN_ATTRIB_PACK__;	/* 802.11 info element */
-	UINT16 proberesp_rate __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_ScanResultSub_t;
+	UINT16 chid ACX_PACKED;
+	UINT16 anl ACX_PACKED;
+	UINT16 sl ACX_PACKED;
+	UINT8 bssid[WLAN_BSSID_LEN] ACX_PACKED;
+	UINT16 bcnint ACX_PACKED;
+	UINT16 capinfo ACX_PACKED;
+	acx100_bytestr32_t ssid ACX_PACKED;
+	UINT8 supprates[10] ACX_PACKED;	/* 802.11 info element */
+	UINT16 proberesp_rate ACX_PACKED;
+} acx100_ScanResultSub_t;
 
 typedef struct acx100_ScanResult {
-	UINT16 rsvd __WLAN_ATTRIB_PACK__;
-	UINT16 scanreason __WLAN_ATTRIB_PACK__;
+	UINT16 rsvd ACX_PACKED;
+	UINT16 scanreason ACX_PACKED;
 	 acx100_ScanResultSub_t
-	    result[ACX100_SCANRESULT_MAX] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_ScanResult_t;
+	    result[ACX100_SCANRESULT_MAX] ACX_PACKED;
+} acx100_ScanResult_t;
 
 /*-- Inquiry Frame, Diagnose: ChInfo Results & Subfields --*/
 typedef struct acx100_ChInfoResultSub {
-	UINT16 chid __WLAN_ATTRIB_PACK__;
-	UINT16 anl __WLAN_ATTRIB_PACK__;
-	UINT16 pnl __WLAN_ATTRIB_PACK__;
-	UINT16 active __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_ChInfoResultSub_t;
+	UINT16 chid ACX_PACKED;
+	UINT16 anl ACX_PACKED;
+	UINT16 pnl ACX_PACKED;
+	UINT16 active ACX_PACKED;
+} acx100_ChInfoResultSub_t;
 
 #define ACX100_CHINFORESULT_BSSACTIVE	BIT0
 #define ACX100_CHINFORESULT_PCFACTIVE	BIT1
 
 typedef struct acx100_ChInfoResult {
-	UINT16 scanchannels __WLAN_ATTRIB_PACK__;
+	UINT16 scanchannels ACX_PACKED;
 	 acx100_ChInfoResultSub_t
-	    result[ACX100_CHINFORESULT_MAX] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_ChInfoResult_t;
+	    result[ACX100_CHINFORESULT_MAX] ACX_PACKED;
+} acx100_ChInfoResult_t;
 
 /*-- Inquiry Frame, Diagnose: Host Scan Results & Subfields --*/
 typedef struct acx100_HScanResultSub {
-	UINT16 chid __WLAN_ATTRIB_PACK__;
-	UINT16 anl __WLAN_ATTRIB_PACK__;
-	UINT16 sl __WLAN_ATTRIB_PACK__;
-	UINT8 bssid[WLAN_BSSID_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 bcnint __WLAN_ATTRIB_PACK__;
-	UINT16 capinfo __WLAN_ATTRIB_PACK__;
-	acx100_bytestr32_t ssid __WLAN_ATTRIB_PACK__;
-	UINT8 supprates[10] __WLAN_ATTRIB_PACK__;	/* 802.11 info element */
-	UINT16 proberesp_rate __WLAN_ATTRIB_PACK__;
-	UINT16 atim __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_HScanResultSub_t;
+	UINT16 chid ACX_PACKED;
+	UINT16 anl ACX_PACKED;
+	UINT16 sl ACX_PACKED;
+	UINT8 bssid[WLAN_BSSID_LEN] ACX_PACKED;
+	UINT16 bcnint ACX_PACKED;
+	UINT16 capinfo ACX_PACKED;
+	acx100_bytestr32_t ssid ACX_PACKED;
+	UINT8 supprates[10] ACX_PACKED;	/* 802.11 info element */
+	UINT16 proberesp_rate ACX_PACKED;
+	UINT16 atim ACX_PACKED;
+} acx100_HScanResultSub_t;
 
 typedef struct acx100_HScanResult {
-	UINT16 nresult __WLAN_ATTRIB_PACK__;
-	UINT16 rsvd __WLAN_ATTRIB_PACK__;
+	UINT16 nresult ACX_PACKED;
+	UINT16 rsvd ACX_PACKED;
 	 acx100_HScanResultSub_t
-	    result[ACX100_HSCANRESULT_MAX] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_HScanResult_t;
+	    result[ACX100_HSCANRESULT_MAX] ACX_PACKED;
+} acx100_HScanResult_t;
 
 /*-- Unsolicited Frame, MAC Mgmt: LinkStatus --*/
 #define ACX100_LINK_NOTCONNECTED	((UINT16)0)
@@ -677,8 +679,8 @@ typedef struct acx100_HScanResult {
 #define ACX100_LINK_ASSOCFAIL		((UINT16)6)
 
 typedef struct acx100_LinkStatus {
-	UINT16 linkstatus __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_LinkStatus_t;
+	UINT16 linkstatus ACX_PACKED;
+} acx100_LinkStatus_t;
 
 /*-- Unsolicited Frame, MAC Mgmt: AssociationStatus --*/
 #define ACX100_ASSOCSTATUS_STAASSOC	((UINT16)1)
@@ -688,44 +690,44 @@ typedef struct acx100_LinkStatus {
 #define ACX100_ASSOCSTATUS_AUTHFAIL	((UINT16)5)
 
 typedef struct acx100_AssocStatus {
-	UINT16 assocstatus __WLAN_ATTRIB_PACK__;
-	UINT8 sta_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	UINT16 assocstatus ACX_PACKED;
+	UINT8 sta_addr[WLAN_ADDR_LEN] ACX_PACKED;
 	/* old_ap_addr is only valid if assocstatus == 2 */
-	UINT8 old_ap_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 reason __WLAN_ATTRIB_PACK__;
-	UINT16 reserved __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_AssocStatus_t;
+	UINT8 old_ap_addr[WLAN_ADDR_LEN] ACX_PACKED;
+	UINT16 reason ACX_PACKED;
+	UINT16 reserved ACX_PACKED;
+} acx100_AssocStatus_t;
 
 /*-- Unsolicited Frame, MAC Mgmt: AuthRequest (AP Only) --*/
 typedef struct acx100_AuthRequest {
-	UINT8 sta_addr[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	UINT16 algorithm __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_AuthReq_t;
+	UINT8 sta_addr[WLAN_ADDR_LEN] ACX_PACKED;
+	UINT16 algorithm ACX_PACKED;
+} acx100_AuthReq_t;
 
 /*-- Unsolicited Frame, MAC Mgmt: PSUserCount (AP Only) --*/
 typedef struct acx100_PSUserCount {
-	UINT16 usercnt __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_PSUserCount_t;
+	UINT16 usercnt ACX_PACKED;
+} acx100_PSUserCount_t;
 
 
 /*-- Collection of all Inf frames --*/
 typedef union acx100_infodata {
-	acx100_CommTallies16_t commtallies16 __WLAN_ATTRIB_PACK__;
-	acx100_CommTallies32_t commtallies32 __WLAN_ATTRIB_PACK__;
-	acx100_ScanResult_t scanresult __WLAN_ATTRIB_PACK__;
-	acx100_ChInfoResult_t chinforesult __WLAN_ATTRIB_PACK__;
-	acx100_HScanResult_t hscanresult __WLAN_ATTRIB_PACK__;
-	acx100_LinkStatus_t linkstatus __WLAN_ATTRIB_PACK__;
-	acx100_AssocStatus_t assocstatus __WLAN_ATTRIB_PACK__;
-	acx100_AuthReq_t authreq __WLAN_ATTRIB_PACK__;
-	acx100_PSUserCount_t psusercnt __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_infodata_t;
+	acx100_CommTallies16_t commtallies16 ACX_PACKED;
+	acx100_CommTallies32_t commtallies32 ACX_PACKED;
+	acx100_ScanResult_t scanresult ACX_PACKED;
+	acx100_ChInfoResult_t chinforesult ACX_PACKED;
+	acx100_HScanResult_t hscanresult ACX_PACKED;
+	acx100_LinkStatus_t linkstatus ACX_PACKED;
+	acx100_AssocStatus_t assocstatus ACX_PACKED;
+	acx100_AuthReq_t authreq ACX_PACKED;
+	acx100_PSUserCount_t psusercnt ACX_PACKED;
+} acx100_infodata_t;
 
 typedef struct acx100_InfFrame {
-	UINT16 framelen __WLAN_ATTRIB_PACK__;
-	UINT16 infotype __WLAN_ATTRIB_PACK__;
-	acx100_infodata_t info __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_InfFrame_t;
+	UINT16 framelen ACX_PACKED;
+	UINT16 infotype ACX_PACKED;
+	acx100_infodata_t info ACX_PACKED;
+} acx100_InfFrame_t;
 
 
 /* Descriptor Control Bits */
@@ -795,238 +797,238 @@ typedef struct acx100_InfFrame {
 /*--- Request (bulk OUT) packet contents -------------------------------------*/
 
 typedef struct acx100_usb_txhdr {
-  UINT16	desc __WLAN_ATTRIB_PACK__;
-  UINT16 MPDUlen __WLAN_ATTRIB_PACK__;
-  UINT8 index __WLAN_ATTRIB_PACK__;
-  UINT8 txRate __WLAN_ATTRIB_PACK__;
-  UINT32 hostData __WLAN_ATTRIB_PACK__;
-  UINT8  ctrl1 __WLAN_ATTRIB_PACK__;
-  UINT8  ctrl2 __WLAN_ATTRIB_PACK__;
-  UINT16 dataLength __WLAN_ATTRIB_PACK__;
+  UINT16	desc ACX_PACKED;
+  UINT16 MPDUlen ACX_PACKED;
+  UINT8 index ACX_PACKED;
+  UINT8 txRate ACX_PACKED;
+  UINT32 hostData ACX_PACKED;
+  UINT8  ctrl1 ACX_PACKED;
+  UINT8  ctrl2 ACX_PACKED;
+  UINT16 dataLength ACX_PACKED;
 } acx100_usb_txhdr_t;
 
 
 typedef struct acx100_usb_txfrm {
-  acx100_usb_txhdr_t hdr;
-  UINT8 data[WLAN_DATA_MAXLEN];
-} acx100_usb_txfrm_t __WLAN_ATTRIB_PACK__;
+  acx100_usb_txhdr_t hdr ACX_PACKED;
+  UINT8 data[WLAN_DATA_MAXLEN] ACX_PACKED;
+} acx100_usb_txfrm_t;
 
 typedef struct acx100_usb_scan {
-	UINT16 unk1 __WLAN_ATTRIB_PACK__;
-	UINT16 unk2 __WLAN_ATTRIB_PACK__;
-} acx100_usb_scan_t __WLAN_ATTRIB_PACK__;
+	UINT16 unk1 ACX_PACKED;
+	UINT16 unk2 ACX_PACKED;
+} acx100_usb_scan_t;
 
 typedef struct acx100_usb_scan_status {
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT16 length __WLAN_ATTRIB_PACK__;
-	UINT32	status __WLAN_ATTRIB_PACK__;
-} acx100_usb_scan_status_t __WLAN_ATTRIB_PACK__;
+	UINT16 rid ACX_PACKED;
+	UINT16 length ACX_PACKED;
+	UINT32	status ACX_PACKED;
+} acx100_usb_scan_status_t;
 
 typedef struct acx100_usb_cmdreq {
-	UINT16 parm0 __WLAN_ATTRIB_PACK__;
-	UINT16 parm1 __WLAN_ATTRIB_PACK__;
-	UINT16 parm2 __WLAN_ATTRIB_PACK__;
-	UINT8 pad[54] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_cmdreq_t;
+	UINT16 parm0 ACX_PACKED;
+	UINT16 parm1 ACX_PACKED;
+	UINT16 parm2 ACX_PACKED;
+	UINT8 pad[54] ACX_PACKED;
+} acx100_usb_cmdreq_t;
 
 typedef struct acx100_usb_wridreq {
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_wridreq_t;
+	UINT16 rid ACX_PACKED;
+	UINT16 frmlen ACX_PACKED;
+	UINT8 data[ACX100_RIDDATA_MAXLEN] ACX_PACKED;
+} acx100_usb_wridreq_t;
 
 typedef struct acx100_usb_rridreq {
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-	UINT8 pad[56] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rridreq_t;
+	UINT16 rid ACX_PACKED;
+	UINT16 frmlen ACX_PACKED;
+	UINT8 pad[56] ACX_PACKED;
+} acx100_usb_rridreq_t;
 
 typedef struct acx100_usb_wmemreq {
 	/*
-  UINT16 offset __WLAN_ATTRIB_PACK__;
-	UINT16 page __WLAN_ATTRIB_PACK__;
+  UINT16 offset ACX_PACKED;
+	UINT16 page ACX_PACKED;
   */
-	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_wmemreq_t;
+	UINT8 data[ACX100_USB_RWMEM_MAXLEN] ACX_PACKED;
+} acx100_usb_wmemreq_t;
 
 typedef struct acx100_usb_rxtx_ctrl {
-	UINT8 data __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rxtx_ctrl_t;
+	UINT8 data ACX_PACKED;
+} acx100_usb_rxtx_ctrl_t;
 
 typedef struct acx100_usb_rmemreq {
-	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rmemreq_t;
+	UINT8 data[ACX100_USB_RWMEM_MAXLEN] ACX_PACKED;
+} acx100_usb_rmemreq_t;
 
 /*--- Response (bulk IN) packet contents -------------------------------------*/
 
 typedef struct acx100_usb_rxfrm {
-	acx100_rx_frame_t desc __WLAN_ATTRIB_PACK__;
-	UINT8 data[WLAN_DATA_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rxfrm_t;
+	acx100_rx_frame_t desc ACX_PACKED;
+	UINT8 data[WLAN_DATA_MAXLEN] ACX_PACKED;
+} acx100_usb_rxfrm_t;
 
 typedef struct acx100_usb_infofrm {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	acx100_InfFrame_t info __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_infofrm_t;
+	UINT16 type ACX_PACKED;
+	acx100_InfFrame_t info ACX_PACKED;
+} acx100_usb_infofrm_t;
 
 typedef struct acx100_usb_cmdresp {
-	UINT16 resp0 __WLAN_ATTRIB_PACK__;
-	UINT16 resp1 __WLAN_ATTRIB_PACK__;
-	UINT16 resp2 __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_cmdresp_t;
+	UINT16 resp0 ACX_PACKED;
+	UINT16 resp1 ACX_PACKED;
+	UINT16 resp2 ACX_PACKED;
+} acx100_usb_cmdresp_t;
 
 typedef struct acx100_usb_wridresp {
-	UINT16 resp0 __WLAN_ATTRIB_PACK__;
-	UINT16 resp1 __WLAN_ATTRIB_PACK__;
-	UINT16 resp2 __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_wridresp_t;
+	UINT16 resp0 ACX_PACKED;
+	UINT16 resp1 ACX_PACKED;
+	UINT16 resp2 ACX_PACKED;
+} acx100_usb_wridresp_t;
 
 typedef struct acx100_usb_rridresp {
-	UINT16 rid __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-	UINT8 data[ACX100_RIDDATA_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rridresp_t;
+	UINT16 rid ACX_PACKED;
+	UINT16 frmlen ACX_PACKED;
+	UINT8 data[ACX100_RIDDATA_MAXLEN] ACX_PACKED;
+} acx100_usb_rridresp_t;
 
 typedef struct acx100_usb_wmemresp {
-	UINT16 resp0 __WLAN_ATTRIB_PACK__;
-	UINT16 resp1 __WLAN_ATTRIB_PACK__;
-	UINT16 resp2 __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_wmemresp_t;
+	UINT16 resp0 ACX_PACKED;
+	UINT16 resp1 ACX_PACKED;
+	UINT16 resp2 ACX_PACKED;
+} acx100_usb_wmemresp_t;
 
 typedef struct acx100_usb_rmemresp {
-	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_rmemresp_t;
+	UINT8 data[ACX100_USB_RWMEM_MAXLEN] ACX_PACKED;
+} acx100_usb_rmemresp_t;
 
 typedef struct acx100_usb_bufavail {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_bufavail_t;
+	UINT16 type ACX_PACKED;
+	UINT16 frmlen ACX_PACKED;
+} acx100_usb_bufavail_t;
 
 typedef struct acx100_usb_error {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 errortype __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usb_error_t;
+	UINT16 type ACX_PACKED;
+	UINT16 errortype ACX_PACKED;
+} acx100_usb_error_t;
 
 /*--- Unions for packaging all the known packet types together ---------------*/
 
 #if OLD
 typedef union acx100_usbout {
-  UINT16 type __WLAN_ATTRIB_PACK__;
-        acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
-        acx100_usb_cmdreq_t cmdreq __WLAN_ATTRIB_PACK__;
-        acx100_usb_wridreq_t wridreq __WLAN_ATTRIB_PACK__;
-        acx100_usb_rridreq_t rridreq __WLAN_ATTRIB_PACK__;
-        acx100_usb_wmemreq_t wmemreq __WLAN_ATTRIB_PACK__;
-        acx100_usb_rmemreq_t rmemreq __WLAN_ATTRIB_PACK__;
-        acx100_usb_rxtx_ctrl_t rxtx __WLAN_ATTRIB_PACK__;
-        acx100_usb_scan_t scan __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usbout_t;
+        UINT16 type ACX_PACKED;
+        acx100_usb_txfrm_t txfrm ACX_PACKED;
+        acx100_usb_cmdreq_t cmdreq ACX_PACKED;
+        acx100_usb_wridreq_t wridreq ACX_PACKED;
+        acx100_usb_rridreq_t rridreq ACX_PACKED;
+        acx100_usb_wmemreq_t wmemreq ACX_PACKED;
+        acx100_usb_rmemreq_t rmemreq ACX_PACKED;
+        acx100_usb_rxtx_ctrl_t rxtx ACX_PACKED;
+        acx100_usb_scan_t scan ACX_PACKED;
+} acx100_usbout_t;
 #else
 typedef struct acx100_bulkout {
-	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_bulkout_t;
+	acx100_usb_txfrm_t txfrm ACX_PACKED;
+} acx100_bulkout_t;
 
 typedef struct acx100_usbout {
-  UINT16 cmd __WLAN_ATTRIB_PACK__;
-  UINT16 status __WLAN_ATTRIB_PACK__;
+  UINT16 cmd ACX_PACKED;
+  UINT16 status ACX_PACKED;
   union {
-	acx100_usb_cmdreq_t cmdreq __WLAN_ATTRIB_PACK__;
-	acx100_usb_wridreq_t wridreq __WLAN_ATTRIB_PACK__;
-	acx100_usb_rridreq_t rridreq __WLAN_ATTRIB_PACK__;
-	acx100_usb_wmemreq_t wmemreq __WLAN_ATTRIB_PACK__;
-	acx100_usb_rmemreq_t rmemreq __WLAN_ATTRIB_PACK__;
-	acx100_usb_rxtx_ctrl_t rxtx __WLAN_ATTRIB_PACK__;
-	acx100_usb_scan_t scan __WLAN_ATTRIB_PACK__;
-  } u;
-} __WLAN_ATTRIB_PACK__ acx100_usbout_t;
+	acx100_usb_cmdreq_t cmdreq ACX_PACKED;
+	acx100_usb_wridreq_t wridreq ACX_PACKED;
+	acx100_usb_rridreq_t rridreq ACX_PACKED;
+	acx100_usb_wmemreq_t wmemreq ACX_PACKED;
+	acx100_usb_rmemreq_t rmemreq ACX_PACKED;
+	acx100_usb_rxtx_ctrl_t rxtx ACX_PACKED;
+	acx100_usb_scan_t scan ACX_PACKED;
+  } u ACX_PACKED;
+} acx100_usbout_t;
 #endif
 
 #if OLD
 typedef union acx100_usbin {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	acx100_usb_rxfrm_t rxfrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_infofrm_t infofrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_cmdresp_t cmdresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_wridresp_t wridresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_rridresp_t rridresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_wmemresp_t wmemresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_rmemresp_t rmemresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_bufavail_t bufavail __WLAN_ATTRIB_PACK__;
-	acx100_usb_error_t usberror __WLAN_ATTRIB_PACK__;
-	UINT8 boguspad[3000] __WLAN_ATTRIB_PACK__;
-} __WLAN_ATTRIB_PACK__ acx100_usbin_t;
+	UINT16 type ACX_PACKED;
+	acx100_usb_rxfrm_t rxfrm ACX_PACKED;
+	acx100_usb_txfrm_t txfrm ACX_PACKED;
+	acx100_usb_infofrm_t infofrm ACX_PACKED;
+	acx100_usb_cmdresp_t cmdresp ACX_PACKED;
+	acx100_usb_wridresp_t wridresp ACX_PACKED;
+	acx100_usb_rridresp_t rridresp ACX_PACKED;
+	acx100_usb_wmemresp_t wmemresp ACX_PACKED;
+	acx100_usb_rmemresp_t rmemresp ACX_PACKED;
+	acx100_usb_bufavail_t bufavail ACX_PACKED;
+	acx100_usb_error_t usberror ACX_PACKED;
+	UINT8 boguspad[3000] ACX_PACKED;
+} acx100_usbin_t;
 #else
 typedef struct acx100_usbin {
-  UINT16 cmd __WLAN_ATTRIB_PACK__;
-  UINT16 status __WLAN_ATTRIB_PACK__;
+  UINT16 cmd ACX_PACKED;
+  UINT16 status ACX_PACKED;
   union {
-	acx100_usb_rxfrm_t rxfrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_txfrm_t txfrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_infofrm_t infofrm __WLAN_ATTRIB_PACK__;
-	acx100_usb_cmdresp_t cmdresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_wridresp_t wridresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_rridresp_t rridresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_wmemresp_t wmemresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_rmemresp_t rmemresp __WLAN_ATTRIB_PACK__;
-	acx100_usb_bufavail_t bufavail __WLAN_ATTRIB_PACK__;
-	acx100_usb_error_t usberror __WLAN_ATTRIB_PACK__;
-	UINT8 boguspad[3000] __WLAN_ATTRIB_PACK__;
-  } u;
-} __WLAN_ATTRIB_PACK__ acx100_usbin_t;
+	acx100_usb_rxfrm_t rxfrm ACX_PACKED;
+	acx100_usb_txfrm_t txfrm ACX_PACKED;
+	acx100_usb_infofrm_t infofrm ACX_PACKED;
+	acx100_usb_cmdresp_t cmdresp ACX_PACKED;
+	acx100_usb_wridresp_t wridresp ACX_PACKED;
+	acx100_usb_rridresp_t rridresp ACX_PACKED;
+	acx100_usb_wmemresp_t wmemresp ACX_PACKED;
+	acx100_usb_rmemresp_t rmemresp ACX_PACKED;
+	acx100_usb_bufavail_t bufavail ACX_PACKED;
+	acx100_usb_error_t usberror ACX_PACKED;
+	UINT8 boguspad[3000] ACX_PACKED;
+  } u ACX_PACKED;
+} acx100_usbin_t;
 #endif
 
 #endif /* WLAN_HOSTIF == WLAN_USB */
 
 /*--- Firmware statistics ----------------------------------------------------*/
 typedef struct fw_stats {
-	UINT val0x0;		/* hdr; */
-	UINT tx_desc_of;
-	UINT rx_oom;
-	UINT rx_hdr_of;
-	UINT rx_hdr_use_next;
-	UINT rx_dropped_frame;
-	UINT rx_frame_ptr_err;
-	UINT rx_xfr_hint_trig;
+	UINT val0x0 ACX_PACKED;		/* hdr; */
+	UINT tx_desc_of ACX_PACKED;
+	UINT rx_oom ACX_PACKED;
+	UINT rx_hdr_of ACX_PACKED;
+	UINT rx_hdr_use_next ACX_PACKED;
+	UINT rx_dropped_frame ACX_PACKED;
+	UINT rx_frame_ptr_err ACX_PACKED;
+	UINT rx_xfr_hint_trig ACX_PACKED;
 
-	UINT rx_dma_req;	/* val0x1c */
-	UINT rx_dma_err;	/* val0x20 */
-	UINT tx_dma_req;
-	UINT tx_dma_err;	/* val0x28 */
+	UINT rx_dma_req ACX_PACKED;	/* val0x1c */
+	UINT rx_dma_err ACX_PACKED;	/* val0x20 */
+	UINT tx_dma_req ACX_PACKED;
+	UINT tx_dma_err ACX_PACKED;	/* val0x28 */
 
-	UINT cmd_cplt;
-	UINT fiq;
-	UINT rx_hdrs;		/* val0x34 */
-	UINT rx_cmplt;		/* val0x38 */
-	UINT rx_mem_of;		/* val0x3c */
-	UINT rx_rdys;
-	UINT irqs;
-	UINT acx_trans_procs;
-	UINT decrypt_done;	/* val0x48 */
-	UINT dma_0_done;
-	UINT dma_1_done;
-	UINT tx_exch_complet;
-	UINT commands;
-	UINT acx_rx_procs;
-	UINT hw_pm_mode_changes;
-	UINT host_acks;
-	UINT pci_pm;
-	UINT acm_wakeups;
+	UINT cmd_cplt ACX_PACKED;
+	UINT fiq ACX_PACKED;
+	UINT rx_hdrs ACX_PACKED;		/* val0x34 */
+	UINT rx_cmplt ACX_PACKED;		/* val0x38 */
+	UINT rx_mem_of ACX_PACKED;		/* val0x3c */
+	UINT rx_rdys ACX_PACKED;
+	UINT irqs ACX_PACKED;
+	UINT acx_trans_procs ACX_PACKED;
+	UINT decrypt_done ACX_PACKED;	/* val0x48 */
+	UINT dma_0_done ACX_PACKED;
+	UINT dma_1_done ACX_PACKED;
+	UINT tx_exch_complet ACX_PACKED;
+	UINT commands ACX_PACKED;
+	UINT acx_rx_procs ACX_PACKED;
+	UINT hw_pm_mode_changes ACX_PACKED;
+	UINT host_acks ACX_PACKED;
+	UINT pci_pm ACX_PACKED;
+	UINT acm_wakeups ACX_PACKED;
 
-	UINT wep_key_count;
-	UINT wep_default_key_count;
-	UINT dot11_def_key_mib;
-	UINT wep_key_not_found;
-	UINT wep_decrypt_fail;
+	UINT wep_key_count ACX_PACKED;
+	UINT wep_default_key_count ACX_PACKED;
+	UINT dot11_def_key_mib ACX_PACKED;
+	UINT wep_key_not_found ACX_PACKED;
+	UINT wep_decrypt_fail ACX_PACKED;
 } fw_stats_t;
 
 /* Firmware version struct */
 
 typedef struct fw_ver {
-	UINT16 vala;
-	UINT16 valb;
-	char fw_id[20];
-	UINT32 hw_id;
+	UINT16 vala ACX_PACKED;
+	UINT16 valb ACX_PACKED;
+	char fw_id[20] ACX_PACKED;
+	UINT32 hw_id ACX_PACKED;
 } fw_ver_t;
 
 /*--- IEEE 802.11 header -----------------------------------------------------*/
@@ -1035,15 +1037,15 @@ typedef struct fw_ver {
  * the kernel's struct ieee80_11_hdr from driver/net/wireless/ieee802_11.h */
 typedef struct acx_addr3 {
 	/* IEEE 802.11-1999.pdf chapter 7 might help */
-	UINT16 frame_control __WLAN_ATTRIB_PACK__;	/* 0x00, wlan-ng name */
-	UINT16 duration_id __WLAN_ATTRIB_PACK__;	/* 0x02, wlan-ng name */
-	char address1[0x6] __WLAN_ATTRIB_PACK__;	/* 0x04, wlan-ng name */
-	char address2[0x6] __WLAN_ATTRIB_PACK__;	/* 0x0a */
-	char address3[0x6] __WLAN_ATTRIB_PACK__;	/* 0x10 */
-	UINT16 sequence_control __WLAN_ATTRIB_PACK__;	/* 0x16 */
-	UINT8 *val0x18;
-	struct sk_buff *val0x1c;
-	struct sk_buff *val0x20;
+	UINT16 frame_control ACX_PACKED;	/* 0x00, wlan-ng name */
+	UINT16 duration_id ACX_PACKED;	/* 0x02, wlan-ng name */
+	char address1[0x6] ACX_PACKED;	/* 0x04, wlan-ng name */
+	char address2[0x6] ACX_PACKED;	/* 0x0a */
+	char address3[0x6] ACX_PACKED;	/* 0x10 */
+	UINT16 sequence_control ACX_PACKED;	/* 0x16 */
+	UINT8 *val0x18 ACX_PACKED;
+	struct sk_buff *val0x1c ACX_PACKED;
+	struct sk_buff *val0x20 ACX_PACKED;
 } acx_addr3_t;
 
 /*--- WEP stuff --------------------------------------------------------------*/
@@ -1056,6 +1058,7 @@ typedef struct acx_addr3 {
 #define HOSTWEP_PRIVACYINVOKED		BIT6
 #define HOSTWEP_EXCLUDEUNENCRYPTED	BIT7
 
+/* non-firmware struct --> no packing necessary */
 typedef struct wep_key {
 	UINT8 index;
 	size_t size;
@@ -1065,6 +1068,7 @@ typedef struct wep_key {
 /* FIXME: We don't have size 264! Or is there 2 bytes beyond the key
  * (strange_filler)? */
 
+/* non-firmware struct --> no packing necessary */
 typedef struct key_struct {
 	UINT8 addr[ETH_ALEN];	/* 0x00 */
 	UINT16 filler1;		/* 0x06 */
@@ -1075,6 +1079,7 @@ typedef struct key_struct {
 } key_struct_t;			/* size = 276. FIXME: where is the remaining space?? */
 
 
+/* non-firmware struct --> no packing necessary */
 typedef struct client {
 	UINT16 aid;		/* association ID */
 	char address[ETH_ALEN];	/* 0x2 */
@@ -1095,7 +1100,6 @@ typedef struct client {
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
 	struct	wlandevice 	*priv;
-	UINT32		val0x4;			/* spacing */
 	/* This is the pointer to the beginning of the cards tx queue pool.
 	   The Adress is relative to the internal memory mapping of the card! */
 	UINT32		ui32ACXTxQueueStart;	/* 0x8, official name */
@@ -1103,8 +1107,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	   The Adress is relative to the internal memory mapping of the card! */
 	UINT32		ui32ACXRxQueueStart;	/* 0xc */
 	UINT8		*pTxBufferPool;		/* 0x10 */
-	dma_addr_t	TxBufferPoolPhyAddr;	/* 0x14 */
 	UINT32		TxBufferPoolSize;	/* 0x18 */
+	dma_addr_t	TxBufferPoolPhyAddr;	/* 0x14 */
 	UINT16		TxDescrSize;		/* size per tx descr; ACX111 = ACX100 + 4 */
 	struct	txdescriptor	*pTxDescQPool;	/* V13POS 0x1c, official name */
 	spinlock_t	tx_lock;
@@ -1146,8 +1150,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	dma_addr_t	RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
 	/* UINT32		val0x64; */	/* 0x64, some size */
 	UINT8		*pRxBufferPool;		/* this is supposed to be [rxbuffer *], but it's not defined here, so let's define it as [UINT8 *] */
-	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 	UINT32		RxBufferPoolSize;
+	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 } TIWLAN_DC;
 
 /*--- 802.11 Management capabilities -----------------------------------------*/
@@ -1161,6 +1165,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 #define IEEE802_11_MGMT_CAP_CHAN_AGIL	(1 << 7)
 
 /*--- 802.11 Basic Service Set info ------------------------------------------*/
+/* non-firmware struct --> no packing necessary */
 typedef struct bss_info {
 	UINT8 bssid[ETH_ALEN];	/* BSSID (network ID of the device) */
 	UINT8 mac_addr[ETH_ALEN];	/* MAC address of the station's device */
@@ -1191,6 +1196,7 @@ typedef struct bss_info {
 #define ACX_MODE_3_MANAGED_AP	3
 #define ACX_MODE_FF_AUTO	0xff	/* pseudo mode - not ACX100 related! (accept both Ad-Hoc and Managed stations for association) */
 
+/* non-firmware struct --> no packing necessary */
 struct txrate_ctrl {
 	UINT16  cfg;		      /* Tx rate from iwconfig */
 	UINT16  cur;		      /* the Tx rate we currently use */
@@ -1203,6 +1209,7 @@ struct txrate_ctrl {
 	//TODO: unsigned long txcnt[];
 };
 
+/* non-firmware struct --> no packing necessary */
 struct peer {
 	struct txrate_ctrl txbase;      /* For basic rates */
 	struct txrate_ctrl txrate;      /* For operational rates */
@@ -1212,6 +1219,7 @@ struct peer {
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
  * acx_priv_t) */
 
+/* non-firmware struct --> no packing necessary */
 typedef struct wlandevice {
 	/*** Device chain ***/
 	struct wlandevice	*next;		/* link for list of devices */
@@ -1417,7 +1425,7 @@ typedef struct wlandevice {
 	UINT8		val0x2324_5;
 	UINT8		val0x2324_6;
 	UINT8		val0x2324_7;
-} wlandevice_t __WLAN_ATTRIB_PACK__;
+} wlandevice_t;
 
 /*-- MAC modes --*/
 #define WLAN_MACMODE_NONE	0
@@ -1500,8 +1508,6 @@ typedef struct wlandevice {
 #define SET_RATE_FALLBACK	0x00200000L
 #define GETSET_ALL		0x80000000L
 
-void acx_disable_irq(wlandevice_t *priv);
-void acx_enable_irq(wlandevice_t *priv);
 void acx_schedule_after_interrupt_task(wlandevice_t *priv);
 void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 

@@ -448,7 +448,6 @@ http://www.hazard.maks.net/parprouted/
 
 Trying to use NFS? use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
-
 === DEBUGGING / LOGGING ===
 
 Debug/log levels can be adapted by setting the module's "debug" load parameter
@@ -620,7 +619,7 @@ longer periods may cause trouble).
 
 Maybe basic or operational rate set is set incorrectly, so association
 to an AP fails.
-Try to fix it, with something like iwpriv wlan0 SetRates "1,2 1,2,5,11".
+Try to fix it, e.g. something like iwpriv wlan0 SetRates "1,2 1,2,5,11".
 
 Also, check whether you actually use the newest or a working firmware version.
 In some cases it's actually not this driver but the firmware which is
@@ -637,6 +636,9 @@ or similar file.
 
 Disable any 4X mode feature on your 22Mbps AP, since our driver doesn't support
 4X mode yet and 4X mode is known to cause problems sometimes.
+
+Using IPv6? Make sure to configure an MTU >= 1280, otherwise setting
+the address will fail with an obscure "not enough buffer space" kernel error!
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-((

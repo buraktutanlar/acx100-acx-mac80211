@@ -82,6 +82,7 @@ get_modulation(int r_enum, char suffix) {
 	return -EINVAL;
 }
 
+#if UNUSED
 static int
 fill_ratevector(const char **pstr, u8 *vector, int size,
 		int (*supported)(int mbit, int mod, void *opaque), void *opaque, int or_mask)
@@ -145,6 +146,7 @@ fill_ratevectors(const char *str, u8 *brate, u8 *orate, int size,
 
 	return 0;
 }
+#endif
 
 /* TODO: use u64 masks? */
 

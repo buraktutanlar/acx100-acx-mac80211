@@ -84,8 +84,8 @@
 
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <acx100_conv.h>
 #include <acx100.h>
+#include <acx100_conv.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <idma.h>
@@ -93,6 +93,16 @@
 #include <ihw.h>
 #include <acx80211frm.h>
 
+static client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address); 
+static client_t *acx_sta_list_add(wlandevice_t *priv, const UINT8 *address);
+static inline client_t *acx_sta_list_get_from_hash(wlandevice_t *priv, const UINT8 *address);
+static client_t *acx_sta_list_get(wlandevice_t *priv, const UINT8 *address);
+static UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
+		                          wlandevice_t *priv);
+static UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,
+		                            wlandevice_t *priv);
+static int acx_process_disassoc(wlan_fr_disassoc_t *req, wlandevice_t *priv);
+static int acx_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv);
 static UINT32 acx_process_mgmt_frame(struct rxhostdescriptor *skb,
 				 wlandevice_t *priv);
 static int acx_process_data_frame_master(struct rxhostdescriptor *skb,
@@ -101,6 +111,24 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *skb,
 				     wlandevice_t *priv);
 static int acx_process_NULL_frame(struct rxhostdescriptor *a, 
 			      wlandevice_t *priv, int vala);
+static void acx_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
+ 		                          acxp80211_hdr_t *hdr);
+static int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv);
+static int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv);
+static int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
+ 
+static int acx_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+static int acx_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
+static int acx_transmit_deauthen(const UINT8 *addr, client_t *arg_4, wlandevice_t *priv,
+ 		                      UINT16 reason);
+static int acx_transmit_authen1(wlandevice_t *priv);
+static int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
+ 		                      wlandevice_t *priv);
+static int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+static int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
+static int acx_transmit_assoc_req(wlandevice_t *priv);
+static void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala);
+
 
 alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
@@ -160,7 +188,7 @@ void acx_sta_list_init(wlandevice_t *priv)
  * Hmm, does this function have one "silent" parameter or 0 parameters?
  * Doesn't matter much anyway...
  */
-inline client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address)
+static inline client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address)
 {
 	int i = 0;
 
@@ -198,7 +226,7 @@ inline client_t *acx_sta_list_alloc(wlandevice_t *priv, const UINT8 *address)
 /* acx_sta_list_add()
  * STATUS: FINISHED.
  */
-client_t *acx_sta_list_add(wlandevice_t *priv, const UINT8 *address)
+static client_t *acx_sta_list_add(wlandevice_t *priv, const UINT8 *address)
 {
 	client_t *client;
 	int index;
@@ -276,7 +304,7 @@ static inline client_t *acx_sta_list_get_from_hash(wlandevice_t *priv, const UIN
 /* acx_get_sta_list()
  * STATUS: FINISHED.
  */
-client_t *acx_sta_list_get(wlandevice_t *priv, const UINT8 *address)
+static client_t *acx_sta_list_get(wlandevice_t *priv, const UINT8 *address)
 {
 	client_t *client;
 	client_t *result = NULL;	/* can be removed if tracing unneeded */
@@ -530,7 +558,7 @@ int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *rxdesc)
 /* acx_transmit_assocresp()
  * STATUS: should be ok, but UNVERIFIED.
  */
-UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
+static UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			  wlandevice_t *priv)
 {
 	UINT8 var_1c[6];
@@ -654,7 +682,7 @@ UINT32 acx_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 /* acx_transmit_reassocresp()
  * STATUS: should be ok, but UNVERIFIED.
  */
-UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *priv)
+static UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *priv)
 {
 	UINT8 *da = NULL;
 	UINT8 *sa = NULL;
@@ -774,7 +802,7 @@ UINT32 acx_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *priv)
 /* acx_process_disassoc()
  * STATUS: UNVERIFIED.
  */
-int acx_process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *priv)
+static int acx_process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int res = 0;
@@ -825,7 +853,7 @@ int acx_process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *priv)
 /* acx_process_disassociate()
  * STATUS: UNVERIFIED.
  */
-int acx_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv)
+static int acx_process_disassociate(wlan_fr_disassoc_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int res = 0;
@@ -1055,7 +1083,7 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlande
 	 * interface (ifconfig) */
 
 	/* check if it is our bssid */
-        if (OK =! acx_is_mac_address_equal(priv->bssid, bssid)) {
+        if (OK != acx_is_mac_address_equal(priv->bssid, bssid)) {
 		/* is not our bssid, so bail out */
 		goto done;
 	}
@@ -1439,7 +1467,7 @@ done:
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
+static void acx_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 			  acxp80211_hdr_t *hdr)
 {
 	UINT8 *pSuppRates;
@@ -1602,7 +1630,7 @@ inline const char * const get_status_string(int status)
 /* acx_process_assocresp()
  * STATUS: should be ok, UNVERIFIED.
  */
-int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
+static int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int res = NOT_OK;
@@ -1665,7 +1693,7 @@ int acx_process_assocresp(wlan_fr_assocresp_t *req, wlandevice_t *priv)
 /* acx_process_reassocresp()
  * STATUS: should be ok, UNVERIFIED.
  */
-int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv)
+static int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr = req->hdr;
 	int result = 4;
@@ -1696,7 +1724,7 @@ int acx_process_reassocresp(wlan_fr_reassocresp_t *req, wlandevice_t *priv)
 /* acx_process_authen()
  * STATUS: FINISHED, UNVERIFIED.
  */
-int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
+static int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	client_t *clt;
@@ -1845,7 +1873,7 @@ end:
 /* acx_process_deauthen()
  * STATUS: FINISHED, UNVERIFIED.
  */
-int acx_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
+static int acx_process_deauthen(wlan_fr_deauthen_t *arg_0, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 	int result;
@@ -1943,7 +1971,7 @@ end:
 /* acx_process_deauthenticate()
  * STATUS: FINISHED, UNVERIFIED.
  */
-int acx_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv)
+static int acx_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv)
 {
 	p80211_hdr_t *hdr;
 
@@ -2128,7 +2156,7 @@ static void acx_ibssid_gen(wlandevice_t *priv, unsigned char *p_out)
 /* acx_transmit_deauthen()
  * STATUS: should be ok, but UNVERIFIED.
  */
-int acx_transmit_deauthen(const UINT8 *addr, client_t *clt, wlandevice_t *priv, UINT16 reason)
+static int acx_transmit_deauthen(const UINT8 *addr, client_t *clt, wlandevice_t *priv, UINT16 reason)
 {
 	TxData *hd;
 	struct deauthen_frame_body *payload;
@@ -2206,7 +2234,7 @@ int acx_transmit_deauthen(const UINT8 *addr, client_t *clt, wlandevice_t *priv, 
 /* acx_transmit_authen1()
  * STATUS: UNVERIFIED
  */
-int acx_transmit_authen1(wlandevice_t *priv)
+static int acx_transmit_authen1(wlandevice_t *priv)
 {
 	struct auth_frame_body *payload;
 	struct txdescriptor *tx_desc;
@@ -2277,7 +2305,7 @@ int acx_transmit_authen1(wlandevice_t *priv)
 /* acx_transmit_authen2()
  * STATUS: UNVERIFIED. (not binary compatible yet)
  */
-int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
+static int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 		      wlandevice_t *priv)
 {
 	UINT32 packet_len;
@@ -2369,7 +2397,7 @@ int acx_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 /* acx_transmit_authen3()
  * STATUS: UNVERIFIED.
  */
-int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
+static int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 {
 	UINT32 packet_len;
 	struct txdescriptor *tx_desc;
@@ -2448,7 +2476,7 @@ int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 /* acx_transmit_authen4()
  * STATUS: UNVERIFIED.
  */
-int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
+static int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 {
 	struct txdescriptor *tx_desc;
 	struct txhostdescriptor *hdesc_header;
@@ -2516,7 +2544,7 @@ int acx_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 /* acx_transmit_assoc_req()
  * STATUS: almost ok, but UNVERIFIED.
  */
-int acx_transmit_assoc_req(wlandevice_t *priv)
+static int acx_transmit_assoc_req(wlandevice_t *priv)
 {
 	UINT32 packet_len;
 	struct txdescriptor *tx_desc;
@@ -2882,7 +2910,7 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 /* ActivatePowerSaveMode()
  * STATUS: FINISHED, UNVERIFIED.
  */
-void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala)
+static void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala)
 {
        acx100_ie_powermgmt_t pm;
 
