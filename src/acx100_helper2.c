@@ -243,10 +243,10 @@ static client_t *acx_sta_list_add(wlandevice_t *priv, const u8 *address)
 
 	acxlog(L_BINSTD | L_ASSOC,
 	       "<acx_sta_list_add> sta = %02X:%02X:%02X:%02X:%02X:%02X\n",
-	       address[0], address[1], address[2], address[3], address[4],
-	       address[5]);
+	       address[0], address[1], address[2],
+	       address[3], address[4], address[5]);
 
-      done:
+done:
 	FN_EXIT(1, (int) client);
 	return client;
 }
@@ -317,7 +317,7 @@ static client_t *acx_sta_list_get(wlandevice_t *priv, const u8 *address)
 		}
 	}
 
-      done:
+done:
 	FN_EXIT(1, (int) result);
 	return result;
 }
@@ -558,7 +558,6 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *arg_0,
 	client_t *clt;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	/* FIXME: or is the order the other way round ?? */
 	var_1c[0] = 0;
 	var_1c[1] = 1;
@@ -681,7 +680,6 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *arg_0, wlandevic
 	TxData *fr;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if (WLAN_GET_FC_TODS(ieee2host16(arg_0->hdr->a3.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(arg_0->hdr->a3.fc))) {
 		FN_EXIT(1, NOT_OK);
 		return NOT_OK;
@@ -795,7 +793,6 @@ static int acx_process_disassoc(const wlan_fr_disassoc_t *arg_0, wlandevice_t *p
 	client_t *clts;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = arg_0->hdr;
 
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a4.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a4.fc)))
@@ -844,7 +841,6 @@ static int acx_process_disassociate(const wlan_fr_disassoc_t *req, wlandevice_t 
 	int res = 0;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a3.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a3.fc)))
@@ -899,7 +895,6 @@ static int acx_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlande
 	const u8 *bssid = NULL;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
         p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
 
@@ -1139,7 +1134,6 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 	unsigned int wep_offset = 0;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
 	if (WLAN_GET_FC_ISWEP(ieee2host16(p80211_hdr->a3.fc))) {
@@ -1407,8 +1401,6 @@ static int acx_process_NULL_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 	const client_t *resclt = NULL;
 	int result = NOT_OK;
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-
 	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
 		
 	fc = ieee2host16(p80211_hdr->a3.fc);
@@ -1479,7 +1471,7 @@ static void acx_process_probe_response(const struct rxbuffer *mmt, wlandevice_t 
 	u8 rate_count;
 	unsigned int i, max_rate = 0;
 
-	acxlog(L_STATE, "%s: UNVERIFIED, previous bss_table_count: %u.\n",
+	acxlog(L_ASSOC, "%s: previous bss_table_count: %u.\n",
 	       __func__, priv->bss_table_count);
 
 	FN_ENTER;
@@ -1641,7 +1633,6 @@ static int acx_process_assocresp(const wlan_fr_assocresp_t *req, wlandevice_t *p
 /*	acx_ie_generic_t pdr; */
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a4.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a4.fc)))
@@ -1690,7 +1681,6 @@ static int acx_process_reassocresp(const wlan_fr_reassocresp_t *req, wlandevice_
 	int result = 4;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a3.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a3.fc))) {
 		result = 1;
@@ -1722,7 +1712,6 @@ static int acx_process_authen(const wlan_fr_authen_t *req, wlandevice_t *priv)
 	int result = NOT_OK;
 
 	FN_ENTER;
-	acxlog(L_STATE|L_ASSOC, "%s: UNVERIFIED.\n", __func__);
 	hdr = req->hdr;
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a3.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a3.fc))) {
 		result = NOT_OK;
@@ -1872,7 +1861,6 @@ static int acx_process_deauthen(const wlan_fr_deauthen_t *arg_0, wlandevice_t *p
 	client_t *client, *resclt = NULL;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	hdr = arg_0->hdr;
 
@@ -1966,7 +1954,6 @@ static int acx_process_deauthenticate(const wlan_fr_deauthen_t *req, wlandevice_
 	const p80211_hdr_t *hdr;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	acxlog(L_STD, "processing deauthenticate packet. Hmm, should this have happened?\n");
 	hdr = req->hdr;
 	if (WLAN_GET_FC_TODS(ieee2host16(hdr->a3.fc)) || WLAN_GET_FC_FROMDS(ieee2host16(hdr->a3.fc)))
@@ -2016,7 +2003,6 @@ static void acx_get_random(u8 *s, u16 stack)
 	u32 ran = 0;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	seed[0] = (u8)0;
 	seed[1] = (u8)0;
 	seed[2] = (u8)0;
@@ -2155,7 +2141,6 @@ static int acx_transmit_deauthen(const u8 *addr, client_t *clt, wlandevice_t *pr
 	struct txhostdescriptor *hdesc_payload;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
 		return NOT_OK;
@@ -2232,8 +2217,6 @@ static int acx_transmit_authen1(wlandevice_t *priv)
 	struct txhostdescriptor *hdesc_payload;
 	TxData *hd;
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-
 	FN_ENTER;
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending authentication1 request, awaiting response!\n");
@@ -2306,7 +2289,6 @@ static int acx_transmit_authen2(const wlan_fr_authen_t *arg_0, client_t *sta_lis
 	TxData *hd;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	packet_len = WLAN_HDR_A3_LEN;
 
 	if (sta_list != NULL) {
@@ -2398,7 +2380,6 @@ static int acx_transmit_authen3(const wlan_fr_authen_t *arg_0, wlandevice_t *pri
 	struct auth_frame_body *payload;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
 		FN_EXIT(1, NOT_OK);
 		return OK;
@@ -2477,7 +2458,6 @@ static int acx_transmit_authen4(const wlan_fr_authen_t *arg_0, wlandevice_t *pri
 	struct auth_frame_body *payload;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
 		FN_EXIT(1, NOT_OK);
@@ -2547,7 +2527,6 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	u8 *pCurrPos;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending association request, awaiting response! NOT ASSOCIATED YET.\n");
 	if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
@@ -2666,7 +2645,6 @@ u32 acx_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 	TxData *hd;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 /*	if (clt != NULL) { */
 		if ((tx_desc = acx_get_tx_desc(priv)) == NULL) {
 			FN_EXIT(1, NOT_OK);
@@ -2755,7 +2733,6 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 	for (idx = 0; idx < priv->bss_table_count; idx++) {
 		struct bss_info *this_bss = &priv->bss_table[idx];
 
-		/* V3CHANGE: dbg msg in V1 only */
 		acxlog(L_BINDEBUG | L_ASSOC,
 		       "<Scan Table> %d: SSID=\"%s\",CH=%d,SIR=%d,SNR=%d\n",
 		       (int) idx,
@@ -2767,10 +2744,30 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 		if (OK != acx_is_mac_address_broadcast(priv->ap))
 			if (OK != acx_is_mac_address_equal(this_bss->bssid, priv->ap))
 				continue;
-		if (!(this_bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)))
+
+		/* broken peer with no mode flags set? */
+		if (0 == (this_bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)))
 		{
-			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc! Firmware upgrade of the peer might be useful...\n");
-			SET_BIT(this_bss->caps, IEEE802_11_MGMT_CAP_IBSS);
+			u16 new_mode = IEEE802_11_MGMT_CAP_ESS;
+			const char *mode_str;
+
+			switch(priv->macmode_wanted) {
+				case ACX_MODE_0_IBSS_ADHOC:
+					new_mode = IEEE802_11_MGMT_CAP_IBSS;
+					mode_str = "Ad-Hoc";
+					break;
+				case ACX_MODE_2_MANAGED_STA:
+					mode_str = "Managed";
+					break;
+				case ACX_MODE_FF_AUTO:
+					mode_str = "Auto: chose Managed";
+					break;
+				default:
+					mode_str = "Unknown: chose Managed";
+					break;
+			}
+			acxlog(L_ASSOC, "STRANGE: peer station announces neither ESS (Managed) nor IBSS (Ad-Hoc) capability: patching to assume our currently wanted mode (%s)! Firmware upgrade of the peer would be a good idea...\n", mode_str);
+			SET_BIT(this_bss->caps, new_mode);
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%04x, needed_cap 0x%04x\n",
 		       this_bss->caps, needed_cap);
@@ -2908,7 +2905,6 @@ static void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala)
        acx100_ie_powermgmt_t pm;
 
        FN_ENTER;
-       acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
        acx_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
        if (pm.wakeup_cfg != (u8)0x81) {
@@ -2950,7 +2946,6 @@ void acx_timer(unsigned long address)
 #endif
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: status = %d\n", __func__,
 		priv->status);
 

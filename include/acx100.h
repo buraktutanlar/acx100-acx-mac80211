@@ -68,7 +68,7 @@
 #define L_ASSOC		0x08	/* assocation (network join) and station log */
 #define L_BIN		0x10	/* original messages from binary drivers */
 #define L_FUNC		0x20	/* logging of function enter / leave */
-#define L_STATE		0x40	/* log of function implementation state */
+#define L_UNUSED1	0x40	/* unused */
 #define L_XFER		0x80	/* logging of transfers and mgmt */
 #define L_DATA		0x100	/* logging of transfer data */
 #define L_DEBUG		0x200	/* log of debug info */

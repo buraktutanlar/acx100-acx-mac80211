@@ -281,7 +281,7 @@ static int acx_resume(struct pci_dev *pdev);
 #define __devexit_p(x) x
 #endif
 
-#ifndef pci_name
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 11)
 /* pci_name() got introduced at start of 2.6.x,
  * got mandatory (slot_name member removed) in 2.6.11-bk1 */
 #define pci_name(x) x->slot_name
@@ -338,7 +338,8 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 	unsigned int fw_major = 0, fw_minor = 0, fw_sub = 0, fw_extra = 0;
 	unsigned int hexarr[4] = { 0, 0, 0, 0 };
 	unsigned int hexidx = 0, val = 0;
-	char *num, c;
+	const char *num;
+	char c;
 
 	FN_ENTER;
 	
@@ -612,9 +613,7 @@ static void acx_device_chain_remove(struct net_device *dev)
 *
 * STATUS: should be pretty much ok. UNVERIFIED.
 *
-* Comment: The function was rewritten according to the V3 driver.
-*	The debugging information from V1 is left even if
-*	absent from V3.
+* Comment:
 ----------------------------------------------------------------*/
 static int __devinit
 acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -1200,13 +1199,13 @@ static void acx_up(netdevice_t *dev)
 	acx_enable_irq(priv);
 	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111) ) /* FIXME: first version? */ {
 		/* newer firmware versions don't use a hardware timer any more */
-		acxlog(L_INIT, "firmware version >= 1.9.3.e --> using S/W timer\n");
+		acxlog(L_INIT, "ACX100 f/w ver >= 1.9.3.e or ACX111 --> using s/w timer\n");
 		init_timer(&priv->mgmt_timer);
 		priv->mgmt_timer.function = acx_timer;
 		priv->mgmt_timer.data = (unsigned long)priv;
 	}
 	else {
-		acxlog(L_INIT, "firmware version < 1.9.3.e --> using H/W timer\n");
+		acxlog(L_INIT, "ACX100 f/w ver < 1.9.3.e --> using h/w timer\n");
 	}
 	/* FIXME: explicitly calling this here doesn't seem too clean... */
 	if ( CHIPTYPE_ACX111 == priv->chip_type ) {
@@ -2047,6 +2046,11 @@ MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
 static int __init acx_init_module(void)
 {
 	int res;
+#ifdef __LITTLE_ENDIAN
+	const char *endianness = "little-endian";
+#else
+	const char *endianness = "BIG-ENDIAN";
+#endif
 
 	FN_ENTER;
 
@@ -2069,13 +2073,7 @@ static int __init acx_init_module(void)
 	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode.\n");
 #endif
 
-	acxlog(L_STD, "Running on a "
-#ifdef __LITTLE_ENDIAN
-		"little-endian"
-#else
-		"BIG-ENDIAN"
-#endif
-		" CPU.\n");
+	acxlog(L_STD, "Running on a %s CPU.\n", endianness);
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
 	acxlog(L_STD|L_INIT, "%s: %s Driver initialized, waiting for cards to probe...\n", __func__, version);
 

@@ -117,7 +117,6 @@ void p802addr_to_str(char *buf, u8 *addr)
 	int addrindex;
 	char c;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	for (addrindex = 0; addrindex < ETH_ALEN; addrindex++) {
 		c = '0' + (((unsigned)addr[addrindex]) >> 4);
 		if(c>'9') c+='a'-'9'-1;
@@ -160,7 +159,6 @@ void p802addr_to_str(char *buf, u8 *addr)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_beacon(wlan_fr_beacon_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_BEACON;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -208,7 +206,6 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	f->type = WLAN_FSTYPE_BEACON;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -296,7 +293,6 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_ibssatim(wlan_fr_ibssatim_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_ATIM;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -379,7 +375,6 @@ void acx_mgmt_decode_ibssatim(wlan_fr_ibssatim_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_DISASSOC;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -420,7 +415,6 @@ void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_DISASSOC;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -468,7 +462,6 @@ void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_assocreq(wlan_fr_assocreq_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_ASSOCREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -515,7 +508,6 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_ASSOCREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -587,7 +579,6 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_assocresp(wlan_fr_assocresp_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_ASSOCRESP;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -688,7 +679,6 @@ void acx_mgmt_decode_assocresp(wlan_fr_assocresp_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_REASSOCREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -738,7 +728,6 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_REASSOCREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -812,7 +801,6 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_REASSOCRESP;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -913,7 +901,6 @@ void acx_mgmt_decode_reassocresp(wlan_fr_reassocresp_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_probereq(wlan_fr_probereq_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_PROBEREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -953,7 +940,6 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_PROBEREQ;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -1069,7 +1055,6 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_PROBERESP;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -1155,7 +1140,6 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_authen(wlan_fr_authen_t * f)
 {
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_AUTHEN;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -1205,7 +1189,6 @@ void acx_mgmt_decode_authen(wlan_fr_authen_t * f)
 {
 	wlan_ie_t *ie_ptr;
 
-	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_AUTHEN;
 	f->hdr = (p80211_hdr_t *) f->buf;
 
@@ -1264,7 +1247,6 @@ void acx_mgmt_decode_authen(wlan_fr_authen_t * f)
 --------------------------------------------------------------*/
 void acx_mgmt_encode_deauthen(wlan_fr_deauthen_t * f)
 {
-	acxlog(L_STATE, "%s: NONV3.\n", __func__);
 	f->type = WLAN_FSTYPE_DEAUTHEN;
 	f->hdr = (p80211_hdr_t *) f->buf;
 

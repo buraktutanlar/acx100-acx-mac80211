@@ -708,50 +708,40 @@ static int acx_read_proc_phy(char *buf, char **start, off_t offset, int count,
 	return length;
 }
 
-u16 acx_proc_register_entries(const struct net_device *dev)
+static const char *proc_files[] = { "", "_diag", "_eeprom", "_phy" };
+static void *acx_proc_funcs[] = { acx_read_proc, acx_read_proc_diag, acx_read_proc_eeprom, acx_read_proc_phy };
+u16 manage_proc_entries(const struct net_device *dev, int remove)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	char procbuf[80];
+	int i;
 
-	sprintf(procbuf, "driver/acx_%s", dev->name);
-	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
-        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc, priv))
-		return NOT_OK;
-
-	sprintf(procbuf, "driver/acx_%s_diag", dev->name);
-	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
-        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_diag, priv))
-		return NOT_OK;
-
-	sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
-	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
-        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_eeprom, priv))
-		return NOT_OK;
-	sprintf(procbuf, "driver/acx_%s_phy", dev->name);
-	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
-        if (!create_proc_read_entry(procbuf, 0, 0, acx_read_proc_phy, priv))
-		return NOT_OK;
-	
+	for (i = 0; i < 4; i++)
+	{
+		sprintf(procbuf, "driver/acx_%s", dev->name);
+		strcat(procbuf, proc_files[i]);
+		if (!remove) {
+			acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+			if (!create_proc_read_entry(procbuf, 0, 0, acx_proc_funcs[i], priv))
+				return NOT_OK;
+		}
+		else
+		{
+			acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+			remove_proc_entry(procbuf, NULL);
+		}
+	}
 	return OK;
+}
+
+u16 acx_proc_register_entries(const struct net_device *dev)
+{
+	return manage_proc_entries(dev, 0);
 }
 
 u16 acx_proc_unregister_entries(const struct net_device *dev)
 {
-	char procbuf[80];
-
-	sprintf(procbuf, "driver/acx_%s_phy", dev->name);
-	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
-       	remove_proc_entry(procbuf, NULL);
-	sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
-	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
-       	remove_proc_entry(procbuf, NULL);
-	sprintf(procbuf, "driver/acx_%s_diag", dev->name);
-	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
-       	remove_proc_entry(procbuf, NULL);
-	sprintf(procbuf, "driver/acx_%s", dev->name);
-	acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
-       	remove_proc_entry(procbuf, NULL);
-	return OK;
+	return manage_proc_entries(dev, 1);
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -1011,7 +1001,7 @@ fail:
 * STATUS: fixed some horrible bugs, should be ok now. FINISHED.
 ----------------------------------------------------------------*/
 
-int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
+static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
 {
 	int counter;
 	unsigned int i;
@@ -1103,7 +1093,7 @@ int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 off
 * STATUS: FINISHED.
 ----------------------------------------------------------------*/
 
-int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
+static int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
 {
 	int result = OK;
 	/* we skip the first four bytes which contain the control sum. */
@@ -1200,8 +1190,8 @@ int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 
 *
 *----------------------------------------------------------------*/
 
-char default_firmware_dir[] = "/usr/share/acx";
-int acx_upload_fw(wlandevice_t *priv)
+static char default_firmware_dir[] = "/usr/share/acx";
+static int acx_upload_fw(wlandevice_t *priv)
 {
 	int res1 = NOT_OK;
 	int res2 = NOT_OK;
@@ -1647,8 +1637,6 @@ int acx_init_wep(wlandevice_t *priv)
 
 	FN_ENTER;
 	
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-
 	if (OK != acx_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_STD, "ctlMemoryMapRead FAILED\n");
 		goto fail;
@@ -3904,7 +3892,7 @@ void acx_set_timer(wlandevice_t *priv, u32 timeout)
 {
 	FN_ENTER;
 
-	acxlog(L_BINDEBUG | L_IRQ, "<acx_set_timer> Elapse = %d\n", timeout);
+	acxlog(L_BINDEBUG | L_IRQ, "<%s> Elapse = %d\n", __func__, timeout);
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		acxlog(L_STD, "attempt to set the timer when the card interface is not up!\n");
 		FN_EXIT(0, 0);
@@ -3992,7 +3980,7 @@ void acx_update_capabilities(wlandevice_t *priv)
 * STATUS: FINISHED.
 * 	  NOT ADAPTED FOR ACX111 !!
 *
-* Comment: This function was in V3 driver only.
+* Comment:
 ----------------------------------------------------------------*/
 u16 acx_read_eeprom_offset(wlandevice_t *priv,
 					u32 addr, u8 *charbuf)
@@ -4019,7 +4007,7 @@ u16 acx_read_eeprom_offset(wlandevice_t *priv,
 		}
 	}
 
-	*charbuf = (unsigned char) acx_read_reg8(priv, priv->io[IO_ACX_EEPROM_DATA]);
+	*charbuf = acx_read_reg8(priv, priv->io[IO_ACX_EEPROM_DATA]);
 	acxlog(L_DEBUG, "EEPROM read 0x%04x --> 0x%02x\n", addr, *charbuf); 
 	result = OK;
 
@@ -4161,7 +4149,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	}
 
 	acxlog(L_DEBUG, "count was %d\n", count);
-	*charbuf = (u8)acx_read_reg8(priv, priv->io[IO_ACX_PHY_DATA]);
+	*charbuf = acx_read_reg8(priv, priv->io[IO_ACX_PHY_DATA]);
 	
 #ifdef BROKEN_KILLS_TRAFFIC
 	acx_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
