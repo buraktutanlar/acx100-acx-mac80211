@@ -2476,8 +2476,8 @@ int acx111_recalib_radio(wlandevice_t *priv)
 	acx111_cmd_radiocalib_t cal;
 
 	acxlog(L_STD, "recalibrating ACX111 radio. Not tested yet, please report status!!\n");
-	cal.methods = 0x8000000f; /* automatic recalibration, choose all methods */
-	cal.interval = 58594; /* automatic recalibration every 60 seconds (value in TUs) FIXME: what is the firmware default here?? */
+	cal.methods = cpu_to_le32(0x8000000f); /* automatic recalibration, choose all methods */
+	cal.interval = cpu_to_le32(58594); /* automatic recalibration every 60 seconds (value in TUs) FIXME: what is the firmware default here?? */
 
 	return acx_issue_cmd(priv, ACX111_CMD_RADIOCALIB, &cal, sizeof(cal), ACX_CMD_TIMEOUT_DEFAULT);
 }
@@ -3673,7 +3673,7 @@ acx_join_bssid(wlandevice_t *priv)
 		** defined with JOINBSS_RATES_BASIC111_nnn.
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
-		tmp.u.acx111.rates_basic = priv->defpeer.txbase.cfg;
+		tmp.u.acx111.rates_basic = cpu_to_le16(priv->defpeer.txbase.cfg);
 		acxlog(L_ASSOC, "%s rates_basic 0x%04x, rates_supported 0x%04x\n", __func__, priv->defpeer.txbase.cfg, priv->defpeer.txrate.cfg);
 	} else {
 		tmp.u.acx100.dtim_interval = dtim_interval;

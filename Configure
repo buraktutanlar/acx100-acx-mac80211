@@ -165,7 +165,7 @@ then
 		$ECHO "Symmetric multiprocessing support (CONFIG_SMP) is disabled."
 	else
 		$ECHO "WARNING: Symmetric multiprocessing support (CONFIG_SMP) is enabled. If you"
-		$ECHO "really have more than one cpu, be warned that this driver is not yet SMP safe."
+		$ECHO "really have more than one cpu, be warned that this driver might still be not SMP safe."
 		WARNING_FLAG=1
 	fi
 	if is_unset CONFIG_USB

@@ -597,7 +597,9 @@ card due to the card having IDs 0xffff etc., then play with Linux boot
 parameters, specifically the "pci=XXXX" flags, and most specifically,
 "pci=assign-busses", since this managed to fix it for several persons
 (DWL-650+, Vigor520).
-Please tell us if this managed to resolve some issue with a particular card!
+If a PCI memory region cannot be reserved, then you may need to tell the
+CardBus driver to use a different memory region, as reported in one case.
+Please tell us if these managed to resolve some issue with a particular card!
 Use tools like "cardctl info", "lspci -v", "dump_cis".
 Also, make sure to shuffle cards in different PCI slots!! The ACX1xx probably
 needs PCI bus mastering support, and some motherboards either don't support it
@@ -726,6 +728,10 @@ a maximum rate that's compatible with the maximum rate of your peer
 
 If traffic is problematic in case other peers are active, then fiddling with
 iwconfig rts might help.
+
+Multicast not working? The driver is currently not fully handling multicast.
+See https://sourceforge.net/forum/message.php?msg_id=2361212 for discussion
+and (semi-)solutions.
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-(

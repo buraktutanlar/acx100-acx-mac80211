@@ -241,6 +241,14 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	 * flags at the exact moment this is needed...
 	 * FIXME: what about Ctl2? Equally problematic? */
 
+	/* uhoh, but acx111 does need a reset here, otherwise it breaks acx111
+	 * traffic completely. FIXME: clearing Ctl_8 completely remains wrong,
+	 * and it will probably cause the same timing issues as observed
+	 * with acx100, so we should find out proper flag management soon
+	 * instead of doing such crude hacks */
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
+		Ctl_8 = 0;
+	}
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
@@ -1680,7 +1688,7 @@ fail:
 }
 
 /*----------------------------------------------------------------
-* acx_create_tx_desc_queue
+* acx100_create_tx_desc_queue
 *
 *
 * Arguments:
@@ -1699,7 +1707,7 @@ fail:
 
 /* optimized to nothing - it's a compile-time check, really */
 extern void error_txdescriptor_must_be_0x30_bytes_in_length(void);
-static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
+static void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 
@@ -1707,8 +1715,8 @@ static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
 	u32 i;
 	struct txdescriptor *tx_desc;
 	struct txhostdescriptor *tx_hostdesc;
+
 	dma_addr_t hostmemptr; /* remains 0 in USB case */
-	u8 ctl_init = 0x0;
 
 	FN_ENTER;
 
@@ -1718,14 +1726,9 @@ static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
 
 	if(sizeof(struct txdescriptor) != 0x30)
 		error_txdescriptor_must_be_0x30_bytes_in_length();
-
+	/* the acx111 txdescriptor is 4 bytes larger */
 	if(priv->chip_type == CHIPTYPE_ACX111) {
-		/* the acx111 txdescriptor is 4 bytes larger */
 		pDc->TxDescrSize = sizeof(struct txdescriptor)+4;
-
-		ctl_init = DESC_CTL_HOSTOWN;
-	} else if (priv->chip_type == CHIPTYPE_ACX100) {
-		ctl_init = DESC_CTL_INIT;
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1775,7 +1778,7 @@ static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
 		 * in some cases */
 		tx_desc->HostMemPtr = cpu_to_le32(hostmemptr);
 		/* initialise ctl */
-		tx_desc->Ctl_8 = ctl_init;
+		tx_desc->Ctl_8 = DESC_CTL_INIT;
 		/* point to next txdesc */
 		tx_desc->pNextDesc = cpu_to_le32(mem_offs + pDc->TxDescrSize);
 		/* pointer to first txhostdesc */
@@ -1803,7 +1806,7 @@ static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
 }
 
 /*----------------------------------------------------------------
-* acx_create_rx_desc_queue
+* acx100_create_rx_desc_queue
 *
 *
 * Arguments:
@@ -1820,7 +1823,7 @@ static void acx_create_tx_desc_queue(TIWLAN_DC *pDc)
 *
 *----------------------------------------------------------------*/
 
-static void acx_create_rx_desc_queue(TIWLAN_DC *pDc)
+static void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -2104,8 +2107,8 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	pDc->pTxDescQPool = NULL;
 	pDc->pRxDescQPool = NULL;
 
-	acx_create_tx_desc_queue(pDc);
-	acx_create_rx_desc_queue(pDc);
+	acx100_create_tx_desc_queue(pDc);
+	acx100_create_rx_desc_queue(pDc);
 	if (OK != acx_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_STD, "Failed to read memory map\n");
 		goto fail;
@@ -2268,8 +2271,8 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 				     le32_to_cpu(queueconf.rx1_queue_address));
 	pDc->ui32ACXRxQueueStart = le32_to_cpu(queueconf.rx1_queue_address);
 
-	acx_create_tx_desc_queue(pDc);
-	acx_create_rx_desc_queue(pDc);
+	acx100_create_tx_desc_queue(pDc);
+	acx100_create_rx_desc_queue(pDc);
 
 	FN_EXIT(1, OK);
 	return OK;

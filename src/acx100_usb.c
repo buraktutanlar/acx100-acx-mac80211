@@ -329,6 +329,9 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 	int numconfigs,numfaces,result;
 	struct usb_config_descriptor *config;
 	struct usb_endpoint_descriptor *epdesc;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
+	struct usb_host_endpoint *ep;
+#endif
 	struct usb_interface_descriptor *ifdesc;
 	int i,j,numep;
 #if USB_24
@@ -405,8 +408,14 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		priv->bulkoutep=1;
 		priv->bulkinep=1;
 		for (i=0;i<numep;i++) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
+			ep = usbdev->ep_in[i];
+			if(!ep) continue;
+			epdesc = &ep->desc;
+#else
 			epdesc=usb_epnum_to_ep_desc(usbdev,i);
 			if (!epdesc) continue;
+#endif
 			if ((epdesc->bmAttributes)&USB_ENDPOINT_XFER_BULK) {
 				if ((epdesc->bEndpointAddress)&0x80) priv->bulkinep=(epdesc->bEndpointAddress)&0xF;
 				else priv->bulkoutep=(epdesc->bEndpointAddress)&0xF;
@@ -1801,13 +1810,26 @@ static void dump_device(struct usb_device *usbdev)
   printk(KERN_INFO "  tt: 0x%X\n",(unsigned int)(usbdev->tt));
   printk(KERN_INFO "  ttport: %d\n",(unsigned int)(usbdev->ttport));
   printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",(unsigned int)(usbdev->toggle[0]),(unsigned int)(usbdev->toggle[1]));
-  /* printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]); halted removed in 2.6.9-rc1 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 9)
+  /* halted removed in 2.6.9-rc1 */
+  printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]);
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
+  /* This saw a change after 2.6.10 */
+  printk(KERN_INFO "  ep_in wMaxPacketSize: ");
+  for(i = 0; i < 16; ++i) printk("%d ", usbdev->ep_in[i]->desc.wMaxPacketSize);
+  printk("\n");
+  printk(KERN_INFO "  ep_out wMaxPacketSize: ");
+  for(i = 0; i < 15; ++i) printk("%d ", usbdev->ep_out[i]->desc.wMaxPacketSize);
+  printk("\n");
+#else
   printk(KERN_INFO "  epmaxpacketin: ");
   for (i=0;i<16;i++) printk("%d ",usbdev->epmaxpacketin[i]);
   printk("\n");
   printk(KERN_INFO "  epmaxpacketout: ");
   for (i=0;i<16;i++) printk("%d ",usbdev->epmaxpacketout[i]);
   printk("\n");
+#endif
   printk(KERN_INFO "  parent: 0x%X\n",(unsigned int)(usbdev->parent));
   printk(KERN_INFO "  bus: 0x%X\n",(unsigned int)(usbdev->bus));
 #if NO_DATATYPE

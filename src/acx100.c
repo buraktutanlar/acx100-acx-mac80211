@@ -275,10 +275,16 @@ static int acx_suspend(struct pci_dev *pdev, u32 state);
 static int acx_resume(struct pci_dev *pdev);
 #endif
 
+/* FIXME: checks should be removed once driver is included in the kernel */
 #ifndef __devexit_p
-/* FIXME: check should be removed once driver is included in the kernel */
 #warning *** your kernel is EXTREMELY old since it does not even know about __devexit_p - this driver could easily FAIL to work, so better upgrade your kernel! ***
 #define __devexit_p(x) x
+#endif
+
+#ifndef pci_name
+/* pci_name() got introduced at start of 2.6.x,
+ * got mandatory (slot_name member removed) in 2.6.11-bk1 */
+#define pci_name(x) x->slot_name
 #endif
 
 /*@-fullinitblock@*/
@@ -717,7 +723,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
 	       "Found %s-based wireless network card at %s, irq:%d, phymem1:0x%lx, phymem2:0x%lx, mem1:0x%p, mem1_size:%ld, mem2:0x%p, mem2_size:%ld\n",
-	       chip_name, (char *)pdev->slot_name /* was: pci_name(pdev) */, pdev->irq, phymem1, phymem2,
+	       chip_name, pci_name(pdev), pdev->irq, phymem1, phymem2,
 	       mem1, mem_region1_size,
 	       mem2, mem_region2_size);
 	acxlog(0xffff, "initial debug setting is 0x%04x\n", debug);
@@ -1787,7 +1793,6 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 	}
 		
 	CLEAR_BIT(irqtype, priv->irq_mask); /* check only "interesting" IRQ types */
-	/* pm_access(priv->pm); OUTDATED, thus disabled at the moment */
 	acxlog(L_IRQ, "IRQTYPE: 0x%X, irq_mask: 0x%X\n", irqtype, priv->irq_mask);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
@@ -2064,6 +2069,13 @@ static int __init acx_init_module(void)
 	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode.\n");
 #endif
 
+	acxlog(L_STD, "Running on a "
+#ifdef __LITTLE_ENDIAN
+		"little-endian"
+#else
+		"BIG-ENDIAN"
+#endif
+		" CPU.\n");
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
 	acxlog(L_STD|L_INIT, "%s: %s Driver initialized, waiting for cards to probe...\n", __func__, version);
 
