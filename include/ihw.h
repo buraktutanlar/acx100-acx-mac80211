@@ -63,8 +63,8 @@ typedef struct mac {
 	+ (readw(priv->iobase + offset + 2) << 16)
 #define acx100_write_reg32(priv, offset, val) \
 	do { \
-		writew(val & 0xffff, priv->iobase + offset); \
-		writew(val >> 16, priv->iobase + offset + 2); \
+		writew((val) & 0xffff, priv->iobase + offset); \
+		writew((val) >> 16, priv->iobase + offset + 2); \
 	} while (0)
 #endif
 #define acx100_read_reg16(priv, offset) \

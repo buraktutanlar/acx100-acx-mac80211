@@ -1,4 +1,6 @@
-ACX100 firmware versions:
+=== ACX100 notes ===
+
+=== ACX100 firmware versions ===
 
 1.5.0 (original Linux firmware):
   Combined firmware (includes support for some radio types).
@@ -21,11 +23,40 @@ ACX100 firmware versions:
 
 1.9.8.b (from dwl520+_drivers_307.zip):
   Perfect transfer (PheeNet WL-0022), everything ok so far.
+  Hmm, not so sure: my mini-PCI card has frequent radio lockups which can
+  be fixed by an ENABLE_TX or ENABLE_RX cmd - not sure yet whether it's caused
+  by the firmware, though.
 
-ACX111 firmware versions:
+=== ACX111 (TNETW1130) notes ===
 
-0.1.0.11:
-  Nothing known so far.
+The USR5410 needs FW1130.BIN (e.g. md5sum d5147672b1e00ba61d0eff24c064bfe9),
+NOT TIACX111.BIN.
 
-1.2.0.30:
-  Nothing known so far.
+Xterasys XN-2522g *only* works with FwRad16.bin and dwl-g650+_drv_v1.0.bin
+(rename or symlink one of them to TIACX111.BIN).
+
+Gabor Csuri said:
+  D-Link DWL-G650+ HW/B1 Radio 0x16 EEPROM 0x0005
+  
+  FwRad16.bin from http://www.ovislink.nl/WL8000.zip
+  ver: 1.2.0.30
+  size: 83024
+  status: works /WEP not tested/
+  
+  TIACX111.BIN from
+  ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip
+  ver: 0.1.0.11
+  size: 62772
+  status: works /WEP not tested/
+
+=== ACX111 firmware versions ===
+
+0.1.0.11 (TIACX111.BIN,
+ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip):
+  Works at least with DWL-G650+ HW/B1 (see above).
+
+0.4.11.4 (FwRad16.bin, size 76208):
+  Reported to work with German Reichelt noname card.
+
+1.2.0.30 (FwRad16.bin, http://www.ovislink.nl/WL8000.zip):
+  Works at least with DWL-G650+ HW/B1 (see above).

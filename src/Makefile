@@ -100,7 +100,7 @@ include $(ACX100_SRC)../config.mk
 CPPFLAGS += -D__KERNEL__ -DMODULE -DWLAN_HOSTIF=WLAN_PCI -I$(KERNEL_BUILD)/include -I../include
 LDFLAGS = -m elf_i386 -r
 CC = gcc
-USBCFLAGS += -D__KERNEL__ -I$(KERNEL_BUILD)/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -I../include/ -c -DWLAN_HOSTIF=WLAN_USB -DACX_DEBUG
+USBCFLAGS += -D__KERNEL__ -I$(KERNEL_BUILD)/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -I../include/ -c -DWLAN_HOSTIF=WLAN_USB $(COMMON_DRIVER_DEFINES)
 CFLAGS += -Wall -Wstrict-prototypes -Wno-trigraphs -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586
 #CPPFLAGS += -D__KERNEL__ -DMODULE -DMODVERSIONS -DWLAN_HOSTIF=WLAN_PCI -I$(KERNEL_BUILD)/include -I../include -include $(KERNEL_BUILD)/include/linux/modversions.h
 
@@ -143,7 +143,7 @@ acx_usb_ioctl.o: acx100_ioctl.c Makefile
 acx_usb_idma.o: idma.c
 	$(CC) $(USBCFLAGS) -c -o $@ $<
 
-acx_usb_ihw.o: ihw_usb.c Makefile
+acx_usb_ihw.o: ihw.c Makefile
 	$(CC) $(USBCFLAGS) -c -o $@ $<
 
 acx_usb_main.o: acx100_usb.c

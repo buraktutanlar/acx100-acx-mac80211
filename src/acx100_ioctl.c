@@ -91,16 +91,17 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x07
 #define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x08
 #define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x09
-#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x11
-#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x12
-#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x13
+#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x0a
+#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0b
+#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x12
+#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x13
+#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x14
 
 
 /* channel frequencies
@@ -155,6 +156,10 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetTxAnt" },
+{ cmd : ACX100_IOCTL_SET_PHY_AMP_BIAS,
+	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	get_args : 0,
+	name : "SetPHYAmpBias"},
 { cmd : ACX100_IOCTL_SET_ED,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -1797,7 +1802,7 @@ static inline int acx100_ioctl_set_debug(struct net_device *dev,
 	int debug_new = *((int *)extra);
 	int result = -EINVAL;
 
-	acxlog(L_STD, "%s: setting debug from 0x%04X to 0x%04X\n", __func__,
+	acxlog(0xffff, "%s: setting debug from 0x%04X to 0x%04X\n", __func__,
 	       debug, debug_new);
 	debug = debug_new;
 
@@ -2045,9 +2050,15 @@ static inline int acx100_ioctl_set_antenna(struct net_device *dev, struct iw_req
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
-	(void)printk("Rx antenna selection seems to be bit 6 (0x40)\n");
-	(void)printk("Tx antenna selection seems to be bit 5 (0x20)\n");
+	(void)printk("current antenna value: 0x%02X (COMBINED bit mask)\n", priv->antenna);
+	(void)printk("Rx antenna selection:\n");
+	(void)printk("0x00 ant. 1\n");
+	(void)printk("0x40 ant. 2\n");
+	(void)printk("0x80 full diversity\n");
+	(void)printk("0xc0 partial diversity\n");
+	(void)printk("Tx antenna selection:\n");
+	(void)printk("0x00 ant. 2\n"); /* yep, those ARE reversed! */
+	(void)printk("0x20 ant. 1\n");
 	priv->antenna = (UINT8)*extra;
 	(void)printk("new antenna value: 0x%02X\n", priv->antenna);
 	priv->set_mask |= GETSET_ANTENNA;
@@ -2076,9 +2087,15 @@ static inline int acx100_ioctl_get_antenna(struct net_device *dev, struct iw_req
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
-	(void)printk("Rx antenna selection seems to be bit 6 (0x40)\n");
-	(void)printk("Tx antenna selection seems to be bit 5 (0x20)\n");
+	(void)printk("current antenna value: 0x%02X (COMBINED bit mask)\n", priv->antenna);
+	(void)printk("Rx antenna selection:\n");
+	(void)printk("0x00 ant. 1\n");
+	(void)printk("0x40 ant. 2\n");
+	(void)printk("0x80 full diversity\n");
+	(void)printk("0xc0 partial diversity\n");
+	(void)printk("Tx antenna selection:\n");
+	(void)printk("0x00 ant. 2\n"); /* yep, those ARE reversed! */
+	(void)printk("0x20 ant. 1\n");
 
 	return 0;
 }
@@ -2087,8 +2104,7 @@ static inline int acx100_ioctl_get_antenna(struct net_device *dev, struct iw_req
 * acx100_ioctl_set_rx_antenna
 *
 *
-* Arguments: 0 = antenna1; 1 = antenna2; 
-* / 2 and 3 = diversity?  - need test / 
+* Arguments: 0 == antenna1; 1 == antenna2; 2 == full diversity; 3 == partial diversity
 * Returns:
 *
 * Side effects:
@@ -2108,6 +2124,10 @@ static inline int acx100_ioctl_set_rx_antenna(struct net_device *dev, struct iw_
 	int result = -EINVAL;
 
 	FN_ENTER;
+
+	if (*extra > 3)
+		goto end;
+
 	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
 	if (0 != (err = acx100_lock(priv, &flags))) {
@@ -2130,7 +2150,7 @@ end:
 * acx100_ioctl_set_tx_antenna
 *
 *
-* Arguments: 0 = antenna1; 1 = antenna2;
+* Arguments: 0 == antenna2; 1 == antenna1;
 *
 * Returns:
 *
@@ -2151,6 +2171,10 @@ static inline int acx100_ioctl_set_tx_antenna(struct net_device *dev, struct iw_
 	int result = -EINVAL;
 
 	FN_ENTER;
+
+	if (*extra > 1)
+		goto end;
+
 	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
 	if (0 != (err = acx100_lock(priv, &flags))) {
@@ -2158,7 +2182,7 @@ static inline int acx100_ioctl_set_tx_antenna(struct net_device *dev, struct iw_
 		goto end;
 	}
 	priv->antenna &= 0xdf;
-	priv->antenna |= ((*extra &= 0x01) << 5);
+	priv->antenna |= ((*extra & 0x01) << 5);
 	priv->set_mask |= GETSET_ANTENNA;
 	acx100_unlock(priv, &flags);
 	(void)printk("new antenna value: 0x%02X\n", priv->antenna);
@@ -2612,6 +2636,50 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 
 
 /*----------------------------------------------------------------
+* acx100_ioctl_set_phy_amp_bias
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: NEW
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	UINT16 gpio_old;
+
+	if (priv->chip_type != CHIPTYPE_ACX100) {
+		/* WARNING!!! removing this check *might* damage
+		 * hardware, since we're tweaking GPIOs here after all!!!
+		 * You've been warned... */
+		acxlog(L_IOCTL, "sorry, setting bias level for non-ACX100 not supported yet.\n");
+		return 0;
+	}
+	
+	if (*extra > 7)
+	{
+		acxlog(0xffff, "invalid bias parameter, range is 0 - 7\n");
+		return -EINVAL;
+	}
+
+	gpio_old = acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]);
+	acxlog(L_DEBUG, "gpio_old: 0x%04x\n", gpio_old);
+	(void)printk("current PHY power amplifier bias: %d\n", (gpio_old & 0x0700) >> 8);
+	acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], (gpio_old & 0xf8ff) | ((UINT16)*extra << 8));
+	(void)printk("new PHY power amplifier bias: %d\n", (unsigned char)*extra);
+	return 0;
+}
+
+/*----------------------------------------------------------------
 * acx100_ioctl_set_ed_threshold
 *
 *
@@ -2809,6 +2877,7 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_get_antenna,
 	(iw_handler) acx100_ioctl_set_rx_antenna,
 	(iw_handler) acx100_ioctl_set_tx_antenna,
+	(iw_handler) acx100_ioctl_set_phy_amp_bias,
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
 	(iw_handler) acx100_ioctl_set_scan_chan_delay,

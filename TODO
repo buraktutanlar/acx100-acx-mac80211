@@ -64,6 +64,7 @@ BUGS:
   https://sourceforge.net/forum/forum.php?thread_id=1049230&forum_id=257272
   IRQ loss has been reported to also happen when switching from text mode
   to frame buffer on Linux bootup
+- acx100_reset_dev enables IRQs, but IRQ handler not available yet!!!
 - when Tx is broken (no reception of peer),
   then it's possible to reactivate it using ACX100_CMD_ENABLE_TX and ENABLE_RX!!
   Does it happen in case of lots of traffic?
@@ -89,28 +90,40 @@ orum_id=257272)
 - iwlist wlan0 scanning doesn't work on first try. Huh, works properly! 040413 [AM]
 - see Bug reports
 
-STANDARD TODO ITEMS:
+ACX100 TODO ITEMS:
+
+ACX100 USB TODO ITEMS:
++ ACX100 USB 2.6.x
+- ACX100 USB implement Tx power setting (via I/O register access via firmware)
+- ACX100 USB scan not working? (chip_type??)
+- ACX100 USB no on-the-fly change of bitrate??
+- stabilize ACX100 USB (DHCP etc.)
+- crash on USB unload
+- ACX100 USB endianness
+- acx100usb_dump_bytes merge with acx100_dump_bytes
+- merge USB structs with standard ACX100 structs
+
+ACX111 TODO ITEMS:
+- Tx descriptor is 4 bytes bigger than ACX100, but we don't account for
+  it in all cases!!!!!!!!
+- fix (broken?) rx_config setting
+- find out why access to phy regs fails
+
+COMMON TODO ITEMS:
 * calibrate link quality scaling to display more useful values for kwavecontrol/iwconfig
 * use -pedantic -Werror!
 * Ad-Hoc "Master" not working? (Beacon packets??)
 * finish ACX111 (TNETW1x30) support
 + support kwavecontrol (new FIXED release after kwavecontrol 0.3 finally out?)
-+ ACX100 USB 2.6.x
 + implement standard power management, make sure ACPI states are fully working
   (suspend/resume handlers; resuming from suspend-to-ram has been reported
   to actually hang the machine!). Working quite nicely, even with
   network access after resume with all previous settings, 040421 [AM]
 - merge ACX100 USB support (acx100_usb.c) into main code somehow (many ioctl or /proc related things missing for USB)
-- ACX100 USB implement Tx power setting (via I/O register access via firmware)
 - rtnl_lock/unlock??
 - implement 802.11b power save mode
-- ACX100 USB scan not working? (chip_type??)
-- ACX100 USB no on-the-fly change of bitrate??
-- stabilize ACX100 USB (DHCP etc.)
 - join generic Linux 802.11 stack (Jeff Garzik)
-- ACX100 USB endianness
 - WEP flag in assoc_req ok??
-- crash on USB unload
 - split into README / INSTALL
 - full AMD64, PPC support
 - more verbose Info IRQ

@@ -399,11 +399,24 @@ typedef struct acx100_wep_options {
 typedef struct dot11WEPDefaultKey {
     UINT16	rid;
     UINT16	len;
-    UINT8	Action;
-    UINT8	KeySize;
+    UINT8	action;
+    UINT8	keySize;
     UINT8	defaultKeyNum;
-    UINT8	Key[29];	/* check this! was Key[19]. */
+    UINT8	key[29];	/* check this! was Key[19]. */
 } dot11WEPDefaultKey_t;
+
+typedef struct acx111WEPDefaultKey {
+    UINT16	rid;
+    UINT16	len;
+    UINT8	action;
+    UINT16	reserved;
+    UINT8	keySize;
+    UINT8	type;
+    UINT8	index;
+    UINT8	defaultKeyNum;
+    UINT8	counter[6];
+    UINT8	key[29];	/* check this! was Key[19]. */
+} acx111WEPDefaultKey_t;
 
 typedef struct dot11WEPDefaultKeyID {
     UINT16	rid;
@@ -447,6 +460,8 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset);
 int acx100_verify_init(wlandevice_t *priv);
 void acx100_init_mboxes(wlandevice_t *priv);
+void acx100_set_wepkey(wlandevice_t *priv);
+void acx111_set_wepkey(wlandevice_t *priv);
 int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt);
 int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *pt);
 int acx100_init_max_probe_request_template(wlandevice_t *priv);

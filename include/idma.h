@@ -109,6 +109,8 @@ typedef struct framehdr {
 
 #define	DESC_CTL_DONE		(ACX100_CTL_ACXDONE | ACX100_CTL_OWN)
 
+#define DESC_CTL2_FCS		0x02
+#define DESC_CTL2_MORE_FRAG	0x04
 #define DESC_CTL2_RTS		0x20
 
 typedef struct txdescriptor {

@@ -88,8 +88,10 @@ extern int debug;
 extern int acx100_debug_func_indent;
 
 #define acxlog(chan, args...) \
-	if (debug & (chan)) \
-		printk(KERN_WARNING args)
+	do { \
+		if (debug & (chan)) \
+			printk(KERN_WARNING args); \
+	} while (0)
 
 #define FUNC_INDENT_INCREMENT 2
 
@@ -250,6 +252,8 @@ typedef enum {
 	IO_ACX_PHY_CTL,
 
 	IO_ACX_GPIO_OE,
+
+	IO_ACX_GPIO_OUT,
 
 	IO_ACX_CMD_MAILBOX_OFFS,
 	IO_ACX_INFO_MAILBOX_OFFS,
@@ -752,11 +756,6 @@ typedef struct acx100_InfFrame {
 #define ACX100_USB_TXHI_DIRECTED   0x2
 #define ACX100_USB_TXHI_BROADCAST  0x4
 
-#define ACX100_USB_CTL2_FCS       0x02
-#define ACX100_USB_CTL2_MORE_FRAG 0x04
-#define ACX100_USB_CTL2_RTS       0x20
-
-
 /*--- Request (bulk OUT) packet contents -------------------------------------*/
 
 typedef struct acx100_usb_txhdr {
@@ -1079,7 +1078,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	struct	framehdr	*pFrameHdrQPool;/* 0x28 */
 	UINT32		FrameHdrQPoolSize;	/* 0x2c */
 	dma_addr_t	FrameHdrQPoolPhyAddr;	/* 0x30 */
-	UINT32 		val0x38;		/* 0x38, NOT USED */
+	/* UINT32 		val0x38; */	/* 0x38, NOT USED */
 
 	/* This is the pointer to the beginning of the hosts tx queue pool.
 	   The address is relative to the cards internal memory mapping */
@@ -1088,16 +1087,16 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	/* This is the pointer to the beginning of the hosts tx queue pool.
 	   The address is relative to the host memory mapping */
 	UINT32		TxHostDescQPoolPhyAddr;	/* 0x44 */
-	UINT32		val0x48;		/* 0x48, NOT USED */
-	UINT32		val0x4c;		/* 0x4c, NOT USED */
+	/* UINT32		val0x48; */	/* 0x48, NOT USED */
+	/* UINT32		val0x4c; */	/* 0x4c, NOT USED */
 
 	/* This is the pointer to the beginning of the cards rx queue pool.
 	   The Adress is relative to the host memory mapping!! */
 	struct	rxdescriptor	*pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
 	UINT32		rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
 	UINT32		rx_tail;		/* 0x6c */
-	UINT32		val0x50;		/* V1POS:0x50, some size NOT USED */
-	UINT32		val0x54;		/* 0x54, official name NOT USED */
+	/* UINT32		val0x50; */	/* V1POS:0x50, some size NOT USED */
+	/* UINT32		val0x54; */	/* 0x54, official name NOT USED */
 
 	/* This is the pointer to the beginning of the hosts rx queue pool.
 	   The address is relative to the card internal memory mapping */
@@ -1106,7 +1105,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	/* This is the pointer to the beginning of the hosts rx queue pool.
 	   The address is relative to the host memory mapping */
 	UINT32		RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
-	UINT32		val0x64;		/* 0x64, some size */
+	/* UINT32		val0x64; */	/* 0x64, some size */
 	UINT32		*pRxBufferPool;		/* *rxdescq1; 0x70 */
 	UINT32		RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 	UINT32		RxBufferPoolSize;
@@ -1343,7 +1342,7 @@ typedef struct wlandevice {
 	TIWLAN_DC	dc;			/* V3POS 2380, V1POS 2338 */
 	UINT32		TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
 	UINT32		RxQueueNo;		/* V3POS 24f4, V1POS 24cc */
-	UINT32	TxQueueFree;
+	UINT32		TxQueueFree;
 	struct	rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
 	UINT16		memblocksize;		/* V3POS 2354, V1POS 230c */
 	UINT32		RxBlockNum;		/* V3POS 24e4, V1POS 24bc */

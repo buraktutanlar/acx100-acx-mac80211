@@ -57,7 +57,7 @@ Returning such completely improperly supported WLAN hardware to the shop
 and mentioning unacceptable terms suddenly doesn't sound like such a
 chore any more...
 
---- CARD COMPATIBILITY (aka "the real dirt") ---
+=== CARD COMPATIBILITY (aka "the real dirt") ===
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB and Compact Flash implementations,
@@ -98,7 +98,7 @@ Again, the cards mentioned in the listing above will NOT work with this driver
 supporting your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
 
---- STATUS AS OF 040523 ---
+=== STATUS AS OF 040523 ===
 
 Status Matrix:
 
@@ -139,7 +139,7 @@ http://wlan.kewl.org and cvs.kewl.org (thanks, guys, for the cool work!).
 There is a free download of the 802.11b spec at
 http://standards.ieee.org/getieee802/
 
---- REQUIREMENTS ---
+=== REQUIREMENTS ===
 
 What to do or have (we will NOT remind you later about any requirements,
 since this seeks to list all requirements in full):
@@ -173,12 +173,12 @@ What to NOT do:
   though.
 
 
---- FIRMWARE INSTALLATION ---
+=== FIRMWARE INSTALLATION ===
 
 You may tell us about your experiences with various firmware versions,
 then we'll add that info to doc/firmware_versions.txt.
 
--- Firmware for ACX100 non-USB cards ---
+-- Firmware for ACX100 non-USB cards --
 
 The firmware files are needed to drive the cards' onboard embedded
 wireless baseband CPU.
@@ -254,7 +254,7 @@ APLUSRMX.BIN - Maxim radio module
 Other files:
 SMCSN.BIN - combined(?) firmware for SMC2435W
 
-- Firmware from Linux binary driver (not recommended - too old) -
+- ACX100 Firmware from Linux binary driver (not recommended - TOO OLD) -
 
 Several drivers are available on the internet, and they all seem to
 work. But since the firmware is embedded in the binary driver, it needs
@@ -282,17 +282,22 @@ ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
 Read the ACX100 instructions above, but keep in mind that they may be wrong
 since you're using an ACX111 card with ACX111 firmware.
 NOTE: For ACX111 cards even recently there are both a combined firmware
-(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FIXME file names?)
+(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FW1130.BIN?)
 available.
-You need to make sure the driver has both the main firmware functionality plus
+Note that D-Link makes a driver download distinction between the DWL-G650+ Rev. Ax and Bx: they are both ACX111, but contain different firmware images!
+This could mean that there might be hardware differences between various ACX111
+implementations, and thus you might need to use a specific firmware for your
+particular card.
+
+You need to make sure our driver has both the main firmware functionality plus
 radio functionality available, otherwise you won't transmit anything!
 Either by using a base firmware plus additional radio image file, or by using
-a combined firmware including radio functionality.
+a combined firmware which already includes radio functionality.
 For non-radio firmwares you NEED the additional radio module, with radio
 firmwares you MUST NOT have the driver load the radio module.
 ACX111 cards usually have radio types 0x16 or 0x17 (see log message).
 
---- "NORMAL" DRIVER INSTALLATION ---
+=== "NORMAL" DRIVER INSTALLATION ===
 
 This is the usual way to get the driver running on Linux 2.4.x.
 
@@ -362,7 +367,7 @@ insmod src/acx_pci.o firmware_dir=firmware use_eth_name=1
 
 For troubleshooting, see below.
 
---- LINUX 2.6 DRIVER INSTALLATION ---
+=== LINUX 2.6 DRIVER INSTALLATION ===
 
 In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
 source tree.
@@ -399,7 +404,7 @@ you want to specify another path, you should use the parameter KSRC, so
 > SOLUTION THREE (only for version before 0.2.0pre8)
 Other 2.6.x kernel patches can be found at http://luca.pca.it/projects/acx100/
 
---- USAGE HINTS ---
+=== USAGE HINTS ===
 
 Want to use driver as BUILTIN kernel driver, but then driver fails to know
 where the firmware files are? Use kernel boot parameter acx_firmware_dir=XXX.
@@ -424,7 +429,7 @@ http://www.hazard.maks.net/parprouted/
 Trying to use NFS? use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
---- DEBUGGING / LOGGING ---
+=== DEBUGGING / LOGGING ===
 
 Debug/log levels can be adapted by setting the module's "debug" load parameter
 and/or via the "iwpriv SetDebug" command and/or the default log value
@@ -453,7 +458,7 @@ A log console (e.g. /dev/tty8) may be configured in /etc/syslog*.conf
 Change to the logging console (Ctrl-Alt-F8) to view the kernel log messages
 instantly (useful in case of driver crash debugging).
 
---- TROUBLESHOOTING / WORKAROUNDS ---
+=== TROUBLESHOOTING / WORKAROUNDS ===
 
 Don't forget to set the driver debug/log level (see above) to 0xffff in case
 normal message logging is insufficient to resolve your card problem!
@@ -562,7 +567,7 @@ Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a card set to Peer).
 Further, the ESSID is CaSe SEnsITivE!
 Since the driver is currently doing passive scan only, your peer station HAS
-to be configured to send Beacon frames (100ms period works best).
+to be configured to send Beacon frames (100ms Beacon period works best).
 
 Then read the file containing the driver log (see "DEBUGGING / LOGGING").
 
@@ -585,6 +590,9 @@ we're making connects to the AP you want...
 If you get some "link failed" message or similar, try using
 MII_NOT_SUPPORTED=yes in your /etc/sysconfig/network-scripts/ifcfg-wlan0
 or similar file.
+
+Disable any 4X mode feature on your 22Mbps AP, since our driver doesn't support
+4X mode yet and 4X mode is known to cause problems sometimes.
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-((
@@ -654,7 +662,7 @@ A useful report would include:
 
 Thanks for listening!
 
---- BUGS / SHORTCOMINGS / PATCHES ---
+=== BUGS / SHORTCOMINGS / PATCHES ===
 
 - will not work on SMP multi-processor kernels yet
            (some problems, maybe even crashes). Working to fix that.
@@ -686,7 +694,7 @@ sure to let us know which code parts are not supposed to be used by BSD
 systems. Thanks!
 ************************* !!!!!!!!!!!!!!!!!!!!!  *************************
 
---- SYSTEM CUSTOMIZATION ---
+=== SYSTEM CUSTOMIZATION ===
 
 Again, no automatic system installation is provided, since the various Linux
 distributions often differ in their exact network configuration methods
@@ -722,7 +730,7 @@ The waproamd daemon has to look for available access points and set the eth1 nic
 "dhclient eth1"
 or set ifconfig manually. 
 
---- AND FINALLY... ---
+=== AND FINALLY... ===
 
 Let me mention that we REALLY dislike the way very stupid hardware vendors
 name their cards containing DIFFERENT chipsets!!
@@ -734,6 +742,9 @@ USRobotics also just started to enjoy these despicable acts:
 the USR2210 usually has the ACX100, however newer versions with UNCHANGED
 naming (e.g. at tigerdirect.com) contain a newer incompatible 802.11g
 TI chipset.
+
+Sitecom recently also joined the devilish party with their "WL-120" (ACX111)
+and "WL-120 v2" (Harris) cards.
 
 But the worst offender is D-Link: they have "DWL-650" and "DWL-650+".
 "DWL-650+" is simply an improved version of the "DWL-650", right?
@@ -758,14 +769,16 @@ which hardware to avoid like the plague, for heaven's sake!
 This is such a <CENSORED>, I could <OUCH, CENSORED!>...
 
 Also, we just learned that D-Link tech support can be very clueless, too:
-one guy, after having been advised that his DWL-120+ uses an Atmel
-chipset, spent considerable time trying to get this card to work with an
-incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
+one guy, after having been ill-advised by D-Link support that his DWL-120+
+uses an Atmel chipset, spent considerable time trying to get this card to work
+with an incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
 the DWL-120+ is using an ACX100 in USB mode!).
 This proves that D-Link really deserves the award above,
 and it also shows that one should avoid D-Link like the plague from now on
 (at least until they get rid of their stupid product naming habits),
 since they don't seem to know or care about their very own products.
+To be fair, they at least provide a page which lists many of their
+wireless cards and links to their corresponding Linux driver projects...
 
 Finally, let me mention that we also really dislike the way how
 Texas Instruments handles Linux driver support. It's a really shameful
@@ -788,7 +801,7 @@ shelled out considerable amounts of money for...
 For an example of a vendor whose actions I deem useful, let me just mention
 Sitecom. They list Linux compatibility status for many of their products on
 their website, and from the look of it they clearly support Linux quite
-actively.
+actively. (UPDATE: they also screwed up. See above. :-\)
 
 Have fun!
 

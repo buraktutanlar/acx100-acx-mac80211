@@ -1246,7 +1246,42 @@ void acx100_init_mboxes(wlandevice_t *priv)
 #endif
 }
 
-
+void acx100_set_wepkey( wlandevice_t *priv )
+{
+  dot11WEPDefaultKey_t dk;
+  int i;
+   
+  for ( i = 0; i < NUM_WEPKEYS; i++ ) {
+    if ( priv->wep_keys[i].size != 0 ) {
+      acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
+      dk.action = 1;
+      dk.keySize = priv->wep_keys[i].size;
+      dk.defaultKeyNum = i;
+      memcpy(dk.key, priv->wep_keys[i].key, dk.keySize);
+      acx100_configure(priv, &dk, ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
+    }
+  }
+}
+ 
+void acx111_set_wepkey( wlandevice_t *priv )
+{
+  acx111WEPDefaultKey_t dk;
+  int i;
+                                                                                
+  for ( i = 0; i < NUM_WEPKEYS; i++ ) {
+    if ( priv->wep_keys[i].size != 0 ) {
+      acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
+      memset(&dk, 0, sizeof(dk));
+      dk.action = 1;            /* add key */
+      dk.keySize = priv->wep_keys[i].size;
+      dk.type = 0;              /* default wep key */
+      dk.index = 0;             /* ignored when setting default key */
+      dk.defaultKeyNum = i;
+      memcpy(dk.key, priv->wep_keys[i].key, dk.keySize);
+      acx100_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &dk, sizeof(dk), 5000);
+    }
+  }
+}
 
 /*----------------------------------------------------------------
 * acx100_init_wep
@@ -1276,7 +1311,6 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 {
 	int i;
 	acx100_wep_options_t options;
-	dot11WEPDefaultKey_t wp;
 	dot11WEPDefaultKeyID_t dk;
 	acx100_wep_mgmt_t wep_mgmt; /* size = 37 bytes */
 
@@ -1310,16 +1344,9 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 
 		acxlog(L_ASSOC, "%s: writing WEP options.\n", __func__);
 		acx100_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
-		for (i = 0; i < NUM_WEPKEYS; i++) {
-			if (priv->wep_keys[i].size != 0) {
-				wp.Action = (UINT8)1;
-				wp.KeySize = (UINT8)priv->wep_keys[i].size;
-				wp.defaultKeyNum = priv->wep_keys[i].index;
-				memcpy(wp.Key, &priv->wep_keys[i].key, priv->wep_keys[i].size);
-				acxlog(L_ASSOC, "%s: writing default WEP key %d.\n", __func__, i);
-				acx100_configure(priv, &wp, ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE); /* 0x1007 */
-			}
-		}
+		
+		acx100_set_wepkey( priv );
+		
 		if (priv->wep_keys[priv->wep_current_index].size != 0) {
 			acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
 			dk.KeyID = priv->wep_current_index;
@@ -1840,6 +1867,9 @@ static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level)
 	 * right... (especially since Windows XP doesn't seem to show
 	 * actual Tx dBm values :-P) */
 #if (WLAN_HOSTIF!=WLAN_USB)
+	/* NOTE: on Maxim, value 30 IS 30mW, and value 10 IS 10mW - so the
+	 * values are EXACTLY mW!!! Not sure about RFMD and others,
+	 * though... */
 	UINT8 dbm2val_maxim[21] = {
 		(UINT8)63, (UINT8)63, (UINT8)63, (UINT8)62,
 		(UINT8)61, (UINT8)61, (UINT8)60, (UINT8)60,
@@ -1879,11 +1909,10 @@ static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level)
 static inline int acx111_set_tx_level(wlandevice_t *priv, UINT8 level) {
 
 	struct ACX111TxLevel tx_level;
-	tx_level.id = 0x100d;
-	tx_level.length = 1;
+
 	tx_level.level = level;
 
-	if (acx100_configure(priv, &tx_level, 0x100d) == 0) {
+	if (acx100_configure(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL) == 0) {
 		acxlog(L_INIT, "Error setting acx111 tx level\n");
 		return 1;
 	}
@@ -1993,7 +2022,9 @@ void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s)
 void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s)
 {
 	FN_ENTER;
+	priv->bss_table_count = 0;
 	acx100_set_status(priv, ISTATUS_1_SCANNING);
+
 	acx100_issue_cmd(priv, ACX1xx_CMD_SCAN, s, sizeof(struct acx111_scan), 5000);
 	FN_EXIT(0, 0);
 }
@@ -2163,55 +2194,19 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		/* encode */
 		acxlog(L_INIT, "Updating WEP key settings\n");
 		{
-			dot11WEPDefaultKey_t dk;
 
-			struct {
-				UINT8 mac[6];
-				UINT8 action;
-				UINT16 reserved;
-				UINT8 size;
-				UINT8 type;
-				UINT8 index;
-				UINT8 id;
-				UINT8 counter[6];
-				UINT8 key[29];
-			} acx111_wep_key;	
+		    memmap_t dkey;
 
-			memmap_t dkey;
-			int i;
+		    if ( priv->chip_type == CHIPTYPE_ACX100 ) {
+			acx100_set_wepkey( priv );
+		    } else 
+		    if ( priv->chip_type == CHIPTYPE_ACX111 ) {
+			acx111_set_wepkey( priv );
+		    }
 
-			for (i = 0; i < NUM_WEPKEYS; i++) {
-				if (priv->wep_keys[i].size != 0) {
-
-					acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
-					if(priv->chip_type == CHIPTYPE_ACX100) {
-						dk.Action = 1;
-						dk.KeySize = priv->wep_keys[i].size;
-						dk.defaultKeyNum = i;
-						memcpy(dk.Key, priv->wep_keys[i].key,
-							dk.KeySize);
-
-						acx100_configure(priv, &dk, ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
-
-					} else if(priv->chip_type == CHIPTYPE_ACX111) {
-						memset(&acx111_wep_key, 0, sizeof(acx111_wep_key)),
-						acx111_wep_key.action = 1; /* add key */
-						acx111_wep_key.size = priv->wep_keys[i].size;
-						acx111_wep_key.type = 0; /* default wep key */
-						acx111_wep_key.index = 0; /* ignored when setting default key */
-						acx111_wep_key.id = i;
-						memcpy(acx111_wep_key.key, priv->wep_keys[i].key,
-							acx111_wep_key.size);
-
-						acx100_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &acx111_wep_key, sizeof(acx111_wep_key), 5000);
-
-					}
-				}
-			}
-
-			dkey.m.dkey.num = priv->wep_current_index;
-			acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.m.dkey.num);
-			acx100_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
+		    dkey.m.dkey.num = priv->wep_current_index;
+		    acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.m.dkey.num);
+		    acx100_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
 		}
 		priv->set_mask &= ~GETSET_WEP;
 	}
@@ -3418,30 +3413,40 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 
 	FN_ENTER;
 
-	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], reg);
+	acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x0); /* disable Rx/Tx */
+
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], (UINT32)reg);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], 2);
 
-	while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_PHY_CTL]))
+	acx100_schedule(HZ / 100);
+
+	while (0 != acx100_read_reg32(priv, priv->io[IO_ACX_PHY_CTL]))
 	{
+		acx100_schedule(HZ / 100);
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
-		if (++count > 0xffff) {
+		if (++count > 10) {
 			result = 0;
 			acxlog(L_BINSTD, "%s: timeout waiting for read phy cmd\n", __func__);
+			*charbuf = 0;
+			acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
 			goto done;
 		}
 	}
 
+	acxlog(L_DEBUG, "count was %d\n", count);
 	*charbuf = (UINT8)acx100_read_reg8(priv, priv->io[IO_ACX_PHY_DATA]);
+	
+	acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
 #else
 	mem_read_write_t mem;
 
 	mem.addr = cpu_to_le16(reg);
 	mem.type = cpu_to_le16(0x82);
 	mem.len = cpu_to_le32(4);
-	acx100_issue_cmd(priv, ACX1xx_CMD_MEM_READ, &mem, 0x8, 5000);
+	acx100_issue_cmd(priv, ACX1xx_CMD_MEM_READ, &mem, 8, 5000);
 	*charbuf = (UINT8)mem.data;
 #endif
 	acxlog(L_DEBUG, "radio PHY read 0x%02x from 0x%04x\n", *charbuf, reg); 

@@ -179,7 +179,12 @@ typedef struct device_id {
 } device_id_t;
 
 const char *name_acx100 = "ACX100";
+const char *name_tnetw1100a = "TNETW1100A";
+const char *name_tnetw1100b = "TNETW1100B";
+
 const char *name_acx111 = "ACX111";
+const char *name_tnetw1130 = "TNETW1130";
+
  
 /*@-fullinitblock@*/
 static const struct pci_device_id acx100_pci_id_tbl[] __devinitdata = {
@@ -329,6 +334,22 @@ static void acx100_get_firmware_version(wlandevice_t *priv)
 	acxlog(L_DEBUG, "firmware_numver %08x\n", priv->firmware_numver);
 
 	priv->firmware_id = fw.hw_id;
+
+	/* we're able to find out more detailed chip names now */
+	switch (fw.hw_id) {
+		case 0x01020505:
+			priv->chip_name = name_tnetw1100a;
+			break;
+		case 0x01030505:
+			priv->chip_name = name_tnetw1100b;
+			break;
+		case 0x03010101:
+			priv->chip_name = name_tnetw1130;
+			break;
+		default:
+			acxlog(0xffff, "unknown chip ID 0x%08x, please report!!\n", fw.hw_id);
+			break;
+	}
 
 	FN_EXIT(0, 0);
 }

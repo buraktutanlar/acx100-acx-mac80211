@@ -1477,11 +1477,12 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 		return;
 	}
 
-	/* pSuppRates points to the Supported Rates element: info[1] is essid_len */
-	pSuppRates = &hdr->info[hdr->info[0x1] + 0x2];
-	/* pDSparms points to the DS Parameter Set */
-	pDSparms = &pSuppRates[pSuppRates[0x1] + 0x2];
-
+	if (acx100_is_mac_address_equal(hdr->a4.a3, priv->dev_addr))
+	{
+		acxlog(L_ASSOC, "huh, scan found our own MAC!?\n");
+		return; /* just skip this one silently */
+	}
+			
 	/* filter out duplicate stations we already registered in our list */
 	for (station = 0; station < priv->bss_table_count; station++) {
 		UINT8 *a = priv->bss_table[station].bssid;
@@ -1498,15 +1499,12 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 		}
 	}
 
-	for (station = 0;
-	     station < hdr->info[0x1] && (hdr->info[0x2 + station] == 0);
-	     station++) {
-	};
-	/* FIXME: this line does nothing ^^^^ */
+	/* pSuppRates points to the Supported Rates element: info[1] is essid_len */
+	pSuppRates = &hdr->info[hdr->info[0x1] + 0x2];
+	/* pDSparms points to the DS Parameter Set */
+	pDSparms = &pSuppRates[pSuppRates[0x1] + 0x2];
 
-	/* NONBIN_DONE: bug in V3: doesn't reset scan structs when
-	 * starting next site survey scan (leading to garbled ESSID strings with
-	 * old garbage). Thus let's completely zero out the entry that we're
+	/* Let's completely zero out the entry that we're
 	 * going to fill next in order to not risk any corruption. */
 	memset(&priv->bss_table[priv->bss_table_count], 0, sizeof(struct bss_info));
 
