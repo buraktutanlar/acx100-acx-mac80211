@@ -558,16 +558,6 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* enable busmastering (required for CardBus) */
 	pci_set_master(pdev);
-#if DOES_NOT_WORK
-	/* on my Dell Inspiron 8000, if I try to suspend it,
-	 * the notebook immediately resumes after shutdown when my
-	 * ACX100 mini-PCI card is installed. This is obviously not useful :-(
-	 * Thus I'm trying to fix this severe problem by playing with
-	 * PCI power management bits. So far it's not very successful
-	 * :-\
-	 */
-	acxlog(L_DEBUG, "wake: %d\n", pci_enable_wake(pdev, 0, 0));
-#endif
 
 	/* acx100 and acx111 have different pci memory regions */
 	chip_type = (UINT16)id->driver_data;
@@ -2004,8 +1994,11 @@ static int __init acx100_init_module(void)
 	acxlog(L_STD, "acx100: ENABLED USB SUPPORT!\n");
 #endif
 
-#ifndef ACX_32BIT_IO
-	acxlog(L_STD, "acx100: WARNING: Using 16 bit access only!\n");
+	acxlog(L_STD, "acx100: %sUsing %s\n",
+#if (ACX_IO_WIDTH==32)
+	"", "32 bit I/O access.");
+#else
+	"WARNING: ", "16 bit I/O access only!");
 #endif
 
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);

@@ -2360,8 +2360,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 					priv->channel);
 
 		/* not needed in AP mode */
-		if ((ACX_MODE_2_MANAGED_STA == priv->macmode_wanted)
-		||  (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted)) {
+		if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
 
 			if (0 == scanning) {
 				/* stop any previous scan */
@@ -2384,18 +2383,18 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 					memset(&s, 0, sizeof(struct acx111_scan));
 
 					s.count = 3;
-					s.channel_list_select = 0; //scan every allowed channel
-					//s.channel_list_select = 1; //scan given channels
+					s.channel_list_select = 0; /* scan every allowed channel */
+					/*s.channel_list_select = 1;*/ /* scan given channels */
 					s.reserved1 = 0;
 					s.reserved2 = 0;
 					s.rate = 0x0a; /* 1 Mbs */
-					//s.rate = 0x0c; /* 54 Mbs */
-					//s.options = 0; // do an active scan
-					s.options = 1; // do an passive scan
-					//s.options = 3; // do an passive background scan
+					/*s.rate = 0x0c;*/ /* 54 Mbs */
+					/*s.options = 0;*/ /* do an active scan */
+					s.options = 1; /* do an passive scan */
+					/*s.options = 3;*/ /* do an passive background scan */
 					s.chan_duration = 50;
 					s.max_probe_delay = 100;
-					//s.modulation = 0x40; // long praeamble ? ofdm ?
+					/*s.modulation = 0x40;*/ /* long preamble ? ofdm ? */
 					s.modulation = 0;
 					s.channel_list[0] = 6;
 					s.channel_list[1] = 4;
@@ -2483,7 +2482,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GET_STATION_ID|GETSET_REG_DOMAIN;
 	acx100_update_card_settings(priv, 1, 0, 0);
 
-	//set our global interrupt mask
+	/* set our global interrupt mask */
 	if(priv->chip_type == CHIPTYPE_ACX100) {
 		/* priv->irq_mask = 0xdbb5; not longer used anymore! */
 		priv->irq_mask = 0xd9b5;
@@ -2712,7 +2711,7 @@ void acx100_set_probe_request_template(wlandevice_t *priv)
 	
   	txf = &pt.hdr;
 	FN_ENTER;
-	//pt.hdr.a4.a1[6] = 0xff;
+	/* pt.hdr.a4.a1[6] = 0xff; */
 	frame_len = 0x18;
 	pt.hdr.a4.fc = cpu_to_le16(0x40);
 	pt.hdr.a4.dur = cpu_to_le16(0x0);
@@ -2720,8 +2719,8 @@ void acx100_set_probe_request_template(wlandevice_t *priv)
 	MAC_COPY(pt.hdr.a4.a2, priv->dev_addr);
 	MAC_COPY(pt.hdr.a4.a3, bcast_addr);
 	pt.hdr.a4.seq = cpu_to_le16(0x0);
-//	pt.hdr.b4.a1[0x0] = 0x0;
-	//pt.hdr.a4.a4[0x1] = priv->next;
+/*	pt.hdr.b4.a1[0x0] = 0x0; */
+	/* pt.hdr.a4.a4[0x1] = priv->next; */
 	memset(txf->val0x18, 0, 8);
 
 	/* set entry 2: Beacon Interval (2 octets) */
@@ -2779,7 +2778,7 @@ void acx111_set_probe_request_template(wlandevice_t *priv)
 	MAC_COPY(&template[0x10], bcast_addr);
 
 	this = &template[0x18];	
-	this[0] = 0; //element id ssid
+	this[0] = 0; /* element id ssid */
 	this[1] = priv->essid_len;
 	memcpy(&this[2], priv->essid, priv->essid_len);
 	frame_len += 2 + priv->essid_len;
@@ -2979,8 +2978,8 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 	result = 0;
 
 done:
-//	  acx100_enable_irq(priv);
-//	  acx100_start(priv);
+/*	  acx100_enable_irq(priv); */
+/*	  acx100_start(priv); */
 	FN_EXIT(1, result);
 	return result;
 }
@@ -3357,7 +3356,15 @@ UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
 	FN_ENTER;
 
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], cpu_to_le32(reg));
-	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_DATA], cpu_to_le32(value));
+	/* FIXME: we don't use 32bit access here since mprusko said that
+	 * it results in distorted sensitivity on his card (huh!?!?
+	 * doesn't happen with my setup...)
+	 * Maybe we actually need a delay similar to the one in the read
+	 * function, due to some radio chipsets being too slow...
+	 * FIXME: which radio is in the problematic card? My working one
+	 * is 0x11 */
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA], cpu_to_le16(value));
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA] + 2, 0);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], cpu_to_le32(1));
 
 	acxlog(L_DEBUG, "radio PHY write 0x%02x -->  0x%04x\n", value, reg); 

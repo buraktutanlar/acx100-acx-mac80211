@@ -82,12 +82,15 @@ STANDARD TODO ITEMS:
 * calibrate link quality scaling to display more useful values for kwavecontrol/iwconfig
 * use -pedantic -Werror!
 + support kwavecontrol (new FIXED release after kwavecontrol 0.3 finally out?)
-- finish ACX111 (TNETW1x30) support
++ finish ACX111 (TNETW1x30) support
 + ACX100 USB 2.6.x
 + implement standard power management, make sure ACPI states are fully working
   (suspend/resume handlers; resuming from suspend-to-ram has been reported
   to actually hang the machine!). Working quite nicely, even with
   network access after resume with all previous settings, 040421 [AM]
+- merge ACX100 USB support (acx100_usb.c) into main code somehow (many ioctl or /proc related things missing for USB)
+- ACX100 USB implement Tx power setting (via firmware)
+- rtnl_lock/unlock??
 - implement 802.11b power save mode
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)

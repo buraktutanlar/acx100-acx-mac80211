@@ -34,7 +34,7 @@ clean:
 inject:
 	./scripts/inject_kernel_tree . $(KSRC)
 
-distclean: 
+distclean: clean
 #	@echo "WARNING this will remove all binaries, including the \
 #		file that contains the firmware information. If you \
 #		wish to continue press enter, else CTL-C"; \

@@ -164,6 +164,14 @@ the usual RFMD, so these cards will not work with the limited proprietary
 linux driver binary's firmware and so a windows firmware with proper
 support for this radio type must be used.
 
+NOTE: For ACX111 cards even recently there are both a combined firmware
+(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FIXME file names?)
+available.
+You need to make sure the driver has both the main firmware functionality plus
+radio functionality available, otherwise you won't transmit anything!
+For non-radio firmwares you NEED the additional radio module, with radio
+firmwares you MUST NOT have the driver load the radio module.
+
 FIXME: need to establish proper script support for the fact that the
 ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
 
@@ -368,6 +376,9 @@ Wired-Wireless bridging? Driver would perhaps need to support WDS
 (whatever that is). For now, proxy ARP should do:
 http://www.hazard.maks.net/parprouted/
 
+Trying to use NFS? use options 'rsize=1024,wsize=1024' in /etc/fstab .
+
+
 --- DEBUGGING / LOGGING ---
 
 Debug/log levels can be adapted by setting the module's "debug" load parameter
@@ -459,6 +470,12 @@ helped several times!)
 Oh, and last but not least, always make sure to get the latest BIOS for your
 computer - that also helped in some cases of broken power management code or
 resource allocation!
+If you have trouble with the ACX100 mini-PCI card in your notebook (i.e.
+the notebook restarts immediately after suspending), then you have a
+notebook with BIOS troubles as well (the BIOS needs to handle the PME#
+pin activity properly). Workaround: disconnect/hide the PME# signal
+on the card (pin 34, see mini-PCI spec).
+
 
 -- Driver locked up the box --
 Umm... ouch!
@@ -545,10 +562,9 @@ Also try other channel values to reduce interference by cordless phones,
 microwaves etc.
 
 If you keep getting Tx errors, also try setting other values for
-"iwconfig sens" (e.g. 92, useful values are between 30 to 100 and
-between 160 and 200).
-
-When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
+"iwconfig sens" (e.g. 92, useful values are between 30 and 100 and
+between 160 and 200). Most useful range is 85 to 91 (91 best).
+In case of Tx error 0x20, use iwconfig retry (set both values!).
 
 
 If you experience complete traffic lockups after some random time,
@@ -587,7 +603,7 @@ Thanks for listening!
 
 - will not work on SMP multi-processor kernels yet
            (some problems, maybe even crashes). Working to fix that.
-- power management (suspend/resume) handlers are not finished yet
+- power management (suspend/resume) handlers are not completely stable yet
 - no automatic rate adaptation yet
            (setting rate to 22M will prevent communication with 11M peers)
            We'll have to implement auto rate adaptation properly soon.
