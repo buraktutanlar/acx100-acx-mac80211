@@ -43,6 +43,15 @@
  * --------------------------------------------------------------------
  */
 
+#ifdef S_SPLINT_S /* some crap that splint needs to not crap out */
+#define __signed__ signed
+#define __u64 unsigned long long
+#define loff_t unsigned long
+#define sigval_t unsigned long
+#define siginfo_t unsigned long
+#define stack_t unsigned long
+#define __s64 signed long long
+#endif
 #include <linux/config.h>
 #include <linux/version.h>
 
@@ -74,8 +83,8 @@
 #include <acx100_helper.h>
 #include <idma.h>
 
-static UINT8 oui_rfc1042[] = { 0x00, 0x00, 0x00 };
-static UINT8 oui_8021h[] = { 0x00, 0x00, 0xf8 };
+static UINT8 oui_rfc1042[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0x00 };
+static UINT8 oui_8021h[] = { (UINT8)0x00, (UINT8)0x00, (UINT8)0xf8 };
 
 /*----------------------------------------------------------------
 * acx100_rxdesc_to_txdesc
@@ -106,8 +115,8 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 	payload = txdesc->host_desc + 1;
 	header = txdesc->host_desc;
 	
-	payload->val0x4 = 0;
-	header->val0x4 = 0;
+	payload->data_offset = 0;
+	header->data_offset = 0;
 	
 	memcpy(header->data, &rxdesc->data->buf, WLAN_HDR_A3_LEN);
 	memcpy(payload->data, &rxdesc->data->val0x24, 
@@ -145,7 +154,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 			 struct txdescriptor *tx_desc,
 			 struct sk_buff *skb)
 {
-	UINT16 proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
+	unsigned short proto;		/* protocol type or data length, depending on whether DIX or 802.3 ethernet format */
 	UINT16 fc;
 	struct txhostdescriptor *payload;
 	struct txhostdescriptor *header;
@@ -167,7 +176,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	header = tx_desc->host_desc;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
-	if (skb->len <= 0) {
+	if (0 == skb->len) {
 		acxlog(L_DEBUG, "zero-length skb!\n");
 		return 1;
 	}
@@ -196,27 +205,24 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		e_snap = (wlan_snap_t*)((UINT8*)e_llc + sizeof(wlan_llc_t));
 			
 		/* setup the LLC header */
-		e_llc->dsap = 0xAA;	/* SNAP, see IEEE 802 */
-		e_llc->ssap = 0xAA;
-		e_llc->ctl = 0x03;
+		e_llc->dsap = (UINT8)0xaa;	/* SNAP, see IEEE 802 */
+		e_llc->ssap = (UINT8)0xaa;
+		e_llc->ctl = (UINT8)0x03;
 
 		/* setup the SNAP header */
 		e_snap->type = htons(proto);
-		if (acx100_stt_findproto(proto)) {
+		if (0 != acx100_stt_findproto(proto)) {
 			memcpy(e_snap->oui, oui_8021h, WLAN_IEEE_OUI_LEN);
 		} else {
 			memcpy(e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN);
 		}
-
-
 		/* trim off ethernet header and copy payload to tx_desc */
 		payload->length = skb->len - sizeof(wlan_ethhdr_t);
 		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), payload->length);
 	}
 	
-	/* FIXME: find out what these fields stand for */
-	payload->val0x4 = 0;
-	header->val0x4 = 0;
+	payload->data_offset = 0;
+	header->data_offset = 0;
 	
 	/* calculate total tx_desc length */
 	tx_desc->total_length = payload->length + header->length;
@@ -250,12 +256,13 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		break;
 	default:			/* fall through */
 		acxlog(L_STD, "Error: Converting eth to wlan in unknown mode.\n");
+		goto fail;
 	}
 	memcpy(w_hdr->a3.a1, a1, WLAN_ADDR_LEN);
 	memcpy(w_hdr->a3.a2, a2, WLAN_ADDR_LEN);
 	memcpy(w_hdr->a3.a3, a3, WLAN_ADDR_LEN);
 
-	if (priv->wep_enabled)
+	if (0 != priv->wep_enabled)
 		fc |= host2ieee16(WLAN_SET_FC_ISWEP(1));
 		
 	w_hdr->a3.fc = fc;
@@ -280,6 +287,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	acxlog(L_DATA, "\n");
 */	
 	
+fail:
 	FN_EXIT(0, 0);
 	return 0;
 }
@@ -309,7 +317,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 *
 *----------------------------------------------------------------*/
 
-struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
+/*@null@*/ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 		rxhostdescriptor *rx_desc)
 {
 	UINT8 *daddr = NULL;
@@ -322,7 +330,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 	p80211_hdr_t *w_hdr;
 	UINT buflen;
 	UINT16 fc;
-	UINT payload_length;
+	size_t payload_length;
 	UINT payload_offset;
 
 //	int i;
@@ -335,7 +343,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
 	
 	/* check if additional header is included */
-	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
+	if (0 != (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR)) {
 		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
 		w_hdr = (p80211_hdr_t*)(((UINT8*)w_hdr) + WLAN_CRC_LEN);
 		payload_length -= WLAN_CRC_LEN;
@@ -343,19 +351,19 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 
 	/* setup some vars for convenience */
 	fc = ieee2host16(w_hdr->a3.fc);
-	if ((WLAN_GET_FC_TODS(fc) == 0) && (WLAN_GET_FC_FROMDS(fc) == 0)) {
+	if ((0 == WLAN_GET_FC_TODS(fc)) && (0 == WLAN_GET_FC_FROMDS(fc))) {
 		daddr = w_hdr->a3.a1;
 		saddr = w_hdr->a3.a2;
-	} else if ((WLAN_GET_FC_TODS(fc) == 0) && (WLAN_GET_FC_FROMDS(fc) == 1)) {
+	} else if (0 == (WLAN_GET_FC_TODS(fc)) && (1 == WLAN_GET_FC_FROMDS(fc))) {
 		daddr = w_hdr->a3.a1;
 		saddr = w_hdr->a3.a3;
-	} else if ((WLAN_GET_FC_TODS(fc) == 1) && (WLAN_GET_FC_FROMDS(fc) == 0)) {
+	} else if ((1 == WLAN_GET_FC_TODS(fc)) && (0 == WLAN_GET_FC_FROMDS(fc))) {
 		daddr = w_hdr->a3.a3;
 		saddr = w_hdr->a3.a2;
 	} else {
 		payload_offset = WLAN_HDR_A4_LEN;
 		payload_length -= ( WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN );
-		if (payload_length < 0 ) {
+		if (0 > payload_length) {
 			acxlog(L_STD, "A4 frame too short!\n");
 			return NULL;
 		}
@@ -363,7 +371,7 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 		saddr = w_hdr->a4.a4;
 	}
 	
-	if (WLAN_GET_FC_ISWEP(fc)){
+	if (0 != WLAN_GET_FC_ISWEP(fc)) {
 		/* chop off the IV+ICV WEP header and footer */
 		acxlog(L_DATA | L_DEBUG, "It's a WEP packet, chopping off IV and ICV.\n");
 		payload_length -= 8;
@@ -386,9 +394,9 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 
 	/* Test for the various encodings */
 	if ( (payload_length >= sizeof(wlan_ethhdr_t)) &&
-	     ( e_llc->dsap != 0xaa || e_llc->ssap != 0xaa ) &&
-	     ((memcmp(daddr, e_hdr->daddr, WLAN_ETHADDR_LEN) == 0) ||
-	     (memcmp(saddr, e_hdr->saddr, WLAN_ETHADDR_LEN) == 0))) {
+	     ((e_llc->dsap != (UINT8)0xaa) || (e_llc->ssap != (UINT8)0xaa)) &&
+	     ((0 == memcmp(daddr, e_hdr->daddr, WLAN_ETHADDR_LEN)) ||
+	      (0 == memcmp(saddr, e_hdr->saddr, WLAN_ETHADDR_LEN)))) {
 		acxlog(L_DEBUG | L_DATA, "802.3 ENCAP len: %d\n", payload_length);
 		/* 802.3 Encapsulated */
 		/* Test for an overlength frame */
@@ -415,13 +423,13 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 		memcpy(skb->data, e_hdr, payload_length);	/* copy the data */
 
 	} else if ((payload_length >= sizeof(wlan_llc_t) + sizeof(wlan_snap_t)) &&
-		   (e_llc->dsap == 0xaa) &&
-		   (e_llc->ssap == 0xaa) &&
-		   (e_llc->ctl == 0x03) && 
+		   (e_llc->dsap == (UINT8)0xaa) &&
+		   (e_llc->ssap == (UINT8)0xaa) &&
+		   (e_llc->ctl == (UINT8)0x03) && 
 		   (((memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN)==0) &&
 //		    (ethconv == WLAN_ETHCONV_8021h) && 
-		    (acx100_stt_findproto(ieee2host16(e_snap->type)))) || 
-		    (memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN)!=0)))
+		    (0 != acx100_stt_findproto(ieee2host16(e_snap->type)))) || 
+		    (0 != memcmp( e_snap->oui, oui_rfc1042, WLAN_IEEE_OUI_LEN))))
 	{
 		acxlog(L_DEBUG | L_DATA, "SNAP+RFC1042 len: %d\n", payload_length);
 		/* it's a SNAP + RFC1042 frame && protocol is in STT */
@@ -460,9 +468,9 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t *priv, struct
 		       payload_length);
 		       
 	}  else if ((payload_length >= sizeof(wlan_llc_t) + sizeof(wlan_snap_t)) &&
-		    (e_llc->dsap == 0xaa) &&
-		    (e_llc->ssap == 0xaa) &&
-		    (e_llc->ctl == 0x03) ) {
+		    (e_llc->dsap == (UINT8)0xaa) &&
+		    (e_llc->ssap == (UINT8)0xaa) &&
+		    (e_llc->ctl == (UINT8)0x03) ) {
 		acxlog(L_DEBUG | L_DATA, "802.1h/RFC1042 len: %d\n", payload_length);
 		/* it's an 802.1h frame || (an RFC1042 && protocol is not in STT) */
 		/* build a DIXII + RFC894 */

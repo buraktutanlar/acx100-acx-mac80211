@@ -430,7 +430,7 @@ static const char * const cmd_error_strings[] = {
 *
 *----------------------------------------------------------------*/
 int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
-			void *pcmdparam, int paramlen, UINT32 timeout)
+			/*@null@*/ void *pcmdparam, int paramlen, UINT32 timeout)
 {
 	int counter;
 	int result = 0;
@@ -448,7 +448,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	
 	if (cmd!=ACX100_CMD_INTERROGATE) {
 		acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
-		acx100_dump_bytes(pcmdparam,paramlen);
+		acx100_dump_bytes(pcmdparam, paramlen);
 	}
 
 	/*** make sure we have at least *some* timeout value ***/
@@ -961,7 +961,7 @@ void acx100_log_mac_address(int level, UINT8 * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_power_led(wlandevice_t *priv, int enable)
+void acx100_power_led(wlandevice_t *priv, UINT8 enable)
 {
 	if (enable)
 		acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 

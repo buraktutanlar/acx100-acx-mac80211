@@ -49,36 +49,16 @@ typedef struct GenericPacket {
 	UINT8 bytes[32];
 } GenericPacket_t;
 
-typedef struct InitPacket {
-//    UINT16 vala;
-//    UINT16 valb;
-	UINT CodeStart;		//0x4
-	UINT CodeEnd;		//0x8
-	UINT WEPCacheStart;	//0xc
-	UINT WEPCacheEnd;	//0x10
-	UINT PacketTemplateStart;	//0x14
-	UINT PacketTemplateEnd;	//0x18
-	UINT valc;
-} InitPacket_t;
-
-typedef struct InitPacket2 {
-//    char buf[0x30];
-	UINT16 vald;
-	UINT8 vale;
-	UINT8 valf;
-//              UINT PacketTemplateStart;//0x14
-//              UINT PacketTemplateEnd;  //0x18
-} InitPacket2_t;
 
 typedef struct acx100_memmap {
 	UINT16	rid;
-	UINT16	length;
+	UINT16	len;
 	UINT32	CodeStart;
 	UINT32	CodeEnd;
-	UINT32	WEPStart;
-	UINT32	WEPEnd;
-	UINT32	PacketStart;
-	UINT32	PacketEnd;
+	UINT32	WEPCacheStart;
+	UINT32	WEPCacheEnd;
+	UINT32	PacketTemplateStart;
+	UINT32	PacketTemplateEnd;
 	UINT32	QueueStart;
 	UINT32	QueueEnd;
 	UINT32	PoolStart;
@@ -86,127 +66,33 @@ typedef struct acx100_memmap {
 } acx100_memmap_t;
 
 typedef struct acx100_memconfigoption {
-	UINT16 vala;
-	UINT16 valb;
-	UINT32 DMA_config;
-	struct rxhostdescriptor *val0x8;
-	UINT32 rx_mem;
-	UINT32 tx_mem;
-	UINT16 TxBlockNum;
-	UINT16 RxBlockNum;
+	UINT16	rid;
+	UINT16	len;
+	UINT32	DMA_config;
+	struct	rxhostdescriptor *RxHostDesc;        /* val0x8 */
+	UINT32	rx_mem;
+	UINT32	tx_mem;
+	UINT16	TxBlockNum;
+	UINT16	RxBlockNum;
 } acx100_memconfigoption_t;
 
-#ifdef V1_VERSION
-typedef struct ConfigWrite {
-	UINT16 vala;		//0x4
-	UINT16 valb;		//0x6
-	UINT CodeStart;		//0x8
-	UINT CodeEnd;		//0xc
-	UINT8 valc;		//0x10
-	UINT8 vald;		//0x11
-	UINT8 val001;		//0x12
-	UINT32 vale;		//0x16
-	UINT valf;		//0x1a
-	UINT valg;		//0x1e
-	UINT8 valh;		//0x1f
-	UINT8 vali;		//0x20
-	UINT8 valj;		//0x21
-} ConfigWrite_t;
-typedef struct ConfigWrite2 {
-	UINT16 vala;		//0x4 
-	UINT16 valb;		//0x6
-	UINT CodeStart;		//0x8
-	UINT CodeEnd;		//0xc
-	UINT8 valc;		//0x10
-	UINT8 vald;		//0x11
-	UINT8 val001;		//0x12
-	UINT32 vale;		//0x16
-	UINT valf;		//0x1a
-	UINT valg;		//0x1e
-	UINT valh;		//0x1f
-	UINT32 vali;		//0x20
-	UINT32 val0x28;
-//    UINT8 valj;     //0x21
-} ConfigWrite2_t;
-#else
-
-/* I think these stucts changed (or where even wrong in version 1)
- */
-typedef struct ConfigWrite {
-	UINT16 vala;		//0x4
-	UINT16 valb;		//0x6
-	UINT CodeStart;		//0x8
-	UINT CodeEnd;		//0xc
-	UINT8 valc;		//0x10
-	UINT8 vald;		//0x11
-	UINT8 val001;		//0x12
-	UINT8 val002;		//0x13
-	UINT32 vale;		//0x14
-	UINT valf;		//0x18
-	UINT valg;		//0x1c
-	UINT8 valh;		//0x20
-/*    UINT8 vali;     //0x21
-    UINT8 valj;     //0x22 */
-} ConfigWrite_t;
-typedef struct ConfigWrite2 {
-	UINT16 vala;		//0x4
-	UINT16 valb;		//0x6
-	UINT CodeStart;		//0x8
-	UINT CodeEnd;		//0xc
-	UINT8 valc;		//0x10
-	UINT8 vald;		//0x11
-	UINT8 val001;		//0x12
-	UINT8 val002;		//0x13
-	UINT32 vale;		//0x14
-	UINT valf;		//0x18
-	UINT valg;		//0x1c
-	UINT valh;		//0x20
-	UINT32 vali;		//0x24
-	UINT32 val0x28;		//0x28
-} ConfigWrite2_t;
-typedef struct ConfigWrite3 {
-	UINT16 vala;		//0x4
-	UINT16 valb;		//0x6
-	UINT CodeStart;		//0x8
-	UINT CodeEnd;		//0xc
-	UINT8 valc;		//0x10
-	UINT8 vald;		//0x11
-	UINT8 val001;		//0x12
-	UINT8 val002;		//0x13
-	UINT32 vale;		//0x14
-	UINT valf;		//0x18
-	UINT valg;		//0x1c
-	UINT valh;		//0x20
-	UINT16 vali;		//0x24
-	UINT16 valj;		//0x26
-} ConfigWrite3_t;
-#endif
 
 typedef struct QueueConfig {
-	UINT16 vala;		/* rid */
-	UINT16 valb;            /* length */
-	UINT32 AreaSize;     
-	UINT32 RxQueueStart;
-	UINT8  vald;           /* queue options */
-	UINT8  vale;	       /* # tx queues */
-	UINT8 valf1;
-	UINT8 valf2;           /* # rx buffers */
-	UINT32 QueueEnd;
-	UINT32 QueueEnd2;
-	UINT32 TxQueueStart;   
-	UINT8  valj;           /*  */
-	UINT8  valk;           /* # tx buffers */
-	UINT16 vall;
+	UINT16	rid;			/* rid */
+	UINT16	len;			/* length */
+	UINT32	AreaSize;
+	UINT32	RxQueueStart;
+	UINT8	QueueOptions;		/* queue options, val0xd */
+	UINT8	NumTxQueues;		/* # tx queues, val0xe */
+	UINT8	NumRxDesc;		/* for USB only */
+	UINT8	padf2;			/* # rx buffers */
+	UINT32	QueueEnd;
+	UINT32	HostQueueEnd;		/* QueueEnd2*/
+	UINT32	TxQueueStart;
+	UINT8	TxQueuePri;
+	UINT8	NumTxDesc;
+	UINT16	pad;
 } QueueConfig_t;
-
-#if MAYBE_BOGUS
-typedef struct wep {
-	UINT16 vala;
-
-	UINT8 wep_key[MAX_KEYLEN];
-	char key_name[0x16];
-} wep_t;
-#endif
 
 typedef struct associd {
 	UINT16 vala;
@@ -223,13 +109,26 @@ typedef struct associd {
 #define PS_OPT_ENA_ENHANCED_PS	0x04 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set in the TIM; newer firmwares only(?) */
 #define PS_OPT_STILL_RCV_BCASTS	0x01
 
-typedef struct powermgmt {
+typedef struct acx100_powermgmt {
+	UINT32	rid;
+	UINT32	len;
 	UINT8 wakeup_cfg;
 	UINT8 listen_interval; /* for EACH_ITVL: wake up every "beacon units" interval */
 	UINT8 options;
 	UINT8 hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	UINT16 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} powermgmt_t;
+} acx100_powermgmt_t;
+
+typedef struct acx111_powermgmt {
+	UINT32	rid;
+	UINT32	len;
+	UINT8	wakeup_cfg;
+	UINT8	listen_interval; /* for EACH_ITVL: wake up every "beacon units" interval */
+	UINT8	options;
+	UINT8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
+	UINT32	beaconRxTime;
+	UINT32 enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
+} acx111_powermgmt_t;
 
 typedef struct defaultkey {
 	UINT8 num;
@@ -240,15 +139,8 @@ typedef struct memmap {
 	UINT16 length;
 	union data {
 		struct GenericPacket gp;
-		struct InitPacket ip;
-		struct InitPacket2 ip2;
-		struct ConfigWrite cw;
-		struct ConfigWrite2 cw2;
-		struct ConfigWrite3 cw3;
-		struct QueueConfig qc;
 		/* struct wep wp; */
 		struct associd asid;
-		struct powermgmt power;
 		struct defaultkey dkey;
 	} m;
 } memmap_t;
@@ -298,7 +190,7 @@ typedef struct scan {
 
 typedef struct tim {
 	UINT16 size;
-	char buf[0x100];
+	UINT8 buf[0x100];
 } tim_t;
 
 typedef struct proberesp {
@@ -395,7 +287,41 @@ typedef struct {
     UINT32 len;
 } radioinit_t;
 
-void acx100_schedule(UINT32 timeout);
+
+typedef struct acx100_wep_options {
+    UINT16	rid;
+    UINT16	len;
+    UINT16	NumKeys;	/* max # of keys */
+    UINT8	WEPOption;
+    UINT8	Pad;		/* used only for acx111 */
+} acx100_wep_options_t;
+
+typedef struct dot11WEPDefaultKey {
+    UINT16	rid;
+    UINT16	len;
+    UINT8	Action;
+    UINT8	KeySize;
+    UINT8	defaultKeyNum;
+    UINT8	Key[29];	// check this! was Key[19].
+} dot11WEPDefaultKey_t;
+
+typedef struct dot11WEPDefaultKeyID {
+    UINT16	rid;
+    UINT16	len;
+    UINT8	KeyID;
+} dot11WEPDefaultKeyID_t;
+
+typedef struct acx100_wep_mgmt {
+    UINT8	MacAddr[WLAN_ADDR_LEN];
+    UINT16	Action;
+    UINT16	KeySize;
+    UINT16	Key[29];	/* 29*8 == 232bits == WEP256 */
+} acx100_wep_mgmt_t;
+
+
+
+
+void acx100_schedule(long timeout);
 int acx100_reset_dev(netdevice_t *dev);
 void acx100_join_bssid(wlandevice_t *priv);
 int acx100_init_mac(netdevice_t *dev);
@@ -409,15 +335,15 @@ unsigned int acx100_read_eeprom_offset(wlandevice_t *priv, UINT16 addr,
 					unsigned char *charbuf);
 void acx100_start(wlandevice_t *priv);
 void acx100_reset_mac(wlandevice_t *priv);
-firmware_image_t *acx100_read_fw( const char *file);
+/*@null@*/ firmware_image_t *acx100_read_fw( const char *file);
 int acx100_upload_fw(wlandevice_t *priv);
 int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 offset);
 int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset );
 int acx100_verify_init(wlandevice_t *priv);
 int acx100_read_eeprom_area(wlandevice_t *priv);
 void acx100_init_mboxes(wlandevice_t *priv);
-int acx100_init_wep(wlandevice_t *priv, memmap_t *pt);
-int acx100_init_packet_templates(wlandevice_t *priv, memmap_t *pt);
+int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt);
+int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *pt);
 int acx100_init_max_probe_request_template(wlandevice_t *priv);
 int acx100_init_max_null_data_template(wlandevice_t *priv);
 int acx100_init_max_beacon_template(wlandevice_t *priv);

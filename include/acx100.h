@@ -392,7 +392,7 @@ typedef enum {
 #define ACX100_RID_WEP_OPTIONS			0x07
 #define ACX100_RID_MEMORY_MAP			0x08	/* huh? */
 #define ACX100_RID_SSID				0x08	/* huh? */
-#define ACX100_RID_UNKNOWN_09			0x09	/* mapped to cfgInvalid in FW150 */
+#define ACX100_RID_SCAN_STATUS			0x09	/* mapped to cfgInvalid in FW150 */
 #define ACX100_RID_ASSOC_ID			0x0a
 #define ACX100_RID_UNKNOWN_0B			0x0b	/* mapped to cfgInvalid in FW150 */
 #define ACX100_RID_UNKNOWN_0C			0x0c	/* very small implementation in FW150! */
@@ -452,11 +452,16 @@ typedef enum {
 #define ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN		0x20
 #define ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN	0x04
 #define ACX100_RID_DOT11_CURRENT_REG_DOMAIN_LEN		0x02
+#if (WLAN_HOSTIF==WLAN_USB)
+#define ACX100_RID_DOT11_CURRENT_ANTENNA_LEN		0x02
+#else
 #define ACX100_RID_DOT11_CURRENT_ANTENNA_LEN		0x01
+#endif
 #define ACX100_RID_DOT11_TX_POWER_LEVEL_LEN		0x01
 #define ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN		0x01
 #define ACX100_RID_DOT11_ED_THRESHOLD_LEN		0x04
 #define ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET_LEN	0x01
+#define ACX100_RID_SCAN_STATUS_LEN			0x04
 
 /*--- Configuration RIDs: Network Parameters, Dynamic Configuration Entities -*/
 #define ACX100_RID_GROUPADDR		((UINT16)0xFC80)
@@ -1797,7 +1802,6 @@ typedef struct acx100_InfFrame {
 #define ACX100_USB_TXHI_DIRECTED   0x2
 #define ACX100_USB_TXHI_BROADCAST  0x4
 
-
 #define ACX100_USB_CTL2_FCS       0x02
 #define ACX100_USB_CTL2_MORE_FRAG 0x04
 #define ACX100_USB_CTL2_RTS       0x20
@@ -1805,15 +1809,20 @@ typedef struct acx100_InfFrame {
 
 /*--- Request (bulk OUT) packet contents -------------------------------------*/
 
-typedef struct acx100_usb_txfrm {
-  UINT16 desc __WLAN_ATTRIB_PACK__;
+typedef struct acx100_usb_txhdr {
+  UINT16	desc __WLAN_ATTRIB_PACK__;
   UINT16 MPDUlen __WLAN_ATTRIB_PACK__;
-  UINT16 index __WLAN_ATTRIB_PACK__;
-  UINT16 txRate __WLAN_ATTRIB_PACK__;
+  UINT8 index __WLAN_ATTRIB_PACK__;
+  UINT8 txRate __WLAN_ATTRIB_PACK__;
   UINT32 hostData __WLAN_ATTRIB_PACK__;
   UINT8  ctrl1 __WLAN_ATTRIB_PACK__;
   UINT8  ctrl2 __WLAN_ATTRIB_PACK__;
   UINT16 dataLength __WLAN_ATTRIB_PACK__;
+} acx100_usb_txhdr_t;
+
+
+typedef struct acx100_usb_txfrm {
+  acx100_usb_txhdr_t hdr;
   UINT8 data[WLAN_DATA_MAXLEN];
 } acx100_usb_txfrm_t __WLAN_ATTRIB_PACK__;
 
@@ -1824,6 +1833,11 @@ typedef struct acx100_usb_scan {
 	UINT16 unk2 __WLAN_ATTRIB_PACK__;
 } acx100_usb_scan_t __WLAN_ATTRIB_PACK__;
 
+typedef struct acx100_usb_scan_status {
+	UINT16 rid __WLAN_ATTRIB_PACK__;
+	UINT16 length __WLAN_ATTRIB_PACK__;
+	UINT32	status __WLAN_ATTRIB_PACK__;
+} acx100_usb_scan_status_t __WLAN_ATTRIB_PACK__;
 
 typedef struct acx100_usb_cmdreq {
 	UINT16 type __WLAN_ATTRIB_PACK__;
@@ -1867,11 +1881,9 @@ typedef struct acx100_usb_rxtx_ctrl {
 } __WLAN_ATTRIB_PACK__ acx100_usb_rxtx_ctrl_t;
 
 typedef struct acx100_usb_rmemreq {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
-	UINT16 offset __WLAN_ATTRIB_PACK__;
-	UINT16 page __WLAN_ATTRIB_PACK__;
-	UINT8 pad[56] __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
+	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rmemreq_t;
 
 /*--- Response (bulk IN) packet contents -------------------------------------*/
@@ -1919,8 +1931,8 @@ typedef struct acx100_usb_wmemresp {
 } __WLAN_ATTRIB_PACK__ acx100_usb_wmemresp_t;
 
 typedef struct acx100_usb_rmemresp {
-	UINT16 type __WLAN_ATTRIB_PACK__;
-	UINT16 frmlen __WLAN_ATTRIB_PACK__;
+	UINT16 cmd __WLAN_ATTRIB_PACK__;
+	UINT16 status __WLAN_ATTRIB_PACK__;
 	UINT8 data[ACX100_USB_RWMEM_MAXLEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ acx100_usb_rmemresp_t;
 
@@ -2220,6 +2232,15 @@ typedef struct fw_stats {
 	UINT wep_decrypt_fail;
 } fw_stats_t;
 
+/* Firmware version struct */
+
+typedef struct fw_ver {
+	UINT16 vala;
+	UINT16 valb;
+	char fw_id[20];
+	UINT32 hw_id;
+} fw_ver_t;
+
 /*--- IEEE 802.11 header -----------------------------------------------------*/
 /* FIXME: acx100_addr3_t should probably actually be discarded in favour of the
  * identical linux-wlan-ng p80211_hdr_t. An even better choice would be to use
@@ -2248,8 +2269,8 @@ typedef struct acx100_addr3 {
 #define HOSTWEP_EXCLUDEUNENCRYPTED	BIT7
 
 typedef struct wep_key {
-	UINT32 index;
-	UINT16 size;
+	UINT8 index;
+	size_t size;
 	UINT8 key[29];
 	UINT16 strange_filler;
 } wep_key_t;			/* size = 264 bytes (33*8) */
@@ -2267,53 +2288,43 @@ typedef struct key_struct {
 
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
 typedef struct TIWLAN_DC {	/* V3 version */
-	struct wlandevice *priv;
-
-	UINT val0x4;		//spacing
-
-	UINT ui32ACXTxQueueStart;	/* 0x8, official name */
-	UINT ui32ACXRxQueueStart;	/* 0xc */
-
-	UINT8 *pTxBufferPool;	/* 0x10 */
-	dma_addr_t TxBufferPoolPhyAddr;	/* 0x14 */
-	UINT TxBufferPoolSize;	/* 0x18 */
-
-	struct txdescriptor *pTxDescQPool;	/* V13POS 0x1c, official name */
-	UINT tx_pool_count;	/* 0x20 indicates # of ring buffer pool entries */
-	UINT tx_head;		/* 0x24 current ring buffer pool member index */
-	UINT tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
-				 * just using it as a ring watch
-				 * official name */
-
-	struct framehdr *pFrameHdrQPool;	/* 0x28 */
-	UINT FrameHdrQPoolSize;	/* 0x2c */
-	dma_addr_t FrameHdrQPoolPhyAddr;	/* 0x30 */
-
-	UINT val0x38;		/* 0x38, official name */
+	struct	wlandevice 	*priv;
+	UINT32		val0x4;			/* spacing */
+	UINT32		ui32ACXTxQueueStart;	/* 0x8, official name */
+	UINT32		ui32ACXRxQueueStart;	/* 0xc */
+	UINT8		*pTxBufferPool;		/* 0x10 */
+	dma_addr_t	TxBufferPoolPhyAddr;	/* 0x14 */
+	UINT32		TxBufferPoolSize;	/* 0x18 */
+	struct	txdescriptor	*pTxDescQPool;	/* V13POS 0x1c, official name */
+	UINT32		tx_pool_count;		/* 0x20 indicates # of ring buffer pool entries */
+	UINT32		tx_head;		/* 0x24 current ring buffer pool member index */
+	UINT32		tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
+						 * just using it as a ring watch
+						 * official name */
+	struct	framehdr	*pFrameHdrQPool;/* 0x28 */
+	UINT32		FrameHdrQPoolSize;	/* 0x2c */
+	dma_addr_t	FrameHdrQPoolPhyAddr;	/* 0x30 */
+	UINT32 		val0x38;		/* 0x38, NOT USED */
 
 	struct txhostdescriptor *pTxHostDescQPool;	/* V3POS 0x3c, V1POS 0x60 */
-	UINT TxHostDescQPoolSize;	/* 0x40 */
-	UINT TxHostDescQPoolPhyAddr;	/* 0x44 */
+	UINT		TxHostDescQPoolSize;	/* 0x40 */
+	UINT32		TxHostDescQPoolPhyAddr;	/* 0x44 */
+	UINT32		val0x48;		/* 0x48, NOT USED */
+	UINT32		val0x4c;		/* 0x4c, NOT USED */
 
-	UINT val0x48;		/* 0x48 */
-	UINT val0x4c;
-
-	struct rxdescriptor *pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
-	UINT rx_pool_count;	/* V1POS 0x78, V3POS 0X54 */
-	UINT rx_tail;		/* 0x6c */
-
-	UINT val0x50;		/* V1POS:0x50, some size */
-	UINT val0x54;		/* 0x54, official name */
+	struct	rxdescriptor	*pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
+	UINT32		rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
+	UINT32		rx_tail;		/* 0x6c */
+	UINT32		val0x50;		/* V1POS:0x50, some size NOT USED */
+	UINT32		val0x54;		/* 0x54, official name NOT USED */
 
 	struct rxhostdescriptor *pRxHostDescQPool;	/* 0x58, is it really rxdescriptor? */
-	UINT RxHostDescQPoolSize;	/* 0x5c */
-	UINT RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
-
-	UINT val0x64;		/* 0x64, some size */
-
-	UINT *pRxBufferPool;	/* *rxdescq1; 0x70 */
-	UINT RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
-	UINT RxBufferPoolSize;
+	UINT32		RxHostDescQPoolSize;	/* 0x5c */
+	UINT32		RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
+	UINT32		val0x64;		/* 0x64, some size */
+	UINT32		*pRxBufferPool;		/* *rxdescq1; 0x70 */
+	UINT32		RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
+	UINT32		RxBufferPoolSize;
 } TIWLAN_DC;
 
 /*--- 802.11 Management capabilities -----------------------------------------*/
@@ -2328,8 +2339,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 
 /*--- 802.11 Basic Service Set info ------------------------------------------*/
 typedef struct bss_info {
-	u8 bssid[ETH_ALEN];	/* BSSID */
-	u8 essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
+	UINT8 bssid[ETH_ALEN];	/* BSSID */
+	UINT8 essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
 	size_t essid_len;	/* Length of ESSID (FIXME: \0 included?) */
 	UINT16 caps;		/* 802.11 capabilities information */
 	UINT8 channel;		/* 802.11 channel */
@@ -2355,186 +2366,184 @@ typedef struct bss_info {
 #define ACX_MODE_2_MANAGED_STA	2
 #define ACX_MODE_3_MANAGED_AP	3
 
+
+
 /* FIXME: this should be named something like struct acx100_priv (typedef'd to
  * acx100_priv_t) */
+
 typedef struct wlandevice {
 	/*** Device chain ***/
-	struct wlandevice *next;	/* link for list of devices */
+	struct wlandevice	*next;		/* link for list of devices */
 
 	/*** Linux network device ***/
-	struct net_device *netdev;	/* pointer to linux netdevice */
-	struct net_device *prev_nd;	/* FIXME: We should not chain via our
-					 * private struct wlandevice _and_
-					 * the struct net_device. */
+	struct net_device *netdev;		/* pointer to linux netdevice */
+	struct net_device *prev_nd;		/* FIXME: We should not chain via our
+						 * private struct wlandevice _and_
+						 * the struct net_device. */
 
 	/*** Device statistics ***/
-	struct net_device_stats stats;	/* net device statistics */
+	struct net_device_stats stats;		/* net device statistics */
 #ifdef WIRELESS_EXT
-	struct iw_statistics wstats;	/* wireless statistics */
+	struct iw_statistics wstats;		/* wireless statistics */
 #endif
-/*	struct p80211_frmrx_t rx; *//* 802.11 frame rx statistics */
+/*	struct p80211_frmrx_t rx; */		/* 802.11 frame rx statistics */
 
 	/*** Power managment ***/
-	struct pm_dev *pm;	/* PM crap */
+	struct pm_dev *pm;			/* PM crap */
 
 	/*** USB stuff ***/
 #if (WLAN_HOSTIF==WLAN_USB)
-	struct usb_device *usbdev;
-	acx100_usbin_t usbin;
-	acx100_usbin_t bulkin;
-	acx100_usbout_t usbout;
-	acx100_usbout_t bulkout;
-	struct urb *urb;
-	struct urb *bulkrx_urb;
-	struct urb *bulktx_urb;
-	/* struct usb_ctrlrequest usb_setup; not needed and not
-	 * available in older kernel versions */
+	struct	usb_device	*usbdev;
+	acx100_usbin_t		usbin;
+	acx100_usbin_t		bulkin;
+	acx100_usbout_t		usbout;
+	acx100_usbout_t		bulkout;
+	int			usb_txoffset;
+	int			usb_txsize;
+	struct	urb		*ctrl_urb;
+	struct	urb		*bulkrx_urb;
+	struct	urb		*bulktx_urb;
+	struct	usb_ctrlrequest	usb_setup;
+	/* struct usb_ctrlrequest usb_setup; is needed for irq-save control messages */
 #endif
 
-	/*** Procfs support ***/
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *proc_entry;
-#endif
 	/*** Management timer ***/
-	struct timer_list mgmt_timer;
+	struct	timer_list	mgmt_timer;
 
 	/*** Locking ***/
-	spinlock_t lock;	/* mutex for concurrent accesses to structure */
+	spinlock_t	lock;			/* mutex for concurrent accesses to structure */
 
 	/*** Hardware identification ***/
-	UINT8 form_factor;
-	UINT8 radio_type;
-	unsigned char eeprom_version;
+	UINT8		form_factor;
+	UINT8		radio_type;
+	UINT8		eeprom_version;
 
 	/*** Firmware identification ***/
-	unsigned char firmware_version[20];
-	UINT32 firmware_numver;
-	UINT32 firmware_id;
+	char		firmware_version[20];
+	UINT32		firmware_numver;
+	UINT32		firmware_id;
 
 	/*** Hardware resources ***/
-	UINT16 irq_mask;	/* interrupts types to mask out (not wanted) */
+	UINT16		irq_mask;		/* interrupts types to mask out (not wanted) */
 
-	UINT membase;		/* 10 */
-	UINT membase2;		/* 14 */
-	UINT iobase;		/* 18 */
-	UINT iobase2;		/* 1c */
-	UINT chip_type;
-	char *chip_name;
-	UINT *io;
+	unsigned long	membase;		/* 10 */
+	unsigned long	membase2;		/* 14 */
+	unsigned long	iobase;			/* 18 */
+	unsigned long	iobase2;		/* 1c */
+	UINT		chip_type;
+	char		*chip_name;
+	UINT		*io;
 
 	/*** Device state ***/
-	int hw_unavailable;	/* indicates whether the hardware has been
-				 * suspended or ejected. actually a counter. */
-	int dev_state_mask;
-	int monitor;		/* whether the device is in monitor mode */
-	int monitor_setting;
-	char led_power;		/* power led status */
-	UINT32 get_mask;	/* mask of settings to fetch from the card */
-	UINT32 set_mask;	/* mask of settings to write to the card */
+	int		hw_unavailable;		/* indicates whether the hardware has been
+						 * suspended or ejected. actually a counter. */
+	UINT16		dev_state_mask;
+	int		monitor;		/* whether the device is in monitor mode */
+	int		monitor_setting;
+	UINT8		led_power;		/* power led status */
+	UINT32		get_mask;		/* mask of settings to fetch from the card */
+	UINT32		set_mask;		/* mask of settings to write to the card */
 
 	/*** Wireless network settings ***/
-	UINT8 dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over when it makes sense only */
-	UINT8 address[WLAN_ADDR_LEN];
-	UINT8 bssid[WLAN_ADDR_LEN];
-	UINT8 ap[ETH_ALEN];	/* The AP we want, FF:FF:FF:FF:FF:FF is any */
-	UINT8 macmode;		/* This is the mode we're currently in */
-	UINT8 mode;		/* That's the MAC mode we want */
-	char essid_active;	/* specific ESSID active, or select any? */
-	size_t essid_len;		/* to avoid dozens of strlen() */
-	char essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
-	char essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
-	char nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
-	UINT16 channel;		/* V3POS 22f0, V1POS b8 */
-	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
-	char bitrate_auto;	/* whether to auto adjust bit rates */
-	UINT8 rate_fallback_retries;
-	unsigned char reg_dom_id;	/* reg domain setting */
-	UINT16 reg_dom_chanmask;
-	UINT status;		/* 802.11 association status */
-	UINT unknown0x2350;	/* FIXME: old status ?? */
-	UINT8 auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
+	UINT8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over when it makes sense only */
+	UINT8		address[WLAN_ADDR_LEN];
+	UINT8		bssid[WLAN_ADDR_LEN];
+	UINT8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
+	UINT16		macmode;		/* This is the mode we're currently in */
+	UINT16		mode;			/* That's the MAC mode we want */
+	UINT8		essid_active;		/* specific ESSID active, or select any? */
+	UINT8		essid_len;		/* to avoid dozens of strlen() */
+	char		essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
+	char		essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
+	char		nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
+	UINT16		channel;		/* V3POS 22f0, V1POS b8 */
+	UINT8		bitrateval;		/* V3POS b8, V1POS ba */
+	UINT8		bitrate_auto;		/* whether to auto adjust bit rates */
+	UINT8		rate_fallback_retries;
+	UINT8		reg_dom_id;		/* reg domain setting */
+	UINT16		reg_dom_chanmask;
+	UINT16		status;			/* 802.11 association status */
+	UINT16		unknown0x2350;		/* FIXME: old status ?? */
+	UINT16		auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
-	UINT8 bss_table_count;		/* # of active BSS scan table entries */
-	struct bss_info bss_table[32];	/* BSS scan table */
-	struct bss_info station_assoc;	/* the station we're currently associated to */
-	char scan_running;
-	unsigned long scan_start;
-	UINT8 scan_retries;	/* V3POS 2826, V1POS 27fe */
+	UINT16		bss_table_count;	/* # of active BSS scan table entries */
+	struct		bss_info bss_table[32];	/* BSS scan table */
+	struct		bss_info station_assoc;	/* the station we're currently associated to */
+	UINT8		scan_running;
+	UINT32		scan_start;
+	UINT16		scan_retries;		/* V3POS 2826, V1POS 27fe */
 
 	/* 802.11 power save mode */
-	UINT8 ps_wakeup_cfg;
-	UINT8 ps_listen_interval;
-	UINT8 ps_options;
-	UINT8 ps_hangover_period;
-	UINT16 ps_enhanced_transition_time;
+	UINT8		ps_wakeup_cfg;
+	UINT8		ps_listen_interval;
+	UINT8		ps_options;
+	UINT8		ps_hangover_period;
+	UINT16		ps_enhanced_transition_time;
 
 	/*** PHY settings ***/
-	unsigned char tx_disabled;
-	unsigned char tx_level_dbm;
-	unsigned char tx_level_val;
-	char tx_level_auto; /* whether to do automatic power adjustment */
-	unsigned char antenna;	/* antenna settings */
-	unsigned char ed_threshold;	/* energy detect threshold */
-	unsigned char cca;	/* clear channel assessment */
-	char preamble_mode;	/* 0 == Long Preamble, 1 == Short, 2 == Auto */
-	char preamble_flag;	/* 0 == Long Preamble, 1 == Short */
+	UINT8		tx_disabled;
+	UINT8		tx_level_dbm;
+	UINT8		tx_level_val;
+	UINT8		tx_level_auto;		/* whether to do automatic power adjustment */
+	UINT8		antenna;		/* antenna settings */
+	UINT8		ed_threshold;		/* energy detect threshold */
+	UINT8		cca;			/* clear channel assessment */
+	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
+	UINT8		preamble_flag;		/* 0 == Long Preamble, 1 == Short */
 
-	UINT16 rts_threshold;
-	UINT32 short_retry;	/* V3POS 204, V1POS 20c */
-	UINT32 long_retry;	/* V3POS 208, V1POS 210 */
-	UINT16 msdu_lifetime;	/* V3POS 20c, V1POS 214 */
-	UINT32 auth_alg;	/* V3POS 228, V3POS 230, used in transmit_authen1 */
-	UINT16 listen_interval;	/* V3POS 250, V1POS 258, given in units of beacon interval */
-	UINT32 beacon_interval;	/* V3POS 2300, V1POS c8 */
+	UINT16		rts_threshold;
+	UINT32		short_retry;		/* V3POS 204, V1POS 20c */
+	UINT32		long_retry;		/* V3POS 208, V1POS 210 */
+	UINT16		msdu_lifetime;		/* V3POS 20c, V1POS 214 */
+	UINT32		auth_alg;		/* V3POS 228, V3POS 230, used in transmit_authen1 */
+	UINT16		listen_interval;	/* V3POS 250, V1POS 258, given in units of beacon interval */
+	UINT32		beacon_interval;	/* V3POS 2300, V1POS c8 */
 
-	UINT16 capabilities;	/* V3POS b0 */
-	unsigned char capab_short;	/* V3POS 1ec, V1POS 1f4 */
-	unsigned char capab_pbcc;	/* V3POS 1f0, V1POS 1f8 */
-	unsigned char capab_agility;	/* V3POS 1f4, V1POS 1fc */
-	char rate_spt_len;	/* V3POS 1243, V1POS 124b */
-	char rate_support1[5];	/* V3POS 1244, V1POS 124c */
-	char rate_support2[5];	/* V3POS 1254, V1POS 125c */
+	UINT16		capabilities;		/* V3POS b0 */
+	UINT8		capab_short;		/* V3POS 1ec, V1POS 1f4 */
+	UINT8		capab_pbcc;		/* V3POS 1f0, V1POS 1f8 */
+	UINT8		capab_agility;		/* V3POS 1f4, V1POS 1fc */
+	UINT8		rate_spt_len;		/* V3POS 1243, V1POS 124b */
+	UINT8		rate_support1[5];	/* V3POS 1244, V1POS 124c */
+	UINT8		rate_support2[5];	/* V3POS 1254, V1POS 125c */
 
 	/*** Encryption settings (WEP) ***/
-	UINT32 wep_enabled;
-	UINT32 wep_restricted;	/* V3POS c0 */
-	UINT32 wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
-	wep_key_t wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
-	key_struct_t wep_key_struct[10];	/* V3POS 688 */
+	UINT8		wep_enabled;
+	UINT8		wep_restricted;		/* V3POS c0 */
+	UINT8		wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
+	wep_key_t	wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
+	key_struct_t	wep_key_struct[10];	/* V3POS 688 */
 
 	/*** Card Rx/Tx management ***/
-	UINT16 rx_config_1;	/* V3POS 2820, V1POS 27f8 */
-	UINT16 rx_config_2;	/* V3POS 2822, V1POS 27fa */
-	TIWLAN_DC dc;		/* V3POS 2380, V1POS 2338 */
-	UINT TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
-	UINT RxQueueNo;		/* V3POS 24f4, V1POS 24cc */
-	int TxQueueFree;
-	struct rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
-	UINT16 memblocksize;	/* V3POS 2354, V1POS 230c */
-	UINT32 val0x24e4;	/* V3POS 24e4, V1POS 24bc */
-	UINT32 val0x24e8;	/* V3POS 24e8, V1POS 24c0 */
-	UINT32 val0x24fc;	/* V3POS 24fc, V1POS 24d4 */
-	UINT32 val0x2500;	/* V3POS 2500, V1POS 24d8 */
+	UINT16		rx_config_1;		/* V3POS 2820, V1POS 27f8 */
+	UINT16		rx_config_2;		/* V3POS 2822, V1POS 27fa */
+	TIWLAN_DC	dc;			/* V3POS 2380, V1POS 2338 */
+	UINT32		TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
+	UINT32		RxQueueNo;		/* V3POS 24f4, V1POS 24cc */
+	UINT32	TxQueueFree;
+	struct	rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
+	UINT16		memblocksize;		/* V3POS 2354, V1POS 230c */
+	UINT32		RxBlockNum;		/* V3POS 24e4, V1POS 24bc */
+	UINT32		TotalRxBlockSize;	/* V3POS 24e8, V1POS 24c0 */
+	UINT32		TxBlockNum;		/* V3POS 24fc, V1POS 24d4 */
+	UINT32		TotalTxBlockSize;	/* V3POS 2500, V1POS 24d8 */
 
 	/*** ACX100 command interface ***/
-	UINT16 cmd_type;	/* V3POS 2508, V1POS 24e0 */
-	UINT16 cmd_status;	/* V3POS 250a, V1POS 24e2 */
-	UINT32 CommandParameters;	/* FIXME: used to be an array UINT*0x88,
-					 * but it should most likely be *one*
-					 * UINT32 instead, pointing to the cmd
-					 * param memory. V3POS 268c, V1POS 2664 */
+	UINT16		cmd_type;		/* V3POS 2508, V1POS 24e0 */
+	UINT16		cmd_status;		/* V3POS 250a, V1POS 24e2 */
+	UINT32		CommandParameters;	/* FIXME: used to be an array UINT*0x88,
+						 * but it should most likely be *one*
+						 * UINT32 instead, pointing to the cmd
+						 * param memory. V3POS 268c, V1POS 2664 */
 
-	UINT16 info_type;	/* V3POS 2508, V1POS 24e0 */
-	UINT16 info_status;	/* V3POS 250a, V1POS 24e2 */
-	UINT32 InfoParameters;	/* V3POS 2814, V1POS 27ec */
+	UINT16		info_type;		/* V3POS 2508, V1POS 24e0 */
+	UINT16		info_status;		/* V3POS 250a, V1POS 24e2 */
+	UINT32		InfoParameters;		/* V3POS 2814, V1POS 27ec */
 
 	/*** Unknown ***/
-	char dtim_interval;	/* V3POS 2302 */
-	char val0x2324[0x8];	/* V3POS 2324 */
+	UINT8		dtim_interval;		/* V3POS 2302 */
+	UINT8		val0x2324[0x8];		/* V3POS 2324 */
 } wlandevice_t __WLAN_ATTRIB_PACK__;
-/* DON'T optimize this struct by scaling variables down to their actual size!
- * It will take even MORE memory, probably due to register loading
- * issues (bigger code size) */
 
 /*-- MAC modes --*/
 #define WLAN_MACMODE_NONE	0
@@ -2593,26 +2602,26 @@ typedef struct wlandevice {
 #define RX_CFG2_RCV_OTHER		0x0001
 
 /*-- get and set mask values --*/
-#define GETSET_WEP		0x00000001
-#define GETSET_TXPOWER		0x00000002
-#define GETSET_ANTENNA		0x00000004
-#define GETSET_ED_THRESH	0x00000008
-#define GETSET_CCA		0x00000010
-#define GETSET_TX		0x00000020
-#define GETSET_RX		0x00000040
-#define GETSET_RETRY		0x00000080
-#define GETSET_REG_DOMAIN	0x00000100
-#define GETSET_CHANNEL		0x00000200
-#define GETSET_ESSID		0x00000400
-#define GETSET_MODE		0x00000800
-#define SET_MSDU_LIFETIME	0x00001000
-#define GET_STATION_ID		0x00002000
-#define SET_RATE_FALLBACK	0x00004000
-#define SET_RXCONFIG		0x00008000
-#define SET_WEP_OPTIONS		0x00010000
-#define GETSET_LED_POWER	0x00020000
-#define GETSET_POWER_80211	0x00040000
-#define GETSET_ALL		0x80000000
+#define GETSET_WEP		0x00000001L
+#define GETSET_TXPOWER		0x00000002L
+#define GETSET_ANTENNA		0x00000004L
+#define GETSET_ED_THRESH	0x00000008L
+#define GETSET_CCA		0x00000010L
+#define GETSET_TX		0x00000020L
+#define GETSET_RX		0x00000040L
+#define GETSET_RETRY		0x00000080L
+#define GETSET_REG_DOMAIN	0x00000100L
+#define GETSET_CHANNEL		0x00000200L
+#define GETSET_ESSID		0x00000400L
+#define GETSET_MODE		0x00000800L
+#define SET_MSDU_LIFETIME	0x00001000L
+#define GET_STATION_ID		0x00002000L
+#define SET_RATE_FALLBACK	0x00004000L
+#define SET_RXCONFIG		0x00008000L
+#define SET_WEP_OPTIONS		0x00010000L
+#define GETSET_LED_POWER	0x00020000L
+#define GETSET_POWER_80211	0x00040000L
+#define GETSET_ALL		0x80000000L
 
 void acx100_disable_irq(wlandevice_t *priv);
 void acx100_enable_irq(wlandevice_t *priv);
@@ -2658,16 +2667,20 @@ extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
+	/*@-noeffect@*/
 	(void)*priv;
 	(void)*flags;
+	/*@=noeffect@*/
 	return 0;
 }
 
 extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
+	/*@-noeffect@*/
 	(void)*priv;
 	(void)*flags;
+	/*@=noeffect@*/
 }
 #endif /* BROKEN_LOCKING */
 

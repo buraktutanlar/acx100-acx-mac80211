@@ -217,14 +217,14 @@ void ActivatePowerSaveMode(wlandevice_t *priv, int vala);
 #endif
 void acx100_timer(unsigned long a);
 void acx100_complete_dot11_scan(wlandevice_t *priv);
-char *acx100_get_status_name(int status);
-void acx100_set_status(wlandevice_t *priv, int status);
+char *acx100_get_status_name(UINT16 status);
+void acx100_set_status(wlandevice_t *priv, UINT16 status);
 void acx100_ibssid_gen(wlandevice_t *priv, unsigned char *p_out);
 
 extern void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 void acx100_gen_challenge(challenge_text_t *);
-void acx100_get_random(UINT8 *, UINT32);
+void acx100_get_random(UINT8 *, UINT16);
 
 int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
 int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv);
@@ -234,7 +234,7 @@ int acx100_transmit_authen1(wlandevice_t *priv);
 int acx100_transmit_assoc_req(wlandevice_t *priv);
 UINT32 acx100_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
 int acx100_transmit_deauthen(char *a, client_t *arg_4, wlandevice_t *priv,
-		      int valb);
+		      UINT16 reason);
 UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			  wlandevice_t *priv);
 UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0,

@@ -60,8 +60,8 @@ void acx100_get_cmd_state(wlandevice_t *priv);
 void acx100_write_cmd_type(wlandevice_t *priv, UINT16 vala);
 void acx100_write_cmd_status(wlandevice_t *priv, UINT vala);
 
-int acx100_issue_cmd(wlandevice_t *priv, UINT command, void *hw,
-		     int valb, UINT32 valc);
+int acx100_issue_cmd(wlandevice_t *priv, UINT cmd, /*@null@*/ void *pcmdparam,
+		     int paramlen, UINT32 timeout);
 
 int acx100_configure(wlandevice_t *priv, void *pdr, short type);
 int acx100_configure_length(wlandevice_t *priv, void *pdr, short type,
@@ -79,4 +79,4 @@ int acx100_is_mac_address_broadcast(const UINT8 * const address);
 int acx100_is_mac_address_multicast(mac_t *mac);
 void acx100_log_mac_address(int level, UINT8 *mac);
 
-void acx100_power_led(wlandevice_t *priv, int enable);
+void acx100_power_led(wlandevice_t *priv, UINT8 enable);

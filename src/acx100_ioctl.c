@@ -36,6 +36,16 @@
  * --------------------------------------------------------------------
  */
 
+#ifdef S_SPLINT_S /* some crap that splint needs to not crap out */
+#define __signed__ signed
+#define __u64 unsigned long long
+#define u64 unsigned long long
+#define loff_t unsigned long
+#define sigval_t unsigned long
+#define siginfo_t unsigned long
+#define stack_t unsigned long
+#define __s64 signed long long
+#endif
 #include <linux/config.h>
 #include <linux/version.h>
 
@@ -255,12 +265,12 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 		goto end;
 	}
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
-	priv->channel = channel;
+	priv->channel = (UINT16)channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
 	if (priv->macmode == ACX_MODE_3_MANAGED_AP) {
@@ -314,7 +324,7 @@ static inline int acx100_ioctl_set_mode(struct net_device *dev, struct iw_reques
 	FN_ENTER;
 	acxlog(L_IOCTL, "Set Mode <= %i\n", *uwrq);
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -394,7 +404,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	static const unsigned char off[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 	int result = 0;
-	int i;
+	UINT16 i;
 	unsigned char *ap;
 
 	FN_ENTER;
@@ -416,7 +426,7 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 		goto end;
 	}
 
-	if (acx100_is_mac_address_broadcast(ap)) {
+	if (0 != acx100_is_mac_address_broadcast(ap)) {
 		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
 		acx100_set_mac_address_broadcast(priv->ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
@@ -485,7 +495,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	int err;
 	int result = 0;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -500,7 +510,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 	acx100_scan_chan(priv);
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	while (!(acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x2000)) {
+	while (0 == (acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES]) & 0x2000)) {
 		/* FIXME: urks, busy loop! */
 	};
 #endif
@@ -524,16 +534,16 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 			int wep;
 		};
 		struct ap *ap_table;
-		int i = 0;
+		UINT16 i;
 
 		ap_table = kmalloc(sizeof(struct ap) * IW_MAX_AP, GFP_USER);
 		if (!ap_table) {
 			result = -ENOMEM;
 			goto end;
 		}
-		if (priv->bss_table_count != 0) {
+		if (0 != priv->bss_table_count) {
 
-			for (; i < priv->bss_table_count; i++) {
+			for (i = 0; i < priv->bss_table_count; i++) {
 
 				ap_table[i].channel =
 				    priv->bss_table[i].channel;
@@ -551,10 +561,9 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 			}
 		}
 
-		dwrq->length =
-		    priv->bss_table_count * sizeof(struct ap);
+		dwrq->length = priv->bss_table_count * sizeof(struct ap);
 		/* FIXME memcpy? */
-		if (copy_to_user (dwrq->pointer, ap_table, dwrq->length) != 0)
+		if (copy_to_user(dwrq->pointer, ap_table, dwrq->length) != 0)
 			result = -EFAULT;
 		kfree(ap_table);
 
@@ -607,7 +616,7 @@ static inline int acx100_ioctl_set_scan(struct net_device *dev, struct iw_reques
 	FN_ENTER;
 
 	/* don't start scan if device is not up yet */
-	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
+	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		result = -EAGAIN;
 		goto end;
 	}
@@ -648,8 +657,8 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	
 	/* Add mode */
 	iwe.cmd = SIOCGIWMODE;
-	if (bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)) {
-		if (bss->caps & IEEE802_11_MGMT_CAP_ESS)
+	if (0 != (bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS))) {
+		if (0 != (bss->caps & IEEE802_11_MGMT_CAP_ESS))
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
@@ -678,7 +687,7 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 
 	/* Add encryption */
 	iwe.cmd = SIOCGIWENCODE;
-	if (bss->caps & IEEE802_11_MGMT_CAP_WEP)
+	if (0 != (bss->caps & IEEE802_11_MGMT_CAP_WEP))
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
 	else
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
@@ -690,7 +699,7 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 	iwe.cmd = SIOCGIWRATE;
 	iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
 	ptr_rate = ptr + IW_EV_LCP_LEN;
-	for (i = 0; bss->supp_rates[i]; i++)
+	for (i = 0; 0 != bss->supp_rates[i]; i++)
 	{
 		iwe.u.bitrate.value = (bss->supp_rates[i] & ~0x80) * 500000; /* units of 500kb/s */
 		acxlog(L_IOCTL, "scan, rate: %d [%02x]\n", iwe.u.bitrate.value, bss->supp_rates[i]);
@@ -784,15 +793,15 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 		goto end;
 	}
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
 	/* ESSID disabled? */
-	if (dwrq->flags == 0)
+	if (0 == dwrq->flags)
 	{
-		priv->essid_active = 0;
+		priv->essid_active = (UINT8)0;
 	}
 	else
 	{
@@ -802,10 +811,10 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 			goto end_unlock;
 		}
 
-		priv->essid_len = len - 1;
+		priv->essid_len = (UINT8)(len - 1);
 		memcpy(priv->essid, extra, priv->essid_len);
 		priv->essid[priv->essid_len] = '\0';
-		priv->essid_active = 1;
+		priv->essid_active = (UINT8)1;
 	}
 
 	priv->set_mask |= GETSET_ESSID;
@@ -825,7 +834,7 @@ static inline int acx100_ioctl_get_essid(struct net_device *dev, struct iw_reque
 	acxlog(L_IOCTL, "Get ESSID => %s\n", priv->essid);
 
 	dwrq->flags = priv->essid_active;
-	if (priv->essid_active)
+	if ((UINT8)0 != priv->essid_active)
 	{
 		memcpy(extra, priv->essid, priv->essid_len);
 		extra[priv->essid_len] = '\0';
@@ -949,14 +958,14 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		goto end;
 	}
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
 	priv->bitrateval = bitrateval;
 #if BITRATE_AUTO
-	priv->bitrate_auto = (vwrq->fixed == 0);
+	priv->bitrate_auto = (UINT8)(vwrq->fixed == (__u8)0);
 #endif
 	
 	acx100_unlock(priv, &flags);
@@ -998,7 +1007,7 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 	 * perhaps fixing. */
 	vwrq->value = priv->bitrateval * 100000;
 #if BITRATE_AUTO
-	vwrq->fixed = (priv->bitrate_auto == 0);
+	vwrq->fixed = (__u8)(priv->bitrate_auto == (UINT8)0);
 #else
 	vwrq->fixed = 1;
 #endif
@@ -1011,7 +1020,7 @@ static inline int acx100_ioctl_set_rts(struct net_device *dev, struct iw_request
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int val = vwrq->value;
 
-	if (vwrq->disabled)
+	if (0 != vwrq->disabled)
 		val = 2312;
 	if ((val < 0) || (val > 2312))
 		return -EINVAL;
@@ -1061,7 +1070,7 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 	       "Set Encoding flags = 0x%04x, size = %i, key: %s\n",
 	       dwrq->flags, dwrq->length, extra ? "set" : "No key");
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -1072,11 +1081,11 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 
 		/* if index is 0 or invalid, use default key */
 		if ((index == 0) || (index > 4))
-			index = priv->wep_current_index;
+			index = (int)priv->wep_current_index;
 		else
 			index--;
 
-		if (!(dwrq->flags & IW_ENCODE_NOKEY)) {
+		if (0 == (dwrq->flags & IW_ENCODE_NOKEY)) {
 			if (dwrq->length > 29)
 				dwrq->length = 29; /* restrict it */
 
@@ -1099,9 +1108,9 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 	} else {
 		/* set transmit key */
 		if ((index >= 1) && (index <= 4))
-			priv->wep_current_index = index - 1;
+			priv->wep_current_index = (UINT8)(index - 1);
 		else
-			if (!(dwrq->flags & IW_ENCODE_MODE))
+			if (0 == (dwrq->flags & IW_ENCODE_MODE))
 			{
 				/* complain if we were not just setting
 				 * the key mode */
@@ -1110,14 +1119,14 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 			}
 	}
 
-	priv->wep_enabled = !(dwrq->flags & IW_ENCODE_DISABLED);
+	priv->wep_enabled = (UINT8)!(dwrq->flags & IW_ENCODE_DISABLED);
 
 	if (dwrq->flags & IW_ENCODE_OPEN) {
 		priv->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
-		priv->wep_restricted = 0;
+		priv->wep_restricted = (UINT8)0;
 	} else if (dwrq->flags & IW_ENCODE_RESTRICTED) {
 		priv->auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
-		priv->wep_restricted = 1;
+		priv->wep_restricted = (UINT8)1;
 	}
 
 	/* set flag to make sure the card WEP settings get updated */
@@ -1128,12 +1137,13 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 	       dwrq->flags);
 
 	for (index = 0; index <= 3; index++) {
-		if (priv->wep_keys[index].size != 0)
+		if (0 != priv->wep_keys[index].size) {
 			acxlog(L_IOCTL,
-			       "index = %ld, size = %d, key at 0x%p\n",
+			       "index = %d, size = %d, key at 0x%p\n",
 			       priv->wep_keys[index].index,
 			       priv->wep_keys[index].size,
 			       priv->wep_keys[index].key);
+		}
 	}
 	result = -EINPROGRESS;
 
@@ -1173,14 +1183,14 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 		/* return -EOPNOTSUPP; */
 	}
 
-	if (priv->wep_enabled == 0)
+	if (priv->wep_enabled == (UINT8)0)
 	{
 		dwrq->flags = IW_ENCODE_DISABLED;
 	}
 	else
 	{
 		dwrq->flags =
-			(priv->wep_restricted == 1) ? IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
+			(priv->wep_restricted == (UINT8)1) ? IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
 
 		dwrq->length =
 		    priv->wep_keys[priv->wep_current_index].size;
@@ -1206,7 +1216,7 @@ static inline int acx100_ioctl_set_power(struct net_device *dev, struct iw_reque
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	acxlog(L_IOCTL, "Set 802.11 Power Save flags = 0x%04x\n", vwrq->flags);
-	if (vwrq->disabled) {
+	if (0 != vwrq->disabled) {
 		priv->ps_wakeup_cfg &= ~PS_CFG_ENABLE;
 		priv->set_mask |= GETSET_POWER_80211;
 		return -EINPROGRESS;
@@ -1266,7 +1276,7 @@ static inline int acx100_ioctl_get_power(struct net_device *dev, struct iw_reque
 		vwrq->value = priv->ps_listen_interval * 1000000;
 		vwrq->flags = IW_POWER_PERIOD|IW_POWER_RELATIVE;
 	}
-	if (priv->ps_options & PS_OPT_STILL_RCV_BCASTS)
+	if (0 != (priv->ps_options & PS_OPT_STILL_RCV_BCASTS))
 		vwrq->flags |= IW_POWER_ALL_R;
 	else
 		vwrq->flags |= IW_POWER_UNICAST_R;
@@ -1331,7 +1341,7 @@ static inline int acx100_ioctl_set_txpow(struct net_device *dev, struct iw_reque
 
 	FN_ENTER;
 	acxlog(L_IOCTL, "Set Tx power <= %d, disabled %d, flags 0x%04x\n", vwrq->value, vwrq->disabled, vwrq->flags);
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -1341,16 +1351,16 @@ static inline int acx100_ioctl_set_txpow(struct net_device *dev, struct iw_reque
 
 	priv->tx_disabled = vwrq->disabled;
 	if (vwrq->value == -1) {
-		if (vwrq->disabled) {
-			priv->tx_level_dbm = 0;
+		if (0 != vwrq->disabled) {
+			priv->tx_level_dbm = (UINT8)0;
 			acxlog(L_IOCTL, "Disable radio Tx\n");
 		} else {
-			priv->tx_level_auto = 1;
+			priv->tx_level_auto = (UINT8)1;
 			acxlog(L_IOCTL, "Set Tx power auto (NIY)\n");
 		}
 	} else {
 		priv->tx_level_dbm = vwrq->value <= 20 ? vwrq->value : 20;
-		priv->tx_level_auto = 0;
+		priv->tx_level_auto = (UINT8)0;
 		acxlog(L_IOCTL, "Set Tx power = %d dBm\n", priv->tx_level_dbm);
 	}
 	priv->set_mask |= GETSET_TXPOWER;
@@ -1382,9 +1392,20 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 {
 	if (dwrq->pointer != NULL) {
 		struct iw_range *range = (struct iw_range *)extra;
+		wlandevice_t *priv = (wlandevice_t *) dev->priv;
+		UINT16 i, temp;
 
 		dwrq->length = sizeof(struct iw_range);
 		memset(range, 0, sizeof(struct iw_range));
+		range->num_channels = 0;
+		for (i = 0; i < 14; i++)
+			if (priv->reg_dom_chanmask & (1 << i))
+			{
+				range->freq[range->num_channels].i = i + 1;
+				range->freq[range->num_channels].m = acx100_channel_freq[i] * 100000;
+				range->freq[range->num_channels++].e = 1; /* MHz values */
+			}
+		range->num_frequency = range->num_channels;
 
 		range->min_pmp = 0;
 		range->max_pmp = 5000000;
@@ -1393,6 +1414,11 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		range->pmp_flags = IW_POWER_PERIOD;
 		range->pmt_flags = IW_POWER_TIMEOUT;
 		range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
+
+		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
+			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
+		range->num_txpower = IW_MAX_TXPOWER;
+		range->txpower_capa = IW_TXPOW_DBM;
 
 		range->we_version_compiled = WIRELESS_EXT;
 		range->we_version_source = 0x9;
@@ -1407,6 +1433,13 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		range->max_r_time = 65535; /* FIXME: lifetime ranges and orders of magnitude are strange?? */
 
 		range->sensitivity = 0x3f;
+
+		for (i=0; i < priv->rate_spt_len; i++) {
+			range->bitrate[i] = (priv->rate_support1[i] & ~0x80) * 500000;
+			if (range->bitrate[i] == 0)
+				break;
+		}
+		range->num_bitrates = i;
 
 		range->max_qual.qual = 100;
 		range->max_qual.level = 100;
@@ -1517,7 +1550,7 @@ static inline int acx100_ioctl_set_nick(struct net_device *dev, struct iw_reques
 
 	FN_ENTER;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -1565,7 +1598,7 @@ static inline int acx100_ioctl_get_retry(struct net_device *dev,
 	int err;
 	int result = -EINVAL;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -1622,16 +1655,16 @@ static inline int acx100_ioctl_set_retry(struct net_device *dev,
 		result = -EFAULT;
 		goto end;
 	}
-	if (vwrq->disabled) {
+	if (0 != vwrq->disabled) {
 		result = -EINVAL;
 		goto end;
 	}
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 	if (IW_RETRY_LIMIT == (vwrq->flags & IW_RETRY_TYPE)) {
-		printk("current retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
+		(void)printk("current retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
                 if (vwrq->flags & IW_RETRY_MAX) {
                         priv->long_retry = vwrq->value;
                 } else if (vwrq->flags & IW_RETRY_MIN) {
@@ -1641,14 +1674,14 @@ static inline int acx100_ioctl_set_retry(struct net_device *dev,
                         priv->long_retry = vwrq->value;
                         priv->short_retry = vwrq->value;
                 }
-		printk("new retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
+		(void)printk("new retry limits: short %ld long %ld\n", priv->short_retry, priv->long_retry);
 		priv->set_mask |= GETSET_RETRY;
 		result = -EINPROGRESS;
 	}
 	else
-	if (vwrq->flags & IW_RETRY_LIFETIME) {
+	if (0 != (vwrq->flags & IW_RETRY_LIFETIME)) {
 		priv->msdu_lifetime = vwrq->value;
-		printk("new MSDU lifetime: %d\n", priv->msdu_lifetime);
+		(void)printk("new MSDU lifetime: %d\n", priv->msdu_lifetime);
 		priv->set_mask |= SET_MSDU_LIFETIME;
 		result = -EINPROGRESS;
 	}
@@ -1735,9 +1768,9 @@ static inline int acx100_ioctl_list_reg_domain(struct net_device *dev, struct iw
 	int i;
 	unsigned char **entry;
 
-	printk("Domain/Country  Channels  Setting\n");
+	(void)printk("Domain/Country  Channels  Setting\n");
 	for (i = 0, entry = reg_domain_strings; *entry; i++, entry++)
-		printk("%s      %d\n", *entry, i+1);
+		(void)printk("%s      %d\n", *entry, i+1);
 	return 0;
 }
 
@@ -1766,7 +1799,7 @@ static inline int acx100_ioctl_set_reg_domain(struct net_device *dev, struct iw_
 	int result = -EINVAL;
 
 	FN_ENTER;
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -1844,25 +1877,28 @@ static inline int acx100_ioctl_set_short_preamble(struct net_device *dev, struct
 	if ((*extra < 0) || (*extra > 2))
 		return -EINVAL;
 
-	priv->preamble_mode = *extra;
+	priv->preamble_mode = (UINT8)*extra;
 	switch (*extra) {
 		case 0:
 			descr = "off";
-			priv->preamble_flag = 0;
+			priv->preamble_flag = (UINT8)0;
 			break;
 		case 1:
 			descr = "on";
-			priv->preamble_flag = 1;
+			priv->preamble_flag = (UINT8)1;
 			break;
 		case 2:
 			descr = "auto (peer capability dependent)";
 
 			/* associated to a station? */
-			if (priv->station_assoc.bssid[0] != 0x00)
-				priv->preamble_flag = priv->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE;
+			if (0x00 != priv->station_assoc.bssid[0])
+				priv->preamble_flag = (UINT8)((priv->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
+			break;
+		default:
+			descr = "unknown mode, error";
 			break;
 	}
-	printk("new Short Preamble setting: %s\n", descr);
+	(void)printk("new Short Preamble setting: %s\n", descr);
 
 	return 0;
 }
@@ -1899,8 +1935,11 @@ static inline int acx100_ioctl_get_short_preamble(struct net_device *dev, struct
 		case 2:
 			descr = "auto (peer capability dependent)";
 			break;
+		default:
+			descr = "unknown mode, error";
+			break;
 	}
-	printk("current Short Preamble setting: %s\n", descr);
+	(void)printk("current Short Preamble setting: %s\n", descr);
 
 	*extra = priv->preamble_mode;
 
@@ -1928,11 +1967,11 @@ static inline int acx100_ioctl_set_antenna(struct net_device *dev, struct iw_req
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	printk("current antenna value: 0x%02X\n", priv->antenna);
-	printk("Rx antenna selection seems to be bit 6 (0x40)\n");
-	printk("Tx antenna selection seems to be bit 5 (0x20)\n");
+	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("Rx antenna selection seems to be bit 6 (0x40)\n");
+	(void)printk("Tx antenna selection seems to be bit 5 (0x20)\n");
 	priv->antenna = *extra;
-	printk("new antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("new antenna value: 0x%02X\n", priv->antenna);
 	priv->set_mask |= GETSET_ANTENNA;
 
 	return -EINPROGRESS;
@@ -1959,9 +1998,9 @@ static inline int acx100_ioctl_get_antenna(struct net_device *dev, struct iw_req
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	printk("current antenna value: 0x%02X\n", priv->antenna);
-	printk("Rx antenna selection seems to be bit 6 (0x40)\n");
-	printk("Tx antenna selection seems to be bit 5 (0x20)\n");
+	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("Rx antenna selection seems to be bit 6 (0x40)\n");
+	(void)printk("Tx antenna selection seems to be bit 5 (0x20)\n");
 
 	return 0;
 }
@@ -1991,9 +2030,9 @@ static inline int acx100_ioctl_set_rx_antenna(struct net_device *dev, struct iw_
 	int result = -EINVAL;
 
 	FN_ENTER;
-	printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -2001,7 +2040,7 @@ static inline int acx100_ioctl_set_rx_antenna(struct net_device *dev, struct iw_
 	priv->antenna |= (*extra << 6);
 	priv->set_mask |= GETSET_ANTENNA;
 	acx100_unlock(priv, &flags);
-	printk("new antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("new antenna value: 0x%02X\n", priv->antenna);
 	result = -EINPROGRESS;
 
 end:
@@ -2034,9 +2073,9 @@ static inline int acx100_ioctl_set_tx_antenna(struct net_device *dev, struct iw_
 	int result = -EINVAL;
 
 	FN_ENTER;
-	printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -2044,7 +2083,7 @@ static inline int acx100_ioctl_set_tx_antenna(struct net_device *dev, struct iw_
 	priv->antenna |= ((*extra &= 0x01) << 5);
 	priv->set_mask |= GETSET_ANTENNA;
 	acx100_unlock(priv, &flags);
-	printk("new antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("new antenna value: 0x%02X\n", priv->antenna);
 	result = -EINPROGRESS;
 
 end:
@@ -2073,20 +2112,20 @@ static inline int acx100_ioctl_wlansniff(struct net_device *dev, struct iw_reque
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int *parms = (int*)extra;
-	int enable = parms[0] > 0;
+	int enable = (int)(parms[0] > 0);
 	unsigned long flags;
 	int err;
 	int result = -EINVAL;
 
 	FN_ENTER;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
 	priv->monitor = parms[0];
-	printk("setting monitor to: 0x%02X\n", priv->monitor);
+	(void)printk("setting monitor to: 0x%02X\n", priv->monitor);
 
 	switch (parms[0])
 	{
@@ -2101,14 +2140,14 @@ static inline int acx100_ioctl_wlansniff(struct net_device *dev, struct iw_reque
 		break;
 	}
 
-	if (priv->monitor)
+	if (0 != priv->monitor)
 		priv->monitor_setting = 0x02; /* don't decrypt default key only, override decryption mechanism */
 	else
 		priv->monitor_setting = 0x00; /* don't decrypt default key only, don't override decryption */
 
 	priv->set_mask |= SET_RXCONFIG | SET_WEP_OPTIONS;
 
-	if (enable)
+	if (0 != enable)
 	{
 		priv->channel = parms[1];
 		priv->set_mask |= GETSET_RX;
@@ -2146,7 +2185,7 @@ static inline int acx100_ioctl_unknown11(struct net_device *dev, struct iw_reque
 	int err;
 	int result = -EINVAL;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
@@ -2179,9 +2218,9 @@ static inline int acx100_ioctl_set_ed_threshold(struct net_device *dev, struct i
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 
-	printk("current ED threshold value: %d\n", priv->ed_threshold);
+	(void)printk("current ED threshold value: %d\n", priv->ed_threshold);
 	priv->ed_threshold = (unsigned char)*extra;
-	printk("new ED threshold value: %d\n", (unsigned char)*extra);
+	(void)printk("new ED threshold value: %d\n", (unsigned char)*extra);
 	priv->set_mask |= GETSET_ED_THRESH;
 
 	return -EINPROGRESS;
@@ -2211,14 +2250,14 @@ static inline int acx100_ioctl_set_cca(struct net_device *dev, struct iw_request
 	int err;
 	int result = -EINVAL;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
-	printk("current CCA value: 0x%02X\n", priv->cca);
+	(void)printk("current CCA value: 0x%02X\n", priv->cca);
 	priv->cca = (unsigned char)*extra;
-	printk("new CCA value: 0x%02X\n", (unsigned char)*extra);
+	(void)printk("new CCA value: 0x%02X\n", (unsigned char)*extra);
 	priv->set_mask |= GETSET_CCA;
 	acx100_unlock(priv, &flags);
 	result = -EINPROGRESS;
@@ -2234,13 +2273,13 @@ static inline int acx100_ioctl_set_led_power(struct net_device *dev, struct iw_r
 	int err;
 	int result = -EINVAL;
 
-	if ((err = acx100_lock(priv, &flags))) {
+	if (0 != (err = acx100_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
-	printk("current power LED status: %d\n", priv->led_power);
+	(void)printk("current power LED status: %d\n", priv->led_power);
 	priv->led_power = (unsigned char)*extra;
-	printk("new power LED status: %d\n", (unsigned char)*extra);
+	(void)printk("new power LED status: %d\n", (unsigned char)*extra);
 	priv->set_mask |= GETSET_LED_POWER;
 
 	acx100_unlock(priv, &flags);
@@ -2395,7 +2434,7 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 	/* This is the way it is done in the orinoco driver.
 	 * Check to see if device is present.
 	 */
-	if (! netif_device_present(dev))
+	if (0 == netif_device_present(dev))
 	{
 		return -ENODEV;
 	}
@@ -2699,7 +2738,8 @@ int acx100_ioctl_main(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 	}
 
-	if ((priv->dev_state_mask & ACX_STATE_IFACE_UP) && priv->set_mask)
+	if ((0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))
+	&& (0 != priv->set_mask))
 		acx100_update_card_settings(priv, 0, 0, 0);
 
 #if WIRELESS_EXT < 13

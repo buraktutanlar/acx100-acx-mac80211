@@ -9,12 +9,13 @@ KERNELDIR = /lib/modules/$(KERNELRELEASE)
 MODULE_PATH = net
 INSTALL = /usr/bin/install -c
 DEPMOD = $(shell which depmod)
+LN = $(shell which ln)
 
 # FIXME: should be changed to -DACX_32BIT_IO=$(ACX_32BIT_IO),
 # also same handling as for ACX_DEBUG above
 export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_32BIT_IO
 
-include $(KERNELDIR)/build/.config
+-include $(KERNELDIR)/build/.config
 
 .PHONY: depmod all clean install uninstall
 
@@ -44,20 +45,40 @@ ifdef KERN26
 MODULES = acx_pci.ko # sorry, no USB 2.6 compile yet
 CLEAN_EXTRA = *.mod.c
 
-modules:
 ifeq ($(KERNEL_BUILD),$(KERNEL_OUTPUT))
-	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) MODVERDIR=$(PWD) \
-		modules
+TMPOUT =
 else # ifeq KERNEL_BUILD...
-	mkdir -p $(PWD)/tmp
-	cp $(KERNEL_OUTPUT)/.config $(PWD)/tmp
-	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) O=$(PWD)/tmp \
-		MODVERDIR=$(PWD) modules
+TMPOUT = O=$(PWD)/tmp # need to use a temporary output dir
 endif # ifeq KERNEL_BUILD...
 
-all: modules
+modules:
+	if test -n $(TMPOUT); then \
+	mkdir -p $(PWD)/tmp; \
+	cp $(KERNEL_OUTPUT)/.config $(PWD)/tmp; \
+	fi
+	# use "make V=1" to see full compile execution
+	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) $(TMPOUT) \
+		MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_PCI modules
+	# ugh, very bloody hack, but I don't know how to make
+	# the Makefile accept the different filenames USB uses. Anyone?
+	if test -n "$(ACX100_SRC)"; then \
+	cd $(ACX100_SRC); \
+	fi
+	$(LN) -f -s acx80211frm.c acx_usb_80211frm.c
+	$(LN) -f -s acx100_conv.c acx_usb_conv.c
+	$(LN) -f -s acx100_helper.c acx_usb_helper.c
+	$(LN) -f -s acx100_helper2.c acx_usb_helper2.c
+	$(LN) -f -s idma.c acx_usb_idma.c
+	$(LN) -f -s acx100_usb.c acx_usb_main.c
+	if test -n "$(ACX100_SRC)"; then \
+	cd -; \
+	fi
+	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) $(TMPOUT) \
+		MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_USB modules
 	@echo
 	@echo "*** WARNING: acx100_pci.ko changed to acx_pci.ko. Don't forget to update any scripts! ***"
+
+all: modules
 
 install: all
 else # KERN26
@@ -69,11 +90,20 @@ include $(ACX100_SRC)../config.mk
 CPPFLAGS += -D__KERNEL__ -DMODULE -DWLAN_HOSTIF=WLAN_PCI -I$(KERNEL_BUILD)/include -I../include
 LDFLAGS = -m elf_i386 -r
 CC = gcc
-USBCFLAGS += -D__KERNEL__ -I$(KERNEL_BUILD)/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -I../include/ -c -DWLAN_HOSTIF=WLAN_USB -DDEBUG -DACX_DEBUG
+USBCFLAGS += -D__KERNEL__ -I$(KERNEL_BUILD)/include  -Wall -Wstrict-prototypes  -Wno-trigraphs  -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586 -DMODULE -I../include/ -c -DWLAN_HOSTIF=WLAN_USB -DACX_DEBUG
 CFLAGS += -Wall -Wstrict-prototypes -Wno-trigraphs -O -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=4 -march=i586
 #CPPFLAGS += -D__KERNEL__ -DMODULE -DMODVERSIONS -DWLAN_HOSTIF=WLAN_PCI -I$(KERNEL_BUILD)/include -I../include -include $(KERNEL_BUILD)/include/linux/modversions.h
 
 includes = $(wildcard ../include/*.h)
+
+# File naming style:
+# Driver modules should be named acx_HARDWARE.(k)o
+# Other files should be named acx_HARDWARE_FUNCTION.o
+# acx100 specific files should be named acx100_XXX
+# Renaming can happen gradually over time.
+objects = acx100.o acx100_ioctl.o acx100_helper.o acx100_helper2.o ihw.o idma.o acx100_conv.o acx80211frm.o ioregister.o
+
+usb_objs = acx_usb_main.o acx_usb_ihw.o acx_usb_helper.o acx_usb_ioctl.o acx_usb_helper2.o acx_usb_80211frm.o acx_usb_idma.o acx_usb_conv.o 
 
 all: acx_pci.o acx_usb.o
 	@echo
@@ -138,13 +168,20 @@ uninstall:
 # 2.6 in-tree (kbuild)
 else # ifeq PATCHLEVEL
 
-EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=WLAN_PCI
-#EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=WLAN_PCI
+EXTRA_CFLAGS += -I$(src)/../include -DWLAN_HOSTIF=$(WLAN_HOSTIF)
+#EXTRA_CFLAGS += -Idrivers/net/wireless/acx100 -DWLAN_HOSTIF=$(WLAN_HOSTIF)
+
+ifeq ($(WLAN_HOSTIF),WLAN_PCI)
 
 obj-m += acx_pci.o
-#obj-m += acx_usb.o
-
 acx_pci-objs = $(pci_objs)
-#acx_usb-objs := $(usb_objs)
+
+else
+
+obj-m += acx_usb.o
+acx_usb-objs := $(usb_objs)
+
+endif
+
 
 endif # ifeq PATCHLEVEL
