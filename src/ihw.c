@@ -305,7 +305,7 @@ void acx_get_info_state(wlandevice_t *priv)
 
 	/* inform hw that we have read this info message */
 	acx_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_ACK); /* now bother hw to notice it */
+	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_INFOACK); /* now bother hw to notice it */
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
@@ -492,6 +492,9 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 		/* Test for IDLE state */
 		if (!priv->cmd_status) 
 			break;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0) /* FIXME: exact first version? */
+		cond_resched();
+#endif
 	}
 
 	/*** The card doesn't get IDLE, we're in trouble ***/
@@ -522,16 +525,15 @@ int acx_issue_cmd(wlandevice_t *priv, UINT cmd,
 	acx_write_cmd_type_or_status(priv, cmd, 0);
 	
 	/*** execute command ***/
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG],
-			  acx_read_reg16(priv, priv->io[IO_ACX_INT_TRIG]) | 0x01);
+	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_CMD);
 
 	/*** wait for IRQ to occur, then ACK it? ***/
 
 	/*** make sure we have at least *some* timeout value ***/
-	if (timeout == 0) {
+	if (unlikely(timeout == 0)) {
 		timeout = 1;
 	}
-	if (timeout > 120000) {
+	if (unlikely(timeout > 120000)) {
 		timeout = 120000;
 	}
 	timeout *= 20;
@@ -665,7 +667,8 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	** ----------------------------------- */
 	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
 	usb_fill_control_urb(priv->ctrl_urb,usbdev,outpipe,priv->usb_setup,&(priv->usbout),blocklen,acx100usb_control_complete,priv);
-	priv->ctrl_urb->timeout=timeout;
+	/* 2.6.9-rc1: "USB: Remove struct urb->timeout as it does not work" */
+	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message FAILED with errcode %d\n",ucode);
@@ -692,7 +695,8 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	priv->usbin.status=0; /* delete old status flag -> set to fail */
 	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
 	usb_fill_control_urb(priv->ctrl_urb,usbdev,inpipe,priv->usb_setup,&(priv->usbin),acklen,acx100usb_control_complete,priv);
-	priv->ctrl_urb->timeout=timeout;
+	/* 2.6.9-rc1: "USB: Remove struct urb->timeout as it does not work" */
+	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %d\n",ucode);
@@ -993,7 +997,10 @@ inline int acx_is_mac_address_equal(UINT8 *one, UINT8 *two)
 *----------------------------------------------------------------*/
 inline UINT8 acx_is_mac_address_group(mac_t *mac)
 {
-	return mac->vala & 1;
+	if (mac->vala & 1) {
+		return OK;
+	}
+	return NOT_OK;
 }
 
 /*----------------------------------------------------------------
@@ -1099,12 +1106,13 @@ inline int acx_is_mac_address_multicast(mac_t *mac)
 *----------------------------------------------------------------*/
 void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 {
-	if (debug & level) {
-		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
-			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-			tail
-		);
-	}
+	if (!(debug & level))
+		return;
+
+	printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+		tail
+	);
 }
 
 /*----------------------------------------------------------------
@@ -1126,15 +1134,14 @@ void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 *----------------------------------------------------------------*/
 void acx100_power_led(wlandevice_t *priv, UINT8 enable)
 {
-	if(priv->chip_type == CHIPTYPE_ACX111) {
-		/* acx111 makes all led handling itself */
-		return;
-	}
+	UINT16 gpio_pled =
+		(CHIPTYPE_ACX111 == priv->chip_type) ? 0x0040 : 0x0800;
+	acxlog(L_IOCTL, "Please report in case toggling the power LED doesn't work for your card!\n");
 	if (enable)
-		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 
-			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) & ~0x0800);
+		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
+			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) & ~gpio_pled);
 	else
-		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], 
-			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) | 0x0800);
+		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
+			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) | gpio_pled);
 }
 

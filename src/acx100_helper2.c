@@ -1,4 +1,4 @@
-/* src/acx100_helper2.c - helper functions
+/* src/acx100_helper2.c - helper functions for 802.11 protocol management
  *
  * --------------------------------------------------------------------
  *
@@ -356,22 +356,22 @@ inline const char *acx_get_status_name(UINT16 status)
 * 5 means: status unknown
 *----------------------------------------------------------------*/
 
-void acx_set_status(wlandevice_t *priv, UINT16 status)
+void acx_set_status(wlandevice_t *priv, UINT16 new_status)
 {
 	const char *stat;
 #define QUEUE_OPEN_AFTER_ASSOC 1 /* this really seems to be needed now */
 #if QUEUE_OPEN_AFTER_ASSOC
-	static int associated = 0;
 #endif
+	UINT16 old_status = priv->status;
 
 	FN_ENTER;
-	stat = acx_get_status_name(status);
+	stat = acx_get_status_name(new_status);
 
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting status = %d (%s)\n",
-	       __func__, status, stat);
+	       __func__, new_status, stat);
 
 #if WIRELESS_EXT > 13 /* wireless_send_event() and SIOCGIWSCAN */
-	if (ISTATUS_4_ASSOCIATED == status) {
+	if (ISTATUS_4_ASSOCIATED == new_status) {
 		union iwreq_data wrqu;
 
 		wrqu.data.length = 0;
@@ -391,7 +391,7 @@ void acx_set_status(wlandevice_t *priv, UINT16 status)
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(priv->netdev, SIOCGIWAP, &wrqu, NULL);
 
-		if (ISTATUS_0_STARTED == status) {
+		if (ISTATUS_0_STARTED == new_status) {
 			if (memcmp(priv->netdev->dev_addr, priv->dev_addr, ETH_ALEN)) {
 				/* uh oh, the interface's MAC address changed,
 				 * need to update templates (and init STAs??) */
@@ -408,37 +408,33 @@ void acx_set_status(wlandevice_t *priv, UINT16 status)
 	}
 #endif
 
-	priv->status = status;
+	priv->status = new_status;
 
 	if (priv->status == ISTATUS_1_SCANNING) {
 		priv->scan_retries = 0;
 		acx_set_timer(priv, 2500000); /* 2.5s initial scan time (used to be 1.5s, but failed to find WEP APs!) */
-	} else if (priv->status <= ISTATUS_3_AUTHENTICATED) {
-		priv->auth_assoc_retries = 0;
+	} else if ((ISTATUS_2_WAIT_AUTH <= priv->status) && (ISTATUS_3_AUTHENTICATED >= priv->status)) {
+		priv->auth_or_assoc_retries = 0;
 		acx_set_timer(priv, 1500000); /* 1.5 s */
 	}
 
 #if QUEUE_OPEN_AFTER_ASSOC
-	if (status == ISTATUS_4_ASSOCIATED)
+	if (new_status == ISTATUS_4_ASSOCIATED)
 	{
-		if (associated == 0)
-		{
+		if (old_status < ISTATUS_4_ASSOCIATED) {
 			/* ah, we're newly associated now,
-			 * so let's restart the net queue */
-			acxlog(L_BUF, "wake queue after association.\n");
-			netif_wake_queue(priv->netdev);
+			 * so let's indicate carrier */
+			acx_carrier_on(priv->netdev, "after association");
+			acx_wake_queue(priv->netdev, "after association");
 		}
-		associated = 1;
 	}
 	else
 	{
-		/* not associated any more, so let's stop the net queue */
-		if (associated == 1)
-		{
-			acxlog(L_BUF, "stop queue after losing association.\n");
-			netif_stop_queue(priv->netdev);
+		/* not associated any more, so let's kill carrier */
+		if (old_status >= ISTATUS_4_ASSOCIATED) {
+			acx_carrier_off(priv->netdev, "after losing association");
+			acx_stop_queue(priv->netdev, "after losing association");
 		}
-		associated = 0;
 	}
 #endif
 	FN_EXIT(0, OK);
@@ -924,21 +920,21 @@ static int acx_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlande
 
 	if ((!to_ds) && (!from_ds)) {
 		/* To_DS = 0, From_DS = 0 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		sa = p80211_hdr->a3.a2;	/* SA */
-		bssid = p80211_hdr->a3.a3;	/* BSSID */
+		da = p80211_hdr->a3.a1;
+		sa = p80211_hdr->a3.a2;
+		bssid = p80211_hdr->a3.a3;
 	} else
 	if ((!to_ds) && (from_ds)) {
 		/* To_DS = 0, From_DS = 1 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		sa = p80211_hdr->a3.a3;	/* SA */
-		bssid = p80211_hdr->a3.a2;	/* BSSID */
+		da = p80211_hdr->a3.a1;
+		sa = p80211_hdr->a3.a3;
+		bssid = p80211_hdr->a3.a2;
 	} else
 	if ((to_ds) && (!from_ds)) {
 		/* To_DS = 1, From_DS = 0 */
-		da = p80211_hdr->a3.a3;	/* DA */
-		sa = p80211_hdr->a3.a2;	/* SA */
-		bssid = p80211_hdr->a3.a1;	/* BSSID */
+		da = p80211_hdr->a3.a3;
+		sa = p80211_hdr->a3.a2;
+		bssid = p80211_hdr->a3.a1;
 	} else {
 		/* To_DS = 1, From_DS = 1 */
 		acxlog(L_DEBUG, "frame error occurred??\n");
@@ -1035,9 +1031,9 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlande
 	p80211_hdr_t *p80211_hdr;
 	int to_ds, from_ds;
 	int result = NOT_OK;
+	netdevice_t *dev = priv->netdev;
 
 	FN_ENTER;
-	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
 
@@ -1048,26 +1044,26 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlande
 
 	if ((!to_ds) && (!from_ds)) {
 		/* To_DS = 0, From_DS = 0 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		bssid = p80211_hdr->a3.a3;	/* BSSID */
+		da = p80211_hdr->a3.a1;
+		bssid = p80211_hdr->a3.a3;
 	} else
 	if ((!to_ds) && (from_ds)) {
 		/* To_DS = 0, From_DS = 1 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		bssid = p80211_hdr->a3.a2;	/* BSSID */
+		da = p80211_hdr->a3.a1;
+		bssid = p80211_hdr->a3.a2;
 	} else
 	if ((to_ds) && (!from_ds)) {
 		/* To_DS = 1, From_DS = 0 */
-		da = p80211_hdr->a3.a3;	/* DA */
-		bssid = p80211_hdr->a3.a1;	/* BSSID */
+		da = p80211_hdr->a3.a3;
+		bssid = p80211_hdr->a3.a1;
 	} else {
 		/* To_DS = 1, From_DS = 1 */
 		acxlog(L_DEBUG, "rx: frame error occurred??\n");
 		priv->stats.rx_errors++;
-		goto done;
+		goto drop;
 	}
 
-	if (debug & L_DEBUG)
+	if (unlikely(debug & L_DEBUG))
 	{
 		printk("rx: da ");
 		acx_log_mac_address(L_DEBUG, da, ",bssid ");
@@ -1077,34 +1073,51 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlande
 		acx_log_mac_address(L_DEBUG, bcast_addr, "\n");
 	}
 
-#if WE_DONT_WANT_TO_REJECT_MULTICAST
-	/* FIXME: we should probably reenable this code and check against
-	 * a list of multicast addresses that are configured for the
-	 * interface (ifconfig) */
+	/* promiscuous mode --> receive all packets */
+	if (unlikely(dev->flags & IFF_PROMISC))
+		goto process;
 
-	/* check if it is our bssid */
+	/* FIRST, check if it is our BSSID */
         if (OK != acx_is_mac_address_equal(priv->bssid, bssid)) {
-		/* is not our bssid, so bail out */
-		goto done;
+		/* is not our BSSID, so bail out */
+		goto drop;
 	}
 
-	/* check if it is broadcast */
-	if (OK != acx_is_mac_address_broadcast(da)) {
-		if ((signed char) da[0] >= 0) {
-			/* no broadcast, so check if it is our address */
-                        if (OK != acx_is_mac_address_equal(da, priv->dev_addr)) {
-				/* it's not, so bail out */
-				goto done;
-			}
+	/* then, check if it is our address */
+	if (OK == acx_is_mac_address_directed((mac_t *)da))
+	{
+		if (OK == acx_is_mac_address_equal(da, priv->dev_addr)) {
+			goto process;
 		}
 	}
 
-	/* packet is from our bssid, and is either broadcast or destined for us, so process it */
-#endif
+	/* then, check if it is broadcast */
+	if (OK == acx_is_mac_address_broadcast(da)) {
+		goto process;
+	}
+	
+	if (OK == acx_is_mac_address_multicast((mac_t *)da))
+	{
+		/* unconditionally receive all multicasts */
+		if (dev->flags & IFF_ALLMULTI)
+			goto process;
+
+		/* FIXME: check against the list of
+		 * multicast addresses that are configured
+		 * for the interface (ifconfig) */
+		acxlog(L_XFER, "FIXME: multicast packet, need to check against a list of multicast addresses (to be created!); accepting packet for now\n");
+		/* for now, just accept it here */
+		goto process;
+	}
+
+	acxlog(L_DEBUG, "Rx foreign packet, dropping\n");
+	goto drop;
+process:
+	/* receive packet */
 	acx_rx(rxdesc, priv);
 
 	result = OK;
-done:
+drop:
 	FN_EXIT(1, result);
 	return result;
 }
@@ -1843,6 +1856,7 @@ static int acx_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv)
 		/* ok, we're through: we're authenticated. Woohoo!! */
 		acx_set_status(priv, ISTATUS_3_AUTHENTICATED);
 		acxlog(L_BINSTD | L_ASSOC, "Authenticated!\n");
+		/* now that we're authenticated, request association */
 		acx_transmit_assoc_req(priv);
 		break;
 	}
@@ -2447,7 +2461,7 @@ static int acx_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 	hdesc_payload->length = cpu_to_le16(packet_len - WLAN_HDR_A3_LEN);
 	hdesc_payload->data_offset = 0;
 
-	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_auth3!\n");
+	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_authen3!\n");
 
 	tx_desc->total_length = cpu_to_le16(packet_len);
 	
@@ -3000,9 +3014,9 @@ void acx_timer(unsigned long address)
 		break;
 	case ISTATUS_2_WAIT_AUTH:
 		priv->scan_retries = 0;
-		if (++priv->auth_assoc_retries < 10) {
+		if (++priv->auth_or_assoc_retries < 10) {
 			acxlog(L_ASSOC, "resend authen1 request (attempt %d).\n",
-			       priv->auth_assoc_retries + 1);
+			       priv->auth_or_assoc_retries + 1);
 			acx_transmit_authen1(priv);
 		} else {
 			/* time exceeded: fall back to scanning mode */
@@ -3014,10 +3028,10 @@ void acx_timer(unsigned long address)
 		acx_set_timer(priv, 2500000); /* used to be 1500000, but some other driver uses 2.5s wait time  */
 		break;
 	case ISTATUS_3_AUTHENTICATED:
-		if (++priv->auth_assoc_retries < 10) {
+		if (++priv->auth_or_assoc_retries < 10) {
 			acxlog(L_ASSOC,
 			       "resend association request (attempt %d).\n",
-			       priv->auth_assoc_retries + 1);
+			       priv->auth_or_assoc_retries + 1);
 			acx_transmit_assoc_req(priv);
 		} else {
 			/* time exceeded: give up */

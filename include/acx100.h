@@ -286,10 +286,10 @@ typedef enum {
 } IO_INDICES;
 
 /* Values for IO_ACX_INT_TRIG register */
-#define INT_TRIG_RXPRC	0x08	/* inform hw that rx descriptor in queue needs processing */
-#define INT_TRIG_TXPRC	0x04	/* inform hw that tx descriptor in queue needs processing */
-#define INT_TRIG_ACK	0x02	/* ack that we received info from info mailbox */
-#define INT_TRIG_CMD	0x01	/* inform hw that we have filled command mailbox */
+#define INT_TRIG_RXPRC		0x08	/* inform hw that rx descriptor in queue needs processing */
+#define INT_TRIG_TXPRC		0x04	/* inform hw that tx descriptor in queue needs processing */
+#define INT_TRIG_INFOACK	0x02	/* ack that we received info from info mailbox */
+#define INT_TRIG_CMD		0x01	/* inform hw that we have filled command mailbox */
 
 #define IO_INDICES_SIZE END_OF_IO_ENUM * sizeof(UINT16)
 
@@ -738,7 +738,7 @@ typedef struct acx100_InfFrame {
 #define ACX100_CTL_RECLAIM    0x08	/* ready to reuse */
 #define ACX100_CTL_HOSTDONE   0x20	/* host has finished processing */
 #define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
-#define ACX100_CTL_OWN        0x80	/* host owns the desc */
+#define ACX100_CTL_OWN        0x80	/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
 
 /* Used in beacon frames and the like */
 #define DOT11RATEBYTE_1		(1*2)
@@ -1336,7 +1336,7 @@ typedef struct wlandevice {
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */
-	UINT16		auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
+	UINT16		auth_or_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	UINT16		bss_table_count;	/* # of active BSS scan table entries */
 	struct		bss_info bss_table[32];	/* BSS scan table */
@@ -1368,6 +1368,7 @@ typedef struct wlandevice {
 	UINT8		ed_threshold;		/* energy detect threshold */
 	UINT8		cca;			/* clear channel assessment */
 	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
+	unsigned long	time_last_recalib;
 
 	UINT16		rts_threshold;
 	UINT32		short_retry;		/* V3POS 204, V1POS 20c */
@@ -1392,6 +1393,8 @@ typedef struct wlandevice {
 	key_struct_t	wep_key_struct[10];	/* V3POS 688 */
 
 	/*** Card Rx/Tx management ***/
+	UINT32		promiscuous;
+	UINT32		mc_count;		/* multicast count */
 	UINT16		rx_config_1;		/* V3POS 2820, V1POS 27f8 */
 	UINT16		rx_config_2;		/* V3POS 2822, V1POS 27fa */
 	TIWLAN_DC	dc;			/* V3POS 2380, V1POS 2338 */
@@ -1419,12 +1422,14 @@ typedef struct wlandevice {
 
 	/*** Unknown ***/
 	UINT8		dtim_interval;		/* V3POS 2302 */
+#if UNUSED
 	UINT8		val0x2324_0;		/* V3POS 2324 */
 	UINT8		val0x2324_2;
 	UINT8		val0x2324_4;
 	UINT8		val0x2324_5;
 	UINT8		val0x2324_6;
 	UINT8		val0x2324_7;
+#endif
 } wlandevice_t;
 
 /*-- MAC modes --*/
@@ -1436,22 +1441,27 @@ typedef struct wlandevice {
 /*-- rx_config_1 bitfield --*/
 /*  bit     description
  *    13   include additional header (length etc.) *required*
- *    10   receive only own beacon frames
+ *    10   receive frames from own SSID only
  *     9   discard broadcast (01:xx:xx:xx:xx:xx in mac)
- * 8,7,6   ???
- *     5   BSSID filter
- *     4   promiscuous mode (aka. filter wrong mac addr)
- *     3   receive ALL frames (disable filter)
+ *     8   receive packets for multicast address 1
+ *     7   receive packets for multicast address 0
+ *     6   discard all multicast packets
+ *     5   discard frames from foreign BSSID
+ *     4   discard frames with foreign destination MAC address
+ *     3   promiscuous mode (receive ALL frames, disable filter)
  *     2   include FCS
  *     1   include additional header (802.11 phy?)
  *     0   ???
  */
 #define RX_CFG1_PLUS_ADDIT_HDR		0x2000
-#define RX_CFG1_ONLY_OWN_BEACONS	0x0400
-#define RX_CFG1_DISABLE_BCAST		0x0200
+#define RX_CFG1_FILTER_SSID		0x0400
+#define RX_CFG1_FILTER_BCAST		0x0200
+#define RX_CFG1_RCV_MC_ADDR1		0x0100
+#define RX_CFG1_RCV_MC_ADDR0		0x0080
+#define RX_CFG1_FILTER_ALL_MULTI	0x0040
 #define RX_CFG1_FILTER_BSSID		0x0020
-#define RX_CFG1_PROMISCUOUS		0x0010
-#define RX_CFG1_RCV_ALL_FRAMES		0x0008
+#define RX_CFG1_FILTER_MAC		0x0010
+#define RX_CFG1_RCV_PROMISCUOUS		0x0008
 #define RX_CFG1_INCLUDE_FCS		0x0004
 #define RX_CFG1_INCLUDE_ADDIT_HDR	0x0002
 

@@ -390,8 +390,13 @@ static inline int acx_ioctl_set_mode(struct net_device *dev, struct iw_request_i
 			priv->macmode_wanted = ACX_MODE_2_MANAGED_STA;
 			break;
 		case IW_MODE_MASTER:
+#if MASTER_MODE_SUPPORTED
 			priv->macmode_wanted = ACX_MODE_3_MANAGED_AP;
 			break;
+#else
+			acxlog(0xffff, "Master mode (AP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under heavy development...\n");
+			/* fall through */
+#endif
 		default:
 			result = -EOPNOTSUPP;
 			goto end_unlock;
@@ -546,7 +551,7 @@ static inline int acx_ioctl_set_ap(struct net_device *dev,
 		goto end;
 	}
 
-	if (0 != acx_is_mac_address_broadcast(ap)) {
+	if (OK == acx_is_mac_address_broadcast(ap)) {
 		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
 		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
@@ -986,7 +991,9 @@ acx_ioctl_set_rate(struct net_device *dev,
 
 	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
 		int i;
-		if(vwrq->value == -1) vwrq->value = 54000000;
+		if(vwrq->value == -1)
+			/* "iwconfig rate auto" --> choose highest */
+			vwrq->value = (CHIPTYPE_ACX100 == priv->chip_type) ? 22000000 : 54000000;
 		i = VEC_SIZE(acx111_rate_tbl)-1;
 		while(i >= 0) {
 			if(vwrq->value == acx111_rate_tbl[i]) {
@@ -1122,7 +1129,7 @@ static inline int acx_ioctl_set_rts(struct net_device *dev, struct iw_request_in
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int val = vwrq->value;
 
-	if ((__u8)0 != vwrq->disabled)
+	if ((UINT8)0 != vwrq->disabled)
 		val = 2312;
 	if ((val < 0) || (val > 2312))
 		return -EINVAL;
@@ -1136,8 +1143,8 @@ static inline int acx_ioctl_get_rts(struct net_device *dev, struct iw_request_in
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	vwrq->value = priv->rts_threshold;
-	vwrq->disabled = (__u8)(vwrq->value >= 2312);
-	vwrq->fixed = (__u8)1;
+	vwrq->disabled = (UINT8)(vwrq->value >= 2312);
+	vwrq->fixed = (UINT8)1;
 	return OK;
 }
 
@@ -1315,7 +1322,7 @@ static inline int acx_ioctl_set_power(struct net_device *dev, struct iw_request_
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	acxlog(L_IOCTL, "Set 802.11 Power Save flags = 0x%04x\n", vwrq->flags);
-	if ((__u8)0 != vwrq->disabled) {
+	if ((UINT8)0 != vwrq->disabled) {
 		CLEAR_BIT(priv->ps_wakeup_cfg, PS_CFG_ENABLE);
 		SET_BIT(priv->set_mask, GETSET_POWER_80211);
 		return -EINPROGRESS;
@@ -1407,8 +1414,8 @@ static inline int acx_ioctl_get_txpow(struct net_device *dev, struct iw_request_
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	vwrq->flags = IW_TXPOW_DBM;
-	vwrq->disabled = (__u8)0;
-	vwrq->fixed = (__u8)0;
+	vwrq->disabled = (UINT8)0;
+	vwrq->fixed = (UINT8)0;
 	vwrq->value = priv->tx_level_dbm;
 
 	acxlog(L_IOCTL, "Get Tx power ==> %d dBm\n", priv->tx_level_dbm);
@@ -1506,7 +1513,7 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 				range->freq[range->num_channels].m = acx_channel_freq[i - 1] * 100000;
 				range->freq[range->num_channels++].e = 1; /* MHz values */
 			}
-		range->num_frequency = (__u8)range->num_channels;
+		range->num_frequency = (UINT8)range->num_channels;
 
 		range->min_rts = 0;
 		range->max_rts = 2312;
@@ -1517,8 +1524,8 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 		range->encoding_size[0] = 5;
 		range->encoding_size[1] = 13;
 		range->encoding_size[2] = 29;
-		range->num_encoding_sizes = (__u8)3;
-		range->max_encoding_tokens = (__u8)4;
+		range->num_encoding_sizes = (UINT8)3;
+		range->max_encoding_tokens = (UINT8)4;
 		
 		range->min_pmp = 0;
 		range->max_pmp = 5000000;
@@ -1530,11 +1537,11 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 
 		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
 			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
-		range->num_txpower = (__u8)IW_MAX_TXPOWER;
+		range->num_txpower = (UINT8)IW_MAX_TXPOWER;
 		range->txpower_capa = IW_TXPOW_DBM;
 
-		range->we_version_compiled = (__u8)WIRELESS_EXT;
-		range->we_version_source = (__u8)0x9;
+		range->we_version_compiled = (UINT8)WIRELESS_EXT;
+		range->we_version_source = (UINT8)0x9;
 
 		range->retry_capa = IW_RETRY_LIMIT;
 		range->retry_flags = IW_RETRY_LIMIT;
@@ -1545,23 +1552,23 @@ static inline int acx_ioctl_get_range(struct net_device *dev, struct iw_request_
 		range->min_r_time = 0;
 		range->max_r_time = 65535; /* FIXME: lifetime ranges and orders of magnitude are strange?? */
 
-		range->sensitivity = 0xff;
+		range->sensitivity = 255;
 
 		for (i=0; i < priv->rate_supported_len; i++) {
 			range->bitrate[i] = (priv->rate_supported[i] & ~0x80) * 500000;
-			/* FIXME: never happens: */
+			/* never happens, but keep it, to be safe: */
 			if (range->bitrate[i] == 0)
 				break;
 		}
-		range->num_bitrates = (__u8)i;
+		range->num_bitrates = (UINT8)i;
 
-		range->max_qual.qual = (__u8)100;
-		range->max_qual.level = (__u8)100;
-		range->max_qual.noise = (__u8)100;
-		/* FIXME: better values */
-		range->avg_qual.qual = (__u8)90;
-		range->avg_qual.level = (__u8)80;
-		range->avg_qual.noise = (__u8)2;
+		range->max_qual.qual = (UINT8)100;
+		range->max_qual.level = (UINT8)100;
+		range->max_qual.noise = (UINT8)100;
+		/* TODO: better values */
+		range->avg_qual.qual = (UINT8)90;
+		range->avg_qual.level = (UINT8)80;
+		range->avg_qual.noise = (UINT8)2;
 	}
 
 	return OK;
@@ -1730,7 +1737,7 @@ static inline int acx_ioctl_get_retry(struct net_device *dev,
 	}
 	acx_unlock(priv, &flags);
 	/* can't be disabled */
-	vwrq->disabled = (__u8)0;
+	vwrq->disabled = (UINT8)0;
 	result = OK;
 
 end:
@@ -1768,7 +1775,7 @@ static inline int acx_ioctl_set_retry(struct net_device *dev,
 		result = -EFAULT;
 		goto end;
 	}
-	if ((__u8)0 != vwrq->disabled) {
+	if ((UINT8)0 != vwrq->disabled) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -2008,8 +2015,9 @@ static inline int acx_ioctl_set_short_preamble(struct net_device *dev, struct iw
 			priv->defpeer.shortpre = 0;
 			priv->ap_peer.shortpre = 0;
 
-			/* associated to a station? */
-/* TODO: fix comment: does it say that we are associated to a IBSS station, not to an AP? Or what? */
+			/* associated to a peer? */
+			/* FIXME: this check breaks in case of an AP
+			 * with hidden (empty!) ESSID */
 			if (priv->status == ISTATUS_4_ASSOCIATED
 			&& 0 != priv->station_assoc.bssid[0]
 			) {
@@ -2095,7 +2103,6 @@ static inline int acx_ioctl_set_antenna(struct net_device *dev, struct iw_reques
 		     "0x00 ant. 1\n"
 		     "0x40 ant. 2\n"
 		     "0x80 full diversity\n"
-		     "0xc0 partial diversity\n"
 		     "0xc0 partial diversity\n"
 		     "0x0f dwell time mask (in units of us)\n"
 		     "Tx antenna selection:\n"
@@ -2293,6 +2300,7 @@ static inline int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_
 	else
 		priv->monitor_setting = 0x00; /* don't decrypt default key only, don't override decryption */
 
+	acx_initialize_rx_config(priv, priv->monitor);
 	SET_BIT(priv->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
 
 	if (0 != enable)
@@ -3403,10 +3411,11 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx_ioctl_get_iw_priv(iwr);
 		break;
 
-	/* case SIOCSIWSPY: FIXME */
-	/* case SIOCGIWSPY: FIXME */
-	/* case SIOCSIWTHRSPY: FIXME */
-	/* case SIOCGIWTHRSPY: FIXME */
+	/* FIXME: */
+	/* case SIOCSIWSPY: */
+	/* case SIOCGIWSPY: */
+	/* case SIOCSIWTHRSPY: */
+	/* case SIOCGIWTHRSPY: */
 
 	case SIOCSIWAP:
 		/* set access point by MAC address */
@@ -3528,8 +3537,9 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx_ioctl_get_rts(dev, NULL,  &(iwr->u.rts), NULL);
 		break;
 
-	/* case  SIOCSIWFRAG: FIXME */
-	/* case  SIOCGIWFRAG: FIXME */
+	/* FIXME: */
+	/* case  SIOCSIWFRAG: */
+	/* case  SIOCGIWFRAG: */
 
 #if WIRELESS_EXT > 9
 	case SIOCGIWTXPOW:

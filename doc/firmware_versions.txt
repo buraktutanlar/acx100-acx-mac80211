@@ -60,3 +60,7 @@ ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip):
 
 1.2.0.30 (FwRad16.bin, http://www.ovislink.nl/WL8000.zip):
   Works at least with DWL-G650+ HW/B1 (see above).
+
+The latest firmware version (as of 041006, which exact version is it?)
+reportedly doesn't work well with this driver (and a WG311v2),
+since traffic stops after few minutes.

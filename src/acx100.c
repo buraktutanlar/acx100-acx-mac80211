@@ -297,7 +297,7 @@ static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev);
 
 static irqreturn_t acx_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void acx_after_interrupt_task(void *data);
-static void acx_set_rx_mode(netdevice_t *dev);
+static void acx_set_multicast_list(netdevice_t *dev);
 void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 static int acx_open(netdevice_t *dev);
@@ -378,7 +378,11 @@ void log_fn_exit_v(const char *funcname, int v) {
 static void acx_get_firmware_version(wlandevice_t *priv)
 {
 	fw_ver_t fw;
-	UINT8 fw_major = (UINT8)0, fw_minor = (UINT8)0, fw_sub = (UINT8)0, fw_extra = (UINT8)0;
+	UINT fw_major = 0, fw_minor = 0, fw_sub = 0, fw_extra = 0;
+	UINT hexarr[4] = { 0, 0, 0, 0 };
+	INT hexidx = 0;
+	char *num;
+	UINT val;
 
 	FN_ENTER;
 	
@@ -391,6 +395,39 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 		FN_EXIT(0, OK);
 		return;
 	}
+
+#define NEW_PARSING 1
+#if NEW_PARSING
+	num = &fw.fw_id[3];
+	val = 0;
+	do {
+		num++;
+		acxlog(L_DEBUG, "num: %c\n", *num);
+		if ((*num != '.') && (*num))
+			val <<= 4;
+		else
+		{
+			hexarr[hexidx] = val;
+			hexidx++;
+			if (hexidx > 3)
+			{
+				acxlog(0xffff, "strange firmware version %s, please report!\n", fw.fw_id);
+				break;
+			}
+			val = 0;
+			continue;
+		}
+		if ((*num >= '0') && (*num <= '9'))
+			*num -= '0';
+		else
+			*num = *num - 'a' + (char)10;
+		val |= *num;
+	} while (*num);
+	fw_major = hexarr[0];
+	fw_minor = hexarr[1];
+	fw_sub = hexarr[2];
+	fw_extra = hexarr[3];
+#else
 	fw_major = (UINT8)(fw.fw_id[4] - '0');
 	fw_minor = (UINT8)(fw.fw_id[6] - '0');
 	fw_sub = (UINT8)(fw.fw_id[8] - '0');
@@ -401,9 +438,10 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 		else
 			fw_extra = (UINT8)(fw.fw_id[10] - 'a' + (char)10);
 	}
+#endif
 	priv->firmware_numver =
 		(UINT32)((fw_major << 24) + (fw_minor << 16) + (fw_sub << 8) + fw_extra);
-	acxlog(L_DEBUG, "firmware_numver %08x\n", priv->firmware_numver);
+	acxlog(L_DEBUG, "firmware_numver 0x%08x\n", priv->firmware_numver);
 
 	priv->firmware_id = fw.hw_id;
 
@@ -792,12 +830,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	memset(dev, 0, sizeof(netdevice_t));
 	ether_setup(dev);
 
-#if QUEUE_OPEN_AFTER_ASSOC
 	/* now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
-	acxlog(L_BUF, "stop queue after setup\n");
-	netif_stop_queue(dev);
-#endif
+	acx_stop_queue(dev, "after setup");
 
 	dev->priv = priv;
 
@@ -817,7 +852,12 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
 
 	/* need to be able to restore PCI state after a suspend */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 9)
+	/* 2.6.9-rc3-mm2 introduced this shorter version */
+	pci_save_state(pdev);
+#else
 	pci_save_state(pdev, priv->pci_state);
+#endif
 
 	if (OK != acx_reset_dev(dev)) {
 		acxlog(L_BINSTD | L_INIT,
@@ -846,7 +886,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #else
 	dev->do_ioctl = &acx_ioctl_old;
 #endif
-	dev->set_multicast_list = &acx_set_rx_mode;
+	dev->set_multicast_list = &acx_set_multicast_list;
 	dev->tx_timeout = &acx_tx_timeout;
 	dev->watchdog_timeo = 4 * HZ;	/* 400 */
 
@@ -890,6 +930,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		result = -EIO;
 		goto fail_register_netdev;
 	}
+	acx_carrier_off(dev, "on probe");
 
 #if THIS_IS_OLD_PM_STUFF_ISNT_IT
 	priv->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
@@ -1134,7 +1175,12 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_STD, "acx100: experimental resume handler called for %p!\n", priv);
 	pci_set_power_state(pdev, 0);
 	acxlog(L_DEBUG, "rsm: power state set\n");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 9)
+	/* 2.6.9-rc3-mm2 introduced this shorter version */
+	pci_restore_state(pdev);
+#else
 	pci_restore_state(pdev, priv->pci_state);
+#endif
 	acxlog(L_DEBUG, "rsm: PCI state restored\n");
 	acx_reset_dev(dev);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
@@ -1277,8 +1323,7 @@ static void acx_up(netdevice_t *dev)
 	}
 	acx_start(priv);
 	
-	acxlog(L_BUF, "start queue on startup\n");
-	netif_start_queue(dev);
+	/* acx_start_queue(dev, "on startup"); */
 
 	FN_EXIT(0, OK);
 }
@@ -1306,8 +1351,7 @@ static void acx_down(netdevice_t *dev)
 
 	FN_ENTER;
 
-	acxlog(L_BUF, "stop queue during close\n");
-	netif_stop_queue(dev);
+	acx_stop_queue(dev, "during close");
 	acx_set_status(priv, ISTATUS_0_STARTED);
 
 	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111)) /* FIXME: first version? */
@@ -1446,13 +1490,6 @@ static int acx_close(netdevice_t *dev)
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
 
-	/* remove task scheduler */
-#ifdef USE_QUEUE_TASKS
-	acxlog(L_STD, "FIXME: how to kill queue tasks on 2.4.x?\n");
-#else
-	flush_scheduled_work();
-#endif
-
 	acxlog(L_INIT, "module count --\n");
 	WLAN_MOD_DEC_USE_COUNT;
 #ifdef BROKEN_LOCKING
@@ -1503,7 +1540,7 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	if (unlikely(OK != acx_lock(priv, &flags)))
 		return NOT_OK;
 
-	if (unlikely(0 != netif_queue_stopped(dev))) {
+	if (unlikely(0 != acx_queue_stopped(dev))) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
 		txresult = NOT_OK;
 		goto fail;
@@ -1532,8 +1569,7 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	 * queue open from the beginning (as long as we're not full,
 	 * and also even before we're even associated),
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
-	acxlog(L_BUF, "stop queue during Tx.\n");
-	netif_stop_queue(dev);
+	acx_stop_queue(dev, "during Tx");
 #endif
 	templen = skb->len;
 
@@ -1549,15 +1585,14 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 
 	dev_kfree_skb(skb);
 
-/*	if (txresult == 1){
+/*	if (txresult == 1) {
 		return NOT_OK;
 	} */
 
 #if 0
 	tx_desc = &priv->dc.pTxDescQPool[priv->dc.pool_idx];
 	if((tx_desc->Ctl & 0x80) != 0) {
-		acxlog(L_BUF, "wake queue after Tx start.\n");
-		netif_wake_queue(dev);
+		acx_wake_queue(dev, "after Tx start");
 	}
 #endif
 	priv->stats.tx_packets++;
@@ -1605,8 +1640,8 @@ static void acx_tx_timeout(netdevice_t *dev)
 	/* clean all tx descs, they may have been completely full */
 	acx_clean_tx_desc_emergency(priv);
 	
-	if ((netif_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
-		netif_wake_queue(dev);
+	if ((acx_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
+		acx_wake_queue(dev, "after Tx timeout");
 #endif
 
 	/* stall may have happened due to radio drift,
@@ -1679,7 +1714,7 @@ static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev)
 }
 
 /*----------------------------------------------------------------
-* acx_set_rx_mode
+* acx_set_multicast_list
 *
 *
 * Arguments:
@@ -1696,9 +1731,34 @@ static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev)
 *
 *----------------------------------------------------------------*/
 
-static void acx_set_rx_mode(/*@unused@*/ netdevice_t *netdev)
+static void acx_set_multicast_list(netdevice_t *dev)
 {
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+
 	FN_ENTER;
+
+	acxlog(L_STD, "FIXME: most likely needs refinement, first implementation version only...\n");
+
+	/* ACX firmwares don't have allmulti capability,
+	 * so just use promiscuous mode instead in this case. */
+	if (dev->flags & (IFF_PROMISC|IFF_ALLMULTI)) {
+		priv->promiscuous = 1;
+		SET_BIT(priv->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		CLEAR_BIT(priv->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(priv->set_mask, SET_RXCONFIG);
+		/* let kernel know in case *we* needed to set promiscuous */
+		dev->flags |= (IFF_PROMISC|IFF_ALLMULTI);
+	}
+	else {
+		priv->promiscuous = 0;
+		CLEAR_BIT(priv->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		SET_BIT(priv->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(priv->set_mask, SET_RXCONFIG);
+		dev->flags &= ~(IFF_PROMISC|IFF_ALLMULTI);
+	}
+
+	acx_update_card_settings(priv, 0, 0, 0);
+
 	FN_EXIT(0, OK);
 }
 
@@ -1873,9 +1933,8 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
  * xmit for management packets, which we really DON'T want */
 /* BS: disabling this caused my card to stop working after a few 
  * seconds when floodpinging. This should be reinvestigated ! */
-		  if (netif_queue_stopped(dev_id)) {
-			  netif_wake_queue(dev_id);
-			  acxlog(L_BUF, "wake queue after Tx complete.\n");
+		  if (acx_queue_stopped(dev_id)) {
+			  acx_wake_queue(dev_id, "after Tx complete");
 		  }
 #endif
 	}
@@ -2074,29 +2133,42 @@ static void acx_after_interrupt_task(void *data)
 			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_ASSOCIATE);
 		}
 		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-			static INT issue_cmd_failed = 0;
 			/* this helps with ACX100 at least;
 			 * hopefully ACX111 also does a
 			 * recalibration here */
 
-			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
-			if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
-			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000))
-			&& */ (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
-			&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)))
-			{
+			/* better wait a bit between recalibrations to
+			 * prevent overheating due to torturing the card
+			 * into working too long despite high temperature
+			 * (just a safety measure) */
+			if (priv->time_last_recalib && time_before(jiffies, priv->time_last_recalib + 300 * HZ)) {
+				acxlog(L_STD, "less than 5 minutes since last radio recalibration (maybe card too hot?): not recalibrating!\n");
 				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-				issue_cmd_failed = 0;
 			}
-			else
-			{
-				/* failed: resubmit, but only limited
-				 * amount of times to prevent endless
-				 * loop */
-				if (issue_cmd_failed++ < 3)
-					acx_schedule_after_interrupt_task(priv);
+			else {
+				static INT issue_cmd_failed = 0;
+
+				/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
+				if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, 5000))
+				&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, 5000))
+				&& */ (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, 5000))
+				&&  (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, 5000)) )
+				{
+					acxlog(L_STD, "successfully recalibrated radio\n");
+					CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+					priv->time_last_recalib = jiffies;
+					issue_cmd_failed = 0;
+				}
+				else
+				{
+					/* failed: resubmit, but only limited
+					 * amount of times to prevent endless
+					 * loop */
+					if (issue_cmd_failed++ < 3)
+						acx_schedule_after_interrupt_task(priv);
+					priv->time_last_recalib = 0; /* and reset time stamp to allow recalib next time */
+				}
 			}
-			acxlog(L_STD, "recalibrated radio\n");
 		}
 	}
 

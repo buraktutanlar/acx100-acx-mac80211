@@ -227,8 +227,8 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 		/* it's 802.3, pass ether payload unchanged,  */
 
 		/* trim off ethernet header and copy payload to tx_desc */
-		payload->length = proto;
-		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), payload->length);
+		payload->length = cpu_to_le16(proto);
+		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), le16_to_cpu(payload->length));
 	} else {
 		/* it's DIXII, time for some conversion */
 		/* Create 802.11 packet. Header also contains llc and snap. */
@@ -236,7 +236,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 		acxlog(L_DEBUG, "tx: DIXII len: %d\n", skb->len);
 
 		/* size of header is 802.11 header + llc + snap */
-		header->length = WLAN_HDR_A3_LEN + sizeof(wlan_llc_t) + sizeof(wlan_snap_t);
+		header->length = cpu_to_le16(WLAN_HDR_A3_LEN + sizeof(wlan_llc_t) + sizeof(wlan_snap_t));
 		/* llc is located behind the 802.11 header */
 		e_llc = (wlan_llc_t*)(header->data +  WLAN_HDR_A3_LEN);
 		/* snap is located behind the llc */
@@ -257,19 +257,15 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 			COPY_OUI(e_snap->oui, oui_rfc1042);
 		}
 		/* trim off ethernet header and copy payload to tx_desc */
-		payload->length = skb->len - sizeof(wlan_ethhdr_t);
-		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), payload->length);
+		payload->length = cpu_to_le16(skb->len - sizeof(wlan_ethhdr_t));
+		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), le16_to_cpu(payload->length));
 	}
 	
 	payload->data_offset = 0;
 	header->data_offset = 0;
 	
 	/* calculate total tx_desc length */
-	tx_desc->total_length = cpu_to_le16(payload->length + header->length);
-
-	/* correct length endianness */
-	payload->length=cpu_to_le16(payload->length);
-	header->length=cpu_to_le16(header->length);
+	tx_desc->total_length = cpu_to_le16(le16_to_cpu(payload->length) + le16_to_cpu(header->length));
 
 	/* Set up the 802.11 header */
 	w_hdr = (p80211_hdr_t*)header->data;
@@ -320,13 +316,13 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 		acxlog(L_DATA, "%02x ", ((UINT8 *) skb->data)[i]);
 	acxlog(L_DATA, "\n");
 
-	acxlog(L_DATA, "802.11 header [%d]: ", header->length);
-	for (i = 0; i < header->length; i++)
+	acxlog(L_DATA, "802.11 header [%d]: ", le16_to_cpu(header->length));
+	for (i = 0; i < le16_to_cpu(header->length); i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) header->data)[i]);
 	acxlog(L_DATA, "\n");
 
-	acxlog(L_DATA, "802.11 payload [%d]: ", payload->length);
-	for (i = 0; i < payload->length; i++)
+	acxlog(L_DATA, "802.11 payload [%d]: ", le16_to_cpu(payload->length));
+	for (i = 0; i < le16_to_cpu(payload->length); i++)
 		acxlog(L_DATA, "%02x ", ((UINT8 *) payload->data)[i]);
 	acxlog(L_DATA, "\n");
 #endif	

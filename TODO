@@ -17,6 +17,10 @@ JANITORIAL/EASY:
 * put ACX100/ACX111/TNETW1100/TNETW1130/TNETW1230 strings on project page
   /homepage once the driver has full support...
 * driver really endianness-clean, e.g. for Mac use? Use cpu_to_leXX, leXX_to_cpu, should be working currently, 040727 [AM]
+* unify function names to acx_this_is_a_function(), acx100_...(), acx111_...()
+* clean up and unify return value handling. Right now the driver seems to have
+  a mess of different functions returning 0 as success, 1 as success, or some
+  functions use -1 etc. pp.
 - add .lsm file
 - AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!
@@ -32,13 +36,9 @@ JANITORIAL/EASY:
 - real init script syntax (add init-usable script to scripts/)
 - average transfer rates in README: our driver vs. Windows standard driver
 - completely overhaul README, split up properly
-- unify function names to acx_this_is_a_function(), acx100_...(), acx111_...()
 - in the doc/ directory, add an intro and describe chipset details and
   interesting information about it
 - maybe add dbg msgs to all failure cases to spot any driver problems fast
-* clean up and unify return value handling. Right now the driver seems to have
-  a mess of different functions returning 0 as success, 1 as success, or some
-  functions use -1 etc. pp.
 - ACX100_CTL_PREAMBLE and DESC_CTL_SHORT_PREAMBLE etc. unify
 
 BUGS:
@@ -107,7 +107,7 @@ ACX100 USB TODO ITEMS:
 ACX111 TODO ITEMS:
 * Tx descriptor is 4 bytes bigger than ACX100, but we don't account for
   it in all cases!!!!!!!!
-- fix (broken?) rx_config setting
+* fix (broken?) rx_config setting
 - find out why access to phy regs fails
 
 COMMON TODO ITEMS:
@@ -141,7 +141,7 @@ COMMON TODO ITEMS:
 + Tx auto rate, crude first implementation done, 040413 [AM]
 - auto power adjustment "iwconfig txpower 20 auto"
 - implement packet fragmentation
-- implement #if WE_DONT_WANT_TO_REJECT_MULTICAST part correctly
++ implement #if WE_DONT_WANT_TO_REJECT_MULTICAST part correctly
 - implement iwpriv to switch between percentage and estimated dBm (problematic!) display?
 - abuse power LED to be an error indicator LED (via timer) in case we switched it off
 + add further iwconfig/iwpriv support: channel traffic percentage indicator,
@@ -186,8 +186,8 @@ COMMON TODO ITEMS:
   consider putting all of ihw.c and idma.c p80211conv.c into single file
 	   moving acx100_helper2.c and acx80211frm.c into single file
 	   acx100.c and acx100_helper.c should be in a single file
-- add driver to linux-wlan-ng or airjack or ...
-	maybe we can just submit it as is for kernel consideration
+	   [AM]: hmm, not so sure about that...
+- add driver to kernel, using generic 802.11 stack to be created
 - make sure all structures are packed correctly!!! (it really does no good if
   we transfer wrongly aligned structs to the ACX100...)
   Note: we seem to be doing well.

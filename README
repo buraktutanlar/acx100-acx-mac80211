@@ -2,16 +2,19 @@
 *             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
-An alternate, possibly more user-friendly but less current guide can be
+An alternate, most likely infinitely much better, more detailed guide can be
 found at http://www.houseofcraig.net/acx100_howto.php
+Regardless of this guide, this README contains a very large amount of important
+first-level driver info, so I'd definitely advise to read it as much as possible.
 
 !!!!! MANDATORY WARNINGS !!!!!
 
 I just learned that the WRT54G router (non-ACX1xx chipset) has trouble with its
 radio when running with higher than usual Tx power (70-100mW or so)
-which is possible using incredibly cool custom Linux firmwares, meaning that
-people end up with defective radios sometimes after 3 months even, if they
-choose irresponsibly high Tx power levels!!
+which is possible using incredibly useful custom Linux firmwares
+(e.g. the Sveasoft ones), meaning that people end up with defective radios
+sometimes after 3 months even, if they choose irresponsibly high
+Tx power levels!!
 Since this driver can drive ACX1xx cards to use up to 100mW of power,
 I really don't know how long the radio would stand that.
 Thus it'd be useful to not use full output power if you can avoid it!!
@@ -34,21 +37,32 @@ defect rate (see doc/general_info). Consider buying any card with FCC ID
 O7J-GL242201 (0 defect reports) instead of the DWL-650+ (5+ defect/problem
 reports). One might attribute this to the higher sales numbers of the
 DWL-650+, but I'm not quite sure...
+Hmm, no, after some more time I cannot say this for certain any more (no
+further defects reported to me).
 
 
 Please don't use the NDIS driver loader cludge instead of our driver.
 For an incredible number of reasons against it, please see
 http://acx100.sourceforge.net/ndis_cludge.html
+(for a start: our driver now supports AMD64, PowerPC, MIPS and of course x86
+-- now please try to do that with NDIS loader "solutions", ok?)
 If for some or another reason you're unhappy with the performance of our
 current driver version, then either fix it if you're capable of doing that
 or immediately think of returning to the shop or, if that is not possible,
 of selling your very poorly supported Taxed Sinstruments based card in
 exchange for a wireless card that is well-supported under Linux.
 Buying the very problematic DriverLoader product instead in an attempt
-to "fix" missing Linux driver support will send the entirely wrong message to
-wireless card manufacturers, so please never choose to do that.
+to "fix" sorely missing Linux driver support will send the entirely wrong
+message to wireless card manufacturers, so please never choose to do that.
 There are many commercial products very much worth buying; but this is
 certainly not one of those...
+If you absolutely don't want to miss out on NDIS loader functionality,
+then I'd suggest trying the free alternative NDIS Loader instead,
+at http://ndisloader.sourceforge.net (FIXME right URL? No internet at home... ;).
+This way at least you won't be telling a company with your money
+(aka: the most important way to "vote") that you think
+that "doing a blatant Windows binary driver usage ripoff is the right way that
+Linux wireless 'support' should be developed".
 
 Also, please take note that I learnt that TI is using and supporting
 Linux for at least TNETW1230 driver SDKs and Linux QoS management (only
@@ -64,17 +78,17 @@ chore any more...
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB and Compact Flash implementations,
-which are both extremely rare -- USB support exists for both
+which are both very rare -- USB support exists for both
 2.4.x and 2.6.x, however it may be not completely "stable" yet). [040523]
 If the driver doesn't work with your ACX100 card, then please notify us
 immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
 and are at your wits end as to what might still make the card fail
-(and make sure to try previous versions of the driver as well!).
+(trying previous versions of the driver is very important as well!).
 
-Other Texas Instruments chips which are e.g. 802.11g capable and may be named
-TNETW1130/1230 (ACX111) only just started to actually be supported in a useful
-way by this driver, so due to different hardware implementations some ACX111
-card designs might not be working yet [040530].
+Other Texas Instruments chips which are e.g. 802.11g capable and are named
+TNETW1130/1230 (ACX111) started to actually be supported in a useful way
+by this driver rather recently only, so due to different hardware
+implementations some ACX111 card designs might still not be working yet [040530].
 
 Also, due to confusion about similar card naming (for further information, see
 bottom), people keep thinking certain cards they own work with this driver.
@@ -98,7 +112,7 @@ DWL-AG650 (Atheros AR5212)
 When looking at the DWL-G650 mess, I could puke again...
 Again, the cards mentioned in the listing above will NOT work with this driver
 (yet?), in most cases you will need to be able to find a different Linux driver
-supporting your card's chipset...
+supporting your card's chipset... (try Google "[CHIPSET] Linux")
 Feel free to send us corrections/additions to this very confusing listing above.
 
 === STATUS AS OF 040826 ===
@@ -434,9 +448,10 @@ Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
 Need to change MAC address? Use ifconfig wlan0 hw ether 112233445566
-(make sure card interface is down!)
-Driver will only update MAC when not associated: needs reinit of card parts.
-Should be working fine now that we also remember to run the firmware MAC change command.
+NOTE: make sure card interface is down! (driver will only update MAC
+when not associated: needs reinit of card parts)
+Also, this will only work in case your AP's MAC filter doesn't deny your new
+MAC!
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
 (in case of an older Kismet release which didn't know the acx100 type yet).
@@ -495,9 +510,13 @@ Consider completely recompiling the kernel (make sure to keep any old
 /lib/modules/KERNELVERSION/ directory tree, then reinstalling this kernel and
 rebooting. Hopefully the driver compiling works then.
 
+On some systems (e.g. Conectiva distribution), it may be required
+to run a "make prepare-all" in the Linux source tree before building
+the driver...
+  
 Also, I hope you haven't downloaded the driver via Windows CVS (since it
 may insert bogus end-of-line chars).
-  
+
 -- Driver init failure (sorted according to init progress) --
 
 If you get the message
@@ -611,7 +630,7 @@ to be configured to send Beacon frames (100ms Beacon period works best).
 Then read the file containing the driver log (see "DEBUGGING / LOGGING").
 
 Make sure that network association is working properly!
-(all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
+(all steps that get listed in the log from STARTED, SCANNING, WAIT_AUTH,
 AUTHENTICATED to ASSOCIATED finish successfully)
 Also make sure your peer AP has reliable Beacon period settings
 (100ms is the standard value which our driver always detects during scan,
@@ -620,6 +639,9 @@ longer periods may cause trouble).
 Maybe basic or operational rate set is set incorrectly, so association
 to an AP fails.
 Try to fix it, e.g. something like iwpriv wlan0 SetRates "1,2 1,2,5,11".
+This is also required to let Ad-Hoc Beacons from acx111 cards get recognized
+by 11Mbps cards, since otherwise the Beacon Tx speed will exceed 11Mbps!
+(will be done automatically in a future driver version)
 
 Also, check whether you actually use the newest or a working firmware version.
 In some cases it's actually not this driver but the firmware which is
@@ -696,7 +718,7 @@ lists, since we cannot track these properly.
 Instead, post a Tracker item at one of Bugs, Support Requests, Feature
 Requests. This way development will be much more organized, with proper
 status and processing assigned to each request, and hopefully nothing
-falling through the cracks. And please consider NOT posting anonymously,
+falling through the cracks. And please try to not post anonymously,
 since this severely degrades tracking quality.
 
 ****************************************
@@ -714,9 +736,7 @@ Thanks for listening!
 - might not work on SMP multi-processor kernels sometimes
            (some problems, maybe even crashes). Reported to work, currently
 - power management (suspend/resume) handlers are not completely stable yet
-- Currently always in promiscuous mode (accepts all packets),
-  filtering needs to be implemented properly
-- many advanced features are not implemented yet
+- several advanced features are not implemented yet
 
 For current tasks, please read TODO (or grep driver for FIXME and TODO).
 
@@ -784,13 +804,14 @@ name their cards containing DIFFERENT chipsets!!
 One of these vendors is SpeedStream/Siemens: a card that uses the same
 name "SS1021" is available in both Orinoco chip and ACX100 chip versions.
 
-USRobotics also just started to enjoy these despicable acts:
+USRobotics also just started to enjoy these terrible misdeeds:
 the USR2210 usually has the ACX100, however newer versions with UNCHANGED
 naming (e.g. at tigerdirect.com) contain a newer incompatible 802.11g
 TI chipset.
 
 Sitecom recently also joined the devilish party with their "WL-120" (ACX111)
-and "WL-120 v2" (Harris) cards.
+and "WL-120 v2" (Harris) cards. Plus, they had GPL non-compliance issues with
+some of their products and were ultimately told by the court to obey it properly.
 
 But the worst offender is D-Link: they have "DWL-650" and "DWL-650+".
 "DWL-650+" is simply an improved version of the "DWL-650", right?
@@ -814,7 +835,7 @@ then AT LEAST change the card name in order to let people know and discern
 which hardware to avoid like the plague, for heaven's sake!
 This is such a <CENSORED>, I could <OUCH, CENSORED!>...
 
-Also, we just learned that D-Link tech support can be very clueless, too:
+Also, we just learned that D-Link tech support can be rather clueless, too:
 one guy, after having been ill-advised by D-Link support that his DWL-120+
 uses an Atmel chipset, spent considerable time trying to get this card to work
 with an incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
@@ -827,15 +848,15 @@ To be fair, they at least provide a page which lists many of their
 wireless cards and links to their corresponding Linux driver projects...
 
 Finally, let me mention that we also really dislike the way how
-Texas Instruments handles Linux driver support. It's a really shameful
-pity, with delays to be measured in years versus the Windows driver
+Texas Instruments handles Linux driver support. It's a shameful pity,
+with delays to be measured in years versus the Windows driver
 support, and with poor and buggy binary driver support.
 All in all our team would be very grateful to receive proper
 development support and cooperation from TI in order to create
 proper Linux drivers. That would be The Good Way to do it...
 (although admittedly that would still only be the second-best way to do it,
 with the best way being to have paid company developers work on a
-well-working OSS driver, of course)
+well-working OSS driver...)
 After all it's the hardware VENDOR that's earning money via OUR, the
 customers', payment, so it should be the damn responsibility of the
 hardware vendor to ensure good driver support (if by no other means
@@ -847,7 +868,7 @@ shelled out considerable amounts of money for...
 For an example of a vendor whose actions I deem useful, let me just mention
 Sitecom. They list Linux compatibility status for many of their products on
 their website, and from the look of it they clearly support Linux quite
-actively. (UPDATE: they also screwed up. See above. :-\)
+actively. (UPDATE: they also screwed up in a big way. See above. :-\)
 
 Have fun!
 

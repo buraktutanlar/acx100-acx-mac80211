@@ -588,8 +588,8 @@ static void acx100usb_disconnect(struct usb_interface *intf)
 	**  ----------------------------------- */
 	if (priv->netdev) {
 		rtnl_lock();
-		if (!netif_queue_stopped(priv->netdev)) {
-			netif_stop_queue(priv->netdev);
+		if (!acx_queue_stopped(priv->netdev)) {
+			acx_stop_queue(priv->netdev, "on USB disconnect");
 	        }
 		rtnl_unlock();
 	}
@@ -751,7 +751,7 @@ static void init_network_device(struct net_device *dev) {
 	** Setup the device and stop the queue
 	** -------------------------------------- */
 	ether_setup(dev);
-	netif_stop_queue(dev);
+	acx_stop_queue(dev, "on init");
 	/* --------------------------------------
 	** put the ACX100 out of sleep mode
 	** ----------------------------------- */
@@ -821,7 +821,7 @@ static int acx100usb_open(struct net_device *dev)
 	acx_start(priv);
 
 
-	netif_start_queue(dev);
+	acx_start_queue(dev, "on open");
 	acx100usb_poll_rx(priv);
 	/* --- */
 	WLAN_MOD_INC_USE_COUNT;
@@ -1123,9 +1123,9 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 		SET_BIT(buf->hdr.hostData, (ACX100_USB_TXHI_ISDATA<<16));
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
-	if (acx_is_mac_address_directed((mac_t *)addr)) 
+	if (OK == acx_is_mac_address_directed((mac_t *)addr)) 
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16)));
-	if (acx_is_mac_address_broadcast(addr)) 
+	if (OK == acx_is_mac_address_broadcast(addr)) 
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16)));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
 	if (debug&L_DATA) acx_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
@@ -1385,7 +1385,7 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 		spin_lock_irqsave(&(priv->usb_tx_lock),flags);
 		priv->usb_tx_mutex=0;
 		spin_unlock_irqrestore(&(priv->usb_tx_lock),flags);
-		if (priv->dev_state_mask&ACX_STATE_IFACE_UP) netif_wake_queue(priv->netdev);
+		if (priv->dev_state_mask&ACX_STATE_IFACE_UP) acx_wake_queue(priv->netdev, "for next Tx");
 	}
 }
 
@@ -1424,8 +1424,8 @@ static int acx100usb_stop(struct net_device *dev)
 	/* --------------------------------
 	* stop the transmit queue...
 	* ------------------------------ */
-	if (!netif_queue_stopped(dev)) {
-		netif_stop_queue(dev);
+	if (!acx_queue_stopped(dev)) {
+		acx_stop_queue(dev, "on iface stop");
 	}
 	/* --------------------------------
 	** mark the device as DOWN
@@ -1503,7 +1503,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** if the queue is halted, there is no point
 	** in sending out data...
 	** ----------------------------------- */
-	if (netif_queue_stopped(dev)) {
+	if (acx_queue_stopped(dev)) {
 		acxlog(L_STD, "%s: called when queue stopped\n", __func__);
 		txresult = 1;
 		goto end;
@@ -1533,8 +1533,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	 * queue open from the beginning (as long as we're not full,
 	 * and also even before we're even associated),
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
-	acxlog(L_BUF, "stop queue during Tx.\n");
-	netif_stop_queue(dev);
+	acx_stop_queue(dev, "during Tx");
 #endif
 #if UNUSED
 	if (acx_lock(priv,&flags)) ...
@@ -1567,7 +1566,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** until the packages are flushed out,
 	** stop the queue...
 	** -------------------------------- */
-	netif_stop_queue(dev);
+	acx_stop_queue(dev, "after Tx");
 	/* -----------------------------------
 	** transmit the data...
 	** -------------------------------- */

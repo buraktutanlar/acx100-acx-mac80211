@@ -164,15 +164,15 @@ static void acx_free_desc_queues(TIWLAN_DC *pDc)
 
 /* NB: this table maps RATE111 bits to ACX100 tx descr constants */
 static const UINT8 bitpos2rate100[] = {
-	RATE100_1		,
-	RATE100_2		,
-	RATE100_5		,
-	0			,
-	0			,
-	RATE100_11		,
-	0			,
-	0			,
-	RATE100_22		,
+	RATE100_1	,
+	RATE100_2	,
+	RATE100_5	,
+	0		,
+	0		,
+	RATE100_11	,
+	0		,
+	0		,
+	RATE100_22	,
 };
 
 void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
@@ -296,14 +296,14 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	}
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	/* sets Ctl ACX100_CTL_OWN to zero telling that the descriptors are now owned by the acx100; do this as LAST operation */
+	/* clears Ctl ACX100_CTL_OWN bit, thus telling that the descriptors are now owned by the acx100; do this as LAST operation */
 	CLEAR_BIT(header->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 	CLEAR_BIT(payload->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 	CLEAR_BIT(tx_desc->Ctl_8, ACX100_CTL_OWN);
 	spin_unlock_irqrestore(&priv->dc.tx_lock, flags);
 
 	tx_desc->tx_time = cpu_to_le32(jiffies);
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], 0x4);
+	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_TXPRC);
 #else
 	tx_desc->tx_time = cpu_to_le32(jiffies);
 	acx100usb_tx_data(priv, tx_desc);
@@ -324,13 +324,14 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			priv->status);
 	else
 		acxlog(L_XFER | L_DATA,
-			"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x status %d\n",
+			"tx: pkt (%s): len %i (%i/%i) mode %d rate %04x%s status %d\n",
 			acx_get_packet_type_string(((p80211_hdr_t*)header->data)->a3.fc),
 			tx_desc->total_length,
 			header->length,
 			payload->length,
 			priv->macmode_joined,
 			tx_desc->u.r2.rate111,
+			(tx_desc->u.r2.rate111 & RATE111_SHORTPRE) ? "(SPr)" : "",
 			priv->status);
 
 	if (debug & L_DATA)
@@ -370,12 +371,12 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			priv->wstats.discard.misc++;
 			break;
 		case 0x10:
-			err = "MSDU lifetime timeout? - change 'iwconfig retry lifetime XXX'";
+			err = "MSDU lifetime timeout? - try changing 'iwconfig retry lifetime XXX'";
 			priv->wstats.discard.misc++;
 			break;
 		case 0x20:
 			err = "excessive Tx retries due to either distance too high "
-			"or unable to Tx or Tx frame error - change "
+			"or unable to Tx or Tx frame error - try changing "
 			"'iwconfig txpower XXX' or 'sens'itivity or 'retry'";
 			priv->wstats.discard.retries++;
 			/* FIXME: set (GETSET_TX|GETSET_RX) here
@@ -429,7 +430,7 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* TODO critical!! is this block valid? */
 	/* let card know there is work to do */
-	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], 0x4);
+	acx_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_TXPRC);
 #endif
 
 #if WIRELESS_EXT > 13 /* wireless_send_event() and IWEVTXDROP are WE13 */
@@ -484,24 +485,24 @@ rate100to111(UINT8 r)
 }
 
 static void
-do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
+do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 sent_rate, UINT8 error)
 {
 	UINT16 cur = txrate->cur;
 	int slower_rate_was_used;
 
 	acxlog(L_DEBUG, "tx: rate mask %04x/%04x/%04x, fallback %d/%d, stepup %d/%d\n",
-		rate, cur, txrate->cfg,
+		sent_rate, cur, txrate->cfg,
 		txrate->fallback_count, txrate->fallback_threshold,
 		txrate->stepup_count, txrate->stepup_threshold
 	);
 
 	/* 
-	cur < rate: old tx packet, before tx_curr went in effect
-	else cur >= rate and:
-	(cur^rate) >= rate: true only if highest set bit
-	in cur is more significant than highest set bit in rate
+	cur < sent_rate: old tx packet, before tx_curr went in effect
+	else cur >= sent_rate and:
+	(cur^rate) >= sent_rate: true only if highest set bit
+	in cur is more significant than highest set bit in sent_rate
 	*/
-	slower_rate_was_used = (cur > rate) && ((cur ^ rate) >= rate);
+	slower_rate_was_used = (cur > sent_rate) && ((cur ^ sent_rate) >= sent_rate);
 	
 	if (slower_rate_was_used || (0 != (error & 0x30))) {
 		txrate->stepup_count = 0;
@@ -510,13 +511,13 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
 		txrate->fallback_count = 0;
 
 		/* clear highest 1 bit in cur */
-		rate=0x1000;
-		while(0 == (cur & rate))
-			rate >>= 1;
-		CLEAR_BIT(cur, rate);
+		sent_rate=0x1000;
+		while(0 == (cur & sent_rate))
+			sent_rate >>= 1;
+		CLEAR_BIT(cur, sent_rate);
 
 		if(cur) { /* we can't disable all rates! */
-			acxlog(L_XFER, "tx: falling back to rate mask %04x\n", cur);
+			acxlog(L_XFER, "tx: falling back to sent_rate mask %04x\n", cur);
 			txrate->cur = cur;
 		}
 	}
@@ -527,16 +528,16 @@ do_handle_txrate_auto(struct txrate_ctrl *txrate, UINT16 rate, UINT8 error)
 			return;
 		txrate->stepup_count = 0;
 		
-		/* try to find higher allowed rate */
+		/* try to find higher allowed sent_rate */
 		do
-		    rate<<=1;
-		while( rate && ((txrate->cfg & rate) == 0));
+		    sent_rate<<=1;
+		while( sent_rate && ((txrate->cfg & sent_rate) == 0));
 		
-		if (!rate) 
+		if (!sent_rate) 
 		    return; /* no higher rates allowed by config */
 		
-		SET_BIT(cur, rate);
-		acxlog(L_XFER, "tx: stepping up to rate mask %04x\n", cur);
+		SET_BIT(cur, sent_rate);
+		acxlog(L_XFER, "tx: stepping up to sent_rate mask %04x\n", cur);
 		txrate->cur = cur;
 	}
 }
@@ -647,7 +648,10 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 	acx_log_txbuffer(pDc);
 	acxlog(L_BUFT, "tx: cleaning up bufs from %d\n", pDc->tx_tail);
 
+#define OLD_LOCKING 1
+#if OLD_LOCKING
 	spin_lock(&pDc->tx_lock);
+#endif
 
 	finger = pDc->tx_tail;
 	watch = finger;
@@ -655,9 +659,15 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 	do {
 		pTxDesc = GET_TX_DESC_PTR(pDc, finger);
 
+#if OLD_LOCKING == 0
+	spin_lock(&pDc->tx_lock);
+#endif
 		/* abort if txdesc is not marked as "Tx finished" and "owned" */
 		if ((pTxDesc->Ctl_8 & DESC_CTL_DONE) != DESC_CTL_DONE)
 		{
+#if OLD_LOCKING == 0
+			spin_unlock(&pDc->tx_lock);
+#endif
 			/* we do need to have at least one cleaned,
 			 * otherwise we wouldn't get called in the first place.
 			 * So better stay around some more, unless
@@ -703,15 +713,15 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 
 		if ((priv->TxQueueFree >= MINFREE_TX + 3)
 		&& (priv->status == ISTATUS_4_ASSOCIATED)
-		&& (netif_queue_stopped(priv->netdev)))
+		&& (acx_queue_stopped(priv->netdev)))
 		{
-			/* FIXME: if construct is ugly:
-			 * should have functions acx_stop_queue
-			 * etc. which set flag priv->tx_stopped
-			 * to be checked here. */
 			acxlog(L_BUF, "tx: wake queue (avail. Tx desc %d)\n", priv->TxQueueFree);
-			netif_wake_queue(priv->netdev);
+			acx_wake_queue(priv->netdev, NULL);
 		}
+#if OLD_LOCKING == 0
+		spin_unlock(&pDc->tx_lock);
+#endif
+
 		/* log AFTER having done the work, faster */
 		if (CHIPTYPE_ACX111 == priv->chip_type)
 			acxlog(L_BUFT, "tx: cleaned %d: ack_fail=%d rts_fail=%d rts_ok=%d r111=%04x\n",
@@ -729,7 +739,10 @@ next:
 	/* remember last position */
 	pDc->tx_tail = finger;
 
+#if OLD_LOCKING
 	spin_unlock(&pDc->tx_lock);
+#endif
+
 
 	FN_EXIT(0, OK);
 }
@@ -785,7 +798,7 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 
 static void acx_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 {
-	unsigned int packet_len = buf->mac_cnt_rcvd & 0xfff;
+	unsigned int packet_len = le16_to_cpu(buf->mac_cnt_rcvd) & 0xfff;
 	p80211msg_lnxind_wlansniffrm_t *msg;
 
 	int payload_offset = 0;
@@ -1109,7 +1122,7 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 
 		if (unlikely(priv->monitor)) {
 			acx_rxmonitor(priv, pRxHostDesc->data);
-		} else if (buf_len >= 14) {
+		} else if (likely(buf_len >= 14)) {
 			acx_rx_ieee802_11_frame(priv, pRxHostDesc);
 		} else {
 			acxlog(L_DEBUG | L_XFER | L_DATA,
@@ -1146,14 +1159,15 @@ inline void acx_process_rx_desc(wlandevice_t *priv)
 #endif
 
 		RX_SPIN_LOCK(&pDc->rx_lock);
-		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN)); /* Host no longer owns this */
 		pRxHostDesc->Status = 0;
+		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN)); /* Host no longer owns this */
 
 		/* ok, descriptor is handled, now check the next descriptor */
 		curr_idx = pDc->rx_tail;
 		pRxHostDesc = &RxHostPool[pDc->rx_tail];
 
 		/* if next descriptor is empty, then bail out */
+		/* FIXME: is this check really entirely correct?? */
 		/* if (!((le16_to_cpu(pRxHostDesc->Ctl) & ACX100_CTL_OWN) && (!(le32_to_cpu(pRxHostDesc->Status) & BIT31)))) */
 		if (!(le32_to_cpu(pRxHostDesc->Status) & BIT31))
 		{
@@ -1847,7 +1861,7 @@ static int acx100_init_memory_pools(wlandevice_t *priv, acx_ie_memmap_t *mmt)
 
 	/* We figure out how many total blocks we can create, using
 	   the block size we chose, and the beginning and ending
-	   memory pointers. IE. end-start/size */
+	   memory pointers, i.e.: end-start/size */
 	TotalMemoryBlocks = (le32_to_cpu(mmt->PoolEnd) - le32_to_cpu(mmt->PoolStart)) / priv->memblocksize;
 
 	acxlog(L_DEBUG,"TotalMemoryBlocks=%d (%d bytes)\n",TotalMemoryBlocks,TotalMemoryBlocks*priv->memblocksize);
@@ -1893,14 +1907,14 @@ static int acx100_init_memory_pools(wlandevice_t *priv, acx_ie_memmap_t *mmt)
 
 	/* alert the device to our decision */
 	if (OK != acx_configure(priv, &MemoryConfigOption, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
-		acxlog(L_DEBUG,"%s: configure memory config options FAILED!\n", __func__);
+		acxlog(L_DEBUG,"%s: configure memory config options FAILED\n", __func__);
 		FN_EXIT(1, NOT_OK);
 		return NOT_OK;
 	}
 
 	/* and tell the device to kick it into gear */
 	if (OK != acx_issue_cmd(priv, ACX100_CMD_INIT_MEMORY, NULL, 0, 5000)) {
-		acxlog(L_DEBUG,"%s: init memory FAILED!\n", __func__);
+		acxlog(L_DEBUG,"%s: init memory FAILED\n", __func__);
 		FN_EXIT(1, NOT_OK);
 		return NOT_OK;
 	}
@@ -2168,7 +2182,7 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 
 	acxlog(L_INIT, "%s: set up acx111 queue memory configuration (queue configs + descriptors)\n", __func__);
 	if (OK != acx_configure(priv, &memconf, ACX1xx_IE_QUEUE_CONFIG /*0x03*/)) {
-		acxlog(L_STD, "setting up memory configuration FAILED!\n");
+		acxlog(L_STD, "setting up memory configuration FAILED\n");
 		goto fail;
 	}
 
@@ -2268,7 +2282,7 @@ struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv)
 	if (priv->TxQueueFree < MINFREE_TX)
 	{
 		acxlog(L_BUF, "stop queue (avail. Tx desc %d).\n", priv->TxQueueFree);
-		netif_stop_queue(priv->netdev);
+		acx_stop_queue(priv->netdev, NULL);
 	}
 
 	/* returning current descriptor, so advance to next free one */

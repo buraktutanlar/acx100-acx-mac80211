@@ -59,12 +59,12 @@ struct txdescriptor *acx_get_tx_desc(wlandevice_t *priv);
 typedef struct rxbuffer {
 	UINT16	mac_cnt_rcvd ACX_PACKED;	/* 0x0, only 12 bits are len! (0xfff) */
 	UINT8	mac_cnt_mblks ACX_PACKED;	/* 0x2 */
-	UINT8	mac_status ACX_PACKED;	/* 0x3 */
+	UINT8	mac_status ACX_PACKED;		/* 0x3 */
 	UINT8	phy_stat_baseband ACX_PACKED;	/* 0x4 bit 0x80: used LNA (Low-Noise Amplifier) */
 	UINT8	phy_plcp_signal ACX_PACKED;	/* 0x5 */
 	UINT8	phy_level ACX_PACKED;		/* 0x6 PHY stat */
-	UINT8	phy_snr ACX_PACKED;		/* 0x7  PHY stat */
-	UINT32	time ACX_PACKED;		/* 0x8  timestamp upon MAC rcv first byte */
+	UINT8	phy_snr ACX_PACKED;		/* 0x7 PHY stat */
+	UINT32	time ACX_PACKED;		/* 0x8 timestamp upon MAC rcv first byte */
 	acx_addr3_t buf ACX_PACKED;	/* 0x0c 0x18 */
 	UINT8	data[ACX100_BAP_DATALEN_MAX] ACX_PACKED;
 } rxb_t;	/* 0x956 */
@@ -112,7 +112,7 @@ typedef struct framehdr {
 #define RATE100_11             110
 #define RATE100_22             220
 /* This bit denotes use of PBCC:
-** (it is unknown whether it works with 1 and 2Mbit rates, probably not) */
+** (PBCC encoding usable with 11 and 22 Mbps speeds only) */
 #define RATE100_PBCC511                0x80
 /* Where did these come from? */
 #define RATE100_6_G            0x0D
@@ -236,7 +236,7 @@ Not shown here.
  * (alternatively we need to cope with the shorted value somehow) */
 typedef UINT32 ACX_PTR;
 typedef struct txdescriptor {
-	ACX_PTR	pNextDesc ACX_PACKED;		/* pointer to the next txdescriptor */
+	ACX_PTR	pNextDesc ACX_PACKED;		/* pointer to next txdescriptor */
 	ACX_PTR	HostMemPtr ACX_PACKED;
 	ACX_PTR	AcxMemPtr ACX_PACKED;
 	UINT32	tx_time ACX_PACKED;
@@ -255,15 +255,15 @@ typedef struct txdescriptor {
 			UINT32 d4 ACX_PACKED;
 		} dummy ACX_PACKED;
 	} fixed_size ACX_PACKED;
-	UINT8	Ctl_8 ACX_PACKED;				/* 0x24, 8bit value */
-	UINT8	Ctl2_8 ACX_PACKED;				/* 0x25, 8bit value */
-	UINT8	error ACX_PACKED;				/* 0x26 */
-	UINT8	ack_failures ACX_PACKED;			/* 0x27 */
-	UINT8	rts_failures ACX_PACKED;			/* 0x28 */
-	UINT8	rts_ok ACX_PACKED;				/* 0x29 */
+	UINT8	Ctl_8 ACX_PACKED;			/* 0x24, 8bit value */
+	UINT8	Ctl2_8 ACX_PACKED;			/* 0x25, 8bit value */
+	UINT8	error ACX_PACKED;			/* 0x26 */
+	UINT8	ack_failures ACX_PACKED;		/* 0x27 */
+	UINT8	rts_failures ACX_PACKED;		/* 0x28 */
+	UINT8	rts_ok ACX_PACKED;			/* 0x29 */
 	union {
     		struct {
-			UINT8	rate ACX_PACKED;		/* 0x2a */
+			UINT8	rate ACX_PACKED;	/* 0x2a */
 			UINT8	queue_ctrl ACX_PACKED;	/* 0x2b */
     		} r1 ACX_PACKED;
     		struct {
@@ -280,10 +280,10 @@ typedef struct txhostdescriptor {
 	UINT16	data_offset ACX_PACKED;			/* 0x04 */
 	UINT16	reserved ACX_PACKED;			/* 0x06 */
 	UINT16	Ctl_16 ACX_PACKED; /* 16bit value, endianness!! */
-	UINT16	length ACX_PACKED;				/* 0x0a */
-	ACX_PTR	desc_phy_next ACX_PACKED;			/* 0x0c [txhostdescriptor *] */
-	ACX_PTR	pNext ACX_PACKED;				/* 0x10 [txhostdescriptor *] */
-	UINT32	Status ACX_PACKED;				/* 0x14, unused on Tx */
+	UINT16	length ACX_PACKED;			/* 0x0a */
+	ACX_PTR	desc_phy_next ACX_PACKED;		/* 0x0c [txhostdescriptor *] */
+	ACX_PTR	pNext ACX_PACKED;			/* 0x10 [txhostdescriptor *] */
+	UINT32	Status ACX_PACKED;			/* 0x14, unused on Tx */
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	txhostdescriptor *desc_phy ACX_PACKED;	/* 0x18 [txhostdescriptor *] */
 	UINT8	*data ACX_PACKED;
@@ -294,10 +294,10 @@ typedef struct rxdescriptor {
 	ACX_PTR	HostMemPtr ACX_PACKED;			/* 0x04 */
 	ACX_PTR	ACXMemPtr ACX_PACKED;			/* 0x08 */
 	UINT32	rx_time ACX_PACKED;			/* 0x0c */
-	UINT16	total_length ACX_PACKED;			/* 0x10 */
+	UINT16	total_length ACX_PACKED;		/* 0x10 */
 	UINT16	WEP_length ACX_PACKED;			/* 0x12 */
 	UINT32	WEP_ofs ACX_PACKED;			/* 0x14 */
-	UINT8	driverWorkspace[16] ACX_PACKED; 		/* 0x18 */
+	UINT8	driverWorkspace[16] ACX_PACKED;		/* 0x18 */
 #if 0
 	UINT32	val0x18 ACX_PACKED;			/* 0x18 the following 16 bytes do not change when acx100 owns the descriptor */
 	UINT32	val0x1c ACX_PACKED;			/* 0x1c */
@@ -308,7 +308,7 @@ typedef struct rxdescriptor {
 	UINT8	Ctl_8 ACX_PACKED;
 	UINT8	rate ACX_PACKED;
 	UINT8	error ACX_PACKED;
-	UINT8	SNR ACX_PACKED;				/* modulation / preamble */
+	UINT8	SNR ACX_PACKED;				/* modulation / preamble; FIXME: huh? SNR is Signal-to-Noise Ratio, which is something entirely different!! */
 	UINT8   RxLevel ACX_PACKED;
 	UINT8	queue_ctrl ACX_PACKED;
 	UINT16	unknown ACX_PACKED;

@@ -524,6 +524,12 @@ typedef struct acx_configoption {
 
 
 
+inline void acx_stop_queue(netdevice_t *dev, char *msg);
+inline int acx_queue_stopped(netdevice_t *dev);
+inline void acx_start_queue(netdevice_t *dev, char *msg);
+inline void acx_wake_queue(netdevice_t *dev, char *msg);
+inline void acx_carrier_off(netdevice_t *dev, char *msg);
+inline void acx_carrier_on(netdevice_t *dev, char *msg);
 void acx_schedule(long timeout);
 int acx_reset_dev(netdevice_t *dev);
 void acx_join_bssid(wlandevice_t *priv);
@@ -547,13 +553,13 @@ int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT3
 void acx100_set_wepkey(wlandevice_t *priv);
 void acx111_set_wepkey(wlandevice_t *priv);
 int acx_init_wep(wlandevice_t *priv);
+void acx_initialize_rx_config(wlandevice_t *priv, INT setting);
 void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all);
 int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
 void acx100_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, acx100_scan_t *s);
 void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
 void acx111_scan_chan(wlandevice_t *priv);
-int acx_set_rxconfig(wlandevice_t *priv);
 int acx_load_radio(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 UINT16 acx_proc_register_entries(struct net_device *dev);
