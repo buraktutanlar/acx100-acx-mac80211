@@ -28,6 +28,9 @@ clean:
 	make -C firmware clean
 	rm -f config.mk
 
+inject:
+	./scripts/inject_kernel_tree .
+
 distclean: 
 #	@echo "WARNING this will remove all binaries, including the \
 #		file that contains the firmware information. If you \

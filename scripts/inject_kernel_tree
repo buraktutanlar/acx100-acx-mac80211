@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+
+use strict;
+
+my $error=0;
+
+$error = 1 if (@ARGV != 1);
+
+if ($error)
+{
+   print "$0: <acx100_root_dir>";
+   exit;
+}
+
+my $from_dir = shift @ARGV;
+
+my $kdir = "/usr/src/linux/drivers/net/wireless";
+my $acx100_dir = "$kdir/acx100";
+if (! -e $kdir)
+{
+   die "$kdir doesn't exist!";
+}
+
+if (!-e $acx100_dir)
+{
+  print "Making $acx100_dir\n";
+  print `mkdir $acx100_dir`;
+}
+
+if (!-e "$from_dir/src")
+{
+   print "$from_dir/src doesn't exist!";
+}
+if (!-e "$from_dir/include")
+{
+   print "$from_dir/include doesn't exist!";
+}
+
+print "Copying files to $acx100_dir\n";
+print `cp $from_dir/src/Makefile2.6 $acx100_dir/Makefile`;
+print `cp $from_dir/src/*.c $acx100_dir`;
+print `cp $from_dir/include/*.h $acx100_dir`;
+
+my $kmakefile = "$kdir/Makefile";
+
+print "Checking for $kmakefile addition: ";
+open IN, "<$kmakefile" or die "Unable to open $kmakefile";
+my @lines = <IN>;
+close IN;
+my $found = 0;
+foreach my $line (@lines)
+{
+  if ($line =~ /acx100/)
+  {
+    $found=1;
+    last;
+  }
+}
+if (!$found)
+{
+  print "Doing it.\n";
+  open OUT, ">>$kmakefile" or die "cannot open $kmakefile for write";
+  print OUT "obj-\$(CONFIG_ACX100) += acx100/";
+  close OUT;
+}
+else
+{
+  print "Already done.\n";
+}
+
+my $kconfig = "$kdir/Kconfig";
+
+print "Checking for $kconfig addition: ";
+open IN, "<$kconfig" or die "Unable to open $kconfig";
+my @lines = <IN>;
+close IN;
+my $found = 0;
+foreach my $line (@lines)
+{
+  if ($line =~ /ACX100/)
+  {
+    $found=1;
+    last;
+  }
+}
+if (!$found)
+{
+  print "Doing it.\n";
+  open OUT, ">$kconfig" or die "cannot open $kconfig for write";
+  my $line = join("", @lines);
+  $line =~ s|endmenu|config ACX100\n\ttristate "ACX100 Cardbus"\n\tdepends on NET_RADIO && NET_WIRELESS && !SMP\n\tdefault n\n\nendmenu\n|;
+  print OUT $line;
+  close OUT;
+}
+else
+{
+  print "Already done.\n";
+}
+

@@ -331,16 +331,20 @@ int acx100_set_probe_response_template(wlandevice_t *priv);
 int acx100_set_beacon_template(wlandevice_t *priv);
 void acx100_set_timer(wlandevice_t *priv, UINT32 time);
 void acx100_update_capabilities(wlandevice_t *priv);
-unsigned int acx100_read_eeprom_offset(wlandevice_t *priv, UINT16 addr,
-					unsigned char *charbuf);
+UINT16 acx100_read_eeprom_offset(wlandevice_t *priv, UINT16 addr,
+					UINT8 *charbuf);
+UINT16 acx100_read_eeprom_area(wlandevice_t *priv);
+UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr,
+					UINT16 len, UINT8 *charbuf);
+UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf);
+UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value);
 void acx100_start(wlandevice_t *priv);
 void acx100_reset_mac(wlandevice_t *priv);
 /*@null@*/ firmware_image_t *acx100_read_fw( const char *file);
 int acx100_upload_fw(wlandevice_t *priv);
 int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 offset);
-int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset );
+int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_mage, UINT32 offset);
 int acx100_verify_init(wlandevice_t *priv);
-int acx100_read_eeprom_area(wlandevice_t *priv);
 void acx100_init_mboxes(wlandevice_t *priv);
 int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt);
 int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *pt);
@@ -363,5 +367,11 @@ int acx100_read_proc(char *page, char **start, off_t offset, int count,
 		     int *eof, void *data);
 int acx100_read_proc_diag(char *page, char **start, off_t offset, int count,
 		     int *eof, void *data);
+int acx100_read_proc_eeprom(char *page, char **start, off_t offset, int count,
+		     int *eof, void *data);
+int acx100_read_proc_phy(char *page, char **start, off_t offset, int count,
+		     int *eof, void *data);
 int acx100_proc_output(char *buf, wlandevice_t *priv);
 int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
+int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
+int acx100_proc_phy_output(char *buf, wlandevice_t *priv);

@@ -165,6 +165,48 @@ int acx100_read_proc_diag(char *buf, char **start, off_t offset, int count,
 	return length;
 }
 
+int acx100_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx100_proc_eeprom_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
+int acx100_read_proc_phy(char *buf, char **start, off_t offset, int count,
+		     int *eof, void *data)
+{
+	wlandevice_t *priv = (wlandevice_t *)data;
+	/* fill buf */
+	int length = acx100_proc_phy_output(buf, priv);
+
+	FN_ENTER;
+	/* housekeeping */
+	if (length <= offset + count)
+		*eof = 1;
+	*start = buf + offset;
+	length -= offset;
+	if (length > count)
+		length = count;
+	if (length < 0)
+		length = 0;
+	FN_EXIT(1, length);
+	return length;
+}
+
 /*------------------------------------------------------------------------------
  * acx100_proc_output
  * Generate content for our /proc entry
@@ -300,6 +342,52 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 
         kfree(fw_stats);
 
+	FN_EXIT(1, p - buf);
+	return p - buf;
+}
+
+int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv)
+{
+	char *p = buf;
+	UINT16 i;
+	UINT8 ch;
+
+	FN_ENTER;
+
+	for (i = 0; i < 0x400; i++)
+	{
+		acx100_read_eeprom_offset(priv, i, &ch);
+		p += sprintf(p, "%c", ch);
+	}
+
+	FN_EXIT(1, p - buf);
+	return p - buf;
+}
+
+int acx100_proc_phy_output(char *buf, wlandevice_t *priv)
+{
+	char *p = buf;
+	UINT16 i;
+	UINT8 ch;
+
+	FN_ENTER;
+
+	/*
+	if (RADIO_RFMD_11 != priv->radio_type) {
+		acxlog(L_STD, "Sorry, not yet adapted for radio types other than RFMD, please verify PHY size etc. first!\n");
+		goto end;
+	}
+	*/
+	
+	/* The PHY area is only 0x80 bytes long; further pages after that
+	 * only have some page number registers with altered value,
+	 * all other registers remain the same. */
+	for (i = 0; i < 0x80; i++)
+	{
+		acx100_read_phy_reg(priv, i, &ch);
+		p += sprintf(p, "%c", ch);
+	}
+	
 	FN_EXIT(1, p - buf);
 	return p - buf;
 }
@@ -562,9 +650,9 @@ int acx100_upload_fw(wlandevice_t *priv)
 
 	for (try = 0; try < 5; try++)
 	{
-		res1 = acx100_write_fw(priv, apfw_image,0);
+		res1 = acx100_write_fw(priv, apfw_image, 0);
 
-		res2 = acx100_validate_fw(priv, apfw_image,0);
+		res2 = acx100_validate_fw(priv, apfw_image, 0);
 
 		if ((0 != res1) && (0 != res2))
 			break;
@@ -790,8 +878,8 @@ fail_close:
 		acxlog(L_STD, "ERROR %d closing %s\n", -retval, file);
 	}
 
-	if ((NULL != res) && (offset != res->size + 8)) {
-		acxlog(L_STD,"Firmware is reporting a different size 0x%08lx to read 0x%08lx\n", res->size + 8, offset);
+	if ((NULL != res) && (offset != le32_to_cpu(res->size) + 8)) {
+		acxlog(L_STD,"Firmware is reporting a different size 0x%08x to read 0x%08lx\n", le32_to_cpu(res->size) + 8, offset);
 		vfree(res);
 		res = NULL;
 	}
@@ -826,7 +914,7 @@ fail:
 * STATUS: fixed some horrible bugs, should be ok now. FINISHED.
 ----------------------------------------------------------------*/
 
-int acx100_write_fw(wlandevice_t *priv, const firmware_image_t * apfw_image, UINT32 offset)
+int acx100_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 offset)
 {
 #if (WLAN_HOSTIF!=WLAN_USB)
 	int counter;
@@ -860,7 +948,7 @@ int acx100_write_fw(wlandevice_t *priv, const firmware_image_t * apfw_image, UIN
 
 	/* the next four bytes contain the image size. */
 	//image = apfw_image;
-	while (len < apfw_image->size) {
+	while (len < le32_to_cpu(apfw_image->size)) {
 
 		int byte = *image;
 		acc |= *image << (counter * 8);
@@ -950,7 +1038,7 @@ int acx100_validate_fw(wlandevice_t *priv, const firmware_image_t * apfw_image, 
 	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR], (UINT16)(offset & 0xffff));
 	acx100_write_reg16(priv, priv->io[IO_ACX_SLV_MEM_ADDR] + 0x2, (UINT16)(offset >> 16));
 
-	while (len < apfw_image->size) {
+	while (len < le32_to_cpu(apfw_image->size)) {
 		acc1 |= *image << (counter * 8);
 
 		image++;
@@ -1045,42 +1133,6 @@ int acx100_verify_init(wlandevice_t *priv)
 
 	FN_EXIT(1, result);
 	return result;
-}
-
-/* acx100_read_eeprom_area
- * NOT ADAPTED FOR ACX111 !!
- * STATUS: OK.
- */
-int acx100_read_eeprom_area(wlandevice_t *priv)
-{
-#if (WLAN_HOSTIF!=WLAN_USB)
-	UINT32 count = 0;
-	UINT16 offs = 0x8c;
-	UINT8 tmp[0x3b];
-
-	for (offs = 0x8c; offs < 0xb9; offs++) {
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], offs);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 2);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
-
-		while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
-		{
-			count++;
-			if (count > 0xffff)
-				return 0;
-			/* scheduling away instead of CPU burning loop
-			 * doesn't seem to work here:
-			 * awful delay, sometimes also failure.
-			 * Doesn't matter anyway (only small delay). */
-		}
-		tmp[offs - 0x8c] =
-			(UINT8)acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_DATA]);
-	}
-#endif
-	return 1;
 }
 
 /*----------------------------------------------------------------
@@ -1839,6 +1891,19 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			priv->get_mask &= ~GET_STATION_ID;
 		}
 
+		if (0 != (priv->get_mask & (GETSET_SENSITIVITY|GETSET_ALL)))
+		{
+			if (RADIO_RFMD_11 == priv->radio_type) {
+				acx100_read_phy_reg(priv, 0x30, &priv->sensitivity);
+			} else {
+				acxlog(L_STD, "ERROR: don't know how to get sensitivity for this radio type, please try to add that!\n");
+				priv->sensitivity = 0;
+			}
+			acxlog(L_INIT, "Got sensitivity value %d\n", priv->sensitivity);
+
+			priv->get_mask &= ~GETSET_SENSITIVITY;
+		}
+
 		if (0 != (priv->get_mask & (GETSET_ANTENNA|GETSET_ALL)))
 		{
 			unsigned char antenna[4 + ACX100_RID_DOT11_CURRENT_ANTENNA_LEN];
@@ -1936,6 +2001,18 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 					priv->tx_level_dbm);
 		acx100_set_tx_level(priv, priv->tx_level_dbm);
 		priv->set_mask &= ~GETSET_TXPOWER;
+	}
+
+	if (0 != (priv->set_mask & (GETSET_SENSITIVITY|GETSET_ALL)))
+	{
+		acxlog(L_INIT, "Updating sensitivity value: %d\n",
+					priv->sensitivity);
+		if (RADIO_RFMD_11 == priv->radio_type) {
+			acx100_write_phy_reg(priv, 0x30, priv->sensitivity);
+		} else {
+			acxlog(L_STD, "ERROR: don't know how to set sensitivity for this radio type, please try to add that!\n");
+		}
+		priv->set_mask &= ~GETSET_SENSITIVITY;
 	}
 
 	if (0 != (priv->set_mask & (GETSET_ANTENNA|GETSET_ALL)))
@@ -2261,7 +2338,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 
 	/* query some settings from the card.
 	 * FIXME: is antenna query needed here?? */
-	priv->get_mask = GETSET_ANTENNA|GET_STATION_ID|GETSET_REG_DOMAIN;
+	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GET_STATION_ID|GETSET_REG_DOMAIN;
 	acx100_update_card_settings(priv, 1, 0, 0);
 
 	sprintf(priv->essid, "STA%02X%02X%02X",
@@ -2965,6 +3042,7 @@ void acx100_update_capabilities(wlandevice_t *priv)
 * Call context:
 *
 * STATUS: FINISHED.
+* 	  NOT ADAPTED FOR ACX111 !!
 *
 * Comment: This function was in V3 driver only.
 *	It should be found what mean the different values written
@@ -2973,15 +3051,12 @@ void acx100_update_capabilities(wlandevice_t *priv)
 *	acx100_read_reg8() instead of a acx100_read_reg16() as the
 *	read value should be an octet. (ygauteron, 29.05.2003)
 ----------------------------------------------------------------*/
-unsigned int acx100_read_eeprom_offset(wlandevice_t *priv,
-					UINT16 addr, unsigned char *charbuf)
+UINT16 acx100_read_eeprom_offset(wlandevice_t *priv,
+					UINT16 addr, UINT8 *charbuf)
 {
 #if (WLAN_HOSTIF!=WLAN_USB)
-#if BOGUS
-	unsigned long start_jif;
-#endif
-	unsigned int i = 0;
-	unsigned int result;
+	UINT32 count = 0;
+	UINT16 result;
 
 	FN_ENTER;
 
@@ -2992,35 +3067,192 @@ unsigned int acx100_read_eeprom_offset(wlandevice_t *priv,
 	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 2);
 	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
 
-	do {
-#if BOGUS
-		start_jif = jiffies;
-		/* NONBIN_DONE: could this CPU burning loop be replaced
-		 * with something much more sane?
-		 Since this waits for 10 jiffies (usually 100
-		 jiffies/second), we could replace the 100ms wait
-		 by proper rescheduling. Do it. */
-
-		while ((jiffies - start_jif) <= 10);
-#else
-		acx100_schedule(HZ / 50);
-#endif
-
-		/* accumulate the 20ms to up to 5000ms */
-		if (i++ > 50) { 
+	while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
+	{
+		/* scheduling away instead of CPU burning loop
+		 * doesn't seem to work here at all:
+		 * awful delay, sometimes also failure.
+		 * Doesn't matter anyway (only small delay). */
+		count++;
+		if (count > 0xffff) {
 			result = 0;
 			acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
 			goto done;
 		}
-
-	} while (acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]) != 0);
+	}
 
 	/* yg: Why reading a 16-bits register for a 8-bits value ? */
 	*charbuf = (unsigned char) acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_DATA]);
+	acxlog(L_DEBUG, "EEPROM read 0x%04x --> 0x%02x\n", addr, *charbuf); 
 	result = 1;
 
 done:
 	FN_EXIT(1, result);
 	return result;
+#endif
+}
+
+/* acx100_read_eeprom_area
+ * STATUS: OK.
+ */
+UINT16 acx100_read_eeprom_area(wlandevice_t *priv)
+{
+#if (WLAN_HOSTIF!=WLAN_USB)
+	UINT16 offs = 0x8c;
+	UINT8 tmp[0x3b];
+
+	for (offs = 0x8c; offs < 0xb9; offs++) {
+		acx100_read_eeprom_offset(priv, offs, &tmp[offs - 0x8c]);
+	}
+#endif
+	return 1;
+}
+
+UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, UINT8 *charbuf)
+{
+#if (WLAN_HOSTIF!=WLAN_USB)
+
+	UINT16 gpio_orig;
+	UINT16 i;
+	UINT8 *data_verify = NULL;
+	UINT16 count;
+	UINT16 result = 0; /* failure */
+	
+	FN_ENTER;
+
+	acxlog(L_STD, "WARNING: I would write to EEPROM now. Since I really DON'T want to do it unless you know what you're doing, I will abort that now.\n");
+	return 0;
+	
+	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
+	 * to be able to write to the EEPROM */
+	gpio_orig = acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]);
+	acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], gpio_orig & ~1);
+	
+	/* ok, now start writing the data out */
+	for (i = 0; i < len; i++) {
+
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], addr + i);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_DATA], *(charbuf + i));
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_DATA] + 0x2, 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 1);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+
+		while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
+		{
+			/* scheduling away instead of CPU burning loop
+			 * doesn't seem to work here at all:
+			 * awful delay, sometimes also failure.
+			 * Doesn't matter anyway (only small delay). */
+			count++;
+			if (count > 0xffff) {
+				acxlog(L_BINSTD, "%s: WARNING, DANGER!!!! Timeout waiting for write eeprom cmd\n", __func__);
+				goto end;
+			}
+		}
+	}
+
+	/* disable EEPROM writing */
+	acx100_write_reg16(priv, priv->io[IO_ACX_GPIO_OE], gpio_orig);
+
+	/* now start a verification run */
+	if ((NULL == (data_verify = kmalloc(len, GFP_KERNEL)))) {
+		goto end;
+	}
+
+	for (i = 0; i < len; i++) {
+
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], addr + i);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 2);
+		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+
+		while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
+		{
+			/* scheduling away instead of CPU burning loop
+			 * doesn't seem to work here at all:
+			 * awful delay, sometimes also failure.
+			 * Doesn't matter anyway (only small delay). */
+			count++;
+			if (count > 0xffff) {
+				acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
+				goto end;
+			}
+		}
+
+		*(data_verify + i) = (UINT8)acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_DATA]);
+	}
+
+	if (0 == memcmp(charbuf, data_verify, len))
+		result = 1; /* read data matches, success */
+	
+end:
+	if (NULL != data_verify)
+        	kfree(data_verify);
+	
+	FN_EXIT(1, result);
+	return result;
+#endif
+}
+
+UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
+{
+#if (WLAN_HOSTIF!=WLAN_USB)
+	UINT32 count = 0;
+	UINT16 result;
+
+	FN_ENTER;
+
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR], reg);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR] + 0x2, 0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL], 2);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL] + 0x2, 0);
+
+	while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_PHY_CTL]))
+	{
+		/* scheduling away instead of CPU burning loop
+		 * doesn't seem to work here at all:
+		 * awful delay, sometimes also failure.
+		 * Doesn't matter anyway (only small delay). */
+		count++;
+		if (count > 0xffff) {
+			result = 0;
+			acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
+			goto done;
+		}
+	}
+
+	/* yg: Why reading a 16-bits register for a 8-bits value ? */
+	*charbuf = (unsigned char) acx100_read_reg16(priv, priv->io[IO_ACX_PHY_DATA]);
+	acxlog(L_DEBUG, "radio PHY read 0x%04x --> 0x%02x\n", reg, *charbuf); 
+	result = 1;
+
+done:
+	FN_EXIT(1, result);
+	return result;
+#endif
+}
+
+UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
+{
+#if (WLAN_HOSTIF!=WLAN_USB)
+
+	FN_ENTER;
+
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR], reg);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR] + 0x2, 0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA], value);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR] + 0x2, 0);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL], 1);
+	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL] + 0x2, 0);
+
+	acxlog(L_DEBUG, "radio PHY write 0x%02x -->  0x%04x\n", value, reg); 
+
+	FN_EXIT(1, 1);
+	return 1;
 #endif
 }

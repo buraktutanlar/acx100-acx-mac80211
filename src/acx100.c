@@ -496,6 +496,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem_region2 = 0;
 	unsigned long mem_region2_size;
 	char procbuf[80];
+	unsigned char ch; 
 
 	FN_ENTER;
 
@@ -607,11 +608,11 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* set the correct io resource list for the active chip */
 	priv->chip_type = chip_type;
 	if (chip_type == CHIPTYPE_ACX100) {
-		acxlog(L_BINSTD, "%s: using acx100 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
+		acxlog(L_BINSTD, "%s: using acx100 io resource addresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		priv->io = acx100_get_io_register_array();
 		priv->chip_name = name_acx100;
 	} else if (chip_type == CHIPTYPE_ACX111) {
-		acxlog(L_BINSTD, "%s: using acx111 io resource adresses (size: %d)\n", __func__, IO_INDICES_SIZE);
+		acxlog(L_BINSTD, "%s: using acx111 io resource addresses (size: %d)\n", __func__, IO_INDICES_SIZE);
 		priv->io = acx111_get_io_register_array();
 		priv->chip_name = name_acx111;
 	} else {
@@ -782,6 +783,13 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	sprintf(procbuf, "driver/acx_%s_diag", dev->name);
 	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
         (void)create_proc_read_entry(procbuf, 0, 0, acx100_read_proc_diag, priv);
+	sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        (void)create_proc_read_entry(procbuf, 0, 0, acx100_read_proc_eeprom, priv);
+	sprintf(procbuf, "driver/acx_%s_phy", dev->name);
+	acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+        (void)create_proc_read_entry(procbuf, 0, 0, acx100_read_proc_phy, priv);
+
 	acxlog(L_STD|L_INIT, "%s: %s Loaded Successfully\n", __func__, version);
 	result = 0;
 	goto done;
@@ -1867,6 +1875,12 @@ static void __exit acx100_cleanup_module(void)
 	while (dev != NULL) {
 		wlandevice_t *priv = (struct wlandevice *) dev->priv;
 
+		sprintf(procbuf, "driver/acx_%s_phy", dev->name);
+		acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+        	remove_proc_entry(procbuf, NULL);
+		sprintf(procbuf, "driver/acx_%s_eeprom", dev->name);
+		acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+        	remove_proc_entry(procbuf, NULL);
 		sprintf(procbuf, "driver/acx_%s_diag", dev->name);
 		acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
         	remove_proc_entry(procbuf, NULL);
