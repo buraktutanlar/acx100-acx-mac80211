@@ -2380,9 +2380,10 @@ static inline int acx_ioctl_dbg_set_masks(struct net_device *dev, struct iw_requ
 /* debug helper function to be able to debug I/O things relatively easily */
 static inline int acx_ioctl_dbg_get_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
+	int result = -EINVAL;
+#if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int *params = (int*)extra;
-	int result = -EINVAL;
 
 	/* expected value order: DbgGetIO type address magic */
 
@@ -2409,15 +2410,19 @@ static inline int acx_ioctl_dbg_get_io(struct net_device *dev, struct iw_request
 	}
 	result = OK;
 end:
+#else
+	acxlog(L_IOCTL, "ACX100 USB not supported yet!\n");
+#endif
 	return result;
 }
 
 /* debug helper function to be able to debug I/O things relatively easily */
 static inline int acx_ioctl_dbg_set_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
+	int result = -EINVAL;
+#if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int *params = (int*)extra;
-	int result = -EINVAL;
 
 	/* expected value order: DbgSetIO type address value magic */
 
@@ -2445,6 +2450,9 @@ static inline int acx_ioctl_dbg_set_io(struct net_device *dev, struct iw_request
 	}
 	result = OK;
 end:
+#else
+	acxlog(L_IOCTL, "ACX100 USB not supported yet!\n");
+#endif
 	return result;
 }
 
@@ -2924,6 +2932,7 @@ end:
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	UINT16 gpio_old;
 
@@ -2948,6 +2957,9 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 	(void)printk("old PHY power amplifier bias: %d\n", (gpio_old & 0x0700) >> 8);
 	acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], (gpio_old & 0xf8ff) | ((UINT16)*extra << 8));
 	(void)printk("new PHY power amplifier bias: %d\n", (unsigned char)*extra);
+#else
+	acxlog(L_IOCTL, "ACX100 USB not supported yet!\n");
+#endif
 	return 0;
 }
 

@@ -50,6 +50,7 @@ typedef struct mac {
 	UINT16 valb;
 } mac_t;
 
+#if (WLAN_HOSTIF!=WLAN_USB) /* must be used for non-USB only */
 #define IO_AS_MACROS
 #ifdef IO_AS_MACROS
 #if ACX_IO_WIDTH == 32
@@ -57,7 +58,7 @@ typedef struct mac {
 	readl((priv->iobase) + (offset))
 #define acx_write_reg32(priv, offset, val) \
 	writel((val), (priv->iobase) + (offset))
-#else
+#else /* ACX_IO_WIDTH == 32 */
 #define acx_read_reg32(priv, offset) \
 	readw((priv->iobase) + (offset)) \
 	+ (readw((priv->iobase) + (offset) + 2) << 16)
@@ -66,7 +67,7 @@ typedef struct mac {
 		writew((val) & 0xffff, (priv->iobase) + (offset)); \
 		writew((val) >> 16, (priv->iobase) + (offset) + 2); \
 	} while (0)
-#endif
+#endif /* ACX_IO_WIDTH == 32 */
 #define acx_read_reg16(priv, offset) \
 	readw((priv->iobase) + (offset))
 #define acx_write_reg16(priv, offset, val) \
@@ -75,14 +76,15 @@ typedef struct mac {
 	readb((priv->iobase) + (offset))
 #define acx_write_reg8(priv, offset, val) \
 	writeb((val), (priv->iobase) + (offset))
-#else
+#else /* IO_AS_MACROS */
 UINT32 acx_read_reg32(wlandevice_t *priv, UINT valb);
 void acx_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
 UINT16 acx_read_reg16(wlandevice_t *priv, UINT valb);
 void acx_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
 UINT8 acx_read_reg8(wlandevice_t *priv, UINT valb);
 void acx_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
-#endif
+#endif /* IO_AS_MACROS */
+#endif /* (WLAN_HOSTIF!=WLAN_USB) */
 
 void acx_get_info_state(wlandevice_t *priv);
 void acx_get_cmd_state(wlandevice_t *priv);

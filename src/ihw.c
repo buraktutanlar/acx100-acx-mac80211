@@ -1155,6 +1155,7 @@ void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 *----------------------------------------------------------------*/
 void acx_power_led(wlandevice_t *priv, UINT8 enable)
 {
+#if (WLAN_HOSTIF!=WLAN_USB)
 	UINT16 gpio_pled =
 		(CHIPTYPE_ACX111 == priv->chip_type) ? 0x0040 : 0x0800;
 	static int rate_limit = 0;
@@ -1167,5 +1168,8 @@ void acx_power_led(wlandevice_t *priv, UINT8 enable)
 	else
 		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
 			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) | gpio_pled);
+#else
+	acxlog(L_IOCTL, "no power LED support on ACX100 USB (yet)!\n");
+#endif
 }
 

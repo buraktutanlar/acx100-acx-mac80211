@@ -113,21 +113,24 @@ esac
 if test ! -r "$MODULE_AT"; then echo "Module not found or not readable.
 Have you built it? This script expects it to be at ../src/acx_pci.[k]o, relative to the script's location. Bailing..."; exit 1; fi
 
+# check whether any file name of the required main firmware file is
+# available in the acx100/firmware or global firmware directory
+
 # FIRMWARE_AT has to be given as an absolute path!!
-FIRMWARE_AT="${SCRIPT_AT}/../firmware"
+for FIRMWARE_AT in "${SCRIPT_AT}/../firmware" "/usr/share/acx"; do
+  for FW_FILE in WLANGEN.BIN TIACX111.BIN FwRad16.bin FW1130.BIN; do
+    if test -r "$FIRMWARE_AT/$FW_FILE"; then
+      #echo A firmware file has been found at "$FIRMWARE_AT/$FW_FILE"
+      FW_FOUND=1
+      break 2
+    fi
+  done
+done
 
-# check whether either of the two required main firmware files is
-# available in our acx100/firmware directory:
-if test ! -r "$FIRMWARE_AT/WLANGEN.BIN" -a ! -r "$FIRMWARE_AT/TIACX111.BIN"; then
-  # nope no firmware there, let's also look in the
-  # *default* directory: /usr/share/acx, before bailing, shall we?
-  FIRMWARE_AT="/usr/share/acx"
-  if test ! -r "$FIRMWARE_AT/WLANGEN.BIN" -a ! -r "$FIRMWARE_AT/TIACX111.BIN"; then
-    echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be either at ../firmware/WLANGEN.BIN (or ../firmware/TIACX111.BIN for the ACX111 chip), relative to the script's location, OR have you placed it in the default directory:/usr/share/acx?. Bailing...";
-    exit 1;
-  fi
+if test "$FW_FOUND" != "1"; then
+  echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be either at ../firmware/WLANGEN.BIN (or ../firmware/TIACX111.BIN for the ACX111 chip), relative to the script's location, OR have you placed it in the default directory:/usr/share/acx?. Bailing...";
+  exit 1;
 fi
-
 
 if test $AUTORATE != "1"; then
   if test "$RATE" != "11M"; then echo "Transfer rate is not set to 11

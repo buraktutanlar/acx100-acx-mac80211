@@ -226,6 +226,7 @@ typedef struct device_id {
 	char *type;
 } device_id_t;
 
+#ifdef NONESSENTIAL_FEATURES
 static const device_id_t device_ids[] =
 {
 	/*@-null@*/
@@ -256,6 +257,7 @@ static const device_id_t device_ids[] =
 	}
 	/*@=null@*/
 };
+#endif /* NONESSENTIAL_FEATURES */
 
 static void acx_disable_irq(wlandevice_t *priv);
 static void acx_enable_irq(wlandevice_t *priv);
@@ -558,6 +560,7 @@ static void acx_display_hardware_details(wlandevice_t *priv)
 	FN_EXIT(0, OK);
 }
 
+#ifdef NONESSENTIAL_FEATURES
 static void acx_show_card_eeprom_id(wlandevice_t *priv)
 {
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
@@ -591,6 +594,7 @@ static void acx_show_card_eeprom_id(wlandevice_t *priv)
 	       "%s: EEPROM card ID string check found unknown card: expected \"Global\", got \"%.*s\"! Please report!\n", __func__, CARD_EEPROM_ID_SIZE, buffer);
 	}
 }
+#endif /* NONESSENTIAL_FEATURES */
 
 static inline void acx_device_chain_add(struct net_device *dev)
 {
@@ -836,7 +840,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	priv->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
+#ifdef NONESSENTIAL_FEATURES
 	acx_show_card_eeprom_id(priv);
+#endif /* NONESSENTIAL_FEATURES */
 
 	dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
 	if (NULL == dev) {
