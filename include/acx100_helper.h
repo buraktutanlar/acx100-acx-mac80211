@@ -274,16 +274,16 @@ typedef struct probereq {
 typedef struct joinbss {
 	UINT8 bssid[WLAN_ADDR_LEN];
 	UINT16 beacon_interval;
-	UINT8 val0x8;
-	UINT8 val0x9;
-	UINT8 val0xa;
-	UINT8 val0xb;
-	UINT8 capab_short;
+	UINT8 dtim_interval;
+	UINT8 rates_basic;
+	UINT8 rates_supported;
+	UINT8 rate_tx;
+	UINT8 preamble_type;
 	UINT8 macmode;
 	UINT8 channel;
 	UINT8 essid_len;
-	char essid[0x20];	
-} joinbss_t;
+	char essid[IW_ESSID_MAX_SIZE];	
+} joinbss_t; /* ACX100 specific join struct */
 
 /*
  * I am temporarily redefining this because the above struct is somewhat wrong.

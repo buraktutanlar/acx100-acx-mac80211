@@ -1184,7 +1184,7 @@ int acx100_set_tim_template(wlandevice_t * hw)
 	t.buf[0xa] = 0x0;
 	result = acx100_issue_cmd(hw, ACX100_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
 	DTIM_count++;
-	if (DTIM_count == hw->val0x2302[0]) {
+	if (DTIM_count == hw->dtim_interval) {
 		DTIM_count = 0;
 	}
 	FN_EXIT(1, result);
@@ -1264,7 +1264,6 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 						   acxp80211_hdr_t * txf)
 {
 	int frame_len;
-	int essid_len;
 	int i;
 	UINT8 *this;
 
@@ -1298,16 +1297,15 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 	txf->val0x22 = hw->capabilities;
 
 	/* set entry 4: SSID (2 + (0 to 32) octets) */
+	acxlog(L_ASSOC, "SSID = %s, len = %i\n", hw->essid, hw->essid_len);
 	this = &txf->info[0];
 	this[0] = 0;		/* "SSID Element ID" */
-	essid_len = strlen(hw->essid);
-	this[1] = essid_len;	/* "Length" */
-	memcpy(&this[2], hw->essid, essid_len);
-	acxlog(L_ASSOC, "SSID = %s, len = %i\n", &this[2], this[1]);
-	frame_len += 2 + essid_len;
+	this[1] = hw->essid_len;	/* "Length" */
+	memcpy(&this[2], hw->essid, hw->essid_len);
+	frame_len += 2 + hw->essid_len;
 
 	/* set entry 5: Supported Rates (2 + (1 to 8) octets) */
-	this = &txf->info[2 + essid_len];
+	this = &txf->info[2 + hw->essid_len];
 
 	this[0] = 1;		/* "Element ID" */
 	this[1] = hw->rate_spt_len;
@@ -1370,19 +1368,32 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 
 void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, int set_all)
 {
+#ifdef BROKEN_LOCKING
 	unsigned long flags;
+#endif
 	unsigned char scanning = 0;
 
 	FN_ENTER;
 
-	if (init)
+#ifdef BROKEN_LOCKING
+	if (init) {
 		/* cannot use acx100_lock() - hw_unavailable is set */
-		spin_lock_irqsave(&wlandev->lock, flags);
-	else
+		local_irq_save(flags);
+		if (!spin_trylock(&wlandev->lock)) {
+			printk(KERN_EMERG "ARGH! Lock already taken in %s:%d\n", __FILE__, __LINE__);
+			local_irq_restore(flags);
+			FN_EXIT(0, 0);
+			return;
+		} else {
+			printk("Lock taken in %s\n", __func__);
+		}
+	} else {
 		if (acx100_lock(wlandev, &flags)) {
 			FN_EXIT(0, 0);
 			return;
 		}
+	}
+#endif
 
 	if (get_all)
 		wlandev->get_mask |= GETSET_ALL;
@@ -1759,7 +1770,9 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 	acxlog(L_INIT, "get_mask 0x%08lx, set_mask 0x%08lx  - after update \n",
 			wlandev->get_mask, wlandev->set_mask);
 
+#ifdef BROKEN_LOCKING
 	acx100_unlock(wlandev, &flags);
+#endif
 	FN_EXIT(0, 0);
 }
 
@@ -1798,6 +1811,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 
 	sprintf(wlandev->essid, "STA%02X%02X%02X",
 		wlandev->dev_addr[3], wlandev->dev_addr[4], wlandev->dev_addr[5]);
+	wlandev->essid_len = 9; /* make sure to adapt if changed above! */
 	wlandev->essid_active = 1;
 
 	wlandev->channel = 1;
@@ -1814,7 +1828,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->beacon_interval = 100;
 	wlandev->mode = 0x0;
 	wlandev->unknown0x2350 = 0;
-	*(UINT16 *) &wlandev->val0x2302[0] = 0x2;
+	wlandev->dtim_interval = 2;
 
 	if ( wlandev->eeprom_version < 5 ) {
 	  acx100_read_eeprom_offset(wlandev, 0x16F, &wlandev->reg_dom_id);
@@ -1856,9 +1870,9 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->capab_pbcc = 1;
 	wlandev->capab_agility = 0;
 
-	wlandev->val0x2324[0x1] = 0x1f;
+	wlandev->val0x2324[0x1] = 0x1f; /* supported rates: 1, 2, 5.5, 11, 22 */
 	wlandev->val0x2324[0x2] = 0x03;
-	wlandev->val0x2324[0x3] = 0x0f;
+	wlandev->val0x2324[0x3] = 0x0f; /* basic rates: 1, 2, 5.5, 11 */
 	wlandev->val0x2324[0x4] = 0x0f;
 	wlandev->val0x2324[0x5] = 0x0f;
 	wlandev->val0x2324[0x6] = 0x1f;
@@ -1968,11 +1982,12 @@ int acx100_set_probe_response_template(wlandevice_t * hw)
 void acx100_set_probe_request_template(wlandevice_t * hw)
 {
 	struct acxp80211_packet pt;
-  struct acxp80211_hdr *txf;
-  char *this;
-  int frame_len,essid_len,i;
+	struct acxp80211_hdr *txf;
+	char *this;
+	int frame_len,i;
 	char dev_addr[0x6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-  txf = &pt.hdr;
+	
+  	txf = &pt.hdr;
 	FN_ENTER;
 	//pt.hdr.a4.a1[6] = 0xff;
 	frame_len = 0x18;
@@ -1998,16 +2013,15 @@ void acx100_set_probe_request_template(wlandevice_t * hw)
 	txf->val0x22 = hw->capabilities;
 
 	/* set entry 4: SSID (2 + (0 to 32) octets) */
+	acxlog(L_ASSOC, "SSID = %s, len = %i\n", hw->essid, hw->essid_len);
 	this = &txf->info[0];
 	this[0] = 0;		/* "SSID Element ID" */
-	essid_len = strlen(hw->essid);
-	this[1] = essid_len;	/* "Length" */
-	memcpy(&this[2], hw->essid, essid_len);
-	acxlog(L_ASSOC, "SSID = %s, len = %i\n", &this[2], this[1]);
-	frame_len += 2 + essid_len;
+	this[1] = hw->essid_len;	/* "Length" */
+	memcpy(&this[2], hw->essid, hw->essid_len);
+	frame_len += 2 + hw->essid_len;
 
 	/* set entry 5: Supported Rates (2 + (1 to 8) octets) */
-	this = &txf->info[2 + essid_len];
+	this = &txf->info[2 + hw->essid_len];
 
 	this[0] = 1;		/* "Element ID" */
 	this[1] = hw->rate_spt_len;
@@ -2066,16 +2080,19 @@ void acx100_join_bssid(wlandevice_t * hw)
 	}
 
 	tmp.beacon_interval = hw->beacon_interval;
-	tmp.val0x8 = hw->val0x2302[0];
+	tmp.dtim_interval = hw->dtim_interval;
+	tmp.rates_basic = hw->val0x2324[3];
 
-	tmp.val0x9 = hw->val0x2324[3];
-	tmp.val0xa = hw->val0x2324[1];
-	tmp.val0xb = 20;	/* bitrate: 2Mbps */
-	tmp.capab_short = hw->capab_short;
+	tmp.rates_supported = hw->val0x2324[1];
+	tmp.rate_tx = 20;	/* bitrate: 2Mbps */
+	tmp.preamble_type = hw->capab_short;
 	tmp.macmode = hw->mode;	/* should be called BSS_Type? */
 	tmp.channel = hw->channel;
-	tmp.essid_len = strlen(hw->essid);
-	memcpy(tmp.essid, hw->essid, tmp.essid_len + 1);
+	tmp.essid_len = hw->essid_len;
+	/* FIXME: the firmware hopefully doesn't stupidly rely
+	 * on having a trailing \0 copied, right?
+	 * (the code memcpy'd essid_len + 1 before, which is WRONG!) */
+	memcpy(tmp.essid, hw->essid, tmp.essid_len);
 
 	acx100_issue_cmd(hw, ACX100_CMD_JOIN, &tmp, tmp.essid_len + 0x11, 5000);
 	acxlog(L_ASSOC | L_BINDEBUG, "<acx100_join_bssid> BSS_Type = %d\n",
@@ -2262,7 +2279,7 @@ void acx100_start(wlandevice_t *wlandev)
 
 	FN_ENTER;
 
-	if (spin_is_locked(wlandev->lock)) {
+	if (spin_is_locked(&wlandev->lock)) {
 		printk(KERN_EMERG "Preventing lock-up!");
 		dont_lock_up = 1;
 	}

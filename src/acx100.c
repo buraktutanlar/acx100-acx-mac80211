@@ -1041,7 +1041,9 @@ static int acx100_close(netdevice_t *dev)
 
 	/* don't use acx100_lock() here: need to close card even in case
 	 * of hw_unavailable set (card ejected) */
+#ifdef BROKEN_LOCKING
 	spin_lock_irq(&wlandev->lock);
+#endif
 
 	wlandev->open = 0;
 
@@ -1059,8 +1061,9 @@ static int acx100_close(netdevice_t *dev)
 	 */
 
 	WLAN_MOD_DEC_USE_COUNT;
-
+#ifdef BROKEN_LOCKING
 	spin_unlock_irq(&wlandev->lock);
+#endif
 
 	FN_EXIT(0, 0);
 	return 0;

@@ -455,10 +455,10 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 		 * stack overflow. They should probably be
 		 * dynamically allocated instead. */
 		struct ap {
-			int size;
-			char essid[32];
+			int essid_len;
+			char essid[IW_ESSID_MAX_SIZE];
 			int channel;
-			char address[6];
+			char address[WLAN_BSSID_LEN];
 
 			int var_71c;
 			int var_718;
@@ -472,11 +472,11 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 
 				var_74c[i].channel =
 				    wlandev->bss_table[i].channel;
-				var_74c[i].size =
-				    wlandev->bss_table[i].size;
+				var_74c[i].essid_len =
+				    wlandev->bss_table[i].essid_len;
 				memcpy(&(var_74c[i].essid),
 				       wlandev->bss_table[i].essid,
-				       var_74c[i].size);
+				       var_74c[i].essid_len);
 				memcpy(var_74c[i].address,
 				       wlandev->bss_table[i].address,
 				       WLAN_BSSID_LEN);
@@ -570,18 +570,16 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 	/* MAC address has to be added first */
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
+	memcpy(iwe.u.ap_addr.sa_data, bss->address, ETH_ALEN);
 	acxlog(L_IOCTL, "scan, station address:\n");
 	acx100_log_mac_address(L_IOCTL, bss->address);
-	memcpy(iwe.u.ap_addr.sa_data, bss->address, ETH_ALEN);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_ADDR_LEN);
 
-	acxlog(L_IOCTL, "scan, essid: %s\n", bss->essid);
 	/* Add ESSID */
-	iwe.u.data.length = 32; /* FIXME!!! length needs to be kept in struct iS instead! */
-	if (iwe.u.data.length > 32)
-		iwe.u.data.length = 32;
 	iwe.cmd = SIOCGIWESSID;
+	iwe.u.data.length = bss->essid_len;
 	iwe.u.data.flags = 1;
+	acxlog(L_IOCTL, "scan, essid: %s\n", bss->essid);
 	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
 	
 	/* Add mode */
@@ -619,12 +617,12 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
 	iwe.u.data.length = 0;
 	acxlog(L_IOCTL, "scan, encryption flags: %x\n", iwe.u.data.flags);
-	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid /* FIXME?? */);
+	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
 
-	ptr_rate = ptr + IW_EV_LCP_LEN;
-
+	/* add rates */
 	iwe.cmd = SIOCGIWRATE;
 	iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
+	ptr_rate = ptr + IW_EV_LCP_LEN;
 	for (i = 0; i < 8; i++)
 	{
 		if (bss->supp_rates[i] == 0)
@@ -729,6 +727,8 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 		    WLAN_SSID_MAXLEN ? WLAN_SSID_MAXLEN : len;
 
 		memcpy(wlandev->essid, extra, len);
+		wlandev->essid[len] = '\0';
+		wlandev->essid_len = len;
 		wlandev->essid_active = 1;
 	}
 
@@ -752,8 +752,8 @@ static inline int acx100_ioctl_get_essid(struct net_device *dev, struct iw_reque
 	if (wlandev->essid_active)
 	{
 		memcpy(extra, wlandev->essid, strlen(wlandev->essid));
-		extra[strlen(wlandev->essid)] = '\0';
-		dwrq->length = strlen(wlandev->essid) + 1;
+		extra[wlandev->essid_len] = '\0';
+		dwrq->length = wlandev->essid_len + 1;
 		dwrq->flags = 1;
 	}
 	return 0;
@@ -1284,8 +1284,7 @@ static inline int acx100_ioctl_get_nick(struct net_device *dev, struct iw_reques
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
 
 	/* FIXME : consider spinlock here */
-	memcpy(extra, wlandev->nick, IW_ESSID_MAX_SIZE);
-	extra[IW_ESSID_MAX_SIZE] = '\0';
+	strcpy(extra, wlandev->nick);
 	/* FIXME : consider spinlock here */
 
 	dwrq->length = strlen(extra)+1;
@@ -1329,7 +1328,8 @@ static inline int acx100_ioctl_set_nick(struct net_device *dev, struct iw_reques
 		goto end_unlock;
 	}
 
-	memcpy(wlandev->nick, extra, dwrq->length);
+	/* extra includes trailing \0, so it's ok */
+	strcpy(wlandev->nick, extra);
 	result = 0;
 
 end_unlock:

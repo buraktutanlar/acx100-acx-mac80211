@@ -2222,8 +2222,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 typedef struct bss_info {
 	char address[WLAN_BSSID_LEN];	/* 0x0 */
 	UINT16 cap;		/* 0x6 */
-	int size;		/* 0x8 */
-	char essid[IW_ESSID_MAX_SIZE];	/* 0xc */
+	size_t essid_len;		/* 0x8 */
+	char essid[IW_ESSID_MAX_SIZE+1];	/* 0xc this one INCLUDES the trailing \0 !! */
 	UINT16 fWEPPrivacy;	/* 0x2c */
 	char supp_rates[0x8];
 	UINT32 channel;		/* 0x64; strange, this is accessed as UINT16 once. oh well, probably doesn't matter */
@@ -2305,9 +2305,10 @@ typedef struct wlandevice {
 	UINT32 macmode;		/* This is the mode we're currently in */
 	UINT32 mode;		/* That's the MAC mode we want */
 	char essid_active;	/* specific ESSID active, or select any? */
-	char essid[IW_ESSID_MAX_SIZE];	/* V3POS 84; essid */
-	char essid_for_assoc[IW_ESSID_MAX_SIZE];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
-	char nick[IW_ESSID_MAX_SIZE];
+	size_t essid_len;		/* to avoid dozens of strlen() */
+	char essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
+	char essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
+	char nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16 channel;		/* V3POS 22f0, V1POS b8 */
 	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
 	UINT8 rate_fallback_retries;
@@ -2318,7 +2319,7 @@ typedef struct wlandevice {
 	UINT8 auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	UINT8 bss_table_count;		/* # of active BSS scan table entries */
-	struct bss_info bss_table[0x20];	/* BSS scan table */
+	struct bss_info bss_table[32];	/* BSS scan table */
 	struct bss_info station_assoc;	/* the station we're currently associated to */
 	char scan_running;
 	unsigned long scan_start;
@@ -2380,7 +2381,7 @@ typedef struct wlandevice {
 	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
 
 	/*** Unknown ***/
-	char val0x2302[6];	/* DTIM ? */
+	char dtim_interval;	/* V3POS 2302 */
 	char val0x2324[0x8];	/* V3POS 2324 */
 } wlandevice_t __WLAN_ATTRIB_PACK__;
 
@@ -2469,10 +2470,17 @@ typedef struct wlandevice {
  * to its weird semantics for save/restore flags. extern inline should prevent
  * the kernel from linking or module from loading if they are not inlined. */
 
+#ifdef BROKEN_LOCKING
 extern inline int acx100_lock(wlandevice_t *wlandev, unsigned long *flags)
 {
-	/* printk(KERN_WARNING "lock\n"); */
-	spin_lock_irqsave(&wlandev->lock, *flags);
+	local_irq_save(*flags);
+	if (!spin_trylock(&wlandev->lock)) {
+		printk("ARGH! Lock already taken in %s\n", __func__);
+		local_irq_restore(*flags);
+		return -EFAULT;
+	} else {
+		printk("Lock given out in %s\n", __func__);
+	}
 	if (wlandev->hw_unavailable) {
 		printk(KERN_WARNING
 		       "acx100_lock() called with hw_unavailable (dev=%p)\n",
@@ -2480,7 +2488,6 @@ extern inline int acx100_lock(wlandevice_t *wlandev, unsigned long *flags)
 		spin_unlock_irqrestore(&wlandev->lock, *flags);
 		return -EBUSY;
 	}
-	/* printk(KERN_WARNING "/lock\n"); */
 	return 0;
 }
 
@@ -2490,6 +2497,24 @@ extern inline void acx100_unlock(wlandevice_t *wlandev, unsigned long *flags)
 	spin_unlock_irqrestore(&wlandev->lock, *flags);
 	/* printk(KERN_WARNING "/unlock\n"); */
 }
+
+#else /* BROKEN_LOCKING */
+
+extern inline int acx100_lock(wlandevice_t *wlandev, unsigned long *flags)
+{
+	/* do nothing and be quiet */
+	(void)*wlandev;
+	(void)*flags;
+	return 0;
+}
+
+extern inline void acx100_unlock(wlandevice_t *wlandev, unsigned long *flags)
+{
+	/* do nothing and be quiet */
+	(void)*wlandev;
+	(void)*flags;
+}
+#endif /* BROKEN_LOCKING */
 
 /* FIXME: LINUX_VERSION_CODE < KERNEL_VERSION(2,4,XX) ?? (not defined in XX=10
  * defined in XX=21, someone care to do a binary search of that range to find

@@ -1510,15 +1510,19 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	 * going to fill next in order to not risk any corruption. */
 	memset(&hw->bss_table[hw->bss_table_count], 0, sizeof(struct bss_info));
 
-	/* copy the SSID element */
+	/* copy the BSSID element */
 	memcpy(hw->bss_table[hw->bss_table_count].address,
 	       hdr->a4.a3, WLAN_BSSID_LEN);
 
-	if (hdr->info[0x1] <= 0x20) {
-		hw->bss_table[hw->bss_table_count].size = hdr->info[0x1];
+	/* copy the ESSID element */
+	if (hdr->info[0x1] <= IW_ESSID_MAX_SIZE) {
+		hw->bss_table[hw->bss_table_count].essid_len = hdr->info[0x1];
 		memcpy(hw->bss_table[hw->bss_table_count].essid,
 		       &hdr->info[0x2], hdr->info[0x1]);
+		hw->bss_table[hw->bss_table_count].essid[hdr->info[0x1]] = '\0';
 	}
+	else
+		acxlog(L_STD, "huh, ESSID overflow in scanned station data?\n");
 
 	hw->bss_table[hw->bss_table_count].channel = pDSparms[2];
 	hw->bss_table[hw->bss_table_count].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
@@ -2401,15 +2405,18 @@ int transmit_assoc_req(wlandevice_t *hw)
 	acxlog(L_ASSOC, "association: requesting capabilities 0x%04X\n", *(UINT16 *)pCurrPos);
 	pCurrPos += 2;
 
+	/* add listen interval */
 	*(UINT16 *)pCurrPos = host2ieee16(hw->listen_interval);
 	pCurrPos += 2;
 
+	/* add ESSID */
 	*(UINT8 *)pCurrPos = 0; /* Element ID */
 	pCurrPos += 1;
 	*(UINT8 *)pCurrPos = strlen(hw->essid_for_assoc); /* Length */
 	memcpy(&pCurrPos[1], hw->essid_for_assoc, pCurrPos[0]);
 	pCurrPos += 1 + pCurrPos[0];
 
+	/* add rates */
 	*(UINT8 *)pCurrPos = 1; /* Element ID */
 	pCurrPos += 1;
 	*(UINT8 *)pCurrPos = hw->rate_spt_len; /* Length */
@@ -2417,6 +2424,7 @@ int transmit_assoc_req(wlandevice_t *hw)
 	memcpy(pCurrPos, hw->rate_support1, hw->rate_spt_len);
 	pCurrPos += hw->rate_spt_len;
 
+	/* calculate lengths */
 	packet_len += (int)pCurrPos - (int)payload->data;
 
 	payload->length = packet_len - WLAN_HDR_A3_LEN;
@@ -2678,7 +2686,6 @@ void IBSSIDGen(wlandevice_t * hw, unsigned char *p_out)
 void d11CompleteScan(wlandevice_t *wlandev)
 {
 	UINT32 idx;
-	UINT32 essid_len;
 	UINT16 needed_cap;
 	INT32 idx_found = -1;
 	UINT32 found_station = 0;
@@ -2690,7 +2697,6 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		needed_cap = (wlandev->mode == 0) ? WLAN_SET_MGMT_CAP_INFO_IBSS(1)	/* 2, we require Ad-Hoc */
 		    : WLAN_SET_MGMT_CAP_INFO_ESS(1) | WLAN_SET_MGMT_CAP_INFO_IBSS(1);	/* 3, Ad-Hoc or Managed */
 	}
-	essid_len = strlen(wlandev->essid);
 
 	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area.\n", wlandev->bss_table_count);
 
@@ -2723,7 +2729,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		}
 
 		if ((!wlandev->essid_active)
-		 || (!memcmp(wlandev->bss_table[idx].essid, wlandev->essid, essid_len)))
+		 || (!memcmp(wlandev->bss_table[idx].essid, wlandev->essid, wlandev->essid_len)))
 		{
 			acxlog(L_ASSOC,
 			       "ESSID matches: \"%s\" (station), \"%s\" (config)\n",
@@ -2753,14 +2759,27 @@ void d11CompleteScan(wlandevice_t *wlandev)
 	}
 	if (found_station) {
 		UINT8 *a;
+		char *essid_src;
+		size_t essid_len;
+
+		if (wlandev->bss_table[idx_found].essid[0] == '\0')
+		{
+			/* if the ESSID of the station we found is empty
+			 * (no broadcast), then use user configured ESSID
+			 * instead */
+			essid_src = wlandev->essid;
+			essid_len = wlandev->essid_len;
+		}
+		else
+		{
+			essid_src = wlandev->bss_table[idx_found].essid;
+			essid_len = strlen(wlandev->bss_table[idx_found].essid);
+		}
+		
 		acx100_update_capabilities(wlandev);
 
-		/* use ESSID we just found, but if it is empty (no broadcast),
-		 * use user configured ESSID instead */
-		memcpy(wlandev->essid_for_assoc,
-			(wlandev->bss_table[idx].essid[0] == '\0') ?
-			wlandev->essid : wlandev->bss_table[idx_found].essid,
-			sizeof(wlandev->essid_for_assoc));
+		memcpy(wlandev->essid_for_assoc, essid_src, essid_len);
+		wlandev->essid_for_assoc[essid_len] = '\0';
 		wlandev->channel = wlandev->bss_table[idx_found].channel;
 		memcpy(wlandev->address,
 		       wlandev->bss_table[idx_found].address, WLAN_ADDR_LEN);

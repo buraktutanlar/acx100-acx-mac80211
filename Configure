@@ -66,10 +66,14 @@ isok() {
 }
 
 fail() {
-	$ECHO "Kernel configuration lacks needed options, please correct"
+	$ECHO "Kernel configuration lacks needed options, please correct! ABORTING."
 	exit 1
 }
 
+$ECHO Kernel version file: $KERNEL_BUILD/include/linux/version.h
+$ECHO Kernel configuration file: $KERNEL_BUILD/.config
+$ECHO "Make damn sure these really match your currently running kernel!!"
+$ECHO
 if [ -e "$KERNEL_BUILD/.config" ]; then
 	$ECHO "Kernel configuration found, performing sanity checks"
 	configcheck PCMCIA
@@ -78,6 +82,7 @@ if [ -e "$KERNEL_BUILD/.config" ]; then
 	configcheck NET_RADIO
 	configcheck PCI
 	configcheck MODULES
+	configcheck SMP
 	$ECHO "All of the following items are required by the driver:"
 	printflag "Loadable modules support" CONFIG_MODULES
 	printflag "Wireless LAN (non-hamradio) support" CONFIG_NET_RADIO
@@ -94,7 +99,14 @@ if [ -e "$KERNEL_BUILD/.config" ]; then
 	elif isok CONFIG_NET_WIRELESS ; then
 		fail	
 	else
-		$ECHO "Kernel configuration satisfies the minimum requirements"
+		$ECHO "Kernel configuration satisfies the minimum requirements, continuing."
+	fi
+	if isok CONFIG_SMP
+	then 
+		$ECHO "You don't have symmetric multiprocessing support (CONFIG_SMP) enabled."
+	else
+		$ECHO "You do have symmetric multiprocessing support (CONFIG_SMP) enabled. If you"
+		$ECHO "really have more than one cpu, be warned that this driver is not yet SMP safe."
 	fi
 else
 	$ECHO "Unable to find kernel configuration -> unable to perform sanity checks"
