@@ -2,6 +2,22 @@ Changes:
 ========
 
 
+2003.11.07 - 0.2.0pre5 released
+- fix problem causing all sorts of machine lockups:
+  implemented centralized card settings management
+- changed net queue mechanism to avoid netdev watchdog timeout messages
+- initial ACX100 USB (DWL-120+) firmware loading support
+- enable EXPERIMENTAL_VER_0_3 features by default now:
+  - replace CPU-burning loops by scheduled delays / faster timing loops
+  - radio Tx level phy setting
+- show error when loading empty firmware file
+- fix crash in acx100_probe_pci() on error cleanup
+- PowerPC compile fixes (WIP)
+- small fixes in start_net
+- HUGE README update
+- remove many unneeded header file includes
+- added crashme script for stability testing
+
 2003.10.07 - 0.2.0pre4 released
 - fix for APs with hidden ESSID: make sure we use user configured ESSID here
 - fix Tx ring buffer overflow

@@ -63,18 +63,12 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
 
-#include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>

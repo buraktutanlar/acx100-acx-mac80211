@@ -57,8 +57,8 @@
 #define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
 
-#include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -69,11 +69,6 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
@@ -83,9 +78,6 @@
 #include <linux/init.h>
 
 #include <linux/pm.h>
-
-#include <asm/pci.h>
-
 
 #include <linux/dcache.h>
 #include <linux/highmem.h>
@@ -179,7 +171,7 @@ device_id_t device_ids[] =
 	{
 		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		"uninitialised",
-		"SpeedStream SS1021"
+		"SpeedStream SS1021 or Gigafast WF721-AEX"
 	},
 	{
 		{0x80, 0x81, 0x82, 0x83, 0x84, 0x85},
@@ -198,38 +190,34 @@ device_id_t device_ids[] =
 	}
 };
 
-static struct pci_device_id pci_id_tbl[] = 
-{
+static struct pci_device_id acx100_pci_id_tbl[] = {
 	{
-	 PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_ACX100,
-	 PCI_ANY_ID, PCI_ANY_ID,
-	 0, 0,
-	 /* Driver data, we just put the name here */
-	 (unsigned long)
-	 "Texas Instruments ACX 100 22Mbps Wireless Interface"},
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_ACX100,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
 	{
-	 PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_ACX100_CB,
-	 PCI_ANY_ID, PCI_ANY_ID,
-	 0, 0,
-	 /* Driver data, we just put the name here */
-	 (unsigned long)
-	 "Texas Instruments ACX 100 22Mbps Wireless Interface"},
-	{
-	 0, 0, 0, 0, 0, 0, 0}
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_ACX100_CB,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
+	{ 0, }
 };
 
-MODULE_DEVICE_TABLE(pci, pci_id_tbl);
+MODULE_DEVICE_TABLE(pci, acx100_pci_id_tbl);
 
 static int acx100_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
 static void acx100_remove_pci(struct pci_dev *pdev);
 
-int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
+static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
 
 
-struct pci_driver acx100_pci_drv_id = {
+static struct pci_driver acx100_pci_drv_id = {
 	.name        = "acx100_pci",
-	.id_table    = pci_id_tbl,
+	.id_table    = acx100_pci_id_tbl,
 	.probe       = acx100_probe_pci,
 	.remove      = __devexit_p(acx100_remove_pci),
 };
@@ -257,9 +245,6 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void acx100_set_rx_mode(netdevice_t * netdev);
 void acx100_rx(/*wlan_pb_t * p80211*/
 	struct rxhostdescriptor *rxdesc, wlandevice_t *hw);
-int init_module(void);
-void cleanup_module(void);
-
 
 static int acx100_open(netdevice_t * dev);
 static int acx100_close(netdevice_t * dev);
@@ -294,7 +279,8 @@ static void acx100_get_firmware_version(wlandevice_t *wlandev)
 		else
 			fw_extra = fw.fw_id[10] - 'a' + 10;
 	}
-	wlandev->firmware_numver = (fw_major << 24) + (fw_minor << 16) + (fw_sub << 8) + (fw_extra);
+	wlandev->firmware_numver =
+		(fw_major << 24) + (fw_minor << 16) + (fw_sub << 8) + fw_extra;
 	acxlog(L_DEBUG, "firmware_numver %08lx\n", wlandev->firmware_numver);
 
 	wlandev->firmware_id = fw.val0x14;
@@ -394,7 +380,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 static int __devinit
 acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	int result;
+	int result = -EIO;
 	int err;
 
 	unsigned long phymem1;
@@ -408,14 +394,18 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	int i;
 	UINT32 hardware_info;
 	char *devname_mask;
+
 	FN_ENTER;
+
+	/* FIXME: flag device somehow to make sure ioctls don't have access
+	 * to uninitialized structures before init is finished */
 
 	/* Enable the PCI device */
 
 	if (pci_enable_device(pdev) != 0) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: pci_enable_device() failed\n",
-		       dev_info);
+		       "%s: %s: pci_enable_device() failed\n",
+		       __func__, dev_info);
 		result = -EIO;
 		goto fail;
 	}
@@ -440,7 +430,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!request_mem_region
 	    (phymem1, pci_resource_len(pdev, 1), "Acx100_1")) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: acx100: Cannot reserve PCI memory region 1\n");
+		       "%s: acx100: Cannot reserve PCI memory region 1\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -448,7 +438,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!request_mem_region
 	    (phymem2, pci_resource_len(pdev, 2), "Acx100_2")) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: acx100: Cannot reserve PCI memory region 2\n");
+		       "%s: acx100: Cannot reserve PCI memory region 2\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -456,8 +446,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem1 = (unsigned long) ioremap(phymem1, PCI_SIZE);
 	if (mem1 == 0) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: ioremap() failed.\n",
-		       dev_info);
+		       "%s: %s: ioremap() failed.\n",
+		       __func__, dev_info);
 		result = -EIO;
 		goto fail;
 	}
@@ -465,8 +455,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem2 = (unsigned long) ioremap(phymem2, PCI_SIZE2);
 	if (mem2 == 0) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: ioremap() failed.\n",
-		       dev_info);
+		       "%s: %s: ioremap() failed.\n",
+		       __func__, dev_info);
 		result = -EIO;
 		goto fail;
 	}
@@ -480,13 +470,17 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	printk("Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
 	if ((wlandev = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: Memory allocation failure\n",
-		       dev_info);
+		       "%s: %s: Memory allocation failure\n",
+		       __func__, dev_info);
 		result = -EIO;
 		goto fail;
 	}
 
 	memset(wlandev, 0, sizeof(wlandevice_t));
+
+	wlandev->open = 0;
+	acxlog(L_INIT, "hw_unavailable = 1\n");
+	wlandev->hw_unavailable = 1;
 
 	wlandev->membase = phymem1;
 	wlandev->iobase = mem1;
@@ -500,9 +494,13 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		acx100_read_eeprom_offset(wlandev,
+		if (!(acx100_read_eeprom_offset(wlandev,
 					 ACX100_EEPROM_ID_OFFSET + i,
-					 &buffer[i]);
+					 &buffer[i])))
+		{
+			acxlog(L_STD, "huh, reading EEPROM failed!?\n");
+			break;
+		}
 	}
 	for (i = 0; i < sizeof(device_ids) / sizeof(struct device_id); i++)
 	{
@@ -521,7 +519,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if ((netdev = kmalloc(sizeof(netdevice_t), GFP_ATOMIC)) == NULL) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: Failed to alloc netdev\n");
+		       "%s: Failed to alloc netdev\n", __func__);
 		result = -EIO;
 		goto fail;
 	}
@@ -529,10 +527,12 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	memset(netdev, 0, sizeof(netdevice_t));
 	ether_setup(netdev);
 
+#if QUEUE_OPEN_AFTER_ASSOC
 	/* now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
 	acxlog(L_XFER, "stop queue after setup.\n");
 	netif_stop_queue(netdev);
+#endif
 
 	netdev->priv = wlandev;
 
@@ -543,8 +543,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (pdev->irq == 0) {
 		acxlog(L_BINSTD | L_IRQ | L_INIT,
-		       "acx100_probe_pci: %s: Can't get IRQ %d\n",
-		       dev_info, 0);
+		       "%s: %s: Can't get IRQ %d\n",
+		       __func__, dev_info, 0);
 		result = -EIO;
 		goto fail;
 	}
@@ -554,8 +554,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (!acx100_reset_dev(netdev)) {
 		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: MAC initialize failure!\n",
-		       dev_info);
+		       "%s: %s: MAC initialize failure!\n",
+		       __func__, dev_info);
 		result = -EIO;
 		goto fail;
 	}
@@ -571,21 +571,14 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	netdev->open = &acx100_open;
 	netdev->stop = &acx100_close;
 	netdev->hard_start_xmit = &acx100_start_xmit;
+	/* FIXME: no handler for netdev->hard_reset! could reset CPU,
+	 * reinit packet templates etc. */
 	netdev->get_stats = &acx100_get_stats;
 	netdev->get_wireless_stats = &acx100_get_wireless_stats;
 	netdev->do_ioctl = &acx100_ioctl;
 	netdev->set_multicast_list = &acx100_set_rx_mode;
 	netdev->tx_timeout = &acx100_tx_timeout;
 	netdev->watchdog_timeo = 4 * HZ;	/* 400 */
-
-	/* ...and register it */
-	if ((err = register_netdev(netdev)) != 0) {
-		acxlog(L_BINSTD | L_INIT,
-		       "acx100_probe_pci: %s: Register net device of %s failed: %d\n\n",
-		       dev_info, netdev->name, err);
-		result = -EIO;
-		goto fail;
-	}
 
 	/* ok, basic setup is finished, now start initialising the card */
 
@@ -602,10 +595,25 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_registered;
 	}
 
+	/* card initialized, so let's release hardware */
+	acxlog(L_INIT, "hw_unavailable--\n");
+	wlandev->hw_unavailable--;
+
 	/* needs to be after acx100_init_mac() due to necessary init stuff */
 	acx100_get_firmware_version(wlandev);
 
 	acx100_display_hardware_details(wlandev);
+
+	/* ...and register the card, AFTER everything else has been set up,
+	 * since otherwise an ioctl could step on our feet due to
+	 * firmware operations happening in parallel or uninitialized data */
+	if ((err = register_netdev(netdev)) != 0) {
+		acxlog(L_BINSTD | L_INIT,
+		       "%s: %s: Register net device of %s failed: %d\n\n",
+		       __func__, dev_info, netdev->name, err);
+		result = -EIO;
+		goto fail;
+	}
 
 	pci_set_drvdata(pdev, netdev);
 	wlandev->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
@@ -618,16 +626,18 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail_registered:
 	unregister_netdev(netdev);
 fail:
-	if (wlandev->pm)
-	{
-		pm_unregister(wlandev->pm);
-	}
-	if (netdev)
-	{
-		kfree(netdev);
-	}
+	acxlog(L_INIT, "fail hw_unavailable++\n");
+	wlandev->hw_unavailable++;
 	if (wlandev)
+	{
+		if (wlandev->pm)
+			pm_unregister(wlandev->pm);
 		kfree(wlandev);
+	}
+	
+	if (netdev)
+		kfree(netdev);
+
 	if (mem1)
 		iounmap((void *) mem1);
 	if (mem2)
@@ -638,6 +648,7 @@ fail:
 
 	release_mem_region(pci_resource_start(pdev, 2),
 			   pci_resource_len(pdev, 2));
+	pci_disable_device(pdev);
 
 done:
 	FN_EXIT(1, result);
@@ -679,12 +690,19 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	netdev = (struct net_device *) pci_get_drvdata(pdev);
 	hw = (struct wlandevice *) netdev->priv;
 
+	/* first, unregister the device to not let the kernel
+	 * (e.g. ioctls) access a half-deconfigured device */
+	netif_device_detach(netdev);
+	unregister_netdev(netdev);
+
+	pm_unregister(hw->pm);
+
 	/* disable both Tx and Rx to shut radio down properly */
 	acx100_issue_cmd(hw, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
 	acx100_issue_cmd(hw, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
 
 	/* disable power LED to save power :-) */
-	acxlog(L_INIT, "switching off power LED.\n");
+	acxlog(L_INIT, "switching off power LED to save power. :-)\n");
 	acx100_power_led(hw, 0);
 
 	/* put the eCPU to sleep to save power
@@ -725,21 +743,16 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 		querydev = olderdev;
 	}
 
-	/* now kill the removed device */
-
-	netif_device_detach(netdev);
-
-	if (hw->state != 1)
+	if (!hw->open)
 		acx100_down(netdev);
 
-	/* What does the following mask mean ?
-	 * Are there symbolic names ? */
-	hw->state = ((hw->state & 0xfe) | 0x2);
+	hw->open = 0;
+
+	acxlog(L_STD, "hw_unavailable++\n");
+	hw->hw_unavailable++;
 
 	acx100_delete_dma_region(hw);
-	pm_unregister(hw->pm);
 
-	unregister_netdev(netdev);
 	if (netdev)
 		kfree(netdev);
 
@@ -767,7 +780,7 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 }
 
 
-int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	int result = 0;
 	netdevice_t *ndev = root_acx100_dev.newest;
@@ -777,31 +790,34 @@ int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	switch(rqst)
 	{
 		case PM_SUSPEND: /* OK, we got a suspend request */
-			if (!netif_queue_stopped(ndev)) { 
-			/* If the queue isn't stopped already, */
-				netif_stop_queue(ndev);
-			/* We turn it off */
-			}
-			/* Then we can cancel our association */
+			if (netif_running(ndev) && netif_device_present(ndev))
+				netif_device_detach(ndev);
+			
+			/* Cancel our association */
 			if (transmit_disassoc(&client, wlandev) == 1) {
 				result = -EINVAL;
 			}
-			/* Then we set our flag */
-			wlandev->iStatus = ISTATUS_0_STARTED;
-			/* Close off IRQs */
+			/* better wait for some time to make sure Tx is
+			 * finished */
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ / 4);
 
+			/* Then we set our flag */
+			acx100_set_status(wlandev, ISTATUS_0_STARTED);
+
+			/* Close off IRQs */
 			acx100_disable_irq(wlandev);
 
-			/* Disable the RX/TX queues */
+			/* Disable the Rx/Tx queues */
 			acx100_issue_cmd(wlandev, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
 			acx100_issue_cmd(wlandev, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
 //			acx100_issue_cmd(wlandev, ACX100_CMD_FLUSH_QUEUE, NULL, 0, 5000);
 
 			/* disable power LED to save power */
-			acxlog(L_INIT, "switching off power LED, save power. :-)\n");
+			acxlog(L_INIT, "switching off power LED to save power. :-)\n");
 			acx100_power_led(wlandev, 0);
 	
-			printk("Asked to suspend: %X\n",rqst);
+			printk("Asked to suspend: %X\n", rqst);
 			/* Now shut off everything else */
 			if (acx100_issue_cmd(wlandev, ACX100_CMD_SLEEP, 0, 0, 5000) == 0)
 			{
@@ -813,16 +829,23 @@ int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 			}
 		case PM_RESUME:
 			pm_access(wlandev->pm);
+#ifndef RESUME_STANDBY_ONLY
+			/* not sure whether we actually had our power
+			 * removed or not, so let's do a full reset! */
+			acx100_reset_dev(ndev);
+#else
 			acx100_issue_cmd(wlandev, ACX100_CMD_WAKE, 0, 0, 5000);
 
 			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_TX, NULL, 0, 5000);
 			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_RX, NULL, 0, 5000);
+#endif
 
-			netif_wake_queue(ndev);
 			acx100_enable_irq(wlandev);
 //			acx100_join_bssid(wlandev);
-			AcxSetStatus(wlandev,ISTATUS_0_STARTED);
+			acx100_set_status(wlandev, ISTATUS_0_STARTED);
 			printk("Asked to resume: %X\n", rqst);
+			if (netif_running(ndev) && !netif_device_present(ndev))
+				netif_device_attach(ndev);
 			break;
 		default:
 			printk("Asked for PM: %X\n", rqst);
@@ -843,19 +866,20 @@ int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 * Side effects:
 *	- Enables on-card interrupt requests
 *	- calls acx100_start
-*	- sets priv ifup variable
 * Call context:
 *	- process thread
 * STATUS:
 *	stable
 * Comment:
-*	This function is called by the kernel when ifconfig sets the 
-*	device as up.
+*	This function is called by acx100_open (when ifconfig sets the 
+*	device as up).
 *----------------------------------------------------------------*/
 static void acx100_up(netdevice_t * dev)
 {
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
+
 	FN_ENTER;
+
 	acx100_enable_irq(wlandev);
 	if (wlandev->firmware_numver >= 0x0109030e) /* FIXME: first version? */
 	{ /* newer firmware versions don't use a hardware timer any more */
@@ -867,7 +891,10 @@ static void acx100_up(netdevice_t * dev)
 	else
 		acxlog(L_INIT, "firmware version < 1.9.3.e --> using hardware timer\n");
 	acx100_start(wlandev);
-	wlandev->ifup = 1;
+	acxlog(L_XFER, "start queue on startup.\n");
+	netif_start_queue(dev);
+
+
 	FN_EXIT(0, 0);
 }
 
@@ -881,7 +908,6 @@ static void acx100_up(netdevice_t * dev)
 *	void
 * Side effects:
 *	- disables on-card interrupt request
-*	- resets priv ifup variable
 * Call context:
 *	process thread
 * STATUS:
@@ -892,8 +918,12 @@ static void acx100_up(netdevice_t * dev)
 static void acx100_down(netdevice_t * dev)
 {
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
+
 	FN_ENTER;
-	wlandev->ifup = 0;
+
+	acxlog(L_XFER, "stop queue during close.\n");
+	netif_stop_queue(dev);
+
 	if (wlandev->firmware_numver >= 0x0109030e) /* FIXME: first version? */
 	{ /* newer firmware versions don't use a hardware timer any more */
 		del_timer_sync(&wlandev->mgmt_timer);
@@ -928,12 +958,14 @@ static void acx100_down(netdevice_t * dev)
 
 static int acx100_open(netdevice_t * ndev)
 {
-	wlandevice_t *dev = (wlandevice_t *) ndev->priv;
+	wlandevice_t *wlandev = (wlandevice_t *) ndev->priv;
 	int result;
+	unsigned long flags;
 
 	FN_ENTER;
-	if (dev->state & 0x2) {
-		acxlog(L_BINSTD | L_INIT, "No such device\n");
+
+	if (acx100_lock(wlandev, &flags)) {
+		acxlog(L_INIT, "card unavailable, bailing\n");
 		result = -ENODEV;
 		goto done;
 	}
@@ -945,7 +977,7 @@ static int acx100_open(netdevice_t * ndev)
 	}
 	acx100_up(ndev);
 
-	dev->state |= 0x1;
+	wlandev->open = 1;
 
 	WLAN_MOD_INC_USE_COUNT;
 	result = 0;
@@ -958,6 +990,7 @@ static int acx100_open(netdevice_t * ndev)
 	 * frames because of dev->flags&IFF_UP is true.
 	 */
 done:
+	acx100_unlock(wlandev, &flags);
 	FN_EXIT(1, result);
 	return result;
 }
@@ -969,6 +1002,7 @@ done:
 * device close method is called in response to the
 * SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
 * from set to clear.
+* (i.e. called for "ifconfig DEV down")
 *
 * Arguments:
 *	hw		wlan device structure
@@ -992,22 +1026,28 @@ static int acx100_close(netdevice_t *dev)
 
 	FN_ENTER;
 
+	/* don't use acx100_lock() here: need to close card even in case
+	 * of hw_unavailable set (card ejected) */
+	spin_lock_irq(&wlandev->lock);
+
+	wlandev->open = 0;
+
 	if (netif_device_present(dev)) {
-		acxlog(L_XFER, "stop queue during close.\n");
-		netif_stop_queue(dev);
 		acx100_down(dev);
 	}
 
 	free_irq(dev->irq, dev);
 	/* hw->val0x240c = 0; */
-	WLAN_MOD_DEC_USE_COUNT;
 
-	wlandev->state &= ~1;
 	/* We currently don't have to do anything else.
 	 * Higher layers know we're not ready from dev->start==0 and
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
+
+	WLAN_MOD_DEC_USE_COUNT;
+
+	spin_unlock_irq(&wlandev->lock);
 
 	FN_EXIT(0, 0);
 	return 0;
@@ -1033,7 +1073,7 @@ static int acx100_close(netdevice_t *dev)
 static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 {
 	int txresult = 0;
-//	unsigned long flags;
+	unsigned long flags;
 	wlandevice_t *hw = (wlandevice_t *) dev->priv;
 //	wlan_pb_t *pb;
 //	wlan_pb_t pb1;
@@ -1048,19 +1088,28 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 	if (!hw) {
 		return 1;
 	}
-	if (!(hw->state & 1)) {
+	if (!(hw->open)) {
 		return 1;
 	}
 
-	if (hw->iStatus != ISTATUS_4_ASSOCIATED) {
-		acxlog(L_ASSOC, "Strange: trying to xmit, but not associated yet: aborting...\n");
+	if (acx100_lock(hw, &flags))
 		return 1;
-	}
 
 	if (netif_queue_stopped(dev)) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
-		return 1;
+		txresult = 1;
+		goto end;
 	}
+
+	if (hw->iStatus != ISTATUS_4_ASSOCIATED) {
+		acxlog(L_XFER, "Trying to xmit, but not associated yet: aborting...\n");
+		/* silently drop the packet, since we're not connected yet */
+		dev_kfree_skb(skb);
+		hw->stats.tx_errors++;
+		txresult = 0;
+		goto end;
+	}
+
 #if 0
 	/* we're going to transmit now, so stop another packet from entering.
 	 * FIXME: most likely we shouldn't do it like that, but instead:
@@ -1070,7 +1119,11 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 	 * Tx buffer becomes free again. And of course also stop the
 	 * queue once we lose association to the network (since it
 	 * doesn't make sense to allow more user packets if we can't
-	 * forward them to a network). */
+	 * forward them to a network).
+	 * FIXME: Hmm, seems this is all wrong. We SHOULD leave the
+	 * queue open from the beginning (as long as we're not full,
+	 * and also even before we're even associated),
+	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
 	acxlog(L_XFER, "stop queue during Tx.\n");
 	netif_stop_queue(dev);
 #endif
@@ -1092,7 +1145,8 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
  */
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL){
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
-		return 1;
+		txresult = 1;
+		goto end;
 	}
 
 	acx100_ether_to_txdesc(hw,tx_desc,skb);
@@ -1114,6 +1168,9 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 #endif
 	hw->stats.tx_packets++;
 	hw->stats.tx_bytes += templen;
+
+end:
+	acx100_unlock(hw, &flags);
 
 	FN_EXIT(1, txresult);
 	return txresult;
@@ -1148,7 +1205,8 @@ static void acx100_tx_timeout(netdevice_t * dev)
 
 //	ctlCmdFlushTxQueue((wlandevice_t*)dev->priv,(memmap_t*)&tmp);
 	FN_ENTER;
-
+	acxlog(L_STD, "Tx timeout!\n");
+	((wlandevice_t *)dev->priv)->stats.tx_errors++;
 }
 
 /*----------------------------------------------------------------
@@ -1251,7 +1309,8 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	static int last_irq_jiffies = 0;
 
 	UINT16 irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
-	
+
+	FN_ENTER;
 	pm_access(wlandev->pm);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
@@ -1304,7 +1363,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		       "<acx100_interrupt> HOST_INT_SCAN_COMPLETE\n");
 
 		if (wlandev->iStatus == ISTATUS_5_UNKNOWN) {
-			wlandev->iStatus = wlandev->unknown0x2350;
+			acx100_set_status(wlandev, wlandev->unknown0x2350);
 			wlandev->unknown0x2350 = 0;
 		} else if (wlandev->iStatus == ISTATUS_1_SCANNING) {
 
@@ -1397,7 +1456,7 @@ void acx100_rx(struct rxhostdescriptor *rxdesc/* wlan_pb_t * pb */,
 	struct sk_buff *skb;
 
 	FN_ENTER;
-	if (hw->state & 1){
+	if (hw->open) {
 		if ((skb = acx100_rxdesc_to_ether(hw, rxdesc))) {
 			ndev = root_acx100_dev.newest;
 			skb->dev = ndev;
@@ -1448,11 +1507,7 @@ MODULE_PARM(firmware_dir, "s");
 MODULE_PARM_DESC(firmware_dir, "Directory where to load acx100 firmware files from");
 
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,22))	//I think
-int __init acx100_init_module(void)
-#else
-int __init init_module(void)
-#endif
+static int __init acx100_init_module(void)
 {
 	int res;
 
@@ -1472,8 +1527,8 @@ int __init init_module(void)
 	acxlog(L_STD,
 	       "acx100: thus your mileage may vary. Visit http://acx100.sf.net for support.\n");
 
-	acxlog(L_BINDEBUG, "init_module: %s Loaded\n", version);
-	acxlog(L_BINDEBUG, "init_module: dev_info is: %s\n", dev_info);
+	acxlog(L_BINDEBUG, "%s: %s Loaded\n", __func__, version);
+	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);
 	//.data(0xc)=dev_info
 
 	res = pci_module_init(&acx100_pci_drv_id);
@@ -1502,11 +1557,7 @@ int __init init_module(void)
 * STATUS: should be ok.
 ----------------------------------------------------------------*/
 
-#if (LINUX_VERSION_CODE >KERNEL_VERSION(2,5,22))	//I think
-void __exit acx100_cleanup_module(void)
-#else
-void __exit cleanup_module(void)
-#endif
+static void __exit acx100_cleanup_module(void)
 {
 	FN_ENTER;
 	pci_unregister_driver(&acx100_pci_drv_id);
@@ -1515,10 +1566,8 @@ void __exit cleanup_module(void)
 
 /* This should init the device and all settings. */
 
-/* For kernels 2.5.* where modutils>=4,2,22, we must have an module_init and module_exit like so: */
-#if (LINUX_VERSION_CODE >KERNEL_VERSION(2,5,22))	//I think
+/* For kernels 2.5.* where modutils>=4.2.22, we must have a module_init and module_exit like so: */
 module_init(acx100_init_module);
 module_exit(acx100_cleanup_module);
-#endif
 
 #endif /* MODULE */

@@ -59,18 +59,12 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
 
-#include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
@@ -137,7 +131,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 * acx100_ether_to_txdesc
 *
 * Uses the contents of the ether frame to build the elements of 
-* the 802.11 frame.  
+* the 802.11 frame.
 *
 * We don't actually set up the frame header here.  That's the 
 * MAC's job.  We're only handling conversion of DIXII or 802.3+LLC 
@@ -232,7 +226,7 @@ int acx100_ether_to_txdesc(wlandevice_t * wlandev,
 		memcpy(payload->data, skb->data + sizeof(wlan_ethhdr_t), payload->length);
 	}
 	
-	/* FIXME: find out where these fields stand for */
+	/* FIXME: find out what these fields stand for */
 	payload->val0x4 = 0;
 	header->val0x4 = 0;
 	
@@ -352,8 +346,8 @@ struct sk_buff *acx100_rxdesc_to_ether(wlandevice_t * wlandev, struct
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;
 	
-	/* check if FCS (CRC) is included */
-	if (wlandev->rx_config_1 & 0x2){
+	/* check if additional header is included */
+	if (wlandev->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
 		w_hdr = (p80211_hdr_t*)(((UINT8*)w_hdr) + WLAN_CRC_LEN);
 		payload_length -= WLAN_CRC_LEN;

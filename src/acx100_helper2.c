@@ -65,7 +65,6 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 
-#include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
@@ -293,6 +292,84 @@ client_t *sta_list_alloc(UINT8 *address)
 }
 
 /*----------------------------------------------------------------
+* acx100_set_status
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: should be ok.
+*
+* Comment:
+* 0 probably means: just started (acx100_start()).
+* 1 probably means: starting scan?
+* 2 probably means: not authenticated yet (process_deauthenticate())
+* 3 probably means: authenticated, but not associated yet (process_disassociate(), process_authen())
+* 4 probably means: associated (process_assocresp(), process_reassocresp())
+* 5 means: status unknown
+*----------------------------------------------------------------*/
+
+void acx100_set_status(wlandevice_t *hw, int status)
+{
+	char *state_str[6] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN" };
+	char *stat;
+#if QUEUE_OPEN_AFTER_ASSOC
+	static int associated = 0;
+#endif
+
+	if (status <= ISTATUS_5_UNKNOWN)
+		stat = state_str[status];
+	else
+		stat = "INVALID??";
+
+	acxlog(L_BINDEBUG | L_ASSOC, "%s: Setting iStatus = %d (%s)\n",
+	       __func__, status, stat);
+
+	if (hw->unknown0x2350 == ISTATUS_5_UNKNOWN) {
+		hw->unknown0x2350 = hw->iStatus;
+		hw->iStatus = ISTATUS_5_UNKNOWN;
+	} else {
+		hw->iStatus = status;
+	}
+	if ((hw->iStatus == ISTATUS_1_SCANNING)
+	    || (hw->iStatus == ISTATUS_5_UNKNOWN)) {
+		hw->scan_retries = 0;
+		acx100_set_timer(hw, 3000000);
+	} else if (hw->iStatus <= ISTATUS_3_AUTHENTICATED) {
+		hw->auth_assoc_retries = 0;
+		acx100_set_timer(hw, 1500000);
+	}
+
+#if QUEUE_OPEN_AFTER_ASSOC
+	if (status == ISTATUS_4_ASSOCIATED)
+	{
+		if (associated == 0)
+		{
+			/* ah, we're newly associated now,
+			 * so let's restart the net queue */
+			acxlog(L_XFER, "wake queue after association.\n");
+			netif_wake_queue(hw->netdev);
+		}
+		associated = 1;
+	}
+	else
+	{
+		/* not associated any more, so let's stop the net queue */
+		if (associated == 1)
+		{
+			acxlog(L_XFER, "stop queue after losing association.\n");
+			netif_stop_queue(hw->netdev);
+		}
+		associated = 0;
+	}
+#endif
+}
+
+/*----------------------------------------------------------------
 * acx80211_rx
 * FIXME: change name to acx100_rx_frame
 *
@@ -322,10 +399,10 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf ;
 
-	if (hw->rx_config_1 & 0x2) {
+	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		p80211_hdr = (p80211_hdr_t *)((UINT8 *)p80211_hdr + 4);
 	}
-//	printk("Rx_CONFIG_1 = %X\n",hw->rx_config_1 & 0x2);
+//	printk("Rx_CONFIG_1 = %X\n",hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR);
 
 	/* see IEEE 802.11-1999.pdf chapter 7 "MAC frame formats" */
 	ftype = WLAN_GET_FC_FTYPE(p80211_hdr->a3.fc);
@@ -722,7 +799,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 			res = 1;
 			if (hw->iStatus > ISTATUS_3_AUTHENTICATED) {
 				/* hw->val0x240 = req->reason[0]; Unused, so removed */
-				AcxSetStatus(hw, ISTATUS_3_AUTHENTICATED);
+				acx100_set_status(hw, ISTATUS_3_AUTHENTICATED);
 				ActivatePowerSaveMode(hw, 2);
 			}
 			res = 0;
@@ -801,7 +878,7 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	FN_ENTER;
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
-	if (hw->rx_config_1 & 0x2){
+	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
 	}
 
@@ -932,7 +1009,7 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 
-	if (hw->rx_config_1 & 0x2){
+	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
 	}
 
@@ -1030,7 +1107,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		wep_offset = 0x10;
 	}
 
-	if (hw->rx_config_1 & 0x2){
+	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
 	}
 
@@ -1290,7 +1367,7 @@ int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	esi = NULL;
 	fr = (p80211_hdr_t*)&pb->data->buf;
-	if (hw->rx_config_1 & 0x2){
+	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		fr = (p80211_hdr_t*)((UINT8*)fr + 4);
 	}
 
@@ -1376,7 +1453,7 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 	 * our current setup: pull the emergency brake and stop scanning! */
 	if ((UINT) hw->iStable > MAX_NUMBER_OF_SITE) {
 		acx100_issue_cmd(hw, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
-		AcxSetStatus(hw, ISTATUS_2_WAIT_AUTH);
+		acx100_set_status(hw, ISTATUS_2_WAIT_AUTH);
 
 		acxlog(L_BINDEBUG | L_ASSOC,
 		       "<Scan Beacon> iStable > MAX_NUMBER_OF_SITE\n");
@@ -1448,7 +1525,7 @@ void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 	       ss->essid, ss->channel,
 	       a[0], a[1], a[2], a[3], a[4], a[5],
 	       (WLAN_GET_MGMT_CAP_INFO_IBSS(ss->cap)) ? "Ad-Hoc peer" : "Access Point",
-	       (int)(max_rate * 0.5), (max_rate & 1) ? ".5" : "",
+	       (int)(max_rate / 2), (max_rate & 1) ? ".5" : "",
 	       ss->sir, ss->snr);
 
 	/* found one station --> increment counter */
@@ -1515,7 +1592,7 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 			if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
 				pdr.m.asid.vala = req->aid[0];
 				acx100_configure(hw, &pdr, ACX100_RID_ASSOC_ID);
-				AcxSetStatus(hw, ISTATUS_4_ASSOCIATED);
+				acx100_set_status(hw, ISTATUS_4_ASSOCIATED);
 				acxlog(L_BINSTD | L_ASSOC,
 				       "ASSOCIATED!\n");
 			}
@@ -1564,7 +1641,7 @@ int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 			return 1;
 		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
 			if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
-				AcxSetStatus(hw, ISTATUS_4_ASSOCIATED);
+				acx100_set_status(hw, ISTATUS_4_ASSOCIATED);
 			}
 			else
 				acxlog(L_STD | L_ASSOC, "Reassociation FAILED: response status code %d: \"%s\"!\n", req->status[0], get_status_string(req->status[0]));
@@ -1646,7 +1723,7 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 			break;
 		if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
 			if (req->auth_alg[0] == WLAN_AUTH_ALG_OPENSYSTEM) {
-				AcxSetStatus(hw, ISTATUS_3_AUTHENTICATED);
+				acx100_set_status(hw, ISTATUS_3_AUTHENTICATED);
 				transmit_assoc_req(hw);
 			} else
 			if (req->auth_alg[0] == WLAN_AUTH_ALG_SHAREDKEY) {
@@ -1654,7 +1731,7 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 			}
 		} else {
 			acxlog(L_ASSOC, "Authentication FAILED (status code %d: \"%s\"), still waiting for authentication.\n", req->status[0], get_status_string(req->status[0]));
-			AcxSetStatus(hw, ISTATUS_2_WAIT_AUTH);
+			acx100_set_status(hw, ISTATUS_2_WAIT_AUTH);
 		}
 		break;
 	case 3:
@@ -1681,7 +1758,7 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 			break;
 
 		/* ok, we're through: we're authenticated. Woohoo!! */
-		AcxSetStatus(hw, ISTATUS_3_AUTHENTICATED);
+		acx100_set_status(hw, ISTATUS_3_AUTHENTICATED);
 		acxlog(L_BINSTD | L_ASSOC, "Authenticated!\n");
 		transmit_assoc_req(hw);
 		break;
@@ -1738,7 +1815,7 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 		 * running we should attempt to rejoin, from the 
 		 * starting point. So:
 		 */
-		AcxSetStatus(hw,ISTATUS_2_WAIT_AUTH);
+		acx100_set_status(hw,ISTATUS_2_WAIT_AUTH);
 		result = 0;
 		goto end;
 	}			
@@ -1801,7 +1878,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 			return 1;
 		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1)) {
 			if (hw->iStatus > ISTATUS_2_WAIT_AUTH) {
-				AcxSetStatus(hw, ISTATUS_2_WAIT_AUTH);
+				acx100_set_status(hw, ISTATUS_2_WAIT_AUTH);
 				return 0;
 			}
 		}
@@ -2650,9 +2727,9 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			wlandev->preamble_flag = WLAN_GET_MGMT_CAP_INFO_SHORT(wlandev->station_assoc.cap);
 		if (wlandev->mode != 0) {
 			transmit_authen1(wlandev);
-			AcxSetStatus(wlandev, ISTATUS_2_WAIT_AUTH);
+			acx100_set_status(wlandev, ISTATUS_2_WAIT_AUTH);
 		} else {
-			AcxSetStatus(wlandev, ISTATUS_4_ASSOCIATED);
+			acx100_set_status(wlandev, ISTATUS_4_ASSOCIATED);
 		}
 	} else {		/* uh oh, no station found in range */
 		if (wlandev->mode == 0) {	/* phew, we're safe: we intended to use Ad-Hoc mode */
@@ -2662,12 +2739,12 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			IBSSIDGen(wlandev, wlandev->address);
 			acx100_update_capabilities(wlandev);
 			acx100_join_bssid(wlandev);
-			AcxSetStatus(wlandev, ISTATUS_4_ASSOCIATED);
+			acx100_set_status(wlandev, ISTATUS_4_ASSOCIATED);
 		} else {
 			acxlog(L_STD | L_ASSOC,
 			       "%s: no matching station found in range and not in Ad-Hoc mode --> giving up scanning.\n",
 			       __func__);
-			AcxSetStatus(wlandev, ISTATUS_0_STARTED);
+			acx100_set_status(wlandev, ISTATUS_0_STARTED);
 		}
 	}
 	FN_EXIT(0, 0);
@@ -2734,11 +2811,14 @@ void acx100_timer(unsigned long a)
 {
 	netdevice_t *ndev = (netdevice_t *)a;
 	wlandevice_t *hw = (wlandevice_t *)ndev->priv;
+	unsigned long flags;
 	
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acxlog(L_BINDEBUG | L_ASSOC, "<acx_timer> iStatus = %d\n",
 	       hw->iStatus);
+	if (acx100_lock(hw, &flags))
+		return;
 
 	switch (hw->iStatus) {
 	case ISTATUS_1_SCANNING:
@@ -2768,7 +2848,7 @@ void acx100_timer(unsigned long a)
 			acxlog(L_ASSOC,
 			       "authen1 request reply timeout, giving up.\n");
 			/* simply set status back to scanning (DON'T start scan) */
-			AcxSetStatus(hw, ISTATUS_1_SCANNING);
+			acx100_set_status(hw, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(hw, 1500000);
 		break;
@@ -2783,12 +2863,12 @@ void acx100_timer(unsigned long a)
 			acxlog(L_ASSOC,
 			       "association request reply timeout, giving up.\n");
 			/* simply set status back to scanning (DON'T start scan) */
-			AcxSetStatus(hw, ISTATUS_1_SCANNING);
+			acx100_set_status(hw, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(hw, 1500000);
 		break;
 	case ISTATUS_5_UNKNOWN:
-		hw->iStatus = hw->unknown0x2350;
+		acx100_set_status(hw, hw->unknown0x2350);
 		hw->unknown0x2350 = 0;
 		break;
 	case ISTATUS_0_STARTED:
@@ -2796,82 +2876,5 @@ void acx100_timer(unsigned long a)
 	default:
 		break;
 	}
-}
-
-/*----------------------------------------------------------------
-* AcxSetStatus
-* FIXME: rename to acx100_set_status
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-/* AcxSetStatus()
- * STATUS: should be ok.
- * 0 probably means: just started (AcxStart()).
- * 1 probably means: starting scan?
- * 2 probably means: not authenticated yet (process_deauthenticate())
- * 3 probably means: authenticated, but not associated yet (process_disassociate(), process_authen())
- * 4 probably means: associated (process_assocresp(), process_reassocresp())
- */
-void AcxSetStatus(wlandevice_t *hw, int status)
-{
-	char *state_str[6] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN" };
-	char *stat;
-	static int associated = 0;
-
-	if (status <= ISTATUS_5_UNKNOWN)
-		stat = state_str[status];
-	else
-		stat = "INVALID??";
-
-	acxlog(L_BINDEBUG | L_ASSOC,
-	       "<AcxSetStatus> iStatus = %d (%s)\n", status, stat);
-
-	if (hw->unknown0x2350 == ISTATUS_5_UNKNOWN) {
-		hw->unknown0x2350 = hw->iStatus;
-		hw->iStatus = ISTATUS_5_UNKNOWN;
-	} else {
-		hw->iStatus = status;
-	}
-	if ((hw->iStatus == ISTATUS_1_SCANNING)
-	    || (hw->iStatus == ISTATUS_5_UNKNOWN)) {
-		hw->scan_retries = 0;
-		acx100_set_timer(hw, 3000000);
-	} else if (hw->iStatus <= ISTATUS_3_AUTHENTICATED) {
-		hw->auth_assoc_retries = 0;
-		acx100_set_timer(hw, 1500000);
-	}
-
-	if (status == ISTATUS_4_ASSOCIATED)
-	{
-		if (associated == 0)
-		{
-			/* ah, we're newly associated now,
-			 * so let's restart the net queue */
-			acxlog(L_XFER, "wake queue after association.\n");
-			netif_wake_queue(hw->netdev);
-		}
-		associated = 1;
-	}
-	else
-	{
-		/* not associated any more, so let's stop the net queue */
-		if (associated == 1)
-		{
-			acxlog(L_XFER, "stop queue after losing association.\n");
-			netif_stop_queue(hw->netdev);
-		}
-		associated = 0;
-	}
+	acx100_unlock(hw, &flags);
 }

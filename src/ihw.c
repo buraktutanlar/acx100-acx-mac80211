@@ -52,18 +52,13 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/pm.h>
-#include <asm/pci.h>
+
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
@@ -410,7 +405,7 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	};
 
 	FN_ENTER;
-	acxlog(L_CTL, "%s cmd %X timeout %ld.\n", __func__, cmd, timeout);
+	acxlog(L_CTL, "%s cmd 0x%X timeout %ld.\n", __func__, cmd, timeout);
 
 	/*** make sure we have at least *some* timeout value ***/
 	if (timeout == 0) {
@@ -470,12 +465,10 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 				acx100_write_reg16(hw, ACX100_IRQ_ACK, 0x200);
 				break;
 			}
-#if EXPERIMENTAL_VER_0_3
 			if (counter % 30000 == 0)
 			{
 				acx100_schedule(HZ / 50);
 			}
-#endif
 		}
 	}
 
@@ -529,7 +522,7 @@ static short CtlLength[0x14] = {
 	ACX100_RID_QUEUE_CONFIG_LEN,
 	ACX100_RID_BLOCK_SIZE_LEN,
 	ACX100_RID_MEMORY_CONFIG_OPTIONS_LEN,
-	ACX100_RID_RATE_LEN,
+	ACX100_RID_RATE_FALLBACK_LEN,
 	ACX100_RID_WEP_OPTIONS_LEN,
 	ACX100_RID_MEMORY_MAP_LEN, //	ACX100_RID_SSID_LEN,
 	0,

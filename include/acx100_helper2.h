@@ -226,7 +226,7 @@ void acx100_timer(unsigned long a);
 void d11CompleteScan(wlandevice_t * wlandev);
 void ProcessProbeResponse(struct rxbuffer *mmt, wlandevice_t * hw,
 			  acxp80211_hdr_t * hdr);
-void AcxSetStatus(wlandevice_t * hw, int vala);
+void acx100_set_status(wlandevice_t *hw, int vala);
 void IBSSIDGen(wlandevice_t * wlandev, unsigned char *p_out);
 
 extern void acx100_rx(/*wlan_pb_t * p80211*/

@@ -52,11 +52,6 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
@@ -64,7 +59,6 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
 
-#include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
@@ -253,7 +247,9 @@ int acx100_create_dma_regions(wlandevice_t * wlandev)
 		goto error;
 	}
 
+#if THIS_IS_BOGUS_ISNT_IT
 	acx100_set_defaults(wlandev);
+#endif
 
 	FN_EXIT(0, 0);
 
@@ -292,12 +288,7 @@ int acx100_delete_dma_region(wlandevice_t * wlandev)
 	acx100_write_reg16(wlandev, ACX100_REG_104, 0);
 
 	/* used to be a for loop 1000, do scheduled delay instead */
-#if EXPERIMENTAL_VER_0_3
 	acx100_schedule(HZ / 10);
-#else
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule_timeout(HZ / 10);
-#endif
 
 	acx100_free_desc_queues(&wlandev->dc);
 
@@ -327,7 +318,7 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 {
 	struct txhostdescriptor *header;
 	struct txhostdescriptor *payload;
-	int flags;
+	unsigned long flags;
 	int i;
 
 	/* header and payload are located in adjacent descriptors */
@@ -492,14 +483,11 @@ void acx100_clean_tx_desc(wlandevice_t *wlandev)
 			
 			wlandev->TxQueueFree++;
 
-			if ((wlandev->TxQueueFree >= MINFREE_TX)
+			if ((wlandev->TxQueueFree >= MINFREE_TX + 3)
 			&& (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
 			&& (netif_queue_stopped(wlandev->netdev)))
 			{
-				/* FIXME: this should maybe be optimized
-				 * to only wake queue after some 5 or 10
-				 * packets have been freed again.
-				 * And besides, the if construct is ugly:
+				/* FIXME: if construct is ugly:
 				 * should have functions acx100_stop_queue
 				 * etc. which set flag wlandev->tx_stopped
 				 * to be checked here. */
@@ -553,19 +541,19 @@ void acx100_rxmonitor(wlandevice_t * wlandev, struct rxbuffer *buf)
 	struct sk_buff *skb;
 	void *datap;
 
-	if (!(wlandev->rx_config_1 & 0x2000))
+	if (!(wlandev->rx_config_1 & RX_CFG1_PLUS_ADDIT_HDR))
 	{
-		printk("rx_config_1 misses 0x2000\n");
+		printk("rx_config_1 misses RX_CFG1_PLUS_ADDIT_HDR\n");
 		return;
 	}
 
-	if (wlandev->rx_config_1 & 0x2000)
+	if (wlandev->rx_config_1 & RX_CFG1_PLUS_ADDIT_HDR)
 	{
 		payload_offset += 3*4; /* status words         */
 		packet_len     += 3*4; /* length is w/o status */
 	}
 		
-	if (wlandev->rx_config_1 & 2)
+	if (wlandev->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR)
 		payload_offset += 4;   /* phy header   */
 
 	/* we are in big luck: the acx100 doesn't modify any of the fields */
@@ -724,13 +712,13 @@ void acx100_log_rxbuffer(TIWLAN_DC *pDc)
 *
 *----------------------------------------------------------------*/
 
-void acx100_process_rx_desc(wlandevice_t * wlandev)
+void acx100_process_rx_desc(wlandevice_t *wlandev)
 {
 	struct rxhostdescriptor *RxPool;
 	TIWLAN_DC *pDc;
 	struct rxhostdescriptor *pDesc;
 	UINT16 buf_len;
-	int flags;
+	unsigned long flags;
 	int curr_idx;
 	int count = 0;
 	p80211_hdr_t *buf;
@@ -770,8 +758,8 @@ void acx100_process_rx_desc(wlandevice_t * wlandev)
 		acxlog(L_BUF, "%s: using curr_idx %d, rx_tail is now %d.\n", __func__, curr_idx, pDc->rx_tail);
 
 		buf = (p80211_hdr_t *)&pDesc->data->buf;
-		if (wlandev->rx_config_1 & 0x2) {
-			/* take into account CRC ?? in front of packet */
+		if (wlandev->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
+			/* take into account additional header in front of packet */
 			buf = (p80211_hdr_t*)((UINT8*)buf + 4);
 		}
 
@@ -1429,7 +1417,7 @@ struct txdescriptor *acx100_get_tx_desc(wlandevice_t * wlandev)
 {
 	struct TIWLAN_DC * pDc = &wlandev->dc;
 	struct txdescriptor *tx_desc;
-	int flags;
+	unsigned long flags;
 
 	FN_ENTER;
 

@@ -11,6 +11,9 @@ extract_firmware: firmware
 driver:
 	make -C src
 
+install:
+	@echo "Sorry, we don't provide a system installation mechanism, since it would need to be distribution specific. Maybe you didn't read the part in the README file mentioning the installation details?"
+
 clean:
 	make -C src clean; \
 	make -C firmware clean

@@ -261,6 +261,47 @@ typedef struct key_struct {
 	UINT8 key[29]; /* 0x12; is this long enough??? */
 } key_struct_t; /* size = 276. FIXME: where is the remaining space?? */
 
+#define GETSET_WEP		0x00000001
+#define GETSET_TXPOWER		0x00000002
+#define GETSET_ANTENNA		0x00000004
+#define GETSET_ED_THRESH	0x00000008
+#define GETSET_CCA		0x00000010
+#define GETSET_TX		0x00000020
+#define GETSET_RX		0x00000040
+#define GETSET_RETRY		0x00000080
+#define GETSET_REG_DOMAIN	0x00000100
+#define GETSET_CHANNEL		0x00000200
+#define GETSET_ESSID		0x00000400
+#define GETSET_MODE		0x00000800
+#define SET_MSDU_LIFETIME	0x00001000
+#define GET_STATION_ID		0x00002000
+#define SET_RATE_FALLBACK	0x00004000
+#define SET_RXCONFIG		0x00008000
+#define SET_WEP_OPTIONS		0x00010000
+#define GETSET_ALL		0x80000000
+
+#define RX_CFG1_PLUS_ADDIT_HDR		0x2000
+#define RX_CFG1_ONLY_OWN_BEACONS	0x0400
+#define RX_CFG1_DISABLE_BCAST		0x0200
+#define RX_CFG1_FILTER_BSSID		0x0020
+#define RX_CFG1_PROMISCUOUS		0x0010
+#define RX_CFG1_RCV_ALL_FRAMES		0x0008
+#define RX_CFG1_INCLUDE_FCS		0x0004
+#define RX_CFG1_INCLUDE_ADDIT_HDR	0x0002
+
+#define RX_CFG2_RCV_ASSOC_REQ		0x0800
+#define RX_CFG2_RCV_AUTH_FRAMES		0x0400
+#define RX_CFG2_RCV_BEACON_FRAMES	0x0200
+#define RX_CFG2_FILTER_ON_SOME_BIT	0x0100
+#define RX_CFG2_RCV_CTRL_FRAMES		0x0080
+#define RX_CFG2_RCV_DATA_FRAMES		0x0040
+#define RX_CFG2_RCV_BROKEN_FRAMES	0x0020
+#define RX_CFG2_RCV_MGMT_FRAMES		0x0010
+#define RX_CFG2_RCV_PROBE_REQ		0x0008
+#define RX_CFG2_RCV_PROBE_RESP		0x0004
+#define RX_CFG2_RCV_ACK_FRAMES		0x0002
+#define RX_CFG2_RCV_OTHER		0x0001
+
 /* WLAN device type */
 typedef struct wlandevice {
 	struct wlandevice *next;	/* 00 link for list of devices */
@@ -276,7 +317,8 @@ typedef struct wlandevice {
 	/* end PCMCIA crap */
 
 	/* Hardware config */
-	int hw_unavailable; /* indicates whether the hardware has been suspended or ejected or so */
+	int hw_unavailable; /* indicates whether the hardware has been suspended or ejected */
+	int open;
 	UINT irq;		/* 0c */
 	UINT16 irq_mask;	/* mask indicating the interrupt types that are masked (not wanted) V3POS 2418, V1POS 23f4 */
 
@@ -292,6 +334,38 @@ typedef struct wlandevice {
 
 	UINT8 dev_addr[MAX_ADDR_LEN];	/* V3POS 2340, V1POS 22f0 (or was it 22f8?) */
 
+		/*
+			experiments etc. show the following results:
+
+			rx_config_1:
+			bit      desc
+			13	include additional header (length etc.) *required*
+			10	receive only own beacon frames
+			 9	discard broadcast (01:xx:xx:xx:xx:xx in mac)
+			 8,7,6  ???
+			 5	BSSID-filter
+			 4	promiscuous mode (aka. filter wrong mac addr)
+			 3	receive ALL frames (disable filter)
+			 2	include FCS
+			 1	include additional header (802.11 phy?)
+			 0	??
+			 
+			rx_config_2: (sending raw 802.11b frames was a huge help to figure
+						   that out!)
+			bit      desc
+			11	receive association requests etc.
+			10	receive authentication frames
+			 9	receive beacon frames
+			 8	?? filter on some bit in 802.11 header ??
+			 7	receive control frames
+			 6	receive data frames
+			 5	receive broken frames
+			 4	receive management frames
+			 3	receive probe requests
+			 2	receive probe responses
+			 1	receive ack frames
+			 0	receive other
+		*/
 	UINT16 rx_config_1;	/* V3POS 2820, V1POS 27f8 */
 	UINT16 rx_config_2;	/* V3POS 2822, V1POS 27fa */
 
@@ -306,18 +380,14 @@ typedef struct wlandevice {
 	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
 
 	/*** PHY settings ***/
-#if EXPERIMENTAL_VER_0_3
 	unsigned char tx_level_dbm;
 	unsigned char tx_level_val;
-#endif
-	/* tx power settings */
-	unsigned char pow;
 	/* antenna settings */
-	unsigned char antenna[4 + ACX100_RID_DOT11_CURRENT_ANTENNA_LEN];
+	unsigned char antenna;
 	/* ed threshold settings */
-	unsigned char ed_threshold[4 + ACX100_RID_DOT11_ED_THRESHOLD_LEN];
+	unsigned char ed_threshold;
 	/* cca settings */
-	unsigned char cca[4 + ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN];
+	unsigned char cca;
 
 	/*** Linux device management ***/
 	/* netlink socket */
@@ -334,9 +404,9 @@ typedef struct wlandevice {
 	   hmm, or given that net_device_stats is so big: maybe it does NOT
 	   contain a complete net_device_stats???
 	 */
-	UINT8 state;		/* 0x7c */
 	UINT8 ifup; /* whether the device is up */
 	int monitor; /* whether the device is in monitor mode or not */
+	int monitor_setting;
 
 /* compatibility to wireless extensions */
 #ifndef WIRELESS_EXT
@@ -348,8 +418,11 @@ typedef struct wlandevice {
 #endif
 
 	/*** wireless settings ***/
+	UINT32 get_mask;	/* mask of settings to fetch from the card */
+	UINT32 set_mask;	/* mask of settings to write to the card */
 	UINT32 mode;		/* V3POS 80; that's the MAC mode we want */
 	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
+	UINT8 rate_fallback_retries;
 	char essid[0x20];	/* V3POS 84; essid */
 	char essid_active;	/* specific ESSID active, or select any? */
 	char nick[IW_ESSID_MAX_SIZE];
@@ -435,14 +508,6 @@ typedef struct wlandevice {
 //	wait_queue_head_t reqwq;
 
 //	acx100_metacmd_t *cmds;
-
-	/* device methods (init by MSD, used by p80211 */
-	int (*open) (struct wlandevice *wlandev);
-	int (*close) (struct wlandevice *wlandev);
-	void (*reset) (struct wlandevice *wlandev);
-	int (*txframe) (struct wlandevice *wlandev, struct sk_buff *skb);
-	int (*mlmerequest) (struct wlandevice *wlandev, p80211msg_t *msg);
-	void (*hwremovedfn) (struct wlandevice *wlandev);
 
 #ifdef CONFIG_PROC_FS
 	/* Procfs support */
@@ -534,20 +599,24 @@ static inline void p80211netdev_wake_queue(wlandevice_t * wlandev)
 extern inline int acx100_lock(wlandevice_t *wlandev,
                                unsigned long *flags)
 {
+	/* printk(KERN_WARNING "lock\n"); */
         spin_lock_irqsave(&wlandev->lock, *flags);
         if (wlandev->hw_unavailable) {
-                printk(KERN_DEBUG "acx100_lock() called with hw_unavailable (dev=%p)\n",
+                printk(KERN_WARNING "acx100_lock() called with hw_unavailable (dev=%p)\n",
                        wlandev->netdev);
                 spin_unlock_irqrestore(&wlandev->lock, *flags);
                 return -EBUSY;
         }
+	/* printk(KERN_WARNING "/lock\n"); */
         return 0;
 }
 
 extern inline void acx100_unlock(wlandevice_t *wlandev,
                                   unsigned long *flags)
 {
+	/* printk(KERN_WARNING "unlock\n"); */
         spin_unlock_irqrestore(&wlandev->lock, *flags);
+	/* printk(KERN_WARNING "/unlock\n"); */
 }
 
 #endif

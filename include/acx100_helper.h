@@ -367,10 +367,10 @@ int acx100_set_beacon_template(wlandevice_t * wlandev);
 int acx100_set_generic_beacon_probe_response_frame(wlandevice_t * hw,
 						   acxp80211_hdr_t * txf);
 int acx100_set_defaults(wlandevice_t * hw);
+void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, int set_all);
 int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd);
 int acx100_set_probe_response_template(wlandevice_t * hw);
 void acx100_set_probe_request_template(wlandevice_t * skb);
-void acx100_parse_conf_opt(wlandevice_t * hw);
 void acx100_join_bssid(wlandevice_t * hw);
 int acx100_init_mac(netdevice_t * hw);
 void acx100_scan_chan(wlandevice_t *wlandev);

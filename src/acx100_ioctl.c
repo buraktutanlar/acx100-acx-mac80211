@@ -52,18 +52,15 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <linux/netdevice.h>
-#include <asm/io.h>
-#include <linux/delay.h>
-#include <asm/byteorder.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 #include <wlan_compat.h>
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
+
 #include <linux/pm.h>
-#include <asm/pci.h>
+
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
@@ -129,13 +126,7 @@ static inline int acx100_ioctl_set_freq(struct iwreq *iwr, wlandevice_t *wlandev
 	acx100_lock(wlandev, &flags);
 
 	acxlog(L_IOCTL, "Set Frequency <= %i (%i)\n",
-	       iwr->u.freq.m, iwr->u.freq.e);
-
-	if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
-	{
-		transmit_disassoc(NULL,wlandev);
-	}
-	AcxSetStatus(wlandev,ISTATUS_0_STARTED);
+		iwr->u.freq.m, iwr->u.freq.e);
 
 	if (iwr->u.freq.e == 0 && iwr->u.freq.m <= 1000) {
 		/* Setting by channel number */
@@ -158,32 +149,18 @@ static inline int acx100_ioctl_set_freq(struct iwreq *iwr, wlandevice_t *wlandev
 		return -EFAULT;
 	}
 
-	if (wlandev->ifup)
-	{
-		if (wlandev->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
-			wlandev->channel = channel;
-			acxlog(L_IOCTL, "Changing to channel %d\n",
-			       channel);
-			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_TX, &(wlandev->channel), 0x1, 5000);
-			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_RX, &(wlandev->channel), 0x1, 5000);	
-		} else if (wlandev->macmode == WLAN_MACMODE_ESS_STA	/* 2 */
-			   || wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ ) {
-			struct scan s;
-
-			s.count = 1; /* number of scans to do */
-			s.start_chan = channel;
-			s.flags = 0x8000;
-			s.max_rate = 20; /* 2Mbps */
-			s.options = 0x1; /* active scan or background */
-			s.chan_duration = 50; /* channel duration */
-			s.max_probe_delay = 100; /* max probe delay */
-			acxlog(L_IOCTL, "Changing to channel %d\n",
-			       channel);
-
-			acx100_scan_chan_p(wlandev, &s);
-		}
-	}
 	wlandev->channel = channel;
+	/* hmm, the following code part is strange, but this is how
+	 * it was being done before... */
+	if (wlandev->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
+		/* hmm, AP mode? So simply set channel... */
+		acxlog(L_IOCTL, "Changing to channel %d\n", wlandev->channel);
+		wlandev->set_mask |= GETSET_TX|GETSET_RX;
+	} else if (wlandev->macmode == WLAN_MACMODE_ESS_STA	/* 2 */
+		|| wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ ) {
+		/* trigger scanning... */
+		wlandev->set_mask |= GETSET_CHANNEL;
+	}
 	acx100_unlock(wlandev, &flags);
 	return 0;
 }
@@ -206,11 +183,6 @@ static inline int acx100_ioctl_set_freq(struct iwreq *iwr, wlandevice_t *wlandev
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_mode(struct iwreq *iwr, wlandevice_t *wlandev)
 {
-	/* struct scan s; */
-	unsigned long flags;
-
-	acx100_lock(wlandev, &flags);
-
 	acxlog(L_IOCTL, "Set Mode <= %i\n", iwr->u.mode);
 
 	if (iwr->u.mode == IW_MODE_ADHOC)
@@ -218,38 +190,10 @@ static inline int acx100_ioctl_set_mode(struct iwreq *iwr, wlandevice_t *wlandev
 	else if (iwr->u.mode == IW_MODE_INFRA)
 		wlandev->mode = 2;
 	else {
-		acx100_unlock(wlandev, &flags);
 		return -EOPNOTSUPP;
 	}
 
-	if (wlandev->ifup)
-	{
-		/* FIXME: this one is completely useless, right? */
-		/* acx100_join_bssid(wlandev); */
-
-		/* This is the same as is done when changing channels,
-		   it seems that this way network gets up after mode change.
-		   I don't think this is the way it should work, so FIXME */
-/*
-		s.count = 1;
-		s.start_chan = wlandev->channel;
-		s.flags = 0x8000;
-		s.max_rate = 20; // 2 Mbps 
-		s.options = 0x1;
-		s.chan_duration = 50;
-		s.max_probe_delay = 100;
-
-		acx100_scan_chan_p(wlandev, &s);
-*/
-	if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
-	{
-		transmit_disassoc(NULL,wlandev);
-	}
-		AcxSetStatus(wlandev,ISTATUS_0_STARTED);
-
-	}
-
-	acx100_unlock(wlandev, &flags);
+	wlandev->set_mask |= GETSET_MODE;
 
 	return 0;
 }
@@ -284,13 +228,14 @@ static inline int acx100_ioctl_get_waplist(struct iwreq *iwr, wlandevice_t *hw)
 	acx100_scan_chan(hw);
 
 	while (!(acx100_read_reg16(hw, ACX100_STATUS) & 0x2000)) {
+		/* FIXME: urks, busy loop! */
 	};
 
 	acxlog(L_IOCTL, "after site survey status = %d\n",
 	       hw->iStatus);
 
 	if (hw->iStatus == ISTATUS_5_UNKNOWN) {
-		hw->iStatus = hw->unknown0x2350;
+		acx100_set_status(hw, hw->unknown0x2350);
 		hw->unknown0x2350 = 0;
 	}
 
@@ -396,15 +341,11 @@ static inline int acx100_ioctl_get_waplist(struct iwreq *iwr, wlandevice_t *hw)
 static inline int acx100_ioctl_set_essid(struct iwreq *iwr, wlandevice_t *wlandev)
 {
 	int len = iwr->u.data.length;
-	unsigned long flags;
 
-	acx100_lock(wlandev, &flags);
-
-	acxlog(L_IOCTL, "Set Essid <= %s\n", iwr->u.data.pointer);
+	acxlog(L_IOCTL, "Set ESSID <= %s\n", iwr->u.data.pointer);
 
 	if (len <= 0) {
-		acx100_unlock(wlandev, &flags);
-		return 0;
+		goto end;
 	}
 
 	/* ESSID disabled? */
@@ -423,28 +364,9 @@ static inline int acx100_ioctl_set_essid(struct iwreq *iwr, wlandevice_t *wlande
 		wlandev->essid_active = 1;
 	}
 
-	if (wlandev->ifup)
-	{
-//		if ((wlandev->macmode == WLAN_MACMODE_ESS_STA /* 2 */ )
-//		    || (wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ )) {
-			/* we changed our ESSID, so let's initiate a new
-			 * scanning process to join BSSIDs with matching
-			 * ESSID */
+	wlandev->set_mask |= GETSET_ESSID;
 
-//			acx100_scan_chan(wlandev);
-		
-//		}
-		if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
-		{
-			transmit_disassoc(NULL,wlandev);
-		} 
-		AcxSetStatus(wlandev,ISTATUS_0_STARTED);
-		acx100_scan_chan(wlandev);
-
-	}
-
-	acx100_unlock(wlandev, &flags);
-
+end:
 	return 0;
 }
 
@@ -498,8 +420,8 @@ static inline int acx100_ioctl_set_rate(struct iwreq *iwr, wlandevice_t *hw)
 			break;
 
 		default:
-			acx100_unlock(hw, &flags);
 			result = -EINVAL;
+			break;
 		}
 
 	} else if (iwr->u.bitrate.fixed == 2) {
@@ -535,12 +457,11 @@ static inline int acx100_ioctl_set_rate(struct iwreq *iwr, wlandevice_t *hw)
 			break;
 
 		default:
-			acx100_unlock(hw, &flags);
 			result = -EINVAL;
+			break;
 		}
 
 	} else {
-		acx100_unlock(hw, &flags);
 		result = -EOPNOTSUPP;
 	}
 
@@ -608,14 +529,15 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 	acx100_lock(hw, &flags);
 
 	acxlog(L_IOCTL,
-	       "Set Encoding flags = %i, size = %i, key: %s\n",
+	       "Set Encoding flags = 0x%04x, size = %i, key: %s\n",
 	       iwr->u.encoding.flags, iwr->u.encoding.length,
 	       iwr->u.encoding.pointer ? "set" : "No key");
 
-	if (hw->macmode == WLAN_MACMODE_NONE /* 0 */ )
+	if (hw->mode == 0 /* Ad-Hoc */ )
 	{
 		/* ok, let's pretend it's supported, but print a
-		 * warning message */
+		 * warning message
+		 * FIXME: should be removed once it's definitely working. */
 		acxlog(L_STD, "Warning: WEP support might not be supported in Ad-Hoc mode yet!\n");
 		/* return -EOPNOTSUPP; */
 	}
@@ -623,14 +545,6 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 	index = iwr->u.encoding.flags & IW_ENCODE_INDEX;
 
 	if (iwr->u.encoding.length != 0) {
-
-		struct {
-			int pad;
-			UINT8 val0x4;
-			UINT8 val0x5;
-			UINT8 val0x6;
-			char key[29];
-		} var_9ac;
 
 		if (iwr->u.encoding.flags & IW_ENCODE_OPEN) {
 
@@ -701,14 +615,6 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 			return -EINVAL;
 		}
 
-		var_9ac.val0x4 = 1;
-		var_9ac.val0x5 = hw->wep_keys[index].size;
-		var_9ac.val0x6 = index;
-		memcpy(var_9ac.key, hw->wep_keys[index].key,
-		       var_9ac.val0x5);
-
-		acx100_configure(hw, &var_9ac, ACX100_RID_DOT11_WEP_KEY);
-
 		hw->wep_enabled = 1;
 
 	} else if (index == 0) {
@@ -717,18 +623,17 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 			hw->wep_enabled = 0;
 
 	} else if (--index <= 3) {
-		memmap_t dkey;
 
 		hw->wep_current_index = index;
-		dkey.m.dkey.num = hw->wep_current_index;
-
-		acx100_configure(hw, &dkey, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
 
 	} else {
 
 		acx100_unlock(hw, &flags);
 		return -EINVAL;
 	}
+
+	/* set flag to make sure the card WEP settings get updated */
+	hw->set_mask |= GETSET_WEP;
 
 	/* V3CHANGE: dbg msg not present */
 	acxlog(L_IOCTL, "len = %d, key at 0x%p, flags = 0x%x\n",
@@ -770,7 +675,8 @@ static inline int acx100_ioctl_get_encode(struct iwreq *iwr, wlandevice_t *wland
 {
 	if (wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ ) {
 		/* ok, let's pretend it's supported, but print a
-		 * warning message */
+		 * warning message
+		 * FIXME: should be removed once it's definitely working. */
 		acxlog(L_STD, "Warning: WEP support might not be supported in Ad-Hoc mode yet!\n");
 		/* return -EOPNOTSUPP; */
 	}
@@ -799,30 +705,9 @@ static inline int acx100_ioctl_get_encode(struct iwreq *iwr, wlandevice_t *wland
 	acxlog(L_IOCTL, "len = %d, key = %p, flags = 0x%x\n",
 	       iwr->u.encoding.length, iwr->u.encoding.pointer,
 	       iwr->u.encoding.flags);
-	       
-	return 0;
-}
-
-#if EXPERIMENTAL_VER_0_3
-/* FIXME: this should be solved by decoding the radio firmware module,
- * since it probably has some standard structure describing how to
- * set the power level of the radio module which it controls.
- * Or maybe not, since the radio module probably has a function interface
- * instead which then manages Tx level programming :-\
- */
-static inline int acx100_rfmd_set_tx_level(wlandevice_t *wlandev, UINT16 value)
-{
-	acxlog(L_STD, "setting power level to 0x%02x\n", value);
-	acx100_write_reg16(wlandev, 0x268, 0x11);
-	acx100_write_reg16(wlandev, 0x268 + 2, 0);
-	acx100_write_reg16(wlandev, 0x26c, value);
-	acx100_write_reg16(wlandev, 0x26c + 2, 0);
-	acx100_write_reg16(wlandev, 0x270, 1);
-	acx100_write_reg16(wlandev, 0x270 + 2, 0);
 
 	return 0;
 }
-#endif
 
 /*----------------------------------------------------------------
 * acx100_ioctl_get_txpow
@@ -843,52 +728,14 @@ static inline int acx100_rfmd_set_tx_level(wlandevice_t *wlandev, UINT16 value)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_get_txpow(struct iwreq *iwr, wlandevice_t *hw)
 {
-	memmap_t pow;
 	struct iw_param *rrq = &iwr->u.txpower;
-	char *txpow;
-	int txpowval;
-	unsigned long flags;
-
-	acx100_lock(hw, &flags);
-
-#if EXPERIMENTAL_VER_0_3 == 0
-	/* The current firmware seems to allow only values 2 and 1, probably
-	 * with distinct power levels of 16.5 dBm or 18 dBm, respectively.
-	 */
-	acx100_interrogate(hw, &pow, ACX100_RID_DOT11_TX_POWER_LEVEL);
-
-	switch (pow.m.gp.bytes[0])
-	{
-	case 2:
-		txpow = "16.5";
-		txpowval = 16;
-		break;
-
-	case 1:
-		txpow = "18";
-		txpowval = 18;
-		break;
-	default:
-		txpow = "??";
-		txpowval = 0;
-		break;
-	}
-#else
-	txpowval = hw->tx_level_dbm;
-#endif
 
 	rrq->flags = IW_TXPOW_DBM;
 	rrq->disabled = 0;
 	rrq->fixed = 0;
-	rrq->value = txpowval;
+	rrq->value = hw->tx_level_dbm;
 
-#if EXPERIMENTAL_VER_0_3
-	acxlog(L_IOCTL, "Get transmit power => %d dBm\n", txpowval);
-#else
-	acxlog(L_IOCTL, "Get transmit power => %s dBm\n", txpow);
-#endif
-
-	acx100_unlock(hw, &flags);
+	acxlog(L_IOCTL, "Get transmit power => %d dBm\n", hw->tx_level_dbm);
 
 	return 0;
 }
@@ -912,47 +759,11 @@ static inline int acx100_ioctl_get_txpow(struct iwreq *iwr, wlandevice_t *hw)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_txpow(struct iwreq *iwr, wlandevice_t *hw)
 {
-	memmap_t pow;
 	struct iw_param *rrq = &iwr->u.txpower;
-	char *txpow;
-	unsigned long flags;
-#if EXPERIMENTAL_VER_0_3
-	/* FIXME: most likely incorrect dBm levels for now, try to find out
-	 * proper ones */
-	unsigned char dbm2val[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
-#endif
 
-	acx100_lock(hw, &flags);
-
-#if EXPERIMENTAL_VER_0_3
 	hw->tx_level_dbm = rrq->value <= 20 ? rrq->value : 20;
 	acxlog(L_IOCTL, "Set transmit power = %d dBm\n", hw->tx_level_dbm);
-	acx100_rfmd_set_tx_level(hw, dbm2val[hw->tx_level_dbm]);
-#else
-	/* Research indicates that the GL2422VP
-	 * might have 16.5 dBm (45 mW) and 18 dBm (63 mW) */
-	switch (rrq->value)
-	{
-	case 16:
-		txpow = "16.5";
-		pow.m.gp.bytes[0] = 2;
-		break;
-	case 18:
-		txpow = "18";
-		pow.m.gp.bytes[0] = 1;
-		break;
-	default:
-		txpow = "??";
-		pow.m.gp.bytes[0] = rrq->value;
-		break;
-	}
-
-	hw->pow = pow.m.gp.bytes[0];
-	acxlog(L_IOCTL, "Set transmit power = %s dBm\n", txpow);
-	acx100_configure(hw, &pow, ACX100_RID_DOT11_TX_POWER_LEVEL);
-#endif
-
-	acx100_unlock(hw, &flags);
+	hw->set_mask |= GETSET_TXPOWER;
 
 	return 0;
 }
@@ -1170,29 +981,24 @@ static inline int acx100_ioctl_get_nick(wlandevice_t *hw, struct iw_point *ip)
 static inline int acx100_ioctl_set_nick(wlandevice_t *hw, struct iw_point *ip)
 {
 	char nickbuf[IW_ESSID_MAX_SIZE+1];
-	unsigned long flags;
-
-	acx100_lock(hw, &flags);
+	int result = 0;
 
 	if(ip->length > IW_ESSID_MAX_SIZE) {
-		acx100_unlock(hw, &flags);
-		return -E2BIG;
+		result = -E2BIG;
+		goto end;
 	}
 
-	memset(nickbuf,0,sizeof(nickbuf));
+	memset(nickbuf, 0, sizeof(nickbuf));
 
-	if (copy_from_user(nickbuf,ip->pointer,ip->length)) {
-		acx100_unlock(hw, &flags);
-		return -EFAULT;
+	if (copy_from_user(nickbuf, ip->pointer, ip->length)) {
+		result = -EFAULT;
+		goto end;
 	}
 
-	/* FIXME: consider spinlock here */
-	memcpy(hw->nick,nickbuf,sizeof(hw->nick));
-	/* FIXME: consider spinlock here */
+	memcpy(hw->nick, nickbuf, sizeof(hw->nick));
 
-	acx100_unlock(hw, &flags);
-
-	return 0;
+end:
+	return result;
 }
 
 /*----------------------------------------------------------------
@@ -1248,7 +1054,7 @@ static inline int acx100_ioctl_get_fw_stats(wlandevice_t *hw)
 	UINT host_acks;
 	UINT pci_pm;
 	UINT acm_wakeups;
-		
+
 	UINT wep_key_count;
 	UINT wep_default_key_count;
 	UINT dot11_def_key_mib;
@@ -1259,7 +1065,9 @@ static inline int acx100_ioctl_get_fw_stats(wlandevice_t *hw)
 //	int i;
 	unsigned long flags;
 
-	acx100_lock(hw, &flags);
+	if (acx100_lock(hw, &flags)) {
+		return 0;
+	}
 
 	acx100_interrogate(hw, &tmp, ACX100_RID_FIRMWARE_STATISTICS);
 
@@ -1308,8 +1116,9 @@ static inline int acx100_ioctl_unknown11(wlandevice_t *hw)
 {
 	unsigned long flags;
 	client_t client;
-	acx100_lock(hw, &flags);
 
+	if (acx100_lock(hw, &flags))
+		return 0;
 	transmit_disassoc(&client,hw);
 	acx100_unlock(hw, &flags);
 
@@ -1337,9 +1146,6 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 {
 	int *parms = (int*) iwr->u.name;
 	int enable = parms[0] > 0;
-	unsigned long flags;
-
-	acx100_lock(hw, &flags);
 
 	hw->monitor = parms[0];
 
@@ -1356,15 +1162,18 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 		break;
 	}
 
-	acx100_set_rxconfig(hw);
+	if (hw->monitor)
+		hw->monitor_setting = 0x02; /* don't decrypt default key only, override decryption mechanism */
+	else
+		hw->monitor_setting = 0x00; /* don't decrypt default key only, don't override decryption */
+
+	hw->set_mask |= SET_RXCONFIG | SET_WEP_OPTIONS;
 
 	if (enable)
 	{
 		hw->channel = parms[1];
-		acx100_issue_cmd(hw, ACX100_CMD_ENABLE_RX, &(hw->channel), 0x1, 5000);	
+		hw->set_mask |= GETSET_RX;
 	}
-
-	acx100_unlock(hw, &flags);
 
 	return 0;
 }
@@ -1388,19 +1197,9 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_get_antenna(wlandevice_t *hw)
 {
-	unsigned char antenna[0x5];
-	unsigned long flags;
-
-	acx100_lock(hw, &flags);
-
-	memset(antenna, 0, sizeof(antenna));
-	acx100_interrogate(hw, &antenna, ACX100_RID_DOT11_CURRENT_ANTENNA);
-
-	printk("current antenna value: 0x%02X\n", antenna[0x4]);
+	printk("current antenna value: 0x%02X\n", hw->antenna);
 	printk("Rx antenna selection seems to be bit 6 (0x40)\n");
 	printk("Tx antenna selection seems to be bit 5 (0x20)\n");
-
-	acx100_unlock(hw, &flags);
 
 	return 0;
 }
@@ -1425,21 +1224,13 @@ static inline int acx100_ioctl_get_antenna(wlandevice_t *hw)
 static inline int acx100_ioctl_set_antenna(wlandevice_t *hw, struct iwreq *iwr)
 {
 	UINT8 val = *( (UINT8 *) iwr->u.name );
-	unsigned long flags;
 
-	acx100_lock(hw, &flags);
-
-	memset(hw->antenna, 0, sizeof(hw->antenna));
-	acx100_interrogate(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
-	printk("current antenna value: 0x%02X\n", hw->antenna[0x4]);
+	printk("current antenna value: 0x%02X\n", hw->antenna);
 	printk("Rx antenna selection seems to be bit 6 (0x40)\n");
 	printk("Tx antenna selection seems to be bit 5 (0x20)\n");
-	hw->antenna[0x4] = val;
-	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
-	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
-	acx100_unlock(hw, &flags);
+	hw->antenna = val;
+	printk("new antenna value: 0x%02X\n", hw->antenna);
+	hw->set_mask |= GETSET_ANTENNA;
 
 	return 0;
 }
@@ -1466,18 +1257,14 @@ static inline int acx100_ioctl_set_rx_antenna(wlandevice_t *hw, struct iwreq *iw
 	UINT8 val = *( (UINT8 *) iwr->u.name );
 	unsigned long flags;
 
+	printk("current antenna value: 0x%02X\n", hw->antenna);
+	/* better keep the separate operations atomic */
 	acx100_lock(hw, &flags);
-
-	memset(hw->antenna, 0, sizeof(hw->antenna));
-	acx100_interrogate(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
-	printk("current antenna value: 0x%02X\n", hw->antenna[0x04]);
-	hw->antenna[0x04] &= 0x3f;
-	hw->antenna[0x04] |= (val << 6);
-	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
-	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
+	hw->antenna &= 0x3f;
+	hw->antenna |= (val << 6);
+	hw->set_mask |= GETSET_ANTENNA;
 	acx100_unlock(hw, &flags);
+	printk("new antenna value: 0x%02X\n", hw->antenna);
 
 	return 0;
 }
@@ -1504,18 +1291,14 @@ static inline int acx100_ioctl_set_tx_antenna(wlandevice_t *hw, struct iwreq *iw
 	UINT8 val = *( (UINT8 *) iwr->u.name );
 	unsigned long flags;
 
+	printk("current antenna value: 0x%02X\n", hw->antenna);
+	/* better keep the separate operations atomic */
 	acx100_lock(hw, &flags);
-
-	memset(hw->antenna, 0, sizeof(hw->antenna));
-	acx100_interrogate(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
-	printk("current antenna value: 0x%02X\n", hw->antenna[0x04]);
-	hw->antenna[0x04] &= 0xdf;
-	hw->antenna[0x04] |= ((val &= 0x01) << 5);
-	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
-	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
-
+	hw->antenna &= 0xdf;
+	hw->antenna |= ((val &= 0x01) << 5);
+	hw->set_mask |= GETSET_ANTENNA;
 	acx100_unlock(hw, &flags);
+	printk("new antenna value: 0x%02X\n", hw->antenna);
 
 	return 0;
 }
@@ -1539,24 +1322,14 @@ static inline int acx100_ioctl_set_tx_antenna(wlandevice_t *hw, struct iwreq *iw
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_retry(wlandevice_t *hw, struct iwreq *iwr)
 {
-	char short_retry[4 + ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN];
-	char long_retry[4 + ACX100_RID_DOT11_LONG_RETRY_LIMIT_LEN];
 	char *val = (char *)iwr->u.name;
-	unsigned long flags;
 
-	acx100_lock(hw, &flags);
-
-	printk ("current short retry limit value: %ld, current long retry limit value: %ld\n", hw->short_retry, hw->long_retry);
+	printk("current short retry limit value: %ld, current long retry limit value: %ld\n", hw->short_retry, hw->long_retry);
 	hw->short_retry = val[0];
 	hw->long_retry = val[1];
-	printk ("updated short retry limit value: %ld, updated long retry limit value: %ld\n", hw->short_retry, hw->long_retry);
+	printk("new short retry limit value: %ld, new long retry limit value: %ld\n", hw->short_retry, hw->long_retry);
 
-	short_retry[0x4] = hw->short_retry;
-	long_retry[0x4] = hw->long_retry;
-	acx100_configure(hw, &short_retry, ACX100_RID_DOT11_SHORT_RETRY_LIMIT);
-	acx100_configure(hw, &long_retry, ACX100_RID_DOT11_LONG_RETRY_LIMIT);
-
-	acx100_unlock(hw, &flags);
+	hw->set_mask |= GETSET_RETRY;
 
 	return 0;
 }
@@ -1580,10 +1353,7 @@ static inline int acx100_ioctl_set_retry(wlandevice_t *hw, struct iwreq *iwr)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_get_short_preamble(wlandevice_t *hw, struct iwreq *iwr)
 {
-	unsigned long flags;
 	char *descr = NULL;
-
-	acx100_lock(hw, &flags);
 
 	switch(hw->preamble_mode) {
 		case 0:
@@ -1596,11 +1366,9 @@ static inline int acx100_ioctl_get_short_preamble(wlandevice_t *hw, struct iwreq
 			descr = "auto (peer capability dependent)";
 			break;
 	}
-	printk ("current Short Preamble setting: %s\n", descr);
+	printk("current Short Preamble setting: %s\n", descr);
 
 	*( (int *) iwr->u.name ) = hw->preamble_mode;
-
-	acx100_unlock(hw, &flags);
 
 	return 0;
 }
@@ -1625,10 +1393,7 @@ static inline int acx100_ioctl_get_short_preamble(wlandevice_t *hw, struct iwreq
 static inline int acx100_ioctl_set_short_preamble(wlandevice_t *hw, struct iwreq *iwr)
 {
 	int val = *( (int *) iwr->u.name );
-	unsigned long flags;
 	char *descr = NULL;
-
-	acx100_lock(hw, &flags);
 
 	if ((val < 0) || (val > 2))
 		return -EINVAL;
@@ -1651,9 +1416,7 @@ static inline int acx100_ioctl_set_short_preamble(wlandevice_t *hw, struct iwreq
 				hw->preamble_flag = WLAN_GET_MGMT_CAP_INFO_SHORT(hw->station_assoc.cap);
 			break;
 	}
-	printk ("updated Short Preamble setting: %s\n", descr);
-
-	acx100_unlock(hw, &flags);
+	printk("new Short Preamble setting: %s\n", descr);
 
 	return 0;
 }
@@ -1678,19 +1441,11 @@ static inline int acx100_ioctl_set_short_preamble(wlandevice_t *hw, struct iwreq
 static inline int acx100_ioctl_set_ed_threshold(wlandevice_t *hw, struct iwreq *iwr)
 {
 	int val = *( (int *) iwr->u.name );
-	unsigned long flags;
 
-	acx100_lock(hw, &flags);
-
-	memset(hw->ed_threshold, 0, sizeof(hw->ed_threshold));
-
-	acx100_interrogate(hw, &(hw->ed_threshold), ACX100_RID_DOT11_ED_THRESHOLD);
-	printk ("current ED threshold value: 0x%02X\n", hw->ed_threshold[0x4]);
-	hw->ed_threshold[0x4] = (unsigned char)val;
-	printk ("updated ED threshold value: 0x%02X\n", (unsigned char)val);
-	acx100_configure(hw, &(hw->ed_threshold), ACX100_RID_DOT11_ED_THRESHOLD);
-
-	acx100_unlock(hw, &flags);
+	printk("current ED threshold value: 0x%02X\n", hw->ed_threshold);
+	hw->ed_threshold = (unsigned char)val;
+	printk("new ED threshold value: 0x%02X\n", (unsigned char)val);
+	hw->set_mask |= GETSET_ED_THRESH;
 
 	return 0;
 }
@@ -1719,13 +1474,10 @@ static inline int acx100_ioctl_set_cca(wlandevice_t *hw, struct iwreq *iwr)
 
 	acx100_lock(hw, &flags);
 
-	memset(hw->cca, 0, sizeof(hw->cca));
-
-	acx100_interrogate(hw, &(hw->cca), ACX100_RID_DOT11_CURRENT_CCA_MODE);
-	printk ("current CCA value: 0x%02X\n", hw->cca[0x4]);
-	hw->cca[0x4] = (unsigned char)val;
-	printk ("updated CCA value: 0x%02X\n", (unsigned char)val);
-	acx100_configure(hw, &(hw->cca), ACX100_RID_DOT11_CURRENT_CCA_MODE);
+	printk("current CCA value: 0x%02X\n", hw->cca);
+	hw->cca = (unsigned char)val;
+	printk("new CCA value: 0x%02X\n", (unsigned char)val);
+	hw->set_mask |= GETSET_CCA;
 
 	acx100_unlock(hw, &flags);
 
@@ -1733,7 +1485,6 @@ static inline int acx100_ioctl_set_cca(wlandevice_t *hw, struct iwreq *iwr)
 }
 
 static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41};
-static unsigned int reg_domain_channel_masks[] = {0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff};
 
 static unsigned char *reg_domain_strings[] =
 { "FCC (USA)        (1-11)",
@@ -1750,7 +1501,6 @@ static unsigned char *reg_domain_strings[] =
 void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id)
 {
 	int i;
-	memmap_t dom;
 
 	for (i = 0; i < 7; i++)
 		if (reg_domain_ids[i] == reg_dom_id)
@@ -1763,21 +1513,6 @@ void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id)
 	}
 	acxlog(L_STD, "setting regulatory domain to %d (0x%x): %s\n", i+1, reg_domain_ids[i], reg_domain_strings[i]);
 	wlandev->reg_dom_id = reg_domain_ids[i];
-	wlandev->reg_dom_chanmask = reg_domain_channel_masks[i];
-	dom.m.gp.bytes[0] = reg_dom_id;
-	acx100_configure(wlandev, &dom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
-	if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->channel - 1) ) ))
-	{ /* hmm, need to adjust our channel setting to reside within our
-	     domain */
-		for (i = 1; i <= 14; i++)
-			if (wlandev->reg_dom_chanmask & (1 << (i - 1) ) )
-			{
-				acxlog(L_STD, "adjusting selected channel from %d to %d due to new regulatory domain.\n", wlandev->channel, i);
-				wlandev->channel = i;
-				break;
-			}
-	}
-	return;
 }
 
 /*----------------------------------------------------------------
@@ -1826,23 +1561,15 @@ static inline int acx100_ioctl_list_reg_domain(wlandevice_t *hw)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_get_reg_domain(wlandevice_t *hw, struct iwreq *iwr)
 {
-	memmap_t dom;
-	int val, i;
-	unsigned long flags;
+	int i;
 
-	acx100_lock(hw, &flags);
-
-	acx100_interrogate(hw, &dom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
-	val = dom.m.gp.bytes[0];
 	for (i=1; i <= 7; i++)
-		if (reg_domain_ids[i-1] == val)
+		if (reg_domain_ids[i-1] == hw->reg_dom_id)
 		{
-			acxlog(L_STD, "regulatory domain is currently set to %d (0x%x): %s\n", i, val, reg_domain_strings[i-1]);
+			acxlog(L_STD, "regulatory domain is currently set to %d (0x%x): %s\n", i, hw->reg_dom_id, reg_domain_strings[i-1]);
 			*(iwr->u.name) = i;
 			break;
 		}
-
-	acx100_unlock(hw, &flags);
 
 	return 0;
 }
@@ -1867,16 +1594,12 @@ static inline int acx100_ioctl_get_reg_domain(wlandevice_t *hw, struct iwreq *iw
 static inline int acx100_ioctl_set_reg_domain(wlandevice_t *hw, struct iwreq *iwr)
 {
 	unsigned char val = *(iwr->u.name);
-	unsigned long flags;
 
 	if ((val < 1) || (val > 7))
 		return -EINVAL;
 
-	acx100_lock(hw, &flags);
-
-	acx100_set_reg_domain(hw, reg_domain_ids[val-1]);
-
-	acx100_unlock(hw, &flags);
+	hw->reg_dom_id = reg_domain_ids[val-1];
+	hw->set_mask |= GETSET_REG_DOMAIN;
 
 	return 0;
 }
@@ -1941,13 +1664,10 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	wlandevice_t *hw;
 	int mult, channel;
 	int result;
-	int reinit;
 	struct iwreq *iwr;
-	unsigned long flags;
 
 	hw = (wlandevice_t *) dev->priv;
 	iwr = (struct iwreq *) ifr;
-	reinit = 0;
 	result = 0;
 	mult = 1;
 	channel = -1;
@@ -1959,7 +1679,9 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	 * Check to see if device is present.
 	 */
 	if (! netif_device_present(dev))
+	{
 		return -ENODEV;
+	}
 
 	switch (cmd) {
 	case SIOCGIWNAME:
@@ -1975,7 +1697,6 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		   > 1000 = frequency in Hz */
 
 		result = acx100_ioctl_set_freq(iwr, hw);
-		reinit = 1;
 		break;
 
 	case SIOCGIWFREQ:
@@ -2032,14 +1753,13 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		/* set ESSID (network name) */
 
 		result = acx100_ioctl_set_essid(iwr, hw);
-		reinit = 1;
 		break;
 
 
 	case SIOCGIWESSID:
 		/* get ESSID */
 
-		acxlog(L_IOCTL, "Get Essid => %s\n", hw->essid);
+		acxlog(L_IOCTL, "Get ESSID => %s\n", hw->essid);
 
 		iwr->u.essid.flags = hw->essid_active;
 		if (hw->essid_active)
@@ -2183,9 +1903,14 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		break;
 	}
 
+	if (hw->open && hw->set_mask)
+		acx100_update_card_settings(hw, 0, 0, 0);
+
+#if THIS_LEADS_TO_CRASHES
 	if (hw->mode != 2 && reinit == 1) {
 		acx100_lock(hw, &flags);
 
+		acxlog(L_STD, "ioctl reinit\n");
 		if (!acx100_set_beacon_template(hw)) {
 			acxlog(L_BINSTD,
 			       "acx100_set_beacon_template returns error\n");
@@ -2202,6 +1927,7 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 
 		acx100_unlock(hw, &flags);
 	}
+#endif
 
 	return result;
 }

@@ -5,26 +5,61 @@
 
 Let us first mention that this driver is supposed to support EVERY SINGLE CARD
 with ACX100 chip (except for USB implementations, which are extremely rare
--- work for these is just starting).
-If it doesn't work with your ACX100 card, then please notify us
-immediately if you followed every installation advice and are at your
-wits end as to what might still make the card fail.
+-- initial successful firmware loading support is in the driver now,
+but it's far from working completely - feel free to work on this support).
+If the driver doesn't work with your ACX100 card, then please notify us
+immediately after you followed *EVERY ADVICE IN THIS FILE* (and elsewhere)
+and are at your wits end as to what might still make the card fail.
 
---- STATUS ---
+Note that any Texas Instruments chips OTHER than the ACX100 (which is
+also known as TNETW1100) are NOT supported by this driver (yet).
+These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230.
+For now, you should take these unsupported cards back to the shop
+where you bought them, mentioning completely missing unacceptable
+driver support from Texas Instruments.
 
-Currently this driver is a pretty experimental release only.
-We're not totally sure about the status of WEP support. In Ad-Hoc
-and Managed mode, using a WEP key works, but there are bugs lurking
-everywhere when you try more "advanced" settings. This needs to be
-cleaned up soon.
+Also, due to similar card naming confusion (for further information, see
+bottom), people keep thinking certain cards they own work with this
+driver. Cards that are *NOT* based on ACX100 chipset (as opposed to
+the stupidly similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+)
+are:
+DWL-G120 (PRISM GT chipset)
+DWL-G520 (Atheros AR5212A)
+DWL-G650, version A1 (PRISM GT)
+DWL-G650, version B1 (Atheros AR5211)
+DWL-G650, version B2 (Atheros AR5001)
+DWL-AG520 (Atheros AR5212)
+DWL-AB650 (Atheros AR5211)
+DWL-AG650 (Atheros AR5212)
+DWL-G520+ (TNETW1130: not supported yet!)
+DWL-G650+ (TNETW1130)
 
-Also, SMP appears to be problematic, if you have SMP turn it off. We 
-will attempt to clean this up as soon as possible.
+When looking at the DWL-G650 mess, I could puke again...
+Again, these cards listed above will NOT work with this driver, you will
+hopefully be able to find a different Linux driver supporting your card's
+chipset...
+Of course, all old DWL-120/520/650 cards also don't work with this
+driver, since they used Prism2 (except for some rare samples of the
+DWL-650, where D-Link ALSO used ACX100, confusingly).
+Feel free to send us corrections/additions to this very confusing listing above.
+
+--- STATUS AS OF 031101 ---
+
+Currently this driver still is a relatively experimental release only.
+We're still not totally sure about the status of WEP support.
+Many situations should work, but it might still not work properly
+or fail sometimes.
+
+Also, SMP appears to be problematic; if you have SMP, then turn it off.
+We will attempt to clean this up as soon as possible.
 
 Furthermore, associating with some access points might still be problematic
-due to very strict checks in their firmware.
-Many other things haven't been tested (properly) yet.
+due to strict 802.11b compliance checks in their firmware.
+
 HostAP support has not been implemented yet, but it's definitely possible.
+
+Many other things haven't been tested (properly) yet.
+
 Skillful testers and BSD driver writers welcome!!
 There is a free download of the 802.11b spec at
 http://standards.ieee.org/getieee802/
@@ -34,18 +69,26 @@ http://standards.ieee.org/getieee802/
 Relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental),
 with CONFIG_NET_RADIO enabled ("Wireless LAN") and CONFIG_NET_WIRELESS,
 for wireless extensions (iwconfig etc.). And Non-SMP. And of course you
-need proper kernel header files / kernel source installed for the kernel
-you're running!
+need proper kernel header files / kernel source installed for the exact
+kernel you're running!
 
-Next, a firmware is needed. We cannot ship this with our driver, so you
-will have to get it elsewhere. There are two options: you have a windows
-driver installed or have a zip file with all the necessary windows files
-in it (for example D-Link installer), or you have a binary linux driver
-(not recommended, since these contain much older firmware files).
+Also, you need to have the package containing iwconfig, iwpriv & Co.
+installed on your system (Debian: package wireless-tools).
+
+Next, a firmware is needed.
+We cannot ship this with our driver, so you will have to get it elsewhere.
+There are two options:
+a) you have a windows driver installed or have a zip file with all the
+   necessary windows files in it (for example D-Link installer)
+b) you have a binary linux driver (not recommended, since these contain
+   much older firmware files)
 
 Certain DWL-650+ and 520+ cards and Planet cards use a Maxim radio instead of
-the usual RFMD, so these cards will not work with the linux driver firmware
-and so the windows firmware must be used.
+the usual RFMD, so these cards will not work with the limited proprietary
+linux driver binary's firmware and so a windows firmware with proper
+support for this radio type must be used.
+
+Again, here are your options:
 
 -- Firmware provided by Windows driver --
 
@@ -58,7 +101,7 @@ Ready to roll. :)
 
 Longer background explanation (READ IN CASE OF PROBLEMS!):
 
-The firmware used by windows driver consists of several files normally
+The firmware used by the windows driver consists of several files normally
 named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
 the c:\winnt\system32 directory, or in the install archive.
 Place these files in the firmware directory, and you are ready to roll.
@@ -73,14 +116,14 @@ Here you have a choice, you can either copy the individual files over
 or use the combined file on its own. If you copy the combined file it must be
 renamed to "WLANGEN.BIN".
 
-The files in the recent driver package are:
+The firmware files in the recent driver package are:
 WLANGEN.BIN - Generic firmware
 RADIO0d.BIN - Maxim radio module
 RADIO11.BIN - RFMD radio module
 RADIO15.BIN - UNKNOWN radio module, e.g. for DrayTek Vigor 520, found at
 e.g. ftp://ftp.draytek.com.tw/VIGOR520/Driver/3.99.3.0/driver.zip
 
-The files in earlier packages are:
+The firmware files in earlier packages are:
 AIRPLUS.BIN  - Firmware with embedded RFMD module
 APLUSMX.BIN  - Firmware with embedded Maxim module
 APLUSGEN.BIN - Generic firmware
@@ -100,11 +143,11 @@ you are set. Make sure that no radio modules (RADIO*.BIN) files are
 placed in the firmware directory when using a linux firmware, otherwise
 the driver will attempt to load and initialise the radio module for your
 card again, with unpredictable results (FIXME: need to check against
-firmware version on this one, to avoid such trouble).
+firmware version on this one, to avoid such trouble; in other words:
+which version was the last combined firmware version: please tell us!).
 The linux driver already has the radio module embedded in the firmware.
-The firmware version this Linux driver contains is 1.5.0, as printed during
-our driver initialisation.
-
+The firmware version which this Linux driver contains is 1.5.0,
+as printed during our driver initialisation.
 
 
 You may tell us about your experiences with various firmware versions on
@@ -112,9 +155,9 @@ our Wiki page FirmwareExperiences.
 
 --- "NORMAL" INSTALLATION ---
 
-This is the usual installation on Linux 2.4.x.
+This is the usual way to get the driver running on Linux 2.4.x.
 
-For installation, you have two choices:
+You have two choices:
 
 The fast way:
   Just run "make" in the main directory (make sure to have package
@@ -183,46 +226,77 @@ with linux-2.6 ;-)
 
 --- USAGE HINTS ---
 
-If you plan to do wireless traffic monitoring with Kismet, then choose
-card type Orinoco in kismet.conf.
+Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf.
+
+Wired-Wireless bridging? Driver would perhaps need to support WDS
+(whatever that is). For now, proxy ARP should do:
+http://www.hazard.maks.net/parprouted/
 
 --- TROUBLESHOOTING / WORKAROUNDS ---
 
-Driver build problems:
-If the driver compile keeps failing, then it might be caused by a module
-version conflict of your current kernel. Consider completely recompiling
-the kernel, then removing the WHOLE /lib/modules/KERNELVERSION/ directory tree,
-then reinstalling this kernel and rebooting. Hopefully the driver compiling
-works then.
+Don't forget to set the driver debug/log level (see above) to 0xffff in case
+normal message logging is insufficient to resolve your card problem!
 
-Driver init/network failure:
+-- Driver build problems --
+If the driver compile or loading keeps failing, then it might be caused
+by a module version conflict of your current kernel, such as:
+
+./../src/acx100_pci.o: unresolved symbol unregister_netdev_Rdbdb76d4
+
+Consider completely recompiling the kernel (make sure to keep any old
+.config file with previous config settings!), then removing the WHOLE
+/lib/modules/KERNELVERSION/ directory tree, then reinstalling this kernel and
+rebooting. Hopefully the driver compiling works then.
+
+-- Driver init failure --
+In case of ACX100 CardBus, you need to make sure you're using
+kernel CardBus support, not pcmcia-cs CardBus modules!
+(yenta socket instead of e.g. i82365)
+On SUSE: "kernel" type instead of "external".
+Thinkpad notebook? Make sure your CardBus feature is enabled in the
+configuration utility...
+If your card gets recognized as "Anonymous Memory" (i.e. gets inserted,
+but doesn't get recognized as a CardBus card), then try to use
+further memory and port areas in /etc/pcmcia/config.opts (restart
+pcmcia-cs). Also, try *restricting* the areas it probes instead: sometimes it
+fails to detect a card if there are large amounts of ranges to be probed.
+Please tell us if this managed to resolve some issue with a particular card!
+Use tools like "cardctl info", "lspci -v", "dump_cis".
+
+-- Network failure --
 First, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
 Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a peer card).
+Further, the ESSID is CaSe SEnsITivE!
 
 Then read the file containing the driver log (the file where
-the KERN_WARNING channel gets written to), as given in the syslog
-configuration file which is called /etc/sysklogd.conf or similar.
+the KERN_WARNING channel gets written to, somewhere in /var/log),
+as given in the syslog configuration file which is called /etc/sysklogd.conf
+or similar.
+Make sure that network association is working properly!
+(all steps that get listed from STARTED, SCANNING, WAIT_AUTH,
+AUTHENTICATED to ASSOCIATED finish successfully)
 
-If you still have trouble, then make sure that you didn't get an iwconfig
-version incompatibility warning. This can mess up quite a lot :-((
+
+If you are still having trouble, then make sure that you didn't get an iwconfig
+version incompatibility warning. This can mess up terribly many settings :-((
 
 We tried to make the driver log as dumbed down as possible to make sure
-even casual users are able to follow the network association steps
+even casual wireless users are able to follow the network association steps
 towards the final successful association.
-
-When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 Usual power levels for a connection are (at least for my PheeNet WL-0022
 CardBus, other people WILL have better or worse results!):
-Signal level 86/100 (extremely good, at least to my AP PheeNet withDWL-900AP+ firmware; directly neighbouring the AP)
+Signal level 86/100 (extremely good, at least to my PheeNet AP with DWL-900AP+ firmware; directly neighbouring the AP)
 Signal level 29/100 (anything less: connection lost @22Mbps)
 Signal level 26/100 (anything less: connection lost @11Mbps)
 Signal level 21/100 (anything less: connection lost @1Mbps)
 Noise level 0/100 (anything more can be problematic, > 10 is deadly)
 Link Quality == reverse of Noise level
+
+When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
 
 If you still have trouble getting a connection, or if the connection is
@@ -233,7 +307,7 @@ And if that still doesn't give you the info you need,
 then consider NOT posting a request on the Forum or writing to the mailing
 lists, since we cannot track these properly.
 Instead, post a Tracker item at one of Bugs, Support Requests, Feature
-Requests. This way development will be MUCH more organized, with proper
+Requests. This way development will be much more organized, with proper
 status and processing assigned to each request, and hopefully nothing
 falling through the cracks.
 
@@ -241,7 +315,7 @@ falling through the cracks.
 
 - will not work on SMP multi-processor kernels yet
            (some problems, maybe even crashes). Working to fix that.
-- power management (suspend/resume) handlers are not implemented yet
+- power management (suspend/resume) handlers are not finished yet
 - no automatic rate adaptation yet
            (setting rate to 22M will prevent communication with 11M peers)
            We'll have to implement auto rate adaptation properly soon.

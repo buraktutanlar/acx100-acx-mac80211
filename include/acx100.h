@@ -356,7 +356,7 @@ Configuration RIDs: Network Parameters, Static Configuration Entities
 #define		ACX100_RID_QUEUE_CONFIG			0x03
 #define		ACX100_RID_BLOCK_SIZE			0x04
 #define		ACX100_RID_MEMORY_CONFIG_OPTIONS	0x05
-#define		ACX100_RID_RATE				0x06
+#define		ACX100_RID_RATE_FALLBACK			0x06
 #define		ACX100_RID_WEP_OPTIONS			0x07
 #define		ACX100_RID_MEMORY_MAP			0x08	/* huh? */
 #define		ACX100_RID_SSID				0x08	/* huh? */
@@ -403,7 +403,7 @@ Configuration RID lengths: Network Params, Static Config Entities
 #define		ACX100_RID_QUEUE_CONFIG_LEN		0x1c
 #define		ACX100_RID_BLOCK_SIZE_LEN		0x02
 #define		ACX100_RID_MEMORY_CONFIG_OPTIONS_LEN	0x14
-#define		ACX100_RID_RATE_LEN			0x01
+#define		ACX100_RID_RATE_FALLBACK_LEN		0x01
 #define		ACX100_RID_WEP_OPTIONS_LEN		0x03
 #define		ACX100_RID_MEMORY_MAP_LEN		0x28
 #define		ACX100_RID_SSID_LEN			0x20
