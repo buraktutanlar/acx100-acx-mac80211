@@ -3023,6 +3023,7 @@ static int acx_set_defaults(wlandevice_t *priv)
 
 	priv->led_power = (UINT8)1; /* LED is active on startup */
 	priv->brange_max_quality = (UINT8)60; /* LED blink max quality is 60 */
+	priv->brange_time_last_state_change = jiffies;
 
 	/* copy the MAC address we just got from the card
 	 * into our MAC address used during current 802.11 session */

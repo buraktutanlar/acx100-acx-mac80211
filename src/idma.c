@@ -49,6 +49,9 @@
 #include <wlan_compat.h>
 
 #include <linux/pci.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
+#include <linux/dma-mapping.h>
+#endif
 
 
 
@@ -66,13 +69,21 @@
 #include <ihw.h>
 #include <monitor.h>
 
-/* ACX100 buffer count used to be increased to 32 each,
- * but several people had memory allocation issues,
- * so back to 16 again... */
+/* Now that the pci_alloc_consistent() problem has been resolved,
+ * feel free to modify buffer count for ACX100 to 32, too.
+ * But it's not required since the card isn't too fast anyway */
 #define RXBUFFERCOUNT_ACX100 16
 #define TXBUFFERCOUNT_ACX100 16
-#define RXBUFFERCOUNT_ACX111 16 /* used to be 32, and the Windows driver uses */
-#define TXBUFFERCOUNT_ACX111 16 /* 32 too, but mem alloc of 32 often fails */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
+/* dma_alloc_coherent() uses GFP_KERNEL, much less problematic than
+ * the pci_alloc_consistent() used below using GFP_ATOMIC (quite often causes
+ * a larger alloc to fail), so use less buffers there to be more successful */
+#define RXBUFFERCOUNT_ACX111 32
+#define TXBUFFERCOUNT_ACX111 32
+#else
+#define RXBUFFERCOUNT_ACX111 16
+#define TXBUFFERCOUNT_ACX111 16
+#endif
 #define TXBUFFERCOUNT_USB 10
 #define RXBUFFERCOUNT_USB 10
 
@@ -84,6 +95,29 @@ void acx_dump_bytes(void *, int);
 extern void acx100usb_tx_data(wlandevice_t *,void *);
 #endif
 
+static inline void *acx_alloc_coherent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle, int flag)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
+	return dma_alloc_coherent(hwdev == NULL ? NULL : &hwdev->dev, size, dma_handle, flag);
+#else
+	{
+		static int warn_count = 0;
+
+		if (warn_count++ < 1)
+			acxlog(0xffff, "WARNING: using old PCI-specific DMA allocation, may fail, out-of-mem!! Upgrade kernel if it does...\n");
+		return pci_alloc_consistent(hwdev, size, dma_handle);
+	}
+#endif
+}
+
+static inline void acx_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
+	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev, size, vaddr, dma_handle);
+#else
+	pci_free_consistent(hwdev, size, vaddr, dma_handle);
+#endif
+}
 
 /*----------------------------------------------------------------
 * acx_free_desc_queues
@@ -112,7 +146,7 @@ static void acx_free_desc_queues(TIWLAN_DC *pDc)
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (NULL != ptr) \
 	{ \
-		pci_free_consistent(0, size, ptr, phyaddr); \
+		acx_free_coherent(0, size, ptr, phyaddr); \
 		ptr = NULL; \
 		size = 0; \
 	}
@@ -1229,7 +1263,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (!(pDc->pFrameHdrQPool =
-	      pci_alloc_consistent(0, pDc->FrameHdrQPoolSize, &pDc->FrameHdrQPoolPhyAddr))) {
+	      acx_alloc_coherent(priv->pdev, pDc->FrameHdrQPoolSize, &pDc->FrameHdrQPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "pDc->pFrameHdrQPool memory allocation FAILED\n");
 		goto fail;
 	}
@@ -1249,7 +1283,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	pDc->TxBufferPoolSize = priv->TxQueueCnt * (WLAN_MAX_ETHFRM_LEN - WLAN_ETHHDR_LEN);
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (!(pDc->pTxBufferPool =
-	      pci_alloc_consistent(0, pDc->TxBufferPoolSize, &pDc->TxBufferPoolPhyAddr))) {
+	      acx_alloc_coherent(priv->pdev, pDc->TxBufferPoolSize, &pDc->TxBufferPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "pDc->pTxBufferPool memory allocation (%d bytes) FAILED\n", pDc->TxBufferPoolSize);
 		goto fail;
 	}
@@ -1271,8 +1305,8 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	pDc->TxHostDescQPoolSize =  priv->TxQueueCnt * sizeof(struct txhostdescriptor) + 3;
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (!(pDc->pTxHostDescQPool =
-	      pci_alloc_consistent(0, pDc->TxHostDescQPoolSize,
-				  &pDc->TxHostDescQPoolPhyAddr))) {
+	      acx_alloc_coherent(priv->pdev, pDc->TxHostDescQPoolSize,
+				  &pDc->TxHostDescQPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue; see README\n");
 		goto fail;
 	}
@@ -1354,6 +1388,8 @@ fail:
 	return res;
 }
 
+/* FIXME: shouldn't free memory on failure, do it just like
+ * acx100_create_tx_host_desc_queue instead... */
 static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv = pDc->priv;
@@ -1380,7 +1416,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 				+ priv->TxQueueCnt * eth_body_len;
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (!(pDc->pTxBufferPool =
-	      pci_alloc_consistent(0, pDc->TxBufferPoolSize, &pDc->TxBufferPoolPhyAddr))) {
+	      acx_alloc_coherent(priv->pdev, pDc->TxBufferPoolSize, &pDc->TxBufferPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "pDc->pTxBufferPool memory allocation error\n");
 		FN_EXIT(1, 2);
 		return 2;
@@ -1404,10 +1440,10 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	pDc->TxHostDescQPoolSize =  priv->TxQueueCnt * sizeof(struct txhostdescriptor) + 3;
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (!(pDc->pTxHostDescQPool =
-	      pci_alloc_consistent(0, pDc->TxHostDescQPoolSize,
-				   &pDc->TxHostDescQPoolPhyAddr))) {
+	      acx_alloc_coherent(priv->pdev, pDc->TxHostDescQPoolSize,
+				   &pDc->TxHostDescQPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue; see README\n");
-		pci_free_consistent(0, pDc->TxBufferPoolSize,
+		acx_free_coherent(0, pDc->TxBufferPoolSize,
 				    pDc->pTxBufferPool,
 				    pDc->TxBufferPoolPhyAddr);
 		FN_EXIT(1, 2);
@@ -1538,8 +1574,8 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (NULL == (pDc->pRxHostDescQPool =
-	     pci_alloc_consistent(0, pDc->RxHostDescQPoolSize,
-				&pDc->RxHostDescQPoolPhyAddr))) {
+	     acx_alloc_coherent(priv->pdev, pDc->RxHostDescQPoolSize,
+				&pDc->RxHostDescQPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "Failed to allocate shared memory for RxHostDesc queue; see README\n");
 		goto fail;
 	}
@@ -1556,8 +1592,8 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 	pDc->RxBufferPoolSize = ( priv->RxQueueCnt * (RX_BUFFER_SIZE) );
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (NULL == (pDc->pRxBufferPool =
-	     pci_alloc_consistent(0, pDc->RxBufferPoolSize,
-				  &pDc->RxBufferPoolPhyAddr))) {
+	     acx_alloc_coherent(priv->pdev, pDc->RxBufferPoolSize,
+				  &pDc->RxBufferPoolPhyAddr, GFP_KERNEL))) {
 		acxlog(L_STD, "Failed to allocate shared memory for Rx buffer (%d bytes); see README\n", pDc->RxBufferPoolSize);
 		goto fail;
 	}

@@ -63,11 +63,15 @@
 #define stack_t unsigned long
 #define __s64 signed long long
 #endif
+
 #include <linux/config.h>
 #include <linux/version.h>
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
+#include <linux/moduleparam.h>
+#endif
 
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -455,10 +459,10 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 		(UINT32)((fw_major << 24) + (fw_minor << 16) + (fw_sub << 8) + fw_extra);
 	acxlog(L_DEBUG, "firmware_numver 0x%08x\n", priv->firmware_numver);
 
-	priv->firmware_id = fw.hw_id;
+	priv->firmware_id = le32_to_cpu(fw.hw_id);
 
 	/* we're able to find out more detailed chip names now */
-	switch (fw.hw_id & 0xffff0000) {
+	switch (priv->firmware_id & 0xffff0000) {
 		case 0x01010000:
 		case 0x01020000:
 			priv->chip_name = name_tnetw1100a;
@@ -471,7 +475,7 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 			priv->chip_name = name_tnetw1130;
 			break;
 		default:
-			acxlog(0xffff, "unknown chip ID 0x%08x, please report!!\n", fw.hw_id);
+			acxlog(0xffff, "unknown chip ID 0x%08x, please report!!\n", priv->firmware_id);
 			break;
 	}
 
@@ -549,7 +553,7 @@ static void acx_display_hardware_details(wlandevice_t *priv)
 			break;
 	}
 
-	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%04x. Uploaded firmware '%s' (0x%08x).\n", priv->form_factor, form_str, priv->radio_type, radio_str, priv->eeprom_version, priv->firmware_version, priv->firmware_id);
+	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%02x. Uploaded firmware '%s' (0x%08x).\n", priv->form_factor, form_str, priv->radio_type, radio_str, priv->eeprom_version, priv->firmware_version, priv->firmware_id);
 
 	FN_EXIT(0, OK);
 }
@@ -560,7 +564,7 @@ static void acx_show_card_eeprom_id(wlandevice_t *priv)
 	UINT16 i;
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
-	/* use direct eeprom access */
+	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
 		if (OK != acx_read_eeprom_offset(priv,
 					 (UINT16)(ACX100_EEPROM_ID_OFFSET + i),
@@ -802,6 +806,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(priv, 0, sizeof(wlandevice_t));
 
+#if (WLAN_HOSTIF!=WLAN_USB)
+	priv->pdev = pdev;
+#endif
 	priv->chip_type = chip_type;
 	priv->chip_name = chip_name;
 	if (PCI_HEADER_TYPE_CARDBUS == (int)pdev->hdr_type) {
@@ -1238,8 +1245,7 @@ static int acx_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *data)
 			}
 			/* better wait for some time to make sure Tx is
 			 * finished */
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ / 4);
+			acx_schedule(HZ / 4);
 
 			/* Then we set our flag */
 			acx_set_status(priv, ISTATUS_0_STARTED);
@@ -1324,13 +1330,13 @@ static void acx_up(netdevice_t *dev)
 	acx_enable_irq(priv);
 	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111) ) /* FIXME: first version? */ {
 		/* newer firmware versions don't use a hardware timer any more */
-		acxlog(L_INIT, "firmware version >= 1.9.3.e --> using software timer\n");
+		acxlog(L_INIT, "firmware version >= 1.9.3.e --> using S/W timer\n");
 		init_timer(&priv->mgmt_timer);
 		priv->mgmt_timer.function = acx_timer;
 		priv->mgmt_timer.data = (unsigned long)priv;
 	}
 	else {
-		acxlog(L_INIT, "firmware version < 1.9.3.e --> using hardware timer\n");
+		acxlog(L_INIT, "firmware version < 1.9.3.e --> using H/W timer\n");
 	}
 	if ( CHIPTYPE_ACX111 == priv->chip_type ) {
 	    acx_init_wep(priv);
@@ -1643,9 +1649,6 @@ static void acx_tx_timeout(netdevice_t *dev)
 {
 	wlandevice_t *priv;
 
-	/* FIXME: for debugging [041003], remove after some time */
-	printk("dev is %p\n", dev);
-
 	FN_ENTER;
 	
 	priv = (wlandevice_t *)dev->priv;
@@ -1771,7 +1774,9 @@ static void acx_set_multicast_list(netdevice_t *dev)
 		dev->flags &= ~(IFF_PROMISC|IFF_ALLMULTI);
 	}
 
-	acx_update_card_settings(priv, 0, 0, 0);
+	/* cannot update card settings directly here, atomic context! */
+	SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
+	acx_schedule_after_interrupt_task(priv);
 
 	FN_EXIT(0, OK);
 }
@@ -1779,9 +1784,6 @@ static void acx_set_multicast_list(netdevice_t *dev)
 static inline void acx_update_link_quality_led(wlandevice_t *priv)
 {
 	int qual;
-
-	if (unlikely(priv->brange_time_last_state_change == 0))
-		priv->brange_time_last_state_change = jiffies;
 
 	qual = acx_signal_determine_quality(priv->wstats.qual.level, priv->wstats.qual.noise);
 	if (qual > priv->brange_max_quality)
@@ -2134,7 +2136,7 @@ static void acx_after_interrupt_task(void *data)
 	FN_ENTER;
 
 	if(unlikely(in_interrupt())) {
-		acxlog(L_IRQ, "You cannot call this method within interrupt context\n");
+		acxlog(L_IRQ, "Don't call this in IRQ context!\n");
 		return;
 	}
 			
@@ -2207,6 +2209,10 @@ static void acx_after_interrupt_task(void *data)
 				}
 			}
 		}
+		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG) {
+			acx_update_card_settings(priv, 0, 0, 0);
+			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
+		}
 	}
 
 	FN_EXIT(0, OK);
@@ -2273,6 +2279,8 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 
 #ifdef MODULE
 
+/* introduced earlier than 2.6.10, but takes more memory, so don't use it
+ * if there's no compile warning by kernel */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 #ifdef ACX_DEBUG
 module_param(debug, int, 0);

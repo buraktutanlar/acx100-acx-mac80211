@@ -467,8 +467,9 @@ when not associated: needs reinit of card parts)
 Also, this will only work in case your AP's MAC filter doesn't deny your new
 MAC!
 
-Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
-(in case of an older Kismet release which didn't know the acx100 type yet).
+Wireless traffic monitoring (promiscuous mode) with Kismet? Set card type
+Orinoco in kismet.conf (in case of an older Kismet release which didn't know
+the acx100 type yet).
 Oh, and also make sure to run "iwpriv wlan0 monitor 2 4" to enable.
 
 Wired-Wireless bridging? Driver would perhaps need to support WDS
@@ -595,10 +596,9 @@ in the Makefile, then recompile, to use 16bit I/O access instead
 of slightly problematic but faster 32bit access.
 
 If you get messages similar to
-"Failed to allocate shared memory for Rx buffer...", then this could indicate
-that you don't have enough (DMA capable) RAM available for this driver
-configuration. Downscaling ...XBUFFERCOUNT... defines in src/idma.c may help.
-Alternatively buying more RAM (which is always VERY important in Linux!) may
+"Failed to allocate shared memory for Rx buffer...", then please report.
+This shouldn't happen any more, unless you have very little memory,
+in which case buying more RAM (which is always VERY important in Linux!) may
 help.
 
 -- Driver locked up the box (OOPS etc.) --
@@ -684,8 +684,12 @@ Disable any 4X mode feature on your 22Mbps AP, since our driver doesn't support
 Using IPv6? Make sure to configure an MTU >= 1280, otherwise setting
 the address will fail with an obscure "not enough buffer space" kernel error!
 
+If your transfer speed is very low in auto rate mode, then make sure to use
+a maximum rate that's compatible with the maximum rate of your peer
+(non-auto-rate mode wouldn't get any connection in that case, BTW...).
+
 If you are still having trouble, then make sure that you didn't get an iwconfig
-version incompatibility warning. This can mess up terribly many settings :-((
+version incompatibility warning. This can mess up terribly many settings :-(
 Get new wireless-tools then...
 
 We tried to make the driver log as dumbed down as possible to make sure
@@ -740,8 +744,8 @@ lists, since we cannot track these properly.
 Instead, post a Tracker item at one of Bugs, Support Requests, Feature
 Requests. This way development will be much more organized, with proper
 status and processing assigned to each request, and hopefully nothing
-falling through the cracks. And please try to not post anonymously,
-since this severely degrades tracking quality.
+falling through the cracks. Please try to not post anonymously,
+since this severely degrades tracking quality. Thanks!
 
 ****************************************
 A useful report would include:

@@ -335,6 +335,7 @@ typedef enum {
 #define ACX_AFTER_IRQ_CMD_STOP_SCAN		0x01
 #define ACX_AFTER_IRQ_CMD_ASSOCIATE		0x02
 #define ACX_AFTER_IRQ_CMD_RADIO_RECALIB		0x04
+#define ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG	0x08
 
 /*--- Buffer Management Commands ---------------------------------------------*/
 
@@ -1223,6 +1224,8 @@ struct peer {
 typedef struct wlandevice {
 	/*** Device chain ***/
 	struct wlandevice	*next;		/* link for list of devices */
+
+	struct pci_dev *pdev;	
 
 	/*** Linux network device ***/
 	struct net_device *netdev;		/* pointer to linux netdevice */
