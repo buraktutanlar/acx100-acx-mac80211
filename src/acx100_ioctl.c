@@ -80,35 +80,38 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
-/* someone broke SET/GET convention: SETs must be even, GETs odd */
-#define ACX100_IOCTL			SIOCIWFIRSTPRIV
-#define ACX100_IOCTL_DEBUG		ACX100_IOCTL + 0x00
-#define ACX100_IOCTL_LIST_DOM		ACX100_IOCTL + 0x01
-#define ACX100_IOCTL_SET_DOM		ACX100_IOCTL + 0x02
-#define ACX100_IOCTL_GET_DOM		ACX100_IOCTL + 0x03
-#define ACX100_IOCTL_SET_SCAN_MODE	ACX100_IOCTL + 0x04
-#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x06
-#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x08
-#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x09
-#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x11
-#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x12
-#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x14
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x16
-#define ACX100_IOCTL_GET_PLED		ACX100_IOCTL + 0x17
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x18
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x19
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x1a
-#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x1b
-#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x1c
-#define ACX111_IOCTL_INFO		ACX100_IOCTL + 0x1d
-#define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x1e
-#define ACX100_IOCTL_GET_BRANGE_MAXQUALITY		ACX100_IOCTL + 0x13 /* Sorry, about breaking odd/even, */
-#define ACX100_IOCTL_SET_BRANGE_MAXQUALITY		ACX100_IOCTL + 0x0f /* but I couldn't set these to 0x20/0x21 */
+/* someone broke SET/GET convention: SETs must have even position, GETs odd */
+#define ACX100_IOCTL SIOCIWFIRSTPRIV
+enum {
+	ACX100_IOCTL_DEBUG = ACX100_IOCTL,
+	ACX100_IOCTL_GET__________UNUSED1,
+	ACX100_IOCTL_SET_PLED,
+	ACX100_IOCTL_GET_PLED,
+	ACX100_IOCTL_SET_RATES,
+	ACX100_IOCTL_LIST_DOM,
+	ACX100_IOCTL_SET_DOM,
+	ACX100_IOCTL_GET_DOM,
+	ACX100_IOCTL_SET_SCAN_PARAMS,
+	ACX100_IOCTL_GET_SCAN_PARAMS,
+	ACX100_IOCTL_SET_PREAMB,
+	ACX100_IOCTL_GET_PREAMB,
+	ACX100_IOCTL_SET_ANT,
+	ACX100_IOCTL_GET_ANT,
+	ACX100_IOCTL_RX_ANT,
+	ACX100_IOCTL_TX_ANT,
+	ACX100_IOCTL_SET_PHY_AMP_BIAS,
+	ACX100_IOCTL_GET_PHY_CHAN_BUSY,
+	ACX100_IOCTL_SET_ED,
+	ACX100_IOCTL_GET__________UNUSED3,
+	ACX100_IOCTL_SET_CCA,
+	ACX100_IOCTL_GET__________UNUSED4,
+	ACX100_IOCTL_MONITOR,
+	ACX100_IOCTL_TEST,
+	ACX100_IOCTL_DBG_SET_MASKS,
+	ACX111_IOCTL_INFO,
+	ACX100_IOCTL_DBG_SET_IO,
+	ACX100_IOCTL_DBG_GET_IO,
+};
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -126,6 +129,18 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	get_args : 0,
 	name : "SetDebug" },
 #endif
+{ cmd : ACX100_IOCTL_SET_PLED,
+	set_args : IW_PRIV_TYPE_BYTE | 2,
+	get_args : 0,
+	name : "SetLEDPower" },
+{ cmd : ACX100_IOCTL_GET_PLED,
+	set_args : 0,
+	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 2,
+	name : "GetLEDPower" },
+{ cmd : ACX100_IOCTL_SET_RATES,
+	set_args : IW_PRIV_TYPE_CHAR | 256,
+	get_args : 0,
+	name : "SetRates" },
 { cmd : ACX100_IOCTL_LIST_DOM,
 	set_args : 0,
 	get_args : 0,
@@ -138,14 +153,14 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : 0,
 	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	name : "GetRegDomain" },
-{ cmd : ACX100_IOCTL_SET_SCAN_MODE,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+{ cmd : ACX100_IOCTL_SET_SCAN_PARAMS,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
 	get_args : 0,
-	name : "SetScanMode" },
-{ cmd : ACX100_IOCTL_SET_SCAN_CHAN_DELAY,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetScanDelay" },
+	name : "SetScanParams" },
+{ cmd : ACX100_IOCTL_GET_SCAN_PARAMS,
+	set_args : 0,
+	get_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
+	name : "GetScanParams" },
 { cmd : ACX100_IOCTL_SET_PREAMB,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -174,7 +189,7 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetPhyAmpBias"},
-{ cmd : ACX100_IOCTL_GET_PHY_MEDIUM_BUSY,
+{ cmd : ACX100_IOCTL_GET_PHY_CHAN_BUSY,
 	set_args : 0,
 	get_args : 0,
 	name : "GetPhyChanBusy" },
@@ -186,22 +201,6 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetCCA" },
-{ cmd : ACX100_IOCTL_SET_PLED,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetLEDPower" },
-{ cmd : ACX100_IOCTL_GET_PLED,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "GetLEDPower" },
-{ cmd : ACX100_IOCTL_SET_BRANGE_MAXQUALITY,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetBlinkMaxQ" },
-{ cmd : ACX100_IOCTL_GET_BRANGE_MAXQUALITY,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "GetBlinkMaxQ" },
 { cmd : ACX100_IOCTL_MONITOR,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
@@ -214,23 +213,18 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
 	name : "DbgSetMasks" },
-{ cmd : ACX100_IOCTL_DBG_GET_IO,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
-	get_args : 0,
-	name : "DbgGetIO" },
-{ cmd : ACX100_IOCTL_DBG_SET_IO,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
-	get_args : 0,
-	name : "DbgSetIO" },
 { cmd : ACX111_IOCTL_INFO,
 	set_args : 0,
 	get_args : 0,
 	name : "GetAcx111Info" },
-{ cmd : ACX100_IOCTL_SET_RATES,
-	set_args : IW_PRIV_TYPE_CHAR | 256,
+{ cmd : ACX100_IOCTL_DBG_SET_IO,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
 	get_args : 0,
-	name : "SetRates" },
-
+	name : "DbgSetIO" },
+{ cmd : ACX100_IOCTL_DBG_GET_IO,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
+	get_args : 0,
+	name : "DbgGetIO" },
 };
 
 /*------------------------------------------------------------------------------
@@ -263,10 +257,11 @@ static inline int acx_ioctl_commit(struct net_device *dev,
 static inline int acx_ioctl_get_name(struct net_device *dev, struct iw_request_info *info, char *cwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	const char * const protocol_name =
-		(CHIPTYPE_ACX100 == priv->chip_type) ? "IEEE 802.11b+" : "IEEE 802.11g+";
-	acxlog(L_IOCTL, "Get Name ==> %s\n", protocol_name);
-	strcpy(cwrq, protocol_name);
+
+	strcpy(cwrq, "IEEE 802.11b+");
+	if (CHIPTYPE_ACX111 == priv->chip_type)
+			cwrq[11] = 'g';
+	acxlog(L_IOCTL, "Get Name ==> %s\n", cwrq);
 	return OK;
 }
 
@@ -1291,11 +1286,6 @@ static inline int acx_ioctl_get_encode(struct net_device *dev, struct iw_request
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 
-	if (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted) {
-		/* it's most definitely supported now. */
-		/* return -EOPNOTSUPP; */
-	}
-
 	if (priv->wep_enabled == (UINT8)0)
 	{
 		dwrq->flags = IW_ENCODE_DISABLED;
@@ -1799,7 +1789,7 @@ static inline int acx_ioctl_set_retry(struct net_device *dev,
 		goto end;
 	}
 	if (IW_RETRY_LIMIT == (vwrq->flags & IW_RETRY_TYPE)) {
-		(void)printk("current retry limits: short %d long %d\n", priv->short_retry, priv->long_retry);
+		(void)printk("old retry limits: short %d long %d\n", priv->short_retry, priv->long_retry);
                 if (0 != (vwrq->flags & IW_RETRY_MAX)) {
                         priv->long_retry = vwrq->value;
                 } else if (0 != (vwrq->flags & IW_RETRY_MIN)) {
@@ -2113,7 +2103,7 @@ static inline int acx_ioctl_set_antenna(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
-	(void)printk("current antenna value: 0x%02X (COMBINED bit mask)\n"
+	(void)printk("old antenna value: 0x%02X (COMBINED bit mask)\n"
 		     "Rx antenna selection:\n"
 		     "0x00 ant. 1\n"
 		     "0x40 ant. 2\n"
@@ -2194,7 +2184,7 @@ static inline int acx_ioctl_set_rx_antenna(struct net_device *dev, struct iw_req
 	if (*extra > 3)
 		goto end;
 
-	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("old antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
 	if (0 != (err = acx_lock(priv, &flags))) {
 		result = err;
@@ -2241,7 +2231,7 @@ static inline int acx_ioctl_set_tx_antenna(struct net_device *dev, struct iw_req
 	if (*extra > 1)
 		goto end;
 
-	(void)printk("current antenna value: 0x%02X\n", priv->antenna);
+	(void)printk("old antenna value: 0x%02X\n", priv->antenna);
 	/* better keep the separate operations atomic */
 	if (0 != (err = acx_lock(priv, &flags))) {
 		result = err;
@@ -2279,8 +2269,8 @@ end:
 static inline int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int *parms = (int*)extra;
-	int enable = (int)(parms[0] > 0);
+	int *params = (int*)extra;
+	int enable = (int)(params[0] > 0);
 	unsigned long flags;
 	int err;
 	int result = -EINVAL;
@@ -2292,12 +2282,12 @@ static inline int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_
 		goto end;
 	}
 
-	priv->monitor = parms[0];
+	priv->monitor = params[0];
 	/* not using printk() here, since it distorts kismet display
 	 * when printk messages activated */
 	acxlog(L_IOCTL, "setting monitor to: 0x%02X\n", priv->monitor);
 
-	switch (parms[0])
+	switch (params[0])
 	{
 	case 0:
 		priv->netdev->type = ARPHRD_ETHER;
@@ -2320,7 +2310,7 @@ static inline int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_
 
 	if (0 != enable)
 	{
-		priv->channel = parms[1];
+		priv->channel = params[1];
 		SET_BIT(priv->set_mask, GETSET_RX);
 	}
 	acx_unlock(priv, &flags);
@@ -2372,15 +2362,15 @@ end:
 static inline int acx_ioctl_dbg_set_masks(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int *parms = (int*)extra;
+	int *params = (int*)extra;
 	int result = -EINVAL;
 
 	acxlog(L_IOCTL, "setting flags in settings mask: get_mask %08x set_mask %08x\n"
 	                "before: get_mask %08x set_mask %08x\n",
-			(UINT32)parms[0], (UINT32)parms[1],
+			(UINT32)params[0], (UINT32)params[1],
 			priv->get_mask, priv->set_mask);
-	SET_BIT(priv->get_mask, (UINT32)parms[0]);
-	SET_BIT(priv->set_mask, (UINT32)parms[1]);
+	SET_BIT(priv->get_mask, (UINT32)params[0]);
+	SET_BIT(priv->set_mask, (UINT32)params[1]);
 	acxlog(L_IOCTL, "after:  get_mask %08x set_mask %08x\n", priv->get_mask, priv->set_mask);
 	result = -EINPROGRESS; /* immediately call commit handler */
 
@@ -2391,21 +2381,21 @@ static inline int acx_ioctl_dbg_set_masks(struct net_device *dev, struct iw_requ
 static inline int acx_ioctl_dbg_get_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int *parms = (int*)extra;
+	int *params = (int*)extra;
 	int result = -EINVAL;
 
 	/* expected value order: DbgGetIO type address magic */
 
-	if (parms[2] != 0x1234) {
-		acxlog(L_IOCTL, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", parms[2], 0x1234);
+	if (params[2] != 0x1234) {
+		acxlog(L_IOCTL, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", params[2], 0x1234);
 		goto end;
 	}
-	switch(parms[0]) {
+	switch(params[0]) {
 		case 0x0: /* Internal RAM */
 			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
 			break;
 		case 0xffff: /* MAC registers */
-			acxlog(L_IOCTL, "value at register 0x%04x is 0x%08x\n", parms[1], acx_read_reg32(priv, parms[1]));
+			acxlog(L_IOCTL, "value at register 0x%04x is 0x%08x\n", params[1], acx_read_reg32(priv, params[1]));
 			break;
 		case 0x81: /* PHY RAM table */
 			acxlog(L_IOCTL, "sorry, access to PHY RAM not implemented yet.\n");
@@ -2426,22 +2416,22 @@ end:
 static inline int acx_ioctl_dbg_set_io(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int *parms = (int*)extra;
+	int *params = (int*)extra;
 	int result = -EINVAL;
 
 	/* expected value order: DbgSetIO type address value magic */
 
-	if (parms[3] != 0x1234) {
-		acxlog(0xffff, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", parms[3], 0x1234);
+	if (params[3] != 0x1234) {
+		acxlog(0xffff, "wrong magic: 0x%04x doesn't match 0x%04x! If you don't know what you're doing, then please stop NOW, this can be DANGEROUS!!\n", params[3], 0x1234);
 		goto end;
 	}
-	switch(parms[0]) {
+	switch(params[0]) {
 		case 0x0: /* Internal RAM */
 			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
 			break;
 		case 0xffff: /* MAC registers */
-			acxlog(L_IOCTL, "setting value at register 0x%04x to 0x%08x\n", parms[1], parms[2]);
-			acx_write_reg32(priv, parms[1], parms[2]);
+			acxlog(L_IOCTL, "setting value at register 0x%04x to 0x%08x\n", params[1], params[2]);
+			acx_write_reg32(priv, params[1], params[2]);
 			break;
 		case 0x81: /* PHY RAM table */
 			acxlog(L_IOCTL, "sorry, access to PHY RAM not implemented yet.\n");
@@ -2955,7 +2945,7 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 
 	gpio_old = acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]);
 	acxlog(L_DEBUG, "gpio_old: 0x%04x\n", gpio_old);
-	(void)printk("current PHY power amplifier bias: %d\n", (gpio_old & 0x0700) >> 8);
+	(void)printk("old PHY power amplifier bias: %d\n", (gpio_old & 0x0700) >> 8);
 	acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], (gpio_old & 0xf8ff) | ((UINT16)*extra << 8));
 	(void)printk("new PHY power amplifier bias: %d\n", (unsigned char)*extra);
 	return 0;
@@ -3015,7 +3005,7 @@ static inline int acx_ioctl_set_ed_threshold(struct net_device *dev, struct iw_r
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 
-	(void)printk("current ED threshold value: %d\n", priv->ed_threshold);
+	(void)printk("old ED threshold value: %d\n", priv->ed_threshold);
 	priv->ed_threshold = (unsigned char)*extra;
 	(void)printk("new ED threshold value: %d\n", (unsigned char)*extra);
 	SET_BIT(priv->set_mask, GETSET_ED_THRESH);
@@ -3052,7 +3042,7 @@ static inline int acx_ioctl_set_cca(struct net_device *dev, struct iw_request_in
 		goto end;
 	}
 
-	(void)printk("current CCA value: 0x%02X\n", priv->cca);
+	(void)printk("old CCA value: 0x%02X\n", priv->cca);
 	priv->cca = (unsigned char)*extra;
 	(void)printk("new CCA value: 0x%02X\n", (unsigned char)*extra);
 	SET_BIT(priv->set_mask, GETSET_CCA);
@@ -3063,25 +3053,30 @@ end:
 	return result;
 }
 
-static inline int acx_ioctl_set_scan_mode(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+static inline int acx_ioctl_set_scan_params(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	unsigned long flags;
 	int err;
 	int result = -EINVAL;
-	char *scan_modes[] = { "active", "passive", "background" };
-
-	if (*extra > 2)
-		goto end;
+	int *params = (int *)extra;
+	const char *scan_modes[] = { "active", "passive", "background" };
 
 	if (0 != (err = acx_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
-	(void)printk("current scan mode: %d (%s)\n", priv->scan_mode, scan_modes[priv->scan_mode]);
-	priv->scan_mode = (UINT16)*extra;
-	(void)printk("new scan mode: %d (%s)\n", priv->scan_mode, scan_modes[priv->scan_mode]);
+	(void)printk("old scan parameters: mode %d (%s), min chan time %dTU, max chan time %dTU, max scan rate byte: %d\n", priv->scan_mode, scan_modes[priv->scan_mode], priv->scan_probe_delay, priv->scan_duration, priv->scan_rate);
+	if ((params[0] != -1) && (params[0] >= 0) && (params[0] <= 2))
+		priv->scan_mode = params[0];
+	if (params[1] != -1)
+		priv->scan_probe_delay = params[1];
+	if (params[2] != -1)
+		priv->scan_duration = params[2];
+	if ((params[3] != -1) && (params[3] <= 255))
+		priv->scan_rate = params[3];
+	(void)printk("new scan parameters: mode %d (%s), min chan time %dTU, max chan time %dTU, max scan rate byte: %d\n", priv->scan_mode, scan_modes[priv->scan_mode], priv->scan_probe_delay, priv->scan_duration, priv->scan_rate);
 	acx_unlock(priv, &flags);
 	result = OK;
 
@@ -3089,21 +3084,27 @@ end:
 	return result;
 }
 
-static inline int acx_ioctl_set_scan_chan_delay(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+static inline int acx_ioctl_get_scan_params(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	unsigned long flags;
 	int err;
 	int result = -EINVAL;
+	int *params = (int *)extra;
+	const char *scan_modes[] = { "active", "passive", "background" };
 
 	if (0 != (err = acx_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
 
-	(void)printk("current scan channel delay: %dms\n", priv->scan_probe_delay);
-	priv->scan_probe_delay = (UINT16)*extra;
-	(void)printk("new scan channel delay: %dms\n", (UINT16)*extra);
+	(void)printk("current scan parameters: mode %d (%s), min chan time %dTU, max chan time %dTU, max scan rate byte: %d\n", priv->scan_mode, scan_modes[priv->scan_mode], priv->scan_probe_delay, priv->scan_duration, priv->scan_rate);
+
+	params[0] = priv->scan_mode;
+	params[1] = priv->scan_probe_delay;
+	params[2] = priv->scan_duration;
+	params[3] = priv->scan_rate;
+
 	acx_unlock(priv, &flags);
 	result = OK;
 
@@ -3117,14 +3118,22 @@ static inline int acx100_ioctl_set_led_power(struct net_device *dev, struct iw_r
 	unsigned long flags;
 	int err;
 	int result = -EINVAL;
+	char *led_modes[] = { "off", "on", "LinkQuality" };
 
 	if (0 != (err = acx_lock(priv, &flags))) {
 		result = err;
 		goto end;
 	}
-	(void)printk("current power LED status: %d\n", priv->led_power);
-	priv->led_power = (unsigned char)*extra;
-	(void)printk("new power LED status: %d\n", (unsigned char)*extra);
+	(void)printk("old power LED status: %d (%s)\n", priv->led_power, led_modes[priv->led_power]);
+	priv->led_power = (unsigned char)extra[0];
+	if (priv->led_power == 2)
+	{
+		(void)printk("old max link quality setting: %d\n", priv->brange_max_quality);
+		priv->brange_max_quality = (unsigned char)extra[1];
+	}
+	(void)printk("new power LED status: %d (%s)\n", priv->led_power, led_modes[priv->led_power]);
+	if (priv->led_power == 2)
+		(void)printk("new max link quality setting: %d\n", priv->brange_max_quality);
 	SET_BIT(priv->set_mask, GETSET_LED_POWER);
 
 	acx_unlock(priv, &flags);
@@ -3137,44 +3146,19 @@ end:
 static inline int acx100_ioctl_get_led_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	*extra = (char)priv->led_power;
+	extra[0] = (char)priv->led_power;
+	if (priv->led_power == 2)
+		extra[1] = priv->brange_max_quality;
+	else
+		extra[1] = -1;
 	return OK;
-}
-
-static inline int acx100_ioctl_get_brange_maxquality(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
-{
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	*extra = (char)priv->brange_max_quality;
-	return OK;
-}
-
-
-static inline int acx100_ioctl_set_brange_maxquality(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
-{
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	unsigned long flags;
-	int err;
-	int result = -EINVAL;
-
-	if (0 != (err = acx_lock(priv, &flags))) {
-		result = err;
-		goto end;
-	}
-
-	priv->brange_max_quality = (unsigned char)*extra;
-
-	acx_unlock(priv, &flags);
-	result = -EINPROGRESS;
-
-end:
-	return result;
 }
 
 
 #if WIRELESS_EXT >= 13
 static const iw_handler acx_ioctl_handler[] =
 {
-	(iw_handler) acx_ioctl_commit,	/* SIOCSIWCOMMIT */
+	(iw_handler) acx_ioctl_commit,		/* SIOCSIWCOMMIT */
 	(iw_handler) acx_ioctl_get_name,	/* SIOCGIWNAME */
 	(iw_handler) NULL,			/* SIOCSIWNWID */
 	(iw_handler) NULL,			/* SIOCGIWNWID */
@@ -3206,8 +3190,8 @@ static const iw_handler acx_ioctl_handler[] =
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) NULL,			/* [nothing] */
 #endif /* IW_HANDLER_VERSION > 4 */
-	(iw_handler) acx_ioctl_set_ap,	/* SIOCSIWAP */
-	(iw_handler) acx_ioctl_get_ap,	/* SIOCGIWAP */
+	(iw_handler) acx_ioctl_set_ap,		/* SIOCSIWAP */
+	(iw_handler) acx_ioctl_get_ap,		/* SIOCGIWAP */
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) acx_ioctl_get_aplist,	/* SIOCGIWAPLIST */
 #if WIRELESS_EXT > 13
@@ -3225,8 +3209,8 @@ static const iw_handler acx_ioctl_handler[] =
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) acx_ioctl_set_rate,	/* SIOCSIWRATE */
 	(iw_handler) acx_ioctl_get_rate,	/* SIOCGIWRATE */
-	(iw_handler) acx_ioctl_set_rts,	/* SIOCSIWRTS */
-	(iw_handler) acx_ioctl_get_rts,	/* SIOCGIWRTS */
+	(iw_handler) acx_ioctl_set_rts,		/* SIOCSIWRTS */
+	(iw_handler) acx_ioctl_get_rts,		/* SIOCGIWRTS */
 	(iw_handler) NULL /* acx_ioctl_set_frag FIXME */,	/* SIOCSIWFRAG */
 	(iw_handler) NULL /* acx_ioctl_get_frag FIXME */,	/* SIOCGIWFRAG */
 	(iw_handler) acx_ioctl_set_txpow,	/* SIOCSIWTXPOW */
@@ -3246,11 +3230,14 @@ static const iw_handler acx_ioctl_private_handler[] =
 #else
 [ACX100_IOCTL_DEBUG			- ACX100_IOCTL] = (iw_handler) NULL,
 #endif
+[ACX100_IOCTL_SET_PLED           	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_led_power,
+[ACX100_IOCTL_GET_PLED			- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_led_power,
+[ACX100_IOCTL_SET_RATES          	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_rates,
 [ACX100_IOCTL_LIST_DOM           	- ACX100_IOCTL] = (iw_handler) acx_ioctl_list_reg_domain,
 [ACX100_IOCTL_SET_DOM            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_reg_domain,
 [ACX100_IOCTL_GET_DOM            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_get_reg_domain,
-[ACX100_IOCTL_SET_SCAN_MODE      	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_scan_mode,
-[ACX100_IOCTL_SET_SCAN_CHAN_DELAY	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_scan_chan_delay,
+[ACX100_IOCTL_SET_SCAN_PARAMS      	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_scan_params,
+[ACX100_IOCTL_GET_SCAN_PARAMS      	- ACX100_IOCTL] = (iw_handler) acx_ioctl_get_scan_params,
 [ACX100_IOCTL_SET_PREAMB         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_short_preamble,
 [ACX100_IOCTL_GET_PREAMB         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_get_short_preamble,
 [ACX100_IOCTL_SET_ANT            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_antenna,
@@ -3258,20 +3245,15 @@ static const iw_handler acx_ioctl_private_handler[] =
 [ACX100_IOCTL_RX_ANT             	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_rx_antenna,
 [ACX100_IOCTL_TX_ANT             	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_tx_antenna,
 [ACX100_IOCTL_SET_PHY_AMP_BIAS   	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_phy_amp_bias,
-[ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	- ACX100_IOCTL] = (iw_handler) acx_ioctl_get_phy_chan_busy_percentage,
+[ACX100_IOCTL_GET_PHY_CHAN_BUSY		- ACX100_IOCTL] = (iw_handler) acx_ioctl_get_phy_chan_busy_percentage,
 [ACX100_IOCTL_SET_ED             	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_ed_threshold,
 [ACX100_IOCTL_SET_CCA            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_cca,
-[ACX100_IOCTL_SET_PLED           	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_led_power,
-[ACX100_IOCTL_GET_PLED				- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_led_power,
-[ACX100_IOCTL_SET_BRANGE_MAXQUALITY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_brange_maxquality,
-[ACX100_IOCTL_GET_BRANGE_MAXQUALITY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_brange_maxquality,
 [ACX100_IOCTL_MONITOR            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_wlansniff,
 [ACX100_IOCTL_TEST               	- ACX100_IOCTL] = (iw_handler) acx_ioctl_unknown11,
 [ACX100_IOCTL_DBG_SET_MASKS      	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_set_masks,
-[ACX100_IOCTL_DBG_GET_IO         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_get_io,
-[ACX100_IOCTL_DBG_SET_IO         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_set_io,
 [ACX111_IOCTL_INFO			- ACX100_IOCTL] = (iw_handler) acx111_ioctl_info,
-[ACX100_IOCTL_SET_RATES          	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_rates,
+[ACX100_IOCTL_DBG_SET_IO         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_set_io,
+[ACX100_IOCTL_DBG_GET_IO         	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_get_io,
 };
 
 const struct iw_handler_def acx_ioctl_handler_def =
@@ -3597,6 +3579,14 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 #endif
 		
+	case ACX100_IOCTL_SET_PLED:
+		acx100_ioctl_set_led_power(dev, NULL, NULL, iwr->u.name);
+		break;
+
+	case ACX100_IOCTL_GET_PLED:
+		acx100_ioctl_get_led_power(dev, NULL, NULL, iwr->u.name);
+		break;
+		
 	case ACX100_IOCTL_LIST_DOM:
 		acx_ioctl_list_reg_domain(dev, NULL, NULL, NULL);
 		break;
@@ -3609,6 +3599,14 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		acx_ioctl_get_reg_domain(dev, NULL, NULL, iwr->u.name);
 		break;
 		
+	case ACX100_IOCTL_SET_SCAN_PARAMS:
+		acx_ioctl_set_scan_params(dev, NULL, NULL, iwr->u.name);
+		break;
+
+	case ACX100_IOCTL_GET_SCAN_PARAMS:
+		acx_ioctl_get_scan_params(dev, NULL, NULL, iwr->u.name);
+		break;
+
 	case ACX100_IOCTL_SET_PREAMB:
 		acx_ioctl_set_short_preamble(dev, NULL, NULL, iwr->u.name);
 		break;
@@ -3625,6 +3623,14 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		acx_ioctl_get_antenna(dev, NULL, NULL, NULL);
 		break;
 		
+	case ACX100_IOCTL_RX_ANT:
+		acx_ioctl_set_rx_antenna(dev, NULL, NULL, iwr->u.name);
+		break;
+		
+	case ACX100_IOCTL_TX_ANT:
+		acx_ioctl_set_tx_antenna(dev, NULL, NULL, iwr->u.name);
+		break;
+		
 	case ACX100_IOCTL_SET_ED:
 		acx_ioctl_set_ed_threshold(dev, NULL, NULL, iwr->u.name);
 		break;
@@ -3633,30 +3639,6 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		acx_ioctl_set_cca(dev, NULL, NULL, iwr->u.name);
 		break;
 		
-	case ACX100_IOCTL_SET_SCAN_MODE:
-		acx_ioctl_set_scan_mode(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_SCAN_CHAN_DELAY:
-		acx_ioctl_set_scan_chan_delay(dev, NULL, NULL, iwr->u.name);
-		break;
-		
-	case ACX100_IOCTL_SET_PLED:
-		acx100_ioctl_set_led_power(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_PLED:
-		acx100_ioctl_get_led_power(dev, NULL, NULL, iwr->u.name);
-		break;
-		
-	case ACX100_IOCTL_SET_BRANGE_MAXQUALITY:
-		acx100_ioctl_set_brange_maxquality(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_BRANGE_MAXQUALITY:
-		acx100_ioctl_get_brange_maxquality(dev, NULL, NULL, iwr->u.name);
-		break;
-
 	case ACX100_IOCTL_MONITOR:	/* set sniff (monitor) mode */
 		acxlog(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
 
@@ -3668,14 +3650,6 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx_ioctl_wlansniff(dev, NULL, NULL, iwr->u.name);
 		break;
 
-	case ACX100_IOCTL_RX_ANT:
-		acx_ioctl_set_rx_antenna(dev, NULL, NULL, iwr->u.name);
-		break;
-		
-	case ACX100_IOCTL_TX_ANT:
-		acx_ioctl_set_tx_antenna(dev, NULL, NULL, iwr->u.name);
-		break;
-		
 	case ACX100_IOCTL_TEST:
 		acx_ioctl_unknown11(dev, NULL, NULL, NULL);
 		break;

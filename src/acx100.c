@@ -1206,7 +1206,11 @@ static int acx_resume(struct pci_dev *pdev)
 	acx_reset_dev(dev);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
-	acx_init_mac(dev, 0);
+	if (OK != acx_init_mac(dev, 0))
+	{
+		acxlog(L_DEBUG, "rsm: init_mac FAILED\n");
+		goto fail;
+	}
 	acxlog(L_DEBUG, "rsm: init MAC done\n");
 	
 	if (1 == if_was_up)
@@ -1219,6 +1223,7 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: settings updated\n");
 	netif_device_attach(dev);
 	acxlog(L_DEBUG, "rsm: device attached\n");
+fail: /* we need to return OK here anyway, right? */
 	FN_EXIT(0, OK);
 	return OK;
 }
@@ -1653,7 +1658,9 @@ static void acx_tx_timeout(netdevice_t *dev)
 	
 	priv = (wlandevice_t *)dev->priv;
 
-#if /* DOH_SEEMS_TO_CONFUSE_FIRMWARE_UNFORTUNATELY */ 1
+/* hmm, maybe it is still better to clean the ring buffer, despite firmware
+ * issues?? */
+#if DOH_SEEMS_TO_CONFUSE_FIRMWARE_UNFORTUNATELY
 	/* clean all tx descs, they may have been completely full */
 	acx_clean_tx_desc_emergency(priv);
 	
@@ -1661,8 +1668,7 @@ static void acx_tx_timeout(netdevice_t *dev)
 		acx_wake_queue(dev, "after Tx timeout");
 #endif
 
-	/* stall may have happened due to radio drift,
-	 * so recalib radio */
+	/* stall may have happened due to radio drift, so recalib radio */
 	SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 	acx_schedule_after_interrupt_task(priv);
 			
@@ -1774,7 +1780,9 @@ static void acx_set_multicast_list(netdevice_t *dev)
 		dev->flags &= ~(IFF_PROMISC|IFF_ALLMULTI);
 	}
 
-	/* cannot update card settings directly here, atomic context! */
+	/* cannot update card settings directly here, atomic context!
+	 * FIXME: hmm, most likely it would be much better instead if
+	 * acx_update_card_settings() always worked in atomic context!*/
 	SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
 	acx_schedule_after_interrupt_task(priv);
 
@@ -1969,7 +1977,7 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 /* this shouldn't happen here generally, since we'd also enable user packet
  * xmit for management packets, which we really DON'T want */
 /* BS: disabling this caused my card to stop working after a few 
- * seconds when floodpinging. This should be reinvestigated ! */
+ * seconds when floodpinging. This should be reinvestigated! */
 		  if (acx_queue_stopped(dev_id)) {
 			  acx_wake_queue(dev_id, "after Tx complete");
 		  }
@@ -2150,71 +2158,71 @@ static void acx_after_interrupt_task(void *data)
 		CLEAR_BIT(priv->irq_status, HOST_INT_SCAN_COMPLETE);
 	}
 
-	if(priv->after_interrupt_jobs != 0) { /* ok, some jobs to do */
+	if (priv->after_interrupt_jobs == 0)
+		goto end; /* no jobs to do */
+	
+	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
+		acxlog(L_IRQ, "Send a stop scan cmd...\n");
+		acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
 
-		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
-			acxlog(L_IRQ, "Send a stop scan cmd...\n");
-			acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
+		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_STOP_SCAN);
+	}
+	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
 
-			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_STOP_SCAN);
+		acx_ie_generic_t pdr;
+		acx_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
+		acx_set_status(priv, ISTATUS_4_ASSOCIATED);
+
+		acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
+
+		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_ASSOCIATE);
+	}
+	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+		/* this helps with ACX100 at least;
+		 * hopefully ACX111 also does a
+		 * recalibration here */
+
+		/* better wait a bit between recalibrations to
+		 * prevent overheating due to torturing the card
+		 * into working too long despite high temperature
+		 * (just a safety measure) */
+		if (priv->time_last_recalib && time_before(jiffies, priv->time_last_recalib + 300 * HZ)) {
+			acxlog(L_STD, "less than 5 minutes since last radio recalibration (maybe card too hot?): not recalibrating!\n");
+			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
-		
-		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
+		else {
+			static INT issue_cmd_failed = 0;
+			INT res = NOT_OK;
 
-			acx_ie_generic_t pdr;
-			acx_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
-			acx_set_status(priv, ISTATUS_4_ASSOCIATED);
-
-			acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
-
-			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_ASSOCIATE);
-		}
-		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-			/* this helps with ACX100 at least;
-			 * hopefully ACX111 also does a
-			 * recalibration here */
-
-			/* better wait a bit between recalibrations to
-			 * prevent overheating due to torturing the card
-			 * into working too long despite high temperature
-			 * (just a safety measure) */
-			if (priv->time_last_recalib && time_before(jiffies, priv->time_last_recalib + 300 * HZ)) {
-				acxlog(L_STD, "less than 5 minutes since last radio recalibration (maybe card too hot?): not recalibrating!\n");
+			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
+			if (CHIPTYPE_ACX111 == priv->chip_type)
+				res = acx111_recalib_radio(priv);
+			else if (CHIPTYPE_ACX100 == priv->chip_type)
+				res = acx100_recalib_radio(priv);
+			if (res == OK)
+			{
+				acxlog(L_STD, "successfully recalibrated radio\n");
 				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+				priv->time_last_recalib = jiffies;
+				issue_cmd_failed = 0;
 			}
-			else {
-				static INT issue_cmd_failed = 0;
-				INT res = NOT_OK;
-
-				/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
-				if (CHIPTYPE_ACX111 == priv->chip_type)
-					res = acx111_recalib_radio(priv);
-				else if (CHIPTYPE_ACX100 == priv->chip_type)
-					res = acx100_recalib_radio(priv);
-				if (res == OK)
-				{
-					acxlog(L_STD, "successfully recalibrated radio\n");
-					CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-					priv->time_last_recalib = jiffies;
-					issue_cmd_failed = 0;
-				}
-				else
-				{
-					/* failed: resubmit, but only limited
-					 * amount of times to prevent endless
-					 * loop */
-					if (issue_cmd_failed++ < 3)
-						acx_schedule_after_interrupt_task(priv);
-					priv->time_last_recalib = 0; /* and reset time stamp to allow recalib next time */
-				}
+			else
+			{
+				/* failed: resubmit, but only limited
+				 * amount of times to prevent endless
+				 * loop */
+				if (issue_cmd_failed++ < 3)
+					acx_schedule_after_interrupt_task(priv);
+				priv->time_last_recalib = 0; /* and reset time stamp to allow recalib next time */
 			}
-		}
-		if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG) {
-			acx_update_card_settings(priv, 0, 0, 0);
-			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
 		}
 	}
+	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG) {
+		acx_update_card_settings(priv, 0, 0, 0);
+		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_UPDATE_CARD_CFG);
+	}
 
+end:
 	FN_EXIT(0, OK);
 }
 

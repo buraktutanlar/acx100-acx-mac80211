@@ -260,7 +260,7 @@ if test "$?" = "0"; then # $DEV exists
 		
 		if test -n "$KEY"; then
 		echo Setting key to $KEY, algorithm $ALG.
-		$IWCONF $DEV key $ALG "$KEY"
+		$IWCONF $DEV key "$KEY" $ALG
 		test "$?" != "0" && echo Failed.
 		fi
 

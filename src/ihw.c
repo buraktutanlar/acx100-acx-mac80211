@@ -44,6 +44,7 @@
 
 #if (WLAN_HOSTIF==WLAN_USB)
 #include <linux/usb.h>
+#define USB_CTRL_HARD_TIMEOUT 5500   /* steps in ms */
 #endif
 
 #include <linux/if_arp.h>
@@ -57,6 +58,7 @@
 #include <linux/pci.h>
 
 #include <linux/etherdevice.h>
+
 
 
 /*================================================================*/
@@ -611,13 +613,13 @@ done:
 }
 #else
 int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 timeout) {
-	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->usbin);
-	int ucode;
+	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->ctrlin);
+	int ucode,delcount;
 	struct usb_device *usbdev;
 
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
-
+	acxlog(L_CTL,"paramlen=%d type=%d\n",paramlen,(pdr)?((acx_ie_generic_t *)pdr)->type:-1);
 	skipridheader=0;
 	/* ----------------------------------------------------
 	** get context from wlandevice
@@ -626,75 +628,88 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	/* ----------------------------------------------------
 	** check which kind of command was issued...
 	** ------------------------------------------------- */
-	priv->usbout.cmd=cmd;
-	priv->usbout.status=0;
+	priv->ctrlout.cmd=cmd;
+	priv->ctrlout.status=0;
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
-		priv->usbout.u.rridreq.rid=((acx_ie_generic_t *)pdr)->type;
-		priv->usbout.u.rridreq.frmlen=paramlen-4;
+		/* -----------------------------------------------------
+		** setup interrogation command...
+		** -------------------------------------------------- */
+		priv->ctrlout.u.rridreq.rid=((acx_ie_generic_t *)pdr)->type;
+		priv->ctrlout.u.rridreq.frmlen=paramlen-4;  /* -4 bytes because we do not need the USB header in the frame length */
 		blocklen=8;
-		switch (priv->usbout.u.rridreq.rid) {
+		switch (priv->ctrlout.u.rridreq.rid) {
 			case ACX1xx_IE_SCAN_STATUS:skipridheader=1;break;
 		}
 		if (skipridheader) acklen=paramlen;
-		else acklen=4+paramlen;
-		acxlog(L_XFER,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbout.cmd,priv->usbout.status,priv->usbout.u.rridreq.rid,priv->usbout.u.rridreq.frmlen);
+		else acklen=4+paramlen; /* acklen -> expected length of ACK from USB device */
+		acxlog(L_CTL,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",priv->ctrlout.cmd,priv->ctrlout.status,priv->ctrlout.u.rridreq.rid,priv->ctrlout.u.rridreq.frmlen);
 	} else if (cmd==ACX1xx_CMD_CONFIGURE) {
-		priv->usbout.u.wridreq.rid=((acx_ie_generic_t *)pdr)->type;
-		priv->usbout.u.wridreq.frmlen=paramlen-4;
-		memcpy(priv->usbout.u.wridreq.data,&(((acx_ie_generic_t *)pdr)->m),paramlen-4);
-		blocklen=paramlen+4;
+		/* -------------------------------------------------
+		** setup configure command...
+		** --------------------------------------------- */
+		priv->ctrlout.u.wridreq.rid=((acx_ie_generic_t *)pdr)->type;
+		priv->ctrlout.u.wridreq.frmlen=paramlen;
+		memcpy(priv->ctrlout.u.wridreq.data,&(((acx_ie_generic_t *)pdr)->m),paramlen);
+		blocklen=paramlen+8;	/* length of parameters + header */
 	} else if ((cmd==ACX1xx_CMD_ENABLE_RX)||(cmd==ACX1xx_CMD_ENABLE_TX)||(cmd==ACX1xx_CMD_SLEEP)) {
-		priv->usbout.u.rxtx.data=1;		/* just for testing */
+		priv->ctrlout.u.rxtx.data=1;		/* just for testing */
 		blocklen=5;
 	} else {
 		/* ----------------------------------------------------
 		** All other commands (not thoroughly tested)
 		** ------------------------------------------------- */
-		if ((pdr)&&(paramlen>0)) memcpy(priv->usbout.u.wmemreq.data,pdr,paramlen);
-		blocklen=paramlen;
+		if ((pdr)&&(paramlen>0)) memcpy(priv->ctrlout.u.wmemreq.data,pdr,paramlen);
+		blocklen=paramlen+4;
 	}
 	/* ----------------------------------------------------
 	** Obtain the I/O pipes
 	** ------------------------------------------------- */
-	outpipe=usb_sndctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
-	inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
+	outpipe=usb_sndctrlpipe(usbdev,0);
+	inpipe =usb_rcvctrlpipe(usbdev,0);
+	acxlog(L_CTL,"ctrl inpipe=0x%X outpipe=0x%X\n",inpipe,outpipe);
 #ifdef ACX_DEBUG
-	acxlog(L_XFER,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
-	if (debug&L_DATA) acx_dump_bytes(&(priv->usbout),blocklen);
+	acxlog(L_CTL,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
+	if (debug&L_DATA) acx_dump_bytes(&(priv->ctrlout),blocklen);
 #endif
 	/* --------------------------------------
 	** fill setup packet and control urb
 	** ----------------------------------- */
 	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_OUT,ACX100_USB_UNKNOWN_REQ1,0,0,blocklen)
-	usb_fill_control_urb(priv->ctrl_urb,usbdev,outpipe,priv->usb_setup,&(priv->usbout),blocklen,acx100usb_control_complete,priv);
+	usb_fill_control_urb(priv->ctrl_urb,usbdev,outpipe,priv->usb_setup,&(priv->ctrlout),blocklen,(usb_complete_t)acx100usb_control_complete,priv);
 	/* 2.6.9-rc1: "USB: Remove struct urb->timeout as it does not work" */
 	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message FAILED with errcode %d\n",ucode);
+		acxlog(L_STD,"WARNING: CTRL MESSAGE FAILED WITH ERRCODE %d\n",ucode);
 		return(NOT_OK);
 	}
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
+	delcount=0;
 	while (priv->ctrl_urb->status==-EINPROGRESS) {
-		udelay(500);
+		udelay(1000);
+		delcount++;
+		if (delcount>USB_CTRL_HARD_TIMEOUT) {
+			acxlog(L_STD,"ERROR, USB device is not responsive!\n");
+			return(NOT_OK);
+		}
 	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
 	result=priv->ctrl_urb->actual_length;
-	acxlog(L_XFER,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
+	acxlog(L_CTL,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
 	if (result<0) {
 		return(NOT_OK);
 	}
 	/* --------------------------------------
 	** Check for device acknowledge ...
 	** -------------------------------------- */
-	acxlog(L_XFER,"sending USB control msg (in) (acklen=%d)\n",acklen);
-	priv->usbin.status=0; /* delete old status flag -> set to fail */
+	acxlog(L_CTL,"sending USB control msg (in) (acklen=%d) sizeof(acx100_usbin_t)=%d\n",acklen,sizeof(acx100_usbin_t));
+	priv->ctrlin.status=0; /* delete old status flag -> set to fail */
 	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
-	usb_fill_control_urb(priv->ctrl_urb,usbdev,inpipe,priv->usb_setup,&(priv->usbin),acklen,acx100usb_control_complete,priv);
+	usb_fill_control_urb(priv->ctrl_urb,usbdev,inpipe,priv->usb_setup,&(priv->ctrlin),acklen,(usb_complete_t)acx100usb_control_complete,priv);
 	/* 2.6.9-rc1: "USB: Remove struct urb->timeout as it does not work" */
 	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
@@ -705,33 +720,39 @@ int acx_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 time
 	/* ---------------------------------
 	** wait for request to complete...
 	** ------------------------------ */
+	delcount=0;
 	while (priv->ctrl_urb->status==-EINPROGRESS) {
-		udelay(500);
+		udelay(1000);
+		delcount++;
+		if (delcount>USB_CTRL_HARD_TIMEOUT) {
+			acxlog(L_STD,"ERROR, USB device is not responsive!\n");
+			return(NOT_OK);
+		}
 	}
 	/* ---------------------------------
 	** check the result
 	** ------------------------------ */
 	result=priv->ctrl_urb->actual_length;
-	acxlog(L_XFER,"read=%d bytes\n",result);
+	acxlog(L_CTL,"read=%d bytes\n",result);
 	if (result<0) {
 		FN_EXIT(0,result);
 		return(NOT_OK);
 	}
-	if (priv->usbin.status!=1) {
-		acxlog(L_DEBUG,"command returned status %d\n",priv->usbin.status);
+	if (priv->ctrlin.status!=1) {
+		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %d\n",priv->ctrlin.status);
 	}
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
 		if ((pdr)&&(paramlen>0)) {
 			if (skipridheader) {
-				memcpy(pdr,&(priv->usbin.u.rmemresp.data),paramlen-4);
-				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",priv->usbin.cmd,priv->usbin.status);
+				memcpy(pdr,&(priv->ctrlin.u.rmemresp.data),paramlen-4);
+				acxlog(L_CTL,"response frame: cmd=%d status=%d\n",priv->ctrlin.cmd,priv->ctrlin.status);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen-4);
 				if (debug&L_DATA) 
 				    acx_dump_bytes(pdr,paramlen-4);
 			}
 			else {
-				memcpy(pdr,&(priv->usbin.u.rridresp.rid),paramlen);
-				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbin.cmd,priv->usbin.status,priv->usbin.u.rridresp.rid,priv->usbin.u.rridresp.frmlen);
+				memcpy(pdr,&(priv->ctrlin.u.rridresp.rid),paramlen);
+				acxlog(L_CTL,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->ctrlin.cmd,priv->ctrlin.status,priv->ctrlin.u.rridresp.rid,priv->ctrlin.u.rridresp.frmlen);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
 				if (debug&L_DATA)
 				    acx_dump_bytes(pdr,paramlen);

@@ -79,6 +79,7 @@
 #define L_XFER_BEACON	0x2000	/* also log beacon packets */
 #define L_BUFT		0x4000	/* debug tx buffer mgmt (ring buffer etc.) */
 #define L_BUF (L_BUFR+L_BUFT)	/* debug buffer mgmt (ring buffer etc.) */
+#define L_USBRXTX	0x8000  /* debug USB rx/tx operations */
 
 #define L_BINDEBUG	(L_BIN | L_DEBUG)
 #define L_BINSTD	(L_BIN | L_STD)
@@ -766,6 +767,10 @@ typedef struct acx100_InfFrame {
 /* Should be sent to the ctrlout endpoint */
 #define ACX100_USB_ENBULKIN	6
 
+/* The number of bulk URBs to use */
+
+#define ACX100_USB_NUM_BULK_URBS 8
+
 /* Should be sent to the bulkout endpoint */
 #define ACX100_USB_TXFRM	0
 #define ACX100_USB_CMDREQ	1
@@ -1246,21 +1251,26 @@ typedef struct wlandevice {
 	/*** USB stuff ***/
 #if (WLAN_HOSTIF==WLAN_USB)
 	struct	usb_device	*usbdev;
-	acx100_usbin_t		usbin;
-	acx100_usbin_t		bulkin;
-	acx100_usbout_t		usbout;
-	acx100_bulkout_t	bulkout;
+	acx100_usbin_t		rxtruncbuf;
+	acx100_usbin_t		bulkins[ACX100_USB_NUM_BULK_URBS];
+	acx100_usbout_t		ctrlout;
+	acx100_usbin_t		ctrlin;
+	acx100_bulkout_t	bulkouts[ACX100_USB_NUM_BULK_URBS];
 	int			usb_txoffset;
 	int			usb_txsize;
-	int			usb_max_bulkout;
-	int			usb_tx_mutex;
+	int			usb_free_tx;
+	int			rxtruncsize;
+	int			bulkinep;	/* bulk-in endpoint */
+	int			bulkoutep;	/* bulk-out endpoint */
 	struct txdescriptor *	currentdesc;
 	spinlock_t		usb_ctrl_lock;
 	spinlock_t		usb_tx_lock;
 	struct	urb		*ctrl_urb;
-	struct	urb		*bulkrx_urb;
-	struct	urb		*bulktx_urb;
-	unsigned char	usb_setup[8];
+	struct	urb		*bulkrx_urbs[ACX100_USB_NUM_BULK_URBS];
+	struct	urb		*bulktx_urbs[ACX100_USB_NUM_BULK_URBS];
+	unsigned char		bulktx_states[ACX100_USB_NUM_BULK_URBS];
+	unsigned char		usb_setup[8];
+	unsigned char		rxtruncation;
 #endif
 
 	/*** Management timer ***/
@@ -1317,6 +1327,7 @@ typedef struct wlandevice {
 	UINT8		scan_mode;		/* 0 == active, 1 == passive, 2 == background */
 	UINT16		scan_duration;
 	UINT16		scan_probe_delay;
+	UINT8		scan_rate;
 #if WIRELESS_EXT > 15
 	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
 #endif

@@ -753,8 +753,8 @@ void acx_reset_mac(wlandevice_t *priv)
 * Arguments:
 *	netdevice that contains the wlandevice priv variable
 * Returns:
-*	0 on fail
-*	1 on success
+*	NOT_OK on fail
+*	OK on success
 * Side effects:
 *	device is hard reset
 * Call context:
@@ -863,8 +863,8 @@ fail:
 * Arguments:
 *
 * Returns:
-* 1 = File can be openend
-* 0 = Error open file
+* OK = File can be openend
+* NOT_OK = Error open file
 *
 * Side effects:
 *
@@ -1139,8 +1139,8 @@ int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT32 
 *   apfw_image  firmware image.
 *
 * Returns:
-*	0	firmware image corrupted or not correctly written
-*	1	success
+*	NOT_OK	firmware image corrupted or not correctly written
+*	OK	success
 *
 * STATUS: FINISHED.
 ----------------------------------------------------------------*/
@@ -1233,8 +1233,8 @@ int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, UINT
 * Arguments:
 *	wlandevice: private device that contains card device
 * Returns:
-*	0: failed
-*	1: success
+*	NOT_OK: failed
+*	OK: success
 * Side effects:
 *
 * Call context:
@@ -2391,7 +2391,7 @@ void acx100_scan_chan(wlandevice_t *priv)
 	s.count = cpu_to_le16(priv->scan_count);
 	s.start_chan = cpu_to_le16(1);
 	s.flags = cpu_to_le16(0x8000);
-	s.max_rate = RATE100_2; /* 2 Mbps */
+	s.max_rate = priv->scan_rate;
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);
@@ -2415,7 +2415,7 @@ void acx111_scan_chan(wlandevice_t *priv) {
 	s.reserved1 = 0;
 	s.reserved2 = 0;
 
-	s.rate = RATE100_2; /* 2 Mbps */
+	s.rate = priv->scan_rate;
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);;
@@ -3054,6 +3054,7 @@ static int acx_set_defaults(wlandevice_t *priv)
 	priv->scan_mode = ACX_SCAN_PASSIVE;
 	priv->scan_duration = 100;
 	priv->scan_probe_delay = 200;
+	priv->scan_rate = RATE100_2;
 
 	priv->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
 	priv->preamble_mode = 2; /* auto */
