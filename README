@@ -2,6 +2,9 @@
 *             Open-Source wireless driver for TI ACX1xx chipsets              *
 *******************************************************************************
 
+An alternate, possibly more user-friendly but less current guide can be
+found at http://www.houseofcraig.net/acx100_howto.php
+
 !!!!! MANDATORY WARNINGS !!!!!
 
 I just learned that the WRT54G router (non-ACX1xx chipset) has trouble with its
@@ -103,7 +106,7 @@ Feel free to send us corrections/additions to this very confusing listing above.
 Status Matrix:
 
 		ACX100			ACX100 USB		ACX111
-Rates		1/2/5.5/11/22 (+auto)	1/2/5.5/11/22		all up to 54Mb? (+auto)
+Rates		1/2/5.5/11/22 (+auto)	1/2/5.5/11/22		all up to 54Mb (+auto)
 5GHz		--			--			NIY (any hardware?)
 Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64-/128-/256-)
 Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64-/128-/256-)
@@ -118,7 +121,7 @@ still is a bit experimental.
 We're still not totally sure about the status of WEP support:
 ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
-ACX111: nothing yet.
+ACX111: not working yet.
 
 Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
@@ -155,7 +158,7 @@ since this seeks to list all requirements in full):
   but please report IMMEDIATELY if they have any trouble,
   I'm very interested in that!
   Users who have archs other than x86 may need to remove certain compiler
-  flags in src/Makefile which are unsupported by their non-x86 compiler
+  flags in src/Makefile which are unsupported by their non-x86 compiler (e.g. -march=i586)
 * most likely a Bus Master capable PCI slot for PCI card versions, slave
   PCI slot won't work (FIXME: is that true?)
 * relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
@@ -496,7 +499,7 @@ rebooting. Hopefully the driver compiling works then.
 Also, I hope you haven't downloaded the driver via Windows CVS (since it
 may insert bogus end-of-line chars).
   
--- Driver init failure --
+-- Driver init failure (sorted according to init progress) --
 
 If you get the message
 
@@ -508,11 +511,6 @@ or CPU architecture or (non-)register calling convention or kernel version
 -- see syslog for evidence!!)
 and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
-
-If your firmware upload fails due to upload corruption (see log!),
-then this could indicate I/O timing issues. Set ACX_IO_WIDTH=16
-in the Makefile, then recompile, to use 16bit I/O access instead
-of slightly problematic but faster 32bit access.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
@@ -552,12 +550,24 @@ helped several times!)
 Oh, and last but not least, always make sure to get the latest BIOS for your
 computer - that also helped in some cases of broken power management code or
 resource allocation!
+
 If you have trouble with the ACX100 mini-PCI card in your notebook (i.e.
 the notebook restarts immediately after suspending), then you have a
 notebook with BIOS troubles as well (the BIOS needs to handle the PME#
 pin activity properly). Workaround: disconnect/hide the PME# signal
 on the card (pin 34, see mini-PCI spec).
 
+If your firmware upload fails due to upload corruption (see log!),
+then this could indicate I/O timing issues. Set ACX_IO_WIDTH=16
+in the Makefile, then recompile, to use 16bit I/O access instead
+of slightly problematic but faster 32bit access.
+
+If you get messages similar to
+"Failed to allocate shared memory for Rx buffer...", then this could indicate
+that you don't have enough (DMA capable) RAM available for this driver
+configuration. Downscaling ...XBUFFERCOUNT... defines in src/idma.c may help.
+Alternatively buying more RAM (which is always VERY important in Linux!) may
+help.
 
 -- Driver locked up the box (OOPS etc.) --
 Umm... ouch!

@@ -3308,7 +3308,7 @@ int acx_init_mac(netdevice_t *dev, UINT16 init)
 	FN_ENTER;
 
 	acxlog(L_BINDEBUG,          "******************************************\n");
-	acxlog(L_BINDEBUG | L_INIT, "************ acx_initmac_1 ************\n");
+	acxlog(L_BINDEBUG | L_INIT, "************* acx_init_mac_1 *************\n");
 	acxlog(L_BINDEBUG,          "******************************************\n");
 #if (WLAN_HOSTIF!=WLAN_USB)
 	priv->memblocksize = 256; /* 256 is default */

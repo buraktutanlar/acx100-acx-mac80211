@@ -1742,6 +1742,8 @@ static char *info_type_msg[] = {
     "internal watchdog reset was done",
     "failed to send powersave (NULL frame) notification to AP",
     "encrypt/decrypt on a packet has failed",
+    "(unknown)",
+    "MIC failure: fake WEP encrypt??"
 };
 
 static void acx_handle_info_irq(wlandevice_t *priv)
@@ -1829,7 +1831,8 @@ irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ struc
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
 		static int txcnt = 0;
 
-		if (txcnt++ % 4 == 0)
+		/* don't clean up on each Tx complete, wait a bit */
+		if (++txcnt % (priv->TxQueueCnt >> 2) == 0)
 			acx_clean_tx_desc(priv);
 		acx_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");

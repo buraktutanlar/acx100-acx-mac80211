@@ -399,13 +399,17 @@ static void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 			 * ENABLE_TX|ENABLE_RX helps, so even do
 			 * DISABLE_TX and DISABLE_RX in order to perhaps
 			 * have more impact. */
-			if (++retry_errors >= 3) {
+			if (++retry_errors % 4 == 0) {
 #if (WLAN_HOSTIF!=WLAN_USB)
-				printk(KERN_WARNING "several excessive Tx retry errors occurred, attempting to recalibrate the radio!! This *might* indicate card overheating, so you may want to verify proper card operation, since recalibration might delay card over-temperature failure until it's too late (final fatal card damage). Just a (over?)cautious warning...\n");
+				if (retry_errors < 20)
+					printk(KERN_WARNING "several excessive Tx retry errors occurred, attempting to recalibrate the radio!! This radio drift *might* be due to increasing card temperature, so you may want to verify proper card temperature, since recalibration might delay card over-temperature failure until it's too late (final fatal card damage). Just a (over?)cautious warning...\n");
+				else
+				if (retry_errors == 20)
+					printk(KERN_WARNING "several radio recalibrations occurred, DISABLING notification message.\n");
+
 				SET_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 				acx_schedule_after_interrupt_task(priv);
 #endif
-				retry_errors = 0;
 			}
 			break;
 		case 0x40:
@@ -1214,7 +1218,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	if (!(pDc->pTxHostDescQPool =
 	      pci_alloc_consistent(0, pDc->TxHostDescQPoolSize,
 				  &pDc->TxHostDescQPoolPhyAddr))) {
-		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue\n");
+		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue; see README\n");
 		goto fail;
 	}
 	acxlog(L_DEBUG, "pDc->pTxHostDescQPool = 0x%p\n"
@@ -1223,7 +1227,7 @@ static int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 			pDc->TxHostDescQPoolPhyAddr);
 #else
 	if ((pDc->pTxHostDescQPool=kmalloc(pDc->TxHostDescQPoolSize,GFP_KERNEL))==NULL) {
-		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue\n");
+		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue; see README\n");
 		goto fail;
 	}
 	memset(pDc->pTxHostDescQPool, 0, pDc->TxHostDescQPoolSize);
@@ -1345,7 +1349,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	if (!(pDc->pTxHostDescQPool =
 	      pci_alloc_consistent(0, pDc->TxHostDescQPoolSize,
 				   &pDc->TxHostDescQPoolPhyAddr))) {
-		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue\n");
+		acxlog(L_STD, "Failed to allocate shared memory for TxHostDesc queue; see README\n");
 		pci_free_consistent(0, pDc->TxBufferPoolSize,
 				    pDc->pTxBufferPool,
 				    pDc->TxBufferPoolPhyAddr);
@@ -1358,7 +1362,7 @@ static int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 			pDc->TxHostDescQPoolPhyAddr);
 #else
 	if ((pDc->pTxHostDescQPool=kmalloc(pDc->TxHostDescQPoolSize,GFP_KERNEL))==NULL) {
-		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue\n");
+		acxlog(L_STD,"Failed to allocate memory for TxHostDesc queue; see README\n");
 		kfree(pDc->pTxBufferPool);
 		FN_EXIT(1,2);
 		return(2);
@@ -1479,12 +1483,12 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 	if (NULL == (pDc->pRxHostDescQPool =
 	     pci_alloc_consistent(0, pDc->RxHostDescQPoolSize,
 				&pDc->RxHostDescQPoolPhyAddr))) {
-		acxlog(L_STD, "Failed to allocate shared memory for RxHostDesc queue\n");
+		acxlog(L_STD, "Failed to allocate shared memory for RxHostDesc queue; see README\n");
 		goto fail;
 	}
 #else
 	if (NULL == (pDc->pRxHostDescQPool = kmalloc(pDc->RxHostDescQPoolSize, GFP_KERNEL))) {
-		acxlog(L_STD, "Failed to allocate memory for RxHostDesc queue\n");
+		acxlog(L_STD, "Failed to allocate memory for RxHostDesc queue; see README\n");
 		goto fail;
 	}
 	memset(pDc->pRxHostDescQPool, 0, pDc->RxHostDescQPoolSize);
@@ -1497,12 +1501,12 @@ static int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 	if (NULL == (pDc->pRxBufferPool =
 	     pci_alloc_consistent(0, pDc->RxBufferPoolSize,
 				  &pDc->RxBufferPoolPhyAddr))) {
-		acxlog(L_STD, "Failed to allocate shared memory for Rx buffer\n");
+		acxlog(L_STD, "Failed to allocate shared memory for Rx buffer (%d bytes); see README\n", pDc->RxBufferPoolSize);
 		goto fail;
 	}
 #else
 	if (NULL == (pDc->pRxBufferPool = kmalloc(pDc->RxBufferPoolSize, GFP_KERNEL))) {
-		acxlog(L_STD, "Failed to allocate memory for Rx buffer\n");
+		acxlog(L_STD, "Failed to allocate memory for Rx buffer; see README\n");
 		goto fail;
 	}
 	memset(pDc->pRxBufferPool, 0, pDc->RxBufferPoolSize);
