@@ -53,6 +53,9 @@
 #include <linux/types.h>
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 
 #include <wlan_compat.h>
 

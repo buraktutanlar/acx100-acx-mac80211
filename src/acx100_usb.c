@@ -63,6 +63,9 @@
 #include <linux/rtnetlink.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
@@ -138,7 +141,7 @@ static inline struct urb *alloc_urb(int iso_pk, int mem_flags) {
 
 static inline void usb_set_intfdata(struct usb_interface *intf, void *data) {}
 
-#endif //#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
+#endif /* #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0) */
 
 /* -------------------------------------------------------------------------
 **                             Module Stuff
@@ -225,12 +228,12 @@ static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
 #ifdef ACX_DEBUG
-//int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD;
-//int debug = L_ALL;
+/* int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD; */
+/* int debug = L_ALL; */
 int debug = L_STD;
 int acx100_debug_func_indent=0;
 static char * acx100usb_pstatus(int);
-void acx100usb_dump_bytes(void *,int) __attribute__((__unused__));
+extern void acx100_dump_bytes(void *,int) __attribute__((__unused__));
 static void dump_device(struct usb_device *);
 static void dump_device_descriptor(struct usb_device_descriptor *);
 #if USB_24
@@ -914,7 +917,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			if (debug&L_DATA) {
 				if ((packetsize>0)&&(packetsize<1024)) {
 					acxlog(L_DATA,"received data:\n");
-					acx100usb_dump_bytes(ptr,packetsize);
+					acx100_dump_bytes(ptr,packetsize);
 				}
 			}
 #endif
@@ -1037,11 +1040,11 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.MPDUlen=cpu_to_le16(size);
 	buf->hdr.ctrl1=0;
 	buf->hdr.ctrl2=0;
-	buf->hdr.hostData=cpu_to_le32(size|(desc->rate)<<24);
+	buf->hdr.hostData=cpu_to_le32(size|(desc->u.r1.rate)<<24);
 	if (1 == priv->preamble_flag)
 		buf->hdr.ctrl1|=DESC_CTL_SHORT_PREAMBLE;
 	buf->hdr.ctrl1|=DESC_CTL_FIRST_MPDU;
-	buf->hdr.txRate=desc->rate;
+	buf->hdr.txRate=desc->u.r1.rate;
 	buf->hdr.index=1;
 	buf->hdr.dataLength=cpu_to_le16(size|((buf->hdr.txRate)<<24));
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t *)header->data)->a3.fc)==WLAN_FTYPE_DATA) {
@@ -1051,7 +1054,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	if (acx100_is_mac_address_directed((mac_t *)addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16));
 	if (acx100_is_mac_address_broadcast(addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
-	if (debug&L_DATA) acx100usb_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
+	if (debug&L_DATA) acx100_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
 	/* ---------------------------------------------
 	** check whether we need to send the data in
 	** fragments (block larger than max bulkout
@@ -1705,7 +1708,7 @@ static void dump_config_descriptor(struct usb_config_descriptor *cd)
   printk(KERN_INFO "  bConfigurationValue: %d (0x%X)\n",cd->bConfigurationValue,cd->bConfigurationValue);
   printk(KERN_INFO "  iConfiguration: %d (0x%X)\n",cd->iConfiguration,cd->iConfiguration);
   printk(KERN_INFO "  bmAttributes: %d (0x%X)\n",cd->bmAttributes,cd->bmAttributes);
-  //printk(KERN_INFO "  MaxPower: %d (0x%X)\n",cd->bMaxPower,cd->bMaxPower);
+  /* printk(KERN_INFO "  MaxPower: %d (0x%X)\n",cd->bMaxPower,cd->bMaxPower); */
 }
 
 static void dump_device_descriptor(struct usb_device_descriptor *dd)
@@ -1782,24 +1785,5 @@ static void dump_interface_descriptor(struct usb_interface_descriptor *id)
 #endif
 }
 #endif
-
-void acx100usb_dump_bytes(void *data,int num)
-{
-  int i,remain=num;
-  unsigned char *ptr=(unsigned char *)data;
-  while (remain>0) {
-    if (remain<16) {
-      printk(KERN_WARNING);
-      for (i=0;i<remain;i++) printk("%02X ",*ptr++);
-      printk("\n");
-      remain=0;
-    } else {
-      printk(KERN_WARNING);
-      for (i=0;i<16;i++) printk("%02X ",*ptr++);
-      printk("\n");
-      remain-=16;
-    }
-  }
-}
 
 #endif

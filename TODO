@@ -16,6 +16,7 @@ JANITORIAL/EASY:
 (for debugging)
 * put ACX100/ACX111/TNETW1100/TNETW1130/TNETW1230 strings on project page
   /homepage once the driver has full support...
+* driver really endianness-clean, e.g. for Mac use? Use cpu_to_leXX, leXX_to_cpu, should be working currently, 040727 [AM]
 - add .lsm file
 - AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!
@@ -27,11 +28,11 @@ JANITORIAL/EASY:
   cqual/TAU/calltree/Perfometer/Nitro Technologies Memory Checker/MemCheck Deluxe
 - check all alloc() type functions for proper after-use of free() type functions
 - per-card debug setting? (using priv->debug, needs to check priv NULL though)
+  Not really worth it...
 - real init script syntax (add init-usable script to scripts/)
-- driver really endianness-clean, e.g. for Mac use? Use cpu_to_leXX, leXX_to_cpu, most parts fixed, 040413 [AM]
 - average transfer rates in README: our driver vs. Windows standard driver
 - completely overhaul README, split up properly
-- unify function names to acx100_this_is_a_function()
+- unify function names to acx_this_is_a_function(), acx100_...(), acx111_...()
 - in the doc/ directory, add an intro and describe chipset details and
   interesting information about it
 - maybe add dbg msgs to all failure cases to spot any driver problems fast
@@ -64,7 +65,7 @@ BUGS:
   https://sourceforge.net/forum/forum.php?thread_id=1049230&forum_id=257272
   IRQ loss has been reported to also happen when switching from text mode
   to frame buffer on Linux bootup
-- acx100_reset_dev enables IRQs, but IRQ handler not available yet!!!
+* acx100_reset_dev enables IRQs, but IRQ handler not available yet!!!
 - when Tx is broken (no reception of peer),
   then it's possible to reactivate it using ACX100_CMD_ENABLE_TX and ENABLE_RX!!
   Does it happen in case of lots of traffic?
@@ -104,7 +105,7 @@ ACX100 USB TODO ITEMS:
 - merge USB structs with standard ACX100 structs
 
 ACX111 TODO ITEMS:
-- Tx descriptor is 4 bytes bigger than ACX100, but we don't account for
+* Tx descriptor is 4 bytes bigger than ACX100, but we don't account for
   it in all cases!!!!!!!!
 - fix (broken?) rx_config setting
 - find out why access to phy regs fails
@@ -114,19 +115,21 @@ COMMON TODO ITEMS:
 * use -pedantic -Werror!
 * Ad-Hoc "Master" not working? (Beacon packets??)
 * finish ACX111 (TNETW1x30) support
+* more verbose Info IRQ
+* Working implementation of "ifconfig wlan0 hw ether 112233445566". Partially
+  working, exact cause for Tx errors with different MAC unknown, 040413 [AM]
 + support kwavecontrol (new FIXED release after kwavecontrol 0.3 finally out?)
 + implement standard power management, make sure ACPI states are fully working
   (suspend/resume handlers; resuming from suspend-to-ram has been reported
   to actually hang the machine!). Working quite nicely, even with
   network access after resume with all previous settings, 040421 [AM]
++ full AMD64, PPC support (PPC should be finished now)
 - merge ACX100 USB support (acx100_usb.c) into main code somehow (many ioctl or /proc related things missing for USB)
 - rtnl_lock/unlock??
 - implement 802.11b power save mode
 - join generic Linux 802.11 stack (Jeff Garzik)
 - WEP flag in assoc_req ok??
 - split into README / INSTALL
-- full AMD64, PPC support
-- more verbose Info IRQ
 - implement our own log ring buffer (to prevent having to write to system logs)
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)
@@ -137,16 +140,14 @@ COMMON TODO ITEMS:
 + Tx auto rate, crude first implementation done, 040413 [AM]
 - auto power adjustment "iwconfig txpower 20 auto"
 - implement packet fragmentation
-+ Working implementation of "ifconfig wlan0 hw ether 112233445566". Partially
-  working, exact cause for Tx errors with different MAC unknown, 040413 [AM]
 - implement #if WE_DONT_WANT_TO_REJECT_MULTICAST part correctly
 - implement iwpriv to switch between percentage and estimated dBm (problematic!) display?
 - abuse power LED to be an error indicator LED (via timer) in case we switched it off
-- add further iwconfig/iwpriv support: channel traffic percentage indicator,
++ add further iwconfig/iwpriv support: channel traffic percentage indicator,
   iwspy, ...
 - introduce decent device statistics like those in net_device_stats. Now only
   tx/rx packets and errors are counted. further work done, 040413 [AM]
-  Rx error counters need implementation (find out flags in Rx descriptor)
+  Rx error counters need implementation (should be gathered from statistics, probably not avail in rx descriptor)
 - are all packets really using correct network addresses?
 + iwevent, not fully verified, 040413 [AM]
 - netif_carrier_off(dev->netdev); /* disable running netdev watchdog */

@@ -39,7 +39,7 @@
 #if (WLAN_HOSTIF==WLAN_USB)
 
 #ifdef ACX_DEBUG
-extern void acx100usb_dump_bytes(void *,int);
+extern void acx100_dump_bytes(void *,int);
 #endif
 
 #include <linux/config.h>
@@ -146,7 +146,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	inpipe =usb_rcvctrlpipe(usbdev,0);      /* default endpoint for ctrl-transfers: 0 */
 #ifdef ACX_DEBUG
 	acxlog(L_XFER,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
-	if (debug&L_DATA) acx100usb_dump_bytes(&(priv->usbout),blocklen);
+	if (debug&L_DATA) acx100_dump_bytes(&(priv->usbout),blocklen);
 #endif
 	/* --------------------------------------
 	** fill setup packet and control urb
@@ -210,13 +210,13 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 				memcpy(pdr,&(priv->usbin.u.rmemresp.data),paramlen);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",priv->usbin.cmd,priv->usbin.status);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
-				if (debug&L_DATA) acx100usb_dump_bytes(pdr,paramlen);
+				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen);
 			}
 			else {
 				memcpy(pdr,&(priv->usbin.u.rridresp.rid),paramlen+4);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbin.cmd,priv->usbin.status,priv->usbin.u.rridresp.rid,priv->usbin.u.rridresp.frmlen);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen+4);
-				if (debug&L_DATA) acx100usb_dump_bytes(pdr,paramlen+4);
+				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen+4);
 			}
 		}
 	}
@@ -249,7 +249,7 @@ static short CtlLength[0x14] = {
 	ACX100_RID_MEMORY_CONFIG_OPTIONS_LEN,
 	ACX100_RID_RATE_FALLBACK_LEN,
 	ACX100_RID_WEP_OPTIONS_LEN,
-	ACX100_RID_MEMORY_MAP_LEN, //	ACX100_RID_SSID_LEN,
+	ACX100_RID_MEMORY_MAP_LEN,
 	ACX100_RID_SCAN_STATUS_LEN,
 	ACX100_RID_ASSOC_ID_LEN,
 	0,
@@ -272,7 +272,7 @@ static short CtlLengthDot11[0x14] = {
 	ACX100_RID_DOT11_DTIM_PERIOD_LEN,
 	ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN,
 	ACX100_RID_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN, //ACX100_RID_DOT11_WEP_KEY_LEN,
+	ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN,
 	ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
 	0,
 	ACX100_RID_DOT11_CURRENT_REG_DOMAIN_LEN,

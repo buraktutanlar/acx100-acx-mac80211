@@ -59,6 +59,9 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 
 #include <p80211mgmt.h>
 #include <acx100.h>
@@ -110,7 +113,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 	header->data_offset = 0;
 	
 	memcpy(header->data, &rxdesc->data->buf, WLAN_HDR_A3_LEN);
-	memcpy(payload->data, &rxdesc->data->val0x24, 
+	memcpy(payload->data, &rxdesc->data->data,
 		(rxdesc->data->mac_cnt_rcvd & 0xfff) - WLAN_HDR_A3_LEN);
 
 }

@@ -370,7 +370,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 				 * since otherwise we enter an eternal loop,
 				 * as update_card_settings calls set_status */
 				MAC_COPY(priv->dev_addr, priv->netdev->dev_addr);
-				priv->set_mask |= SET_TEMPLATES|SET_STA_LIST;
+				priv->set_mask |= GETSET_STATION_ID|SET_TEMPLATES|SET_STA_LIST;
 				acx100_update_card_settings(priv, 0, 0, 0);
 			}
 		}
@@ -928,21 +928,23 @@ static int acx100_process_data_frame_master(struct rxhostdescriptor *rxdesc, wla
 	to_ds = WLAN_GET_FC_TODS(ieee2host16(p80211_hdr->a3.fc));
 	from_ds = WLAN_GET_FC_FROMDS(ieee2host16(p80211_hdr->a3.fc));
 
+	if ((!to_ds) && (!from_ds)) {
+		/* To_DS = 0, From_DS = 0 */
+		da = p80211_hdr->a3.a1;	/* DA */
+		sa = p80211_hdr->a3.a2;	/* SA */
+		bssid = p80211_hdr->a3.a3;	/* BSSID */
+	} else
+	if ((!to_ds) && (from_ds)) {
+		/* To_DS = 0, From_DS = 1 */
+		da = p80211_hdr->a3.a1;	/* DA */
+		sa = p80211_hdr->a3.a3;	/* SA */
+		bssid = p80211_hdr->a3.a2;	/* BSSID */
+	} else
 	if ((to_ds) && (!from_ds)) {
 		/* To_DS = 1, From_DS = 0 */
 		da = p80211_hdr->a3.a3;	/* DA */
 		sa = p80211_hdr->a3.a2;	/* SA */
 		bssid = p80211_hdr->a3.a1;	/* BSSID */
-	} else if ((!to_ds) && (from_ds)) {
-		/* To_DS = 0, From_DS = 1 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		sa = p80211_hdr->a3.a3;	/* SA */
-		bssid = p80211_hdr->a3.a2;	/* BSSID */
-	} else if ((!to_ds) && (!from_ds)) {
-		/* To_DS = 0, From_DS = 0 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		sa = p80211_hdr->a3.a2;	/* SA */
-		bssid = p80211_hdr->a3.a3;	/* BSSID */
 	} else {
 		/* To_DS = 1, From_DS = 1 */
 		acxlog(L_DEBUG, "frame error occurred??\n");
@@ -1038,7 +1040,7 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 	UINT8 *bssid = NULL;
 	p80211_hdr_t *p80211_hdr;
 	int to_ds, from_ds;
-	int result;
+	int result = 0;
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
@@ -1050,18 +1052,20 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 
 	acxlog(L_DEBUG, "to_ds %i, from_ds %i\n", to_ds, from_ds);
 
+	if ((!to_ds) && (!from_ds)) {
+		/* To_DS = 0, From_DS = 0 */
+		da = p80211_hdr->a3.a1;	/* DA */
+		bssid = p80211_hdr->a3.a3;	/* BSSID */
+	} else
+	if ((!to_ds) && (from_ds)) {
+		/* To_DS = 0, From_DS = 1 */
+		da = p80211_hdr->a3.a1;	/* DA */
+		bssid = p80211_hdr->a3.a2;	/* BSSID */
+	} else
 	if ((to_ds) && (!from_ds)) {
 		/* To_DS = 1, From_DS = 0 */
 		da = p80211_hdr->a3.a3;	/* DA */
 		bssid = p80211_hdr->a3.a1;	/* BSSID */
-	} else if ((!to_ds) && (from_ds)) {
-		/* To_DS = 0, From_DS = 1 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		bssid = p80211_hdr->a3.a2;	/* BSSID */
-	} else if ((!to_ds) && (!from_ds)) {
-		/* To_DS = 0, From_DS = 0 */
-		da = p80211_hdr->a3.a1;	/* DA */
-		bssid = p80211_hdr->a3.a3;	/* BSSID */
 	} else {
 		/* To_DS = 1, From_DS = 1 */
 		acxlog(L_DEBUG, "frame error occurred??\n");
@@ -1069,17 +1073,20 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 		goto done;
 	}
 
-	acxlog(L_DEBUG, "da ");
-	acx100_log_mac_address(L_DEBUG, da);
-	acxlog(L_DEBUG, ",bssid ");
-	acx100_log_mac_address(L_DEBUG, bssid);
-	acxlog(L_DEBUG, ",priv->bssid ");
-	acx100_log_mac_address(L_DEBUG, priv->bssid);
-	acxlog(L_DEBUG, ",dev_addr ");
-	acx100_log_mac_address(L_DEBUG, priv->dev_addr);
-	acxlog(L_DEBUG, ",bcast_addr ");
-	acx100_log_mac_address(L_DEBUG, bcast_addr);
-	acxlog(L_DEBUG, "\n");
+	if (debug & L_DEBUG)
+	{
+		acxlog(L_DEBUG, "da ");
+		acx100_log_mac_address(L_DEBUG, da);
+		acxlog(L_DEBUG, ",bssid ");
+		acx100_log_mac_address(L_DEBUG, bssid);
+		acxlog(L_DEBUG, ",priv->bssid ");
+		acx100_log_mac_address(L_DEBUG, priv->bssid);
+		acxlog(L_DEBUG, ",dev_addr ");
+		acx100_log_mac_address(L_DEBUG, priv->dev_addr);
+		acxlog(L_DEBUG, ",bcast_addr ");
+		acx100_log_mac_address(L_DEBUG, bcast_addr);
+		acxlog(L_DEBUG, "\n");
+	}
 
 #if WE_DONT_WANT_TO_REJECT_MULTICAST
 	/* FIXME: we should probably reenable this code and check against
@@ -1107,8 +1114,8 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 #endif
 	acx100_rx(rxdesc, priv);
 
-done:
 	result = 1;
+done:
 	FN_EXIT(1, result);
 	return result;
 }
@@ -1151,6 +1158,55 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 	}
 
 	switch (WLAN_GET_FC_FSTYPE(ieee2host16(p80211_hdr->a3.fc))) {
+	/* beacons first, for speed */
+	case WLAN_FSTYPE_BEACON /* 0x08 */ :
+		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
+			switch (priv->status) {
+			   case ISTATUS_1_SCANNING:
+			   case ISTATUS_5_UNKNOWN:
+				memset(&alloc_p80211mgmt_req.a.beacon, 0,
+				       0xe * 4);
+				alloc_p80211mgmt_req.a.beacon.buf =
+				    (char *) p80211_hdr;
+				alloc_p80211mgmt_req.a.beacon.len =
+				    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+				if (debug & L_DATA)
+				{
+					acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
+					       p80211_hdr->a3.fc, p80211_hdr->a3.dur, p80211_hdr->a3.seq);
+					a = p80211_hdr->a3.a1;
+					acxlog(L_DATA,
+					       "BCN a1: %02X:%02X:%02X:%02X:%02X:%02X\n",
+					       a[0], a[1], a[2], a[3], a[4], a[5]);
+					a = p80211_hdr->a3.a2;
+					acxlog(L_DATA,
+					       "BCN a2: %02X:%02X:%02X:%02X:%02X:%02X\n",
+					       a[0], a[1], a[2], a[3], a[4], a[5]);
+					a = p80211_hdr->a3.a3;
+					acxlog(L_DATA,
+					       "BCN a3: %02X:%02X:%02X:%02X:%02X:%02X\n",
+					       a[0], a[1], a[2], a[3], a[4], a[5]);
+				}
+				acx_mgmt_decode_beacon
+				    (&alloc_p80211mgmt_req.a.beacon);
+				acx100_process_probe_response(rxdesc->data,
+						     priv,
+						     (acxp80211_hdr_t *)
+						     alloc_p80211mgmt_req.
+						     a.beacon.hdr);
+				break;
+			default:
+				/* acxlog(L_ASSOC | L_DEBUG,
+				   "Incoming beacon message not handled during status %i.\n",
+				   priv->status); */
+			break;
+			}
+		} else {
+			acxlog(L_DEBUG,
+			       "Incoming beacon message not handled in mode %d.\n",
+			       priv->macmode_joined);
+		}
+		break;
 	case WLAN_FSTYPE_ASSOCREQ /* 0x00 */ :
 		if (ACX_MODE_2_MANAGED_STA != priv->macmode_joined) {
 			memset(&alloc_p80211mgmt_req, 0, 8 * 4);
@@ -1242,51 +1298,6 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 	case 6:
 	case 7:
 		/* exit */
-		break;
-	case WLAN_FSTYPE_BEACON /* 0x08 */ :
-		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
-			switch (priv->status) {
-			   case ISTATUS_1_SCANNING:
-			   case ISTATUS_5_UNKNOWN:
-				memset(&alloc_p80211mgmt_req.a.beacon, 0,
-				       0xe * 4);
-				alloc_p80211mgmt_req.a.beacon.buf =
-				    (char *) p80211_hdr;
-				alloc_p80211mgmt_req.a.beacon.len =
-				    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
-				acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
-				       p80211_hdr->a3.fc, p80211_hdr->a3.dur, p80211_hdr->a3.seq);
-				a = p80211_hdr->a3.a1;
-				acxlog(L_DATA,
-				       "BCN a1: %02X:%02X:%02X:%02X:%02X:%02X\n",
-				       a[0], a[1], a[2], a[3], a[4], a[5]);
-				a = p80211_hdr->a3.a2;
-				acxlog(L_DATA,
-				       "BCN a2: %02X:%02X:%02X:%02X:%02X:%02X\n",
-				       a[0], a[1], a[2], a[3], a[4], a[5]);
-				a = p80211_hdr->a3.a3;
-				acxlog(L_DATA,
-				       "BCN a3: %02X:%02X:%02X:%02X:%02X:%02X\n",
-				       a[0], a[1], a[2], a[3], a[4], a[5]);
-				acx_mgmt_decode_beacon
-				    (&alloc_p80211mgmt_req.a.beacon);
-				acx100_process_probe_response(rxdesc->data,
-						     priv,
-						     (acxp80211_hdr_t *)
-						     alloc_p80211mgmt_req.
-						     a.beacon.hdr);
-				break;
-			default:
-				/* acxlog(L_ASSOC | L_DEBUG,
-				   "Incoming beacon message not handled during status %i.\n",
-				   priv->status); */
-			break;
-			}
-		} else {
-			acxlog(L_DEBUG,
-			       "Incoming beacon message not handled in mode %d.\n",
-			       priv->macmode_joined);
-		}
 		break;
 	case WLAN_FSTYPE_ATIM /* 0x09 */ :
 		/* exit */
@@ -1570,6 +1581,29 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
 		if ((pSuppRates[2+i] & ~0x80) > max_rate)
 			max_rate = pSuppRates[2+i] & ~0x80;
+	}
+	
+	/* FIXME  how we select the max txrate */
+	if ( priv->chip_type == CHIPTYPE_ACX111) {
+	    switch ( max_rate ) {
+		case 2:		priv->txrate_curr = RATE111_1;
+				break;
+				
+		case 4:		priv->txrate_curr = RATE111_2;
+				break;
+				
+		case 22:	priv->txrate_curr = RATE111_11;
+				break;
+				
+		case 44:	priv->txrate_curr = RATE111_22;
+				break;
+				
+		case 108:	priv->txrate_curr = RATE111_54;
+				break;
+				
+		default:  	priv->txrate_curr = RATE111_1;
+				break;
+	    }
 	}
 	acxlog(L_DEBUG, ".\n");
 
@@ -2110,6 +2144,7 @@ int acx100_transmit_authen1(wlandevice_t *priv)
 	acxlog(L_BINSTD | L_ASSOC, "Sending authentication1 request, awaiting response!\n");
 
 	if ((tx_desc = acx100_get_tx_desc(priv)) == NULL) {
+		FN_EXIT(0, 0);
 		return 1;
 	}
 
@@ -2858,7 +2893,12 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 		acxlog(L_STD | L_ASSOC,
 		       "%s: matching station FOUND (idx %d), JOINING (%02X %02X %02X %02X %02X %02X).\n",
 		       __func__, idx_found, a[0], a[1], a[2], a[3], a[4], a[5]);
-		acx100_join_bssid(priv);
+
+		if ( CHIPTYPE_ACX111 != priv->chip_type ) {
+		    acx100_join_bssid(priv);
+		} else {
+		    acx111_join_bssid(priv);
+		}
 
 		if ((UINT8)2 == priv->preamble_mode)
 			/* if Auto mode, then use Preamble setting which
@@ -2880,7 +2920,11 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 			acx100_ibssid_gen(priv, priv->address);
 			acx100_update_capabilities(priv);
 			priv->macmode_chosen = ACX_MODE_0_IBSS_ADHOC;
-			acx100_join_bssid(priv);
+			if ( CHIPTYPE_ACX111 != priv->chip_type ) {
+			    acx100_join_bssid(priv);
+			} else {
+			    acx111_join_bssid(priv);
+			}
 			acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
 		} else {
 			acxlog(L_STD | L_ASSOC,

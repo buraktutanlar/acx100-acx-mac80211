@@ -54,27 +54,27 @@ typedef struct mac {
 #ifdef IO_AS_MACROS
 #if ACX_IO_WIDTH == 32
 #define acx100_read_reg32(priv, offset) \
-	readl(priv->iobase + offset)
+	readl((priv->iobase) + (offset))
 #define acx100_write_reg32(priv, offset, val) \
-	writel(val, priv->iobase + offset)
+	writel((val), (priv->iobase) + (offset))
 #else
 #define acx100_read_reg32(priv, offset) \
-	readw(priv->iobase + offset) \
-	+ (readw(priv->iobase + offset + 2) << 16)
+	readw((priv->iobase) + (offset)) \
+	+ (readw((priv->iobase) + (offset) + 2) << 16)
 #define acx100_write_reg32(priv, offset, val) \
 	do { \
-		writew((val) & 0xffff, priv->iobase + offset); \
-		writew((val) >> 16, priv->iobase + offset + 2); \
+		writew((val) & 0xffff, (priv->iobase) + (offset)); \
+		writew((val) >> 16, (priv->iobase) + (offset) + 2); \
 	} while (0)
 #endif
 #define acx100_read_reg16(priv, offset) \
-	readw(priv->iobase + offset)
+	readw((priv->iobase) + (offset))
 #define acx100_write_reg16(priv, offset, val) \
-	writew(val, priv->iobase + offset)
+	writew((val), (priv->iobase) + (offset))
 #define acx100_read_reg8(priv, offset) \
-	readb(priv->iobase + offset)
+	readb((priv->iobase) + (offset))
 #define acx100_write_reg8(priv, offset, val) \
-	writeb(val, priv->iobase + offset)
+	writeb((val), (priv->iobase) + (offset))
 #else
 UINT32 acx100_read_reg32(wlandevice_t *priv, UINT valb);
 void acx100_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);

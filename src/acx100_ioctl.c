@@ -85,24 +85,26 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_LIST_DOM		ACX100_IOCTL + 0x01
 #define ACX100_IOCTL_SET_DOM		ACX100_IOCTL + 0x02
 #define ACX100_IOCTL_GET_DOM		ACX100_IOCTL + 0x03
-#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x04
-#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x05
-#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x06
-#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x07
-#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x08
-#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x09
-#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x0a
-#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x10
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x11
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x12
-#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x13
-#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x14
-#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x15
+#define ACX100_IOCTL_SET_SCAN_MODE	ACX100_IOCTL + 0x04
+#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x05
+#define ACX100_IOCTL_SET_PREAMB		ACX100_IOCTL + 0x06
+#define ACX100_IOCTL_GET_PREAMB		ACX100_IOCTL + 0x07
+#define ACX100_IOCTL_SET_ANT		ACX100_IOCTL + 0x08
+#define ACX100_IOCTL_GET_ANT		ACX100_IOCTL + 0x09
+#define ACX100_IOCTL_RX_ANT		ACX100_IOCTL + 0x0a
+#define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x0b
+#define ACX100_IOCTL_SET_PHY_AMP_BIAS	ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_GET_PHY_MEDIUM_BUSY	ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x11
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x12
+#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x13
+#define ACX100_IOCTL_DBG_GET_IO		ACX100_IOCTL + 0x14
+#define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x15
+#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x16
+#define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x17
 
 
 /* channel frequencies
@@ -133,6 +135,14 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : 0,
 	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	name : "GetRegDomain" },
+{ cmd : ACX100_IOCTL_SET_SCAN_MODE,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	get_args : 0,
+	name : "SetScanMode" },
+{ cmd : ACX100_IOCTL_SET_SCAN_CHAN_DELAY,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	get_args : 0,
+	name : "SetScanDelay" },
 { cmd : ACX100_IOCTL_SET_PREAMB,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -173,10 +183,6 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetCCA" },
-{ cmd : ACX100_IOCTL_SET_SCAN_CHAN_DELAY,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetScanDelay" },
 { cmd : ACX100_IOCTL_SET_PLED,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -204,7 +210,11 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_ACX111_INFO,
 	set_args : 0,
 	get_args : 0,
-	name : "GetAcx111Info" }
+	name : "GetAcx111Info" },
+{ cmd : ACX100_IOCTL_SET_RATES,
+	set_args : IW_PRIV_TYPE_CHAR | 256,
+	get_args : 0,
+	name : "SetRates" },
 };
 
 /*------------------------------------------------------------------------------
@@ -453,7 +463,7 @@ static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_reques
 		priv->set_mask |= GETSET_SENSITIVITY;
 		return -EINPROGRESS;
 	} else {
-		printk("ERROR: don't know how to modify sensitivity for this radio type, please try to add that!\n");
+		printk("Don't know how to modify sensitivity for this radio type, please try to add that!\n");
 		return -EINVAL;
 	}
 }
@@ -472,7 +482,7 @@ static inline int acx100_ioctl_get_sens(struct net_device *dev, struct iw_reques
 		vwrq->fixed = 1;
 		return 0;
 	} else {
-		printk("ERROR: don't know how to get sensitivity for this radio type, please try to add that!\n");
+		printk("Don't know how to get sensitivity for this radio type, please try to add that!\n");
 		return -EINVAL;
 	}
 }
@@ -974,7 +984,7 @@ static int acx111_ioctl_set_rate(struct net_device *dev, struct iw_request_info 
 			priv->txrate_auto = 0;
 			priv->txrate_curr = priv->txrate_cfg;
 		} else {
-			priv->txrate_curr = priv->txrate_cfg; //TODO: = RATE111_1 + RATE111_2; /* 2Mbps, play it safe at the beginning */
+			priv->txrate_curr = priv->txrate_cfg; /* TODO: = RATE111_1 + RATE111_2; */ /* 2Mbps, play it safe at the beginning */
 			priv->txrate_fallback_count = 0;
 			priv->txrate_stepup_count = 0;
 		}
@@ -1041,11 +1051,6 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 		case 22000000:	/* 22Mbps */
 			txrate_cfg = ACX_TXRATE_22PBCC;
 			txrate_auto_idx_max = 4;
-			break;
-
-		case 54000000:	/* 54Mbps */
-			txrate_cfg = ACX_TXRATE_54_G;
-			txrate_auto_idx_max = 12;
 			break;
 
 #if BITRATE_AUTO
@@ -1172,14 +1177,15 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
+	acxlog(L_IOCTL, "Tx = %d, auto rate %d, current rate %d\n", priv->txrate_cfg, priv->txrate_auto, priv->txrate_curr);
 	if (CHIPTYPE_ACX100 == priv->chip_type) {
 		vwrq->value = priv->txrate_curr * 100000;
 	} else {
 		int i = 0;
-		UINT16 cfg = priv->txrate_cfg;
-		while(cfg>1) {
+		UINT16 curr = priv->txrate_curr;
+		while(curr>1) {
 			i++;
-			cfg>>=1;
+			curr>>=1;
 		}
 		vwrq->value = acx111_rate_tbl[i];
 	}
@@ -2701,7 +2707,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "CTL (dynamic) 0x%X\n", tx_desc->Ctl);
 		acxlog(L_STD, "CTL2 (dynamic) 0x%X\n", tx_desc->Ctl2);
 		acxlog(L_STD, "Status (dynamic) 0x%X\n", tx_desc->error);
-		acxlog(L_STD, "Rate (dynamic) 0x%X\n", tx_desc->rate);
+		acxlog(L_STD, "Rate (dynamic) 0x%X\n", tx_desc->u.r1.rate);
 
 		tx_desc = GET_NEXT_TX_DESC_PTR(pDc, tx_desc);
 	}
@@ -2735,6 +2741,105 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	return result;
 }
 
+
+/*----------------------------------------------------------------
+* acx111_ioctl_set_rates
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: NEW
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+#include "setrate.c"
+
+static int
+acx111_supported(int mbit, int modulation, void *opaque)
+{
+	if(mbit==33) return -ENOTSUPP;
+	return 0;
+}
+
+static u16
+acx111mask[] = {
+	[DOT11_RATE_1 ] = RATE111_1 ,
+	[DOT11_RATE_2 ] = RATE111_2 ,
+	[DOT11_RATE_5 ] = RATE111_5 ,
+	[DOT11_RATE_11] = RATE111_11,
+	[DOT11_RATE_22] = RATE111_22,
+	/* [DOT11_RATE_33] = */
+	[DOT11_RATE_6 ] = RATE111_6 ,
+	[DOT11_RATE_9 ] = RATE111_9 ,
+	[DOT11_RATE_12] = RATE111_12,
+	[DOT11_RATE_18] = RATE111_18,
+	[DOT11_RATE_24] = RATE111_24,
+	[DOT11_RATE_36] = RATE111_36,
+	[DOT11_RATE_48] = RATE111_48,
+	[DOT11_RATE_54] = RATE111_54,
+};
+
+static u32
+acx111_gen_mask(int mbit, int modulation, void *opaque)
+{
+	/* lower 16 bits show selected 1, 2, CCK and CCKOFDM rates */
+	/* upper 16 bits show selected PBCC and OFDM rates */
+	u32 m = acx111mask[rate_mbit2enum(mbit)];
+	if(modulation==DOT11_MOD_PBCC || modulation==DOT11_MOD_OFDM)
+		return m<<16;
+	return m;
+}
+
+
+static int
+acx111_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
+		 struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	unsigned long flags;
+	int result;
+	u32 brate = 0, erate = 0;
+
+	result = fill_ratemasks(extra, &brate, &erate, acx111_supported, acx111_gen_mask, 0);
+	if(result)
+		goto end;
+	erate |= brate;
+
+	/* simplistic for now: disallow PBCC and OFDM */
+	/* can be improved, but needs complicated handling in tx code */
+	if(erate & 0xffff0000) return -EINVAL;
+	if(!erate) return -EINVAL;
+
+	result = acx100_lock(priv, &flags);
+	if(result)
+		goto end;
+
+	priv->txrate_cfg = erate; /* TODO: we need separate txrate_cfg for mgmt packets */
+	priv->txrate_curr = priv->txrate_cfg;
+	while( !(erate & 0x8000) ) erate<<=1;
+	priv->txrate_auto = (erate!=0x8000); /* more than one bit is set? */
+	if (priv->txrate_auto)
+	{
+		/* TODO: priv->txrate_curr = RATE111_1 + RATE111_2; */ /* 2Mbps, play it safe at the beginning */
+		priv->txrate_fallback_count = 0;
+		priv->txrate_stepup_count = 0;
+	}
+
+	acx100_unlock(priv, &flags);
+
+	acxlog(L_IOCTL, "Tx rate = %04x, auto rate %d, current rate %04x\n", priv->txrate_cfg, priv->txrate_auto, priv->txrate_curr);
+	priv->set_mask |= SET_RATE_FALLBACK;
+	result = -EINPROGRESS;
+end:
+	return result;
+}
 
 /*----------------------------------------------------------------
 * acx100_ioctl_set_phy_amp_bias
@@ -2882,6 +2987,32 @@ end:
 	return result;
 }
 
+static inline int acx100_ioctl_set_scan_mode(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	unsigned long flags;
+	int err;
+	int result = -EINVAL;
+	char *scan_modes[] = { "active", "passive", "background" };
+
+	if (*extra > 2)
+		goto end;
+
+	if (0 != (err = acx100_lock(priv, &flags))) {
+		result = err;
+		goto end;
+	}
+
+	(void)printk("current scan mode: %d (%s)\n", priv->scan_mode, scan_modes[priv->scan_mode]);
+	priv->scan_mode = (UINT16)*extra;
+	(void)printk("new scan mode: %d (%s)\n", priv->scan_mode, scan_modes[priv->scan_mode]);
+	acx100_unlock(priv, &flags);
+	result = 0;
+
+end:
+	return result;
+}
+
 static inline int acx100_ioctl_set_scan_chan_delay(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
@@ -2896,7 +3027,7 @@ static inline int acx100_ioctl_set_scan_chan_delay(struct net_device *dev, struc
 
 	(void)printk("current scan channel delay: %dms\n", priv->scan_probe_delay);
 	priv->scan_probe_delay = (UINT16)*extra;
-	(void)printk("new current scan channel delay: %dms\n", (UINT16)*extra);
+	(void)printk("new scan channel delay: %dms\n", (UINT16)*extra);
 	acx100_unlock(priv, &flags);
 	result = 0;
 
@@ -3005,6 +3136,8 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_list_reg_domain,
 	(iw_handler) acx100_ioctl_set_reg_domain,
 	(iw_handler) acx100_ioctl_get_reg_domain,
+	(iw_handler) acx100_ioctl_set_scan_mode,
+	(iw_handler) acx100_ioctl_set_scan_chan_delay,
 	(iw_handler) acx100_ioctl_set_short_preamble,
 	(iw_handler) acx100_ioctl_get_short_preamble,
 	(iw_handler) acx100_ioctl_set_antenna,
@@ -3015,14 +3148,14 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_get_phy_chan_busy_percentage,
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
-	(iw_handler) acx100_ioctl_set_scan_chan_delay,
 	(iw_handler) acx100_ioctl_set_led_power,
 	(iw_handler) acx100_ioctl_wlansniff,
 	(iw_handler) acx100_ioctl_unknown11,
 	(iw_handler) acx100_ioctl_dbg_set_masks,
 	(iw_handler) acx100_ioctl_dbg_get_io,
 	(iw_handler) acx100_ioctl_dbg_set_io,
-	(iw_handler) acx100_ioctl_acx111_info
+	(iw_handler) acx100_ioctl_acx111_info,
+	(iw_handler) acx111_ioctl_set_rates,
 };
 
 const struct iw_handler_def acx100_ioctl_handler_def =
@@ -3034,7 +3167,7 @@ const struct iw_handler_def acx100_ioctl_handler_def =
 	.private = (iw_handler *) acx100_ioctl_private_handler,
 	.private_args = (struct iw_priv_args *) acx100_ioctl_private_args,
 #if WIRELESS_EXT > 15
-	.spy_offset = 0 /* FIXME */,
+	.spy_offset = ((void *) (&((struct wlandevice *) NULL)->spy_data) - (void *) NULL),
 #endif /* WE > 15 */
 };
 

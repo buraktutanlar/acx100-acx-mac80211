@@ -48,6 +48,9 @@
 
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 
 #include <wlan_compat.h>
 
@@ -64,7 +67,7 @@
 #include <acx100_helper.h>
 #include <ihw.h>
 
-void acx100_dump_bytes(void *,int);
+extern void acx100_dump_bytes(void *,int);
 
 #if (WLAN_HOSTIF==WLAN_USB)
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
@@ -302,7 +305,7 @@ void acx100_get_info_state(wlandevice_t *priv)
 
 	/* inform hw that we have read this info message */
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
-	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_ACK); /* now bug hw to notice it */
+	acx100_write_reg16(priv, priv->io[IO_ACX_INT_TRIG], INT_TRIG_ACK); /* now bother hw to notice it */
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
@@ -750,7 +753,7 @@ static short CtlLength[0x14] = {
 	0,
 	ACX1xx_IE_ASSOC_ID_LEN,
 	0,
-	0,
+	ACX1xx_IE_CONFIG_OPTIONS_LEN,
 	ACX1xx_IE_FWREV_LEN,
 	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
 	ACX1xx_IE_MEDIUM_USAGE_LEN,
@@ -821,7 +824,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 	else
 		len=CtlLengthDot11[type-0x1000];
 
-	if (len==0) {
+	if (unlikely(len==0)) {
 		acxlog(L_DEBUG,"WARNING: ENCOUNTERED ZEROLENGTH RID (%x)\n",type);
 	}
 	acxlog(L_XFER,"configuring: type(rid)=0x%X len=%d\n",type,len);
@@ -955,10 +958,7 @@ inline int acx100_is_mac_address_zero(mac_t *mac)
 *----------------------------------------------------------------*/
 inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 {
-	if (memcmp(one, two, ETH_ALEN))
-		return 0; /* no match */
-	else
-		return 1; /* matched */
+	return (memcmp(one, two, ETH_ALEN) == 0);
 }
 
 /*----------------------------------------------------------------
@@ -1121,24 +1121,3 @@ void acx100_power_led(wlandevice_t *priv, UINT8 enable)
 			acx100_read_reg16(priv, priv->io[IO_ACX_GPIO_OE]) | 0x0800);
 }
 
-
-void acx100_dump_bytes(void *data,int num)
-{
-  int i,remain=num;
-  unsigned char *ptr=(unsigned char *)data;
-
-  if (!(debug & L_DEBUG))
-	  return;
-
-  while (remain>0) {
-    printk(KERN_WARNING);
-    if (remain<16) {
-      for (i=0;i<remain;i++) printk("%02X ",*ptr++);
-      remain=0;
-    } else {
-      for (i=0;i<16;i++) printk("%02X ",*ptr++);
-      remain-=16;
-    }
-    printk("\n");
-}
-}

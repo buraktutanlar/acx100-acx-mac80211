@@ -66,6 +66,9 @@
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 #include <asm/uaccess.h>
 
 #include <linux/pm.h>
@@ -87,7 +90,9 @@
 #include <idma.h>
 #include <ihw.h>
 
+#if BOGUS
 UINT8 DTIM_count;
+#endif
 
 extern char *firmware_dir; /* declared in acx100.c, to keep together with other MODULE_PARMs */
 
@@ -509,8 +514,8 @@ int acx100_reset_dev(netdevice_t *dev)
 	
 	/* reset the device to make sure the eCPU is stopped 
 	   to upload the firmware correctly */
-	acx100_reset_mac(priv);
-	
+	acx100_reset_mac(priv);	
+
 	/* TODO maybe seperate the two init parts into functions */
 	/* FIXME: they turned out to become pretty much equal now,
 	   so they could be merged, I guess */
@@ -1081,7 +1086,7 @@ int acx100_load_radio(wlandevice_t *priv)
 {
 	UINT32 offset;
 	acx100_memmap_t mm;
-	int res1 = 0, res2 = 0;
+	int res = 0, res1 = 0, res2 = 0;
 	firmware_image_t *radio_image=0;
 	radioinit_t radioinit;
 	char *filename;
@@ -1095,8 +1100,7 @@ int acx100_load_radio(wlandevice_t *priv)
 	filename = kmalloc(PATH_MAX, GFP_USER);
 	if (!filename) {
 		acxlog(L_STD, "ALERT: can't allocate filename\n");
-		FN_EXIT(0, 0);
-		return 0;
+		goto fail;
 	}
 
 	sprintf(filename,"%s/RADIO%02x.BIN", firmware_dir, priv->radio_type);
@@ -1114,9 +1118,8 @@ int acx100_load_radio(wlandevice_t *priv)
 	if (NULL == radio_image)
 	{
 		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of a combined firmware, FATAL when using a separated firmware (base firmware / radio image).\n",filename);
-		kfree(filename);
-		FN_EXIT(1, 1);
-		return 1; /* Doesn't need to be fatal, we might be using a combined image */
+		res = 1; /* Doesn't need to be fatal, we might be using a combined image */
+		goto fail;
 	}
 
 	acx100_issue_cmd(priv, ACX1xx_CMD_SLEEP, NULL, 0, 5000);
@@ -1139,23 +1142,22 @@ int acx100_load_radio(wlandevice_t *priv)
 	vfree(radio_image);
 	
 	if ((0 == res1) || (0 == res2))
-	{
-		FN_EXIT(0, 0);
-		return 0;
-	}
+		goto fail;
 
 	/* will take a moment so let's have a big timeout */
 	acx100_issue_cmd(priv, ACX1xx_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
 
-	kfree(filename);
 	if (0 == acx100_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP))
 	{
 		acxlog(L_STD, "Error reading memory map\n");
-		FN_EXIT(0, 0);
-		return 0;
+		goto fail;
 	}
-	FN_EXIT(0, 0);
-	return 1;
+	res = 1;
+fail:
+	if (filename)
+		kfree(filename);
+	FN_EXIT(1, res);
+	return res;
 }
 
 #if (WLAN_HOSTIF!=WLAN_USB)
@@ -1282,7 +1284,7 @@ void acx111_set_wepkey( wlandevice_t *priv )
       dk.action = 1;            /* add key */
       dk.keySize = priv->wep_keys[i].size;
 
-    /* is this two lines nessesary ?*/
+    /* are these two lines neccessary? */
       dk.type = 0;              /* default wep key */
       dk.index = 0;             /* ignored when setting default key */
 
@@ -1324,6 +1326,7 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 	acx100_wep_options_t options;
 	dot11WEPDefaultKeyID_t dk;
 	acx100_wep_mgmt_t wep_mgmt; /* size = 37 bytes */
+	int res = 0;
 
 	FN_ENTER;
 	
@@ -1331,7 +1334,7 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 
 	if (acx100_interrogate(priv, pt, ACX1xx_IE_MEMORY_MAP) == 0) {
 		acxlog(L_STD, "ctlMemoryMapRead failed!\n");
-		return 0;
+		goto fail;
 	}
 
 	acxlog(L_BINDEBUG, "CodeEnd:%X\n", pt->CodeEnd);
@@ -1343,7 +1346,7 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 
 		if (acx100_configure(priv, pt, ACX1xx_IE_MEMORY_MAP) == 0) {
 			acxlog(L_STD, "%s: ctlMemoryMapWrite failed!\n", __func__);
-			return 0;
+			goto fail;
 		}
 
 		options.NumKeys = cpu_to_le16(NUM_WEPKEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
@@ -1377,14 +1380,14 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 		/* now retrieve the updated WEPCacheEnd pointer... */
 		if (0 == acx100_interrogate(priv, pt, ACX1xx_IE_MEMORY_MAP)) {
 			acxlog(L_STD, "ctlMemoryMapRead #2 failed!\n");
-			return 0;
+			goto fail;
 		}
 		/* ...and tell it to start allocating templates at that location */
 		pt->PacketTemplateStart = pt->WEPCacheEnd; /* no endianness conversion needed */
 
 		if (0 == acx100_configure(priv, pt, ACX1xx_IE_MEMORY_MAP)) {
 			acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
-			return 0;
+			goto fail;
 		}
 	} else {
 	    acx111_set_wepkey( priv );
@@ -1395,9 +1398,11 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 		acx100_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
 	    }
 	}
+	res = 1;
 
-	FN_EXIT(1, 1);
-	return 1;
+fail:
+	FN_EXIT(1, res);
+	return res;
 }
 
 int acx100_init_max_null_data_template(wlandevice_t *priv)
@@ -1569,9 +1574,11 @@ int acx100_set_tim_template(wlandevice_t *priv)
 	t.buf[0x9] = (UINT8)0x0;
 	t.buf[0xa] = (UINT8)0x0;
 	result = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(struct tim), 5000);
+#if BOGUS
 	if (++DTIM_count == priv->dtim_interval) {
 		DTIM_count = (UINT8)0;
 	}
+#endif
 	FN_EXIT(1, result);
 	return result;
 }
@@ -1853,11 +1860,9 @@ int acx111_init_packet_templates(wlandevice_t *priv)
 static inline UINT8 acx111_get_tx_level(wlandevice_t *priv) {
 
 	struct ACX111TxLevel tx_level;
-	tx_level.id = 0x100d;
-	tx_level.length = 1;
-	tx_level.level = 0;
 
-	if (acx100_interrogate(priv, &tx_level, 0x100d) == 0) {
+	tx_level.level = 0;
+	if (acx100_interrogate(priv, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL) == 0) {
 		acxlog(L_INIT, "Error getting acx111 tx level\n");
 	}
 	return tx_level.level;
@@ -1962,8 +1967,8 @@ static inline int acx111_set_tx_level(wlandevice_t *priv, UINT8 level) {
  */
 void acx100_scan_chan(wlandevice_t *priv)
 {
-	struct scan s;
-	memset(&s, 0, sizeof(struct scan));
+	acx100_scan_t s;
+
 	FN_ENTER;
 	acxlog(L_INIT, "Starting radio scan\n");
 
@@ -1980,16 +1985,17 @@ void acx100_scan_chan(wlandevice_t *priv)
 	 * pick an outdated one) */
 	priv->bss_table_count = 0;
 	acx100_set_status(priv, ISTATUS_1_SCANNING);
+	memset(&s, 0, sizeof(acx100_scan_t));
 	s.count = cpu_to_le16(priv->scan_count);
 	s.start_chan = cpu_to_le16(1);
 	s.flags = cpu_to_le16(0x8000);
-	s.max_rate = 20; /* 2 Mbps */
+	s.max_rate = ACX_TXRATE_2; /* 2 Mbps */
 	s.options = priv->scan_mode;
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);
 	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
 
-	acx100_issue_cmd(priv, ACX1xx_CMD_SCAN, &s, sizeof(struct scan), 5000);
+	acx100_issue_cmd(priv, ACX1xx_CMD_SCAN, &s, sizeof(acx100_scan_t), 5000);
 
 	FN_EXIT(0, 0);
 }
@@ -1997,23 +2003,24 @@ void acx100_scan_chan(wlandevice_t *priv)
 void acx111_scan_chan(wlandevice_t *priv) {
 
 	struct acx111_scan s;
-	memset(&s, 0, sizeof(struct acx111_scan));
+
 	FN_ENTER;
 	acxlog(L_INIT, "Starting radio scan\n");
 
+	memset(&s, 0, sizeof(struct acx111_scan));
 	s.count = 3;
 	s.channel_list_select = 0; /* scan every allowed channel */
 	/*s.channel_list_select = 1;*/ /* scan given channels */
 	s.reserved1 = 0;
 	s.reserved2 = 0;
 	/*s.rate = 0x0a;*/ /* 1 Mbs */
-	s.rate = 0x14; /* 2 Mbs */
+	s.rate = ACX_TXRATE_2; /* 2 Mbs */
 	/*s.rate = 0x0c;*/ /* 54 Mbs */
 	/*s.options = ACX_SCAN_ACTIVE;*/
-	s.options = ACX_SCAN_PASSIVE;
+	s.options = priv->scan_mode;
 	/*s.options = ACX_SCAN_PASSIVE | ACX_SCAN_BACKGROUND;*/ /* do an passive background scan */
 	s.chan_duration = 50;
-	s.max_probe_delay = 200;
+	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
 	/*s.modulation = 0x40;*/ /* long preamble ? ofdm ? -> only for active scan*/
 	s.modulation = 0;
 	/*s.channel_list[0] = 6;
@@ -2026,12 +2033,12 @@ void acx111_scan_chan(wlandevice_t *priv) {
 /* AcxScanWithParam()
  * STATUS: should be ok.
  */
-void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s)
+void acx100_scan_chan_p(wlandevice_t *priv, acx100_scan_t *s)
 {
 	FN_ENTER;
 	acx100_set_status(priv, ISTATUS_1_SCANNING);
 
-	acx100_issue_cmd(priv, ACX1xx_CMD_SCAN, s, sizeof(struct scan), 5000);
+	acx100_issue_cmd(priv, ACX1xx_CMD_SCAN, s, sizeof(acx100_scan_t), 5000);
 	FN_EXIT(0, 0);
 }
 
@@ -2108,7 +2115,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	}
 
 	if (0 != priv->get_mask) {
-		if (0 != (priv->get_mask & (GET_STATION_ID|GETSET_ALL))) {
+		if (0 != (priv->get_mask & (GETSET_STATION_ID|GETSET_ALL))) {
 			UINT8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
 			UINT8 *paddr;
 			int i;
@@ -2122,7 +2129,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 				 * copied into iwpriv->dev_addr */
 				priv->netdev->dev_addr[5 - i] = paddr[i];
 			}
-			priv->get_mask &= ~GET_STATION_ID;
+			priv->get_mask &= ~GETSET_STATION_ID;
 		}
 
 		if (0 != (priv->get_mask & (GETSET_SENSITIVITY|GETSET_ALL))) {
@@ -2131,7 +2138,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			|| (RADIO_RALINK_15 == priv->radio_type)) {
 				acx100_read_phy_reg(priv, 0x30, &priv->sensitivity);
 			} else {
-				acxlog(L_STD, "ERROR: don't know how to get sensitivity for radio type %d, please try to add that!\n", priv->radio_type);
+				acxlog(L_STD, "Don't know how to get sensitivity for radio type 0x%02x, please try to add that!\n", priv->radio_type);
 				priv->sensitivity = 0;
 			}
 			acxlog(L_INIT, "Got sensitivity value %d\n", priv->sensitivity);
@@ -2178,6 +2185,23 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			acxlog(L_INIT, "Got regulatory domain 0x%02X\n", priv->reg_dom_id);
 			priv->get_mask &= ~GETSET_REG_DOMAIN;
 		}
+	}
+
+	if (0 != (priv->set_mask & (GETSET_STATION_ID|GETSET_ALL))) {
+		UINT8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+		UINT8 *paddr;
+		int i;
+
+		paddr = &stationID[4];
+		for (i = 0; i < 6; i++) {
+			/* copy the MAC address we obtained when we noticed
+			 * that the ethernet iface's MAC changed 
+			 * to the card (reversed in
+			 * the card!) */
+			paddr[i] = priv->dev_addr[5 - i];
+		}
+		acx100_configure(priv, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+		priv->set_mask &= ~GETSET_STATION_ID;
 	}
 
 	if (0 != (priv->set_mask & (SET_TEMPLATES|GETSET_ALL))) {
@@ -2249,7 +2273,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		|| (RADIO_RALINK_15 == priv->radio_type)) {
 			acx100_write_phy_reg(priv, 0x30, priv->sensitivity);
 		} else {
-			acxlog(L_STD, "ERROR: don't know how to modify sensitivity for radio type %d, please try to add that!\n", priv->radio_type);
+			acxlog(L_STD, "Don't know how to modify sensitivity for radio type %d, please try to add that!\n", priv->radio_type);
 		}
 		priv->set_mask &= ~GETSET_SENSITIVITY;
 	}
@@ -2506,12 +2530,12 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 				acx100_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, 5000);
 #warning Is this used anymore?
 				if(priv->chip_type == CHIPTYPE_ACX100) {
-					struct scan s;
+					acx100_scan_t s;
 					s.count = 1;
 					s.start_chan = priv->channel;
 					s.flags = 0x8000;
-					s.max_rate = 20; /* 2 Mbps */
-					s.options = 0x1;
+					s.max_rate = ACX_TXRATE_2; /* 2 Mbps */
+					s.options = priv->scan_mode;
 					s.chan_duration = 50;
 					s.max_probe_delay = 100;
 
@@ -2601,7 +2625,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	FN_ENTER;
 
 	/* query some settings from the card. */
-	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GET_STATION_ID|GETSET_REG_DOMAIN;
+	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
 	acx100_update_card_settings(priv, 1, 0, 0);
 
 	/* set our global interrupt mask */
@@ -2650,16 +2674,16 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->preamble_mode = (UINT8)2;
 	priv->preamble_flag = (UINT8)0;
 	priv->listen_interval = 100;
-	priv->beacon_interval = 100;
+	priv->beacon_interval = DEFAULT_BEACON_INTERVAL;
 	priv->macmode_wanted = ACX_MODE_FF_AUTO; /* associate to either Ad-Hoc or Managed */
 	priv->macmode_joined = 0xaa; /* make sure we know that we didn't join anything */
 	priv->unknown0x2350 = 0;
-	priv->dtim_interval = (UINT8)2;
+	priv->dtim_interval = (UINT8)DEFAULT_DTIM_INTERVAL;
 
-	priv->msdu_lifetime = 4096; /* used to be 2048, but FreeBSD driver changed it to 4096 to work properly in noisy wlans */
+	priv->msdu_lifetime = DEFAULT_MSDU_LIFETIME;
 	priv->set_mask |= SET_MSDU_LIFETIME;
 
-	priv->rts_threshold = 2312; /* max. size: disable RTS mechanism */
+	priv->rts_threshold = DEFAULT_RTS_THRESHOLD;
 
 	/* use standard default values for retry limits */
 	priv->short_retry = 7; /* max. retries for (short) non-RTS packets */
@@ -2677,7 +2701,7 @@ int acx100_set_defaults(wlandevice_t *priv)
 	} else {
 		priv->txrate_cfg = RATE111_ALL;
 		if (1 == priv->txrate_auto)
-			priv->txrate_curr = RATE111_ALL; //TODO: RATE111_1 + RATE111_2; /* 2Mbps, play it safe at the beginning */
+			priv->txrate_curr = RATE111_ALL; /* TODO: RATE111_1 + RATE111_2; */ /* 2Mbps, play it safe at the beginning */
 		else
 			priv->txrate_curr = priv->txrate_cfg;
 	}
@@ -2686,8 +2710,8 @@ int acx100_set_defaults(wlandevice_t *priv)
 	 * Setting it higher will cause higher ping times due to retries. */
 	priv->txrate_fallback_retries = (UINT8)1;
 	priv->set_mask |= SET_RATE_FALLBACK;
-	priv->txrate_fallback_threshold = (UINT8)12;
-	priv->txrate_stepup_threshold = (UINT8)3;
+	priv->txrate_fallback_threshold = (UINT8)3;
+	priv->txrate_stepup_threshold = (UINT8)12;
 
 	/* Supported Rates element - the rates here are given in units of
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
@@ -2720,15 +2744,19 @@ int acx100_set_defaults(wlandevice_t *priv)
 	priv->capab_pbcc = (UINT8)1;
 	priv->capab_agility = (UINT8)0;
 
-	priv->val0x2324[0x1] = (UINT8)0x1f; /* supported rates: 1, 2, 5.5, 11, 22 */
-	priv->val0x2324[0x2] = (UINT8)0x03;
-	priv->val0x2324[0x3] = (UINT8)0x0f; /* basic rates: 1, 2, 5.5, 11 */
-	priv->val0x2324[0x4] = (UINT8)0x0f;
-	priv->val0x2324[0x5] = (UINT8)0x0f;
-	priv->val0x2324[0x6] = (UINT8)0x1f;
+	priv->rates_supported = 0x1f; /* supported rates: 1, 2, 5.5, 11, 22 */
+	priv->val0x2324_2 = 0x03;
+	priv->rates_basic = 0x0f; /* basic rates: 1, 2, 5.5, 11 */
+	priv->val0x2324_4 = 0x0f;
+	priv->val0x2324_5 = 0x0f;
+	priv->val0x2324_6 = 0x1f;
 
 	/* set some more defaults */
-	priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
+	if ( priv->chip_type == CHIPTYPE_ACX100 ) { 
+	    priv->tx_level_dbm = (UINT8)18; /* don't use max. level, since it might be dangerous (e.g. WRT54G people experience excessive Tx power damage!) */
+	} else {
+	    priv->tx_level_dbm = (UINT8)0x1E; /* This is the only supported powerlevel in the EEPROM */
+	}
 	priv->tx_level_auto = (UINT8)1;
 	priv->set_mask |= GETSET_TXPOWER;
 
@@ -2854,8 +2882,9 @@ void acx100_set_probe_request_template(wlandevice_t *priv)
 	int frame_len,i;
 	UINT8 bcast_addr[0x6] = {0xff,0xff,0xff,0xff,0xff,0xff};
 	
-  	txf = &pt.hdr;
 	FN_ENTER;
+	memset(&pt, 0x0, sizeof(pt));
+  	txf = &pt.hdr;
 	/* pt.hdr.a4.a1[6] = 0xff; */
 	frame_len = 0x18;
 	pt.hdr.a4.fc = cpu_to_le16(0x40);
@@ -2945,6 +2974,7 @@ void acx111_set_probe_request_template(wlandevice_t *priv)
 }
 
 
+extern void error_joinbss_must_be_0x30_bytes_in_length(void);
 /*----------------------------------------------------------------
 * acx100_join_bssid
 *
@@ -2971,6 +3001,85 @@ void acx100_join_bssid(wlandevice_t *priv)
 	int i;
 	joinbss_t tmp;
 	
+	if(sizeof(joinbss_t)!=0x30)
+		error_joinbss_must_be_0x30_bytes_in_length();
+	
+	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+	FN_ENTER;
+	memset(&tmp, 0, sizeof(tmp));
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		tmp.bssid[i] = priv->address[5 - i];
+	}
+
+	tmp.beacon_interval = cpu_to_le16(priv->beacon_interval);
+
+	if ( priv->chip_type != CHIPTYPE_ACX111 ) {
+		tmp.u.acx100.dtim_interval = priv->dtim_interval;
+		tmp.u.acx100.rates_basic = priv->rates_basic;
+		tmp.u.acx100.rates_supported = priv->rates_supported;
+	} else {
+		tmp.u.acx111.dtim_interval = priv->dtim_interval;
+		tmp.u.acx111.rates_basic = 
+			JOINBSS_RATES_BASIC111_1 +
+			JOINBSS_RATES_BASIC111_2 +
+			JOINBSS_RATES_BASIC111_5 +
+			JOINBSS_RATES_BASIC111_11 +
+			JOINBSS_RATES_BASIC111_22 +
+			0;
+	}
+
+	tmp.txrate_val = (UINT8)ACX_TXRATE_2;	/* bitrate for beacon, probe resp, RTS, PS-Poll frames */
+	tmp.preamble_type = priv->capab_short;
+	tmp.macmode = priv->macmode_chosen;	/* should be called BSS_Type? */
+	tmp.channel = priv->channel;
+	tmp.essid_len = priv->essid_len;
+	/* The firmware hopefully doesn't stupidly rely
+	 * on having a trailing \0 copied, right?
+	 * (the code memcpy'd essid_len + 1 before, which is WRONG!) */
+	memcpy(tmp.essid, priv->essid, tmp.essid_len);
+
+	acx100_issue_cmd(priv, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11, 5000);
+	acxlog(L_ASSOC | L_BINDEBUG, "<%s> BSS_Type = %d\n", __func__, tmp.macmode);
+	acxlog(L_ASSOC | L_BINDEBUG,
+		   "<%s> JoinBSSID MAC:%02X %02X %02X %02X %02X %02X\n", __func__,
+		   tmp.bssid[5], tmp.bssid[4], tmp.bssid[3],
+		   tmp.bssid[2], tmp.bssid[1], tmp.bssid[0]);
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		priv->bssid[5 - i] = tmp.bssid[i];
+	}
+	priv->macmode_joined = tmp.macmode;
+	acx100_update_capabilities(priv);
+	FN_EXIT(0, 0);
+}
+
+/*----------------------------------------------------------------
+* acx111_join_bssid
+*
+*
+* Arguments:
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS:
+*
+* Comment:
+*
+*----------------------------------------------------------------*/
+
+/* AcxJoin()
+ * STATUS: FINISHED, UNVERIFIED.
+ */
+void acx111_join_bssid(wlandevice_t *priv)
+{
+	int i;
+	acx111_joinbss_t tmp;
+	
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	FN_ENTER;
 	memset(&tmp, 0, sizeof(tmp));
@@ -2981,11 +3090,7 @@ void acx100_join_bssid(wlandevice_t *priv)
 
 	tmp.beacon_interval = cpu_to_le16(priv->beacon_interval);
 	tmp.dtim_interval = priv->dtim_interval;
-	tmp.rates_basic = priv->val0x2324[3];
-
-	if ( priv->chip_type != CHIPTYPE_ACX111 ) {
-	    tmp.rates_supported = priv->val0x2324[1];
-	}
+	tmp.rates_basic = 1;
 
 	tmp.txrate_val = (UINT8)ACX_TXRATE_2;	/* bitrate: 2Mbps */
 	tmp.preamble_type = priv->capab_short;
@@ -2997,7 +3102,7 @@ void acx100_join_bssid(wlandevice_t *priv)
 	 * (the code memcpy'd essid_len + 1 before, which is WRONG!) */
 	memcpy(tmp.essid, priv->essid, tmp.essid_len);
 
-	acx100_issue_cmd(priv, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11, 5000);
+	acx100_issue_cmd(priv, ACX1xx_CMD_JOIN, &tmp, sizeof(tmp), 5000);
 	acxlog(L_ASSOC | L_BINDEBUG, "<%s> BSS_Type = %d\n", __func__, tmp.macmode);
 	acxlog(L_ASSOC | L_BINDEBUG,
 		   "<%s> JoinBSSID MAC:%02X %02X %02X %02X %02X %02X\n", __func__,
@@ -3098,18 +3203,6 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 
 	MAC_COPY(dev->dev_addr, priv->dev_addr);
 
-#if 0
-	/* FIXME: most likely that's not needed here,
-	 * since it's done in acx100_start() */
-	priv->set_mask |= SET_STA_LIST;
-	priv->set_mask |= SET_TEMPLATES;
-	acx100_update_card_settings(priv, 1, 0, 0);
-#endif
-
-
-		
-	/*priv->val0x240c = 0x1; */
-
 	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 		if (acx100_set_beacon_template(priv) == 0) {
 			acxlog(L_STD,
@@ -3126,8 +3219,6 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 	result = 0;
 
 fail:
-/*	  acx100_enable_irq(priv); */
-/*	  acx100_start(priv); */
 	FN_EXIT(1, result);
 	return result;
 }
@@ -3263,7 +3354,7 @@ void acx100_update_capabilities(wlandevice_t *priv)
 
 	priv->capabilities = 0;
 	if (ACX_MODE_3_MANAGED_AP == priv->macmode_wanted) {
-		priv->capabilities = WLAN_SET_MGMT_CAP_INFO_ESS(1);	/* 1 */
+		priv->capabilities |= WLAN_SET_MGMT_CAP_INFO_ESS(1);	/* 1 */
 	} else {
 		priv->capabilities |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);	/* 2 */
 	}
@@ -3368,8 +3459,10 @@ UINT16 acx100_read_eeprom_area(wlandevice_t *priv)
 
 UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, UINT8 *charbuf)
 {
+#if (WLAN_HOSTIF==WLAN_USB)
 	UINT16 result = 1;
-#if (WLAN_HOSTIF!=WLAN_USB)
+#else
+	UINT16 result = 0;
 
 	UINT16 gpio_orig;
 	UINT16 i;
@@ -3402,8 +3495,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 			 * Doesn't matter anyway (only small delay). */
 			if (++count > 0xffff) {
 				acxlog(L_BINSTD, "%s: WARNING, DANGER!!!! Timeout waiting for write eeprom cmd\n", __func__);
-				result = 0;
-				goto end;
+				goto fail;
 			}
 		}
 	}
@@ -3413,8 +3505,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 
 	/* now start a verification run */
 	if ((NULL == (data_verify = kmalloc(len, GFP_KERNEL)))) {
-		result = 0;
-		goto end;
+		goto fail;
 	}
 
 	for (i = 0; i < len; i++) {
@@ -3431,8 +3522,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 			 * Doesn't matter anyway (only small delay). */
 			if (++count > 0xffff) {
 				acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
-				result = 0;
-				goto end;
+				goto fail;
 			}
 		}
 
@@ -3442,7 +3532,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 	if (0 == memcmp(charbuf, data_verify, len))
 		result = 1; /* read data matches, success */
 	
-end:
+fail:
 	if (NULL != data_verify)
         	kfree(data_verify);
 	
@@ -3466,16 +3556,13 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], (UINT32)reg);
 	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], 2);
 
-	acx100_schedule(HZ / 100);
-
 	while (0 != acx100_read_reg32(priv, priv->io[IO_ACX_PHY_CTL]))
 	{
-		acx100_schedule(HZ / 100);
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
-		if (++count > 10) {
+		if (++count > 0xffff) {
 			result = 0;
 			acxlog(L_BINSTD, "%s: timeout waiting for read phy cmd\n", __func__);
 			*charbuf = 0;
@@ -3538,3 +3625,93 @@ UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
 	FN_EXIT(1, 1);
 	return 1;
 }
+
+
+/* FIXME: check whether this function is indeed acx111 only,
+ * rename ALL relevant definitions to indicate actual card scope! */
+void acx111_read_configoption(wlandevice_t *priv)
+{
+	acx1xx_configoption_t	co;
+	acx1xx_configoption_t	co2;
+	int	i;
+	UINT8	*pEle;
+	
+	FN_ENTER;
+	
+	if (!acx100_interrogate(priv, &co, ACX111_IE_CONFIG_OPTIONS) ) {
+	    acxlog(L_STD, "Reading ConfigOption FAILED!!! \n");
+	    return;
+	};
+
+	memcpy(&co2, &co, sizeof(co_fixed_t));
+	
+	pEle = (UINT8 *)&co;
+	pEle += (UINT8 *)sizeof(co_fixed_t) - (UINT8 *)4;
+	
+	co2.antennas.rid = pEle[0];
+	co2.antennas.len = pEle[1];
+	acxlog(L_DEBUG, "AntennaID : %02X  Length: %02X, Data: ", co2.antennas.rid, co2.antennas.len);
+	for (i=0;i<pEle[1];i++) {
+	    co2.antennas.list[i] = pEle[i+2];
+	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+	}
+	acxlog(L_DEBUG, "\n");
+
+	pEle += pEle[1] + 2;	
+	co2.power_levels.rid = pEle[0];
+	co2.power_levels.len = pEle[1];
+	acxlog(L_DEBUG, "PowerLevelID : %02X  Length: %02X, Data: ", co2.power_levels.rid, co2.power_levels.len);
+	for (i=0;i<pEle[1]*2;i++) {
+	    co2.power_levels.list[i] = pEle[i+2];
+	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+	}
+	acxlog(L_DEBUG, "\n");
+
+	pEle += pEle[1]*2 + 2;	
+	co2.data_rates.rid = pEle[0];
+	co2.data_rates.len = pEle[1];
+	acxlog(L_DEBUG, "DataRatesID : %02X  Length: %02X, Data: ", co2.data_rates.rid, co2.data_rates.len);
+	for (i=0;i<pEle[1];i++) {
+	    co2.data_rates.list[i] = pEle[i+2];
+	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+	}
+	acxlog(L_DEBUG, "\n");
+	
+	pEle += pEle[1] + 2;
+	co2.domains.rid = pEle[0];
+	co2.domains.len = pEle[1];
+	acxlog(L_DEBUG, "DomainID : %02X  Length: %02X, Data: ", co2.domains.rid, co2.domains.len);
+	for (i=0;i<pEle[1];i++) {
+	    co2.domains.list[i] = pEle[i+2];
+	    acxlog(L_DEBUG, " %02X", pEle[i+2]);
+	}
+	acxlog(L_DEBUG, "\n");
+	
+	pEle += pEle[1] + 2;
+	co2.product_id.rid = pEle[0];
+	co2.product_id.len = pEle[1];
+	for (i=0;i<pEle[1];i++) {
+	    co2.product_id.list[i] = pEle[i+2];
+	}
+	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %s\n", co2.product_id.rid, co2.product_id.len, (char *)co2.product_id.list);
+
+	pEle += pEle[1] + 2;	
+	co2.manufactor.rid = pEle[0];
+	co2.manufactor.len = pEle[1];
+	for (i=0;i<pEle[1];i++) {
+	    co2.manufactor.list[i] = pEle[i+2];
+	}
+	acxlog(L_DEBUG, "ManufactorID : %02X  Length: %02X, Data: %s\n", co2.manufactor.rid, co2.manufactor.len, (char *)co2.manufactor.list);
+
+/*
+	acxlog(L_DEBUG, "EEPROM part : \n");
+	for (i=0; i<58; i++) {
+	    acxlog(L_DEBUG, "%02X =======>  0x%02x \n", i, (UINT8 *)co.configoption_fixed.NVSv[i-2]);
+	}
+*/	
+	
+	
+	FN_EXIT(1, 1);
+
+}
+

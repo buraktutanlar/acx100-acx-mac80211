@@ -77,6 +77,9 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
+#if WIRELESS_EXT > 12
+#include <net/iw_handler.h>
+#endif
 #include <linux/netdevice.h>
 
 #include <wlan_compat.h>
@@ -253,6 +256,7 @@ static const device_id_t device_ids[] =
 
 static int acx100_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
+static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *dev, wlandevice_t *priv, unsigned long mem_region1, void *mem1, unsigned long mem_region2, void *mem2);
 static void acx100_remove_pci(struct pci_dev *pdev);
 
 static int acx100_suspend(struct pci_dev *pdev, u32 state);
@@ -612,7 +616,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	phymem2 = pci_resource_start(pdev, mem_region2);
 
 	if (!request_mem_region
-	    (phymem1, pci_resource_len(pdev, mem_region1), "Acx100_1")) {
+	    (phymem1, pci_resource_len(pdev, mem_region1), "ACX1xx_1")) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 1 (or also: are you sure you have CardBus support in kernel?)\n", __func__);
 		result = -EIO;
@@ -620,7 +624,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	if (!request_mem_region
-	    (phymem2, pci_resource_len(pdev, mem_region2), "Acx100_2")) {
+	    (phymem2, pci_resource_len(pdev, mem_region2), "ACX1xx_2")) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: acx100: Cannot reserve PCI memory region 2\n", __func__);
 		result = -EIO;
@@ -849,32 +853,65 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail:
 	acxlog(L_STD|L_INIT, "%s: %s Loading FAILED\n", __func__, version);
 
-	/* FIXME: that stuff from here on should be merged with remove_pci */
+	acx_cleanup_card_and_resources(pdev, dev, priv, mem_region1, mem1, mem_region2, mem2);
 
-	/* remove new failed dev from linked list */
-	acx100_device_chain_remove(dev);
+done:
+	FN_EXIT(1, result);
+	return result;
+} /* acx100_probe_pci() */
 
-	if (NULL != dev)
+static void acx_cleanup_card_and_resources(struct pci_dev *pdev, netdevice_t *dev, wlandevice_t *priv, unsigned long mem_region1, void *mem1, unsigned long mem_region2, void *mem2)
+{
+	/* unregister the device to not let the kernel
+	 * (e.g. ioctls) access a half-deconfigured device */
+
+	if (dev != NULL)
 	{
-		pci_set_drvdata(pdev, NULL);
-		kfree(dev);
+		acxlog(L_INIT, "Removing device %s!\n", dev->name);
+		netif_device_detach(dev);
+		unregister_netdev(dev);
+
+		/* find our PCI device in the global acx100 list and remove it */
+		acx100_device_chain_remove(dev);
 	}
 
-	if (NULL != priv)
+	if (priv != NULL)
 	{
-		/* don't free priv->io here, this *global* resource
-		 * will be freed on module unload */
+		if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))
+			acx100_down(dev);
+
+		priv->dev_state_mask &= ~ACX_STATE_IFACE_UP;
+
+		acxlog(L_STD, "hw_unavailable++\n");
+		priv->hw_unavailable++;
+
 #if THIS_IS_OLD_PM_STUFF_ISNT_IT
 		if (NULL != priv->pm)
 			pm_unregister(priv->pm);
 #endif
+		acx100_delete_dma_regions(priv);
+
+		/* don't free priv->io here, this *global* resource
+		 * will be freed on module unload */
 		kfree(priv);
 	}
-	
+
+	if (dev != NULL)
+	{
+		/* remove dev registration */
+		pci_set_drvdata(pdev, NULL);
+
+		/* don't use free_netdev() here,
+		 * supported by newer kernels only */
+		kfree(dev);
+	}
+
+	/* finally, clean up PCI bus state */
+
 	if (0 != mem1)
-		iounmap((void *) mem1);
+		iounmap(mem1);
 	if (0 != mem2)
-		iounmap((void *) mem2);
+		iounmap(mem2);
 
 	release_mem_region(pci_resource_start(pdev, mem_region1),
 			   pci_resource_len(pdev, mem_region1));
@@ -882,14 +919,11 @@ fail:
 	release_mem_region(pci_resource_start(pdev, mem_region2),
 			   pci_resource_len(pdev, mem_region2));
 
-	pci_set_drvdata(pdev, NULL); /* to be sure nothing is left */
-
 	pci_disable_device(pdev);
 
-done:
-	FN_EXIT(1, result);
-	return result;
-} /* acx100_probe_pci() */
+	/* put device into ACPI D3 mode (shutdown) */
+	pci_set_power_state(pdev, 3);
+}
 
 
 /*----------------------------------------------------------------
@@ -921,81 +955,33 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 {
 	struct net_device *dev;
 	wlandevice_t *priv;
-	UINT16 chip_type;
+	unsigned long mem_region1 = 0, mem_region2 = 0;
 
 	FN_ENTER;
 
 	dev = (struct net_device *) pci_get_drvdata(pdev);
 	priv = (struct wlandevice *) dev->priv;
 	
-	if(dev == NULL || priv == NULL) {
+	if (dev == NULL || priv == NULL) {
 		acxlog(L_STD, "%s: card not used. Skipping any release code\n", __func__);
 		goto end;
-	}	
-
-	/* unregister the device to not let the kernel
-	 * (e.g. ioctls) access a half-deconfigured device */
-	acxlog(L_INIT, "Removing device %s!\n", dev->name);
-	netif_device_detach(dev);
-	unregister_netdev(dev);
-
-#if THIS_IS_OLD_PM_STUFF_ISNT_IT
-	pm_unregister(priv->pm);
-#endif
-
-	/* find our PCI device in the global acx100 list and remove it */
-	acx100_device_chain_remove(dev);
-
-	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP))
-		acx100_down(dev);
-
-	priv->dev_state_mask &= ~ACX_STATE_IFACE_UP;
-
-	acxlog(L_STD, "hw_unavailable++\n");
-	priv->hw_unavailable++;
-
-#if NEWER_KERNELS_ONLY
-	free_netdev(dev);
-#else
-	if (dev)
-		kfree(dev);
-#endif
-	pci_set_drvdata(pdev, NULL);
-
-	acx100_delete_dma_regions(priv);
-
-	iounmap((void *) priv->iobase);
-	iounmap((void *) priv->iobase2);
-
-	chip_type = priv->chip_type;
-	
-	/* don't free priv->io here, this *global* resource
-	 * will be freed on module unload */
-	kfree(priv);
-
-	/* finally, clean up PCI bus state */
-
-	if(chip_type == CHIPTYPE_ACX100) {
-
-		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION1),
-				   pci_resource_len(pdev, PCI_ACX100_REGION1));
-
-		release_mem_region(pci_resource_start(pdev, PCI_ACX100_REGION2),
-				   pci_resource_len(pdev, PCI_ACX100_REGION2));
-	}
-	if(chip_type == CHIPTYPE_ACX111) {
-
-		release_mem_region(pci_resource_start(pdev, PCI_ACX111_REGION1),
-				   pci_resource_len(pdev, PCI_ACX111_REGION1));
-
-		release_mem_region(pci_resource_start(pdev, PCI_ACX111_REGION2),
-				   pci_resource_len(pdev, PCI_ACX111_REGION2));
 	}
 
-	/* put device into ACPI D3 mode (shutdown) */
-	pci_set_power_state(pdev, 3);
+	if (priv->chip_type == CHIPTYPE_ACX100) {
+		mem_region1 = PCI_ACX100_REGION1;
+		mem_region2 = PCI_ACX100_REGION2;
+	}
+	else
+	if (priv->chip_type == CHIPTYPE_ACX111) {
+		mem_region1 = PCI_ACX111_REGION1;
+		mem_region2 = PCI_ACX111_REGION2;
+	}
+	else
+		acxlog(L_INIT, "unknown chip type!\n");
 
-	end:
+	acx_cleanup_card_and_resources(pdev, dev, priv, mem_region1, priv->iobase, mem_region2, priv->iobase2);
+
+end:
 	FN_EXIT(0, 0);
 }
 
@@ -1415,24 +1401,8 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	acxlog(L_BUF, "stop queue during Tx.\n");
 	netif_stop_queue(dev);
 #endif
-#if UNUSED
-	if (acx100_lock(priv,&flags)) ...
-
-	memset(pb, 0, sizeof(wlan_pb_t) /*0x14*4 */ );
-
-	pb->ethhostbuf = skb;
-	pb->ethbuf = skb->data;
-#endif
-
 	templen = skb->len;
-/*	if (templen > ETH_FRAME_LEN) {
-		templen = ETH_FRAME_LEN;
-	}
-	pb->ethbuflen = templen;
-	pb->ethfrmlen = templen;
 
-	pb->eth_hdr = (wlan_ethhdr_t *) pb->ethbuf;
- */
 	if (unlikely((tx_desc = acx100_get_tx_desc(priv)) == NULL)) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
@@ -1649,7 +1619,7 @@ void acx100_disable_irq(wlandevice_t *priv)
 #define INFO_IV_ICV_FAILURE     0x0005  /* encryption/decryption proces s on a packet failed */
 
 static char *info_type_msg[] = {
-    "<unknown)",
+    "(unknown)",
     "scan complete",
     "WEP key not found",
     "internal watchdog reset was done",
@@ -1740,9 +1710,11 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_RX_COMPLETE);
 	}
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
+#if THIS_LED_TO_TX_RINGBUFFER_LOCKUP_ISSUES
 		static int txcnt = 0;
 
 		if (txcnt++ % 4 == 0)
+#endif
 			acx100_clean_tx_desc(priv);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
@@ -1982,7 +1954,7 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 
 	FN_ENTER;
 	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		if ((skb = acx100_rxdesc_to_ether(priv, rxdesc))) {
+		if (likely(skb = acx100_rxdesc_to_ether(priv, rxdesc))) {
 			(void)netif_rx(skb);
 			priv->netdev->last_rx = jiffies;
 			priv->stats.rx_packets++;

@@ -89,6 +89,16 @@
 extern int debug;
 extern int acx100_debug_func_indent;
 
+
+/* Driver defaults */
+
+#define DEFAULT_DTIM_INTERVAL	10
+#define DEFAULT_MSDU_LIFETIME	4096	/* used to be 2048, but FreeBSD driver changed it to 4096 to work properly in noisy wlans */
+#define DEFAULT_RTS_THRESHOLD	2312	/* max. size: disable RTS mechanism */
+#define DEFAULT_BEACON_INTERVAL	100
+
+
+
 #define acxlog(chan, args...) \
 	do { \
 		if (debug & (chan)) \
@@ -451,6 +461,7 @@ typedef enum {
 #define ACX100_IE_SSID_LEN				0x20
 #define ACX1xx_IE_SCAN_STATUS_LEN			0x04
 #define ACX1xx_IE_ASSOC_ID_LEN				0x02
+#define ACX1xx_IE_CONFIG_OPTIONS_LEN			0x14C
 #define ACX1xx_IE_FWREV_LEN				0x18
 #define ACX1xx_IE_FCS_ERROR_COUNT_LEN			0x04
 #define ACX1xx_IE_MEDIUM_USAGE_LEN			0x08
@@ -1336,6 +1347,9 @@ typedef struct wlandevice {
 	UINT8		scan_mode;		/* 0 == active, 1 == passive, 2 == background */
 	UINT16		scan_duration;
 	UINT16		scan_probe_delay;
+#if WIRELESS_EXT > 15
+	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
+#endif
 			
 	/*** Wireless network settings ***/
 	UINT8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over from the network device's MAC address (ifconfig) when it makes sense only */
@@ -1449,7 +1463,14 @@ typedef struct wlandevice {
 
 	/*** Unknown ***/
 	UINT8		dtim_interval;		/* V3POS 2302 */
-	UINT8		val0x2324[0x8];		/* V3POS 2324 */
+	UINT8		val0x2324_0;		/* V3POS 2324 */
+	UINT8		rates_supported;
+	UINT8		val0x2324_2;
+	UINT8		rates_basic;
+	UINT8		val0x2324_4;
+	UINT8		val0x2324_5;
+	UINT8		val0x2324_6;
+	UINT8		val0x2324_7;
 } wlandevice_t __WLAN_ATTRIB_PACK__;
 
 /*-- MAC modes --*/
@@ -1510,7 +1531,7 @@ typedef struct wlandevice {
 
 /*-- get and set mask values --*/
 #define GETSET_LED_POWER	0x00000001L
-#define GET_STATION_ID		0x00000002L
+#define GETSET_STATION_ID	0x00000002L
 #define SET_TEMPLATES		0x00000004L
 #define SET_STA_LIST		0x00000008L
 #define GETSET_TX		0x00000010L

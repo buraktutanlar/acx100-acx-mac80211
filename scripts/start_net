@@ -15,6 +15,7 @@ ESSID="any" # THIS IS CASE SeNsItIvE!! any == associate to any ESSID
 # Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
 CHAN=6 # it's useful to try to stick to channels 1, 6 or 11 only, since these don't overlap with other channels
+#SHORTPREAMBLE=1 #set a value of 1 in order to use "Short Preamble" (incompatible with very old WLAN hardware!)
 #TXPOWER=18 # 0..20 (dBm) (18dBm is firmware default) overly large setting might perhaps destroy your radio eventually!
 MODE=Auto # Auto == auto-select Managed or Ad-Hoc depending on environment
 DEBUG=0xb
@@ -105,6 +106,12 @@ if test -n "$CHAN"; then
   $IWCONF $DEV channel $CHAN
   test "$?" != "0" && echo Failed.
 fi
+if test -n "$SHORTPREAMBLE"; then
+  echo Setting short preamble to $SHORTPREAMBLE.
+  $IWPRIV $DEV SetSPreamble $SHORTPREAMBLE
+  test "$?" != "0" && echo Failed.
+  sleep 1
+fi
 if test -n "$TXPOWER"; then
   echo Setting Tx power level to $TXPOWER dBm.
   $IWCONF $DEV txpower $TXPOWER
@@ -112,7 +119,7 @@ if test -n "$TXPOWER"; then
   sleep 1
 fi
 
-echo Trying to join or setup ESSID $ESSID.
+echo Going to try to join or setup ESSID $ESSID.
 $IWCONF $DEV essid "$ESSID"
 test "$?" != "0" && echo Failed.
 
@@ -172,10 +179,10 @@ else
   test -n "$GATEWAY" && $ROUTE add default gw $GATEWAY
 fi
 
-# Finally, let's do some tweaking to make sure we don't have any
-# buffer management problems (yeah, it's an ugly workaround!)
-$IFCONF $DEV mtu 576
-if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
+# Finally, if you have any buffer management problems report us before 
+# uncomment this 2 lines below (yeah, it's an ugly workaround!)
+#$IFCONF $DEV mtu 576
+#if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
 
 # just in case ;)
 $SYNC

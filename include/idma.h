@@ -64,19 +64,16 @@ char *acx100_get_packet_type_string(UINT16 fc);
 #define ACX100_RXBUF_HDRSIZE 12
 
 typedef struct rxbuffer {
-	/* UINT32	status;	*/	/* 0x0 MAC stat */
 	UINT16	mac_cnt_rcvd;	/* 0x0, only 12 bits are len! (0xfff) */
 	UINT8	mac_cnt_mblks;	/* 0x2 */
 	UINT8	mac_status;	/* 0x3 */
-	/* UINT16	stat; */		/* 0x4 PHY stat */
 	UINT8	phy_stat_baseband;	/* 0x4 bit 0x80: used LNA (Low-Noise Amplifier) */
 	UINT8	phy_plcp_signal;	/* 0x5 */
 	UINT8	phy_level;		/* 0x6 PHY stat */
 	UINT8	phy_snr;		/* 0x7  PHY stat */
 	UINT32	time;		/* 0x8  timestamp upon MAC rcv first byte */
 	acx100_addr3_t buf;	/* 0x0c 0x18 */
-	UINT8	val0x24[0x922];
-
+	UINT8	data[ACX100_BAP_DATALEN_MAX];
 } rxb_t;			/* 0x956 */
 
 typedef struct txbuffer {
@@ -141,11 +138,11 @@ typedef struct txdescriptor {
     		struct {
 			UINT8	rate;		/* 0x2a */
 			UINT8	queue_ctrl;	/* 0x2b */
-    		} __attribute__((packed));
+    		} r1 __attribute__((packed));
     		struct {
 			UINT16  rate111;
-    		} __attribute__((packed));
-	} __attribute__((packed));
+    		} r2 __attribute__((packed));
+	} u __attribute__((packed));
 	UINT32	queue_info;			/* 0x2c (acx100, 'reserved' on acx111) */
 
 } txdesc_t __attribute__((packed));		/* size : 48 = 0x30 */
@@ -172,23 +169,24 @@ typedef struct txdescriptor {
 /* Special 'try everything' value */
 #define RATE111_ALL		0x1fff
 
+
 /* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
-     11b  11g  11a
-     ---- ---- ----
- 1  |B   |B   |
- 2  |Q   |Q   |
- 5.5|Cp  |Cp  |
- 6  |    |O  d|O
- 9  |    |  od| o
-11  |Cp  |Cp  |
-12  |    |O  d|O
-18  |    |  od| o
-22  |    | p  |
-24  |    |O  d|O
-33  |    | p  |
-36  |    |  od| o
-48  |    |  od| o
-54  |    |  od| o
+     11b 11g 11a
+     --- --- ---
+ 1  |B  |B  |
+ 2  |Q  |Q  |
+ 5.5|Cp |C p|
+ 6  |   |Od |O
+ 9  |   |od |o
+11  |Cp |C p|
+12  |   |Od |O
+18  |   |od |o
+22  |   |  p|
+24  |   |Od |O
+33  |   |  p|
+36  |   |od |o
+48  |   |od |o
+54  |   |od |o
 
 Mandatory:
  B - DBPSK
@@ -197,8 +195,8 @@ Mandatory:
  O - OFDM
 Optional:
  o - OFDM
- p - PBCC
  d - CCK-OFDM (also known as DSSS-OFDM)
+ p - PBCC
 
 DBPSK = Differential Binary Phase Shift Keying
 DQPSK = Differential Quaternary Phase Shift Keying

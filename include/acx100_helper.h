@@ -257,7 +257,7 @@ typedef struct beacon {
 #define ACX_SCAN_PASSIVE	1
 #define ACX_SCAN_BACKGROUND	2
 
-typedef struct scan {
+typedef struct acx100_scan {
 	UINT16 count; /* number of scans to do, 0xffff == continuous */
 	UINT16 start_chan;
 	UINT16 flags; /* channel list mask; 0x8000 == all channels? */
@@ -265,7 +265,7 @@ typedef struct scan {
 	UINT8 options; /* scan mode: 0 == active, 1 == passive, 2 == background */
 	UINT16 chan_duration;
 	UINT16 max_probe_delay;
-} scan_t;			/* length 0xc */
+} acx100_scan_t;			/* length 0xc */
 
 typedef struct acx111_scan {
 	UINT16 count; /* number of scans to do */
@@ -296,19 +296,55 @@ typedef struct probereq {
 	char buf[0x44];
 } __WLAN_ATTRIB_PACK__ probereq_t;
 
-typedef struct joinbss {
+/* as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
+ * NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
+typedef struct __WLAN_ATTRIB_PACK__ joinbss {
 	UINT8 bssid[ETH_ALEN];
 	UINT16 beacon_interval;
+union __WLAN_ATTRIB_PACK__ {
+ struct __WLAN_ATTRIB_PACK__ {
 	UINT8 dtim_interval;
 	UINT8 rates_basic;
 	UINT8 rates_supported;
+ } acx100 __WLAN_ATTRIB_PACK__;
+ struct __WLAN_ATTRIB_PACK__ {
+	UINT16 rates_basic;
+	UINT8 dtim_interval;
+ } acx111 __WLAN_ATTRIB_PACK__;
+} u __WLAN_ATTRIB_PACK__;
 	UINT8 txrate_val;
 	UINT8 preamble_type;
 	UINT8 macmode;
 	UINT8 channel;
 	UINT8 essid_len;
 	char essid[IW_ESSID_MAX_SIZE];	
-} __WLAN_ATTRIB_PACK__ joinbss_t; /* ACX100 specific join struct */
+} __WLAN_ATTRIB_PACK__ joinbss_t;
+
+#define JOINBSS_RATES_1		0x01
+#define JOINBSS_RATES_2		0x02
+#define JOINBSS_RATES_5		0x04
+#define JOINBSS_RATES_11	0x08
+#define JOINBSS_RATES_22	0x10
+
+#define JOINBSS_RATES_BASIC111_1	0x0001
+#define JOINBSS_RATES_BASIC111_2	0x0002
+#define JOINBSS_RATES_BASIC111_5	0x0004
+#define JOINBSS_RATES_BASIC111_11	0x0020
+#define JOINBSS_RATES_BASIC111_22	0x0100
+
+typedef struct acx111_joinbss {
+	UINT8	bssid[ETH_ALEN];
+	UINT16	beacon_interval;
+	UINT16	rates_basic;
+	UINT8	dtim_interval;
+	UINT8	txrate_val;
+	UINT8	preamble_type;
+	UINT8	macmode;
+	UINT16	channel;
+	UINT8	band;
+	UINT8	essid_len;
+	char	essid[IW_ESSID_MAX_SIZE];
+} __WLAN_ATTRIB_PACK__ acx111_joinbss_t; /* ACX111 specific join struct */
 
 /*
  * I am temporarily redefining this because the above struct is somewhat wrong.
@@ -430,12 +466,78 @@ typedef struct acx100_wep_mgmt {
     UINT8	Key[29];	/* 29*8 == 232bits == WEP256 */
 } acx100_wep_mgmt_t;
 
+/* Config Option structs */
+
+typedef struct co_antennas {
+    UINT8	rid;
+    UINT8	len;
+    UINT8	list[2];
+} co_antennas_t;
+
+typedef struct co_powerlevels {
+    UINT8	rid;
+    UINT8	len;
+    UINT16	list[8];
+} co_powerlevels_t;
+
+typedef struct co_datarates {
+    UINT8	rid;
+    UINT8	len;
+    UINT8	list[8];
+} co_datarates_t;
+
+typedef struct co_domains {
+    UINT8	rid;
+    UINT8	len;
+    UINT8	list[6];
+} co_domains_t;
+
+typedef struct co_product_id {
+    UINT8	rid;
+    UINT8	len;
+    UINT8	list[128];
+} co_product_id_t;
+
+typedef struct co_manuf_id {
+    UINT8	rid;
+    UINT8	len;
+    UINT8	list[128];
+} co_manuf_t;
+
+typedef struct co_fixed {
+    UINT8	rid;
+    UINT8	len;
+    char	NVSv[8];
+    UINT8	MAC[6];
+    UINT16	probe_delay;
+    UINT32	eof_memory;
+    UINT8	dot11CCAModes;
+    UINT8	dot11Diversity;
+    UINT8	dot11ShortPeambleOption;
+    UINT8	dot11PBCCOption;
+    UINT8	dot11ChannelAgility;
+    UINT8	dot11PhyType;
+/*    UINT8	dot11TempType;
+    UINT8	num_var;           seems to be erased     */
+} co_fixed_t;
+
+
+typedef struct acx1xx_configoption {
+    co_fixed_t			configoption_fixed;
+    co_antennas_t		antennas;
+    co_powerlevels_t		power_levels;
+    co_datarates_t		data_rates;
+    co_domains_t		domains;
+    co_product_id_t		product_id;
+    co_manuf_t			manufactor;
+} acx1xx_configoption_t;
 
 
 
 void acx100_schedule(long timeout);
 int acx100_reset_dev(netdevice_t *dev);
 void acx100_join_bssid(wlandevice_t *priv);
+void acx111_join_bssid(wlandevice_t *priv);
 int acx100_init_mac(netdevice_t *dev, UINT16 init);
 int acx100_set_defaults(wlandevice_t *priv);
 void acx100_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
@@ -475,7 +577,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
 void acx100_set_probe_request_template(wlandevice_t *priv);
 void acx100_scan_chan(wlandevice_t *priv);
-void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);
+void acx100_scan_chan_p(wlandevice_t *priv, acx100_scan_t *s);
 void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
 void acx111_scan_chan(wlandevice_t *priv);
 int acx100_set_rxconfig(wlandevice_t *priv);
@@ -492,4 +594,6 @@ int acx100_proc_output(char *buf, wlandevice_t *priv);
 int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
 int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
 int acx100_proc_phy_output(char *buf, wlandevice_t *priv);
+void acx100_read_configoption(wlandevice_t *priv);
+
 #endif /* __ACX_ACX100_HELPER_H */

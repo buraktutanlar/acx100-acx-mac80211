@@ -16,6 +16,11 @@ Default: depending on card EEPROM data
 GetRegDomain - returns the value of the current regulatory domain setting
 "iwpriv wlan0 GetRegDomain", "dmesg"
 
+SetScanMode - sets scan mode (0 == active, 1 == passive, 2 == background)
+"iwpriv wlan0 SetScanMode 0", "dmesg"
+
+SetScanDelay - sets time (in ms) to wait per channel on a scan
+
 SetSPreamble - Activates the Short Preamble transfer (slightly faster rates)
 Default: 0, off (better compatibility, slower)
 "iwpriv wlan0 SetSPreamble 1", "dmesg"
@@ -40,8 +45,6 @@ Default: 0x70 == 112
 SetCCA - change Channel Clear Assessment setting
 Default: 0x0d == 13
 "iwpriv wlan0 SetCCA 15", "dmesg"
-
-SetScanDelay - sets time (in ms) to wait per channel on a scan
 
 SetLEDPower - change power LED setting (save power)
 Default: on

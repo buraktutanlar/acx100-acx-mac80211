@@ -79,11 +79,7 @@
 
 #define MINFREE_TX 3
 
-#ifdef ACX_DEBUG
-#if (WLAN_HOSTIF==WLAN_USB)
-extern void acx100usb_dump_bytes(void *,int);
-#endif
-#endif
+void acx100_dump_bytes(void *,int);
 #if (WLAN_HOSTIF==WLAN_USB)
 extern void acx100usb_tx_data(wlandevice_t *,void *);
 #endif
@@ -258,7 +254,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
-	if (!acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ //0x14 + (qcfg.vale * 8))) {
+	if (!acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ /* 0x14 + (qcfg.vale * 8))) { */
 		acxlog(L_BINSTD, "ctlQueueConfigurationWrite returns fail\n");
 		goto fail;
 	}
@@ -386,7 +382,7 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	/* let's use 25% for fragmentations and 75% for frame transfers */
 	memconf.fragmentation = 0x0f; 
 
-	// Set up our host descriptor pool + data pool
+	/* Set up our host descriptor pool + data pool */
 	if (acx111_create_tx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx111_create_tx_host_desc_queue returns fail\n");
 		goto fail;
@@ -496,9 +492,9 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	if (CHIPTYPE_ACX100 == priv->chip_type) {
 		/* set rate */
 		if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
-			tx_desc->rate = 20;	/* 2Mbps for MGMT pkt compatibility */
+			tx_desc->u.r1.rate = ACX_TXRATE_2;	/* 2Mbps for MGMT pkt compatibility */
 		} else {
-			tx_desc->rate = priv->txrate_curr;
+			tx_desc->u.r1.rate = priv->txrate_curr;
 		}
 		
 		if (1 == priv->preamble_flag)
@@ -520,7 +516,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		tx_desc->Ctl |= ACX100_CTL_AUTODMA | ACX100_CTL_RECLAIM | ACX100_CTL_FIRSTFRAG;
 	} else if(priv->chip_type == CHIPTYPE_ACX111) {
 		if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
-			tx_desc->rate111 = RATE111_2;	/* 2Mbps for MGMT pkt compatibility */
+			tx_desc->u.r2.rate111 = RATE111_2;	/* 2Mbps for MGMT pkt compatibility */
 			/*
 			NB: my acx111 frequently has great difficulties
 			sending 2Mbit frames, up to complete inability
@@ -529,7 +525,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			Maybe we shall allow RATE111_1 here too?
 			*/
 		} else {
-			tx_desc->rate111 = priv->txrate_curr +
+			tx_desc->u.r2.rate111 = priv->txrate_curr +
 				((1 == priv->preamble_flag) ? RATE111_SHORTPRE : 0);
 		}
 
@@ -575,7 +571,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	{
 		acxlog(L_DATA, "802.11 header[%d]: ", header->length);
 #if (WLAN_HOSTIF==WLAN_USB)
-		acx100usb_dump_bytes(header->data, header->length);
+		acx100_dump_bytes(header->data, header->length);
 #else
 		for (i = 0; i < header->length; i++)
 			printk("%02x ", ((UINT8 *) header->data)[i]);
@@ -583,7 +579,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 #endif
 		acxlog(L_DATA, "802.11 payload[%d]: ", payload->length);
 #if (WLAN_HOSTIF==WLAN_USB)
-		acx100usb_dump_bytes(payload->data, payload->length);
+		acx100_dump_bytes(payload->data, payload->length);
 #else
 		for (i = 0; i < payload->length; i++)
 			printk("%02x ", ((UINT8 *) payload->data)[i]);
@@ -662,8 +658,8 @@ static UINT8 txrate_auto_table[] = { (UINT8)ACX_TXRATE_1, (UINT8)ACX_TXRATE_2,
 
 static void acx100_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
 {
-	acxlog(L_DEBUG, "rate %d/%d, fallback %d/%d, stepup %d/%d\n", pTxDesc->rate, priv->txrate_curr, priv->txrate_fallback_count, priv->txrate_fallback_threshold, priv->txrate_stepup_count, priv->txrate_stepup_threshold);
-	if ((pTxDesc->rate < priv->txrate_curr) || (0x0 != (pTxDesc->error & 0x30))) {
+	acxlog(L_DEBUG, "rate %d/%d, fallback %d/%d, stepup %d/%d\n", pTxDesc->u.r1.rate, priv->txrate_curr, priv->txrate_fallback_count, priv->txrate_fallback_threshold, priv->txrate_stepup_count, priv->txrate_stepup_threshold);
+	if ((pTxDesc->u.r1.rate < priv->txrate_curr) || (0x0 != (pTxDesc->error & 0x30))) {
 		if (++priv->txrate_fallback_count
 				> priv->txrate_fallback_threshold) {
 			if (priv->txrate_auto_idx > 0) {
@@ -675,7 +671,7 @@ static void acx100_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc)
 		}
 	}
 	else
-	if (pTxDesc->rate == priv->txrate_curr) {
+	if (pTxDesc->u.r1.rate == priv->txrate_curr) {
 		if (++priv->txrate_stepup_count
 				> priv->txrate_stepup_threshold) {
 			if (priv->txrate_auto_idx < priv->txrate_auto_idx_max) {
@@ -705,12 +701,12 @@ outcome of last tx event.
 */
 static void acx111_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
 	UINT16 rate;
-	//TODO: performance hack: UINT16 txrate_curr = priv->txrate_curr;
+	/* TODO: performance hack: UINT16 txrate_curr = priv->txrate_curr; */
 	int slower_rate_was_used;
 	int n;
 
 	n=0;
-	rate = pTxDesc->rate111 & 0x1fff;
+	rate = pTxDesc->u.r2.rate111 & 0x1fff;
 	while( (rate>>=1) != 0) n++;
 	rate = 1<<n;
 	/* rate has only one bit set now, corresponding to actual tx rate used */
@@ -722,13 +718,15 @@ static void acx111_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
 	);
 
 	/* 
-	txrate_curr >= rate: always true
+	txrate_curr < rate: old tx packet, before tx_curr went in effect
+	else txrate_curr >= rate and:
 	(txrate_curr^rate) >= rate: true only if highest set bit
 	in txrate_curr is more signficant than highest set bit in rate
 	*/
-	slower_rate_was_used = ((priv->txrate_curr ^ rate) >= rate);
+	slower_rate_was_used = (priv->txrate_curr > rate) && ((priv->txrate_curr ^ rate) >= rate);
 	
 	if (slower_rate_was_used || (0 != (pTxDesc->error & 0x30))) {
+		priv->txrate_stepup_count = 0;
 		if (++priv->txrate_fallback_count <= priv->txrate_fallback_threshold) return;
 		priv->txrate_fallback_count = 0;
 		if(priv->txrate_curr == 0x0001) return;	/* 1 Mbit is a rock bottom */
@@ -741,6 +739,7 @@ static void acx111_handle_txrate_auto(wlandevice_t *priv, txdesc_t *pTxDesc) {
 	}
 	else
 	if (!slower_rate_was_used) {
+		priv->txrate_fallback_count = 0;
 		if (++priv->txrate_stepup_count	<= priv->txrate_stepup_threshold) return;
 		priv->txrate_stepup_count = 0;
 		/* try to find higher allowed rate */
@@ -876,7 +875,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 		ack_failures = pTxDesc->ack_failures;
 		rts_failures = pTxDesc->rts_failures;
 		rts_ok = pTxDesc->rts_ok;
-		r111 = pTxDesc->rate111;
+		r111 = pTxDesc->u.r2.rate111;
 
 		/* free it */
 		pTxDesc->Ctl = ACX100_CTL_OWN;
@@ -896,7 +895,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 			netif_wake_queue(priv->netdev);
 		}
 		/* log AFTER having done the work, faster */
-		acxlog(L_BUFT, "cleaned %d, ack_fail=%d, rts_fail=%d, rts_ok=%d r111=%04x\n", finger, ack_failures, rts_failures, rts_ok, r111);
+		acxlog(L_BUFT, "cleaned %d: ack_fail=%d rts_fail=%d, rts_ok=%d r111=%04x\n", finger, ack_failures, rts_failures, rts_ok, r111);
 
 next:
 		/* update pointer for descr to be cleaned next */
@@ -1467,7 +1466,7 @@ int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc)
 	host_desc->data_phy = (UINT8 *)cpu_to_le32(frame_payload_phy);
 	host_desc->desc_phy = host_desc_phy;
 	host_desc->desc_phy_next = (struct txhostdescriptor *)cpu_to_le32(((UINT8 *) pDc->TxHostDescQPoolPhyAddr + align_offs));
-	//host_desc->desc_phy_next = (struct txhostdescriptor *) pDc->TxHostDescQPoolPhyAddr;
+	/* host_desc->desc_phy_next = (struct txhostdescriptor *) pDc->TxHostDescQPoolPhyAddr; */
 #endif
 	res = 0;
 
@@ -1668,7 +1667,7 @@ int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 #endif
 
 	/* allocate RX buffer pool */
-	pDc->RxBufferPoolSize = (priv->RxQueueNo * sizeof(struct rxbuffer));
+	pDc->RxBufferPoolSize = ( priv->RxQueueNo * (sizeof(struct rxbuffer) + 32) );
 #if (WLAN_HOSTIF!=WLAN_USB)
 	if (NULL == (pDc->pRxBufferPool =
 	     pci_alloc_consistent(0, pDc->RxBufferPoolSize,
@@ -1736,7 +1735,7 @@ int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	host_desc->data_phy = (struct rxbuffer *)cpu_to_le32(data_phy);
 #endif
-	host_desc->length = cpu_to_le16(sizeof(struct rxbuffer));
+	host_desc->length = cpu_to_le16(sizeof(struct rxbuffer) + 32);
 
 	host_desc->val0x28 = 2;
 	host_desc->Ctl &= cpu_to_le16(~ACX100_CTL_OWN);
@@ -1770,6 +1769,8 @@ fail:
 *
 *----------------------------------------------------------------*/
 
+/* optimized to nothing - it's a compile-time check, really */
+extern void error_txdescriptor_must_be_0x30_bytes_in_length(void);
 void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 {
 	wlandevice_t *priv;
@@ -1788,8 +1789,6 @@ void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 
 	pDc->TxDescrSize = sizeof(struct txdescriptor);
 
-	/* optimized to nothing - it's a compile-time check, really */
-	extern void error_txdescriptor_must_be_0x30_bytes_in_length(void);
 	if(sizeof(struct txdescriptor) != 0x30)
 		error_txdescriptor_must_be_0x30_bytes_in_length();
 	/* the acx111 txdescriptor is 4 byte larger */
@@ -1807,7 +1806,7 @@ void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 #endif
 
 #if (WLAN_HOSTIF!=WLAN_USB)
-	if(pDc->pTxDescQPool == NULL) { //calculate it
+	if(pDc->pTxDescQPool == NULL) { /* calculate it */
 		pDc->pTxDescQPool = (struct txdescriptor *) (priv->iobase2 +
 					     pDc->ui32ACXTxQueueStart);
 	}
@@ -1963,10 +1962,10 @@ void acx100_create_rx_desc_queue(TIWLAN_DC *pDc)
 
 int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 {
-	UINT32 TotalMemoryBlocks;  // var_40
+	UINT32 TotalMemoryBlocks;
         memblocksize_t MemoryBlockSize;
 
-        acx100_memconfigoption_t MemoryConfigOption;    // var_2c
+        acx100_memconfigoption_t MemoryConfigOption;
 
 	FN_ENTER;
 
@@ -2163,3 +2162,25 @@ char *acx100_get_packet_type_string(UINT16 fc)
 	FN_EXIT(1, (int)type_string);
 	return type_string;
 }
+
+void acx100_dump_bytes(void *data,int num)
+{
+  int i,remain=num;
+  unsigned char *ptr=(unsigned char *)data;
+
+  if (!(debug & L_DEBUG))
+	  return;
+
+  while (remain>0) {
+    printk(KERN_WARNING);
+    if (remain<16) {
+      for (i=0;i<remain;i++) printk("%02X ",*ptr++);
+      remain=0;
+    } else {
+      for (i=0;i<16;i++) printk("%02X ",*ptr++);
+      remain-=16;
+    }
+    printk("\n");
+  }
+}
+

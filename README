@@ -104,6 +104,7 @@ Status Matrix:
 
 		ACX100			ACX100 USB		ACX111
 Rates		1/2/5.5/11/22		1/2/5.5/11/22		11/22 (54 NIY)
+5GHz		--			--			NIY (any hardware?)
 Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64?/128?/256?)
 Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64?/128?/256?)
 Auto		*			*			*
@@ -289,7 +290,7 @@ Read the ACX100 instructions above, but keep in mind that they may be wrong
 since you're using an ACX111 card with ACX111 firmware.
 NOTE: For ACX111 cards even recently there are both a combined firmware
 (TIACX111.BIN or FwRad16.bin) and a non-combined firmware (FW1130.BIN?)
-available.
+available (see further below).
 Occasionally a firmware is also called GPLUS.BIN originally.
 Rename to TIACX111.BIN in this case.
 Note that D-Link makes a driver download distinction between the DWL-G650+ Rev. Ax and Bx: they are both ACX111, but contain different firmware images!
@@ -423,8 +424,7 @@ Card insertion driver autoloading? You need to configure PCI hotplug layer,
 Need to change MAC address? Use ifconfig wlan0 hw ether 112233445566
 (make sure card interface is down!)
 Driver will only update MAC when not associated: needs reinit of card parts.
-And it doesn't work quite right yet, communication is slightly distorted :-\
-(maybe the card firmware even keeps the MAC address of the EEPROM or so...)
+Should be working fine now that we also remember to run the firmware MAC change command.
 
 Wireless traffic monitoring with Kismet? Set card type Orinoco in kismet.conf
 (in case of an older Kismet release which didn't know the acx100 type yet).
@@ -489,9 +489,16 @@ may insert bogus end-of-line chars).
   
 -- Driver init failure --
 
-If you get "Invalid module format" during insmod, then it's probably a
-gcc version difference (see syslog) and you should make sure to compile
-the driver with the same gcc version that you used for compiling the kernel.
+If you get the message
+
+insmod: error inserting './../src/acx_pci.ko': -1 Invalid module format
+Error while inserting module! Bailing...
+
+during insmod, then it's probably a binary incompatibility (gcc version
+or CPU architecture or (non-)register calling convention or kernel version
+-- see syslog for evidence!!)
+and you should make sure to compile the driver with the same build settings
+that you used for compiling the kernel.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
@@ -623,7 +630,8 @@ Link Quality == reverse of Noise level
 
 Note that these signal levels are *NOT* expressed in dBm, instead it's a
 percentage value (of course, since xx/100 is percentage) which as closely as
-possible matches values of the current Windows driver.
+possible matches values of the current Windows driver (although I guess
+it's not as closely matching as we thought!).
 I still hope that we'll be able to calibrate our driver eventually to show dBm
 values :-\
 Note that signal levels in Ad-Hoc mode are being displayed relative to the station
