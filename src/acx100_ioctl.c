@@ -57,7 +57,6 @@
 #if WIRELESS_EXT > 12
 #include <net/iw_handler.h>
 #endif /* WE > 12 */
-#include <asm/uaccess.h>
 
 /*================================================================*/
 /* Project Includes */
@@ -99,6 +98,7 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x12
 #define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x14
 #define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x16
+#define ACX100_IOCTL_GET_PLED		ACX100_IOCTL + 0x17
 #define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x18
 #define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x19
 #define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x1a
@@ -106,6 +106,8 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_DBG_SET_IO		ACX100_IOCTL + 0x1c
 #define ACX111_IOCTL_INFO		ACX100_IOCTL + 0x1d
 #define ACX100_IOCTL_SET_RATES		ACX100_IOCTL + 0x1e
+#define ACX100_IOCTL_GET_BRANGE_MAXQUALITY		ACX100_IOCTL + 0x13 /* Sorry, about breaking odd/even, */
+#define ACX100_IOCTL_SET_BRANGE_MAXQUALITY		ACX100_IOCTL + 0x0f /* but I couldn't set these to 0x20/0x21 */
 
 /* channel frequencies
  * TODO: Currently, every other 802.11 driver keeps its own copy of this. In
@@ -187,6 +189,18 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
 	name : "SetLEDPower" },
+{ cmd : ACX100_IOCTL_GET_PLED,
+	set_args : 0,
+	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	name : "GetLEDPower" },
+{ cmd : ACX100_IOCTL_SET_BRANGE_MAXQUALITY,
+	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	get_args : 0,
+	name : "SetBlinkMaxQ" },
+{ cmd : ACX100_IOCTL_GET_BRANGE_MAXQUALITY,
+	set_args : 0,
+	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	name : "GetBlinkMaxQ" },
 { cmd : ACX100_IOCTL_MONITOR,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
@@ -1057,6 +1071,8 @@ acx_ioctl_set_rate(struct net_device *dev,
 		}
 	}
 	priv->defpeer.txbase = priv->defpeer.txrate;
+	if (priv->defpeer.txrate.do_auto) /* only do that in auto mode, non-auto will be able to use one specific Tx rate only anyway */
+		priv->defpeer.txbase.cfg &= RATE111_80211B_COMPAT; /* only use 802.11b base rates, for standard 802.11b H/W compatibility */
  
 	priv->ap_peer = priv->defpeer;
 	acx_update_dot11_ratevector(priv);
@@ -3115,6 +3131,43 @@ end:
 	return result;
 }
 
+static inline int acx100_ioctl_get_led_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	*extra = (char)priv->led_power;
+	return OK;
+}
+
+static inline int acx100_ioctl_get_brange_maxquality(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	*extra = (char)priv->brange_max_quality;
+	return OK;
+}
+
+
+static inline int acx100_ioctl_set_brange_maxquality(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	unsigned long flags;
+	int err;
+	int result = -EINVAL;
+
+	if (0 != (err = acx_lock(priv, &flags))) {
+		result = err;
+		goto end;
+	}
+
+	priv->brange_max_quality = (unsigned char)*extra;
+
+	acx_unlock(priv, &flags);
+	result = -EINPROGRESS;
+
+end:
+	return result;
+}
+
+
 #if WIRELESS_EXT >= 13
 static const iw_handler acx_ioctl_handler[] =
 {
@@ -3206,6 +3259,9 @@ static const iw_handler acx_ioctl_private_handler[] =
 [ACX100_IOCTL_SET_ED             	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_ed_threshold,
 [ACX100_IOCTL_SET_CCA            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_set_cca,
 [ACX100_IOCTL_SET_PLED           	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_led_power,
+[ACX100_IOCTL_GET_PLED				- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_led_power,
+[ACX100_IOCTL_SET_BRANGE_MAXQUALITY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_set_brange_maxquality,
+[ACX100_IOCTL_GET_BRANGE_MAXQUALITY	- ACX100_IOCTL] = (iw_handler) acx100_ioctl_get_brange_maxquality,
 [ACX100_IOCTL_MONITOR            	- ACX100_IOCTL] = (iw_handler) acx_ioctl_wlansniff,
 [ACX100_IOCTL_TEST               	- ACX100_IOCTL] = (iw_handler) acx_ioctl_unknown11,
 [ACX100_IOCTL_DBG_SET_MASKS      	- ACX100_IOCTL] = (iw_handler) acx_ioctl_dbg_set_masks,
@@ -3573,6 +3629,10 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		acx_ioctl_set_cca(dev, NULL, NULL, iwr->u.name);
 		break;
 		
+	case ACX100_IOCTL_SET_SCAN_MODE:
+		acx_ioctl_set_scan_mode(dev, NULL, NULL, iwr->u.name);
+		break;
+
 	case ACX100_IOCTL_SET_SCAN_CHAN_DELAY:
 		acx_ioctl_set_scan_chan_delay(dev, NULL, NULL, iwr->u.name);
 		break;
@@ -3580,7 +3640,19 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 	case ACX100_IOCTL_SET_PLED:
 		acx100_ioctl_set_led_power(dev, NULL, NULL, iwr->u.name);
 		break;
+
+	case ACX100_IOCTL_GET_PLED:
+		acx100_ioctl_get_led_power(dev, NULL, NULL, iwr->u.name);
+		break;
 		
+	case ACX100_IOCTL_SET_BRANGE_MAXQUALITY:
+		acx100_ioctl_set_brange_maxquality(dev, NULL, NULL, iwr->u.name);
+		break;
+
+	case ACX100_IOCTL_GET_BRANGE_MAXQUALITY:
+		acx100_ioctl_get_brange_maxquality(dev, NULL, NULL, iwr->u.name);
+		break;
+
 	case ACX100_IOCTL_MONITOR:	/* set sniff (monitor) mode */
 		acxlog(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
 

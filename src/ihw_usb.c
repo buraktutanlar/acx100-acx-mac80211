@@ -561,7 +561,7 @@ void acx_log_mac_address(int level, UINT8 * mac, const char* tail) {
 
 
 /*----------------------------------------------------------------
-* acx100_power_led
+* acx_power_led
 *
 *
 * Arguments:
@@ -577,7 +577,7 @@ void acx_log_mac_address(int level, UINT8 * mac, const char* tail) {
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_power_led(wlandevice_t *priv, UINT8 enable) {
+void acx_power_led(wlandevice_t *priv, UINT8 enable) {
   /*
   if (enable)
     acx_write_reg16(priv, 0x290, acx_read_reg16(priv, 0x290) & ~0x0800);

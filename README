@@ -29,6 +29,20 @@ Thus I adjusted all driver files to use a hopefully safe 18dBm per default
 Please inform us immediately if you suspect a dead radio resulting from
 prolonged use of overly large Tx power, we'd like to know that immediately!!!!!
 
+UPDATE: I found out that after a large amount of use (primary development card!),
+one SMD capacitor of the mini-PCI card in my notebook leaked. This is probably
+due to a terrible heat situation in modern notebooks. Replaced the SMD
+capacitor with a hopefully equivalent one, seems to work fine.
+This could have been aggravated by the driver always recalibrating the radio
+on Tx error, which might have allowed the radio to operate beyond the critical
+high temperature limit...
+Since our driver now does the next recalibration several minutes later only,
+this should be more than enough time to notice that the card isn't working under
+good conditions.
+CONCLUSION: better make sure that the card isn't excessively hot in case it
+stops working temporarily. It might damage the hardware after some time
+otherwise...
+
 This driver may still cause your box to lockup in very rare cases!
 If this happens, then please report at/create a bug report!
 
@@ -144,9 +158,9 @@ Furthermore, associating with some access points might still be problematic
 due to strict 802.11 compliance checks in their firmware (which we fail
 to meet, of course).
 
-Master mode support (aka HostAP) has not really been implemented yet,
-but at least it can be configured now. It won't be supported for quite a while
-(only with new generic Linux 802.11 stack), don't hold your breath. [040725]
+Master mode support (aka HostAP) has not really been implemented yet.
+It won't be supported for quite a while (only with new generic
+Linux 802.11 stack), don't hold your breath. [041111]
 
 The non-standard 4x (4X) mode (aka "44Mbps") is not supported yet and will need
 several driver changes. Don't hold your breath, this is really low priority.
@@ -175,7 +189,7 @@ since this seeks to list all requirements in full):
   flags in src/Makefile which are unsupported by their non-x86 compiler (e.g. -march=i586)
 * most likely a Bus Master capable PCI slot for PCI card versions, slave
   PCI slot won't work (FIXME: is that true?)
-* relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
+* relatively recent Linux kernel 2.4.x (>= 2.4.18 preferred) or 2.6.x
 	with CONFIG_NET_RADIO enabled ("Wireless LAN")
 	and CONFIG_NET_WIRELESS, for wireless extensions (iwconfig etc.).
 	And Non-SMP (no CONFIG_SMP).

@@ -51,9 +51,19 @@ SetCCA - change Channel Clear Assessment setting
 Default: 0x0d == 13
 "iwpriv wlan0 SetCCA 15", "dmesg"
 
-SetLEDPower - change power LED setting (save power)
-Default: on
+SetLEDPower - change power LED setting (0 - off, 1 - on, 2 - blink with range
+Default: 2 (blinking)
 "iwpriv wlan0 SetLEDPower 0", "dmesg"
+
+GetLEDPower - get the current power LED setting
+"iwpriv wlan0 GetLEDPower", "dmesg"
+
+GetBlinkMaxQ - set the current quality that equates to blinking at full speed
+Default: 60 
+"iwpriv wlan0 SetBlinkMaxQ 60", "dmesg"
+
+GetBlinkMaxQ - get the current quality that equates to blinking at full speed
+"iwpriv wlan0 GetBlinkMaxQ", "dmesg"
 
 monitor - activate Kismet monitor mode (Orinoco card type)
 Default: off

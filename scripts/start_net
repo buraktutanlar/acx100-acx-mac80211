@@ -378,7 +378,7 @@ if test "$?" = "0"; then # $DEV exists
 
 	# ugly workaround for buffer management problems
 	if test "$MTU_576" -eq 1; then
-		echo Setting mtu to 576.
+		echo "Setting mtu down to 576. NOTE that e.g. IPv6 would need >= 1280, so make sure you're doing the right thing here!"
 		test -n "$IFCONF" && "$IFCONF" $DEV mtu 576
 		if test "$?" != "0"; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
 	fi

@@ -1116,7 +1116,7 @@ void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 }
 
 /*----------------------------------------------------------------
-* acx100_power_led
+* acx_power_led
 *
 *
 * Arguments:
@@ -1132,11 +1132,14 @@ void acx_log_mac_address(int level, const UINT8 *mac, const char* tail)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_power_led(wlandevice_t *priv, UINT8 enable)
+void acx_power_led(wlandevice_t *priv, UINT8 enable)
 {
 	UINT16 gpio_pled =
 		(CHIPTYPE_ACX111 == priv->chip_type) ? 0x0040 : 0x0800;
-	acxlog(L_IOCTL, "Please report in case toggling the power LED doesn't work for your card!\n");
+	static int rate_limit = 0;
+
+	if (rate_limit++ < 3)
+		acxlog(L_IOCTL, "Please report in case toggling the power LED doesn't work for your card!\n");
 	if (enable)
 		acx_write_reg16(priv, priv->io[IO_ACX_GPIO_OUT], 
 			acx_read_reg16(priv, priv->io[IO_ACX_GPIO_OUT]) & ~gpio_pled);

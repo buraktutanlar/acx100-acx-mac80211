@@ -145,6 +145,8 @@ typedef struct framehdr {
 #define RATE111_ALL		0x1fff
 /* These bits denote acx100 compatible settings */
 #define RATE111_ACX100_COMPAT	0x0127
+/* These bits denote 802.11b compatible settings */
+#define RATE111_80211B_COMPAT	0x0027
 
 /* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
      11b 11g 11a

@@ -1296,7 +1296,7 @@ typedef struct wlandevice {
 	UINT16		dev_state_mask;
 	int		monitor;		/* whether the device is in monitor mode */
 	int		monitor_setting;
-	UINT8		led_power;		/* power led status */
+	UINT8		led_power;		/* power LED status */
 	UINT32		get_mask;		/* mask of settings to fetch from the card */
 	UINT32		set_mask;		/* mask of settings to write to the card */
 
@@ -1364,6 +1364,11 @@ typedef struct wlandevice {
 	UINT8		tx_level_val;
 	UINT8		tx_level_auto;		/* whether to do automatic power adjustment */
 	unsigned long	time_last_recalib;
+
+	unsigned long	brange_time_last_state_change;	/* time the power LED was last changed */
+	UINT8		brange_last_state;					/* last state of the LED */
+	UINT8		brange_max_quality;					/* maximum quality that equates to full speed */
+
 	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
 
 	UINT8		sensitivity;

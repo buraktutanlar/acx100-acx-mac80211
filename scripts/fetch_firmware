@@ -9,7 +9,8 @@ ftp://ftp.dlink.de/dwl-products/dwl-520PLUS/Treiber_Firmware/dwl520+_driver_eng_
 ACX111_FILE_LOCATIONS="
 ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip
 ftp://ftp.dlink.de/dwl-products/dwl-g650PLUS/Treiber_Firmware/dwlg650plus_WPA-utility-driver_2.02.zip
-"
+ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_rev_ax_drv_v204.zip
+" # v204 untested (may not work), thus at end of list
 
 find_driver_dir()
 {

@@ -264,6 +264,12 @@ static void acx_remove_pci(struct pci_dev *pdev);
 static int acx_suspend(struct pci_dev *pdev, u32 state);
 static int acx_resume(struct pci_dev *pdev);
 
+#ifndef __devexit_p
+/* FIXME: check should be removed once driver is included in the kernel */
+#warning *** your kernel is EXTREMELY old since it does not even know about __devexit_p - this driver could easily FAIL to work, so better upgrade your kernel! ***
+#define __devexit_p(x) x
+#endif
+
 /*@-fullinitblock@*/
 static struct pci_driver acx_pci_drv_id = {
 	.name        = "acx_pci",
@@ -304,6 +310,12 @@ static int acx_open(netdevice_t *dev);
 static int acx_close(netdevice_t *dev);
 static void acx_up(netdevice_t *dev);
 static void acx_down(netdevice_t *dev);
+
+/*----------------------------------------------------------------
+    External Functions (PMD: didn't know where to put this!
+*----------------------------------------------------------------*/
+
+extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 
 /*----------------------------------------------------------------
     Debugging support
@@ -381,7 +393,7 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 	UINT fw_major = 0, fw_minor = 0, fw_sub = 0, fw_extra = 0;
 	UINT hexarr[4] = { 0, 0, 0, 0 };
 	INT hexidx = 0;
-	char *num;
+	char *num, c;
 	UINT val;
 
 	FN_ENTER;
@@ -402,26 +414,26 @@ static void acx_get_firmware_version(wlandevice_t *priv)
 	val = 0;
 	do {
 		num++;
-		acxlog(L_DEBUG, "num: %c\n", *num);
-		if ((*num != '.') && (*num))
+		c = *num;
+		acxlog(L_DEBUG, "num: %c\n", c);
+		if ((c != '.') && (c))
 			val <<= 4;
 		else
 		{
 			hexarr[hexidx] = val;
 			hexidx++;
 			if (hexidx > 3)
-			{
-				acxlog(0xffff, "strange firmware version %s, please report!\n", fw.fw_id);
+			{ /* reached end */
 				break;
 			}
 			val = 0;
 			continue;
 		}
-		if ((*num >= '0') && (*num <= '9'))
-			*num -= '0';
+		if ((c >= '0') && (c <= '9'))
+			c -= '0';
 		else
-			*num = *num - 'a' + (char)10;
-		val |= *num;
+			c = c - 'a' + (char)10;
+		val |= c;
 	} while (*num);
 	fw_major = hexarr[0];
 	fw_minor = hexarr[1];
@@ -1242,7 +1254,7 @@ static int acx_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *data)
 
 			/* disable power LED to save power */
 			acxlog(L_INIT, "switching off power LED to save power :-)\n");
-			acx100_power_led(priv, 0);
+			acx_power_led(priv, 0);
 	
 			printk("Asked to suspend: %X\n", rqst);
 			/* Now shut off everything else */
@@ -1764,6 +1776,24 @@ static void acx_set_multicast_list(netdevice_t *dev)
 	FN_EXIT(0, OK);
 }
 
+static inline void acx_update_link_quality_led(wlandevice_t *priv)
+{
+	int qual;
+
+	if (unlikely(priv->brange_time_last_state_change == 0))
+		priv->brange_time_last_state_change = jiffies;
+
+	qual = acx_signal_determine_quality(priv->wstats.qual.level, priv->wstats.qual.noise);
+	if (qual > priv->brange_max_quality)
+		qual = priv->brange_max_quality;
+
+	if (time_after(jiffies, priv->brange_time_last_state_change + (HZ/2 - HZ/2 * (long) qual/priv->brange_max_quality ) )) {
+		acx_power_led(priv, (UINT8)(priv->brange_last_state == 0));
+		priv->brange_last_state ^= 1; /* toggle */
+		priv->brange_time_last_state_change = jiffies;
+	}
+}
+
 /*----------------------------------------------------------------
 * acx_enable_irq
 *
@@ -1901,6 +1931,10 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 		FN_EXIT(0, OK);
 		return IRQ_NONE;
 	}
+
+	/* Routine to perform blink with range */
+	if (unlikely(priv->led_power == 2))
+		acx_update_link_quality_led(priv);
 /*	if (acx_lock(priv,&flags)) ... */
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
@@ -2331,7 +2365,7 @@ static void __exit acx_cleanup_module(void)
 	
 		/* disable power LED to save power :-) */
 		acxlog(L_INIT, "switching off power LED to save power :-)\n");
-		acx100_power_led(priv, (UINT8)0);
+		acx_power_led(priv, (UINT8)0);
 
 #if REDUNDANT
 		/* put the eCPU to sleep to save power

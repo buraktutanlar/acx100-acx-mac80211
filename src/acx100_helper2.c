@@ -85,7 +85,6 @@
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
 #include <acx100.h>
-#include <acx100_conv.h>
 #include <p80211types.h>
 #include <acx100_helper.h>
 #include <idma.h>

@@ -1873,10 +1873,6 @@ static int acx_set_generic_beacon_probe_response_frame(wlandevice_t *priv,
 	bcn->hdr.seq = 0x0;
 
 	/*** set entry 1: Timestamp field (8 octets) ***/
-	/* Question: strange usage of struct, is it ok?
-	 * Answer: sort of. The current struct definition is for *one*
-	 * specific packet type only (and thus not for a Probe Response);
-	 * this needs to be redefined eventually */
 	memset(bcn->timestamp, 0, sizeof(bcn->timestamp));
 
 	/*** set entry 2: Beacon Interval (2 octets) ***/
@@ -2705,7 +2701,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (0 != (priv->set_mask & (GETSET_LED_POWER|GETSET_ALL))) {
 		/* Enable Tx */
 		acxlog(L_INIT, "Updating power LED status: %d\n", priv->led_power);
-		acx100_power_led(priv, priv->led_power);
+		acx_power_led(priv, priv->led_power);
 		CLEAR_BIT(priv->set_mask, GETSET_LED_POWER);
 	}
 
@@ -3026,7 +3022,8 @@ static int acx_set_defaults(wlandevice_t *priv)
 	}
 
 	priv->led_power = (UINT8)1; /* LED is active on startup */
-		
+	priv->brange_max_quality = (UINT8)60; /* LED blink max quality is 60 */
+
 	/* copy the MAC address we just got from the card
 	 * into our MAC address used during current 802.11 session */
 	MAC_COPY(priv->dev_addr, priv->netdev->dev_addr);
@@ -3075,10 +3072,14 @@ static int acx_set_defaults(wlandevice_t *priv)
 	priv->long_retry = 4; /* max. retries for long (RTS) packets */
 	SET_BIT(priv->set_mask, GETSET_RETRY);
 
+	/* FIXME: should be unified with the set_rate() ioctl to have
+	 * one common function to call for "easy" (i.e. non-set_rates())
+	 * rate setup. Maybe even unify with set_rates(), but this
+	 * would require lots of thoughts about flexible code */
 	priv->defpeer.txrate.do_auto = 1;
 	priv->defpeer.txrate.pbcc511 = 0;
 	priv->defpeer.txrate.fallback_threshold = 12;
-	priv->defpeer.txrate.stepup_threshold = 3;
+	priv->defpeer.txrate.stepup_threshold = 5;
 	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
 		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
 		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
@@ -3087,13 +3088,12 @@ static int acx_set_defaults(wlandevice_t *priv)
 		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
 	}
 	priv->defpeer.txbase = priv->defpeer.txrate;
+	if (priv->defpeer.txrate.do_auto) /* only do that in auto mode, non-auto will be able to use one specific Tx rate only anyway */
+		priv->defpeer.txbase.cfg &= RATE111_80211B_COMPAT; /* only use 802.11b base rates, for standard 802.11b H/W compatibility */
 	priv->defpeer.shortpre = 0;
 	priv->ap_peer = priv->defpeer;
 
-	/* # of retries to use when in auto rate mode.
-	 * Setting it higher will cause higher ping times due to retries. */
-	/* FIXME: where is the code for the above comment, when did this
-	 * get changed??? */
+	/* configure card to do rate fallback when in auto rate mode. */
 	SET_BIT(priv->set_mask, SET_RATE_FALLBACK);
 
 	/* Supported Rates element - the rates here are given in units of
@@ -3418,11 +3418,12 @@ acx_join_bssid(wlandevice_t *priv)
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
 		tmp.u.acx111.rates_basic = priv->defpeer.txbase.cfg;
+		acxlog(L_ASSOC, "%s rates_basic 0x%04x, rates_supported 0x%04x\n", __func__, priv->defpeer.txbase.cfg, priv->defpeer.txrate.cfg);
 	} else {
 		tmp.u.acx100.dtim_interval = dtim_interval;
 		tmp.u.acx100.rates_basic = rate111to5bits(priv->defpeer.txbase.cfg);
 		tmp.u.acx100.rates_supported = rate111to5bits(priv->defpeer.txrate.cfg);
-		acxlog(L_DEBUG, "rates_basic 0x%04x --> 0x%02x rates_supported 0x%04x --> 0x%02x\n", priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
+		acxlog(L_ASSOC, "%s rates_basic 0x%04x --> 0x%02x, rates_supported 0x%04x --> 0x%02x\n", __func__, priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
 	}
 
 	/* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames

@@ -143,7 +143,7 @@ COMMON TODO ITEMS:
 - implement packet fragmentation
 + implement #if WE_DONT_WANT_TO_REJECT_MULTICAST part correctly
 - implement iwpriv to switch between percentage and estimated dBm (problematic!) display?
-- abuse power LED to be an error indicator LED (via timer) in case we switched it off
+- abuse power LED to be an error indicator LED (via timer) in case we switched it off (PMD: I made it blink with range**)
 + add further iwconfig/iwpriv support: channel traffic percentage indicator,
   iwspy, ...
 - introduce decent device statistics like those in net_device_stats. Now only
