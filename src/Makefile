@@ -160,7 +160,7 @@ clean:
 	rm -f $(pci_objs) $(usb_objs) ${MODULES} ${CLEAN_EXTRA}
 
 distclean: clean
-	rm -f *~ ../doc/*~ ../include/*~ ../scripts/*~ *.rej
+	rm -f *~ ../doc/*~ ../include/*~ ../scripts/*~ *.rej .#*
 
 install:
 	@echo "*** Copying driver modules ${MODULES} to ${KERNELDIR}/${MODULE_PATH}... ***"

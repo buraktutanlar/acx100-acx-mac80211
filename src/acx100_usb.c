@@ -255,7 +255,7 @@ char *firmware_dir;
 
 extern const struct iw_handler_def acx100_ioctl_handler_def;
 
-static struct usb_device_id acx100usb_ids[] = {
+static const struct usb_device_id acx100usb_ids[] = {
    { USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED) },
    { USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_UNBOOTED) },
    { }
@@ -1091,8 +1091,8 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	/* ------------------------------------------
 	** extract header and payload from descriptor
 	** --------------------------------------- */
-	header = desc->host_desc;
-	payload = desc->host_desc+1;
+	header = desc->fixed_size.s.host_desc;
+	payload = desc->fixed_size.s.host_desc+1;
 	/* ----------------------------------------------
 	** concatenate header and payload into USB buffer
 	** ------------------------------------------- */
@@ -1113,7 +1113,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.ctrl1=0;
 	buf->hdr.ctrl2=0;
 	buf->hdr.hostData=cpu_to_le32(size|(desc->u.r1.rate)<<24);
-	if (1 == priv->preamble_flag)
+	if (1 == priv->defpeer.shortpre) /* vda: TODO: when to use ap_peer? */
 		SET_BIT(buf->hdr.ctrl1, DESC_CTL_SHORT_PREAMBLE);
 	SET_BIT(buf->hdr.ctrl1, DESC_CTL_FIRST_MPDU);
 	buf->hdr.txRate=desc->u.r1.rate;
@@ -1361,8 +1361,8 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	** free the txdescriptor...
 	** ------------------------------------------- */
 	txdesc=priv->currentdesc;
-	header = txdesc->host_desc;
-	payload = txdesc->host_desc+1;
+	header = txdesc->fixed_size.s.host_desc;
+	payload = txdesc->fixed_size.s.host_desc+1;
 	SET_BIT(header->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
 	SET_BIT(payload->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
 	SET_BIT(txdesc->Ctl_8, DESC_CTL_DONE);

@@ -43,6 +43,7 @@
 #define ISTATUS_2_WAIT_AUTH	2
 #define ISTATUS_3_AUTHENTICATED	3
 #define ISTATUS_4_ASSOCIATED	4
+/* TODO: ISTATUS_4_ASSOCIATED_IBSS, ISTATUS_4_ASSOCIATED_AP */
 #define ISTATUS_5_UNKNOWN	5
 
 
@@ -298,7 +299,7 @@ typedef struct probereq {
 
 /* as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
  * NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
-typedef struct __WLAN_ATTRIB_PACK__ joinbss {
+typedef struct __WLAN_ATTRIB_PACK__ acx_joinbss {
 	UINT8 bssid[ETH_ALEN];
 	UINT16 beacon_interval;
 union __WLAN_ATTRIB_PACK__ {
@@ -318,7 +319,7 @@ union __WLAN_ATTRIB_PACK__ {
 	UINT8 channel;
 	UINT8 essid_len;
 	char essid[IW_ESSID_MAX_SIZE];	
-} __WLAN_ATTRIB_PACK__ joinbss_t;
+} __WLAN_ATTRIB_PACK__ acx_joinbss_t;
 
 #define JOINBSS_RATES_1		0x01
 #define JOINBSS_RATES_2		0x02
@@ -326,25 +327,24 @@ union __WLAN_ATTRIB_PACK__ {
 #define JOINBSS_RATES_11	0x08
 #define JOINBSS_RATES_22	0x10
 
+/* Looks like missing bits are used to indicate 11g rates!
+** (it follows from the fact that constants below match 1:1 to RATE111_nn)
+** This was actually seen! Look at that Assoc Request,
+** it _does_ contain 11g rates in basic set:
+01:30:20.070772 Beacon (xxx) [1.0* 2.0* 5.5* 11.0* 6.0* 9.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit] ESS CH: 1
+01:30:20.074425 Authentication (Open System)-1: Succesful
+01:30:20.076539 Authentication (Open System)-2:
+01:30:20.076620 Acknowledgment
+01:30:20.088546 Assoc Request (xxx) [1.0* 2.0* 5.5* 6.0* 9.0* 11.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit]
+01:30:20.122413 Assoc Response AID(1) :: Succesful
+01:30:20.122679 Acknowledgment
+01:30:20.173204 Beacon (xxx) [1.0* 2.0* 5.5* 11.0* 6.0* 9.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit] ESS CH: 1
+*/
 #define JOINBSS_RATES_BASIC111_1	0x0001
 #define JOINBSS_RATES_BASIC111_2	0x0002
 #define JOINBSS_RATES_BASIC111_5	0x0004
 #define JOINBSS_RATES_BASIC111_11	0x0020
 #define JOINBSS_RATES_BASIC111_22	0x0100
-
-typedef struct acx111_joinbss {
-	UINT8	bssid[ETH_ALEN];
-	UINT16	beacon_interval;
-	UINT16	rates_basic;
-	UINT8	dtim_interval;
-	UINT8	txrate_val;
-	UINT8	preamble_type;
-	UINT8	macmode;
-	UINT16	channel;
-	UINT8	band;
-	UINT8	essid_len;
-	char	essid[IW_ESSID_MAX_SIZE];
-} __WLAN_ATTRIB_PACK__ acx111_joinbss_t; /* ACX111 specific join struct */
 
 /*
  * I am temporarily redefining this because the above struct is somewhat wrong.
@@ -536,8 +536,7 @@ typedef struct acx1xx_configoption {
 
 void acx100_schedule(long timeout);
 int acx_reset_dev(netdevice_t *dev);
-void acx100_join_bssid(wlandevice_t *priv);
-void acx111_join_bssid(wlandevice_t *priv);
+void acx_join_bssid(wlandevice_t *priv);
 int acx100_init_mac(netdevice_t *dev, UINT16 init);
 int acx100_set_defaults(wlandevice_t *priv);
 void acx100_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
@@ -595,9 +594,9 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
 int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
 int acx100_proc_phy_output(char *buf, wlandevice_t *priv);
 void acx100_read_configoption(wlandevice_t *priv);
+void acx_update_ratevector(wlandevice_t *priv);
+void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 
-int acx111_set_tx_level(wlandevice_t *priv, UINT8 level);
-UINT8 acx111_get_tx_level(wlandevice_t *priv);
 
 int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);

@@ -125,6 +125,7 @@ COMMON TODO ITEMS:
   network access after resume with all previous settings, 040421 [AM]
 + full AMD64, PPC support (PPC should be finished now)
 - merge ACX100 USB support (acx100_usb.c) into main code somehow (many ioctl or /proc related things missing for USB)
+- per-peer auto rate support (base work done by Denis Vlasenko already)
 - rtnl_lock/unlock??
 - implement 802.11b power save mode
 - join generic Linux 802.11 stack (Jeff Garzik)

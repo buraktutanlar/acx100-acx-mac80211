@@ -161,7 +161,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 typedef char *dev_info_t;
 static dev_info_t dev_info = "TI acx" DRIVER_SUFFIX;
 
-static char *version = "TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
+static char version[] __devinitdata = "TI acx" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
 
 #ifdef ACX_DEBUG
 int debug = L_BIN|L_ASSOC|L_INIT|L_STD;
@@ -173,12 +173,6 @@ int use_eth_name = 0;
 char *firmware_dir;
 
 extern const struct iw_handler_def acx100_ioctl_handler_def;
-
-typedef struct device_id {
-	unsigned char id[6];
-	char *descr;
-	char *type;
-} device_id_t;
 
 const char *name_acx100 = "ACX100";
 const char *name_tnetw1100a = "TNETW1100A";
@@ -222,6 +216,12 @@ static const struct pci_device_id acx100_pci_id_tbl[] __devinitdata = {
 /*@=fullinitblock@*/
 
 MODULE_DEVICE_TABLE(pci, acx100_pci_id_tbl);
+
+typedef struct device_id {
+	unsigned char id[6];
+	char *descr;
+	char *type;
+} device_id_t;
 
 static const device_id_t device_ids[] =
 {
@@ -282,7 +282,6 @@ static struct pci_driver acx100_pci_drv_id = {
 
 typedef struct acx100_device {
 	netdevice_t *newest;
-
 } acx100_device_t;
 
 /* if this driver was only about PCI devices, then we probably wouldn't
@@ -378,8 +377,7 @@ static void acx100_get_firmware_version(wlandevice_t *priv)
 
 static const char spaces[] = "          " "          "; /* Nx10 spaces */
 
-void
-log_fn_enter(const char *funcname) {
+void log_fn_enter(const char *funcname) {
 	int indent;
 	TIMESTAMP(d);
 
@@ -396,8 +394,7 @@ log_fn_enter(const char *funcname) {
 	acx100_debug_func_indent += FUNC_INDENT_INCREMENT;
 }
 
-void
-log_fn_exit(const char *funcname) {
+void log_fn_exit(const char *funcname) {
 	int indent;
 	TIMESTAMP(d);
 
@@ -414,8 +411,7 @@ log_fn_exit(const char *funcname) {
 	);
 }
 
-void
-log_fn_exit_v(const char *funcname, int v) {
+void log_fn_exit_v(const char *funcname, int v) {
 	int indent;
 	TIMESTAMP(d);
 
@@ -1172,7 +1168,7 @@ static int acx100_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *dat
 #endif
 
 			acx100_enable_irq(priv);
-/*			acx100_join_bssid(priv); */
+/*			acx_join_bssid(priv); */
 			acx100_set_status(priv, ISTATUS_0_STARTED);
 			printk("Asked to resume: %X\n", rqst);
 			if (netif_running(dev) && !netif_device_present(dev))
@@ -1545,7 +1541,7 @@ static void acx100_tx_timeout(netdevice_t *dev)
 	/* clean tx descs, they may have been completely full */
 	acx100_clean_tx_desc(priv);
 	/* better also reset TxQueueFree, you never know... */
-	priv->TxQueueFree = priv->TxQueueNo;
+	priv->TxQueueFree = priv->TxQueueCnt;
 	priv->stats.tx_errors++;
 	printk("acx100: Tx timeout!\n");
 	FN_EXIT(0, OK);
@@ -1695,7 +1691,7 @@ void acx100_disable_irq(wlandevice_t *priv)
 #define INFO_WATCH_DOG_RESET    0x0003  /* hw has been reset as the result of a watchdog timer timeout */
 #define INFO_PS_FAIL            0x0004  /* failed to send out NULL frame from PS mode notification to AP */
                                         /* recommended action: try entering 802.11 PS mode again */
-#define INFO_IV_ICV_FAILURE     0x0005  /* encryption/decryption proces s on a packet failed */
+#define INFO_IV_ICV_FAILURE     0x0005  /* encryption/decryption process on a packet failed */
 
 static char *info_type_msg[] = {
     "(unknown)",
@@ -1789,11 +1785,9 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_RX_COMPLETE);
 	}
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
-#if THIS_LED_TO_TX_RINGBUFFER_LOCKUP_ISSUES
 		static int txcnt = 0;
 
 		if (txcnt++ % 4 == 0)
-#endif
 			acx100_clean_tx_desc(priv);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");
 		acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
@@ -1996,6 +1990,7 @@ void acx100_after_interrupt_task(void *data) {
 			memmap_t pdr;
 			acx100_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
 			acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
+
 			acxlog(L_BINSTD | L_ASSOC, "ASSOCIATED!\n");
 
 			priv->after_interrupt_jobs ^= ACX100_AFTER_INTERRUPT_CMD_ASSOCIATE; /* clear the bit */
@@ -2033,7 +2028,8 @@ void acx100_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 
 	FN_ENTER;
 	if (0 != (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		if (likely(skb = acx100_rxdesc_to_ether(priv, rxdesc))) {
+		skb = acx100_rxdesc_to_ether(priv, rxdesc);
+		if (likely(skb)) {
 			(void)netif_rx(skb);
 			priv->netdev->last_rx = jiffies;
 			priv->stats.rx_packets++;

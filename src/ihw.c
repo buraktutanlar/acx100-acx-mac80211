@@ -300,8 +300,8 @@ void acx100_get_info_state(wlandevice_t *priv)
 
 	value = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
 
-	priv->info_type = value & 0xffff;
-	priv->info_status = value >> 16;
+	priv->info_type = (UINT16)value;
+	priv->info_status = (UINT16)(value >> 16);
 
 	/* inform hw that we have read this info message */
 	acx100_write_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA], priv->info_type | 0x00010000);
@@ -309,6 +309,26 @@ void acx100_get_info_state(wlandevice_t *priv)
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
+
+static const char * const cmd_error_strings[] = {
+	"Idle",
+	"Success",
+	"Unknown Command",
+	"Invalid Information Element",
+	"channel rejected",
+	"channel invalid in current regulatory domain",
+	"MAC invalid",
+	"Command rejected (read-only information element)",
+	"Command rejected",
+	"Already asleep",
+	"Tx in progress",
+	"Already awake",
+	"Write only",
+	"Rx in progress",
+	"Invalid parameter",
+	"Scan in progress",
+	"failed"
+};
 
 /*----------------------------------------------------------------
 * acx100_get_cmd_state
@@ -338,10 +358,11 @@ void acx100_get_cmd_state(wlandevice_t *priv)
 		acx100_read_reg32(priv, priv->io[IO_ACX_CMD_MAILBOX_OFFS]));
 
 	value = acx100_read_reg32(priv, priv->io[IO_ACX_SLV_MEM_DATA]);
+
 	priv->cmd_type = (UINT16)value;
 	priv->cmd_status = (UINT16)(value >> 16);
 
-	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x\n", priv->cmd_type, priv->cmd_status);
+	acxlog(L_CTL, "cmd_type 0x%04x, cmd_status 0x%04x [%s]\n", priv->cmd_type, priv->cmd_status, priv->cmd_status <= 0x10 ? cmd_error_strings[priv->cmd_status] : "UNKNOWN REASON" );
 }
 
 /*----------------------------------------------------------------
@@ -417,25 +438,6 @@ static inline void acx100_read_cmd_param(wlandevice_t *priv, memmap_t *cmd, int 
 {
 	memcpy(cmd, priv->CommandParameters, len);
 }
-
-static const char * const cmd_error_strings[] = {
-	"Idle[TIMEOUT]",
-	"[SUCCESS]",
-	"Unknown Command",
-	"Invalid Information Element",
-	"unknown_FIXME",
-	"channel invalid in current regulatory domain",
-	"unknown_FIXME2",
-	"Command rejected (read-only information element)",
-	"Command rejected",
-	"Already asleep",
-	"Tx in progress",
-	"Already awake",
-	"Write only",
-	"Rx in progress",
-	"Invalid parameter",
-	"Scan in progress"
-};
 
 /*----------------------------------------------------------------
 * acx100_issue_cmd
@@ -575,7 +577,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 	if (1 != cmd_status) {
 		acxlog(L_STD | L_CTL, "%s failed: %s [%d uSec] Cmd: %Xh, Result: %Xh\n",
 				__func__,
-				cmd_status <= 0x0f ?
+				cmd_status <= 0x10 ?
 				cmd_error_strings[cmd_status] : "UNKNOWN REASON",
 				(timeout - counter) * 50,
 				cmd,
@@ -742,7 +744,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
  *
  ****************************************************************************/
 
-static short CtlLength[0x16] = {
+static const short CtlLength[0x16] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
 	ACX1xx_IE_POWER_MGMT_LEN,
@@ -768,7 +770,7 @@ static short CtlLength[0x16] = {
 	
 	};
 
-static short CtlLengthDot11[0x14] = {
+static const short CtlLengthDot11[0x14] = {
 	0,
 	ACX1xx_IE_DOT11_STATION_ID_LEN,
 	0,
@@ -909,7 +911,7 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 	((memmap_t *)pdr)->length = cpu_to_le16(len);
 #endif
 
-	acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d\n",type,len);
+	acxlog(L_CTL,"interrogating: type(rid)=0x%X len=%d\n",type,len);
 
 	return acx100_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr,
 		len + 4, 5000);
@@ -1092,10 +1094,12 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_log_mac_address(int level, UINT8 *mac)
+void acx100_log_mac_address(int level, const UINT8 *mac)
 {
-	acxlog(level, "%02X:%02X:%02X:%02X:%02X:%02X",
+	if (debug & level) {
+		printk("%02X:%02X:%02X:%02X:%02X:%02X",
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	}
 }
 
 /*----------------------------------------------------------------

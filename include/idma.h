@@ -42,17 +42,11 @@
 
 int acx100_create_dma_regions(wlandevice_t *priv);
 int acx111_create_dma_regions(wlandevice_t *priv);
-int acx100_create_tx_host_desc_queue(TIWLAN_DC *pDc);
-int acx111_create_tx_host_desc_queue(TIWLAN_DC *pDc);
-int acx100_create_rx_host_desc_queue(TIWLAN_DC *pDc);
-void acx100_create_tx_desc_queue(TIWLAN_DC *pDc);
-void acx100_create_rx_desc_queue(TIWLAN_DC *pDc);
 int acx100_delete_dma_regions(wlandevice_t *priv);
 void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *txdesc);
 void acx100_clean_tx_desc(wlandevice_t *priv);
 UINT8 acx_signal_to_winlevel(UINT8 rawlevel);
 void acx100_process_rx_desc(wlandevice_t *priv);
-int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *vala);
 struct txdescriptor *acx100_get_tx_desc(wlandevice_t *priv);
 
 char *acx100_get_packet_type_string(UINT16 fc);
@@ -80,7 +74,7 @@ typedef struct txbuffer {
 	UINT8 data[WLAN_MAX_ETHFRM_LEN-WLAN_ETHHDR_LEN];
 } txb_t;
 
-/* This stuct must contain the header of a packet. A header can maximally
+/* This struct must contain the header of a packet. A header can maximally
  * contain a type 4 802.11 header + a LLC + a SNAP, amounting to 38 bytes */
 typedef struct framehdr {
 	char data[0x26];
@@ -94,13 +88,8 @@ typedef struct framehdr {
 	(struct txdescriptor *) (((UINT32)txdesc) + dc->TxDescrSize)
 
 /* flags:
- * 0x01 - short preamble
- * 0x02 - first packet in a row?? fragmentation??? (sorry)
- * 0x40 - usable ?? (0 means: not used for tx)
- * 0x80 - free ? (0 : used, 1 : free)
  * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
  */
-
 #define DESC_CTL_SHORT_PREAMBLE 0x01
 #define DESC_CTL_FIRST_MPDU     0x02
 #define DESC_CTL_AUTODMA        0x04
@@ -117,37 +106,24 @@ typedef struct framehdr {
 #define DESC_CTL2_MORE_FRAG	0x04
 #define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
 
-typedef struct txdescriptor {
-	UINT32	pNextDesc;		/* pointer to the next txdescriptor */
-	UINT32	HostMemPtr;
-	UINT32	AcxMemPtr;
-	UINT32	tx_time;
-	UINT16	total_length;
-	UINT16	Reserved;
-	UINT32	val0x14;		/* the following 16 bytes do not change when acx100 owns the descriptor */
-	UINT32	val0x18;			/* 0x18 */
-	struct	txhostdescriptor *host_desc;	/* 0x1c */
-	UINT32	val0x20;			/* 0x20 */
-	UINT8	Ctl_8;				/* 0x24, 8bit value */
-	UINT8	Ctl2_8;				/* 0x25, 8bit value */
-	UINT8	error;				/* 0x26 */
-	UINT8	ack_failures;			/* 0x27 */
-	UINT8	rts_failures;			/* 0x28 */
-	UINT8	rts_ok;				/* 0x29 */
-	union {
-    		struct {
-			UINT8	rate;		/* 0x2a */
-			UINT8	queue_ctrl;	/* 0x2b */
-    		} r1 __attribute__((packed));
-    		struct {
-			UINT16  rate111;
-    		} r2 __attribute__((packed));
-	} u __attribute__((packed));
-	UINT32	queue_info;			/* 0x2c (acx100, 'reserved' on acx111) */
-
-} txdesc_t __attribute__((packed));		/* size : 48 = 0x30 */
-/* NOTE: The acx111 txdescriptor structure is 4 byte larger */
-/* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
+/* Values for rate field (acx100 only) */
+#define RATE100_1              10
+#define RATE100_2              20
+#define RATE100_5              55
+#define RATE100_11             110
+#define RATE100_22             220
+/* This bit denotes use of PBCC:
+** (it is unknown whether it works with 1 and 2Mbit rates, probably not) */
+#define RATE100_PBCC511                0x80
+/* Where did these come from? */
+#define RATE100_6_G            0x0D
+#define RATE100_9_G            0x0F
+#define RATE100_12_G           0x05
+#define RATE100_18_G           0x07
+#define RATE100_24_G           0x09
+#define RATE100_36_G           0x0B
+#define RATE100_48_G           0x01
+#define RATE100_54_G           0x03
 
 /* Bit values for rate111 field */
 #define RATE111_1		0x0001	/* DBPSK */
@@ -164,7 +140,7 @@ typedef struct txdescriptor {
 #define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
 #define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
 #define RATE111_RESERVED	0x2000
-#define RATE111_PBCC_5_11	0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
+#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
 #define RATE111_SHORTPRE	0x8000  /* short preamble */
 /* Special 'try everything' value */
 #define RATE111_ALL		0x1fff
@@ -219,23 +195,68 @@ Re PBCC: avoid using it. It makes sense only if you have
 TI "11b+" hardware. You _must_ use PBCC in order to reach 22Mbps on it.
 */
 
+typedef struct txdescriptor {
+	UINT32	pNextDesc;		/* pointer to the next txdescriptor */
+	UINT32	HostMemPtr;
+	UINT32	AcxMemPtr;
+	UINT32	tx_time;
+	UINT16	total_length;
+	UINT16	Reserved;
+	/* the following 16 bytes do not change when acx100 owns the descriptor */
+	union { /* we need to add a union here with a *fixed* size of 16, since ptrlen AMD64 (8) != ptrlen x86 (4) */
+		struct {
+			struct  txrate_ctrl *txc;
+			struct txhostdescriptor *host_desc;
+		} s;
+		struct {
+			UINT32 d1;
+			UINT32 d2;
+			UINT32 d3;
+			UINT32 d4;
+		} dummy;
+	} fixed_size;
+	UINT8	Ctl_8;				/* 0x24, 8bit value */
+	UINT8	Ctl2_8;				/* 0x25, 8bit value */
+	UINT8	error;				/* 0x26 */
+	UINT8	ack_failures;			/* 0x27 */
+	UINT8	rts_failures;			/* 0x28 */
+	UINT8	rts_ok;				/* 0x29 */
+	union {
+    		struct {
+			UINT8	rate;		/* 0x2a */
+			UINT8	queue_ctrl;	/* 0x2b */
+    		} r1 __attribute__((packed));
+    		struct {
+			UINT16  rate111;
+    		} r2 __attribute__((packed));
+	} u __attribute__((packed));
+	UINT32	queue_info;			/* 0x2c (acx100, 'reserved' on acx111) */
+
+} txdesc_t __attribute__((packed));		/* size : 48 = 0x30 */
+/* NOTE: The acx111 txdescriptor structure is 4 byte larger */
+/* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
+
+/* some fields here are actually pointers,
+ * but they have to remain UINT32, since using ptr instead
+ * (8 bytes on 64bit systems!!) would disrupt the fixed descriptor
+ * format the acx firmware expects in the non-user area.
+ * Since we need to cram an 8 byte ptr into 4 bytes, this probably
+ * means that ACX related data needs to remain in low memory
+ * (address value needs <= 4 bytes) on 64bit
+ * (alternatively we need to cope with the shorted value somehow) */
+typedef UINT32 ACX_PTR;
 typedef struct txhostdescriptor {
-	UINT8	*data_phy;
-	UINT16	data_offset;
-	UINT16	reserved;
+	ACX_PTR	data_phy;			/* 0x00 [UINT8 *] */
+	UINT16	data_offset;			/* 0x04 */
+	UINT16	reserved;			/* 0x06 */
 	UINT16	Ctl_16; /* 16bit value, endianness!! */
-	UINT16	length;
-	struct	txhostdescriptor *desc_phy_next;	
-	struct	txhostdescriptor *pNext;	/* 0x10 */
-	UINT32	Status;				/* 0x14 */
-/* You can use this area as you want */
-	struct	txhostdescriptor *desc_phy;	/* 0x18 */
-	struct	txdescriptor *val0x1c;		/* 0x1c */
-	UINT32	val0x20;			/* 0x20 */
+	UINT16	length;				/* 0x0a */
+	ACX_PTR	desc_phy_next;			/* 0x0c [txhostdescriptor *] */
+	ACX_PTR	pNext;				/* 0x10 [txhostdescriptor *] */
+	UINT32	Status;				/* 0x14, unused on Tx */
+/* From here on you can use this area as you want (variable length, too!) */
+	struct	txhostdescriptor *desc_phy;	/* 0x18 [txhostdescriptor *] */
 	UINT8	*data;
-	UINT16	val0x28;
-	UINT8	rate;
-	UINT8	val0x2b;
 } txhostdesc_t;			/* size: 0x2c */
 
 typedef struct rxdescriptor {
@@ -265,23 +286,17 @@ typedef struct rxdescriptor {
 } rxdesc_t;			/* size 52 = 0x34 */
 
 typedef struct rxhostdescriptor {
-	struct	rxbuffer *data_phy;
-	UINT16	data_offset;
-	UINT16	reserved;
-	UINT16	Ctl_16; /* 16bit value, endianness!! */
-	UINT16	length;
-	struct	rxhostdescriptor *desc_phy_next;
-	struct	rxhostdescriptor *pNext;
-	UINT32	Status;
-/* You can use this area as you want */
-	struct	rxhostdescriptor *desc_phy;
-	UINT32	val0x1c;
-	UINT32	val0x20;
+	ACX_PTR	data_phy;			/* 0x00 [struct rxbuffer *] */
+	UINT16	data_offset;			/* 0x04 */
+	UINT16	reserved;			/* 0x06 */
+	UINT16	Ctl_16;				/* 0x08; 16bit value, endianness!! */
+	UINT16	length;				/* 0x0a */
+	ACX_PTR	desc_phy_next;			/* 0x0c [struct  rxhostdescriptor *] */
+	ACX_PTR	pNext;				/* 0x10 [struct  rxhostdescriptor *] */
+	UINT32	Status;				/* 0x14 */
+/* From here on you can use this area as you want (variable length, too!) */
+	struct	rxhostdescriptor *desc_phy;	/* 0x18 */
 	struct	rxbuffer *data;
-	UINT8	val0x28;
-	UINT8	val0x29;
-	UINT8	rate;
-	UINT8	val0x2b;
 } rxhostdesc_t;			/* size 44 = 0x2c */
 
 typedef struct MemoryBlockSizeStruct {

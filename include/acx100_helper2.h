@@ -185,10 +185,10 @@ typedef struct TxData {
 } TxData;			/* size: 2400 */
 
 void acx100_sta_list_init(wlandevice_t *priv);
-client_t *acx100_sta_list_alloc(wlandevice_t *priv, UINT8 *address);
-client_t *acx100_sta_list_add(wlandevice_t *priv, UINT8 *address);
-client_t *acx100_sta_list_get(wlandevice_t *priv, UINT8 *address);
-char *acx100_get_status_name(UINT16 status);
+client_t *acx100_sta_list_alloc(wlandevice_t *priv, const UINT8 *address);
+client_t *acx100_sta_list_add(wlandevice_t *priv, const UINT8 *address);
+client_t *acx100_sta_list_get(wlandevice_t *priv, const UINT8 *address);
+const char *acx100_get_status_name(UINT16 status);
 void acx100_set_status(wlandevice_t *priv, UINT16 status);
 int acx100_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
 UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
@@ -205,7 +205,7 @@ int acx100_process_authen(wlan_fr_authen_t *req, wlandevice_t *priv);
 
 int acx100_process_deauthen(wlan_fr_deauthen_t *req, wlandevice_t *priv);
 int acx100_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv);
-int acx100_transmit_deauthen(char *a, client_t *arg_4, wlandevice_t *priv,
+int acx100_transmit_deauthen(const UINT8 *addr, client_t *arg_4, wlandevice_t *priv,
 		      UINT16 reason);
 int acx100_transmit_authen1(wlandevice_t *priv);
 int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,

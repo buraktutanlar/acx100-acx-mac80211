@@ -1159,7 +1159,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	   The address is relative to the host memory mapping */
 	dma_addr_t	RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
 	/* UINT32		val0x64; */	/* 0x64, some size */
-	UINT32		*pRxBufferPool;		/* *rxdescq1; 0x70 */
+	UINT8		*pRxBufferPool;		/* this is supposed to be [rxbuffer *], but it's not defined here, so let's define it as [UINT8 *] */
 	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 	UINT32		RxBufferPoolSize;
 } TIWLAN_DC;
@@ -1205,7 +1205,23 @@ typedef struct bss_info {
 #define ACX_MODE_3_MANAGED_AP	3
 #define ACX_MODE_FF_AUTO	0xff	/* pseudo mode - not ACX100 related! (accept both Ad-Hoc and Managed stations for association) */
 
+struct txrate_ctrl {
+	UINT16  cfg;		      /* Tx rate from iwconfig */
+	UINT16  cur;		      /* the Tx rate we currently use */
+	UINT8   pbcc511;		  /* Use PBCC at 5 and 11Mbit? (else CCK) */
+	UINT8   flt;		      /* Auto adjust Tx rates? */
+	UINT8   fallback_threshold;     /* 0-100 */
+	UINT8   fallback_count;
+	UINT8   stepup_threshold;	/* 0-100 */
+	UINT8   stepup_count;
+	//TODO: unsigned long txcnt[];
+};
 
+struct peer {
+	struct txrate_ctrl txbase;      /* For basic rates */
+	struct txrate_ctrl txrate;      /* For operational rates */
+	UINT8   shortpre;		 /* 0 == Long Preamble, 1 == Short */
+};
 
 /* FIXME: this should be named something like struct acx100_priv (typedef'd to
  * acx100_priv_t) */
@@ -1323,17 +1339,6 @@ typedef struct wlandevice {
 	char		essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
 	char		nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16		channel;		/* V3POS 22f0, V1POS b8 */
-	UINT16		txrate_cfg;		/* Tx rate from iwconfig */
-	UINT16		txrate_curr;		/* the Tx rate we currently use */
-	UINT8		txrate_auto;		/* whether to auto adjust Tx rates */
-	UINT8		txrate_auto_idx;	/* index into rate table */
-	UINT8		txrate_auto_idx_max;
-	/* settings in DWL-520+ .inf file: */
-	UINT8		txrate_fallback_retries; /* 0-255, default 1 */
-	UINT8		txrate_fallback_threshold; /* 0-100, default 12 */
-	UINT8		txrate_fallback_count;
-	UINT8		txrate_stepup_threshold; /* 0-100, default 3 */
-	UINT8		txrate_stepup_count;
 	UINT8		reg_dom_id;		/* reg domain setting */
 	UINT16		reg_dom_chanmask;
 	UINT16		status;			/* 802.11 association status */
@@ -1349,7 +1354,6 @@ typedef struct wlandevice {
 
 	client_t	sta_list[32];		/* should those two be of */
 	client_t	*sta_hash_tab[64];	/* equal size? */
-	
 
 	/* 802.11 power save mode */
 	UINT8		ps_wakeup_cfg;
@@ -1359,22 +1363,23 @@ typedef struct wlandevice {
 	UINT16		ps_enhanced_transition_time;
 
 	/*** PHY settings ***/
-	UINT8		sensitivity;
+	struct peer	defpeer;
+	struct peer	ap_peer;
+
 	UINT8		tx_disabled;
 	UINT8		tx_level_dbm;
 	UINT8		tx_level_val;
 	UINT8		tx_level_auto;		/* whether to do automatic power adjustment */
+	UINT8		sensitivity;
 	UINT8		antenna;		/* antenna settings */
 	UINT8		ed_threshold;		/* energy detect threshold */
 	UINT8		cca;			/* clear channel assessment */
 	UINT8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
-	UINT8		preamble_flag;		/* 0 == Long Preamble, 1 == Short */
 
 	UINT16		rts_threshold;
 	UINT32		short_retry;		/* V3POS 204, V1POS 20c */
 	UINT32		long_retry;		/* V3POS 208, V1POS 210 */
 	UINT16		msdu_lifetime;		/* V3POS 20c, V1POS 214 */
-	UINT32		auth_alg;		/* V3POS 228, V3POS 230, used in transmit_authen1 */
 	UINT16		listen_interval;	/* V3POS 250, V1POS 258, given in units of beacon interval */
 	UINT32		beacon_interval;	/* V3POS 2300, V1POS c8 */
 
@@ -1382,10 +1387,11 @@ typedef struct wlandevice {
 	UINT8		capab_short;		/* V3POS 1ec, V1POS 1f4 */
 	UINT8		capab_pbcc;		/* V3POS 1f0, V1POS 1f8 */
 	UINT8		capab_agility;		/* V3POS 1f4, V1POS 1fc */
-	UINT8		rate_spt_len;		/* V3POS 1243, V1POS 124b */
-	UINT8		rate_support1[13];	/* V3POS 1244, V1POS 124c */
+	UINT8		rate_supported_len;	/* V3POS 1243, V1POS 124b */
+	UINT8		rate_supported[13];	/* V3POS 1244, V1POS 124c */
 
 	/*** Encryption settings (WEP) ***/
+	UINT32		auth_alg;		/* V3POS 228, V3POS 230, used in transmit_authen1 */
 	UINT8		wep_enabled;
 	UINT8		wep_restricted;		/* V3POS c0 */
 	UINT8		wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
@@ -1396,8 +1402,8 @@ typedef struct wlandevice {
 	UINT16		rx_config_1;		/* V3POS 2820, V1POS 27f8 */
 	UINT16		rx_config_2;		/* V3POS 2822, V1POS 27fa */
 	TIWLAN_DC	dc;			/* V3POS 2380, V1POS 2338 */
-	UINT32		TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
-	UINT32		RxQueueNo;		/* V3POS 24f4, V1POS 24cc */
+	UINT32		TxQueueCnt;		/* V3POS 24dc, V1POS 24b4 */
+	UINT32		RxQueueCnt;		/* V3POS 24f4, V1POS 24cc */
 	UINT32		TxQueueFree;
 	struct	rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
 	UINT16		memblocksize;		/* V3POS 2354, V1POS 230c */
@@ -1421,9 +1427,7 @@ typedef struct wlandevice {
 	/*** Unknown ***/
 	UINT8		dtim_interval;		/* V3POS 2302 */
 	UINT8		val0x2324_0;		/* V3POS 2324 */
-	UINT8		rates_supported;
 	UINT8		val0x2324_2;
-	UINT8		rates_basic;
 	UINT8		val0x2324_4;
 	UINT8		val0x2324_5;
 	UINT8		val0x2324_6;

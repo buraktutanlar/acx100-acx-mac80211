@@ -26,9 +26,9 @@ enum {
 	DOT11_MOD_CCKOFDM,
 	DOT11_MOD_PBCC,
 };
-static u8 ratelist[] = { 1,2,5,11,22,33,6,9,12,18,24,36,48,54 };
-static u8 dot11ratebyte[] = { 1*2,2*2,11,11*2,22*2,33*2,6*2,9*2,12*2,18*2,24*2,36*2,48*2,54*2 };
-static u8 default_modulation[] = {
+static const UINT8 ratelist[] = { 1,2,5,11,22,33,6,9,12,18,24,36,48,54 };
+static const UINT8 dot11ratebyte[] = { 1*2,2*2,11,11*2,22*2,33*2,6*2,9*2,12*2,18*2,24*2,36*2,48*2,54*2 };
+static const UINT8 default_modulation[] = {
 	DOT11_MOD_DBPSK,
 	DOT11_MOD_DQPSK,
 	DOT11_MOD_CCK,

@@ -106,9 +106,9 @@ alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
 UINT16 CurrentAID = 1;
 
-char *state_str[7] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN", "INVALID??" };
+const char *state_str[7] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "UNKNOWN", "INVALID??" };
 
-UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+const UINT8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 /*----------------------------------------------------------------
 * acx100_sta_list_init
@@ -160,7 +160,7 @@ void acx100_sta_list_init(wlandevice_t *priv)
  * Hmm, does this function have one "silent" parameter or 0 parameters?
  * Doesn't matter much anyway...
  */
-inline client_t *acx100_sta_list_alloc(wlandevice_t *priv, UINT8 *address)
+inline client_t *acx100_sta_list_alloc(wlandevice_t *priv, const UINT8 *address)
 {
 	int i = 0;
 
@@ -198,7 +198,7 @@ inline client_t *acx100_sta_list_alloc(wlandevice_t *priv, UINT8 *address)
 /* acx100_sta_list_add()
  * STATUS: FINISHED.
  */
-client_t *acx100_sta_list_add(wlandevice_t *priv, UINT8 *address)
+client_t *acx100_sta_list_add(wlandevice_t *priv, const UINT8 *address)
 {
 	client_t *client;
 	int index;
@@ -243,7 +243,7 @@ client_t *acx100_sta_list_add(wlandevice_t *priv, UINT8 *address)
 *----------------------------------------------------------------*/
 
 
-static inline client_t *acx100_sta_list_get_from_hash(wlandevice_t *priv, UINT8 *address)
+static inline client_t *acx100_sta_list_get_from_hash(wlandevice_t *priv, const UINT8 *address)
 {
 	int index;
 
@@ -276,7 +276,7 @@ static inline client_t *acx100_sta_list_get_from_hash(wlandevice_t *priv, UINT8 
 /* acx100_get_sta_list()
  * STATUS: FINISHED.
  */
-client_t *acx100_sta_list_get(wlandevice_t *priv, UINT8 *address)
+client_t *acx100_sta_list_get(wlandevice_t *priv, const UINT8 *address)
 {
 	client_t *client;
 	client_t *result = NULL;	/* can be removed if tracing unneeded */
@@ -296,7 +296,7 @@ client_t *acx100_sta_list_get(wlandevice_t *priv, UINT8 *address)
 	return result;
 }
 
-inline char *acx100_get_status_name(UINT16 status)
+inline const char *acx100_get_status_name(UINT16 status)
 {
 	if (ISTATUS_5_UNKNOWN >= status)
 		return state_str[status];
@@ -328,7 +328,7 @@ inline char *acx100_get_status_name(UINT16 status)
 
 void acx100_set_status(wlandevice_t *priv, UINT16 status)
 {
-	char *stat;
+	const char *stat;
 #define QUEUE_OPEN_AFTER_ASSOC 1 /* this really seems to be needed now */
 #if QUEUE_OPEN_AFTER_ASSOC
 	static int associated = 0;
@@ -599,8 +599,8 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 				return NOT_OK;
 			}
 
-			hdesc_header = tx_desc->host_desc;
-			hdesc_payload = tx_desc->host_desc + 1;
+			hdesc_header = tx_desc->fixed_size.s.host_desc;
+			hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 			hd = (TxData *)hdesc_header->data;
 			payload = (struct assocresp_frame_body *)hdesc_payload->data;
@@ -622,27 +622,12 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			payload->aid = host2ieee16(clt->aid);
 
 			payload->rates.element_ID = 1;
-			payload->rates.length = priv->rate_spt_len;
-			payload->rates.sup_rates[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC; /* 1 Mbit */
-			payload->rates.sup_rates[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC; /* 2 Mbit */
-			payload->rates.sup_rates[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC; /* 5.5 Mbit */
-			payload->rates.sup_rates[3] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC; /* 11 Mbit */
-			payload->rates.sup_rates[4] = DOT11RATEBYTE_22; /* 22 Mbit (was 0xAC) */
-			
-			if ( CHIPTYPE_ACX111 == priv->chip_type ) {
-			    payload->rates.sup_rates[5] = DOT11RATEBYTE_6_G;
-			    payload->rates.sup_rates[6] = DOT11RATEBYTE_9_G;
-			    payload->rates.sup_rates[7] = DOT11RATEBYTE_12_G;
-			    payload->rates.sup_rates[8] = DOT11RATEBYTE_18_G;
-			    payload->rates.sup_rates[9] = DOT11RATEBYTE_24_G;
-			    payload->rates.sup_rates[10] = DOT11RATEBYTE_36_G;
-			    payload->rates.sup_rates[11] = DOT11RATEBYTE_48_G;
-			    payload->rates.sup_rates[12] = DOT11RATEBYTE_54_G;
-			}
-			hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
+			payload->rates.length = priv->rate_supported_len;
+			memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len); //
+			hdesc_payload->length = cpu_to_le16(priv->rate_supported_len + 8);
 			hdesc_payload->data_offset = 0;
 
-			tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
+			tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_supported_len + 8);
 
 			acx100_dma_tx_data(priv, tx_desc);
 		}
@@ -737,8 +722,8 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 		if ((tx_desc = acx100_get_tx_desc(priv)) == NULL) {
 			return 0;
 		}
-		hdesc_header = tx_desc->host_desc;
-		hdesc_payload = tx_desc->host_desc + 1;
+		hdesc_header = tx_desc->fixed_size.s.host_desc;
+		hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 		fr = (TxData*)hdesc_header->data;
 		payload = (struct reassocresp_frame_body *)hdesc_payload->data;
 		fr->frame_control = host2ieee16(WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_REASSOCRESP));	/* 0x30 */
@@ -758,29 +743,12 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 		payload->aid = host2ieee16(clt->aid);
 
 		payload->rates.element_ID = 1;
-		payload->rates.length = priv->rate_spt_len;
-		payload->rates.sup_rates[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC; /* 1 Mbit */
-		payload->rates.sup_rates[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC; /* 2 Mbit */
-		payload->rates.sup_rates[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC; /* 5.5 Mbit */
-		payload->rates.sup_rates[3] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC; /* 11 Mbit */
-		payload->rates.sup_rates[4] = DOT11RATEBYTE_22; /* 22 Mbit */
-
-		if ( CHIPTYPE_ACX111 == priv->chip_type ) {
-		    payload->rates.sup_rates[5] = DOT11RATEBYTE_6_G;
-		    payload->rates.sup_rates[6] = DOT11RATEBYTE_9_G;
-		    payload->rates.sup_rates[7] = DOT11RATEBYTE_12_G;
-		    payload->rates.sup_rates[8] = DOT11RATEBYTE_18_G;
-		    payload->rates.sup_rates[9] = DOT11RATEBYTE_24_G;
-		    payload->rates.sup_rates[10] = DOT11RATEBYTE_36_G;
-		    payload->rates.sup_rates[11] = DOT11RATEBYTE_48_G;
-		    payload->rates.sup_rates[12] = DOT11RATEBYTE_54_G;
-		
-		}
-
+		payload->rates.length = priv->rate_supported_len;
+		memcpy(payload->rates.sup_rates, priv->rate_supported, priv->rate_supported_len); //
 		hdesc_payload->data_offset = 0;
-		hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
+		hdesc_payload->length = cpu_to_le16(priv->rate_supported_len + 8);
 
-		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
+		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_supported_len + 8);
 
 		acx100_dma_tx_data(priv, tx_desc);
 	}
@@ -1051,7 +1019,7 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 	to_ds = WLAN_GET_FC_TODS(ieee2host16(p80211_hdr->a3.fc));
 	from_ds = WLAN_GET_FC_FROMDS(ieee2host16(p80211_hdr->a3.fc));
 
-	acxlog(L_DEBUG, "to_ds %i, from_ds %i\n", to_ds, from_ds);
+	acxlog(L_DEBUG, "rx: to_ds %i, from_ds %i\n", to_ds, from_ds);
 
 	if ((!to_ds) && (!from_ds)) {
 		/* To_DS = 0, From_DS = 0 */
@@ -1069,24 +1037,24 @@ static int acx100_process_data_frame_client(struct rxhostdescriptor *rxdesc, wla
 		bssid = p80211_hdr->a3.a1;	/* BSSID */
 	} else {
 		/* To_DS = 1, From_DS = 1 */
-		acxlog(L_DEBUG, "frame error occurred??\n");
+		acxlog(L_DEBUG, "rx: frame error occurred??\n");
 		priv->stats.rx_errors++;
 		goto done;
 	}
 
 	if (debug & L_DEBUG)
 	{
-		acxlog(L_DEBUG, "da ");
+		printk("rx: da ");
 		acx100_log_mac_address(L_DEBUG, da);
-		acxlog(L_DEBUG, ",bssid ");
+		printk(",bssid ");
 		acx100_log_mac_address(L_DEBUG, bssid);
-		acxlog(L_DEBUG, ",priv->bssid ");
+		printk(",priv->bssid ");
 		acx100_log_mac_address(L_DEBUG, priv->bssid);
-		acxlog(L_DEBUG, ",dev_addr ");
+		printk(",dev_addr ");
 		acx100_log_mac_address(L_DEBUG, priv->dev_addr);
-		acxlog(L_DEBUG, ",bcast_addr ");
+		printk(",bcast_addr ");
 		acx100_log_mac_address(L_DEBUG, bcast_addr);
-		acxlog(L_DEBUG, "\n");
+		printk("\n");
 	}
 
 #if WE_DONT_WANT_TO_REJECT_MULTICAST
@@ -1145,7 +1113,6 @@ done:
  */
 static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
-	static UINT8 reassoc_b;
 	UINT8 *a;
 	p80211_hdr_t *p80211_hdr;
 	int wep_offset = 0;
@@ -1242,8 +1209,6 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		break;
 	case WLAN_FSTYPE_REASSOCREQ /* 0x02 */ :
 		if (ACX_MODE_2_MANAGED_STA != priv->macmode_joined) {
-			reassoc_b = 0;
-
 			memset(&alloc_p80211mgmt_req.a.assocreq, 0, 9 * 4);
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
@@ -1490,7 +1455,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	UINT8 *pDSparms;
 	UINT32 station;
 	UINT8 *a;
-	struct bss_info *ss;
+	struct bss_info *newbss;
 	UINT8 rate_count;
 	int i, max_rate = 0;
 
@@ -1533,6 +1498,8 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 		}
 	}
 
+	newbss = &priv->bss_table[priv->bss_table_count];
+
 	/* pSuppRates points to the Supported Rates element: info[1] is essid_len */
 	pSuppRates = &hdr->info[hdr->info[0x1] + 0x2];
 	/* pDSparms points to the DS Parameter Set */
@@ -1540,37 +1507,37 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 
 	/* Let's completely zero out the entry that we're
 	 * going to fill next in order to not risk any corruption. */
-	memset(&priv->bss_table[priv->bss_table_count], 0, sizeof(struct bss_info));
+	memset(newbss, 0, sizeof(struct bss_info));
 
 	/* copy the BSSID element */
-	MAC_COPY(priv->bss_table[priv->bss_table_count].bssid, hdr->a4.a3);
+	MAC_COPY(newbss->bssid, hdr->a4.a3);
 	/* copy the MAC address element (source address) */
-	MAC_COPY(priv->bss_table[priv->bss_table_count].mac_addr, hdr->a4.a2);
+	MAC_COPY(newbss->mac_addr, hdr->a4.a2);
 
 	/* copy the ESSID element */
 	if (hdr->info[0x1] <= IW_ESSID_MAX_SIZE) {
-		priv->bss_table[priv->bss_table_count].essid_len = hdr->info[0x1];
-		memcpy(priv->bss_table[priv->bss_table_count].essid,
-		       &hdr->info[0x2], hdr->info[0x1]);
-		priv->bss_table[priv->bss_table_count].essid[hdr->info[0x1]] = '\0';
+		newbss->essid_len = hdr->info[0x1];
+		memcpy(newbss->essid, &hdr->info[0x2], hdr->info[0x1]);
+		newbss->essid[hdr->info[0x1]] = '\0';
 	}
 	else {
 		acxlog(L_STD, "huh, ESSID overflow in scanned station data?\n");
 	}
 
-	priv->bss_table[priv->bss_table_count].channel = pDSparms[2];
-	priv->bss_table[priv->bss_table_count].wep = (ieee2host16(hdr->caps) & IEEE802_11_MGMT_CAP_WEP);
-	priv->bss_table[priv->bss_table_count].caps = ieee2host16(hdr->caps);
+	newbss->channel = pDSparms[2];
+	newbss->wep = (ieee2host16(hdr->caps) & IEEE802_11_MGMT_CAP_WEP);
+	newbss->caps = ieee2host16(hdr->caps);
 	rate_count = pSuppRates[1];
-	if (rate_count > 64)
-		rate_count = 64;
-	memcpy(priv->bss_table[priv->bss_table_count].supp_rates,
-	       &pSuppRates[2], rate_count);
-	priv->bss_table[priv->bss_table_count].sir = acx_signal_to_winlevel(mmt->phy_level);
-	priv->bss_table[priv->bss_table_count].snr = acx_signal_to_winlevel(mmt->phy_snr);
+	if (rate_count > 63)
+		rate_count = 63;
+	memcpy(newbss->supp_rates, &pSuppRates[2], rate_count);
+	newbss->supp_rates[rate_count] = 0;
+	/* now, one just uses strlen() on it to know how many rates are there */
+ 
+	newbss->sir = acx_signal_to_winlevel(mmt->phy_level);
+	newbss->snr = acx_signal_to_winlevel(mmt->phy_snr);
 
-	a = priv->bss_table[priv->bss_table_count].bssid;
-	ss = &priv->bss_table[priv->bss_table_count];
+	a = newbss->bssid;
 
 	acxlog(L_DEBUG, "Supported Rates:\n");
 	/* find max. transfer rate */
@@ -1585,14 +1552,16 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t *priv,
 	}
 
 	acxlog(L_STD | L_ASSOC,
-	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, BSSID %02X %02X %02X %02X %02X %02X, %s/%d%sMbps, Caps 0x%04x, SIR %d, SNR %d.\n",
+	       "%s: found and registered station %d: ESSID \"%s\" on channel %d, "
+	       "BSSID %02X:%02X:%02X:%02X:%02X:%02X, %s/%d%sMbps, "
+	       "Caps 0x%04x, SIR %d, SNR %d.\n",
 	       __func__,
 	       priv->bss_table_count,
-	       ss->essid, ss->channel,
+	       newbss->essid, newbss->channel,
 	       a[0], a[1], a[2], a[3], a[4], a[5],
-	       (ss->caps & IEEE802_11_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
+               (newbss->caps & IEEE802_11_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
 	       (int)(max_rate / 2), (max_rate & 1) ? ".5" : "",
-	       ss->caps, ss->sir, ss->snr);
+	       newbss->caps, newbss->sir, newbss->snr);
 
 	/* found one station --> increment counter */
 	priv->bss_table_count++;
@@ -2028,7 +1997,7 @@ int acx100_process_deauthenticate(wlan_fr_deauthen_t *req, wlandevice_t *priv)
 /* acx100_transmit_deauthen()
  * STATUS: should be ok, but UNVERIFIED.
  */
-int acx100_transmit_deauthen(char *a, client_t *clt, wlandevice_t *priv, UINT16 reason)
+int acx100_transmit_deauthen(const UINT8 *addr, client_t *clt, wlandevice_t *priv, UINT16 reason)
 {
 	TxData *hd;
 	struct deauthen_frame_body *payload;
@@ -2043,8 +2012,8 @@ int acx100_transmit_deauthen(char *a, client_t *clt, wlandevice_t *priv, UINT16 
 		return NOT_OK;
 	}
 
-	hdesc_header = tx_desc->host_desc;
-	hdesc_payload = tx_desc->host_desc + 1;
+	hdesc_header = tx_desc->fixed_size.s.host_desc;
+	hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct deauthen_frame_body *)hdesc_payload->data;
@@ -2056,7 +2025,7 @@ int acx100_transmit_deauthen(char *a, client_t *clt, wlandevice_t *priv, UINT16 
 		clt->used = (UINT8)1;
 		MAC_COPY(hd->da, clt->address);
 	} else {
-		MAC_COPY(hd->da, a);
+		MAC_COPY(hd->da, addr);
 	}
 	MAC_COPY(hd->sa, priv->dev_addr);
 	/* FIXME: this used to use dev_addr, but I think it should use
@@ -2125,8 +2094,8 @@ int acx100_transmit_authen1(wlandevice_t *priv)
 		return NOT_OK;
 	}
 
-	hdesc_header = tx_desc->host_desc;
-	hdesc_payload = tx_desc->host_desc + 1;
+	hdesc_header = tx_desc->fixed_size.s.host_desc;
+	hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2202,8 +2171,8 @@ int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 			return NOT_OK;
 		}
 
-		hdesc_header = tx_desc->host_desc;
-		hdesc_payload = tx_desc->host_desc + 1;
+		hdesc_header = tx_desc->fixed_size.s.host_desc;
+		hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 		hd = (TxData*)hdesc_header->data;
 		payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2287,8 +2256,8 @@ int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 
 	packet_len = WLAN_HDR_A3_LEN;
 
-	hdesc_header = tx_desc->host_desc;
-	hdesc_payload = tx_desc->host_desc + 1;
+	hdesc_header = tx_desc->fixed_size.s.host_desc;
+	hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2364,8 +2333,8 @@ int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 		return OK;
 	}
 
-	hdesc_header = tx_desc->host_desc;
-	hdesc_payload = tx_desc->host_desc + 1;
+	hdesc_header = tx_desc->fixed_size.s.host_desc;
+	hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2436,8 +2405,8 @@ int acx100_transmit_assoc_req(wlandevice_t *priv)
 
 	packet_len = WLAN_HDR_A3_LEN;
 
-	header = tx_desc->host_desc;      /* hostdescriptor for header */
-	payload = tx_desc->host_desc + 1; /* hostdescriptor for payload */
+	header = tx_desc->fixed_size.s.host_desc;      /* hostdescriptor for header */
+	payload = tx_desc->fixed_size.s.host_desc + 1; /* hostdescriptor for payload */
 
 	hd = (TxData *)header->data;
 	pCurrPos = (UINT8 *)payload->data;
@@ -2496,10 +2465,10 @@ int acx100_transmit_assoc_req(wlandevice_t *priv)
 	/* add rates */
 	*(UINT8 *)pCurrPos = (UINT8)1; /* Element ID */
 	pCurrPos += 1;
-	*(UINT8 *)pCurrPos = priv->rate_spt_len; /* Length */
+	*(UINT8 *)pCurrPos = priv->rate_supported_len; /* Length */
 	pCurrPos += 1;
-	memcpy(pCurrPos, priv->rate_support1, priv->rate_spt_len);
-	pCurrPos += priv->rate_spt_len;
+	memcpy(pCurrPos, priv->rate_supported, priv->rate_supported_len);
+	pCurrPos += priv->rate_supported_len;
 
 	/* calculate lengths */
 	packet_len += (int)pCurrPos - (int)payload->data;
@@ -2552,8 +2521,8 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 			return NOT_OK;
 		}
 
-		hdesc_header = tx_desc->host_desc;
-		hdesc_payload = tx_desc->host_desc + 1;
+		hdesc_header = tx_desc->fixed_size.s.host_desc;
+		hdesc_payload = tx_desc->fixed_size.s.host_desc + 1;
 
 		hd = (TxData *)hdesc_header->data;
 		payload = (struct disassoc_frame_body *)hdesc_payload->data;
@@ -2572,10 +2541,10 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 
 		payload->reason = host2ieee16(7);	/* "Class 3 frame received from nonassociated station." */
 
-		hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
+		hdesc_payload->length = cpu_to_le16(priv->rate_supported_len + 8);
 		hdesc_payload->data_offset = 0;
 
-		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
+		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_supported_len + 8);
 
 		/* FIXME: lengths missing! */
 		acx100_dma_tx_data(priv, tx_desc);
@@ -2714,7 +2683,7 @@ void acx100_ibssid_gen(wlandevice_t *priv, unsigned char *p_out)
 	UINT8 oct;
 
 	FN_ENTER;
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < ETH_ALEN; i++) {
 		/* store jiffies modulo 0xff */
 		jifmod = (UINT8)(jiffies % 0xff);
 		/* now XOR eax with this value */
@@ -2871,16 +2840,8 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 		       "%s: matching station FOUND (idx %d), JOINING (%02X %02X %02X %02X %02X %02X).\n",
 		       __func__, idx_found, a[0], a[1], a[2], a[3], a[4], a[5]);
 
-		if ( CHIPTYPE_ACX111 != priv->chip_type ) {
-		    acx100_join_bssid(priv);
-		} else {
-		    acx111_join_bssid(priv);
-		}
-
-		if ((UINT8)2 == priv->preamble_mode)
-			/* if Auto mode, then use Preamble setting which
-			 * the station supports */
-			priv->preamble_flag = (UINT8)((priv->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
+		acx_join_bssid(priv);
+		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc); /* e.g. shortpre */
 
 		if (ACX_MODE_0_IBSS_ADHOC != priv->macmode_chosen) {
 			acx100_transmit_authen1(priv);
@@ -2897,11 +2858,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 			acx100_ibssid_gen(priv, priv->address);
 			acx100_update_capabilities(priv);
 			priv->macmode_chosen = ACX_MODE_0_IBSS_ADHOC;
-			if ( CHIPTYPE_ACX111 != priv->chip_type ) {
-			    acx100_join_bssid(priv);
-			} else {
-			    acx111_join_bssid(priv);
-			}
+			acx_join_bssid(priv);
 			acx100_set_status(priv, ISTATUS_4_ASSOCIATED);
 		} else {
 			acxlog(L_STD | L_ASSOC,
@@ -2984,8 +2941,10 @@ void acx100_timer(unsigned long address)
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	acxlog(L_BINDEBUG | L_ASSOC, "%s: status = %d\n", __func__,
-	       priv->status);
+		priv->status);
+
 	if (OK != acx100_lock(priv, &flags)) {
+		FN_EXIT(0, 0);
 		return;
 	}
 
