@@ -50,6 +50,7 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <asm/io.h>
 
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
@@ -92,11 +93,12 @@ extern UINT8 acx_signal_determine_quality(UINT8 signal, UINT8 noise);
 #define ACX100_IOCTL_TX_ANT		ACX100_IOCTL + 0x09
 #define ACX100_IOCTL_SET_ED		ACX100_IOCTL + 0x0a
 #define ACX100_IOCTL_SET_CCA		ACX100_IOCTL + 0x0b
-#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0c
-#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0d
-#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0e
-#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x0f
-#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_SET_SCAN_CHAN_DELAY	ACX100_IOCTL + 0x0c
+#define ACX100_IOCTL_SET_PLED		ACX100_IOCTL + 0x0d
+#define ACX100_IOCTL_MONITOR		ACX100_IOCTL + 0x0e
+#define ACX100_IOCTL_TEST		ACX100_IOCTL + 0x0f
+#define ACX100_IOCTL_DBG_SET_MASKS	ACX100_IOCTL + 0x10
+#define ACX100_IOCTL_ACX111_INFO	ACX100_IOCTL + 0x11
 
 
 /* channel frequencies
@@ -113,56 +115,60 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_DEBUG,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_debug" },
+	name : "SetDebug" },
 #endif
 { cmd : ACX100_IOCTL_LIST_DOM,
 	set_args : 0,
 	get_args : 0,
-	name : "list_reg_domain" },
+	name : "ListRegDomain" },
 { cmd : ACX100_IOCTL_SET_DOM,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_reg_domain" },
+	name : "SetRegDomain" },
 { cmd : ACX100_IOCTL_GET_DOM,
 	set_args : 0,
 	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "get_reg_domain" },
+	name : "GetRegDomain" },
 { cmd : ACX100_IOCTL_SET_PREAMB,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_s_preamble" },
+	name : "SetSPreamble" },
 { cmd : ACX100_IOCTL_GET_PREAMB,
 	set_args : 0,
 	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "get_s_preamble" },
+	name : "GetSPreamble" },
 { cmd : ACX100_IOCTL_SET_ANT,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_antenna" },
+	name : "SetAntenna" },
 { cmd : ACX100_IOCTL_GET_ANT,
 	set_args : 0,
 	get_args : 0,
-	name : "get_antenna" },
+	name : "GetAntenna" },
 { cmd : ACX100_IOCTL_RX_ANT,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_rx_ant" },
+	name : "SetRxAnt" },
 { cmd : ACX100_IOCTL_TX_ANT,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_tx_ant" },
+	name : "SetTxAnt" },
 { cmd : ACX100_IOCTL_SET_ED,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_ed" },
+	name : "SetED" },
 { cmd : ACX100_IOCTL_SET_CCA,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_cca" },
+	name : "SetCCA" },
+{ cmd : ACX100_IOCTL_SET_SCAN_CHAN_DELAY,
+	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	get_args : 0,
+	name : "SetScanDelay" },
 { cmd : ACX100_IOCTL_SET_PLED,
 	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
-	name : "set_led_power" },
+	name : "SetLEDPower" },
 { cmd : ACX100_IOCTL_MONITOR,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
@@ -170,7 +176,7 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_TEST,
 	set_args : 0,
 	get_args : 0,
-	name : "test" },
+	name : "Test" },
 { cmd : ACX100_IOCTL_DBG_SET_MASKS,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	get_args : 0,
@@ -178,7 +184,7 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_ACX111_INFO,
 	set_args : 0,
 	get_args : 0,
-	name : "Acx111Info" }
+	name : "GetAcx111Info" }
 };
 
 /*------------------------------------------------------------------------------
@@ -210,7 +216,9 @@ static inline int acx100_ioctl_commit(struct net_device *dev,
 
 static inline int acx100_ioctl_get_name(struct net_device *dev, struct iw_request_info *info, char *cwrq, char *extra)
 {
-	const char * const protocol_name = "IEEE 802.11b+";
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	const char * const protocol_name =
+		(CHIPTYPE_ACX100 == priv->chip_type) ? "IEEE 802.11b+" : "IEEE 802.11g+";
 	acxlog(L_IOCTL, "Get Name ==> %s\n", protocol_name);
 	strcpy(cwrq, protocol_name);
 	return 0;
@@ -423,7 +431,7 @@ static inline int acx100_ioctl_set_sens(struct net_device *dev, struct iw_reques
 		priv->set_mask |= GETSET_SENSITIVITY;
 		return -EINPROGRESS;
 	} else {
-		printk("ERROR: don't know how to set sensitivity for this radio type, please try to add that!\n");
+		printk("ERROR: don't know how to modify sensitivity for this radio type, please try to add that!\n");
 		return -EINVAL;
 	}
 }
@@ -495,7 +503,11 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
 		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
 		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
-		acx100_scan_chan(priv);
+		if(priv->chip_type == CHIPTYPE_ACX100) {
+			acx100_scan_chan(priv);
+		} else if(priv->chip_type == CHIPTYPE_ACX111) {
+			acx111_scan_chan(priv);
+		}
 		result = -EINPROGRESS;
 	} else if (!memcmp(off, ap, ETH_ALEN)) {
 		/* "off" == 00:00:00:00:00:00 */
@@ -512,7 +524,11 @@ static inline int acx100_ioctl_set_ap(struct net_device *dev,
                         	} else {
 					MAC_COPY(priv->ap, ap);
 					acxlog(L_IOCTL, "Forcing reassociation\n");
-					acx100_scan_chan(priv);
+					if(priv->chip_type == CHIPTYPE_ACX100) {
+						acx100_scan_chan(priv);
+					} else if(priv->chip_type == CHIPTYPE_ACX111) {
+						acx111_scan_chan(priv);
+					}
 					result = -EINPROGRESS;
 					goto end;
 				}
@@ -616,7 +632,13 @@ static inline int acx100_ioctl_set_scan(struct net_device *dev, struct iw_reques
 		goto end;
 	}
 
-	acx100_scan_chan(priv);
+	if(priv->chip_type == CHIPTYPE_ACX100) {
+		acx100_scan_chan(priv);
+	} else if(priv->chip_type == CHIPTYPE_ACX111) {
+		acx111_scan_chan(priv);
+	}
+
+
 	priv->scan_start = jiffies;
 	priv->scan_running = 1;
 	result = 0;
@@ -2569,6 +2591,28 @@ end:
 	return result;
 }
 
+static inline int acx100_ioctl_set_scan_chan_delay(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	unsigned long flags;
+	int err;
+	int result = -EINVAL;
+
+	if (0 != (err = acx100_lock(priv, &flags))) {
+		result = err;
+		goto end;
+	}
+
+	(void)printk("current scan channel delay: %dms\n", priv->scan_probe_delay);
+	priv->scan_probe_delay = (UINT16)*extra;
+	(void)printk("new current scan channel delay: %dms\n", (UINT16)*extra);
+	acx100_unlock(priv, &flags);
+	result = 0;
+
+end:
+	return result;
+}
+
 static inline int acx100_ioctl_set_led_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
@@ -2678,6 +2722,7 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_tx_antenna,
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
+	(iw_handler) acx100_ioctl_set_scan_chan_delay,
 	(iw_handler) acx100_ioctl_set_led_power,
 	(iw_handler) acx100_ioctl_wlansniff,
 	(iw_handler) acx100_ioctl_unknown11,
@@ -3039,6 +3084,10 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		
 	case ACX100_IOCTL_SET_CCA:
 		acx100_ioctl_set_cca(dev, NULL, NULL, iwr->u.name);
+		break;
+		
+	case ACX100_IOCTL_SET_SCAN_CHAN_DELAY:
+		acx100_ioctl_set_scan_chan_delay(dev, NULL, NULL, iwr->u.name);
 		break;
 		
 	case ACX100_IOCTL_SET_PLED:

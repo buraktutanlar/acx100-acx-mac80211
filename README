@@ -426,14 +426,14 @@ Trying to use NFS? use options 'rsize=1024,wsize=1024' in /etc/fstab .
 --- DEBUGGING / LOGGING ---
 
 Debug/log levels can be adapted by setting the module's "debug" load parameter
-and/or via the "iwpriv set_debug" command and/or the default log value
+and/or via the "iwpriv SetDebug" command and/or the default log value
 (variable "debug") in src/acx100.c.
 A good default value after having managed to get the driver to run would be
 0xb (thus using L_STD|L_INIT|L_ASSOC debug channels, see include/acx100.h).
 
 Example:
 insmod src/acx_pci.o ... debug=0xffff
-iwpriv wlan0 set_debug 0xffff
+iwpriv wlan0 SetDebug 0xffff
 
 If you want to prevent log messages from flooding your tty,
 then use setterm -msg or setterm -msglevel.

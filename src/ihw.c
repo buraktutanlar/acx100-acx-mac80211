@@ -69,6 +69,7 @@ void acx100_dump_bytes(void *,int);
  *
  ****************************************************************************/
 
+#ifndef IO_AS_MACROS
 /*----------------------------------------------------------------
 * acx100_read_reg32
 *
@@ -157,13 +158,13 @@ inline UINT8 acx100_read_reg8(wlandevice_t *priv, UINT offset)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg32(wlandevice_t *priv, UINT offset, UINT valb)
+inline void acx100_write_reg32(wlandevice_t *priv, UINT offset, UINT val)
 {
 #if ACX_IO_WIDTH == 32
-	writel(valb, priv->iobase + offset);
+	writel(val, priv->iobase + offset);
 #else 
-	writew(valb & 0xffff, priv->iobase + offset);
-	writew(valb >> 16, priv->iobase + offset + 2);
+	writew(val & 0xffff, priv->iobase + offset);
+	writew(val >> 16, priv->iobase + offset + 2);
 #endif
 }
 
@@ -184,9 +185,9 @@ inline void acx100_write_reg32(wlandevice_t *priv, UINT offset, UINT valb)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg16(wlandevice_t *priv, UINT offset, UINT16 valb)
+inline void acx100_write_reg16(wlandevice_t *priv, UINT offset, UINT16 val)
 {
-	writew(valb, priv->iobase + offset);
+	writew(val, priv->iobase + offset);
 }
 
 /*----------------------------------------------------------------
@@ -206,10 +207,11 @@ inline void acx100_write_reg16(wlandevice_t *priv, UINT offset, UINT16 valb)
 * Comment:
 *
 *----------------------------------------------------------------*/
-inline void acx100_write_reg8(wlandevice_t *priv, UINT offset, UINT valb)
+inline void acx100_write_reg8(wlandevice_t *priv, UINT offset, UINT val)
 {
-	writeb(valb, priv->iobase + offset);
+	writeb(val, priv->iobase + offset);
 }
+#endif
 
 /*****************************************************************************
  * 
@@ -456,7 +458,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 
 	if(priv->irq_status & 0x200) {
 		acxlog((L_BINDEBUG | L_CTL), "irq status var is not empty: 0x%X\n", priv->irq_status);
-		//goto done;
+		/* goto done; */
 		priv->irq_status ^= 0x200;
 		acxlog((L_BINDEBUG | L_CTL), "irq status fixed to: 0x%X\n", priv->irq_status);
 	}
@@ -482,27 +484,25 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		timeout = 120000;
 	}
 	timeout *= 20;
-	if (timeout) {
-		for (counter = timeout; counter > 0; counter--) {
-			/* it's a busy wait loop, but we're supposed to be
-			 * fast here, so better don't schedule away here?
-			 * In theory, yes, but the timeout can be HUGE,
-			 * so better schedule away sometimes */
-			if (!priv->irqs_active && (irqtype =
-			     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
+	for (counter = timeout; counter > 0; counter--) {
+		/* it's a busy wait loop, but we're supposed to be
+		 * fast here, so better don't schedule away here?
+		 * In theory, yes, but the timeout can be HUGE,
+		 * so better schedule away sometimes */
+		if (!priv->irqs_active && (irqtype =
+		     acx100_read_reg16(priv, priv->io[IO_ACX_IRQ_STATUS_NON_DES])) & 0x200) {
 
-				acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
-				break;
-			} 
-			if(priv->irqs_active && (irqtype = priv->irq_status & 0x200)) {
-				priv->irq_status ^= 0x200;
-				break;
-			}
+			acx100_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], 0x200);
+			break;
+		} 
+		if(priv->irqs_active && (irqtype = priv->irq_status & 0x200)) {
+			priv->irq_status ^= 0x200;
+			break;
+		}
 
-			if (counter % 30000 == 0)
-			{
-				acx100_schedule(HZ / 50);
-			}
+		if (counter % 30000 == 0)
+		{
+			acx100_schedule(HZ / 50);
 		}
 	}
 
@@ -518,7 +518,8 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 		acxlog(L_CTL,
 			"Polling for an IRQ failed with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
 			irqtype, cmd_status, priv->irqs_active, priv->irq_status);
-		dump_stack();
+		if (debug & L_CTL)
+			dump_stack();
 		goto done;
 	}
 
@@ -530,7 +531,8 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 				(timeout - counter) * 50,
 				cmd,
 				cmd_status);
-		dump_stack();
+		if (debug & L_CTL)
+			dump_stack();
 	} else	{
 		/*** read in result parameters if needed ***/
 		if (pcmdparam != NULL && paramlen != 0) {

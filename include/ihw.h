@@ -50,12 +50,37 @@ typedef struct mac {
 	UINT16 valb;
 } mac_t;
 
+#define IO_AS_MACROS
+#ifdef IO_AS_MACROS
+#if ACX_IO_WIDTH == 32
+#define acx100_read_reg32(priv, offset) \
+	readl(priv->iobase + offset)
+#define acx100_write_reg32(priv, offset, val) \
+	writel(val, priv->iobase + offset)
+#else
+#define acx100_read_reg32(priv, offset) \
+	readw(priv->iobase + offset) \
+	+ (readw(priv->iobase + offset + 2) << 16)
+#define acx100_write_reg32(priv, offset, val) \
+	writew(val & 0xffff, priv->iobase + offset) \
+	writew(val >> 16, priv->iobase + offset + 2)
+#endif
+#define acx100_read_reg16(priv, offset) \
+	readw(priv->iobase + offset)
+#define acx100_write_reg16(priv, offset, val) \
+	writew(val, priv->iobase + offset)
+#define acx100_read_reg8(priv, offset) \
+	readb(priv->iobase + offset)
+#define acx100_write_reg8(priv, offset, val) \
+	writeb(val, priv->iobase + offset)
+#else
 UINT32 acx100_read_reg32(wlandevice_t *priv, UINT valb);
 void acx100_write_reg32(wlandevice_t *priv, UINT vala, UINT valb);
 UINT16 acx100_read_reg16(wlandevice_t *priv, UINT valb);
 void acx100_write_reg16(wlandevice_t *priv, UINT vala, UINT16 valb);
 UINT8 acx100_read_reg8(wlandevice_t *priv, UINT valb);
 void acx100_write_reg8(wlandevice_t *priv, UINT vala, UINT valb);
+#endif
 
 void acx100_get_info_state(wlandevice_t *priv);
 void acx100_get_cmd_state(wlandevice_t *priv);

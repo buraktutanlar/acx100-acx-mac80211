@@ -97,6 +97,7 @@ extern int acx100_debug_func_indent;
 	do { \
 		if (debug & L_FUNC) { \
 			int i; \
+			printk("%ld ", jiffies); \
 			for (i = 0; i < acx100_debug_func_indent; i++) \
 				printk(" "); \
 			printk("==> %s\n", __func__); \
@@ -109,6 +110,7 @@ extern int acx100_debug_func_indent;
 		if (debug & L_FUNC) { \
 			int i; \
 			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
+			printk("%ld ", jiffies); \
 			for (i = 0; i < acx100_debug_func_indent; i++) \
 				printk(" "); \
 			if (p) { \

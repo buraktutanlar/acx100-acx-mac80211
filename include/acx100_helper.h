@@ -446,6 +446,7 @@ void acx100_set_probe_request_template(wlandevice_t *priv);
 void acx100_scan_chan(wlandevice_t *priv);
 void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s);
 void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
+void acx111_scan_chan(wlandevice_t *priv);
 int acx100_set_rxconfig(wlandevice_t *priv);
 int acx100_load_radio(wlandevice_t *priv);
 int acx100_read_proc(char *page, char **start, off_t offset, int count,

@@ -2622,7 +2622,7 @@ void acx100_get_random(UINT8 *s, UINT16 stack)
 		ran = (ran * 0xCCCCCCCD) >> 3;
 	}
 
-	/* FIXME: Mmmm, strange ... is it really meant to just take some random part of the stack ?? */
+	/* Mmmm, strange ... is it really meant to just take some random part of the stack?? Hmm, why not? After all it's a random number generator... */
 	len = strlen(var_8);
 
 	/* generate a seed */
@@ -2793,7 +2793,7 @@ void acx100_complete_dot11_scan(wlandevice_t *priv)
 			 */
 			idx_found = idx;
 			found_station = 1;
-			acxlog(L_ASSOC, "found station with empty or single-space (hidden?) SSID, considering for association attempt.\n");
+			acxlog(L_ASSOC, "found station with empty or single-space (hidden?) SSID, considering for assoc attempt.\n");
 			/* ...and keep looking for better matches */
 		}
 		else {

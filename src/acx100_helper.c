@@ -58,6 +58,7 @@
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
+#include <asm/io.h>
 #include <linux/proc_fs.h>
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
@@ -1760,7 +1761,7 @@ success:
 	return result;
 }
 
-int acx111_init_packet_templates(wlandevice_t *priv, memmap_t * mm)
+int acx111_init_packet_templates(wlandevice_t *priv)
 {
 	int result = 0;
 
@@ -2014,8 +2015,10 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 				acxlog(L_ASSOC, "status was ASSOCIATED -> sending disassoc request.\n");
 				acx100_transmit_disassoc(NULL, priv);
 			}
+			/* need to reset some other stuff as well */
 			acxlog(L_DEBUG, "resetting bssid\n");
 			MAC_FILL(priv->bssid, 0x0);
+			priv->set_mask |= SET_TEMPLATES|SET_STA_LIST;
 			acx100_set_status(priv, ISTATUS_0_STARTED);
 		}
 	}
@@ -2076,7 +2079,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			memset(cca, 0, sizeof(priv->cca));
 			acx100_interrogate(priv, cca, ACX100_RID_DOT11_CURRENT_CCA_MODE);
 			priv->cca = cca[4];
-			acxlog(L_INIT, "Got Channel Clear Assessment (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) value %d\n", priv->cca);
+			acxlog(L_INIT, "Got Channel Clear Assessment (CCA) value %d\n", priv->cca);
 			priv->get_mask &= ~GETSET_CCA;
 		}
 
@@ -2092,7 +2095,6 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	}
 
 	if (0 != (priv->set_mask & (SET_TEMPLATES|GETSET_ALL))) {
-		priv->set_mask &= ~SET_TEMPLATES;
 		if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 			if (0 == acx100_set_beacon_template(priv)) {
 				acxlog(L_STD,
@@ -2103,6 +2105,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 					   "acx100_set_probe_response_template failed.\n");
 			}
 		}
+		priv->set_mask &= ~SET_TEMPLATES;
 	}
 	if (0 != (priv->set_mask & (SET_STA_LIST|GETSET_ALL))) {
 		/* TODO insert a sweet if here */
@@ -2183,7 +2186,7 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		if ((RADIO_RFMD_11 == priv->radio_type) || (RADIO_MAXIM_0D == priv->radio_type)) {
 			acx100_write_phy_reg(priv, 0x30, priv->sensitivity);
 		} else {
-			acxlog(L_STD, "ERROR: don't know how to set sensitivity for this radio type, please try to add that!\n");
+			acxlog(L_STD, "ERROR: don't know how to modify sensitivity for this radio type, please try to add that!\n");
 		}
 		priv->set_mask &= ~GETSET_SENSITIVITY;
 	}
@@ -2968,7 +2971,7 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 		   2. create station context and create dma regions
 		   3. init wep default keys 
 		*/
-		if (0 == acx111_init_packet_templates(priv,&pkt)) goto done;
+		if (0 == acx111_init_packet_templates(priv)) goto done;
 
 		if (0 != acx111_create_dma_regions(priv)) {
 			acxlog(L_STD, "acx111_create_dma_regions failed.\n");
@@ -3269,7 +3272,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 	
 	FN_ENTER;
 
-	acxlog(L_STD, "WARNING: I would write to EEPROM now. Since I really DON'T want to do it unless you know what you're doing, I will abort that now.\n");
+	acxlog(L_STD, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing, I will abort that now.\n");
 	return 0;
 	
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO line

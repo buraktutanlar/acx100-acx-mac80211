@@ -127,7 +127,7 @@ fi
 fi
 
 # for notebook use - a power LED is sooo useless anyway ;-))
-#test -n "$IWPRIV" && "$IWPRIV" $DEV set_led_power 0
+#test -n "$IWPRIV" && "$IWPRIV" $DEV SetLEDPower 0
 
 
 if test $USE_DHCP -eq 1; then

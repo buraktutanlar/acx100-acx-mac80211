@@ -2,40 +2,42 @@ Usage: iwpriv wlan0/eth0 COMMAND OPTION1 [OPTION2] [...]
 
 Commands ("iwpriv wlan0"):
 
-set_debug - sets debugging/logging level (see L_* #defines in include/acx100.h)
+SetSebug - sets debugging/logging level (see L_* #defines in include/acx100.h)
 Default: 0x009b
 "iwpriv wlan0 set_debug 0x000b" (L_STD | L_INIT | L_ASSOC)
 
-list_reg_domain - lists the available regulatory domain settings in syslog
+ListRegDmain - lists the available regulatory domain settings in syslog
 "iwpriv wlan0 list_reg_domain", "dmesg"
 
-set_reg_domain - sets the value of the regulatory domain setting
+SetRegDomain - sets the value of the regulatory domain setting
 Default: depending on card EEPROM data
 "iwpriv wlan0 set_reg_domain 3", "dmesg"
 
-get_reg_domain - returns the value of the current regulatory domain setting
+GetRegDomain - returns the value of the current regulatory domain setting
 "iwpriv wlan0 get_reg_domain", "dmesg"
 
-set_s_preamble - Activates the Short Preamble transfer (slightly faster rates)
+SetSPreamble - Activates the Short Preamble transfer (slightly faster rates)
 Default: off (better compatibility)
 "iwpriv wlan0 set_s_preamble 1", "dmesg"
 
-get_s_preamble - returns the Short Preamble transfer setting
+GetSPreamble - returns the Short Preamble transfer setting
 "iwpriv wlan0 get_s_preamble", "dmesg"
 
-set_antenna, get_antenna, set_rx_ant, set_tx_ant - experimental antenna command
+SetAntenna, get_antenna, set_rx_ant, set_tx_ant - experimental antenna command
 
-set_ed - change Energy Detect threshold setting
+SetED - change Energy Detect threshold setting
 Default: 0x70 == 112
 "iwpriv wlan0 set_ed 150", "dmesg"
 
-set_cca - change Channel Clear Assessment setting
+SetCCA - change Channel Clear Assessment setting
 Default: 0x0d == 13
 "iwpriv wlan0 set_cca 15", "dmesg"
 
-set_led_power - change power LED setting (save power)
+SetLEDPower - change power LED setting (save power)
 Default: on
 "iwpriv wlan0 set_led_power 0", "dmesg"
+
+SetScanDelay - sets time (in ms) to wait per channel on a scan
 
 monitor - activate Kismet monitor mode (Orinoco card type)
 Default: off
