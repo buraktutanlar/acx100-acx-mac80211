@@ -51,8 +51,9 @@ fi
 
 MODULE_AT="${SCRIPT_AT}/../src/acx100_pci.o"
 
-if ! [[ -r $MODULE_AT ]]; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx100_pci.o, relative to the script's location. Bailing..."; exit 1; fi 
+if ! [[ -r $MODULE_AT ]]; then echo "Module not found or not readable. Have you built it? This script expects it to be at ../src/acx100_pci.o, relative to the script's location. Bailing..."; exit 1; fi
 
+# FIRMWARE_AT has to be given as an absolute path!!
 FIRMWARE_AT="${SCRIPT_AT}/../firmware"
 
 if ! [[ -r "$FIRMWARE_AT/WLANGEN.BIN" ]]; then echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be at ../firmware/WLANGEN.BIN, relative to the script's location. Bailing..."; exit 1; fi
@@ -96,7 +97,7 @@ fi
 echo Trying to join or setup ESSID $ESSID.
 $IWCONF $DEV essid $ESSID
 if [[ $? != 0 ]]; then echo Failed.; fi
-  
+
 if [[ -n "$MODE" ]]; then
   echo Setting mode to $MODE.
   $IWCONF $DEV mode $MODE

@@ -2,6 +2,16 @@ Changes:
 ========
 
 
+2003.10.07 - 0.2.0pre4 released
+- fix for APs with hidden ESSID: make sure we use user configured ESSID here
+- fix Tx ring buffer overflow
+- probable fix for deauthen packet receiving resulting in dropped link
+- fix module unload crash uncovered by card hotplug functionality
+- show current network mode only after getting associated
+- slight optimizations
+- card EEPROM ID cleanup
+- improve README
+
 2003.09.30 - 0.2.0pre3 released
 - fix broken regulatory domain EEPROM reading
 - replay WEP settings

@@ -131,6 +131,12 @@ static inline int acx100_ioctl_set_freq(struct iwreq *iwr, wlandevice_t *wlandev
 	acxlog(L_IOCTL, "Set Frequency <= %i (%i)\n",
 	       iwr->u.freq.m, iwr->u.freq.e);
 
+	if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
+	{
+		transmit_disassoc(NULL,wlandev);
+	}
+	AcxSetStatus(wlandev,ISTATUS_0_STARTED);
+
 	if (iwr->u.freq.e == 0 && iwr->u.freq.m <= 1000) {
 		/* Setting by channel number */
 		channel = iwr->u.freq.m;
@@ -200,7 +206,7 @@ static inline int acx100_ioctl_set_freq(struct iwreq *iwr, wlandevice_t *wlandev
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_mode(struct iwreq *iwr, wlandevice_t *wlandev)
 {
-	struct scan s;
+	/* struct scan s; */
 	unsigned long flags;
 
 	acx100_lock(wlandev, &flags);
@@ -224,16 +230,23 @@ static inline int acx100_ioctl_set_mode(struct iwreq *iwr, wlandevice_t *wlandev
 		/* This is the same as is done when changing channels,
 		   it seems that this way network gets up after mode change.
 		   I don't think this is the way it should work, so FIXME */
-
+/*
 		s.count = 1;
 		s.start_chan = wlandev->channel;
 		s.flags = 0x8000;
-		s.max_rate = 20; /* 2 Mbps */
+		s.max_rate = 20; // 2 Mbps 
 		s.options = 0x1;
 		s.chan_duration = 50;
 		s.max_probe_delay = 100;
 
 		acx100_scan_chan_p(wlandev, &s);
+*/
+	if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
+	{
+		transmit_disassoc(NULL,wlandev);
+	}
+		AcxSetStatus(wlandev,ISTATUS_0_STARTED);
+
 	}
 
 	acx100_unlock(wlandev, &flags);
@@ -412,13 +425,22 @@ static inline int acx100_ioctl_set_essid(struct iwreq *iwr, wlandevice_t *wlande
 
 	if (wlandev->ifup)
 	{
-		if ((wlandev->macmode == WLAN_MACMODE_ESS_STA /* 2 */ )
-		    || (wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ )) {
+//		if ((wlandev->macmode == WLAN_MACMODE_ESS_STA /* 2 */ )
+//		    || (wlandev->macmode == WLAN_MACMODE_NONE /* 0 */ )) {
 			/* we changed our ESSID, so let's initiate a new
 			 * scanning process to join BSSIDs with matching
 			 * ESSID */
-			acx100_scan_chan(wlandev);
-		}
+
+//			acx100_scan_chan(wlandev);
+		
+//		}
+		if (wlandev->iStatus == ISTATUS_4_ASSOCIATED)
+		{
+			transmit_disassoc(NULL,wlandev);
+		} 
+		AcxSetStatus(wlandev,ISTATUS_0_STARTED);
+		acx100_scan_chan(wlandev);
+
 	}
 
 	acx100_unlock(wlandev, &flags);
@@ -582,7 +604,7 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 {
 	int index;
 	unsigned long flags;
-	
+
 	acx100_lock(hw, &flags);
 
 	acxlog(L_IOCTL,
@@ -841,7 +863,7 @@ static inline int acx100_ioctl_get_txpow(struct iwreq *iwr, wlandevice_t *hw)
 		txpow = "16.5";
 		txpowval = 16;
 		break;
-	
+
 	case 1:
 		txpow = "18";
 		txpowval = 18;
@@ -1232,7 +1254,7 @@ static inline int acx100_ioctl_get_fw_stats(wlandevice_t *hw)
 	UINT dot11_def_key_mib;
 	UINT wep_key_not_found;
 	UINT wep_decrypt_fail;
-	
+
 	} tmp;
 //	int i;
 	unsigned long flags;
@@ -1284,14 +1306,13 @@ static inline int acx100_ioctl_get_fw_stats(wlandevice_t *hw)
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_unknown11(wlandevice_t *hw)
 {
-	int i;
 	unsigned long flags;
 	client_t client;
 	acx100_lock(hw, &flags);
 
 	transmit_disassoc(&client,hw);
 	acx100_unlock(hw, &flags);
-	
+
 	return 0;
 }
 
@@ -1317,11 +1338,11 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 	int *parms = (int*) iwr->u.name;
 	int enable = parms[0] > 0;
 	unsigned long flags;
-	
+
 	acx100_lock(hw, &flags);
 
 	hw->monitor = parms[0];
-	
+
 	switch (parms[0])
 	{
 	case 0:
@@ -1334,7 +1355,7 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 		hw->netdev->type = ARPHRD_IEEE80211;
 		break;
 	}
-	
+
 	acx100_set_rxconfig(hw);
 
 	if (enable)
@@ -1342,7 +1363,7 @@ static inline int acx100_ioctl_wlansniff(wlandevice_t *hw, struct iwreq *iwr)
 		hw->channel = parms[1];
 		acx100_issue_cmd(hw, ACX100_CMD_ENABLE_RX, &(hw->channel), 0x1, 5000);	
 	}
-	
+
 	acx100_unlock(hw, &flags);
 
 	return 0;
@@ -1534,7 +1555,7 @@ static inline int acx100_ioctl_set_retry(wlandevice_t *hw, struct iwreq *iwr)
 	long_retry[0x4] = hw->long_retry;
 	acx100_configure(hw, &short_retry, ACX100_RID_DOT11_SHORT_RETRY_LIMIT);
 	acx100_configure(hw, &long_retry, ACX100_RID_DOT11_LONG_RETRY_LIMIT);
-	
+
 	acx100_unlock(hw, &flags);
 
 	return 0;
@@ -1973,7 +1994,8 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	case SIOCGIWMODE:
 		acxlog(L_IOCTL, "Get Mode => %ld\n", hw->macmode);
 
-		if (!hw->ifup)
+		if (hw->iStatus != ISTATUS_4_ASSOCIATED)
+		/* if (!hw->ifup) */
 		{ /* card not up yet, so for now indicate the mode we want,
 		     not the one we are in */
 			if (hw->mode == 0)

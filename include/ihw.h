@@ -58,8 +58,6 @@ void acx100_write_reg8(wlandevice_t * act, UINT vala, UINT valb);
 void acx100_get_cmd_state(wlandevice_t * act);
 void acx100_write_cmd_type(wlandevice_t * act, UINT16 vala);
 void acx100_write_cmd_status(wlandevice_t * act, UINT vala);
-int acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int valb);
-int acx100_read_cmd_param(wlandevice_t * hw, memmap_t * pdr, int valb);
 
 int acx100_issue_cmd(wlandevice_t * wlandev, UINT command, void *hw,
 		    int valb, UINT32 valc);

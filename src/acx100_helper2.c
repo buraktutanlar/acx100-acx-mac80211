@@ -318,6 +318,7 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	UINT16 ftype;
 	UINT fstype;
 	p80211_hdr_t *p80211_hdr;
+	int result = 0;
 
 	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf ;
 
@@ -331,49 +332,51 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	fstype = WLAN_GET_FC_FSTYPE(p80211_hdr->a3.fc);
 	acxlog(L_STATE, "%s: UNVERIFIED\n", __func__);
 
-	if (ftype == WLAN_FTYPE_DATA && fstype == WLAN_FSTYPE_DATAONLY) {
-		if (hw->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
-			return process_data_frame_master(rxdesc, hw);
-		} else if (hw->iStatus == ISTATUS_4_ASSOCIATED) {
-			return process_data_frame_client(rxdesc, hw);
-		}
-	} else {
-		switch (ftype) {
+	switch (ftype) {
 		case WLAN_FTYPE_MGMT:
-			return process_mgmt_frame(rxdesc, hw);
+			result = process_mgmt_frame(rxdesc, hw);
+			break;
 		case WLAN_FTYPE_CTL:
 			if (fstype != WLAN_FSTYPE_PSPOLL)
-				return 0;
+				result = 0;
+			else
+				result = 1;
 			/*   this call is irrelevant, since
 			 *   process_class_frame is a stub, so return
 			 *   immediately instead.
 			 * return process_class_frame(pb, hw, 3); */
-			return 1;
+			break;
 		case WLAN_FTYPE_DATA:
 			/* binary driver did ftype-1 to appease jump
 			 * table layout */
-			switch (ftype) {
-			case WLAN_FSTYPE_DATA_CFACK:
-			case WLAN_FSTYPE_DATA_CFPOLL:
-			case WLAN_FSTYPE_DATA_CFACK_CFPOLL:
-			case WLAN_FSTYPE_CFPOLL:
-			case WLAN_FSTYPE_CFACK_CFPOLL:
+			if (fstype == WLAN_FSTYPE_DATAONLY) 
+			{
+				if (hw->macmode == WLAN_MACMODE_ESS_AP /* 3 */ ) {
+					result = process_data_frame_master(rxdesc, hw);
+				} else if (hw->iStatus == ISTATUS_4_ASSOCIATED) {
+					result = process_data_frame_client(rxdesc, hw); 				}
+			} else switch (ftype) {
+				case WLAN_FSTYPE_DATA_CFACK:
+				case WLAN_FSTYPE_DATA_CFPOLL:
+				case WLAN_FSTYPE_DATA_CFACK_CFPOLL:
+				case WLAN_FSTYPE_CFPOLL:
+				case WLAN_FSTYPE_CFACK_CFPOLL:
 				/*   see above.
 				   process_class_frame(rxdesc, hw, 3); */
 /* FIXME: is this a binary driver code flaw, the breaks are not present!?!?
  * indeed, this might be the case. */
-			case WLAN_FSTYPE_NULL:
-				process_NULL_frame(rxdesc, hw, 3);
+				case WLAN_FSTYPE_NULL:
+					process_NULL_frame(rxdesc, hw, 3);
 				/* FIXME: same here, see above */
-			case WLAN_FSTYPE_CFACK:
-			default:
-				break;
+				case WLAN_FSTYPE_CFACK:
+				default:
+					break;
 			}
+			break;
 		default:
 			break;
-		}
 	}
-	return 0;
+	return result;
 }
 
 UINT16 CurrentAID = 1;
@@ -1590,9 +1593,12 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 
 	acx100_log_mac_address(L_ASSOC, hw->dev_addr);
 	acx100_log_mac_address(L_ASSOC, hdr->a3.a1);
-	if (!acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1))
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a2);
+	acx100_log_mac_address(L_ASSOC, hdr->a3.a3);
+	acx100_log_mac_address(L_ASSOC, hw->bssid);
+	if (!acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1) &&
+			!acx100_is_mac_address_equal(hw->bssid, hdr->a3.a1))
 		return 1;
-
 	if (hw->mode == 0)
 		return 0;
 
@@ -1603,7 +1609,9 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 			return 0;
 		}
 	}
+	acxlog(L_ASSOC,"Algorithm is ok\n");
 	currclt = acx_get_client_from_sta_hash_tab(hdr->a3.a2);
+	acxlog(L_ASSOC,"Got current client for sta hash tab\n");
 	clt = NULL;
 	while (currclt) {
 		if (!memcmp(hdr->a3.a2, currclt->address, WLAN_ADDR_LEN)) {
@@ -1612,10 +1620,14 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 		}
 		currclt = currclt->next;
 	}
+	acxlog(L_ASSOC,"Found acceptable client\n");
 	/* create a new entry if station isn't registered yet */
 	if (!clt) {
 		if (!(clt = sta_list_add(hdr->a3.a2)))
+		{
+			acxlog(L_ASSOC,"Could not allocate room for this client\n");
 			return 0;
+		}
 
 		memcpy(clt->address, hdr->a3.a2, WLAN_ADDR_LEN);
 		clt->used = 1;
@@ -1683,7 +1695,8 @@ int process_authen(wlan_fr_authen_t *req, wlandevice_t *hw)
 * Arguments:
 *
 * Returns:
-*
+*	0 on all is good
+*	1 on any error
 * Side effects:
 *
 * Call context:
@@ -1708,12 +1721,28 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
+	printk("Entering process_deauthen\n");
 	hdr = arg_0->hdr;
 
 	if (hdr->a3.fc & 0x300)
-		return 1;
-
+	{
+		result = 1;
+		goto end;
+	}
 	addr = hdr->a3.a2;
+	if (memcmp(addr,hw->dev_addr,WLAN_ADDR_LEN))
+	{
+		/* OK, we've been asked to leave the ess. Do we 
+		 * ask to return or do we leave quietly? I'm 
+		 * guessing that since we are still up and 
+		 * running we should attempt to rejoin, from the 
+		 * starting point. So:
+		 */
+		AcxSetStatus(hw,ISTATUS_2_WAIT_AUTH);
+		result = 0;
+		goto end;
+	}			
+
 	client = acx_get_client_from_sta_hash_tab(addr);
 
 	if (client == NULL) {
@@ -1839,9 +1868,9 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 	hd->sequence_control = 0;
 
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER,
-	       "<transmit_deauthen>sta=%02X:%02X:%02X:%02X:%02X:%02X\n",
+	       "<transmit_deauthen>sta=%02X:%02X:%02X:%02X:%02X:%02X for %d\n",
 	       hd->da[0x0], hd->da[0x1], hd->da[0x2],
-	       hd->da[0x3], hd->da[0x4], hd->da[0x5]);
+	       hd->da[0x3], hd->da[0x4], hd->da[0x5],reason);
 
 	hdesc_header->length = WLAN_HDR_A3_LEN;
 	hdesc_header->val0x4 = 0;
@@ -2252,8 +2281,8 @@ int transmit_assoc_req(wlandevice_t *hw)
 
 	*(UINT8 *)pCurrPos = 0; /* Element ID */
 	pCurrPos += 1;
-	*(UINT8 *)pCurrPos = strlen(hw->essid_found); /* Length */
-	memcpy(&pCurrPos[1], hw->essid_found, pCurrPos[0]);
+	*(UINT8 *)pCurrPos = strlen(hw->essid_for_assoc); /* Length */
+	memcpy(&pCurrPos[1], hw->essid_for_assoc, pCurrPos[0]);
 	pCurrPos += 1 + pCurrPos[0];
 
 	*(UINT8 *)pCurrPos = 1; /* Element ID */
@@ -2296,6 +2325,7 @@ int transmit_assoc_req(wlandevice_t *hw)
  * STATUS: almost ok, but UNVERIFIED.
  */
 // FIXME: type of clt is a guess
+// I'm not sure if clt is needed.
 UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 {
 	struct disassoc_frame_body *payload;
@@ -2305,7 +2335,7 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 	TxData *hd;
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	if (clt != NULL) {
+//	if (clt != NULL) {
 		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 			return 1;
 		}
@@ -2316,22 +2346,30 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 		hd = (TxData *)hdesc_header->data;
 		payload = (struct disassoc_frame_body *)hdesc_payload->data;
 
-		clt->used = 2;
+//		clt->used = 2;
 
 		hd->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_DISASSOC);	/* 0xa0 */
 		hd->duration_id = 0;
 		hd->sequence_control = 0;
 
-		memcpy(hd->da, clt->address, WLAN_ADDR_LEN);
+		memcpy(hd->da, hw->address, WLAN_ADDR_LEN);
 		memcpy(hd->sa, hw->dev_addr, WLAN_ADDR_LEN);
 		memcpy(hd->bssid, hw->dev_addr, WLAN_BSSID_LEN);
 
+		hdesc_header->length = WLAN_HDR_A3_LEN;
+		hdesc_header->val0x4 = 0;
+
 		payload->reason = 7;	/* "Class 3 frame received from nonassociated station." */
+
+		hdesc_payload->length = hw->rate_spt_len + 8;
+		hdesc_payload->val0x4 = 0;
+
+		tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
 		/* FIXME: lengths missing! */
 		acx100_dma_tx_data(hw, tx_desc);
 		return 1;
-	}
+//	}
 	return 0;
 }
 
@@ -2588,7 +2626,13 @@ void d11CompleteScan(wlandevice_t *wlandev)
 	if (found_station) {
 		UINT8 *a;
 		acx100_update_capabilities(wlandev);
-		memcpy(wlandev->essid_found, wlandev->val0x126c[idx_found].essid, sizeof(wlandev->essid_found));
+
+		/* use ESSID we just found, but if it is empty (no broadcast),
+		 * use user configured ESSID instead */
+		memcpy(wlandev->essid_for_assoc,
+			(wlandev->val0x126c[idx].essid[0] == '\0') ?
+			wlandev->essid : wlandev->val0x126c[idx_found].essid,
+			sizeof(wlandev->essid_for_assoc));
 		wlandev->channel = wlandev->val0x126c[idx_found].channel;
 		memcpy(wlandev->address,
 		       wlandev->val0x126c[idx_found].address, WLAN_ADDR_LEN);
@@ -2722,7 +2766,8 @@ void acx100_timer(unsigned long a)
 		} else {
 			/* time exceeded: fall back to scanning mode */
 			acxlog(L_ASSOC,
-			       "authen1 request reply timeout, falling back to scanning.\n");
+			       "authen1 request reply timeout, giving up.\n");
+			/* simply set status back to scanning (DON'T start scan) */
 			AcxSetStatus(hw, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(hw, 1500000);
@@ -2734,9 +2779,10 @@ void acx100_timer(unsigned long a)
 			       hw->auth_assoc_retries + 1);
 			transmit_assoc_req(hw);
 		} else {
-			/* time exceeded: fall back to scanning mode */
+			/* time exceeded: give up */
 			acxlog(L_ASSOC,
-			       "association request reply timeout, falling back to scanning.\n");
+			       "association request reply timeout, giving up.\n");
+			/* simply set status back to scanning (DON'T start scan) */
 			AcxSetStatus(hw, ISTATUS_1_SCANNING);
 		}
 		acx100_set_timer(hw, 1500000);

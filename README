@@ -155,6 +155,9 @@ and iwpriv.
 The module itself can be loaded e.g. like:
 insmod src/acx100_pci.o firmware_dir=firmware
 
+NOTE that firmware_dir has to be given as an absolute path; a relative
+path will cause trouble!!
+
 For troubleshooting, see below.
 
 Once you got the driver running, you could set EXPERIMENTAL_VER_x_y in
@@ -178,8 +181,21 @@ need to adapt it...)
 4. build your kernel, cross your fingers and hopefully enjoy acx100
 with linux-2.6 ;-)
 
+--- USAGE HINTS ---
+
+If you plan to do wireless traffic monitoring with Kismet, then choose
+card type Orinoco in kismet.conf.
+
 --- TROUBLESHOOTING / WORKAROUNDS ---
 
+Driver build problems:
+If the driver compile keeps failing, then it might be caused by a module
+version conflict of your current kernel. Consider completely recompiling
+the kernel, then removing the WHOLE /lib/modules/KERNELVERSION/ directory tree,
+then reinstalling this kernel and rebooting. Hopefully the driver compiling
+works then.
+
+Driver init/network failure:
 First, make absolutely sure you're using correct settings for
 association to the wireless network!
 It's of no use to try to associate to a set of access points using
@@ -188,7 +204,7 @@ associate with a peer card).
 
 Then read the file containing the driver log (the file where
 the KERN_WARNING channel gets written to), as given in the syslog
-configuration, /etc/sysklogd.conf or similar.
+configuration file which is called /etc/sysklogd.conf or similar.
 
 If you still have trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up quite a lot :-((
@@ -212,6 +228,14 @@ Link Quality == reverse of Noise level
 If you still have trouble getting a connection, or if the connection is
 problematic, then visit our Wiki HOWTO/troubleshooting pages for more
 info.
+
+And if that still doesn't give you the info you need,
+then consider NOT posting a request on the Forum or writing to the mailing
+lists, since we cannot track these properly.
+Instead, post a Tracker item at one of Bugs, Support Requests, Feature
+Requests. This way development will be MUCH more organized, with proper
+status and processing assigned to each request, and hopefully nothing
+falling through the cracks.
 
 --- BUGS / SHORTCOMINGS / PATCHES ---
 
@@ -272,6 +296,18 @@ that doesn't even have proper driver support for a popular alternative OS,
 then AT LEAST change the card name in order to let people know and discern
 which hardware to avoid like the plague, for heaven's sake!
 This is such a <CENSORED>, I could <OUCH, CENSORED!>...
+
+Also, we just learned that D-Link tech support can be very clueless, too:
+one guy, after having been advised that his DWL-120+ uses an Atmel
+chipset, spent considerable time trying to get this card to work with an
+incompatible Linux driver (it's the DWL-120 which uses an Atmel chip -
+the DWL-120+ most definitely likely is using an ACX100, since it cannot
+be an Atmel due to 22Mbps operation!).
+This proves that D-Link really deserves my "Most Braindead Hardware
+Vendor 2003" award, and it also shows that one should avoid D-Link like
+the plague from now on (at least until they get rid of their stupid
+product naming habits), since they don't seem to know or care about
+their very own products.
 
 Finally, let me mention that we also really dislike the way how
 Texas Instruments handles Linux driver support. It's a really shameful

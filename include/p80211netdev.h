@@ -265,7 +265,7 @@ typedef struct key_struct {
 typedef struct wlandevice {
 	struct wlandevice *next;	/* 00 link for list of devices */
 	struct acx100 *hw;	/* 04 private data for MSD */
-	struct net_device *next_nd;	/* 08 private data for MSD */
+	struct net_device *prev_nd;	/* 08 private data for MSD */
 
 	struct timer_list mgmt_timer;
 
@@ -402,7 +402,7 @@ typedef struct wlandevice {
 	char val0x2324[0x8];	/* V3POS 2324 */
 
 	UINT32 macmode;		/* 0xac; 0 == Ad-Hoc, 2 == infrastructure, using a wlan-ng name here! This is the mode we're currently in */
-	char essid_found[0x20]; /* the ESSID we just found, in case of "essid 'any'" */
+	char essid_for_assoc[0x20]; /* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
 	UINT8 bssid[WLAN_ADDR_LEN];	/* V3POS b2, using a wlan-ng name here! */
 	UINT iStatus;		/* original name. V3POS 234c, V1POS 2304 */// all in the same
 	UINT unknown0x2350;	/* V3POS 2350, V1POS 2308 *///structure

@@ -268,7 +268,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 	int res1, res2;
 	firmware_image_t* apfw_image;
 	char filename[PATH_MAX];
-	
+
 	if (!firmware_dir)
 	{
 		/* since the log will be flooded with other log messages after
@@ -332,7 +332,7 @@ int acx100_load_radio(wlandevice_t *wlandev)
 	acx100_interrogate(wlandev, &mm, ACX100_RID_MEMORY_MAP);
 	offset = mm.m.ip.CodeEnd;
 
-	sprintf(filename,"%s/RADIO%02x.BIN",firmware_dir, wlandev->radio_type);
+	sprintf(filename,"%s/RADIO%02x.BIN", firmware_dir, wlandev->radio_type);
 	radio_image = acx100_read_fw(filename);
 
 /*
@@ -418,6 +418,16 @@ firmware_image_t* acx100_read_fw( const char *file )
 	if (page)
 	{
 		buffer=(char*)page;
+		/* Note that file must be given as absolute path:
+		 * a relative path works on first loading,
+		 * but any subsequent firmware loading during card
+		 * eject/insert will fail, most likely since the first
+		 * module loading happens in user space (and thus
+		 * filp_open can figure out the absolute path from a
+		 * relative path) whereas the card reinsert processing
+		 * probably happens in kernel space where you don't have
+		 * a current directory to be able to figure out an
+		 * absolute path from a relative path... */
 		inf=filp_open(file,O_RDONLY,0);
 		if (IS_ERR(inf))
 		{

@@ -339,10 +339,9 @@ void acx100_write_cmd_status(wlandevice_t * act, UINT vala)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
+static inline void acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
 {
 	memcpy((UINT *) hw->CommandParameters, cmd, len);
-	return 0;
 }
 
 /*----------------------------------------------------------------
@@ -362,10 +361,9 @@ int acx100_write_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_read_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
+static inline void acx100_read_cmd_param(wlandevice_t * hw, memmap_t * cmd, int len)
 {
 	memcpy(cmd, (UINT *) hw->CommandParameters, len);
-	return 0;
 }
 
 /*----------------------------------------------------------------
@@ -442,13 +440,10 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 
 	/*** now write the parameters of the command if needed ***/
 	if (pcmdparam != NULL && paramlen != 0) {
-		if (cmd == ACX100_CMD_INTERROGATE) {
-			/* it's an INTERROGATE command, so just pass the length
-			 * of parameters to read, as data */
-			acx100_write_cmd_param(hw, pcmdparam, 0x4);
-		} else {
-			acx100_write_cmd_param(hw, pcmdparam, paramlen);
-		}
+		/* if it's an INTERROGATE command, just pass the length
+		 * of parameters to read, as data */
+		acx100_write_cmd_param(hw, pcmdparam,
+			(cmd == ACX100_CMD_INTERROGATE) ? 0x4 : paramlen);
 	}
 
 	/*** now write the actual command type ***/
@@ -621,7 +616,7 @@ int acx100_configure(wlandevice_t * hw, void * pdr, short type)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_configure_length(wlandevice_t * hw, void * pdr, short type, short length)
+inline int acx100_configure_length(wlandevice_t * hw, void * pdr, short type, short length)
 {
 	((memmap_t *)pdr)->type = type;
 	((memmap_t *)pdr)->length = length;
