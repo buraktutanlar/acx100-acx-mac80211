@@ -61,7 +61,7 @@ printflag() {
 	then
 		$ECHO "enabled."
 	else
-		$ECHO "DISABLED."
+		$ECHO "DISABLED!"
 	fi
 }
 

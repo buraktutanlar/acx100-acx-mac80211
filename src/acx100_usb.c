@@ -903,7 +903,7 @@ static void acx100usb_poll_rx(wlandevice_t *priv) {
 		priv->bulkrx_urb->actual_length=0;
 		usb_fill_bulk_urb(priv->bulkrx_urb, usbdev, inpipe, inbuf, sizeof(acx100_usbin_t), acx100usb_complete_rx, priv);
 		priv->bulkrx_urb->transfer_flags=ASYNC_UNLINK;
-		priv->bulkrx_urb->timeout=ACX100_USB_RX_TIMEOUT;
+		/* priv->bulkrx_urb->timeout=ACX100_USB_RX_TIMEOUT; */
 		priv->bulkrx_urb->status=0;
 		submit_urb(priv->bulkrx_urb, GFP_KERNEL);
 	}
@@ -1151,7 +1151,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	acxlog(L_XFER,"sending initial %d bytes (remain: %d)\n",txsize,priv->usb_txsize-priv->usb_txoffset);
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,txsize,acx100usb_complete_tx,priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
+	/* priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT; */
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
 	acxlog(L_XFER,"dump: outpipe=%X buf=%p txsize=%d\n",outpipe,buf,txsize);
 	if (ucode!=0) {
@@ -1205,7 +1205,7 @@ static void acx100usb_send_tx_frags(wlandevice_t *priv) {
 	outpipe=usb_sndbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,txsize,acx100usb_complete_tx,priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
+	/* priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT; */
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"submit_urb() return code: %d (%s:%d)\n",ucode,__FILE__,__LINE__);
@@ -1248,7 +1248,7 @@ static void acx100usb_flush_tx(wlandevice_t *priv)
 	outpipe=usb_sndbulkpipe(usbdev,1);      /* default endpoint for bulk-transfers: 1 */
 	usb_fill_bulk_urb(priv->bulktx_urb,usbdev,outpipe,buf,0,&(acx100usb_complete_tx),priv);
 	priv->bulktx_urb->transfer_flags=ASYNC_UNLINK;
-	priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT;
+	/* priv->bulktx_urb->timeout=ACX100_USB_TX_TIMEOUT; */
 	ucode=submit_urb(priv->bulktx_urb, GFP_KERNEL);
         if (ucode!=0) {
 		acxlog(L_STD,"submit_urb() return code: %d (%s:%d)\n",ucode,__FILE__,__LINE__);

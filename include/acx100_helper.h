@@ -524,12 +524,12 @@ typedef struct acx_configoption {
 
 
 
-inline void acx_stop_queue(netdevice_t *dev, char *msg);
-inline int acx_queue_stopped(netdevice_t *dev);
-inline void acx_start_queue(netdevice_t *dev, char *msg);
-inline void acx_wake_queue(netdevice_t *dev, char *msg);
-inline void acx_carrier_off(netdevice_t *dev, char *msg);
-inline void acx_carrier_on(netdevice_t *dev, char *msg);
+void acx_stop_queue(netdevice_t *dev, char *msg);
+int acx_queue_stopped(netdevice_t *dev);
+void acx_start_queue(netdevice_t *dev, char *msg);
+void acx_wake_queue(netdevice_t *dev, char *msg);
+void acx_carrier_off(netdevice_t *dev, char *msg);
+void acx_carrier_on(netdevice_t *dev, char *msg);
 void acx_schedule(long timeout);
 int acx_reset_dev(netdevice_t *dev);
 void acx_join_bssid(wlandevice_t *priv);

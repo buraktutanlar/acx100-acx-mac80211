@@ -1213,8 +1213,8 @@ static inline int acx_ioctl_set_encode(struct net_device *dev, struct iw_request
 
 	} else {
 		/* set transmit key */
-		if ((index >= 1) && (index <= 4))
-			priv->wep_current_index = (UINT8)(index - 1);
+		if ((index >= 0) && (index <= 3))
+			priv->wep_current_index = (UINT8)index;
 		else
 			if (0 == (dwrq->flags & IW_ENCODE_MODE))
 			{

@@ -852,8 +852,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
 
 	/* need to be able to restore PCI state after a suspend */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 9)
-	/* 2.6.9-rc3-mm2 introduced this shorter version */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
+	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
+	   so assume it will find its way into 2.6.10 */
 	pci_save_state(pdev);
 #else
 	pci_save_state(pdev, priv->pci_state);
@@ -1175,8 +1176,9 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_STD, "acx100: experimental resume handler called for %p!\n", priv);
 	pci_set_power_state(pdev, 0);
 	acxlog(L_DEBUG, "rsm: power state set\n");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 9)
-	/* 2.6.9-rc3-mm2 introduced this shorter version */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
+	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
+	   so assume it will find its way into 2.6.10 */
 	pci_restore_state(pdev);
 #else
 	pci_restore_state(pdev, priv->pci_state);
@@ -1921,10 +1923,8 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 		acxlog(L_IRQ, "Got Rx Complete IRQ\n");
 	}
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
-		static int txcnt = 0;
-
 		/* don't clean up on each Tx complete, wait a bit */
-		if (++txcnt % (priv->TxQueueCnt >> 2) == 0)
+		if (++priv->tx_cnt_done % (priv->TxQueueCnt >> 2) == 0)
 			acx_clean_tx_desc(priv);
 		acx_write_reg16(priv, priv->io[IO_ACX_IRQ_ACK], HOST_INT_TX_COMPLETE);
 		acxlog(L_IRQ, "Got Tx Complete IRQ\n");

@@ -614,6 +614,14 @@ or other strange/erratic wireless config behaviour, then make damn sure that
 your wireless-tools version is correct. There are tons of possibilities
 for version conflicts!
 
+A message like
+Warning: Driver for device wlan0 has been compiled with version 16
+of Wireless Extension, while this program is using version 15.
+Some things may be broken...
+also means that you should consider upgrading your wireless-tools,
+since it's a version that doesn't match the one of your currently running
+kernel (or acx100 build kernel).
+
 -- Network failure --
 First, did you ifup the card? (ifconfig wlan0 up)
 Without an activated interface there won't be any net connection at all,

@@ -1402,6 +1402,7 @@ typedef struct wlandevice {
 	UINT32		RxQueueCnt;		/* V3POS 24f4, V1POS 24cc */
 	UINT32		TxQueueFree;
 	struct	rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
+	UINT32		tx_cnt_done;
 	UINT16		memblocksize;		/* V3POS 2354, V1POS 230c */
 	UINT32		RxBlockNum;		/* V3POS 24e4, V1POS 24bc */
 	UINT32		TotalRxBlockSize;	/* V3POS 24e8, V1POS 24c0 */

@@ -83,8 +83,10 @@ modules:
 	if test -n "$(ACX100_SRC)"; then \
 	cd -; \
 	fi
-	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) $(TMPOUT) \
-		MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_USB modules
+	#make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) $(TMPOUT) \
+	#	MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_USB modules
+	@echo
+	@echo "*** USB support is currently broken, please use pf13 instead!! ***"
 	@echo
 	@echo "*** Compilation finished. Make sure to copy required firmware files to /usr/share/acx/ before proceeding! ***"
 
@@ -116,7 +118,9 @@ objects = acx100.o acx100_ioctl.o acx100_helper.o acx100_helper2.o ihw.o idma.o 
 
 usb_objs = acx_usb_main.o acx_usb_ihw.o acx_usb_helper.o acx_usb_ioctl.o acx_usb_helper2.o acx_usb_80211frm.o acx_usb_idma.o acx_usb_conv.o 
 
-all: acx_pci.o acx_usb.o
+all: acx_pci.o
+	@echo
+	@echo "*** USB support is currently broken, please use pf13 instead!! ***"
 	@echo
 	@echo "*** Compilation finished. Make sure to copy required firmware files to /usr/share/acx/ before proceeding! ***"
 
