@@ -273,6 +273,78 @@ static struct usb_driver acx100usb_driver = {
 
 
 
+/*----------------------------------------------------------------
+    Debugging support
+*----------------------------------------------------------------*/
+#ifdef ACX_DEBUG
+
+#define DEBUG_TSC 0
+#define FUNC_INDENT_INCREMENT 2
+
+#if DEBUG_TSC
+#define TIMESTAMP(d) unsigned long d; rdtscl(d)
+#else
+#define TIMESTAMP(d) unsigned long d = jiffies
+#endif
+
+static const char spaces[] = "          " "          "; /* Nx10 spaces */
+
+void
+log_fn_enter(const char *funcname) {
+	int indent;
+	TIMESTAMP(d);
+
+	indent = acx100_debug_func_indent;
+	if(indent>=sizeof(spaces))
+		indent = sizeof(spaces)-1;
+		
+	printk("%lx %s==> %s\n",
+		d,
+		spaces + (sizeof(spaces)-1) - indent,
+		funcname
+	);
+
+	acx100_debug_func_indent += FUNC_INDENT_INCREMENT;
+}
+
+void
+log_fn_exit(const char *funcname) {
+	int indent;
+	TIMESTAMP(d);
+
+	acx100_debug_func_indent -= FUNC_INDENT_INCREMENT;
+
+	indent = acx100_debug_func_indent;
+	if(indent>=sizeof(spaces))
+		indent = sizeof(spaces)-1;
+		
+	printk("%lx %s<== %s\n",
+		d,
+		spaces + (sizeof(spaces)-1) - indent,
+		funcname
+	);
+}
+
+void
+log_fn_exit_v(const char *funcname, int v) {
+	int indent;
+	TIMESTAMP(d);
+
+	acx100_debug_func_indent -= FUNC_INDENT_INCREMENT;
+
+	indent = acx100_debug_func_indent;
+	if(indent>=sizeof(spaces))
+		indent = sizeof(spaces)-1;
+		
+	printk("%lx %s<== %s: %08x\n",
+		d,
+		spaces + (sizeof(spaces)-1) - indent,
+		funcname,
+		v
+	);
+}
+#endif /* ACX_DEBUG */
+
 /* ---------------------------------------------------------------------------
 ** acx100usb_probe():
 ** Inputs:
@@ -334,7 +406,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		/* ---------------------------------------------
 		** allocate memory for the device driver context
 		** --------------------------------------------- */
-		priv = (struct wlandevice *)kmalloc(sizeof(struct wlandevice),GFP_KERNEL);
+		priv = kmalloc(sizeof(struct wlandevice),GFP_KERNEL);
 		if (!priv) {
 			printk(KERN_WARNING SHORTNAME ": could not allocate %d bytes memory for device driver context, giving up.\n",sizeof(struct wlandevice));
 			return OUTOFMEM;
@@ -368,7 +440,7 @@ static int acx100usb_probe(struct usb_interface *intf, const struct usb_device_i
 		/* ---------------------------------------------
 		** Allocate memory for a network device
 		** --------------------------------------------- */
-		if ((dev = (struct net_device *)kmalloc(sizeof(struct net_device),GFP_ATOMIC))==NULL) {
+		if ((dev = kmalloc(sizeof(struct net_device),GFP_ATOMIC))==NULL) {
 			printk(KERN_WARNING SHORTNAME ": failed to alloc netdev\n");
 			kfree(priv);
 			return OUTOFMEM;
@@ -581,7 +653,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	UINT16 *csptr;
 	char filename[128],*firmware,*usbbuf;
 	FN_ENTER;
-	usbbuf = (char *)kmalloc(ACX100_USB_RWMEM_MAXLEN,GFP_KERNEL);
+	usbbuf = kmalloc(ACX100_USB_RWMEM_MAXLEN,GFP_KERNEL);
 	if (!usbbuf) {
 		printk(KERN_ERR SHORTNAME ": not enough memory for allocating USB transfer buffer (req=%d bytes)\n",ACX100_USB_RWMEM_MAXLEN);
 		return(-ENOMEM);
@@ -745,7 +817,7 @@ static int acx100usb_open(struct net_device *dev)
 
 	/* set ifup to 1, since acx100_start needs it (FIXME: ugly) */
 
-	priv->dev_state_mask |= ACX_STATE_IFACE_UP;
+	SET_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx100_start(priv);
 
 
@@ -901,7 +973,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 		offset=0;
 		while (offset<size) {
 			rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
-			rxdesc->Ctl_16 |= cpu_to_le16(ACX100_CTL_OWN);
+			SET_BIT(rxdesc->Ctl_16, cpu_to_le16(ACX100_CTL_OWN));
 			rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
 			packetsize=(le16_to_cpu(ptr->mac_cnt_rcvd) & 0xfff)+ACX100_RXBUF_HDRSIZE; /* packetsize is limited to 12 bits */
 			acxlog(L_DEBUG,"packetsize: %d\n",packetsize);
@@ -1042,17 +1114,19 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.ctrl2=0;
 	buf->hdr.hostData=cpu_to_le32(size|(desc->u.r1.rate)<<24);
 	if (1 == priv->preamble_flag)
-		buf->hdr.ctrl1|=DESC_CTL_SHORT_PREAMBLE;
-	buf->hdr.ctrl1|=DESC_CTL_FIRST_MPDU;
+		SET_BIT(buf->hdr.ctrl1, DESC_CTL_SHORT_PREAMBLE);
+	SET_BIT(buf->hdr.ctrl1, DESC_CTL_FIRST_MPDU);
 	buf->hdr.txRate=desc->u.r1.rate;
 	buf->hdr.index=1;
 	buf->hdr.dataLength=cpu_to_le16(size|((buf->hdr.txRate)<<24));
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t *)header->data)->a3.fc)==WLAN_FTYPE_DATA) {
-		buf->hdr.hostData|=(ACX100_USB_TXHI_ISDATA<<16);
+		SET_BIT(buf->hdr.hostData, (ACX100_USB_TXHI_ISDATA<<16));
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
-	if (acx100_is_mac_address_directed((mac_t *)addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16));
-	if (acx100_is_mac_address_broadcast(addr)) buf->hdr.hostData|=cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16));
+	if (acx100_is_mac_address_directed((mac_t *)addr)) 
+	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16)));
+	if (acx100_is_mac_address_broadcast(addr)) 
+	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16)));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
 	if (debug&L_DATA) acx100_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
 	/* ---------------------------------------------
@@ -1289,9 +1363,9 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	txdesc=priv->currentdesc;
 	header = txdesc->host_desc;
 	payload = txdesc->host_desc+1;
-	header->Ctl_16|=cpu_to_le16(DESC_CTL_DONE);
-	payload->Ctl_16|=cpu_to_le16(DESC_CTL_DONE);
-	txdesc->Ctl_8|=DESC_CTL_DONE;
+	SET_BIT(header->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
+	SET_BIT(payload->Ctl_16, cpu_to_le16(DESC_CTL_DONE));
+	SET_BIT(txdesc->Ctl_8, DESC_CTL_DONE);
 	acx100_clean_tx_desc(priv);
 	/* ----------------------------------------------
 	** check if there are still descriptors that have

@@ -110,25 +110,22 @@
 * STATUS: UNVERIFIED. NONV3.
 * 
 --------------------------------------------------------------*/
-void p802addr_to_str(char *buf, UINT8 * addr)
+void p802addr_to_str(char *buf, UINT8 *addr)
 {
-	int strindex = 0;
 	int addrindex;
+	char c;
 
 	acxlog(L_STATE, "%s: UNVERIFIED. NONV3.\n", __func__);
 	for (addrindex = 0; addrindex < 6; addrindex++) {
-		buf[strindex] = ((addr[addrindex] & 0xf0) >> 4) > 9 ?
-		    'a' + (((addr[addrindex] & 0xf0) >> 4) - 10) :
-		    '0' + ((addr[addrindex] & 0xf0) >> 4);
-		buf[strindex + 1] = (addr[addrindex] & 0x0f) > 9 ?
-		    'a' + ((addr[addrindex] & 0x0f) - 10) :
-		    '0' + (addr[addrindex] & 0x0f);
-		buf[strindex + 2] = ':';
-
-		strindex += 3;
+		c = '0' + (((unsigned)addr[addrindex]) >> 4);
+		if(c>'9') c+='a'-'9'-1;
+		*buf++ = c;
+		c = '0' + (addr[addrindex] & 0x0f);
+		if(c>'9') c+='a'-'9'-1;
+		*buf++ = c;
+		*buf++ = ':';
 	}
-	buf[strindex] = '\0';
-	return;
+	buf[-1] = '\0';
 }
 
 /*--------------------------------------------------------------
@@ -178,8 +175,6 @@ void acx_mgmt_encode_beacon(wlan_fr_beacon_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_BEACON_OFF_CAPINFO +
 	    sizeof(*(f->cap_info));
-
-	return;
 }
 
 /*--------------------------------------------------------------
@@ -264,8 +259,6 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		ie_ptr =
 		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
-
-	return;
 }
 
 
@@ -309,8 +302,6 @@ void acx_mgmt_encode_ibssatim(wlan_fr_ibssatim_t * f)
 	/*-- Information elements */
 
 	f->len = WLAN_HDR_A3_LEN;
-
-	return;
 }
 
 
@@ -351,8 +342,6 @@ void acx_mgmt_decode_ibssatim(wlan_fr_ibssatim_t * f)
 
 	/*-- Fixed Fields ----*/
 	/*-- Information elements */
-
-	return;
 }
 
 
@@ -399,8 +388,6 @@ void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_DISASSOC_OFF_REASON +
 	    sizeof(*(f->reason));
-
-	return;
 }
 
 
@@ -442,8 +429,6 @@ void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t * f)
 				+ WLAN_DISASSOC_OFF_REASON);
 
 	/*-- Information elements */
-
-	return;
 }
 
 
@@ -491,8 +476,6 @@ void acx_mgmt_encode_assocreq(wlan_fr_assocreq_t * f)
 
 	f->len = WLAN_HDR_A3_LEN +
 	    WLAN_ASSOCREQ_OFF_LISTEN_INT + sizeof(*(f->listen_int));
-
-	return;
 }
 
 
@@ -563,7 +546,6 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 		ie_ptr =
 		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
-	return;
 }
 
 
@@ -613,8 +595,6 @@ void acx_mgmt_encode_assocresp(wlan_fr_assocresp_t * f)
 
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_ASSOCRESP_OFF_AID + sizeof(*(f->aid));
-
-	return;
 }
 
 
@@ -665,8 +645,6 @@ void acx_mgmt_decode_assocresp(wlan_fr_assocresp_t * f)
 	f->supp_rates = (wlan_ie_supp_rates_t *)
 	    (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 	     + WLAN_ASSOCRESP_OFF_SUPP_RATES);
-
-	return;
 }
 
 
@@ -717,8 +695,6 @@ void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_REASSOCREQ_OFF_CURR_AP +
 	    sizeof(*(f->curr_ap));
-
-	return;
 }
 
 
@@ -791,7 +767,6 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 		ie_ptr =
 		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
-	return;
 }
 
 
@@ -841,8 +816,6 @@ void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t * f)
 
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_REASSOCRESP_OFF_AID + sizeof(*(f->aid));
-
-	return;
 }
 
 
@@ -893,8 +866,6 @@ void acx_mgmt_decode_reassocresp(wlan_fr_reassocresp_t * f)
 	f->supp_rates = (wlan_ie_supp_rates_t *)
 	    (WLAN_HDR_A3_DATAP(&(f->hdr->a3)) +
 	     WLAN_REASSOCRESP_OFF_SUPP_RATES);
-
-	return;
 }
 
 
@@ -935,8 +906,6 @@ void acx_mgmt_encode_probereq(wlan_fr_probereq_t * f)
 	WLAN_ASSERT(f->len >= WLAN_PROBEREQ_FR_MAXLEN);
 
 	f->len = WLAN_HDR_A3_LEN;
-
-	return;
 }
 
 
@@ -1003,7 +972,6 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 		ie_ptr =
 		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
-	return;
 }
 
 
@@ -1052,8 +1020,6 @@ void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t * f)
 
 	f->len = WLAN_HDR_A3_LEN + WLAN_PROBERESP_OFF_CAP_INFO +
 	    sizeof(*(f->cap_info));
-
-	return;
 }
 
 
@@ -1138,7 +1104,6 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 		ie_ptr =
 		    (wlan_ie_t *) (((UINT8 *) ie_ptr) + 2 + ie_ptr->len);
 	}
-	return;
 }
 
 
@@ -1189,8 +1154,6 @@ void acx_mgmt_encode_authen(wlan_fr_authen_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_AUTHEN_OFF_STATUS +
 	    sizeof(*(f->status));
-
-	return;
 }
 
 
@@ -1247,7 +1210,6 @@ void acx_mgmt_decode_authen(wlan_fr_authen_t * f)
 	    (ie_ptr->eid == WLAN_EID_CHALLENGE)) {
 		f->challenge = (wlan_ie_challenge_t *) ie_ptr;
 	}
-	return;
 }
 
 
@@ -1295,8 +1257,6 @@ void acx_mgmt_encode_deauthen(wlan_fr_deauthen_t * f)
 	f->len =
 	    WLAN_HDR_A3_LEN + WLAN_DEAUTHEN_OFF_REASON +
 	    sizeof(*(f->reason));
-
-	return;
 }
 
 
@@ -1340,6 +1300,4 @@ void acx_mgmt_decode_deauthen(wlan_fr_deauthen_t * f)
 				+ WLAN_DEAUTHEN_OFF_REASON);
 
 	/*-- Information elements */
-
-	return;
 }

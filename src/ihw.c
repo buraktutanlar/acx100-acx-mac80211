@@ -80,7 +80,7 @@ static inline int submit_urb(struct urb *urb, int mem_flags) {
 static void acx100usb_control_complete(struct urb *urb)
 {
 	FN_ENTER;
-	FN_EXIT(0,0);
+	FN_EXIT(0,OK);
 }
 
 #else
@@ -95,7 +95,7 @@ static inline int submit_urb(struct urb *urb, int mem_flags) {
 static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 {
 	FN_ENTER;
-	FN_EXIT(0,0);
+	FN_EXIT(0,OK);
 }
 
 #endif
@@ -461,7 +461,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
 			/*@null@*/ void *pcmdparam, int paramlen, UINT32 timeout)
 {
 	int counter;
-	int result = 0;
+	int result = NOT_OK;
 	UINT16 irqtype = 0;
 	UINT16 cmd_status;
 
@@ -596,7 +596,7 @@ int acx100_issue_cmd(wlandevice_t *priv, UINT cmd,
         			acx100_dump_bytes(pcmdparam, paramlen);
 			}
 		}
-		result = 1;
+		result = OK;
 	}
 
 done:
@@ -665,7 +665,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message failed with errcode %d\n",ucode);
-		return(0);
+		return(NOT_OK);
 	}
 	/* ---------------------------------
 	** wait for request to complete...
@@ -679,7 +679,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	result=priv->ctrl_urb->actual_length;
 	acxlog(L_XFER,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
 	if (result<0) {
-		return(0);
+		return(NOT_OK);
 	}
 	/* --------------------------------------
 	** Check for device acknowledge ...
@@ -692,7 +692,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
 		acxlog(L_STD,"ctrl message (ack) failed with errcode %d\n",ucode);
-		return(0);
+		return(NOT_OK);
 	}
 	/* ---------------------------------
 	** wait for request to complete...
@@ -707,7 +707,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 	acxlog(L_XFER,"read=%d bytes\n",result);
 	if (result<0) {
 		FN_EXIT(0,result);
-		return(0);
+		return(NOT_OK);
 	}
 	if (priv->usbin.status!=1) {
 		acxlog(L_DEBUG,"command returned status %d\n",priv->usbin.status);
@@ -718,18 +718,20 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
 				memcpy(pdr,&(priv->usbin.u.rmemresp.data),paramlen-4);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d\n",priv->usbin.cmd,priv->usbin.status);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen-4);
-				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen-4);
+				if (debug&L_DATA) 
+				    acx100_dump_bytes(pdr,paramlen-4);
 			}
 			else {
 				memcpy(pdr,&(priv->usbin.u.rridresp.rid),paramlen);
 				acxlog(L_XFER,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",priv->usbin.cmd,priv->usbin.status,priv->usbin.u.rridresp.rid,priv->usbin.u.rridresp.frmlen);
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
-				if (debug&L_DATA) acx100_dump_bytes(pdr,paramlen);
+				if (debug&L_DATA)
+				    acx100_dump_bytes(pdr,paramlen);
 			}
 		}
 	}
-	FN_EXIT(0,1);
-	return(1);
+	FN_EXIT(0,OK);
+	return(OK);
 }
 #endif
 
@@ -740,7 +742,7 @@ int acx100_issue_cmd(wlandevice_t *priv,UINT cmd,void *pdr,int paramlen,UINT32 t
  *
  ****************************************************************************/
 
-static short CtlLength[0x14] = {
+static short CtlLength[0x16] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
 	ACX1xx_IE_POWER_MGMT_LEN,
@@ -760,7 +762,10 @@ static short CtlLength[0x14] = {
 	ACX1xx_IE_RXCONFIG_LEN,
 	0,
 	0,
-	ACX1xx_IE_FIRMWARE_STATISTICS_LEN
+	ACX1xx_IE_FIRMWARE_STATISTICS_LEN,
+	0,
+	ACX1xx_IE_FEATURE_CONFIG_LEN
+	
 	};
 
 static short CtlLengthDot11[0x14] = {
@@ -816,7 +821,7 @@ int acx100_configure(wlandevice_t *priv, void *pdr, short type)
 		 || type == ACX1xx_IE_DOT11_CURRENT_CCA_MODE)) {
 		acxlog(L_INIT, "Configure Command 0x%02X not supported under acx111 (yet)\n", type);
 
-		return 0;
+		return NOT_OK;
 	}
 
 	if (type<0x1000)
@@ -876,8 +881,8 @@ inline int acx100_configure_length(wlandevice_t *priv, void *pdr, short type, sh
 * Arguments:
 *
 * Returns:
-*	1 = success
-*	0 = failure
+*	OK = success
+*	NOT_OK = failure
 *
 * Side effects:
 *
@@ -903,6 +908,9 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 #else
 	((memmap_t *)pdr)->length = cpu_to_le16(len);
 #endif
+
+	acxlog(L_XFER,"interrogating: type(rid)=0x%X len=%d\n",type,len);
+
 	return acx100_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr,
 		len + 4, 5000);
 }
@@ -934,9 +942,9 @@ int acx100_interrogate(wlandevice_t *priv, void *pdr, short type)
 inline int acx100_is_mac_address_zero(mac_t *mac)
 {
 	if ((mac->vala == 0) && (mac->valb == 0)) {
-		return 1;
+		return OK;
 	}
-	return 0;
+	return NOT_OK;
 }
 
 /*----------------------------------------------------------------
@@ -958,7 +966,7 @@ inline int acx100_is_mac_address_zero(mac_t *mac)
 *----------------------------------------------------------------*/
 inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 {
-	return (memcmp(one, two, ETH_ALEN) == 0);
+	return memcmp(one, two, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -1003,9 +1011,9 @@ inline UINT8 acx100_is_mac_address_group(mac_t *mac)
 inline UINT8 acx100_is_mac_address_directed(mac_t *mac)
 {
 	if (mac->vala & 1) {
-		return 0;
+		return NOT_OK;
 	}
-	return 1;
+	return OK;
 }
 
 /*----------------------------------------------------------------
@@ -1030,13 +1038,13 @@ inline int acx100_is_mac_address_broadcast(const UINT8 *const address)
 	unsigned char bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 	if (memcmp(address, bcast_addr, ETH_ALEN) == 0)
-		return 1;
+		return OK;
 
 	/* IPv6 broadcast address */
 	if ((address[0] == 0x33) && (address[1] == 0x33))
-		return 1;
+		return OK;
 
-	return 0;
+	return NOT_OK;
 }
 
 /*----------------------------------------------------------------
@@ -1060,11 +1068,11 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 {
 	if (mac->vala & 1) {
 		if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff))
-			return 0;
+			return NOT_OK;
 		else
-			return 1;
+			return OK;
 	}
-	return 0;
+	return NOT_OK;
 }
 
 /*----------------------------------------------------------------
@@ -1086,7 +1094,7 @@ inline int acx100_is_mac_address_multicast(mac_t *mac)
 *----------------------------------------------------------------*/
 void acx100_log_mac_address(int level, UINT8 *mac)
 {
-	acxlog(level, "%02X.%02X.%02X.%02X.%02X.%02X",
+	acxlog(level, "%02X:%02X:%02X:%02X:%02X:%02X",
 			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 

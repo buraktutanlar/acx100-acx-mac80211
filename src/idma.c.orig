@@ -176,8 +176,8 @@ int acx100_delete_dma_regions(wlandevice_t *priv)
 #endif
 	acx100_free_desc_queues(&priv->dc);
 
-	FN_EXIT(0, OK);
-	return OK;
+	FN_EXIT(0, 0);
+	return 0;
 }
 
 /*----------------------------------------------------------------
@@ -204,7 +204,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 	
 	acx100_memmap_t MemMap;
 	struct TIWLAN_DC *pDc;
-	int res = NOT_OK;
+	int res = 2;
 
 	FN_ENTER;
 
@@ -215,7 +215,7 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 
 	/* read out the acx100 physical start address for the queues */
-	if (OK != acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
+	if (!acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapRead returns error\n");
 		goto fail;
 	}
@@ -254,16 +254,16 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "<== Initialize the Queue Indicator\n");
 
-	if (OK != acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ /* 0x14 + (qcfg.vale * 8))) { */
+	if (!acx100_configure_length(priv, &qcfg, ACX1xx_IE_QUEUE_CONFIG, sizeof(QueueConfig_t)-4)){ /* 0x14 + (qcfg.vale * 8))) { */
 		acxlog(L_BINSTD, "ctlQueueConfigurationWrite returns fail\n");
 		goto fail;
 	}
 
-	if (OK != acx100_create_tx_host_desc_queue(pDc)) {
+	if (acx100_create_tx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx100_create_tx_host_desc_queue returns fail\n");
 		goto fail;
 	}
-	if (OK != acx100_create_rx_host_desc_queue(pDc)) {
+	if (acx100_create_rx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx100_create_rx_host_desc_queue returns fail\n");
 		goto fail;
 	}
@@ -273,13 +273,13 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	acx100_create_tx_desc_queue(pDc);
 	acx100_create_rx_desc_queue(pDc);
-	if (OK != acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
+	if (!acx100_interrogate(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "Failed to read memory map\n");
 		goto fail;
 	}
 
 #if (WLAN_HOSTIF==WLAN_USB)
-	if (OK != acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
+	if (!acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD,"Failed to write memory map\n");
 		goto fail;
 	}
@@ -287,17 +287,17 @@ int acx100_create_dma_regions(wlandevice_t *priv)
 
 	MemMap.PoolStart = cpu_to_le32((le32_to_cpu(MemMap.QueueEnd) + 0x1f + 4) & ~0x1f);
 
-	if (OK != acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
+	if (!acx100_configure(priv, &MemMap, ACX1xx_IE_MEMORY_MAP)) {
 		acxlog(L_BINSTD, "ctlMemoryMapWrite returns fail\n");
 		goto fail;
 	}
 
-	if (OK != acx100_init_memory_pools(priv, (acx100_memmap_t *) &MemMap)) {
+	if (!acx100_init_memory_pools(priv, (acx100_memmap_t *) &MemMap)) {
 		acxlog(L_BINSTD, "acx100_init_memory_pools returns fail\n");
 		goto fail;
 	}
 
-	res = OK;
+	res = 0;
 	goto ok;
 
 fail:
@@ -383,11 +383,11 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	memconf.fragmentation = 0x0f; 
 
 	/* Set up our host descriptor pool + data pool */
-	if (OK != acx111_create_tx_host_desc_queue(pDc)) {
+	if (acx111_create_tx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx111_create_tx_host_desc_queue returns fail\n");
 		goto fail;
 	}
-	if (OK != acx100_create_rx_host_desc_queue(pDc)) {
+	if (acx100_create_rx_host_desc_queue(pDc)) {
 		acxlog(L_BINSTD, "acx100_create_rx_host_desc_queue returns fail\n");
 		goto fail;
 	}
@@ -402,7 +402,7 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	memconf.tx_queue1_attributes = 15; /* highest priority */
 
 	acxlog(L_STD, "%s: set up acx111 queue memory configuration (queue configs + descriptors)\n", __func__);
-	if (OK != acx100_configure(priv, &memconf, ACX1xx_IE_QUEUE_CONFIG /*0x03*/)) {
+	if (acx100_configure(priv, &memconf, ACX1xx_IE_QUEUE_CONFIG /*0x03*/) == 0) {
 		acxlog(L_STD, "setting up the memory configuration failed!\n");
 		goto fail;
 	}
@@ -410,7 +410,7 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	/* read out queueconfig */
 	memset(&queueconf, 0xff, sizeof(queueconf));
 
-	if (OK != acx100_interrogate(priv, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS /*0x05*/)) {
+	if (!acx100_interrogate(priv, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS /*0x05*/)) {
 		acxlog(L_BINSTD, "read queuehead returns fail\n");
 	}
 
@@ -433,14 +433,14 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 	acx100_create_tx_desc_queue(pDc);
 	acx100_create_rx_desc_queue(pDc);
 
-	FN_EXIT(1, OK);
-	return OK;
+	FN_EXIT(1, 0);
+	return 0;
 
 fail:
 	acx100_free_desc_queues(pDc);
 
-	FN_EXIT(1, NOT_OK);
-	return NOT_OK;
+	FN_EXIT(1, 1);
+	return 1;
 }
 
 
@@ -618,7 +618,7 @@ void acx100_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		printk("\n");
 #endif
 	}
-	FN_EXIT(0, OK);
+	FN_EXIT(0, 0);
 }
 
 void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
@@ -831,7 +831,7 @@ inline void acx100_log_txbuffer(TIWLAN_DC *pDc)
 			pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 		}
 	}
-	FN_EXIT(0, OK);
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -939,8 +939,7 @@ inline void acx100_clean_tx_desc(wlandevice_t *priv)
 			netif_wake_queue(priv->netdev);
 		}
 		/* log AFTER having done the work, faster */
-		acxlog(L_BUFT, "cleaned %d: ack_fail=%d rts_fail=%d rts_ok=%d r111=%04x\n",
-			finger, ack_failures, rts_failures, rts_ok, r111);
+		acxlog(L_BUFT, "cleaned %d: ack_fail=%d rts_fail=%d, rts_ok=%d r111=%04x\n", finger, ack_failures, rts_failures, rts_ok, r111);
 
 next:
 		/* update pointer for descr to be cleaned next */
@@ -953,7 +952,7 @@ next:
 
 	spin_unlock(&pDc->tx_lock);
 
-	FN_EXIT(0, OK);
+	FN_EXIT(0, 0);
 	return;
 }
 /*----------------------------------------------------------------
@@ -1018,7 +1017,7 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 	if (skb_len > (WLAN_HDR_A4_LEN + WLAN_DATA_MAXLEN + WLAN_CRC_LEN))
 	{
 		printk("monitor mode panic: oversized frame!\n");
-		FN_EXIT(0, NOT_OK);
+		FN_EXIT(0, 0);
 		return;
 	}
 
@@ -1026,7 +1025,7 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 	if ( (skb = dev_alloc_skb(skb_len)) == NULL)
 	{
 		printk("alloc_skb failed trying to allocate %d bytes\n", skb_len);
-		FN_EXIT(0, NOT_OK);
+		FN_EXIT(0, 0);
 		return;
 	}
 
@@ -1111,7 +1110,7 @@ void acx100_rxmonitor(wlandevice_t *priv, struct rxbuffer *buf)
 	priv->stats.rx_bytes += skb->len;
 
 	netif_rx(skb);
-	FN_EXIT(0, OK);
+	FN_EXIT(0, 0);
 }
 
 /*
@@ -1843,7 +1842,7 @@ void acx100_create_tx_desc_queue(TIWLAN_DC *pDc)
 
 #if (WLAN_HOSTIF==WLAN_USB)
   /* allocate memory for TxDescriptors */
-	pDc->pTxDescQPool = kmalloc(pDc->tx_pool_count*sizeof(struct txdescriptor),GFP_KERNEL);
+	pDc->pTxDescQPool = (struct txdescriptor *)kmalloc(pDc->tx_pool_count*sizeof(struct txdescriptor),GFP_KERNEL);
 	if (!pDc->pTxDescQPool) {
 		acxlog(L_STD,"Not enough memory to allocate txdescriptor queue\n");
 		return;
@@ -2021,10 +2020,10 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	MemoryBlockSize.size = cpu_to_le16(priv->memblocksize);
 
 	/* Then we alert the card to our decision of block size */
-	if (OK != acx100_configure(priv, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) {
+	if (!acx100_configure(priv, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) {
 		acxlog(L_BINSTD, "Ctl: MemoryBlockSizeWrite failed\n");
-		FN_EXIT(1, NOT_OK);
-		return NOT_OK;
+		FN_EXIT(1, 0);
+		return 0;
 	}
 
 	/* We figure out how many total blocks we can create, using
@@ -2074,20 +2073,20 @@ int acx100_init_memory_pools(wlandevice_t *priv, acx100_memmap_t *mmt)
 	acxlog(L_DEBUG, "rx_mem %08x rx_mem %08x\n", MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
-	if (OK != acx100_configure(priv, &MemoryConfigOption, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
+	if (!acx100_configure(priv, &MemoryConfigOption, ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
 		acxlog(L_DEBUG,"%s: configure memory config options failed!\n", __func__);
-		FN_EXIT(1, NOT_OK);
-		return NOT_OK;
+		FN_EXIT(1, 0);
+		return 0;
 	}
 
 	/* and tell the device to kick it into gear */
-	if (OK != acx100_issue_cmd(priv, ACX100_CMD_INIT_MEMORY, NULL, 0, 5000)) {
+	if (!acx100_issue_cmd(priv, ACX100_CMD_INIT_MEMORY, NULL, 0, 5000)) {
 		acxlog(L_DEBUG,"%s: init memory failed!\n", __func__);
-		FN_EXIT(1, NOT_OK);
-		return NOT_OK;
+		FN_EXIT(1, 0);
+		return 0;
 	}
-	FN_EXIT(1, OK);
-	return OK;
+	FN_EXIT(1, 1);
+	return 1;
 }
 
 /*----------------------------------------------------------------

@@ -535,7 +535,7 @@ typedef struct acx1xx_configoption {
 
 
 void acx100_schedule(long timeout);
-int acx100_reset_dev(netdevice_t *dev);
+int acx_reset_dev(netdevice_t *dev);
 void acx100_join_bssid(wlandevice_t *priv);
 void acx111_join_bssid(wlandevice_t *priv);
 int acx100_init_mac(netdevice_t *dev, UINT16 init);
@@ -563,7 +563,7 @@ int acx100_verify_init(wlandevice_t *priv);
 void acx100_init_mboxes(wlandevice_t *priv);
 void acx100_set_wepkey(wlandevice_t *priv);
 void acx111_set_wepkey(wlandevice_t *priv);
-int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt);
+int acx100_init_wep(wlandevice_t *priv);
 int acx100_init_packet_templates(wlandevice_t *priv, acx100_memmap_t *pt);
 int acx100_init_max_probe_request_template(wlandevice_t *priv);
 int acx100_init_max_null_data_template(wlandevice_t *priv);
@@ -595,5 +595,11 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv);
 int acx100_proc_eeprom_output(char *buf, wlandevice_t *priv);
 int acx100_proc_phy_output(char *buf, wlandevice_t *priv);
 void acx100_read_configoption(wlandevice_t *priv);
+
+int acx111_set_tx_level(wlandevice_t *priv, UINT8 level);
+UINT8 acx111_get_tx_level(wlandevice_t *priv);
+
+int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
+int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 
 #endif /* __ACX_ACX100_HELPER_H */

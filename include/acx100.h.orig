@@ -89,33 +89,89 @@
 extern int debug;
 extern int acx100_debug_func_indent;
 
+
+/* Driver defaults */
+
+#define DEFAULT_DTIM_INTERVAL	10
+#define DEFAULT_MSDU_LIFETIME	4096	/* used to be 2048, but FreeBSD driver changed it to 4096 to work properly in noisy wlans */
+#define DEFAULT_RTS_THRESHOLD	2312	/* max. size: disable RTS mechanism */
+#define DEFAULT_BEACON_INTERVAL	100
+
+
+#define CLEAR_BIT(val, mask) ((val) &= ~(mask))
+#define SET_BIT(val, mask) ((val) |= (mask))
+
+
 #define acxlog(chan, args...) \
 	do { \
 		if (debug & (chan)) \
 			printk(KERN_WARNING args); \
 	} while (0)
 
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
+#define FUNC_INDENT_INCREMENT 2
 
+#define DEBUG_TSC 0
+#if DEBUG_TSC
 #define FN_ENTER \
 	do { \
 		if (debug & L_FUNC) { \
-			log_fn_enter(__func__); \
+			int i; \
+			unsigned long d; \
+			rdtscl(d); \
+			printk("%lx ", d); \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			printk("==> %s\n", __func__); \
+			acx100_debug_func_indent += FUNC_INDENT_INCREMENT; \
 		} \
 	} while (0)
 
 #define FN_EXIT(p, v) \
 	do { \
 		if (debug & L_FUNC) { \
+			int i; \
+			unsigned long d; \
+			rdtscl(d); \
+			printk("%lx ", d); \
+			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
 			if (p) { \
-				log_fn_exit_v(__func__, v); \
+				printk("<== %s: %08x\n", __func__, v); \
 			} else { \
-				log_fn_exit(__func__); \
+				printk("<== %s\n", __func__); \
 			} \
 		} \
 	} while (0)
+#else
+#define FN_ENTER \
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			printk("%lx ", jiffies); \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			printk("==> %s\n", __func__); \
+			acx100_debug_func_indent += FUNC_INDENT_INCREMENT; \
+		} \
+	} while (0)
+
+#define FN_EXIT(p, v) \
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			printk("%lx ", jiffies); \
+			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			if (p) { \
+				printk("<== %s: %08x\n", __func__, v); \
+			} else { \
+				printk("<== %s\n", __func__); \
+			} \
+		} \
+	} while (0)
+#endif
 
 #else /* ACX_DEBUG */
 
@@ -160,18 +216,6 @@ void log_fn_exit_v(const char *funcname, int v);
 /*============================================================================*
  * Constants                                                                  *
  *============================================================================*/
-/* Driver defaults */
-#define DEFAULT_DTIM_INTERVAL	10
-#define DEFAULT_MSDU_LIFETIME	4096	/* used to be 2048, but FreeBSD driver changed it to 4096 to work properly in noisy wlans */
-#define DEFAULT_RTS_THRESHOLD	2312	/* max. size: disable RTS mechanism */
-#define DEFAULT_BEACON_INTERVAL	100
-
-
-#define CLEAR_BIT(val, mask) ((val) &= ~(mask))
-#define SET_BIT(val, mask) ((val) |= (mask))
-
-#define OK	0x0
-#define NOT_OK	0x1
 
 #define ACX100_CMD_ALLOC_LEN_MIN	((UINT16)4)
 #define ACX100_CMD_ALLOC_LEN_MAX	((UINT16)2400)
@@ -383,7 +427,6 @@ typedef enum {
 #define ACX100_IE_UNKNOWN_12			0x0012	/* NONBINARY: VERY large implementation in FW150!! */
 #define ACX111_IE_BSS_POWER_SAVE		0x0012
 #define ACX1xx_IE_FIRMWARE_STATISTICS		0x0013
-#define ACX1xx_IE_FEATURE_CONFIG		0x0015
 #define ACX1xx_IE_DOT11_STATION_ID		0x1001
 #define ACX100_IE_DOT11_UNKNOWN_1002		0x1002	/* mapped to cfgInvalid in FW150 */
 #define ACX111_IE_DOT11_FRAG_THRESH		0x1002	/* mapped to cfgInvalid in FW150 */
@@ -427,7 +470,6 @@ typedef enum {
 #define ACX1xx_IE_MEDIUM_USAGE_LEN			0x08
 #define ACX1xx_IE_RXCONFIG_LEN				0x04
 #define ACX1xx_IE_FIRMWARE_STATISTICS_LEN		0x9c
-#define ACX1xx_IE_FEATURE_CONFIG_LEN			0x08
 #define ACX1xx_IE_DOT11_STATION_ID_LEN			0x06
 #define ACX100_IE_DOT11_BEACON_PERIOD_LEN		0x02
 #define ACX1xx_IE_DOT11_DTIM_PERIOD_LEN			0x01
@@ -1542,7 +1584,7 @@ extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 		spin_unlock_irqrestore(&priv->lock, *flags);
 		return -EBUSY;
 	}
-	return OK;
+	return 0;
 }
 
 extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)
@@ -1561,7 +1603,7 @@ extern inline int acx100_lock(wlandevice_t *priv, unsigned long *flags)
 	(void)*priv;
 	(void)*flags;
 	/*@=noeffect@*/
-	return OK;
+	return 0;
 }
 
 extern inline void acx100_unlock(wlandevice_t *priv, unsigned long *flags)

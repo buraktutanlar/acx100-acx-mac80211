@@ -428,9 +428,9 @@ inline int acx100_is_mac_address_zero(mac_t *mac)
 inline int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two)
 {
 	if (memcmp(one, two, WLAN_ADDR_LEN))
-		return 0; /* no match */
+		return NOT_OK; /* no match */
 	else
-		return 1; /* matched */
+		return OK; /* matched */
 }
 
 

@@ -155,7 +155,7 @@ static inline int acx100_stt_findproto(unsigned int proto)
 	if (proto == 0x80f3)  /* APPLETALK */
 		return 1;
 
-	return 0;	
+	return 0;
 /*	return ((prottype == ETH_P_AARP) || (prottype == ETH_P_IPX)); */
 }
 
@@ -209,12 +209,12 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 
 	if (unlikely(0 == skb->len)) {
 		acxlog(L_DEBUG, "zero-length skb!\n");
-		return 1;
+		return NOT_OK;
 	}
 
 	header = tx_desc->host_desc;
 	if ((unsigned long)0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
-		return 1;
+		return NOT_OK;
 	payload = tx_desc->host_desc + 1;
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 
@@ -285,13 +285,13 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 		a3 = priv->bssid;
 		break;
 	case ACX_MODE_2_MANAGED_STA:
-		fc |= host2ieee16(WLAN_SET_FC_TODS(1));
+		SET_BIT(fc, host2ieee16(WLAN_SET_FC_TODS(1)));
 		a1 = priv->bssid;
 		a2 = priv->dev_addr;
 		a3 = e_hdr->daddr;
 		break;
 	case ACX_MODE_3_MANAGED_AP:
-		fc |= host2ieee16(WLAN_SET_FC_FROMDS(1));
+		SET_BIT(fc, host2ieee16(WLAN_SET_FC_FROMDS(1)));
 		a1 = e_hdr->daddr;
 		a2 = priv->bssid;
 		a3 = e_hdr->saddr;
@@ -305,7 +305,7 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	MAC_COPY(w_hdr->a3.a3, a3);
 
 	if ((UINT8)0 != priv->wep_enabled)
-		fc |= host2ieee16(WLAN_SET_FC_ISWEP(1));
+		SET_BIT(fc, host2ieee16(WLAN_SET_FC_ISWEP(1)));
 		
 	w_hdr->a3.fc = fc;
 	w_hdr->a3.dur = 0;
@@ -331,8 +331,8 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 #endif	
 	
 fail:
-	FN_EXIT(0, 0);
-	return 0;
+	FN_EXIT(0, OK);
+	return OK;
 }
 
 /*----------------------------------------------------------------
@@ -604,6 +604,6 @@ fail:
 		acxlog(L_DATA, "%02x ", ((UINT8 *) skb->data)[i]);
 	acxlog(L_DATA, "\n");
 */
-	FN_EXIT(0, 0);
+	FN_EXIT(0, OK);
 	return skb;
 }

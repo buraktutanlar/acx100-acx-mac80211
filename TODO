@@ -22,7 +22,7 @@ JANITORIAL/EASY:
 + automated hotplug configuration / configure module parameters / describe it!!!
 - verify correct waproamd operation, partially verified, 040413 [AM]
   (although that's also an issue of fixing waproamd to behave properly)
-- use test_bit, clear_bit, set_bit in acx100_update_card_settings etc.?
++ use test_bit, clear_bit, set_bit in acx100_update_card_settings etc.?
 - Check source code using code checker:
   splint (DONE!), flawfinder, pscan, icc, smatch/valgrind, pc-lint, freshmeat
   cqual/TAU/calltree/Perfometer/Nitro Technologies Memory Checker/MemCheck Deluxe
@@ -36,7 +36,7 @@ JANITORIAL/EASY:
 - in the doc/ directory, add an intro and describe chipset details and
   interesting information about it
 - maybe add dbg msgs to all failure cases to spot any driver problems fast
-- clean up and unify return value handling. Right now the driver seems to have
+* clean up and unify return value handling. Right now the driver seems to have
   a mess of different functions returning 0 as success, 1 as success, or some
   functions use -1 etc. pp.
 - ACX100_CTL_PREAMBLE and DESC_CTL_SHORT_PREAMBLE etc. unify

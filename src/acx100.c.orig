@@ -827,7 +827,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* need to be able to restore PCI state after a suspend */
 	pci_save_state(pdev, priv->pci_state);
 
-	if (OK != acx_reset_dev(dev)) {
+	if (OK != acx100_reset_dev(dev)) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: MAC initialize failure!\n",
 		       __func__, dev_info);
@@ -1092,7 +1092,7 @@ static int acx100_resume(struct pci_dev *pdev)
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, priv->pci_state);
 
-	acx_reset_dev(dev);
+	acx100_reset_dev(dev);
 
 	acx100_init_mac(dev, 0);
 	
@@ -1163,7 +1163,7 @@ static int acx100_pm_callback(struct pm_dev *pmdev, pm_request_t rqst, void *dat
 #ifndef RESUME_STANDBY_ONLY
 			/* not sure whether we actually had our power
 			 * removed or not, so let's do a full reset! */
-			acx_reset_dev(dev);
+			acx100_reset_dev(dev);
 #else
 			acx100_issue_cmd(priv, ACX100_CMD_WAKE, NULL, 0, 5000);
 

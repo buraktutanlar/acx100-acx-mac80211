@@ -146,14 +146,11 @@ http://standards.ieee.org/getieee802/
 
 What to do or have (we will NOT remind you later about any requirements,
 since this seeks to list all requirements in full):
-* x86 box preferrably
-  (minimum reported working so far: ACX100 - 486@100MHz, 16MB)
-  Other architectures:
-  PPC (Powerbooks) may work since they have been tested from time to time,
-  but please report IMMEDIATELY if they have any trouble,
-  I'm very interested in that!
-  Users who have archs other than x86 may need to remove certain compiler
-  flags in src/Makefile which are unsupported by their non-x86 compiler
+* x86 box preferrably (other architectures such as Powerbooks may work since
+  they have been tested from time to time, but please report IMMEDIATELY if
+  they have any trouble, I'm very interested in that!)
+  Users who have other archs may need to remove certain compiler flags
+  in src/Makefile which are unsupported by their non-x86 compiler
 * most likely a Bus Master capable PCI slot for PCI card versions, slave
   PCI slot won't work (FIXME: is that true?)
 * relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental)
@@ -691,8 +688,6 @@ Thanks for listening!
 - might not work on SMP multi-processor kernels sometimes
            (some problems, maybe even crashes). Reported to work, currently
 - power management (suspend/resume) handlers are not completely stable yet
-- Currently always in promiscuous mode (accepts all packets),
-  filtering needs to be implemented properly
 - many advanced features are not implemented yet
 
 For current tasks, please read TODO (or grep driver for FIXME and TODO).

@@ -62,12 +62,12 @@ find_downloader()
   echo "Locating a suitable download tool..."
   WGET=`which wget`
   if test -n $WGET; then
-    DL_STRING="$WGET -c -t 3"
+    DL_STRING="$WGET -c -t 3 --passive-ftp"
     return
   fi
   CURL=`which curl`
   if test -n $CURL; then
-    DL_STRING="$CURL"
+    DL_STRING="$CURL -0"
     return
   fi
   SNARF=`which snarf`
@@ -152,7 +152,7 @@ extract_firmware()
     done
     if [ $CARD_TYPE -lt 2 ]; then
       for files in RADIO0d.BIN RADIO11.BIN RADIO15.BIN WLANGEN.bin; do
-        FILE="`find . -name "$files"|tail -1`"
+        FILE="`find . -name "$files"|tail -n 1`"
 	# need to convert to uppercase
 	if [ -n "`echo "$FILE"|grep WLANGEN.bin`" ]; then
 	  cp "$FILE" "$ACXDIR"/firmware/WLANGEN.BIN
@@ -163,7 +163,7 @@ extract_firmware()
     fi
     if [ $CARD_TYPE -ne 1 ]; then
       for files in TIACX111.BIN; do
-        FILE="`find . -name "$files"|tail -1`"
+        FILE="`find . -name "$files"|tail -n 1`"
 	cp "$FILE" "$ACXDIR"/firmware/
       done
     fi
