@@ -1456,7 +1456,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	 * queue open from the beginning (as long as we're not full,
 	 * and also even before we're even associated),
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
-	acxlog(L_XFER, "stop queue during Tx.\n");
+	acxlog(L_BUF, "stop queue during Tx.\n");
 	netif_stop_queue(dev);
 #endif
 #if UNUSED

@@ -261,7 +261,11 @@ int acx100_ether_to_txdesc(wlandevice_t *priv,
 	header->data_offset = 0;
 	
 	/* calculate total tx_desc length */
-	tx_desc->total_length = payload->length + header->length;
+	tx_desc->total_length = cpu_to_le16(payload->length + header->length);
+
+	/* correct length endianness */
+	payload->length=cpu_to_le16(payload->length);
+	header->length=cpu_to_le16(header->length);
 
 	/* Set up the 802.11 header */
 	w_hdr = (p80211_hdr_t*)header->data;
@@ -373,7 +377,7 @@ fail:
 
 	FN_ENTER;
 
-	payload_length = (rx_desc->data->mac_cnt_rcvd & 0xfff) - WLAN_HDR_A3_LEN;
+	payload_length = (cpu_to_le16(rx_desc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN;
 	payload_offset = WLAN_HDR_A3_LEN;
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;

@@ -173,6 +173,9 @@ What to NOT do:
   CardBus cards, and thus PCI-based, NOT ISA-based (PCMCIA).
   You probably need the pcmcia-cs package for certain CardBus functions,
   though.
+* believe that this driver uses the hotplug package's firmware upload
+  functionality. Right now it uses its completely separate and thus
+  Linux 2.4.x compatible mechanism!
 
 
 === FIRMWARE INSTALLATION ===
@@ -284,8 +287,10 @@ ACX100 USB firmware should be copied to /usr/share/acx/ACX100_USB.bin
 Read the ACX100 instructions above, but keep in mind that they may be wrong
 since you're using an ACX111 card with ACX111 firmware.
 NOTE: For ACX111 cards even recently there are both a combined firmware
-(TIACX111.bin or FwRad16.bin) and a non-combined firmware (FW1130.BIN?)
+(TIACX111.BIN or FwRad16.bin) and a non-combined firmware (FW1130.BIN?)
 available.
+Occasionally a firmware is also called GPLUS.BIN originally.
+Rename to TIACX111.BIN in this case.
 Note that D-Link makes a driver download distinction between the DWL-G650+ Rev. Ax and Bx: they are both ACX111, but contain different firmware images!
 This could mean that there might be hardware differences between various ACX111
 implementations, and thus you might need to use a specific firmware for your

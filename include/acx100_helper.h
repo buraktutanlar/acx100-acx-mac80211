@@ -323,7 +323,7 @@ typedef struct joinbss {
  */
 typedef struct acxp80211_hdr {
 	p80211_hdr_a3_t a4;
-	UINT8 val0x18[8];	/* this contains the Logical Link Control data
+	UINT8 timestamp[8];	/* this contains the Logical Link Control data
 				   the first three bytes are the dsap, ssap and control
 				   respectively. the following 3 bytes are either ieee_oui
 				   or an RFC. See p80211conv.c/h for more. */
@@ -406,8 +406,7 @@ typedef struct dot11WEPDefaultKey {
 } dot11WEPDefaultKey_t;
 
 typedef struct acx111WEPDefaultKey {
-    UINT16	rid;
-    UINT16	len;
+    UINT8	MacAddr[ETH_ALEN];
     UINT8	action;
     UINT16	reserved;
     UINT8	keySize;

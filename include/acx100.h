@@ -755,14 +755,54 @@ typedef struct acx100_InfFrame {
 #define ACX100_CTL_ACXDONE    0x40	/* acx100 has finished processing */
 #define ACX100_CTL_OWN        0x80	/* host owns the desc */
 
-
+/* Values for acx100 tx descr rate field */
 #define ACX_TXRATE_1		10
 #define ACX_TXRATE_2		20
 #define ACX_TXRATE_5_5		55
-#define ACX_TXRATE_5_5PBCC	183
+#define ACX_TXRATE_5_5PBCC	(55 | 0x80)
 #define ACX_TXRATE_11		110
-#define ACX_TXRATE_11PBCC	238
+#define ACX_TXRATE_11PBCC	(110 | 0x80)
 #define ACX_TXRATE_22PBCC	220
+#define ACX_TXRATE_6_G		0x0D
+#define ACX_TXRATE_9_G		0x0F
+#define ACX_TXRATE_12_G		0x05
+#define ACX_TXRATE_18_G		0x07
+#define ACX_TXRATE_24_G		0x09
+#define ACX_TXRATE_36_G		0x0B
+#define ACX_TXRATE_48_G		0x01
+#define ACX_TXRATE_54_G		0x03
+
+/* Values for acx111 tx descr rate field */
+#define ACX111_TXRATE_1		0x0001
+#define ACX111_TXRATE_2		0x0003
+#define ACX111_TXRATE_5		0x0007
+#define ACX111_TXRATE_6		0x000f
+#define ACX111_TXRATE_9		0x001f
+#define ACX111_TXRATE_11	0x003f
+#define ACX111_TXRATE_12	0x007f
+#define ACX111_TXRATE_18	0x00ff
+#define ACX111_TXRATE_22	0x01ff
+#define ACX111_TXRATE_24	0x03ff
+#define ACX111_TXRATE_36	0x07ff
+#define ACX111_TXRATE_48	0x0fff
+#define ACX111_TXRATE_54	0x1fff
+
+#define ACX_RXRATE_1		0x82
+#define ACX_RXRATE_2		0x84
+#define ACX_RXRATE_5_5		0x8B
+#define ACX_RXRATE_5_5PBCC	0x0B
+#define ACX_RXRATE_11		0x96
+#define ACX_RXRATE_11PBCC	0x16
+#define ACX_RXRATE_22PBCC	0x2C
+#define ACX_RXRATE_6_G		0x0C
+#define ACX_RXRATE_9_G		0x12
+#define ACX_RXRATE_12_G		0x18
+#define ACX_RXRATE_18_G		0x24
+#define ACX_RXRATE_24_G		0x30
+#define ACX_RXRATE_36_G		0x48
+#define ACX_RXRATE_48_G		0x60
+#define ACX_RXRATE_54_G		0x6C
+
 
 
 
@@ -1120,6 +1160,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT32		TxBufferPoolSize;	/* 0x18 */
 	UINT16		TxDescrSize;		/* size per tx descr; ACX111 = ACX100 + 4 */
 	struct	txdescriptor	*pTxDescQPool;	/* V13POS 0x1c, official name */
+	spinlock_t	tx_lock;
 	UINT32		tx_pool_count;		/* 0x20 indicates # of ring buffer pool entries */
 	UINT32		tx_head;		/* 0x24 current ring buffer pool member index */
 	UINT32		tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
@@ -1136,13 +1177,14 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT		TxHostDescQPoolSize;	/* 0x40 */
 	/* This is the pointer to the beginning of the hosts tx queue pool.
 	   The address is relative to the host memory mapping */
-	UINT32		TxHostDescQPoolPhyAddr;	/* 0x44 */
+	dma_addr_t	TxHostDescQPoolPhyAddr;	/* 0x44 */
 	/* UINT32		val0x48; */	/* 0x48, NOT USED */
 	/* UINT32		val0x4c; */	/* 0x4c, NOT USED */
 
 	/* This is the pointer to the beginning of the cards rx queue pool.
 	   The Adress is relative to the host memory mapping!! */
 	struct	rxdescriptor	*pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
+	spinlock_t	rx_lock;
 	UINT32		rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
 	UINT32		rx_tail;		/* 0x6c */
 	/* UINT32		val0x50; */	/* V1POS:0x50, some size NOT USED */
@@ -1154,10 +1196,10 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT32		RxHostDescQPoolSize;	/* 0x5c */
 	/* This is the pointer to the beginning of the hosts rx queue pool.
 	   The address is relative to the host memory mapping */
-	UINT32		RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
+	dma_addr_t	RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
 	/* UINT32		val0x64; */	/* 0x64, some size */
 	UINT32		*pRxBufferPool;		/* *rxdescq1; 0x70 */
-	UINT32		RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
+	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 	UINT32		RxBufferPoolSize;
 } TIWLAN_DC;
 
@@ -1317,11 +1359,11 @@ typedef struct wlandevice {
 	char		essid_for_assoc[IW_ESSID_MAX_SIZE+1];	/* the ESSID we are going to use for association, in case of "essid 'any'" and in case of hidden ESSID (use configured ESSID then) */
 	char		nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16		channel;		/* V3POS 22f0, V1POS b8 */
-	UINT8		txrate_cfg;		/* Tx rate from iwconfig */
+	UINT16		txrate_cfg;		/* Tx rate from iwconfig */
+	UINT16		txrate_curr;		/* the Tx rate we currently use */
 	UINT8		txrate_auto;		/* whether to auto adjust Tx rates */
 	UINT8		txrate_auto_idx;	/* index into rate table */
 	UINT8		txrate_auto_idx_max;
-	UINT8		txrate_curr;		/* the Tx rate we currently use */
 	/* settings in DWL-520+ .inf file: */
 	UINT8		txrate_fallback_retries; /* 0-255, default 1 */
 	UINT8		txrate_fallback_threshold; /* 0-100, default 12 */
@@ -1377,8 +1419,7 @@ typedef struct wlandevice {
 	UINT8		capab_pbcc;		/* V3POS 1f0, V1POS 1f8 */
 	UINT8		capab_agility;		/* V3POS 1f4, V1POS 1fc */
 	UINT8		rate_spt_len;		/* V3POS 1243, V1POS 124b */
-	UINT8		rate_support1[5];	/* V3POS 1244, V1POS 124c */
-	UINT8		rate_support2[5];	/* V3POS 1254, V1POS 125c */
+	UINT8		rate_support1[13];	/* V3POS 1244, V1POS 124c */
 
 	/*** Encryption settings (WEP) ***/
 	UINT8		wep_enabled;

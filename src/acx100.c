@@ -724,7 +724,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #if QUEUE_OPEN_AFTER_ASSOC
 	/* now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
-	acxlog(L_XFER, "stop queue after setup.\n");
+	acxlog(L_BUF, "stop queue after setup.\n");
 	netif_stop_queue(dev);
 #endif
 
@@ -1165,7 +1165,7 @@ static void acx100_up(netdevice_t *dev)
 	}
 	acx100_start(priv);
 	
-	acxlog(L_XFER, "start queue on startup.\n");
+	acxlog(L_BUF, "start queue on startup.\n");
 	netif_start_queue(dev);
 
 	FN_EXIT(0, 0);
@@ -1194,7 +1194,7 @@ static void acx100_down(netdevice_t *dev)
 
 	FN_ENTER;
 
-	acxlog(L_XFER, "stop queue during close.\n");
+	acxlog(L_BUF, "stop queue during close.\n");
 	netif_stop_queue(dev);
 	acx100_set_status(priv, ISTATUS_0_STARTED);
 
@@ -1412,7 +1412,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	 * queue open from the beginning (as long as we're not full,
 	 * and also even before we're even associated),
 	 * otherwise we'll get NETDEV WATCHDOG transmit timeouts... */
-	acxlog(L_XFER, "stop queue during Tx.\n");
+	acxlog(L_BUF, "stop queue during Tx.\n");
 	netif_stop_queue(dev);
 #endif
 #if UNUSED
@@ -1452,7 +1452,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	/* tx_desc = &priv->dc.pTxDescQPool[priv->dc.pool_idx]; */
 #if 0
 	/* if((tx_desc->Ctl & 0x80) != 0){ */
-		acxlog(L_XFER, "wake queue after Tx start.\n");
+		acxlog(L_BUF, "wake queue after Tx start.\n");
 		netif_wake_queue(dev);
 	/* } */
 #endif
@@ -1498,7 +1498,7 @@ static void acx100_tx_timeout(netdevice_t *dev)
 	/* clean tx descs, they may have been completely full */
 	acx100_clean_tx_desc(priv);
 	priv->stats.tx_errors++;
-	acxlog(L_STD, "Tx timeout!\n");
+	printk("acx100: Tx timeout!\n");
 	FN_EXIT(0, 0);
 }
 
@@ -1736,7 +1736,7 @@ irqreturn_t acx100_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*/ st
 /* BS: disabling this caused my card to stop working after a few 
  * seconds when floodpinging. This should be reinvestigated ! */
 		  if (netif_queue_stopped(dev_id)) {
-			  acxlog(L_XFER, "wake queue after Tx complete.\n");
+			  acxlog(L_BUF, "wake queue after Tx complete.\n");
 			  netif_wake_queue(dev_id);
 		  }
 #endif
@@ -2036,9 +2036,9 @@ static int __init acx100_init_module(void)
 #endif
 
 #if (ACX_IO_WIDTH==32)
-	acxlog(L_STD, "acx100: Using 32 bit I/O access.\n");
+	acxlog(L_STD, "acx100: Compiled to use 32 bit I/O access.\n");
 #else
-	acxlog(L_STD, "acx100: WARNING: Using 16 bit I/O access only!\n");
+	acxlog(L_STD, "acx100: Warning: compiled to use 16 bit I/O access only!\n");
 #endif
 
 	acxlog(L_BINDEBUG, "%s: dev_info is: %s\n", __func__, dev_info);

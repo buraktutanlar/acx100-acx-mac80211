@@ -51,7 +51,7 @@ endif
 # 2.6 in-tree (kbuild)
 ifdef KERN26
 MODULES = acx_pci.ko acx_usb.ko
-CLEAN_EXTRA = *.mod *.mod.c *.mod.o
+CLEAN_EXTRA = *.mod *.mod.c *.mod.o *.o .*.cmd acx_usb*.c
 
 ifeq ($(KERNEL_BUILD),$(KERNEL_OUTPUT))
 TMPOUT =
@@ -93,6 +93,7 @@ all: modules
 install: all
 else # KERN26
 MODULES = "acx_pci.o acx_usb.o"
+CLEAN_EXTRA = *.o acx_usb*.c
 
 # 2.4 out-of-tree
 include $(ACX100_SRC)../config.mk

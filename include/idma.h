@@ -118,7 +118,7 @@ typedef struct framehdr {
 
 #define DESC_CTL2_FCS		0x02
 #define DESC_CTL2_MORE_FRAG	0x04
-#define DESC_CTL2_RTS		0x20
+#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
 
 typedef struct txdescriptor {
 	UINT32	pNextDesc;		/* pointer to the next txdescriptor */
@@ -137,13 +137,79 @@ typedef struct txdescriptor {
 	UINT8	ack_failures;			/* 0x27 */
 	UINT8	rts_failures;			/* 0x28 */
 	UINT8	rts_ok;				/* 0x29 */
-	UINT8	rate;				/* 0x2a */
-	UINT8	queue_ctrl;			/* 0x2b */
-	UINT32	queue_info;			/* 0x2c */
+	union {
+    		struct {
+			UINT8	rate;		/* 0x2a */
+			UINT8	queue_ctrl;	/* 0x2b */
+    		} __attribute__((packed));
+    		struct {
+			UINT16  rate111;
+    		} __attribute__((packed));
+	} __attribute__((packed));
+	UINT32	queue_info;			/* 0x2c (acx100, 'reserved' on acx111) */
 
-} txdesc_t;			/* size : 48 = 0x30 */
-	/* NOTE: The acx111 txdescriptor structure is 4 byte 
-	   larger than the acx100 txdescriptor */
+} txdesc_t __attribute__((packed));		/* size : 48 = 0x30 */
+/* NOTE: The acx111 txdescriptor structure is 4 byte larger */
+/* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
+
+/* Bit values for rate111 field */
+#define RATE111_1		0x0001
+#define RATE111_2		0x0002
+#define RATE111_5		0x0004
+#define RATE111_6		0x0008
+#define RATE111_9		0x0010
+#define RATE111_11		0x0020
+#define RATE111_12		0x0040
+#define RATE111_18		0x0080
+#define RATE111_22		0x0100
+#define RATE111_24		0x0200
+#define RATE111_36		0x0400
+#define RATE111_48		0x0800
+#define RATE111_54		0x1000
+#define RATE111_RESERVED	0x2000
+#define RATE111_PBCC_5_11	0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
+#define RATE111_SHORTPRE	0x8000  /* short preamble */
+
+/* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
+     11b  11g  11a
+     ---- ---- ----
+ 1  |B   |B   |
+ 2  |Q   |Q   |
+ 5.5|Cp  |Cp  |
+ 6  |    |O  d|O
+ 9  |    |  od| o
+11  |Cp  |Cp  |
+12  |    |O  d|O
+18  |    |  od| o
+22  |    | p  |
+24  |    |O  d|O
+33  |    | p  |
+36  |    |  od| o
+48  |    |  od| o
+54  |    |  od| o
+
+Mandatory:
+ B - DBPSK
+ Q - DQPSK
+ C - CCK
+ O - OFDM
+Optional:
+ o - OFDM
+ p - PBCC
+ d - CCK-OFDM (also known as DSSS-ODFM)
+
+DBPSK = Differential Binary Phase Shift Keying
+DQPSK = Differential Quaternary Phase Shift Keying
+DSSS = Direct Sequence Spread Spectrum
+CCK = Complementary Code Keying, a form of DSSS
+PBCC = Packet Binary Convolutional Coding
+OFDM = Orthogonal Frequency Division Multiplexing
+
+The term CCK-OFDM may be used interchangeably with DSSS-OFDM
+(the IEEE 802.11g-2003 standard uses the latter terminology).
+In the CCK-OFDM, the PLCP header of the frame uses the CCK form of DSSS,
+while the PLCP payload (the MAC frame) is modulated using OFDM.
+*/
 
 typedef struct txhostdescriptor {
 	UINT8	*data_phy;

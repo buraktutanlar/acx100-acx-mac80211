@@ -164,7 +164,7 @@ static const struct iw_priv_args acx100_ioctl_private_args[] = {
 { cmd : ACX100_IOCTL_GET_PHY_MEDIUM_BUSY,
 	set_args : 0,
 	get_args : 0,
-	name : "GetPhyMediumBusy" },
+	name : "GetPhyChanBusy" },
 { cmd : ACX100_IOCTL_SET_ED,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
@@ -959,6 +959,11 @@ static inline int acx100_ioctl_set_rate(struct net_device *dev, struct iw_reques
 			txrate_auto_idx_max = 4;
 			break;
 
+		case 54000000:	/* 54Mbps */
+			txrate_cfg = ACX_TXRATE_54_G;
+			txrate_auto_idx_max = 12;
+			break;
+
 #if BITRATE_AUTO
 		case -1: /* highest available */
 			/* -1 is used to set highest available rate in
@@ -1153,15 +1158,13 @@ static inline int acx100_ioctl_set_encode(struct net_device *dev, struct iw_requ
 		goto end;
 	}
 
-	index = dwrq->flags & IW_ENCODE_INDEX;
+	index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 
 	if (dwrq->length > 0) {
 
 		/* if index is 0 or invalid, use default key */
-		if ((index == 0) || (index > 4))
+		if ((index < 0) || (index > 3))
 			index = (int)priv->wep_current_index;
-		else
-			index--;
 
 		if (0 == (dwrq->flags & IW_ENCODE_NOKEY)) {
 			if (dwrq->length > 29)
@@ -1252,6 +1255,7 @@ end:
 static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_request_info *info, struct iw_point *dwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 
 	if (ACX_MODE_0_IBSS_ADHOC == priv->macmode_wanted) {
 		/* it's most definitely supported now. */
@@ -1264,20 +1268,22 @@ static inline int acx100_ioctl_get_encode(struct net_device *dev, struct iw_requ
 	}
 	else
 	{
+		if ((index < 0) || (index > 3))
+			index = (int)priv->wep_current_index;
+
 		dwrq->flags =
 			(priv->wep_restricted == (UINT8)1) ? IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
 
 		dwrq->length =
-		    priv->wep_keys[priv->wep_current_index].size;
+		    priv->wep_keys[index].size;
 
 		memcpy(extra,
-			     priv->wep_keys[priv->wep_current_index].key,
-			     priv->wep_keys[priv->wep_current_index].size);
+			     priv->wep_keys[index].key,
+			     priv->wep_keys[index].size);
 	}
 
 	/* set the current index */
-	dwrq->flags |=
-	    priv->wep_keys[priv->wep_current_index].index + 1;
+	dwrq->flags |= index + 1;
 
 	acxlog(L_IOCTL, "len = %d, key = %p, flags = 0x%x\n",
 	       dwrq->length, dwrq->pointer,
@@ -2681,7 +2687,7 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 }
 
 /*----------------------------------------------------------------
-* acx100_ioctl_get_phy_busy_percentage
+* acx100_ioctl_get_phy_chan_busy_percentage
 *
 *
 * Arguments:
@@ -2697,7 +2703,7 @@ static inline int acx100_ioctl_set_phy_amp_bias(struct net_device *dev, struct i
 * Comment:
 *
 *----------------------------------------------------------------*/
-static inline int acx100_ioctl_get_phy_busy_percentage(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+static inline int acx100_ioctl_get_phy_chan_busy_percentage(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	struct {
@@ -2709,7 +2715,7 @@ static inline int acx100_ioctl_get_phy_busy_percentage(struct net_device *dev, s
 
 	if (!acx100_interrogate(priv, &usage, ACX1xx_IE_MEDIUM_USAGE))
 		return 0;
-	(void)printk("Medium usage percentage since last invocation: %d%% (microseconds: %d of %d)\n", usage.busytime * 100 / usage.totaltime, usage.busytime, usage.totaltime);
+	(void)printk("Medium busy percentage since last invocation: %d%% (microseconds: %u of %u)\n", 100 * (usage.busytime / 100) / (usage.totaltime / 100), usage.busytime, usage.totaltime); /* prevent calculation overflow */
 	return 0;
 }
 
@@ -2912,7 +2918,7 @@ static const iw_handler acx100_ioctl_private_handler[] =
 	(iw_handler) acx100_ioctl_set_rx_antenna,
 	(iw_handler) acx100_ioctl_set_tx_antenna,
 	(iw_handler) acx100_ioctl_set_phy_amp_bias,
-	(iw_handler) acx100_ioctl_get_phy_busy_percentage,
+	(iw_handler) acx100_ioctl_get_phy_chan_busy_percentage,
 	(iw_handler) acx100_ioctl_set_ed_threshold,
 	(iw_handler) acx100_ioctl_set_cca,
 	(iw_handler) acx100_ioctl_set_scan_chan_delay,

@@ -273,10 +273,12 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
         UINT8 *a;
 	fw_stats_t *fw_stats;
 	char *rtl, *thd, *ttl;
+	unsigned long flags;
 
 	FN_ENTER;
 
 	p += sprintf(p, "*** Rx buf ***\n");
+	spin_lock_irqsave(&pDc->rx_lock, flags);
 	for (i = 0; i < pDc->rx_pool_count; i++)
 	{
 		rtl = (i == pDc->rx_tail) ? " [tail]" : "";
@@ -286,19 +288,25 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 		else
 			p += sprintf(p, "%02u empty%s\n", i, rtl);
 	}
+	spin_unlock_irqrestore(&pDc->rx_lock, flags);
 	p += sprintf(p, "\n");
-	p += sprintf(p, "*** Tx buf ***\n");
+	spin_lock_irqsave(&pDc->tx_lock, flags);
+	p += sprintf(p, "*** Tx buf (free: %d) ***\n", priv->TxQueueFree);
 	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
 		thd = (i == pDc->tx_head) ? " [head]" : "";
 		ttl = (i == pDc->tx_tail) ? " [tail]" : "";
-		if ((UINT8)DESC_CTL_DONE == (pTxDesc->Ctl & (UINT8)DESC_CTL_DONE))
-			p += sprintf(p, "%02u DONE %s%s\n", i, thd, ttl);
+		if (pTxDesc->Ctl & ACX100_CTL_ACXDONE)
+			p += sprintf(p, "%02u DONE  %s%s\n", i, thd, ttl);
 		else
-			p += sprintf(p, "%02u empty%s%s\n", i, thd, ttl);
+		if (!(pTxDesc->Ctl & ACX100_CTL_OWN))
+			p += sprintf(p, "%02u TxWait%s%s\n", i, thd, ttl);
+		else
+			p += sprintf(p, "%02u empty %s%s\n", i, thd, ttl);
 		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
+	spin_unlock_irqrestore(&pDc->tx_lock, flags);
 	p += sprintf(p, "\n");
 	p += sprintf(p, "*** network status ***\n");
 	p += sprintf(p, "dev_state_mask: 0x%04x\n", priv->dev_state_mask);
@@ -1087,6 +1095,7 @@ int acx100_load_radio(wlandevice_t *priv)
 	filename = kmalloc(PATH_MAX, GFP_USER);
 	if (!filename) {
 		acxlog(L_STD, "ALERT: can't allocate filename\n");
+		FN_EXIT(0, 0);
 		return 0;
 	}
 
@@ -1106,6 +1115,7 @@ int acx100_load_radio(wlandevice_t *priv)
 	{
 		acxlog(L_STD,"WARNING: no suitable radio module (%s) found to load. No problem in case of a combined firmware, FATAL when using a separated firmware (base firmware / radio image).\n",filename);
 		kfree(filename);
+		FN_EXIT(1, 1);
 		return 1; /* Doesn't need to be fatal, we might be using a combined image */
 	}
 
@@ -1128,7 +1138,11 @@ int acx100_load_radio(wlandevice_t *priv)
 	
 	vfree(radio_image);
 	
-	if ((0 == res1) || (0 == res2)) return 0;
+	if ((0 == res1) || (0 == res2))
+	{
+		FN_EXIT(0, 0);
+		return 0;
+	}
 
 	/* will take a moment so let's have a big timeout */
 	acx100_issue_cmd(priv, ACX1xx_CMD_RADIOINIT, &radioinit, sizeof(radioinit), 120000);
@@ -1137,8 +1151,10 @@ int acx100_load_radio(wlandevice_t *priv)
 	if (0 == acx100_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP))
 	{
 		acxlog(L_STD, "Error reading memory map\n");
+		FN_EXIT(0, 0);
 		return 0;
 	}
+	FN_EXIT(0, 0);
 	return 1;
 }
 
@@ -1265,8 +1281,12 @@ void acx111_set_wepkey( wlandevice_t *priv )
       memset(&dk, 0, sizeof(dk));
       dk.action = 1;            /* add key */
       dk.keySize = priv->wep_keys[i].size;
+
+    /* is this two lines nessesary ?*/
       dk.type = 0;              /* default wep key */
       dk.index = 0;             /* ignored when setting default key */
+
+
       dk.defaultKeyNum = i;
       memcpy(dk.key, priv->wep_keys[i].key, dk.keySize);
       acx100_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &dk, sizeof(dk), 5000);
@@ -1326,12 +1346,8 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 			return 0;
 		}
 
-	} 
-
-	options.NumKeys = cpu_to_le16(NUM_WEPKEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
-	options.WEPOption = (UINT8)0x00;
-
-	if(priv->chip_type == CHIPTYPE_ACX100) {
+		options.NumKeys = cpu_to_le16(NUM_WEPKEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
+		options.WEPOption = (UINT8)0x00;
 
 		acxlog(L_ASSOC, "%s: writing WEP options.\n", __func__);
 		acx100_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
@@ -1370,9 +1386,17 @@ int acx100_init_wep(wlandevice_t *priv, acx100_memmap_t *pt)
 			acxlog(L_STD, "ctlMemoryMapWrite #2 failed!\n");
 			return 0;
 		}
+	} else {
+	    acx111_set_wepkey( priv );
+
+	    if (priv->wep_keys[priv->wep_current_index].size != 0) {
+		acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
+		dk.KeyID = priv->wep_current_index;
+		acx100_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
+	    }
 	}
 
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 1);
 	return 1;
 }
 
@@ -1495,11 +1519,14 @@ int acx100_init_max_probe_response_template(wlandevice_t *priv)
 int acx100_init_max_probe_request_template(wlandevice_t *priv)
 {
 	probereq_t pr;
+	int res;
 
 	FN_ENTER;
 	memset(&pr, 0, sizeof(struct probereq));
 	pr.size = cpu_to_le16(sizeof(struct probereq) - 0x2);	/* subtract size of size field */
-	return acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct probereq), 5000);
+	res = acx100_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(struct probereq), 5000);
+	FN_EXIT(1, res);
+	return res;
 }
 
 /*----------------------------------------------------------------
@@ -1942,6 +1969,7 @@ void acx100_scan_chan(wlandevice_t *priv)
 
 	if(priv->chip_type == CHIPTYPE_ACX111) {
 		acxlog(L_STD, "ERROR: trying to invoke acx100_scan_chan, but wlandevice == acx111!\n");
+		FN_EXIT(0, 0);
 		return;
 	}
 
@@ -2655,19 +2683,31 @@ int acx100_set_defaults(wlandevice_t *priv)
 
 	/* Supported Rates element - the rates here are given in units of
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
-	priv->rate_spt_len = (UINT8)5;
-	priv->rate_support1[0] = (UINT8)0x82;	/* 1Mbps */
-	priv->rate_support1[1] = (UINT8)0x84;	/* 2Mbps */
-	priv->rate_support1[2] = (UINT8)0x8b;	/* 5.5Mbps */
-	priv->rate_support1[3] = (UINT8)0x96;	/* 11Mbps */
-	priv->rate_support1[4] = (UINT8)0xac;	/* 22Mbps */
 
-	priv->rate_support2[0] = (UINT8)0x82;	/* 1Mbps */
-	priv->rate_support2[1] = (UINT8)0x84;	/* 2Mbps */
-	priv->rate_support2[2] = (UINT8)0x8b;	/* 5.5Mbps */
-	priv->rate_support2[3] = (UINT8)0x96;	/* 11Mbps */
-	priv->rate_support2[4] = (UINT8)0xac;	/* 22Mbps */
+	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
+	    priv->rate_spt_len = (UINT8)13;
+	    priv->rate_support1[0] = (UINT8)ACX_RXRATE_1;	/* 1Mbps */
+	    priv->rate_support1[1] = (UINT8)ACX_RXRATE_2;	/* 2Mbps */
+	    priv->rate_support1[2] = (UINT8)ACX_RXRATE_5_5;	/* 5.5Mbps */
+	    priv->rate_support1[3] = (UINT8)ACX_RXRATE_6_G;	/* 6Mbps */
+	    priv->rate_support1[4] = (UINT8)ACX_RXRATE_9_G;	/* 9Mbps */
+	    priv->rate_support1[5] = (UINT8)ACX_RXRATE_11;	/* 11Mbps */
+	    priv->rate_support1[6] = (UINT8)ACX_RXRATE_12_G;	/* 12Mbps */
+	    priv->rate_support1[7] = (UINT8)ACX_RXRATE_18_G;	/* 18Mbps */
+	    priv->rate_support1[8] = (UINT8)ACX_RXRATE_22PBCC;	/* 22Mbps */
+	    priv->rate_support1[9] = (UINT8)ACX_RXRATE_24_G;	/* 24Mbps */
+	    priv->rate_support1[10] = (UINT8)ACX_RXRATE_36_G;	/* 36Mbps */
+	    priv->rate_support1[11] = (UINT8)ACX_RXRATE_48_G;	/* 48Mbps */
+	    priv->rate_support1[12] = (UINT8)ACX_RXRATE_54_G;	/* 54Mbps */
 
+	} else {
+	    priv->rate_spt_len = (UINT8)5;
+	    priv->rate_support1[0] = (UINT8)ACX_RXRATE_1;	/* 1Mbps */
+	    priv->rate_support1[1] = (UINT8)ACX_RXRATE_2;	/* 2Mbps */
+	    priv->rate_support1[2] = (UINT8)ACX_RXRATE_5_5;	/* 5.5Mbps */
+	    priv->rate_support1[3] = (UINT8)ACX_RXRATE_11;	/* 11Mbps */
+	    priv->rate_support1[4] = (UINT8)ACX_RXRATE_22PBCC;	/* 22Mbps */
+	}
 	priv->capab_short = (UINT8)0;
 	priv->capab_pbcc = (UINT8)1;
 	priv->capab_agility = (UINT8)0;
@@ -2818,7 +2858,7 @@ void acx100_set_probe_request_template(wlandevice_t *priv)
 	pt.hdr.a4.seq = cpu_to_le16(0x0);
 /*	pt.hdr.b4.a1[0x0] = 0x0; */
 	/* pt.hdr.a4.a4[0x1] = priv->next; */
-	memset(txf->val0x18, 0, 8);
+	memset(txf->timestamp, 0, 8);
 
 	/* set entry 2: Beacon Interval (2 octets) */
 	txf->beacon_interval = cpu_to_le16(priv->beacon_interval);
@@ -2935,7 +2975,10 @@ void acx100_join_bssid(wlandevice_t *priv)
 	tmp.dtim_interval = priv->dtim_interval;
 	tmp.rates_basic = priv->val0x2324[3];
 
-	tmp.rates_supported = priv->val0x2324[1];
+	if ( priv->chip_type != CHIPTYPE_ACX111 ) {
+	    tmp.rates_supported = priv->val0x2324[1];
+	}
+
 	tmp.txrate_val = (UINT8)ACX_TXRATE_2;	/* bitrate: 2Mbps */
 	tmp.preamble_type = priv->capab_short;
 	tmp.macmode = priv->macmode_chosen;	/* should be called BSS_Type? */
@@ -3010,13 +3053,13 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 #endif
 
 	if(priv->chip_type == CHIPTYPE_ACX100) {
-		if (0 == acx100_init_wep(priv, &pkt)) goto done;
+		if (0 == acx100_init_wep(priv, &pkt)) goto fail;
 		acxlog(L_DEBUG,"between init_wep and init_packet_templates\n");
-		if (!acx100_init_packet_templates(priv,&pkt)) goto done;
+		if (!acx100_init_packet_templates(priv,&pkt)) goto fail;
 
 		if (acx100_create_dma_regions(priv)) {
 			acxlog(L_STD, "acx100_create_dma_regions failed.\n");
-			goto done;
+			goto fail;
 		}
 
 	} else if(priv->chip_type == CHIPTYPE_ACX111) {
@@ -3025,23 +3068,23 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 		   2. create station context and create dma regions
 		   3. init wep default keys 
 		*/
-		if (0 == acx111_init_packet_templates(priv)) goto done;
+		if (0 == acx111_init_packet_templates(priv)) goto fail;
 
 		if (0 != acx111_create_dma_regions(priv)) {
 			acxlog(L_STD, "acx111_create_dma_regions failed.\n");
-			goto done;
+			goto fail;
 		}
 
-		if (0 == acx100_init_wep(priv, &pkt)) goto done;
+		if (0 == acx100_init_wep(priv, &pkt)) goto fail;
 	} else {
 		acxlog(L_DEBUG,"unknown chip type\n");
-		goto done;
+		goto fail;
 	}
 
 	if (1 == init)
 		if (0 == acx100_set_defaults(priv)) {
 			acxlog(L_STD, "acx100_set_defaults failed.\n");
-			goto done;
+			goto fail;
 		}
 
 
@@ -3068,13 +3111,13 @@ int acx100_init_mac(netdevice_t *dev, UINT16 init)
 		if (acx100_set_probe_response_template(priv) == 0) {
 			acxlog(L_STD,
 				   "acx100_set_probe_response_template failed.\n");
-			goto done;
+			goto fail;
 		}
 	}
 
 	result = 0;
 
-done:
+fail:
 /*	  acx100_enable_irq(priv); */
 /*	  acx100_start(priv); */
 	FN_EXIT(1, result);
@@ -3118,6 +3161,7 @@ void acx100_start(wlandevice_t *priv)
 		if (acx100_lock(priv, &flags))
 		{
 			acxlog(L_STD, "ERROR: lock failed!\n");
+			FN_EXIT(0, 0);
 			return;
 		}
 
@@ -3284,7 +3328,7 @@ UINT16 acx100_read_eeprom_offset(wlandevice_t *priv,
 		if (++count > 0xffff) {
 			result = 0;
 			acxlog(L_BINSTD, "%s: timeout waiting for read eeprom cmd\n", __func__);
-			goto done;
+			goto fail;
 		}
 	}
 
@@ -3292,7 +3336,7 @@ UINT16 acx100_read_eeprom_offset(wlandevice_t *priv,
 	acxlog(L_DEBUG, "EEPROM read 0x%04x --> 0x%02x\n", addr, *charbuf); 
 	result = 1;
 
-done:
+fail:
 	FN_EXIT(1, result);
 #endif
 	return result;
@@ -3430,7 +3474,7 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 #ifdef BROKEN_KILLS_TRAFFIC
 			acx100_write_reg32(priv, priv->io[IO_ACX_ENABLE], 0x3); /* reenable Rx/Tx */
 #endif
-			goto done;
+			goto fail;
 		}
 	}
 
@@ -3451,8 +3495,8 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 #endif
 	acxlog(L_DEBUG, "radio PHY read 0x%02x from 0x%04x\n", *charbuf, reg); 
 	result = 1;
-	goto done; /* silence compiler warning */
-done:
+	goto fail; /* silence compiler warning */
+fail:
 	FN_EXIT(1, result);
 	return result;
 }

@@ -19,6 +19,10 @@ CHAN=6 # it's useful to try to stick to channels 1, 6 or 11 only, since these do
 MODE=Auto # Auto == auto-select Managed or Ad-Hoc depending on environment
 DEBUG=0xb
 #KEY="B401CD21B44CCD21DEADBEEF11" # WEP128
+#KEY0="1234567890"  #WEP64
+#KEY1="1234567890"
+#KEY2="1234567890"
+#KEY3="1234567890"
 ALG=open # open == Open System, restricted == Shared Key
 
 USE_DHCP=0 # set to 1 for auto configuration instead of fixed IP setting
@@ -121,6 +125,30 @@ fi
 if test -n "$KEY"; then
   echo Setting key to $KEY, algorithm $ALG.
   $IWCONF $DEV key $ALG "$KEY"
+  test "$?" != "0" && echo Failed.
+fi
+
+if test -n "$KEY0"; then
+  echo Setting key 0 to $KEY0, algorithm $ALG.
+  $IWCONF $DEV key $ALG "$KEY0" [1]
+  test "$?" != "0" && echo Failed.
+fi
+
+if test -n "$KEY1"; then
+  echo Setting key 1 to $KEY1, algorithm $ALG.
+  $IWCONF $DEV key $ALG "$KEY1" [2]
+  test "$?" != "0" && echo Failed.
+fi
+
+if test -n "$KEY2"; then
+  echo Setting key 2 to $KEY2, algorithm $ALG.
+  $IWCONF $DEV key $ALG "$KEY2" [3]
+  test "$?" != "0" && echo Failed.
+fi
+
+if test -n "$KEY3"; then
+  echo Setting key 3 to $KEY3, algorithm $ALG.
+  $IWCONF $DEV key $ALG "$KEY3" [4]
   test "$?" != "0" && echo Failed.
 fi
 

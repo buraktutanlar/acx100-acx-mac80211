@@ -399,7 +399,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 		{
 			/* ah, we're newly associated now,
 			 * so let's restart the net queue */
-			acxlog(L_XFER, "wake queue after association.\n");
+			acxlog(L_BUF, "wake queue after association.\n");
 			netif_wake_queue(priv->netdev);
 		}
 		associated = 1;
@@ -409,7 +409,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 		/* not associated any more, so let's stop the net queue */
 		if (associated == 1)
 		{
-			acxlog(L_XFER, "stop queue after losing association.\n");
+			acxlog(L_BUF, "stop queue after losing association.\n");
 			netif_stop_queue(priv->netdev);
 		}
 		associated = 0;
@@ -622,16 +622,26 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 			payload->rates.element_ID = 1;
 			payload->rates.length = priv->rate_spt_len;
-			payload->rates.sup_rates[0] = 0x82; /* 1 Mbit */
-			payload->rates.sup_rates[1] = 0x84; /* 2 Mbit */
-			payload->rates.sup_rates[2] = 0x8b; /* 5.5 Mbit */
-			payload->rates.sup_rates[3] = 0x96; /* 11 Mbit */
-			payload->rates.sup_rates[4] = 0xac; /* 22 Mbit */
-
+			payload->rates.sup_rates[0] = ACX_RXRATE_1; /* 1 Mbit */
+			payload->rates.sup_rates[1] = ACX_RXRATE_2; /* 2 Mbit */
+			payload->rates.sup_rates[2] = ACX_RXRATE_5_5; /* 5.5 Mbit */
+			payload->rates.sup_rates[3] = ACX_RXRATE_11; /* 11 Mbit */
+			payload->rates.sup_rates[4] = ACX_RXRATE_22PBCC; /* 22 Mbit (was 0xAC) */
+			
+			if ( CHIPTYPE_ACX111 == priv->chip_type ) {
+			    payload->rates.sup_rates[5] = ACX_RXRATE_6_G;
+			    payload->rates.sup_rates[6] = ACX_RXRATE_9_G;
+			    payload->rates.sup_rates[7] = ACX_RXRATE_12_G;
+			    payload->rates.sup_rates[8] = ACX_RXRATE_18_G;
+			    payload->rates.sup_rates[9] = ACX_RXRATE_24_G;
+			    payload->rates.sup_rates[10] = ACX_RXRATE_36_G;
+			    payload->rates.sup_rates[11] = ACX_RXRATE_48_G;
+			    payload->rates.sup_rates[12] = ACX_RXRATE_54_G;
+			}
 			hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
 			hdesc_payload->data_offset = 0;
 
-			tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+			tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
 
 			acx100_dma_tx_data(priv, tx_desc);
 		}
@@ -748,16 +758,28 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 
 		payload->rates.element_ID = 1;
 		payload->rates.length = priv->rate_spt_len;
-		payload->rates.sup_rates[0] = 0x82; /* 1 Mbit */
-		payload->rates.sup_rates[1] = 0x84; /* 2 Mbit */
-		payload->rates.sup_rates[2] = 0x8b; /* 5.5 Mbit */
-		payload->rates.sup_rates[3] = 0x96; /* 11 Mbit */
-		payload->rates.sup_rates[4] = 0xac; /* 22 Mbit */
+		payload->rates.sup_rates[0] = ACX_RXRATE_1; /* 1 Mbit */
+		payload->rates.sup_rates[1] = ACX_RXRATE_2; /* 2 Mbit */
+		payload->rates.sup_rates[2] = ACX_RXRATE_5_5; /* 5.5 Mbit */
+		payload->rates.sup_rates[3] = ACX_RXRATE_11; /* 11 Mbit */
+		payload->rates.sup_rates[4] = ACX_RXRATE_22PBCC; /* 22 Mbit (was 0xAC) */
+
+		if ( CHIPTYPE_ACX111 == priv->chip_type ) {
+		    payload->rates.sup_rates[5] = ACX_RXRATE_6_G;
+		    payload->rates.sup_rates[6] = ACX_RXRATE_9_G;
+		    payload->rates.sup_rates[7] = ACX_RXRATE_12_G;
+		    payload->rates.sup_rates[8] = ACX_RXRATE_18_G;
+		    payload->rates.sup_rates[9] = ACX_RXRATE_24_G;
+		    payload->rates.sup_rates[10] = ACX_RXRATE_36_G;
+		    payload->rates.sup_rates[11] = ACX_RXRATE_48_G;
+		    payload->rates.sup_rates[12] = ACX_RXRATE_54_G;
+		
+		}
 
 		hdesc_payload->data_offset = 0;
 		hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
 
-		tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
 
 		acx100_dma_tx_data(priv, tx_desc);
 	}
@@ -2045,7 +2067,7 @@ int acx100_transmit_deauthen(char *a, client_t *clt, wlandevice_t *priv, UINT16 
 	hdesc_payload->length = cpu_to_le16(sizeof(deauthen_frame_body_t));
 	hdesc_payload->data_offset = 0;
 
-	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + sizeof(deauthen_frame_body_t));
 
 	acx100_dma_tx_data(priv, tx_desc);
 
@@ -2116,7 +2138,7 @@ int acx100_transmit_authen1(wlandevice_t *priv)
 	hdesc_payload->length = cpu_to_le16(2 + 2 + 2); /* 6 */
 	hdesc_payload->data_offset = 0;
 
-	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + 2 + 2 + 2);
 
 	acx100_dma_tx_data(priv, tx_desc);
 	FN_EXIT(0, 0);
@@ -2207,7 +2229,7 @@ int acx100_transmit_authen2(wlan_fr_authen_t *arg_0, client_t *sta_list,
 		       hd->bssid[0], hd->bssid[1], hd->bssid[2],
 		       hd->bssid[3], hd->bssid[4], hd->bssid[5]);
 
-		tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+		tx_desc->total_length = cpu_to_le16(packet_len);
 	
 		acx100_dma_tx_data(priv, tx_desc);
 	}
@@ -2287,7 +2309,7 @@ int acx100_transmit_authen3(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_auth3!\n");
 
-	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+	tx_desc->total_length = cpu_to_le16(packet_len);
 	
 	acx100_dma_tx_data(priv, tx_desc);
 	FN_EXIT(1, 0);
@@ -2355,7 +2377,7 @@ int acx100_transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *priv)
 	hdesc_payload->length = cpu_to_le16(6);
 	hdesc_payload->data_offset = 0;
 
-	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + 6);
 
 	acx100_dma_tx_data(priv, tx_desc);
 	FN_EXIT(1, 0);
@@ -2473,7 +2495,7 @@ int acx100_transmit_assoc_req(wlandevice_t *priv)
 	payload->length = cpu_to_le16(packet_len - WLAN_HDR_A3_LEN);
 	payload->data_offset = 0;
 
-	tx_desc->total_length = payload->length + header->length;
+	tx_desc->total_length = cpu_to_le16(packet_len);
 
 	acx100_dma_tx_data(priv, tx_desc);
 	FN_EXIT(1, 0);
@@ -2541,7 +2563,7 @@ UINT32 acx100_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 		hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
 		hdesc_payload->data_offset = 0;
 
-		tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
+		tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + priv->rate_spt_len + 8);
 
 		/* FIXME: lengths missing! */
 		acx100_dma_tx_data(priv, tx_desc);
