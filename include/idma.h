@@ -128,8 +128,8 @@ typedef struct txdescriptor {
 	UINT32	val0x18;			/* 0x18 */
 	struct	txhostdescriptor *host_desc;	/* 0x1c */
 	UINT32	val0x20;			/* 0x20 */
-	UINT8	Ctl;				/* 0x24 */
-	UINT8	Ctl2;				/* 0x25 */
+	UINT8	Ctl_8;				/* 0x24, 8bit value */
+	UINT8	Ctl2_8;				/* 0x25, 8bit value */
 	UINT8	error;				/* 0x26 */
 	UINT8	ack_failures;			/* 0x27 */
 	UINT8	rts_failures;			/* 0x28 */
@@ -222,7 +222,7 @@ typedef struct txhostdescriptor {
 	UINT8	*data_phy;
 	UINT16	data_offset;
 	UINT16	reserved;
-	UINT16	Ctl;
+	UINT16	Ctl_16; /* 16bit value, endianness!! */
 	UINT16	length;
 	struct	txhostdescriptor *desc_phy_next;	
 	struct	txhostdescriptor *pNext;	/* 0x10 */
@@ -253,7 +253,7 @@ typedef struct rxdescriptor {
 	struct	rxbuffer *val0x24;		/* 0x24 */
 #endif 
 
-	UINT8	Ctl;
+	UINT8	Ctl_8;
 	UINT8	rate;
 	UINT8	error;
 	UINT8	SNR;				/* modulation / preamble */
@@ -267,7 +267,7 @@ typedef struct rxhostdescriptor {
 	struct	rxbuffer *data_phy;
 	UINT16	data_offset;
 	UINT16	reserved;
-	UINT16	Ctl;
+	UINT16	Ctl_16; /* 16bit value, endianness!! */
 	UINT16	length;
 	struct	rxhostdescriptor *desc_phy_next;
 	struct	rxhostdescriptor *pNext;

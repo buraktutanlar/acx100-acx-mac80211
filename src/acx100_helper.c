@@ -273,7 +273,7 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	char *p = buf;
 	unsigned int i;
         TIWLAN_DC *pDc = &priv->dc;
-        struct rxhostdescriptor *pDesc;
+        struct rxhostdescriptor *pRxDesc;
 	txdesc_t *pTxDesc;
         UINT8 *a;
 	fw_stats_t *fw_stats;
@@ -287,8 +287,8 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	for (i = 0; i < pDc->rx_pool_count; i++)
 	{
 		rtl = (i == pDc->rx_tail) ? " [tail]" : "";
-		pDesc = &pDc->pRxHostDescQPool[i];
-		if ((0 != (pDesc->Ctl & ACX100_CTL_OWN)) && (0 != (pDesc->Status & BIT31)))
+		pRxDesc = &pDc->pRxHostDescQPool[i];
+		if ((0 != (le16_to_cpu(pRxDesc->Ctl_16) & ACX100_CTL_OWN)) && (0 != (le32_to_cpu(pRxDesc->Status) & BIT31)))
 			p += sprintf(p, "%02u FULL%s\n", i, rtl);
 		else
 			p += sprintf(p, "%02u empty%s\n", i, rtl);
@@ -296,19 +296,19 @@ int acx100_proc_diag_output(char *buf, wlandevice_t *priv)
 	spin_unlock_irqrestore(&pDc->rx_lock, flags);
 	p += sprintf(p, "\n");
 	spin_lock_irqsave(&pDc->tx_lock, flags);
-	p += sprintf(p, "*** Tx buf (free: %d) ***\n", priv->TxQueueFree);
+	p += sprintf(p, "*** Tx buf (free: %d, Linux netqueue: %s) ***\n", priv->TxQueueFree, netif_queue_stopped(priv->netdev) ? "STOPPED" : "running");
 	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++)
 	{
 		thd = (i == pDc->tx_head) ? " [head]" : "";
 		ttl = (i == pDc->tx_tail) ? " [tail]" : "";
-		if (pTxDesc->Ctl & ACX100_CTL_ACXDONE)
-			p += sprintf(p, "%02u DONE  %s%s\n", i, thd, ttl);
+		if (pTxDesc->Ctl_8 & ACX100_CTL_ACXDONE)
+			p += sprintf(p, "%02u DONE   (%02x)%s%s\n", i, pTxDesc->Ctl_8, thd, ttl);
 		else
-		if (!(pTxDesc->Ctl & ACX100_CTL_OWN))
-			p += sprintf(p, "%02u TxWait%s%s\n", i, thd, ttl);
+		if (!(pTxDesc->Ctl_8 & ACX100_CTL_OWN))
+			p += sprintf(p, "%02u TxWait (%02x)%s%s\n", i, pTxDesc->Ctl_8, thd, ttl);
 		else
-			p += sprintf(p, "%02u empty %s%s\n", i, thd, ttl);
+			p += sprintf(p, "%02u empty  (%02x)%s%s\n", i, pTxDesc->Ctl_8, thd, ttl);
 		pTxDesc = GET_NEXT_TX_DESC_PTR(pDc, pTxDesc);
 	}
 	spin_unlock_irqrestore(&pDc->tx_lock, flags);
@@ -2717,28 +2717,28 @@ int acx100_set_defaults(wlandevice_t *priv)
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
 
 	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
-	    priv->rate_spt_len = (UINT8)13;
-	    priv->rate_support1[0] = (UINT8)ACX_RXRATE_1;	/* 1Mbps */
-	    priv->rate_support1[1] = (UINT8)ACX_RXRATE_2;	/* 2Mbps */
-	    priv->rate_support1[2] = (UINT8)ACX_RXRATE_5_5;	/* 5.5Mbps */
-	    priv->rate_support1[3] = (UINT8)ACX_RXRATE_6_G;	/* 6Mbps */
-	    priv->rate_support1[4] = (UINT8)ACX_RXRATE_9_G;	/* 9Mbps */
-	    priv->rate_support1[5] = (UINT8)ACX_RXRATE_11;	/* 11Mbps */
-	    priv->rate_support1[6] = (UINT8)ACX_RXRATE_12_G;	/* 12Mbps */
-	    priv->rate_support1[7] = (UINT8)ACX_RXRATE_18_G;	/* 18Mbps */
-	    priv->rate_support1[8] = (UINT8)ACX_RXRATE_22PBCC;	/* 22Mbps */
-	    priv->rate_support1[9] = (UINT8)ACX_RXRATE_24_G;	/* 24Mbps */
-	    priv->rate_support1[10] = (UINT8)ACX_RXRATE_36_G;	/* 36Mbps */
-	    priv->rate_support1[11] = (UINT8)ACX_RXRATE_48_G;	/* 48Mbps */
-	    priv->rate_support1[12] = (UINT8)ACX_RXRATE_54_G;	/* 54Mbps */
+	    priv->rate_spt_len = 13;
+	    priv->rate_support1[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC;	/* 1Mbps */
+	    priv->rate_support1[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC;	/* 2Mbps */
+	    priv->rate_support1[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC;	/* 5.5Mbps */
+	    priv->rate_support1[3] = DOT11RATEBYTE_6_G;	/* 6Mbps */
+	    priv->rate_support1[4] = DOT11RATEBYTE_9_G;	/* 9Mbps */
+	    priv->rate_support1[5] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC;	/* 11Mbps */
+	    priv->rate_support1[6] = DOT11RATEBYTE_12_G;	/* 12Mbps */
+	    priv->rate_support1[7] = DOT11RATEBYTE_18_G;	/* 18Mbps */
+	    priv->rate_support1[8] = DOT11RATEBYTE_22;		/* 22Mbps */
+	    priv->rate_support1[9] = DOT11RATEBYTE_24_G;	/* 24Mbps */
+	    priv->rate_support1[10] = DOT11RATEBYTE_36_G;	/* 36Mbps */
+	    priv->rate_support1[11] = DOT11RATEBYTE_48_G;	/* 48Mbps */
+	    priv->rate_support1[12] = DOT11RATEBYTE_54_G;	/* 54Mbps */
 
 	} else {
-	    priv->rate_spt_len = (UINT8)5;
-	    priv->rate_support1[0] = (UINT8)ACX_RXRATE_1;	/* 1Mbps */
-	    priv->rate_support1[1] = (UINT8)ACX_RXRATE_2;	/* 2Mbps */
-	    priv->rate_support1[2] = (UINT8)ACX_RXRATE_5_5;	/* 5.5Mbps */
-	    priv->rate_support1[3] = (UINT8)ACX_RXRATE_11;	/* 11Mbps */
-	    priv->rate_support1[4] = (UINT8)ACX_RXRATE_22PBCC;	/* 22Mbps */
+	    priv->rate_spt_len = 5;
+	    priv->rate_support1[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC;	/* 1Mbps */
+	    priv->rate_support1[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC;	/* 2Mbps */
+	    priv->rate_support1[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC;	/* 5.5Mbps */
+	    priv->rate_support1[3] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC;	/* 11Mbps */
+	    priv->rate_support1[4] = DOT11RATEBYTE_22;	/* 22Mbps */
 	}
 	priv->capab_short = (UINT8)0;
 	priv->capab_pbcc = (UINT8)1;

@@ -791,25 +791,21 @@ typedef struct acx100_InfFrame {
 #define ACX_TXRATE_48_G		0x01
 #define ACX_TXRATE_54_G		0x03
 
-#define ACX_RXRATE_1		0x82
-#define ACX_RXRATE_2		0x84
-#define ACX_RXRATE_5_5		0x8B
-#define ACX_RXRATE_5_5PBCC	0x0B
-#define ACX_RXRATE_11		0x96
-#define ACX_RXRATE_11PBCC	0x16
-#define ACX_RXRATE_22PBCC	0x2C
-#define ACX_RXRATE_6_G		0x0C
-#define ACX_RXRATE_9_G		0x12
-#define ACX_RXRATE_12_G		0x18
-#define ACX_RXRATE_18_G		0x24
-#define ACX_RXRATE_24_G		0x30
-#define ACX_RXRATE_36_G		0x48
-#define ACX_RXRATE_48_G		0x60
-#define ACX_RXRATE_54_G		0x6C
-
-
-
-
+/* Used in beacon frames and the like */
+#define DOT11RATEBYTE_1		(1*2)
+#define DOT11RATEBYTE_2		(2*2)
+#define DOT11RATEBYTE_5_5	(5*2+1)
+#define DOT11RATEBYTE_11	(11*2)
+#define DOT11RATEBYTE_22	(22*2)
+#define DOT11RATEBYTE_6_G	(6*2)
+#define DOT11RATEBYTE_9_G	(9*2)
+#define DOT11RATEBYTE_12_G	(12*2)
+#define DOT11RATEBYTE_18_G	(18*2)
+#define DOT11RATEBYTE_24_G	(24*2)
+#define DOT11RATEBYTE_36_G	(36*2)
+#define DOT11RATEBYTE_48_G	(48*2)
+#define DOT11RATEBYTE_54_G	(54*2)
+#define DOT11RATEBYTE_BASIC	0x80	/* flags rates included in basic rate set */
 
 #if (WLAN_HOSTIF == WLAN_USB)
 

@@ -901,9 +901,9 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 		offset=0;
 		while (offset<size) {
 			rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
-			rxdesc->Ctl|=ACX100_CTL_OWN;
-			rxdesc->Status=0xF0000000;	/* set the MSB */
-			packetsize=(ptr->mac_cnt_rcvd & 0xfff)+ACX100_RXBUF_HDRSIZE; /* packetsize is limited to 12 bits */
+			rxdesc->Ctl_16 |= cpu_to_le16(ACX100_CTL_OWN);
+			rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
+			packetsize=(le16_to_cpu(ptr->mac_cnt_rcvd) & 0xfff)+ACX100_RXBUF_HDRSIZE; /* packetsize is limited to 12 bits */
 			acxlog(L_DEBUG,"packetsize: %d\n",packetsize);
 			if (packetsize>sizeof(struct rxbuffer)) {
 				acxlog(L_STD,"acx100usb: ERROR, # of received bytes (%d) higher than capacity of buffer (%d bytes)\n",size,sizeof(struct rxbuffer));
@@ -1289,9 +1289,9 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	txdesc=priv->currentdesc;
 	header = txdesc->host_desc;
 	payload = txdesc->host_desc+1;
-	header->Ctl|=DESC_CTL_DONE;
-	payload->Ctl|=DESC_CTL_DONE;
-	txdesc->Ctl|=DESC_CTL_DONE;
+	header->Ctl_16|=cpu_to_le16(DESC_CTL_DONE);
+	payload->Ctl_16|=cpu_to_le16(DESC_CTL_DONE);
+	txdesc->Ctl_8|=DESC_CTL_DONE;
 	acx100_clean_tx_desc(priv);
 	/* ----------------------------------------------
 	** check if there are still descriptors that have
@@ -1301,7 +1301,7 @@ static void acx100usb_trigger_next_tx(wlandevice_t *priv) {
 	** ------------------------------------------- */
 	descnum=ticontext->tx_tail;
 	txdesc=&(ticontext->pTxDescQPool[descnum]);
-	if (!(txdesc->Ctl & ACX100_CTL_OWN)) {
+	if (!(txdesc->Ctl_8 & ACX100_CTL_OWN)) {
 		acx100usb_prepare_tx(priv,txdesc);
 	} else {
 		/* ----------------------------------------------

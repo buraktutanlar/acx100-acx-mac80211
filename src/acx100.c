@@ -1467,6 +1467,8 @@ static void acx100_tx_timeout(netdevice_t *dev)
 	FN_ENTER;
 	/* clean tx descs, they may have been completely full */
 	acx100_clean_tx_desc(priv);
+	/* better also reset TxQueueFree, you never know... */
+	priv->TxQueueFree = priv->TxQueueNo;
 	priv->stats.tx_errors++;
 	printk("acx100: Tx timeout!\n");
 	FN_EXIT(0, 0);

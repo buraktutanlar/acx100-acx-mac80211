@@ -114,7 +114,7 @@ void acx100_rxdesc_to_txdesc(struct rxhostdescriptor *rxdesc,
 	
 	memcpy(header->data, &rxdesc->data->buf, WLAN_HDR_A3_LEN);
 	memcpy(payload->data, &rxdesc->data->data,
-		(rxdesc->data->mac_cnt_rcvd & 0xfff) - WLAN_HDR_A3_LEN);
+		(le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN);
 
 }
 
@@ -380,7 +380,7 @@ fail:
 
 	FN_ENTER;
 
-	payload_length = (cpu_to_le16(rx_desc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN;
+	payload_length = (le16_to_cpu(rx_desc->data->mac_cnt_rcvd) & 0xfff) - WLAN_HDR_A3_LEN;
 	payload_offset = WLAN_HDR_A3_LEN;
 
 	w_hdr = (p80211_hdr_t*)&rx_desc->data->buf;

@@ -2521,7 +2521,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	TIWLAN_DC *pDc = &priv->dc;
-	struct rxdescriptor *rx_desc = (struct rxdescriptor *) pDc->pRxDescQPool;
+	struct rxdescriptor *pRxDesc = (struct rxdescriptor *) pDc->pRxDescQPool;
 	int i;
 	int result = -EINVAL;
 	struct ACX111MemoryConfig memconf;
@@ -2660,15 +2660,15 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 	for (i = 0; i < pDc->rx_pool_count; i++) {
 
 		acxlog(L_STD, "\ndump internal rxdescriptor %d:\n", i);
-		acxlog(L_STD, "mem pos %p\n", rx_desc);
-		acxlog(L_STD, "next 0x%X\n", rx_desc->pNextDesc);
-		acxlog(L_STD, "acx mem pointer (dynamic) 0x%X\n", rx_desc->ACXMemPtr);
-		acxlog(L_STD, "CTL (dynamic) 0x%X\n", rx_desc->Ctl);
-		acxlog(L_STD, "Rate (dynamic) 0x%X\n", rx_desc->rate);
-		acxlog(L_STD, "RxStatus (dynamic) 0x%X\n", rx_desc->error);
-		acxlog(L_STD, "Mod/Pre (dynamic) 0x%X\n", rx_desc->SNR);
+		acxlog(L_STD, "mem pos %p\n", pRxDesc);
+		acxlog(L_STD, "next 0x%X\n", pRxDesc->pNextDesc);
+		acxlog(L_STD, "acx mem pointer (dynamic) 0x%X\n", pRxDesc->ACXMemPtr);
+		acxlog(L_STD, "CTL (dynamic) 0x%X\n", pRxDesc->Ctl_8);
+		acxlog(L_STD, "Rate (dynamic) 0x%X\n", pRxDesc->rate);
+		acxlog(L_STD, "RxStatus (dynamic) 0x%X\n", pRxDesc->error);
+		acxlog(L_STD, "Mod/Pre (dynamic) 0x%X\n", pRxDesc->SNR);
 
-		rx_desc++;
+		pRxDesc++;
 	}
 
 	/* dump host rx descriptor ring buffer */
@@ -2682,7 +2682,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "mem pos 0x%X\n", (UINT32)rx_host_desc);
 		acxlog(L_STD, "buffer mem pos 0x%X\n", (UINT32)rx_host_desc->data_phy);
 		acxlog(L_STD, "buffer mem offset 0x%X\n", rx_host_desc->data_offset);
-		acxlog(L_STD, "CTL 0x%X\n", rx_host_desc->Ctl);
+		acxlog(L_STD, "CTL 0x%X\n", le16_to_cpu(rx_host_desc->Ctl_16));
 		acxlog(L_STD, "Length 0x%X\n", rx_host_desc->length);
 		acxlog(L_STD, "next 0x%X\n", (UINT32)rx_host_desc->desc_phy_next);
 		acxlog(L_STD, "Status 0x%X\n", rx_host_desc->Status);
@@ -2704,8 +2704,8 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "acx mem pointer (dynamic) 0x%X\n", tx_desc->AcxMemPtr);
 		acxlog(L_STD, "host mem pointer (dynamic) 0x%X\n", tx_desc->HostMemPtr);
 		acxlog(L_STD, "length (dynamic) 0x%X\n", tx_desc->total_length);
-		acxlog(L_STD, "CTL (dynamic) 0x%X\n", tx_desc->Ctl);
-		acxlog(L_STD, "CTL2 (dynamic) 0x%X\n", tx_desc->Ctl2);
+		acxlog(L_STD, "CTL (dynamic) 0x%X\n", tx_desc->Ctl_8);
+		acxlog(L_STD, "CTL2 (dynamic) 0x%X\n", tx_desc->Ctl2_8);
 		acxlog(L_STD, "Status (dynamic) 0x%X\n", tx_desc->error);
 		acxlog(L_STD, "Rate (dynamic) 0x%X\n", tx_desc->u.r1.rate);
 
@@ -2724,7 +2724,7 @@ static inline int acx100_ioctl_acx111_info(struct net_device *dev, struct iw_req
 		acxlog(L_STD, "mem pos 0x%X\n", (UINT32)tx_host_desc);
 		acxlog(L_STD, "buffer mem pos 0x%X\n", (UINT32)tx_host_desc->data_phy);
 		acxlog(L_STD, "buffer mem offset 0x%X\n", tx_host_desc->data_offset);
-		acxlog(L_STD, "CTL 0x%X\n", tx_host_desc->Ctl);
+		acxlog(L_STD, "CTL 0x%X\n", le16_to_cpu(tx_host_desc->Ctl_16));
 		acxlog(L_STD, "Length 0x%X\n", tx_host_desc->length);
 		acxlog(L_STD, "next 0x%X\n", (UINT32)tx_host_desc->desc_phy_next);
 		acxlog(L_STD, "Status 0x%X\n", tx_host_desc->Status);

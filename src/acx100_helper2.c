@@ -622,21 +622,21 @@ UINT32 acx100_transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 			payload->rates.element_ID = 1;
 			payload->rates.length = priv->rate_spt_len;
-			payload->rates.sup_rates[0] = ACX_RXRATE_1; /* 1 Mbit */
-			payload->rates.sup_rates[1] = ACX_RXRATE_2; /* 2 Mbit */
-			payload->rates.sup_rates[2] = ACX_RXRATE_5_5; /* 5.5 Mbit */
-			payload->rates.sup_rates[3] = ACX_RXRATE_11; /* 11 Mbit */
-			payload->rates.sup_rates[4] = ACX_RXRATE_22PBCC; /* 22 Mbit (was 0xAC) */
+			payload->rates.sup_rates[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC; /* 1 Mbit */
+			payload->rates.sup_rates[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC; /* 2 Mbit */
+			payload->rates.sup_rates[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC; /* 5.5 Mbit */
+			payload->rates.sup_rates[3] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC; /* 11 Mbit */
+			payload->rates.sup_rates[4] = DOT11RATEBYTE_22; /* 22 Mbit (was 0xAC) */
 			
 			if ( CHIPTYPE_ACX111 == priv->chip_type ) {
-			    payload->rates.sup_rates[5] = ACX_RXRATE_6_G;
-			    payload->rates.sup_rates[6] = ACX_RXRATE_9_G;
-			    payload->rates.sup_rates[7] = ACX_RXRATE_12_G;
-			    payload->rates.sup_rates[8] = ACX_RXRATE_18_G;
-			    payload->rates.sup_rates[9] = ACX_RXRATE_24_G;
-			    payload->rates.sup_rates[10] = ACX_RXRATE_36_G;
-			    payload->rates.sup_rates[11] = ACX_RXRATE_48_G;
-			    payload->rates.sup_rates[12] = ACX_RXRATE_54_G;
+			    payload->rates.sup_rates[5] = DOT11RATEBYTE_6_G;
+			    payload->rates.sup_rates[6] = DOT11RATEBYTE_9_G;
+			    payload->rates.sup_rates[7] = DOT11RATEBYTE_12_G;
+			    payload->rates.sup_rates[8] = DOT11RATEBYTE_18_G;
+			    payload->rates.sup_rates[9] = DOT11RATEBYTE_24_G;
+			    payload->rates.sup_rates[10] = DOT11RATEBYTE_36_G;
+			    payload->rates.sup_rates[11] = DOT11RATEBYTE_48_G;
+			    payload->rates.sup_rates[12] = DOT11RATEBYTE_54_G;
 			}
 			hdesc_payload->length = cpu_to_le16(priv->rate_spt_len + 8);
 			hdesc_payload->data_offset = 0;
@@ -758,21 +758,21 @@ UINT32 acx100_transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *pr
 
 		payload->rates.element_ID = 1;
 		payload->rates.length = priv->rate_spt_len;
-		payload->rates.sup_rates[0] = ACX_RXRATE_1; /* 1 Mbit */
-		payload->rates.sup_rates[1] = ACX_RXRATE_2; /* 2 Mbit */
-		payload->rates.sup_rates[2] = ACX_RXRATE_5_5; /* 5.5 Mbit */
-		payload->rates.sup_rates[3] = ACX_RXRATE_11; /* 11 Mbit */
-		payload->rates.sup_rates[4] = ACX_RXRATE_22PBCC; /* 22 Mbit (was 0xAC) */
+		payload->rates.sup_rates[0] = DOT11RATEBYTE_1 | DOT11RATEBYTE_BASIC; /* 1 Mbit */
+		payload->rates.sup_rates[1] = DOT11RATEBYTE_2 | DOT11RATEBYTE_BASIC; /* 2 Mbit */
+		payload->rates.sup_rates[2] = DOT11RATEBYTE_5_5 | DOT11RATEBYTE_BASIC; /* 5.5 Mbit */
+		payload->rates.sup_rates[3] = DOT11RATEBYTE_11 | DOT11RATEBYTE_BASIC; /* 11 Mbit */
+		payload->rates.sup_rates[4] = DOT11RATEBYTE_22; /* 22 Mbit */
 
 		if ( CHIPTYPE_ACX111 == priv->chip_type ) {
-		    payload->rates.sup_rates[5] = ACX_RXRATE_6_G;
-		    payload->rates.sup_rates[6] = ACX_RXRATE_9_G;
-		    payload->rates.sup_rates[7] = ACX_RXRATE_12_G;
-		    payload->rates.sup_rates[8] = ACX_RXRATE_18_G;
-		    payload->rates.sup_rates[9] = ACX_RXRATE_24_G;
-		    payload->rates.sup_rates[10] = ACX_RXRATE_36_G;
-		    payload->rates.sup_rates[11] = ACX_RXRATE_48_G;
-		    payload->rates.sup_rates[12] = ACX_RXRATE_54_G;
+		    payload->rates.sup_rates[5] = DOT11RATEBYTE_6_G;
+		    payload->rates.sup_rates[6] = DOT11RATEBYTE_9_G;
+		    payload->rates.sup_rates[7] = DOT11RATEBYTE_12_G;
+		    payload->rates.sup_rates[8] = DOT11RATEBYTE_18_G;
+		    payload->rates.sup_rates[9] = DOT11RATEBYTE_24_G;
+		    payload->rates.sup_rates[10] = DOT11RATEBYTE_36_G;
+		    payload->rates.sup_rates[11] = DOT11RATEBYTE_48_G;
+		    payload->rates.sup_rates[12] = DOT11RATEBYTE_54_G;
 		
 		}
 
@@ -1169,7 +1169,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 				alloc_p80211mgmt_req.a.beacon.buf =
 				    (char *) p80211_hdr;
 				alloc_p80211mgmt_req.a.beacon.len =
-				    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+				    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 				if (debug & L_DATA)
 				{
 					acxlog(L_DATA, "BCN fc: %X, dur: %X, seq: %X\n",
@@ -1213,7 +1213,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1232,7 +1232,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
 			acx100_process_assocresp(&alloc_p80211mgmt_req.a.
@@ -1247,7 +1247,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1264,7 +1264,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
@@ -1284,7 +1284,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 			alloc_p80211mgmt_req.a.proberesp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.proberesp.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
 			if (priv->status == ISTATUS_1_SCANNING)
@@ -1307,7 +1307,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.disassoc.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.disassoc.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 		acx_mgmt_decode_disassoc(&alloc_p80211mgmt_req.a.disassoc);
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			acx100_process_disassoc(&alloc_p80211mgmt_req.a.disassoc,
@@ -1325,7 +1325,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.authen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.authen.len =
-			    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+			    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 		acx_mgmt_decode_authen(&alloc_p80211mgmt_req.a.authen);
 		if (!memcmp(priv->bssid,
 			    alloc_p80211mgmt_req.a.authen.hdr->a3.a2,
@@ -1339,7 +1339,7 @@ static UINT32 acx100_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandev
 		alloc_p80211mgmt_req.a.deauthen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.deauthen.len =
-		    (rxdesc->data->mac_cnt_rcvd & 0xfff) - wep_offset;
+		    (le16_to_cpu(rxdesc->data->mac_cnt_rcvd) & 0xfff) - wep_offset;
 		acx_mgmt_decode_deauthen(&alloc_p80211mgmt_req.a.deauthen);
 		/* FIXME: this check is buggy: it should be ==,
 		 * but then our complete deauthen handling would have to be

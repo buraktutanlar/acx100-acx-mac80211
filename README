@@ -103,21 +103,22 @@ Feel free to send us corrections/additions to this very confusing listing above.
 Status Matrix:
 
 		ACX100			ACX100 USB		ACX111
-Rates		1/2/5.5/11/22		1/2/5.5/11/22		11/22 (54 NIY)
+Rates		1/2/5.5/11/22		1/2/5.5/11/22		all up to 54Mb?
 5GHz		--			--			NIY (any hardware?)
-Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64?/128?/256?)
-Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64?/128?/256?)
+Ad-Hoc		* (WEP64?/128?/256?)	* (WEP64?/128?/256?)	* (WEP64-/128-/256-)
+Managed		* (WEP64?/128?/256?)	? (WEP64?/128?/256?)	* (WEP64-/128-/256-)
 Auto		*			*			*
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
-Sensitivity	* (hardware)		- (no go since USB?)	- (NIY, slight problems)
+Sensitivity	* (hardware)		- (no go since USB?)	- (NIY, problems)
 
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
 We're still not totally sure about the status of WEP support.
-Many situations should work, but it might still not work properly
+ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
+ACX111: nothing yet.
 
 Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
