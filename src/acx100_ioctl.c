@@ -62,13 +62,14 @@
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
-
+#include <linux/pm.h>
 #include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
 #include <linux/skbuff.h>
 #include <linux/etherdevice.h>
+
 
 /*================================================================*/
 /* Project Includes */
@@ -79,7 +80,7 @@
 #include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
-#include <p80211conv.h>
+#include <acx100_conv.h>
 #include <p80211netdev.h>
 #include <p80211req.h>
 #include <p80211types.h>
@@ -623,7 +624,7 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 
 		if (index == 0) {
 
-			index = hw->current_index;
+			index = hw->wep_current_index;
 
 			if (iwr->u.encoding.length < 5) {
 				acx100_unlock(hw, &flags);
@@ -696,8 +697,8 @@ static inline int acx100_ioctl_set_encode(struct iwreq *iwr, wlandevice_t *hw)
 	} else if (--index <= 3) {
 		memmap_t dkey;
 
-		hw->current_index = index;
-		dkey.m.dkey.num = hw->current_index;
+		hw->wep_current_index = index;
+		dkey.m.dkey.num = hw->wep_current_index;
 
 		acx100_configure(hw, &dkey, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
 
@@ -762,16 +763,16 @@ static inline int acx100_ioctl_get_encode(struct iwreq *iwr, wlandevice_t *wland
 			(wlandev->wep_restricted == 1) ? IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
 
 		iwr->u.encoding.length =
-		    wlandev->wep_keys[wlandev->current_index].size;
+		    wlandev->wep_keys[wlandev->wep_current_index].size;
 
 		copy_to_user(iwr->u.encoding.pointer,
-			     wlandev->wep_keys[wlandev->current_index].key,
-			     wlandev->wep_keys[wlandev->current_index].size);
+			     wlandev->wep_keys[wlandev->wep_current_index].key,
+			     wlandev->wep_keys[wlandev->wep_current_index].size);
 	}
 
 	/* set the current index */
 	iwr->u.encoding.flags |=
-	    wlandev->wep_keys[wlandev->current_index].index + 1;
+	    wlandev->wep_keys[wlandev->wep_current_index].index + 1;
 
 	acxlog(L_IOCTL, "len = %d, key = %p, flags = 0x%x\n",
 	       iwr->u.encoding.length, iwr->u.encoding.pointer,
@@ -779,6 +780,27 @@ static inline int acx100_ioctl_get_encode(struct iwreq *iwr, wlandevice_t *wland
 	       
 	return 0;
 }
+
+#if EXPERIMENTAL_VER_0_3
+/* FIXME: this should be solved by decoding the radio firmware module,
+ * since it probably has some standard structure describing how to
+ * set the power level of the radio module which it controls.
+ * Or maybe not, since the radio module probably has a function interface
+ * instead which then manages Tx level programming :-\
+ */
+static inline int acx100_rfmd_set_tx_level(wlandevice_t *wlandev, UINT16 value)
+{
+	acxlog(L_STD, "setting power level to 0x%02x\n", value);
+	acx100_write_reg16(wlandev, 0x268, 0x11);
+	acx100_write_reg16(wlandev, 0x268 + 2, 0);
+	acx100_write_reg16(wlandev, 0x26c, value);
+	acx100_write_reg16(wlandev, 0x26c + 2, 0);
+	acx100_write_reg16(wlandev, 0x270, 1);
+	acx100_write_reg16(wlandev, 0x270 + 2, 0);
+
+	return 0;
+}
+#endif
 
 /*----------------------------------------------------------------
 * acx100_ioctl_get_txpow
@@ -807,19 +829,20 @@ static inline int acx100_ioctl_get_txpow(struct iwreq *iwr, wlandevice_t *hw)
 
 	acx100_lock(hw, &flags);
 
+#if EXPERIMENTAL_VER_0_3 == 0
 	/* The current firmware seems to allow only values 2 and 1, probably
 	 * with distinct power levels of 16.5 dBm or 18 dBm, respectively.
 	 */
 	acx100_interrogate(hw, &pow, ACX100_RID_DOT11_TX_POWER_LEVEL);
 
-	switch (pow.m.gp.bytes[0]) 
+	switch (pow.m.gp.bytes[0])
 	{
-	case 2: 
+	case 2:
 		txpow = "16.5";
 		txpowval = 16;
 		break;
 	
-	case 1: 
+	case 1:
 		txpow = "18";
 		txpowval = 18;
 		break;
@@ -828,16 +851,23 @@ static inline int acx100_ioctl_get_txpow(struct iwreq *iwr, wlandevice_t *hw)
 		txpowval = 0;
 		break;
 	}
+#else
+	txpowval = hw->tx_level_dbm;
+#endif
 
 	rrq->flags = IW_TXPOW_DBM;
 	rrq->disabled = 0;
 	rrq->fixed = 0;
 	rrq->value = txpowval;
 
+#if EXPERIMENTAL_VER_0_3
+	acxlog(L_IOCTL, "Get transmit power => %d dBm\n", txpowval);
+#else
 	acxlog(L_IOCTL, "Get transmit power => %s dBm\n", txpow);
+#endif
 
 	acx100_unlock(hw, &flags);
-	       
+
 	return 0;
 }
 
@@ -864,12 +894,22 @@ static inline int acx100_ioctl_set_txpow(struct iwreq *iwr, wlandevice_t *hw)
 	struct iw_param *rrq = &iwr->u.txpower;
 	char *txpow;
 	unsigned long flags;
+#if EXPERIMENTAL_VER_0_3
+	/* FIXME: most likely incorrect dBm levels for now, try to find out
+	 * proper ones */
+	unsigned char dbm2val[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
+#endif
 
 	acx100_lock(hw, &flags);
 
+#if EXPERIMENTAL_VER_0_3
+	hw->tx_level_dbm = rrq->value <= 20 ? rrq->value : 20;
+	acxlog(L_IOCTL, "Set transmit power = %d dBm\n", hw->tx_level_dbm);
+	acx100_rfmd_set_tx_level(hw, dbm2val[hw->tx_level_dbm]);
+#else
 	/* Research indicates that the GL2422VP
 	 * might have 16.5 dBm (45 mW) and 18 dBm (63 mW) */
-	switch (rrq->value) 
+	switch (rrq->value)
 	{
 	case 16:
 		txpow = "16.5";
@@ -888,7 +928,8 @@ static inline int acx100_ioctl_set_txpow(struct iwreq *iwr, wlandevice_t *hw)
 	hw->pow = pow.m.gp.bytes[0];
 	acxlog(L_IOCTL, "Set transmit power = %s dBm\n", txpow);
 	acx100_configure(hw, &pow, ACX100_RID_DOT11_TX_POWER_LEVEL);
-	
+#endif
+
 	acx100_unlock(hw, &flags);
 
 	return 0;
@@ -1024,6 +1065,14 @@ static inline int acx100_ioctl_get_iw_priv(struct iwreq *iwr)
 		get_args : 0,
 		name : "fw"},
 	{ cmd : SIOCIWFIRSTPRIV + 0xd,
+		set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		get_args : 0,
+		name : "set_rx_ant"},
+	{ cmd : SIOCIWFIRSTPRIV + 0xe,
+		set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		get_args : 0,
+		name : "set_tx_ant"},
+	{ cmd : SIOCIWFIRSTPRIV + 0xf,
 		set_args : 0,
 		get_args : 0,
 		name : "test"}
@@ -1233,65 +1282,16 @@ static inline int acx100_ioctl_get_fw_stats(wlandevice_t *hw)
 * Comment:
 *
 *----------------------------------------------------------------*/
-static int acx100_ioctl_unknown11(wlandevice_t *hw)
+static inline int acx100_ioctl_unknown11(wlandevice_t *hw)
 {
-//	UINT16 tmp[(ACX100_RID_MEDIUM_USAGE_LEN+4)/2];
 	int i;
-	struct tmp {
-	UINT16 type;
-	UINT16 length;
-	char version[0x8];
-	UINT16 vendorspec;
-	UINT eom;
-/*	UINT8 ccamode;
-	UINT8 diversity;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-	UINT8 val0xa;
-*/
-	UINT8 val0xa[0xff];
-	} tmp;
-	UINT cmd_offs;
 	unsigned long flags;
-	
+	client_t client;
 	acx100_lock(hw, &flags);
-	acx100_issue_cmd(hw,0,NULL,0x4,5000);
-//	acx100_interrogate(hw, &tmp, 0xc);
-//	tmp.type = 0xc;
-//	tmp.length = 0x50;
-//	acx100_write_cmd_param(hw,&tmp,0x50);
-//	acx100_write_cmd_type(hw,0xc);
-//	acx100_write_reg16(hw,ACX100_REG_7C,
-//		acx100_read_reg16(hw,ACX100_REG_7C)|0x01);
-	cmd_offs = acx100_read_reg32(hw, ACX100_CMD_MAILBOX_OFFS) + hw->iobase2 + 0x4;
-	memcpy(&tmp,(UINT*)cmd_offs ,0x50);
-//	printk("%3X %3X %X %X %X %X %X %X %X %X %3X %3X\n", tmp.type,tmp.length,
-	printk("%3X %3X %s %3X %3X\n", tmp.type,tmp.length,
-		tmp.version,
-/*		tmp.version[1],
-		tmp.version[2],
-		tmp.version[3],
-		tmp.version[4],
-		tmp.version[5],
-		tmp.version[6],
-		tmp.version[7],*/
-		tmp.vendorspec,tmp.eom);
-	for (i = 0; i <(0x50)  ; i++){
-		printk("%X: %4X ",i+0x12,tmp.val0xa[i]);
-		if(i%8 == 7)
-			printk("\n");
-	}
 
-
+	transmit_disassoc(&client,hw);
 	acx100_unlock(hw, &flags);
-
+	
 	return 0;
 }
 
@@ -1398,12 +1398,12 @@ static inline int acx100_ioctl_get_antenna(wlandevice_t *hw)
 *
 * STATUS: NEW
 *
-* Comment:
-*
+* Comment: TX and RX antenna can be set separately but this function good
+*          for testing 0-4 bits
 *----------------------------------------------------------------*/
 static inline int acx100_ioctl_set_antenna(wlandevice_t *hw, struct iwreq *iwr)
 {
-	int val = *( (int *) iwr->u.name );
+	UINT8 val = *( (UINT8 *) iwr->u.name );
 	unsigned long flags;
 
 	acx100_lock(hw, &flags);
@@ -1414,8 +1414,84 @@ static inline int acx100_ioctl_set_antenna(wlandevice_t *hw, struct iwreq *iwr)
 	printk("current antenna value: 0x%02X\n", hw->antenna[0x4]);
 	printk("Rx antenna selection seems to be bit 6 (0x40)\n");
 	printk("Tx antenna selection seems to be bit 5 (0x20)\n");
-	hw->antenna[0x4] = (unsigned char)val;
-	printk("updated antenna value: 0x%02X\n", (unsigned char)val);
+	hw->antenna[0x4] = val;
+	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
+	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
+
+	acx100_unlock(hw, &flags);
+
+	return 0;
+}
+
+/*----------------------------------------------------------------
+* acx100_ioctl_set_rx_antenna
+*
+*
+* Arguments: 0 = antenna1; 1 = antenna2; 
+* / 2 and 3 = diversity?  - need test / 
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: NEW
+*
+* Comment: Could anybody test which antenna is the external one
+*
+*----------------------------------------------------------------*/
+static inline int acx100_ioctl_set_rx_antenna(wlandevice_t *hw, struct iwreq *iwr)
+{
+	UINT8 val = *( (UINT8 *) iwr->u.name );
+	unsigned long flags;
+
+	acx100_lock(hw, &flags);
+
+	memset(hw->antenna, 0, sizeof(hw->antenna));
+	acx100_interrogate(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
+
+	printk("current antenna value: 0x%02X\n", hw->antenna[0x04]);
+	hw->antenna[0x04] &= 0x3f;
+	hw->antenna[0x04] |= (val << 6);
+	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
+	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
+
+	acx100_unlock(hw, &flags);
+
+	return 0;
+}
+
+/*----------------------------------------------------------------
+* acx100_ioctl_set_tx_antenna
+*
+*
+* Arguments: 0 = antenna1; 1 = antenna2;
+*
+* Returns:
+*
+* Side effects:
+*
+* Call context:
+*
+* STATUS: NEW
+*
+* Comment: Could anybody test which antenna is the external one
+*
+*----------------------------------------------------------------*/
+static inline int acx100_ioctl_set_tx_antenna(wlandevice_t *hw, struct iwreq *iwr)
+{
+	UINT8 val = *( (UINT8 *) iwr->u.name );
+	unsigned long flags;
+
+	acx100_lock(hw, &flags);
+
+	memset(hw->antenna, 0, sizeof(hw->antenna));
+	acx100_interrogate(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
+
+	printk("current antenna value: 0x%02X\n", hw->antenna[0x04]);
+	hw->antenna[0x04] &= 0xdf;
+	hw->antenna[0x04] |= ((val &= 0x01) << 5);
+	printk("updated antenna value: 0x%02X\n", hw->antenna[0x04]);
 	acx100_configure(hw, &(hw->antenna), ACX100_RID_DOT11_CURRENT_ANTENNA);
 
 	acx100_unlock(hw, &flags);
@@ -1661,13 +1737,13 @@ void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id)
 
 	if (i == 7)
 	{
-		acxlog(L_STD, "invalid regulatory domain specified!\n");
-		return;
+		acxlog(L_STD, "invalid regulatory domain specified, falling back to FCC (USA)!\n");
+		i = 0;
 	}
 	acxlog(L_STD, "setting regulatory domain to %d (0x%x): %s\n", i+1, reg_domain_ids[i], reg_domain_strings[i]);
-	dom.m.gp.bytes[0] = reg_domain_ids[i];
-	wlandev->reg_dom_id = reg_dom_id;
+	wlandev->reg_dom_id = reg_domain_ids[i];
 	wlandev->reg_dom_chanmask = reg_domain_channel_masks[i];
+	dom.m.gp.bytes[0] = reg_dom_id;
 	acx100_configure(wlandev, &dom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
 	if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->channel - 1) ) ))
 	{ /* hmm, need to adjust our channel setting to reside within our
@@ -1680,6 +1756,7 @@ void acx100_set_reg_domain(wlandevice_t *wlandev, unsigned char reg_dom_id)
 				break;
 			}
 	}
+	return;
 }
 
 /*----------------------------------------------------------------
@@ -2067,6 +2144,14 @@ int acx100_ioctl(netdevice_t * dev, struct ifreq *ifr, int cmd)
 		break;
 		
 	case SIOCIWFIRSTPRIV + 0xd:
+		acx100_ioctl_set_rx_antenna(hw, iwr);
+		break;
+		
+	case SIOCIWFIRSTPRIV + 0xe:
+		acx100_ioctl_set_tx_antenna(hw, iwr);
+		break;
+		
+	case SIOCIWFIRSTPRIV + 0xf:
 		acx100_ioctl_unknown11(hw);
 		break;
 		

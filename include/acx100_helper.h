@@ -344,8 +344,8 @@ int acx100_set_probe_response_template(wlandevice_t * hw);
 int acx100_set_beacon_template(wlandevice_t * wlandev);
 void acx100_set_timer(wlandevice_t * hw, UINT32 time);
 void acx100_update_capabilities(wlandevice_t * hw);
-unsigned int acx100_check_eeprom_name(wlandevice_t * wlandev, UINT16 addr,
-				      unsigned char *charbuf);
+unsigned int acx100_read_eeprom_offset(wlandevice_t * wlandev, UINT16 addr,
+					unsigned char *charbuf);
 void acx100_start(wlandevice_t * hw);
 
 void acx100_reset_mac(wlandevice_t * wlandev);
@@ -354,7 +354,7 @@ int acx100_upload_fw(wlandevice_t * wlandev);
 int acx100_write_fw(wlandevice_t * wlandev, const firmware_image_t * apfw_image, UINT32 offset);
 int acx100_validate_fw(wlandevice_t * wlandev, const firmware_image_t * apfw_mage, UINT32 offset );
 int acx100_verify_init(wlandevice_t * wlandev);
-int acx100_read_eeprom(wlandevice_t * wlandev);
+int acx100_read_eeprom_area(wlandevice_t * wlandev);
 void acx100_init_mboxes(wlandevice_t * hw);
 int acx100_init_wep(wlandevice_t * wlandev, memmap_t * pt);
 int acx100_init_packet_templates(wlandevice_t * hw, memmap_t * pt);

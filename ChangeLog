@@ -2,6 +2,14 @@ Changes:
 ========
 
 
+2003.09.30 - 0.2.0pre3 released
+- fix broken regulatory domain EEPROM reading
+- replay WEP settings
+- lots of WEP changes
+- move from CardServices support to PM. Suspend and Resume might work now
+- EXPERIMENTAL_VER_0_3: add physical Tx level setting for RFMD radios
+- major cleanup efforts
+
 2003.09.21 - 0.2.0pre2 released
 - fix ringbuffer increment screwup
 - fix capability flags announcing: it's not particularly healthy

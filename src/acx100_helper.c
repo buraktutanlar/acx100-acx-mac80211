@@ -68,6 +68,8 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 
+#include <linux/pm.h>
+
 #include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
@@ -82,7 +84,7 @@
 #include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211conv.h>
+#include <acx100_conv.h>
 #include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
@@ -170,7 +172,7 @@ int acx100_reset_dev(netdevice_t * netdev)
 		goto fail;
 	}
 
-	if (!acx100_read_eeprom(hw)) {
+	if (!acx100_read_eeprom_area(hw)) {
 		/* does "CIS" mean "Card Information Structure"?
 		 * If so, then this would be a PCMCIA message...
 		 */
@@ -697,10 +699,10 @@ int acx100_verify_init(wlandevice_t * hw)
 	return result;
 }
 
-  /* read_eeprom
-	 STATUS: OK.
-   */
-int acx100_read_eeprom(wlandevice_t * hw)
+/* acx100_read_eeprom_area
+ * STATUS: OK.
+ */
+int acx100_read_eeprom_area(wlandevice_t * hw)
 {
 	UINT32 count = 0;
 	int offs = 0x8c;
@@ -865,21 +867,21 @@ int acx100_init_wep(wlandevice_t * hw, memmap_t * pt)
 			acx100_configure(hw, &wp, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
 		}
 	}
-	if (hw->wep_keys[hw->current_index].size != 0) {
-		acxlog(L_ASSOC, "setting default WEP key number: %ld.\n", hw->current_index);
-		dk.value = hw->current_index;
+	if (hw->wep_keys[hw->wep_current_index].size != 0) {
+		acxlog(L_ASSOC, "setting default WEP key number: %ld.\n", hw->wep_current_index);
+		dk.value = hw->wep_current_index;
 		acx100_configure(hw, &dk, ACX100_RID_DOT11_WEP_KEY);
 	}
-	/* FIXME: key_struct is filled nowhere! */
+	/* FIXME: wep_key_struct is filled nowhere! */
 	for (i = 0; i <= 9; i++) {
-		if (hw->key_struct[i].len != 0) {
-			acx100_copy_mac_address(wep_mgmt.addr, hw->key_struct[i].addr);
-			wep_mgmt.len = hw->key_struct[i].len;
-			memcpy(&wep_mgmt.key, hw->key_struct[i].key, wep_mgmt.len);
+		if (hw->wep_key_struct[i].len != 0) {
+			acx100_copy_mac_address(wep_mgmt.addr, hw->wep_key_struct[i].addr);
+			wep_mgmt.len = hw->wep_key_struct[i].len;
+			memcpy(&wep_mgmt.key, hw->wep_key_struct[i].key, wep_mgmt.len);
 			wep_mgmt.vala = 1;
 			acxlog(L_ASSOC, "writing WEP key %d (len %d).\n", i, wep_mgmt.len);
 			if (acx100_issue_cmd(hw, ACX100_CMD_WEP_MGMT, &wep_mgmt, 0x25, 5000)) {
-				hw->key_struct[i].index = i;
+				hw->wep_key_struct[i].index = i;
 			}
 		}
 	}
@@ -1651,7 +1653,6 @@ void acx100_set_probe_request_template(wlandevice_t * hw)
  */
 void acx100_parse_conf_opt(wlandevice_t *wlandev)
 {
-
 	FN_ENTER;
 	wlandev->beacon_interval = 100;
 	wlandev->mode = 0x0;
@@ -1693,14 +1694,16 @@ void acx100_parse_conf_opt(wlandevice_t *wlandev)
 	wlandev->capab_agility = 0x0;
 
 	/* set some more defaults */
-
-	/* NOTE: it has been reported that changing power could screw up, so
-	   chose what I believe is the default value */
-	wlandev->pow = 1; // 18 dBm
+	wlandev->pow = 1; /* 18 dBm */
 	wlandev->antenna[0x4] = 0x8f;
 	wlandev->ed_threshold[0x4] = 0x70;
 	wlandev->cca[0x4] = 0x0d;
-	acx100_check_eeprom_name(wlandev, 0x16F, &wlandev->reg_dom_id);
+	if ( wlandev->eeprom_version < 5 ) {
+	  acx100_read_eeprom_offset(wlandev, 0x16F, &wlandev->reg_dom_id);
+	} else {
+	  acx100_read_eeprom_offset(wlandev, 0x171, &wlandev->reg_dom_id);
+	}
+	acxlog(L_INIT, "Regulatory domain ID as read from EEPROM: 0x%x\n", wlandev->reg_dom_id);
 
 	FN_EXIT(0, 0);
 }
@@ -1812,11 +1815,11 @@ int acx100_init_mac(netdevice_t * ndev)
 	}
 
 
-	/* V1_3CHANGE: V1 has dmaCreateDC() loop.
+	/* V1_3CHANGE: V1 has acx100_create_dma_regions() loop.
 	 * TODO: V1 implementation needs to be added again */
 
-	if (dmaCreateDC(hw)) {
-		acxlog(L_STD, "dmaCreateDC failed.\n");
+	if (acx100_create_dma_regions(hw)) {
+		acxlog(L_STD, "acx100_create_dma_regions failed.\n");
 		goto done;
 	}
 	acx_client_sta_list_init();
@@ -1843,7 +1846,7 @@ int acx100_init_mac(netdevice_t * ndev)
 	result = 0;
 
 done:
-//	  hwEnableISR(hw);
+//	  acx100_enable_irq(hw);
 //	  acx100_start(hw);
 	FN_EXIT(1, result);
 	return result;
@@ -1976,9 +1979,34 @@ void acx100_start(wlandevice_t *wlandev)
 #endif
 
 	/* encode */
+	acxlog(L_INIT, "Setting WEP key settings\n");
+	{
+		struct {
+			int pad;
+			UINT8 val0x4;
+			UINT8 val0x5;
+			UINT8 val0x6;
+			char key[29];
+		} var_9ac;
+		memmap_t dkey;
+		int i;
 
-		/* NOT OK YET */
+		for (i = 0; i < NUM_WEPKEYS; i++) {
+			if (wlandev->wep_keys[i].size != 0) {
+				var_9ac.val0x4 = 1;
+				var_9ac.val0x5 = wlandev->wep_keys[i].size;
+				var_9ac.val0x6 = i;
+				memcpy(var_9ac.key, wlandev->wep_keys[i].key,
+					var_9ac.val0x5);
 
+				acx100_configure(wlandev, &var_9ac, ACX100_RID_DOT11_WEP_KEY);
+			}
+		}
+
+		dkey.m.dkey.num = wlandev->wep_current_index;
+		acx100_configure(wlandev, &dkey, ACX100_RID_DOT11_WEP_DEFAULT_KEY_SET);
+	}
+		
 	/* txpow */
 	acxlog(L_INIT, "Set transmit power = %d\n", wlandev->pow);
 	tempmemmap.m.gp.bytes[0] = wlandev->pow;
@@ -1997,9 +2025,8 @@ void acx100_start(wlandevice_t *wlandev)
 	acx100_configure(wlandev, &(wlandev->cca), ACX100_RID_DOT11_CURRENT_CCA_MODE);
 
 	/* reg_domain */
-	acxlog(L_INIT, "Setting regulatory domain to 0x%x\n", wlandev->reg_dom_id);
+	acxlog(L_INIT, "Setting regulatory domain: 0x%x\n", wlandev->reg_dom_id);
 	acx100_set_reg_domain(wlandev, wlandev->reg_dom_id);
-
 
 	/* channel */
 	acxlog(L_INIT, "Changing to channel %d\n", wlandev->channel);
@@ -2105,7 +2132,7 @@ void acx100_update_capabilities(wlandevice_t * hw)
 }
 
 /*----------------------------------------------------------------
-* acx100_check_eeprom_name
+* acx100_read_eeprom_offset
 *
 * Function called to read an octet in the EEPROM.
 *
@@ -2136,7 +2163,7 @@ void acx100_update_capabilities(wlandevice_t * hw)
 *	acx100_read_reg8() instead of a acx100_read_reg16() as the
 *	read value should be an octet. (ygauteron, 29.05.2003)
 ----------------------------------------------------------------*/
-unsigned int acx100_check_eeprom_name(wlandevice_t * hw,
+unsigned int acx100_read_eeprom_offset(wlandevice_t * hw,
 					UINT16 addr, unsigned char *charbuf)
 {
 #if BOGUS

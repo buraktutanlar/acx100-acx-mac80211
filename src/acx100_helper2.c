@@ -62,6 +62,7 @@
 #include <wlan_compat.h>
 
 #include <linux/ioport.h>
+#include <linux/pm.h>
 #include <linux/pci.h>
 
 #include <asm/pci.h>
@@ -78,7 +79,7 @@
 #include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211conv.h>
+#include <acx100_conv.h>
 #include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
@@ -318,7 +319,7 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 	UINT fstype;
 	p80211_hdr_t *p80211_hdr;
 
-	p80211_hdr = (p80211_hdr_t*)&rxdesc->pThisBuf->buf ;
+	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf ;
 
 	if (hw->rx_config_1 & 0x2) {
 		p80211_hdr = (p80211_hdr_t *)((UINT8 *)p80211_hdr + 4);
@@ -457,12 +458,12 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 				clt->val0x9a = 0x1f;
 			}
 
-			if ((tx_desc = get_tx_desc(hw)) == NULL) {
+			if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 				return 0;
 			}
 
-			hdesc_header = tx_desc->val0x1c;
-			hdesc_payload = tx_desc->val0x1c + 1;
+			hdesc_header = tx_desc->host_desc;
+			hdesc_payload = tx_desc->host_desc + 1;
 
 			hd = (TxData *)hdesc_header->data;
 			payload = (struct assocresp_frame_body *)hdesc_payload->data;
@@ -496,7 +497,7 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 
 			tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
-			dma_tx_data(hw, tx_desc);
+			acx100_dma_tx_data(hw, tx_desc);
 		}
 	}
 
@@ -586,11 +587,11 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 			break;
 		}
 
-		if ((tx_desc = get_tx_desc(hw)) == NULL) {
+		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 			return 0;
 		}
-		hdesc_header = tx_desc->val0x1c;
-		hdesc_payload = tx_desc->val0x1c + 1;
+		hdesc_header = tx_desc->host_desc;
+		hdesc_payload = tx_desc->host_desc + 1;
 		fr = (TxData*)hdesc_header->data;
 		payload = (struct reassocresp_frame_body *)hdesc_payload->data;
 		fr->frame_control = WLAN_SET_FC_FSTYPE(WLAN_FSTYPE_REASSOCRESP);	/* 0x30 */
@@ -622,7 +623,7 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 
 		tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
-		dma_tx_data(hw, tx_desc);
+		acx100_dma_tx_data(hw, tx_desc);
 	}
 
 	return 0;
@@ -796,7 +797,7 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	FN_ENTER;
-	p80211_hdr = (p80211_hdr_t*)&rxdesc->pThisBuf->buf;
+	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 	if (hw->rx_config_1 & 0x2){
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
 	}
@@ -870,12 +871,12 @@ int process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *hw)
 				    WLAN_SET_FC_FROMDS(1) +
 				    WLAN_SET_FC_FTYPE(WLAN_FTYPE_DATA);
 
-				if ((tx_desc = get_tx_desc(hw)) == NULL) {
+				if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 					return 0;
 				}
 
 				acx100_rxdesc_to_txdesc(rxdesc, tx_desc);
-				dma_tx_data(hw, tx_desc);
+				acx100_dma_tx_data(hw, tx_desc);
 
 				if (esi != 2) {
 					goto done;
@@ -926,7 +927,7 @@ int process_data_frame_client(struct rxhostdescriptor *rxdesc, wlandevice_t * hw
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	p80211_hdr = (p80211_hdr_t*)&rxdesc->pThisBuf->buf;
+	p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 
 	if (hw->rx_config_1 & 0x2){
 		p80211_hdr = (p80211_hdr_t*)((UINT8*)p80211_hdr + 4);
@@ -1019,7 +1020,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 {
 	static UINT8 reassoc_b;
 	UINT8 *a;
-	p80211_hdr_t *p80211_hdr = (p80211_hdr_t*)&rxdesc->pThisBuf->buf;
+	p80211_hdr_t *p80211_hdr = (p80211_hdr_t*)&rxdesc->data->buf;
 	int wep_offset = 0;
 
 	if(WLAN_GET_FC_ISWEP(p80211_hdr->a3.fc)){
@@ -1038,7 +1039,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1057,7 +1058,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
 			process_assocresp(&alloc_p80211mgmt_req.a.
@@ -1072,7 +1073,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			alloc_p80211mgmt_req.a.assocreq.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocreq.len =
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocreq(&alloc_p80211mgmt_req.a.
 						 assocreq);
@@ -1089,7 +1090,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			alloc_p80211mgmt_req.a.assocresp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.assocresp.len =
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 
 			acx_mgmt_decode_assocresp(&alloc_p80211mgmt_req.a.
 						  assocresp);
@@ -1107,11 +1108,11 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 			alloc_p80211mgmt_req.a.proberesp.buf =
 			    (UINT8 *) p80211_hdr;
 			alloc_p80211mgmt_req.a.proberesp.len =
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 			acx_mgmt_decode_proberesp(&alloc_p80211mgmt_req.a.
 						  proberesp);
 			if (hw->iStatus == ISTATUS_1_SCANNING)
-				ProcessProbeResponse(rxdesc->pThisBuf,
+				ProcessProbeResponse(rxdesc->data,
 						     hw,
 						     (acxp80211_hdr_t *)
 						     alloc_p80211mgmt_req.
@@ -1132,7 +1133,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 				alloc_p80211mgmt_req.a.beacon.buf =
 				    (char *) p80211_hdr;
 				alloc_p80211mgmt_req.a.beacon.len =
-				    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+				    (rxdesc->data->status & 0xfff) - wep_offset;
 				acxlog(L_DATA, "fc: %X\n",
 				       p80211_hdr->a3.fc);
 				acxlog(L_DATA, "dur: %X\n",
@@ -1153,7 +1154,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 				       p80211_hdr->a3.seq);
 				acx_mgmt_decode_beacon
 				    (&alloc_p80211mgmt_req.a.beacon);
-				ProcessProbeResponse(rxdesc->pThisBuf,
+				ProcessProbeResponse(rxdesc->data,
 						     hw,
 						     (acxp80211_hdr_t *)
 						     alloc_p80211mgmt_req.
@@ -1179,7 +1180,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		alloc_p80211mgmt_req.a.disassoc.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.disassoc.len = //pb->p80211frmlen;
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 		acx_mgmt_decode_disassoc(&alloc_p80211mgmt_req.a.disassoc);
 		if (hw->macmode != WLAN_MACMODE_ESS_AP) {
 			process_disassoc(&alloc_p80211mgmt_req.a.disassoc,
@@ -1195,7 +1196,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		alloc_p80211mgmt_req.a.authen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.authen.len = //pb->p80211frmlen;
-			    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+			    (rxdesc->data->status & 0xfff) - wep_offset;
 		acx_mgmt_decode_authen(&alloc_p80211mgmt_req.a.authen);
 		if (!memcmp(hw->address,
 			    alloc_p80211mgmt_req.a.authen.hdr->a3.a2,
@@ -1209,7 +1210,7 @@ UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t * hw)
 		alloc_p80211mgmt_req.a.deauthen.buf =
 		    (UINT8 *) p80211_hdr;
 		alloc_p80211mgmt_req.a.deauthen.len =
-		    (rxdesc->pThisBuf->status & 0xfff) - wep_offset;
+		    (rxdesc->data->status & 0xfff) - wep_offset;
 		acx_mgmt_decode_deauthen(&alloc_p80211mgmt_req.a.deauthen);
 		if (hw->macmode != WLAN_MACMODE_ESS_AP) {
 			process_deauthen(&alloc_p80211mgmt_req.a.deauthen,
@@ -1285,7 +1286,7 @@ int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	esi = NULL;
-	fr = (p80211_hdr_t*)&pb->pThisBuf->buf;
+	fr = (p80211_hdr_t*)&pb->data->buf;
 	if (hw->rx_config_1 & 0x2){
 		fr = (p80211_hdr_t*)((UINT8*)fr + 4);
 	}
@@ -1810,12 +1811,12 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	if ((tx_desc = get_tx_desc(wlandev)) == NULL) {
+	if ((tx_desc = acx100_get_tx_desc(wlandev)) == NULL) {
 		return 0;
 	}
 
-	hdesc_header = tx_desc->val0x1c;
-	hdesc_payload = tx_desc->val0x1c + 1;
+	hdesc_header = tx_desc->host_desc;
+	hdesc_payload = tx_desc->host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct deauthen_frame_body *)hdesc_payload->data;
@@ -1852,7 +1853,7 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
-	dma_tx_data(wlandev, tx_desc);
+	acx100_dma_tx_data(wlandev, tx_desc);
 
 	return 0;
 }
@@ -1892,12 +1893,12 @@ int transmit_authen1(wlandevice_t *wlandev)
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending authentication1 request, awaiting response!\n");
 
-	if ((tx_desc = get_tx_desc(wlandev)) == NULL) {
+	if ((tx_desc = acx100_get_tx_desc(wlandev)) == NULL) {
 		return 1;
 	}
 
-	hdesc_header = tx_desc->val0x1c;
-	hdesc_payload = tx_desc->val0x1c + 1;
+	hdesc_header = tx_desc->host_desc;
+	hdesc_payload = tx_desc->host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -1923,7 +1924,7 @@ int transmit_authen1(wlandevice_t *wlandev)
 
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
-	dma_tx_data(wlandev, tx_desc);
+	acx100_dma_tx_data(wlandev, tx_desc);
 	return 0;
 }
 
@@ -1969,12 +1970,12 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 		sta_list->val0xe = 2;
 		sta_list->val0x98 = arg_0->hdr->a3.seq;
 
-		if ((tx_desc = get_tx_desc(hw)) == NULL) {
+		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 			return 1;
 		}
 
-		hdesc_header = tx_desc->val0x1c;
-		hdesc_payload = tx_desc->val0x1c + 1;
+		hdesc_header = tx_desc->host_desc;
+		hdesc_payload = tx_desc->host_desc + 1;
 
 		hd = (TxData*)hdesc_header->data;
 		payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2013,7 +2014,7 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 		       hd->bssid[0], hd->bssid[1], hd->bssid[2],
 		       hd->bssid[3], hd->bssid[4], hd->bssid[5]);
 
-		dma_tx_data(hw, tx_desc);
+		acx100_dma_tx_data(hw, tx_desc);
 	}
 	return 0;
 }
@@ -2049,14 +2050,14 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 	struct auth_frame_body *payload;
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	if ((tx_desc = get_tx_desc(hw)) == NULL) {
+	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 		return 1;
 	}
 
 	packet_len = WLAN_HDR_A3_LEN;
 
-	hdesc_header = tx_desc->val0x1c;
-	hdesc_payload = tx_desc->val0x1c + 1;
+	hdesc_header = tx_desc->host_desc;
+	hdesc_payload = tx_desc->host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2091,7 +2092,7 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_auth3!\n");
 
-	dma_tx_data(hw, tx_desc);
+	acx100_dma_tx_data(hw, tx_desc);
 	return 0;
 }
 
@@ -2126,12 +2127,12 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
-	if ((tx_desc = get_tx_desc(hw)) == NULL) {
+	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 		return 1;
 	}
 
-	hdesc_header = tx_desc->val0x1c;
-	hdesc_payload = tx_desc->val0x1c + 1;
+	hdesc_header = tx_desc->host_desc;
+	hdesc_payload = tx_desc->host_desc + 1;
 
 	hd = (TxData *)hdesc_header->data;
 	payload = (struct auth_frame_body *)hdesc_payload->data;
@@ -2156,7 +2157,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
-	dma_tx_data(hw, tx_desc);
+	acx100_dma_tx_data(hw, tx_desc);
 	return 0;
 }
 
@@ -2194,14 +2195,14 @@ int transmit_assoc_req(wlandevice_t *hw)
 	FN_ENTER;
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending association request, awaiting response! NOT ASSOCIATED YET.\n");
-	if ((tx_desc = get_tx_desc(hw)) == NULL) {
+	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 		return 1;
 	}
 
 	packet_len = WLAN_HDR_A3_LEN;
 
-	header = tx_desc->val0x1c;      /* hostdescriptor for header */
-	payload = tx_desc->val0x1c + 1; /* hostdescriptor for payload */
+	header = tx_desc->host_desc;      /* hostdescriptor for header */
+	payload = tx_desc->host_desc + 1; /* hostdescriptor for payload */
 
 	hd = (TxData *)header->data;
 	pCurrPos = (UINT8 *)payload->data;
@@ -2269,7 +2270,7 @@ int transmit_assoc_req(wlandevice_t *hw)
 
 	tx_desc->total_length = payload->length + header->length;
 
-	dma_tx_data(hw, tx_desc);
+	acx100_dma_tx_data(hw, tx_desc);
 	return 0;
 }
 
@@ -2305,12 +2306,12 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if (clt != NULL) {
-		if ((tx_desc = get_tx_desc(hw)) == NULL) {
+		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
 			return 1;
 		}
 
-		hdesc_header = tx_desc->val0x1c;
-		hdesc_payload = tx_desc->val0x1c + 1;
+		hdesc_header = tx_desc->host_desc;
+		hdesc_payload = tx_desc->host_desc + 1;
 
 		hd = (TxData *)hdesc_header->data;
 		payload = (struct disassoc_frame_body *)hdesc_payload->data;
@@ -2328,7 +2329,7 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 		payload->reason = 7;	/* "Class 3 frame received from nonassociated station." */
 
 		/* FIXME: lengths missing! */
-		dma_tx_data(hw, tx_desc);
+		acx100_dma_tx_data(hw, tx_desc);
 		return 1;
 	}
 	return 0;

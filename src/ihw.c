@@ -62,7 +62,7 @@
 
 #include <linux/ioport.h>
 #include <linux/pci.h>
-
+#include <linux/pm.h>
 #include <asm/pci.h>
 #include <linux/dcache.h>
 #include <linux/highmem.h>
@@ -77,7 +77,7 @@
 #include <version.h>
 #include <p80211hdr.h>
 #include <p80211mgmt.h>
-#include <p80211conv.h>
+#include <acx100_conv.h>
 #include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
@@ -392,6 +392,24 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	int result = 0;
 	UINT16 irqtype = 0;
 	UINT16 cmd_status;
+	char *cmd_error_strings[] = {
+"Idle[TIMEOUT]",
+"[SUCCESS]",
+"Unknown Command",
+"Invalid Information Element",
+"unknown_FIXME",
+"channel invalid in current regulatory domain",
+"unknown_FIXME2",
+"Command rejected (read-only information element)",
+"Command rejected",
+"Already asleep",
+"Tx in progress",
+"Already awake",
+"Write only",
+"Rx in progress",
+"Invalid parameter",
+"Scan in progress"
+	};
 
 	FN_ENTER;
 	acxlog(L_CTL, "%s cmd %X timeout %ld.\n", __func__, cmd, timeout);
@@ -482,92 +500,11 @@ int acx100_issue_cmd(wlandevice_t * hw, UINT cmd,
 	}
 
 	if (cmd_status != 1) {
-		/* FIXME: optimize into an array */
-		switch (cmd_status) {
-		case 0x0:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Idle[TIMEOUT] [%ld uSec]\n",
+		acxlog(L_STD | L_CTL, "%s failed: %s [%ld uSec]\n",
+				__func__,
+				cmd_status <= 0x0f ?
+				cmd_error_strings[cmd_status] : "UNKNOWN REASON",
 				(timeout - counter) * 50);
-			break;
-
-		case 0x2:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Unknown Command [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0x3:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Invalid Information Element [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0x5:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: channel invalid in current regulatory domain [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0x7:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Command rejected (read-only information element) [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0x8:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Command rejected [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0x9:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Already asleep [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xa:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Tx in progress [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xb:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Already awake [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xc:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Write only [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xd:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Rx in progress [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xe:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Invalid parameter [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		case 0xf:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Scan in progress [%ld uSec]\n",
-				(timeout - counter) * 50);
-			break;
-
-		default:
-			acxlog((L_STD | L_CTL),
-				"acx100_issue_cmd failed: Unknown(0x%x) [%ld uSec]\n",
-				cmd_status, (timeout - counter) * 50);
-			break;
-		}
 	} else	{
 		/*** read in result parameters if needed ***/
 		if (pcmdparam != NULL && paramlen != 0) {
@@ -621,7 +558,7 @@ static short CtlLengthDot11[0x14] = {
 	ACX100_RID_DOT11_DTIM_PERIOD_LEN,
 	ACX100_RID_DOT11_SHORT_RETRY_LIMIT_LEN,
 	ACX100_RID_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN,
+	ACX100_RID_DOT11_WEP_DEFAULT_KEY_LEN, //ACX100_RID_DOT11_WEP_KEY_LEN,
 	ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
 	0,
 	ACX100_RID_DOT11_CURRENT_REG_DOMAIN_LEN,

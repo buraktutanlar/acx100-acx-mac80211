@@ -33,7 +33,9 @@ http://standards.ieee.org/getieee802/
 
 Relatively recent Linux kernel 2.4.x (2.5.x/2.6.x experimental),
 with CONFIG_NET_RADIO enabled ("Wireless LAN") and CONFIG_NET_WIRELESS,
-for wireless extensions (iwconfig etc.). And Non-SMP.
+for wireless extensions (iwconfig etc.). And Non-SMP. And of course you
+need proper kernel header files / kernel source installed for the kernel
+you're running!
 
 Next, a firmware is needed. We cannot ship this with our driver, so you
 will have to get it elsewhere. There are two options: you have a windows
@@ -133,8 +135,12 @@ The slow way:
 No install option has yet been provided (because the driver is still a bit
 experimental anyway :)
 
-The module can be loaded e.g. like:
-insmod src/acx100_pci.o firmware_dir=firmware
+To run the driver, you can use the script scripts/start_net (and adapt it).
+Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
+Again, no system installation is provided, since the various Linux
+distributions often differ in their exact network configuration methods.
+Thus maybe simply adapt and use our scripts/start_net script. Or add
+that script as a properly executed init script in /etc/[rc.d]/init.d/
 
 Debugging/logging options can be changed in a pretty powerful way by setting
 the module's "debug" parameter and/or its preinitialisation value in
@@ -146,12 +152,8 @@ from the horror of heaps of logs once you got the driver running...
 To check out further module parameters and options, please use modinfo
 and iwpriv.
 
-To run the driver, you can use the script scripts/start_net (and adapt it).
-Oh, and don't forget to have a proper DNS server in /etc/resolv.conf ...
-Again, no system installation is provided, since the various Linux
-distributions often differ in their exact network configuration methods.
-Thus maybe simply adapt and use our scripts/start_net script. Or add
-that script as a properly executed init script in /etc/[rc.d]/init.d/
+The module itself can be loaded e.g. like:
+insmod src/acx100_pci.o firmware_dir=firmware
 
 For troubleshooting, see below.
 
@@ -197,7 +199,8 @@ towards the final successful association.
 
 When trying to use NFS, use options 'rsize=1024,wsize=1024' in /etc/fstab .
 
-Power levels for a connection are (at least for my PheeNet WL-0022 CardBus):
+Usual power levels for a connection are (at least for my PheeNet WL-0022
+CardBus, other people WILL have better or worse results!):
 Signal level 86/100 (extremely good, at least to my AP PheeNet withDWL-900AP+ firmware; directly neighbouring the AP)
 Signal level 29/100 (anything less: connection lost @22Mbps)
 Signal level 26/100 (anything less: connection lost @11Mbps)
@@ -223,8 +226,10 @@ info.
 For current tasks, please read TODO.
 
 In case of bugs that didn't exist in previous versions,
-please do regression testing via CVS:
+PLEASE do regression testing via CVS:
 http://www.winehq.org/site/docs/wine-devel/cvs-regression
+(remember: WE are doing the driver, so it's YOUR responsibility to fix any
+problems that might happen in between...)
 
 If you manage to fix or implement something, then please immediately
 send patches for inclusion to the acx100-devel@lists.sf.net mailing list.

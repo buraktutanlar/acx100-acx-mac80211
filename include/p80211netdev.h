@@ -187,9 +187,10 @@ typedef struct acx100_addr3 {
 } acx100_addr3_t;
 
 typedef struct TIWLAN_DC {	/* V3 version */
-	struct wlandevice *wldev;
+	struct wlandevice *wlandev;
 
 	UINT val0x4;		//spacing
+	
 	UINT ui32ACXTxQueueStart;	/* 0x8, official name */
 	UINT ui32ACXRxQueueStart;	/* 0xc */
 
@@ -198,16 +199,16 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT TxBufferPoolSize;	/* 0x18 */
 
 	struct txdescriptor *pTxDescQPool;	/* V13POS 0x1c, official name */
-	UINT pool_count;	/* 0x20 indicates # of ring buffer pool entries */
-	UINT pool_idx;		/* 0x24 current ring buffer pool member index */
+	UINT tx_pool_count;	/* 0x20 indicates # of ring buffer pool entries */
+	UINT tx_head;		/* 0x24 current ring buffer pool member index */
+	UINT tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
+				 * just using it as a ring watch
+				 * official name */
 
 	struct framehdr *pFrameHdrQPool;	/* 0x28 */
 	UINT FrameHdrQPoolSize;	/* 0x2c */
 	dma_addr_t FrameHdrQPoolPhyAddr;	/* 0x30 */
 
-	UINT pool_idx2;		/* 0x34,pool_idx2 is not correct, I'm
-				 * just using it as a ring watch
-				 * official name */
 	UINT val0x38;		/* 0x38, official name */
 
 	struct txhostdescriptor *pTxHostDescQPool;	/* V3POS 0x3c, V1POS 0x60 */
@@ -217,8 +218,9 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT val0x48;		/* 0x48 */
 	UINT val0x4c;
 
-	char *rxdescq1;		/* V1POS 0x74, V3POS 0x50 */
-	UINT rxdescq2;		/* V1POS 0x78, V3POS 0X54 */
+	struct rxdescriptor *pRxDescQPool;		/* V1POS 0x74, V3POS 0x50 */
+	UINT rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
+	UINT rx_tail;	/* 0x6c */
 
 	UINT val0x50;		/* V1POS:0x50, some size */
 	UINT val0x54;		/* 0x54, official name */
@@ -228,14 +230,10 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	UINT RxHostDescQPoolPhyAddr;	/* 0x60, official name. */
 
 	UINT val0x64;		/* 0x64, some size */
-	UINT iPoolSize;		/* 0x68 */
-	UINT iPoolStart;	/* 0x6c */
 
 	UINT *pRxBufferPool;	/* *rxdescq1; 0x70 */
 	UINT RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 	UINT RxBufferPoolSize;
-
-	UINT val0x7c;		/* V3POS 7c, V1POS a0; some flag for Create/DeleteDC */
 } TIWLAN_DC;
 
 typedef struct iS {
@@ -271,22 +269,61 @@ typedef struct wlandevice {
 
 	struct timer_list mgmt_timer;
 
+	/* PCMCIA crap */
+	void *card;
+	int broken_cor_reset;
+	int (*hard_reset)(struct wlandevice *);
+	/* end PCMCIA crap */
+
 	/* Hardware config */
+	int hw_unavailable; /* indicates whether the hardware has been suspended or ejected or so */
 	UINT irq;		/* 0c */
+	UINT16 irq_mask;	/* mask indicating the interrupt types that are masked (not wanted) V3POS 2418, V1POS 23f4 */
+
 	UINT membase;		/* 10 */
 	UINT membase2;		/* 14 */
+	UINT pvMemBaseAddr1;	/* V3POS 2448, V1POS 2424 */
+	UINT pvMemBaseAddr2;	/* V3POS 2434, V1POS 2410 official name */
 	UINT iobase;		/* 18 */
 	UINT iobase2;		/* 1c */
-	int hw_unavailable; /* indicates whether the hardware has been suspended or ejected or so */
 	UINT8 form_factor;
 	UINT8 radio_type;
-	UINT16 eeprom_version;
+	unsigned char eeprom_version;
+
+	UINT8 dev_addr[MAX_ADDR_LEN];	/* V3POS 2340, V1POS 22f0 (or was it 22f8?) */
+
+	UINT16 rx_config_1;	/* V3POS 2820, V1POS 27f8 */
+	UINT16 rx_config_2;	/* V3POS 2822, V1POS 27fa */
 
 	unsigned char firmware_version[20];
 	UINT32 firmware_numver;
 	UINT32 firmware_id;
 
-	spinlock_t lock; /* our new locking variable */
+	/*** ACX100 command interface ***/
+	UINT16 cmd_type;	/* V3POS 2508, V1POS 24e0 */
+	UINT16 cmd_status;	/* V3POS 250a, V1POS 24e2 */
+	UINT32 CommandParameters;	/* FIXME: used to be an array UINT*0x88, but it should most likely be *one* UINT32 instead, pointing to the cmd param memory. V3POS 268c, V1POS 2664 */
+	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
+
+	/*** PHY settings ***/
+#if EXPERIMENTAL_VER_0_3
+	unsigned char tx_level_dbm;
+	unsigned char tx_level_val;
+#endif
+	/* tx power settings */
+	unsigned char pow;
+	/* antenna settings */
+	unsigned char antenna[4 + ACX100_RID_DOT11_CURRENT_ANTENNA_LEN];
+	/* ed threshold settings */
+	unsigned char ed_threshold[4 + ACX100_RID_DOT11_ED_THRESHOLD_LEN];
+	/* cca settings */
+	unsigned char cca[4 + ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN];
+
+	/*** Linux device management ***/
+	/* netlink socket */
+	/* queue for indications waiting for cmd completion */
+	/* Linux netdevice and support */
+	netdevice_t *netdev;	/* ptr to linux netdevice */
 	struct net_device_stats stats;	/* 20 */
 	/* which is:
 	   rx_packets; 20
@@ -297,136 +334,9 @@ typedef struct wlandevice {
 	   hmm, or given that net_device_stats is so big: maybe it does NOT
 	   contain a complete net_device_stats???
 	 */
-
 	UINT8 state;		/* 0x7c */
-	UINT32 mode;		/* V3POS 80; that's the MAC mode we want */
 	UINT8 ifup; /* whether the device is up */
-	char essid[0x20];	/* V3POS 84; essid */
-	char essid_active;
-	char essid_found[0x20]; /* the ESSID we just found, in case of "essid 'any'" */
-	UINT8 address[WLAN_ADDR_LEN]; /* V1+3POS: a6 */ /* the random BSSID of the station we're associated to (or even our own one) */
-	UINT32 macmode;		/* 0xac; 0 == Ad-Hoc, 2 == infrastructure, using a wlan-ng name here! This is the mode we're currently in */
-	UINT16 capabilities;	/* V3POS b0 */
-	UINT8 bssid[WLAN_ADDR_LEN];	/* V3POS b2, using a wlan-ng name here! */
-	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
-	UINT32 wep_restricted;  /* V3POS c0 */
-	UINT32 wep_enabled;
-	char preamble_mode; /* 0 == Long Preamble, 1 == Short, 2 == Auto */
-	char preamble_flag; /* 0 == Long Preamble, 1 == Short */
-
-	/* PCMCIA crap */
-	void *card;
-	int broken_cor_reset;
-	int (*hard_reset)(struct wlandevice *);
-	/* end PCMCIA crap */
-
-	UINT32 capab_short;	/* V3POS 1ec, V1POS 1f4 */
-	UINT32 capab_pbcc;	/* V3POS 1f0, V1POS 1f8 */
-	UINT32 capab_agility;	/* V3POS 1f4, V1POS 1fc */
-	UINT32 short_retry;	/* V3POS 204, V1POS 20c */
-	UINT32 long_retry;	/* V3POS 208, V1POS 210 */
-	UINT32 msdu_lifetime;	/* V3POS 20c, V1POS 214 */
-	UINT32 auth_alg;	/* V3POS 228, V3POS 230, used in transmit_authen1 */
-	UINT16 listen_interval;	/* V3POS 250, V1POS 258, given in units of beacon interval */
-	UINT32 current_index;	/* V3POS 254, V1POS 25c not sure about this */
-	wep_key_t wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
-
-	/* device methods (init by MSD, used by p80211 */
-	int (*open) (struct wlandevice * wlandev);
-	int (*close) (struct wlandevice * wlandev);
-	void (*reset) (struct wlandevice * wlandev);
-	int (*txframe) (struct wlandevice * wlandev, struct sk_buff * skb);
-	int (*mlmerequest) (struct wlandevice * wlandev, p80211msg_t * msg);
-	void (*hwremovedfn) (struct wlandevice * wlandev);
-
-	/* 802.11 State */
-	UINT shortpreamble;	/* C bool */
-
-	char ssid[WLAN_BSSID_LEN];	//0
-	UINT ACXTxQueueStart;
-	UINT cmdflag;
-	UINT scanflag;
-	UINT dlstate;
-	UINT cmd;
-//	acx100_JoinRequest_data_t joinreq;	/* join request saved data */
-
-	key_struct_t key_struct[10]; /* V3POS 688 */
-
-	char rate_spt_len;	/* V3POS 1243, V1POS 124b */
-	char rate_support1[5];	/* V3POS 1244, V1POS 124c */
-	char rate_support2[5];	/* V3POS 1254, V1POS 125c */
-
-	/* FIXME: this should be cleaned up */
-	UINT8 iStable;		/* V3POS 1264, V1POS 126c; original name, "Scan Table" - most likely number of peers found in range */
-	struct iS val0x126c[0x20];	/* V3POS 126c, V1POS 1274 */
-	struct iS station_assoc; /* the station we're currently associated to */
-
-	UINT16 channel;		/* V3POS 22f0, V1POS b8 */
-	UINT32 beacon_interval;	/* V3POS 2300, V1POS c8 */
-	char val0x2302[6];	/* V3POS 2302, V1POS ca */
-	char val0x2324[0x8];	/* V3POS 2324 */
-
-	UINT8 dev_addr[MAX_ADDR_LEN];	/* V3POS 2340, V1POS 22f0 (or was it 22f8?) */
-
-	unsigned char dev_addr2[MAX_ADDR_LEN];	/* V3POS 2348? V1POS 22f8 these 3 are */
-	UINT iStatus;		/* original name. V3POS 234c, V1POS 2304 */// all in the same
-	UINT unknown0x2350;	/* V3POS 2350, V1POS 2308 *///structure
-	UINT16 memblocksize;	/* V3POS 2354, V1POS 230c */
-
-	TIWLAN_DC dc;		/* V3POS 2380, V1POS 2338 */
-
-	UINT32 val0x240c;	/* V3POS 240c, V1POS 23e8 */
-	UINT16 irq_mask;	/* mask indicating the interrupt types that are masked (not wanted) V3POS 2418, V1POS 23f4 */
-
-	UINT pvMemBaseAddr2;	/* V3POS 2434, V1POS 2410 official name */
-	UINT pvMemBaseAddr1;	/* V3POS 2448, V1POS 2424 */
-
-	UINT *val0x244c;	/* V1POS: 2428 */
-	UINT *val0x2450;
-	UINT64 overflow_errors;	/* V3POS 246c, V1POS 2444 */
-	UINT TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
-	int TxQueueFree;
-	UINT val0x24e0;
-	UINT32 val0x24e4;	/* V3POS 24e4, V1POS 24bc */
-	UINT32 val0x24e8;	/* V3POS 24e8, V1POS 24c0 */
-	UINT32 RxHostDescNo;	/* V3POS 24ec, V1POS 24c4 */
-
-	UINT32 RxQueueNo;	/* V3POS 24f4, V1POS 24cc */
-	UINT32 RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
-	UINT32 val0x24fc;	/* V3POS 24fc, V1POS 24d4 */
-	UINT32 val0x2500;	/* V3POS 2500, V1POS 24d8 */
-
-	UINT16 cmd_type;	/* V3POS 2508, V1POS 24e0 */
-	UINT16 cmd_status;	/* V3POS 250a, V1POS 24e2 */
-	UINT32 CommandParameters;	/* FIXME: used to be an array UINT*0x88, but it should most likely be *one* UINT32 instead, pointing to the cmd param memory. V3POS 268c, V1POS 2664 */
-	UINT InfoParameters;	/* V3POS 2814, V1POS 27ec */
-	UINT16 rx_config_1;	/* V3POS 2820, V1POS 27f8 */
-	UINT16 rx_config_2;	/* V3POS 2822, V1POS 27fa */
-	UINT8 scan_retries;	/* V3POS 2826, V1POS 27fe */
-	UINT8 auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
-	int hostwep;
-
-	/* Request/Confirm i/f state (used by p80211) */
-//	UINT32 request_pending;	/* flag, access atomically */
-//	p80211msg_t *curr_msg;
-//	struct timer_list reqtimer;
-//	wait_queue_head_t reqwq;
-
-	/* netlink socket */
-	/* queue for indications waiting for cmd completion */
-	/* Linux netdevice and support */
-	netdevice_t *netdev;	/* ptr to linux netdevice */
-//	struct net_device_stats linux_stats;
-
-//	acx100_metacmd_t *cmds;
-#ifdef CONFIG_PROC_FS
-	/* Procfs support */
-	struct proc_dir_entry *procdir;
-	struct proc_dir_entry *procwlandev;
-#endif
-
-	/* 802.11 device statistics */
-//	struct p80211_frmrx_t rx;
+	int monitor; /* whether the device is in monitor mode or not */
 
 /* compatibility to wireless extensions */
 #ifndef WIRELESS_EXT
@@ -436,21 +346,112 @@ typedef struct wlandevice {
 #ifdef WIRELESS_EXT
 	struct iw_statistics wstats;
 #endif
-	char nick[IW_ESSID_MAX_SIZE];
-	
-	int monitor;
 
-	/* tx power settings */
-	unsigned char pow;
-	/* antenna settings */
-	unsigned char antenna[4 + ACX100_RID_DOT11_CURRENT_ANTENNA_LEN];
-	/* ed threshold settings */
-	unsigned char ed_threshold[4 + ACX100_RID_DOT11_ED_THRESHOLD_LEN];
-	/* cca settings */
-	unsigned char cca[4 + ACX100_RID_DOT11_CURRENT_CCA_MODE_LEN];
+	/*** wireless settings ***/
+	UINT32 mode;		/* V3POS 80; that's the MAC mode we want */
+	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
+	char essid[0x20];	/* V3POS 84; essid */
+	char essid_active;	/* specific ESSID active, or select any? */
+	char nick[IW_ESSID_MAX_SIZE];
+
 	/* reg domain settings */
 	unsigned char reg_dom_id;
 	UINT16 reg_dom_chanmask;
+
+	UINT8 address[WLAN_ADDR_LEN]; /* V1+3POS: a6 */ /* the random BSSID of the station we're associated to (or even our own one in case we're the one to establish the network) */
+	UINT16 channel;		/* V3POS 22f0, V1POS b8 */
+
+	char preamble_mode; /* 0 == Long Preamble, 1 == Short, 2 == Auto */
+	char preamble_flag; /* 0 == Long Preamble, 1 == Short */
+
+	/* PM crap */
+	struct pm_dev *pm;
+	/* end PM crap */
+
+	UINT32 short_retry;	/* V3POS 204, V1POS 20c */
+	UINT32 long_retry;	/* V3POS 208, V1POS 210 */
+	UINT32 msdu_lifetime;	/* V3POS 20c, V1POS 214 */
+	UINT32 auth_alg;	/* V3POS 228, V3POS 230, used in transmit_authen1 */
+	UINT16 listen_interval;	/* V3POS 250, V1POS 258, given in units of beacon interval */
+	UINT32 beacon_interval;	/* V3POS 2300, V1POS c8 */
+
+	UINT16 capabilities;	/* V3POS b0 */
+	unsigned char capab_short;	/* V3POS 1ec, V1POS 1f4 */
+	unsigned char capab_pbcc;	/* V3POS 1f0, V1POS 1f8 */
+	unsigned char capab_agility;	/* V3POS 1f4, V1POS 1fc */
+	char rate_spt_len;	/* V3POS 1243, V1POS 124b */
+	char rate_support1[5];	/* V3POS 1244, V1POS 124c */
+	char rate_support2[5];	/* V3POS 1254, V1POS 125c */
+
+
+	/*** encryption settings ***/
+	UINT32 wep_restricted;  /* V3POS c0 */
+	UINT32 wep_enabled;
+	UINT32 wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
+	wep_key_t wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
+	key_struct_t wep_key_struct[10]; /* V3POS 688 */
+	int hostwep;
+
+	/*** network status ***/
+	/* FIXME: this should be cleaned up */
+	UINT8 iStable;		/* V3POS 1264, V1POS 126c; original name, "Scan Table" - most likely number of peers found in range */
+	struct iS val0x126c[0x20];	/* V3POS 126c, V1POS 1274 */
+	struct iS station_assoc; /* the station we're currently associated to */
+
+	char val0x2302[6];	/* V3POS 2302, V1POS ca */
+	char val0x2324[0x8];	/* V3POS 2324 */
+
+	UINT32 macmode;		/* 0xac; 0 == Ad-Hoc, 2 == infrastructure, using a wlan-ng name here! This is the mode we're currently in */
+	char essid_found[0x20]; /* the ESSID we just found, in case of "essid 'any'" */
+	UINT8 bssid[WLAN_ADDR_LEN];	/* V3POS b2, using a wlan-ng name here! */
+	UINT iStatus;		/* original name. V3POS 234c, V1POS 2304 */// all in the same
+	UINT unknown0x2350;	/* V3POS 2350, V1POS 2308 *///structure
+
+	/*** card Rx/Tx management ***/
+	TIWLAN_DC dc;		/* V3POS 2380, V1POS 2338 */
+
+	UINT TxQueueNo;		/* V3POS 24dc, V1POS 24b4 */
+	UINT RxQueueNo;		/* V3POS 24f4, V1POS 24cc */
+
+	UINT ACXTxQueueStart;
+	UINT16 memblocksize;	/* V3POS 2354, V1POS 230c */
+	int TxQueueFree;
+	UINT32 val0x24e4;	/* V3POS 24e4, V1POS 24bc */
+	UINT32 val0x24e8;	/* V3POS 24e8, V1POS 24c0 */
+
+	struct rxhostdescriptor *RxHostDescPoolStart;	/* V3POS 24f8, V1POS 24d0 */
+	UINT32 val0x24fc;	/* V3POS 24fc, V1POS 24d4 */
+	UINT32 val0x2500;	/* V3POS 2500, V1POS 24d8 */
+
+	/*** helper stuff ***/
+	UINT8 scan_retries;	/* V3POS 2826, V1POS 27fe */
+	UINT8 auth_assoc_retries;	/* V3POS 2827, V1POS 27ff */
+	spinlock_t lock; /* our new locking variable */
+
+	/* Request/Confirm i/f state (used by p80211) */
+//	UINT32 request_pending;	/* flag, access atomically */
+//	p80211msg_t *curr_msg;
+//	struct timer_list reqtimer;
+//	wait_queue_head_t reqwq;
+
+//	acx100_metacmd_t *cmds;
+
+	/* device methods (init by MSD, used by p80211 */
+	int (*open) (struct wlandevice *wlandev);
+	int (*close) (struct wlandevice *wlandev);
+	void (*reset) (struct wlandevice *wlandev);
+	int (*txframe) (struct wlandevice *wlandev, struct sk_buff *skb);
+	int (*mlmerequest) (struct wlandevice *wlandev, p80211msg_t *msg);
+	void (*hwremovedfn) (struct wlandevice *wlandev);
+
+#ifdef CONFIG_PROC_FS
+	/* Procfs support */
+	struct proc_dir_entry *procdir;
+	struct proc_dir_entry *procwlandev;
+#endif
+
+	/* 802.11 device statistics */
+//	struct p80211_frmrx_t rx;
 
 } wlandevice_t __WLAN_ATTRIB_PACK__;
 

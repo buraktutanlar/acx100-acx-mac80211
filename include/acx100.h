@@ -55,7 +55,6 @@
 
 #define MTUSIZE 1500
 
-
 /*** DEBUG / LOG functionality ***/
 #define L_STD		0x01	/* standard logging that really should be there,
 				   like error msgs etc. */

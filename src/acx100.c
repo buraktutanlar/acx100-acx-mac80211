@@ -79,24 +79,13 @@
 
 #include <linux/ioport.h>
 
-#define CONFIG_PCMCIA 0
-
-#if CONFIG_PCMCIA == 0
 #include <linux/pci.h>
 #include <linux/init.h>
 
+#include <linux/pm.h>
+
 #include <asm/pci.h>
 
-#else
-
-#include <pcmcia/version.h>
-#include <pcmcia/cs_types.h>
-#include <pcmcia/cs.h>
-#include <pcmcia/cistpl.h>
-#include <pcmcia/cisreg.h>
-#include <pcmcia/ds.h>
-#include <pcmcia/bus_ops.h>
-#endif
 
 #include <linux/dcache.h>
 #include <linux/highmem.h>
@@ -113,7 +102,7 @@
 #include <p80211msg.h>
 #include <p80211ioctl.h>
 #include <acx100.h>
-#include <p80211conv.h>
+#include <acx100_conv.h>
 #include <p80211netdev.h>
 #include <p80211req.h>
 #include <p80211types.h>
@@ -135,7 +124,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 /*================================================================*/
 /* Local Constants */
-#if CONFIG_PCMCIA == 0
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
 #define PCI_SIZE		0x1000	/* Memory size - 4K bytes */
 #define PCI_SIZE2   0x10000
@@ -148,7 +136,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 /* PCI Class & Sub-Class code, Network-'Other controller' */
 #define PCI_CLASS_NETWORK_OTHERS 0x280
 
-#endif
 /*================================================================*/
 /* Local Macros */
 
@@ -157,11 +144,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 /*================================================================*/
 /* Local Static Definitions */
-#if CONFIG_PCMCIA == 0
 #define DRIVER_SUFFIX	"_pci"
-#else
-#define DRIVER_SUFFIX   "_cs"
-#endif
 
 #define MAX_WLAN_DEVICES 4
 #define CARD_EEPROM_ID_SIZE 6
@@ -171,19 +154,8 @@ MODULE_LICENSE("Dual MPL/GPL");
 unsigned char broken_SS1021_ID[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 unsigned char DrayTek_Vigor_520_ID[6] = {0x80, 0x81, 0x82, 0x83, 0x84, 0x85};
 
-#if CONFIG_PCMCIA > 0
-static dev_info_t dev_info = "acx100_cs";
-static dev_link_t *dev_list;
-typedef struct local_info_t {
-	dev_link_t	link;
-	dev_node_t	node;
-	int		stop;
-	struct bus_operations *bus;
-}local_info_t;
-#else
 typedef char *dev_info_t;
 static dev_info_t dev_info = "TI acx100" DRIVER_SUFFIX;
-#endif
 
 static char *version = "TI acx100" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
 
@@ -194,7 +166,7 @@ int debug = 0x9b;
 int use_eth_name = 0;
 
 char *firmware_dir;
-#if CONFIG_PCMCIA == 0
+
 static struct pci_device_id pci_id_tbl[] = 
 {
 	{
@@ -221,6 +193,8 @@ static int acx100_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
 static void acx100_remove_pci(struct pci_dev *pdev);
 
+int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
+
 
 struct pci_driver acx100_pci_drv_id = {
 	.name        = "acx100_pci",
@@ -228,10 +202,10 @@ struct pci_driver acx100_pci_drv_id = {
 	.probe       = acx100_probe_pci,
 	.remove      = __devexit_p(acx100_remove_pci),
 };
-#endif
 
 typedef struct acx100_device {
 	netdevice_t *next;
+
 } acx100_device_t;
 
 static struct acx100_device root_acx100_dev = {
@@ -243,15 +217,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev);
 static void acx100_tx_timeout(netdevice_t * dev);
 static struct net_device_stats *acx100_get_stats(netdevice_t * hw);
 static struct iw_statistics *acx100_get_wireless_stats(netdevice_t * hw);
-#if CONFIG_PCMCIA > 0
-static dev_link_t * acx100_cs_attach(void);
-static void acx100_cs_detach(dev_link_t *dev_list);
-static void acx100_cs_release(UINT arg);
-static int acx100_cs_event(event_t event, int priority, 
-		event_callback_args_t *args);
-static void acx100_cs_error(client_handle_t handle, int func, int ret);
-static void acx100_cs_config(dev_link_t *link);
-#endif
+
 irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void acx100_set_rx_mode(netdevice_t * netdev);
 void acx100_rx(/*wlan_pb_t * p80211*/
@@ -347,7 +313,7 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 			form_str = "standard?";
 			break;
 		case 0x01:
-			form_str = "D-Link DWL-650+/Planet WL-8305?";
+			form_str = "D-Link DWL-520+/650+/Planet WL-8305?";
 			break;
 		default:
 			form_str = "UNKNOWN, please report!";
@@ -356,7 +322,6 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 
 	acxlog(L_STD, "acx100: form factor 0x%02x (%s), radio type 0x%02x (%s), EEPROM version 0x%04x. Uploaded firmware '%s' (0x%08lx).\n", wlandev->form_factor, form_str, wlandev->radio_type, radio_str, wlandev->eeprom_version, wlandev->firmware_version, wlandev->firmware_id);
 }
-#if CONFIG_PCMCIA == 0
 /*----------------------------------------------------------------
 * acx100_probe_pci
 *
@@ -408,10 +373,10 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	int i;
 	UINT32 hardware_info;
 	char *devname_mask;
-
 	FN_ENTER;
 
 	/* Enable the PCI device */
+
 	if (pci_enable_device(pdev) != 0) {
 		acxlog(L_BINSTD | L_INIT,
 		       "acx100_probe_pci: %s: pci_enable_device() failed\n",
@@ -500,7 +465,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		acx100_check_eeprom_name(wlandev,
+		acx100_read_eeprom_offset(wlandev,
 					 ACX100_EEPROM_ID_OFFSET + i,
 					 &buffer[i]);
 	}
@@ -605,7 +570,8 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	hardware_info = acx100_read_reg16(wlandev, 0x2ac);
 	wlandev->form_factor = hardware_info & 0xff;
 	wlandev->radio_type = hardware_info >> 8 & 0xff;
-	wlandev->eeprom_version = hardware_info >> 16;
+//	wlandev->eeprom_version = hardware_info >> 16;
+	acx100_read_eeprom_offset(wlandev, 0x05, &wlandev->eeprom_version);
 
 	if (acx100_init_mac(netdev) != 0) {
 		acxlog(L_DEBUG | L_INIT,
@@ -620,13 +586,20 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	acx100_display_hardware_details(wlandev);
 
 	pci_set_drvdata(pdev, netdev);
+	wlandev->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
+			&acx100_pm_callback);
+	
+	
 
-	/* Power management registration */
 
 	result = 0;
 	goto done;
 
 fail:
+	if (wlandev->pm)
+	{
+		pm_unregister(wlandev->pm);
+	}
 	if (netdev)
 	{
 		unregister_netdev(netdev);
@@ -726,7 +699,8 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 		hw->state = ((hw->state & 0xfe) | 0x2);
 	}
 
-	dmaDeleteDC(hw);
+	acx100_delete_dma_region(hw);
+	pm_unregister(hw->pm);
 	unregister_netdev(netdev);
 	iounmap((void *) hw->iobase);
 	iounmap((void *) hw->iobase2);
@@ -746,11 +720,64 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	pci_set_power_state(pdev, 3);
 	
 	pci_set_drvdata(pdev, NULL);
+
 	acxlog(L_BINSTD | L_INIT, "Device %s removed!\n", netdev->name);
 
 	FN_EXIT(0, 0);
 }
-#endif
+
+
+int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+{
+	int result = 0;
+	netdevice_t *ndev = root_acx100_dev.next;
+	wlandevice_t *wlandev = (wlandevice_t*)ndev->priv;
+	client_t client;
+	switch(rqst)
+	{
+		case PM_SUSPEND:
+			acx100_disable_irq(wlandev);
+			if (!netif_queue_stopped(ndev)) {
+				netif_stop_queue(ndev);
+			}
+
+			if (transmit_disassoc(&client,wlandev) == 1){
+				result = -EINVAL;
+			}
+
+			acx100_issue_cmd(wlandev, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
+			acx100_issue_cmd(wlandev, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
+
+			/* disable power LED to save power :-) */
+			acxlog(L_INIT, "switching off power LED.\n");
+			acx100_power_led(wlandev, 0);
+	
+			/* put the eCPU to sleep to save power
+			 * Halting is not possible currently,
+			 * since not supported by all firmware versions */
+			acx100_issue_cmd(wlandev, ACX100_CMD_SLEEP, 0, 0, 5000);
+
+			printk("Asked to suspend: %X\n",rqst);
+			result = 0;
+			break;
+		case PM_RESUME:
+			acx100_issue_cmd(wlandev, ACX100_CMD_WAKE, 0, 0, 5000);
+
+			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_TX, NULL, 0, 5000);
+			acx100_issue_cmd(wlandev, ACX100_CMD_ENABLE_RX, NULL, 0, 5000);
+
+			netif_wake_queue(ndev);
+			acx100_enable_irq(wlandev);
+
+			printk("Asked to resume: %X\n",rqst);
+			break;
+		default:
+			printk("Asked for PM: %X\n",rqst);
+			result = -EINVAL;
+			break;
+	}
+	return result;
+}
 
 /*----------------------------------------------------------------
 * acx100_up
@@ -776,7 +803,7 @@ static void acx100_up(netdevice_t * dev)
 {
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
 	FN_ENTER;
-	hwEnableISR(wlandev);
+	acx100_enable_irq(wlandev);
 	if (wlandev->firmware_numver >= 0x0109030e) /* FIXME: first version? */
 	{ /* newer firmware versions don't use a hardware timer any more */
 		acxlog(L_INIT, "firmware version >= 1.9.3.e --> using software timer\n");
@@ -818,7 +845,7 @@ static void acx100_down(netdevice_t * dev)
 	{ /* newer firmware versions don't use a hardware timer any more */
 		del_timer_sync(&wlandev->mgmt_timer);
 	}
-	hwDisableISR(wlandev);
+	acx100_disable_irq(wlandev);
 	FN_EXIT(0, 0);
 }
 
@@ -1013,7 +1040,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 
 	pb->eth_hdr = (wlan_ethhdr_t *) pb->ethbuf;
  */
-	if ((tx_desc = get_tx_desc(hw)) == NULL){
+	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL){
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		return 1;
 	}
@@ -1021,7 +1048,7 @@ static int acx100_start_xmit(struct sk_buff *skb, netdevice_t * dev)
 	acx100_ether_to_txdesc(hw,tx_desc,skb);
 	dev_kfree_skb(skb);
 
-	dma_tx_data(hw, tx_desc);
+	acx100_dma_tx_data(hw, tx_desc);
 	dev->trans_start = jiffies;
 
 /*	if (txresult == 1){
@@ -1177,7 +1204,8 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	static int last_irq_jiffies = 0;
 
 	UINT16 irqtype = acx100_read_reg16(wlandev, ACX100_IRQ_STATUS) & ~(wlandev->irq_mask);
-
+	
+	pm_access(wlandev->pm);
 	/* immediately return if we don't get signalled that an interrupt
 	 * has occurred that we are interested in (interrupt sharing
 	 * with other cards!) */
@@ -1206,11 +1234,11 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 
 	if (irqtype & 0x8) {
-		dmaRxXfrISR(wlandev);
+		acx100_process_rx_desc(wlandev);
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x8);
 	}
 	if (irqtype & 0x2) {
-		dmaTxDataISR(wlandev);
+		acx100_clean_tx_desc(wlandev);
 		acx100_write_reg16(wlandev, ACX100_IRQ_ACK, 0x2);
 #if 0
 /* this shouldn't happen here generally, since we'd also enable user packet
@@ -1403,26 +1431,12 @@ int init_module(void)
 	 * if there is a matching PCI card present (ie., which
 	 * has matching vendor+device id)
 	 */
-	printk("CONFIG_PCMCIA: %d\n",CONFIG_PCMCIA);
-#if CONFIG_PCMCIA > 0
-	servinfo_t serv;
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "acx100_cs: Card Services release "
-			"does not match!\n");
-		return -1;
-	}
-	register_pccard_driver(&dev_info,&acx100_cs_attach,
-			&acx100_cs_detach);
-	printk("This should be a pcmcia card\n");
-#else
 	if (pci_register_driver(&acx100_pci_drv_id) <= 0) {
 		acxlog(L_STD,
 		       "init_module: acx100_pci: No devices found, driver not installed\n");
 		pci_unregister_driver(&acx100_pci_drv_id);
 		return -ENODEV;
 	}
-#endif //CONFIG_PCMCIA
 	FN_EXIT(0, 0);
 	return 0;
 }
@@ -1470,11 +1484,7 @@ void cleanup_module(void)
 	//      }
 
 	FN_ENTER;
-#if CONFIG_PCMCIA > 0
-	unregister_pccard_driver(&dev_info);
-#else
 	pci_unregister_driver(&acx100_pci_drv_id);
-#endif
 	while (root_acx100_dev.next != NULL) {
 		netdev = root_acx100_dev.next;
 		hw /* ebx */  = (wlandevice_t *) netdev->priv;
@@ -1491,322 +1501,7 @@ void cleanup_module(void)
 }
 
 /* This should init the device and all settings. */
-#if CONFIG_PCMCIA > 0
-/*----------------------------------------------------------------
-* acx100_cs_attach
-*
-* cs attach method, calls necessary functions to allocate structure and 
-* other things.
-*
-* Arguments:
-*	none
-*
-* Returns:
-*	0	- success
-*	~0	- failure, module is unloaded.
-*
-* Side effects:
-* 	alot
-*
-* Call context:
-*	process thread (insmod or modprobe)
-* STATUS: should be ok.. NONV3.
-----------------------------------------------------------------*/
 
-static dev_link_t * acx100_cs_attach(void)
-{
-	local_info_t *local;
-	dev_link_t *link;
-	client_reg_t client_reg;
-	int ret;
-
-	local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
-	printk("Got here\n");
-	if (!local) return NULL;
-	memset(local, 0, sizeof(local_info_t));
-	link = &local->link; link->priv = local;
-	/* Initialize the dev_link_t structure */
-	link->release.function = &acx100_cs_release;
-	link->release.data = (UINT)link;
-	
-	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-	link->irq.IRQInfo2 = 0xdfb5;
-	acxlog(L_IRQ, "Setting PCMCIA IRQ mask to %X\n",link->irq.IRQInfo2);
-	
-	link->conf.Attributes = 0;
-	link->conf.Vcc = 50;
-	link->conf.IntType = INT_MEMORY_AND_IO;
-
-	link->next = dev_list;
-	dev_list = link;
-	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
-	client_reg.EventMask =
-		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
-		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
-		CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
-	client_reg.event_handler = &acx100_cs_event;
-	client_reg.Version = 0x0210;
-	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
-	if (ret != CS_SUCCESS) {
-		acx100_cs_error(link->handle, RegisterClient, ret);
-		acx100_cs_detach(link);
-		return NULL;
-	}
-	return link;
-}
-/*----------------------------------------------------------------
-* acx100_cs_detach
-*
-* cs attach method, calls necessary functions to allocate structure and 
-* other things.
-*
-* Arguments:
-*	none
-*
-* Returns:
-*	0	- success
-*	~0	- failure, module is unloaded.
-*
-* Side effects:
-* 	alot
-*
-* Call context:
-*	process thread (insmod or modprobe)
-* STATUS: should be ok.. NONV3.
-----------------------------------------------------------------*/
-
-static void acx100_cs_detach(dev_link_t *dev_list)
-{
-	dev_link_t **linkp;
-
-	for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
-		if (*linkp == dev_list) break;
-	if (*linkp == NULL)
-		return;
-
-	if (dev_list->state & DEV_CONFIG) {
-		acxlog(L_DEBUG,"acx100_cs: detach postponed, '%s' "
-			"still locked\n", dev_list->dev->dev_name);
-	 	dev_list->state |= DEV_STALE_LINK;
-		return;
-	}
-
-	*linkp = dev_list->next;
-	kfree(dev_list->priv);
-}
-
-static void acx100_cs_release(UINT arg)
-{
-	return;
-}
-static int acx100_cs_event(event_t event, int priority, 
-		event_callback_args_t *args)
-{
-	dev_link_t *link = args->client_data;
-	local_info_t *dev = link->priv;
-
-	switch (event) {
-	case CS_EVENT_CARD_REMOVAL:
-		link->state &= ~DEV_PRESENT;
-		if (link->state & DEV_CONFIG) {
-			((local_info_t *)link->priv)->stop = 1;
-			mod_timer(&link->release, jiffies + HZ/20);
-		}
-		break;
-	case CS_EVENT_CARD_INSERTION:
-		link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
-		dev->bus = args->bus;
-		acx100_cs_config(link);
-		break;
-	case CS_EVENT_PM_SUSPEND:
-		link->state |= DEV_SUSPEND;
-		/* NO BREAK */
-	case CS_EVENT_RESET_PHYSICAL:
-		dev->stop = 1;
-		if (link->state & DEV_CONFIG)
-			CardServices(ReleaseConfiguration, link->handle);
-		break;
-	case CS_EVENT_PM_RESUME:
-		link->state &= ~DEV_SUSPEND;
-		/* NO BREAK */
-	case CS_EVENT_CARD_RESET:
-		if (link->state & DEV_CONFIG)
-			CardServices(RequestConfiguration, link->handle,
-				&link->conf);
-		dev->stop = 0;
-		/* Do some restart crap */
-		break;
-	}
-	return 0;
-}
-
-static void acx100_cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = {func,ret};
-	CardServices(ReportError, handle, &err);
-}
-#define CS_CHECK(fn,args...) \
-while ((last_ret=CardServices(last_fn=(fn),args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
-
-const int free_ports = 1;
-
-static void acx100_cs_config(dev_link_t *link)
-{
-	printk("Got here\n");
-	client_handle_t handle = link->handle;
-	local_info_t *dev = link->priv;
-	tuple_t tuple;
-	cisparse_t parse;
-	int last_fn, last_ret;
-	UINT8 buf[64];
-	config_info_t conf;
-	win_req_t req;
-	memreq_t map;
-
-	tuple.DesiredTuple = CISTPL_CONFIG;
-	tuple.Attributes = 0;
-	tuple.TupleData = buf;
-	tuple.TupleDataMax = sizeof(buf);
-	tuple.TupleOffset = 0;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
-	link->conf.ConfigBase = parse.config.base;
-	link->conf.Present = parse.config.rmask[0];
-
-	link->state |= DEV_CONFIG;
-
-	CS_CHECK(GetConfigurationInfo, handle, &conf);
-	link->conf.Vcc = conf.Vcc;
-
-	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	while(1) {
-		cistpl_cftable_entry_t dflt = { 0 };
-		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
-		CFG_CHECK(GetTupleData, handle, &tuple);
-		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
-
-		if (cfg->flags & CISTPL_CFTABLE_DEFAULT) dflt = *cfg;
-		if (cfg->index == 0) goto next_entry;
-		link->conf.ConfigIndex = cfg->index;
-
-		if (cfg->flags & CISTPL_CFTABLE_AUDIO) {
-			link->conf.Attributes |= CONF_ENABLE_SPKR;
-			link->conf.Status = CCSR_AUDIO_ENA;
-		}
-
-		if (cfg->vcc.present & (1<<CISTPL_POWER_VNOM)) {
-			if (conf.Vcc != cfg->vcc.param[CISTPL_POWER_VNOM]/10000)
-				goto next_entry;
-		} else if (dflt.vcc.present & (1<<CISTPL_POWER_VNOM)) {
-			if (conf.Vcc != dflt.vcc.param[CISTPL_POWER_VNOM]/10000)
-				goto next_entry;
-		}
-
-		if (cfg->vpp1.present & (1<<CISTPL_POWER_VNOM))
-			link->conf.Vpp1 = link->conf.Vpp2 = 
-				cfg->vpp1.param[CISTPL_POWER_VNOM]/10000;
-		else if (dflt.vpp1.present & (1<<CISTPL_POWER_VNOM))
-			link->conf.Vpp1 = link->conf.Vpp2 = 
-				dflt.vpp1.param[CISTPL_POWER_VNOM]/10000;
-
-		if (cfg->irq.IRQInfo1 || dflt.irq.IRQInfo1)
-			link->conf.Attributes |= CONF_ENABLE_IRQ;
-
-		link->io.NumPorts1 = link->io.NumPorts2 = 0;
-		if ((cfg->io.nwin > 0) || (dflt.io.nwin > 0)) {
-			cistpl_io_t *io = (cfg->io.nwin) ? &cfg->io : &dflt.io;
-			link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
-			if (!(io->flags & CISTPL_IO_8BIT))
-				link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
-			if (!(io->flags & CISTPL_IO_16BIT))
-				link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
-			link->io.IOAddrLines = io->flags & CISTPL_IO_LINES_MASK;
-			link->io.BasePort1 = io->win[0].base;
-			link->io.NumPorts1 = io->win[0].len;
-			if (io->nwin > 1) {
-				link->io.Attributes2 = link->io.Attributes1;
-				link->io.BasePort2 = io->win[1].base;
-				link->io.NumPorts2 = io->win[1].len;
-			}
-			CFG_CHECK(RequestIO, link->handle, &link->io);
-		}
-
-		if ((cfg->mem.nwin > 0) || (dflt.mem.nwin > 0)) {
-			cistpl_mem_t *mem =
-				(cfg->mem.nwin) ? &cfg->mem : &dflt.mem;
-			req.Attributes = WIN_DATA_WIDTH_16|WIN_MEMORY_TYPE_CM;
-			req.Attributes |= WIN_ENABLE;
-			req.Base = mem->win[0].host_addr;
-			req.Size = mem->win[0].len;
-			if (req.Size < 0x1000)
-				req.Size = 0x1000;
-			req.AccessSpeed = 0;
-			link->win = (window_handle_t)link->handle;
-			CFG_CHECK(RequestWindow, &link->win, &req);
-			map.Page = 0;
-			map.CardOffset = mem->win[0].card_addr;
-			CFG_CHECK(MapMemPage, link->win, &map);
-		}
-		break;
-
-	next_entry:
-		if (link->io.NumPorts1)
-			CardServices(ReleaseIO, link->handle, &link->io);
-		CS_CHECK(GetNextTuple, handle, &tuple);
-	}
-
-	if (link->conf.Attributes & CONF_ENABLE_IRQ)
-		CS_CHECK(RequestIRQ, link->handle, &link->irq);
-
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
-
-	if (free_ports) {
-		if (link->io.BasePort1)
-			release_region(link->io.BasePort1, link->io.NumPorts1);
-		if (link->io.BasePort2)
-			release_region(link->io.BasePort2, link->io.NumPorts2);
-	}
-	
-	sprintf(dev->node.dev_name, "wlan0");
-	dev->node.major = dev->node.minor = 0;
-
-	printk(KERN_INFO "%s: index 0x%02x: Vcc %d.%d",
-		dev->node.dev_name, link->conf.ConfigIndex,
-		link->conf.Vcc/10, link->conf.Vcc%10);
-	if (link->conf.Vpp1)
-		printk(", Vpp %d.%d", link->conf.Vpp1/10, link->conf.Vpp1%10);
-	if (link->conf.Attributes & CONF_ENABLE_IRQ)
-		printk(", irq %d", link->irq.AssignedIRQ);
-	if (link->io.NumPorts1)
-		printk(", io 0x%04x-0x%04x", link->io.BasePort1,
-			link->io.BasePort1+link->io.NumPorts1-1);
-	if (link->io.NumPorts2)
-		printk(" & 0x%04x-0x%04x", link->io.BasePort2,
-			link->io.BasePort2+link->io.NumPorts2-1);
-	if (link->win)
-		printk(", mem 0x%06lx-0x%06lx", req.Base,
-			req.Base+req.Size-1);
-	printk("\n");
-
-	link->state &= ~DEV_CONFIG_PENDING;
-	return;
-
-cs_failed:
-	acx100_cs_error(link->handle, last_fn, last_ret);
-	acx100_cs_release((UINT)link);
-}
-
-
-
-#endif //CONFIG_PCMCIA
 /* For kernels 2.5.* where modutils>=4,2,22, we must have an module_init and module_exit like so: */
 #if (LINUX_VERSION_CODE >KERNEL_VERSION(2,5,22))	//I think
 module_init(acx100_init_module);

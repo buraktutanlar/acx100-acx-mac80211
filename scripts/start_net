@@ -13,7 +13,7 @@ DEV=wlan0
 IP=192.168.0.10
 NETMASK=255.255.255.0
 GATEWAY=192.168.0.254
-ESSID=any # any == associate to any ESSID
+ESSID=any # THIS IS CASE SeNsItIvE!! any == associate to any ESSID
 # Default rate configured as 11Mbps to not cause connection problems with non-22Mbps hardware...
 RATE=11M
 CHAN=10
@@ -35,6 +35,7 @@ SYNC=`which sync`
 INSMOD=`which insmod`
 IFCONF=`which ifconfig`
 IWCONF=`which iwconfig`
+ROUTE=`which route`
 SCRIPT_AT=`dirname $0`
 
 if [[ $SYNC == "" ]]; then echo "sync not found. Go get a sane Linux system. Bailing..."; exit 1; fi
@@ -56,7 +57,7 @@ FIRMWARE_AT="${SCRIPT_AT}/../firmware"
 
 if ! [[ -r "$FIRMWARE_AT/WLANGEN.BIN" ]]; then echo "Firmware not found or not readable. Have you placed it in the firmware directory or run make extract_firmware once? This script expects it to be at ../firmware/WLANGEN.BIN, relative to the script's location. Bailing..."; exit 1; fi
 
-if [[ $RATE != "11M" ]]; then echo "Transfer rate is not 11 Mb, but $RATE. If something doesn't work, try 11 Mb."; fi
+if [[ $RATE != "11M" ]]; then echo "Transfer rate is not 11 Mbps, but $RATE. If something doesn't work, try 11 Mbps."; fi
 
 
 # for better debugging
@@ -119,6 +120,10 @@ if [[ $? != 0 ]]; then echo "Error in \"$IFCONF $DEV $IP netmask $NETMASK\". Bai
 # buffer management problems (yeah, it's an ugly workaround!)
 $IFCONF $DEV mtu 576
 if [[ $? != 0 ]]; then echo "Error in \"$IFCONF $DEV mtu 576\". Bailing..."; exit 1; fi
+
+if [[ -n "$GATEWAY" ]]; then
+  $ROUTE add default gw $GATEWAY
+fi
 
 # # fetch an IP address from DHCP
 # rm -f /etc/dhcpc/dhcpcd-wlan0.pid > /dev/null
