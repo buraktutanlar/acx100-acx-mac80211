@@ -9,9 +9,9 @@ This is the current list of ToDos, in order of importance:
   small packet size
 - the whole driver needs proper (hardware etc.) locking. The binary driver
   didn't make use of locking at all (except for masking IRQs sometimes)
-  Note: locking for the ioctl's is finished
   Note: locking for packet transfer is finished
-- add further iwconfig/iwpriv support: channel traffic percentage indicator, iwspy, ...
+- add further iwconfig/iwpriv support: channel traffic percentage indicator,
+  iwspy, ...
 - further improve firmware management. Detect embedded linux radio 
   modules, etc...
 - implement packet fragmentation (to get rid of stupid hacks like
@@ -47,7 +47,7 @@ This is the current list of ToDos, in order of importance:
   improve standard power management, make sure ACPI states are fully working
   (suspend/resume handlers; resuming from suspend-to-ram has been reported
   to actually hang the machine!)
-- clean up the BSS list (iStable) for old stations that are no longer
+- clean up the BSS list (bss_table) for old stations that are no longer
   valid in order to prevent hitting the limit of the registered stations list
   (by adding a "found at" timestamp and check it) or maybe reimplement
   it as a linked list
@@ -61,7 +61,5 @@ This is the current list of ToDos, in order of importance:
   Also, 4X support seems to be pretty much a dirty hack; but if Windows
   supports it and it's a real gain for many users, then we also ought to
   support it
-- Fix SMP hangups (hyperthreading might be the problem, but does not 
-  appear to be)
 - Use ieee802_11.h from drivers/net/wireless of 2.6 and newer 2.4 kernels for
-  the 802.11 defines instead of the wlan-ng p80211* headers.
+  the 802.11 defines instead of the wlan-ng p80211* headers

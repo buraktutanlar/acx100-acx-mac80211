@@ -40,7 +40,6 @@
 /* System Includes */
 
 #include <linux/config.h>
-#define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
 
 #include <linux/module.h>
@@ -223,7 +222,7 @@ void acx100_reset_mac(wlandevice_t * hw)
 	acx100_schedule(HZ / 100);
 
 	/* now reset bit again */
-	acx100_write_reg16(hw, ACX100_REG0, temp & 0xfffe);
+	acx100_write_reg16(hw, ACX100_REG0, temp & ~0x1);
 
 	temp = acx100_read_reg16(hw, ACX100_RESET_0) | 0x1;
 	acx100_write_reg16(hw, ACX100_RESET_0, temp);
@@ -279,8 +278,8 @@ int acx100_reset_dev(netdevice_t * netdev)
 	}
 
 	if (!acx100_upload_fw(hw)) {
-		acxlog(L_BINSTD,
-			   "Failed to download firmware to the ACX100\n");
+		acxlog(L_STD,
+			   "Failed to upload firmware to the ACX100\n");
 		goto fail;
 	}
 	acx100_write_reg16(hw, ACX100_RESET_2, vala & ~0x1);
@@ -336,6 +335,7 @@ int acx100_upload_fw(wlandevice_t * hw)
 	int res1, res2;
 	firmware_image_t* apfw_image;
 	char filename[PATH_MAX];
+	int try;
 
 	FN_ENTER;
 	if (!firmware_dir)
@@ -354,9 +354,17 @@ int acx100_upload_fw(wlandevice_t * hw)
 		return 0;
 	}
 
-	res1 = acx100_write_fw(hw, apfw_image,0);
+	for (try = 0; try < 5; try++)
+	{
+		res1 = acx100_write_fw(hw, apfw_image,0);
 
-	res2 = acx100_validate_fw(hw, apfw_image,0);
+		res2 = acx100_validate_fw(hw, apfw_image,0);
+
+		if ((res1) && (res2))
+			break;
+		acxlog(L_STD, "firmware upload attempt #%d FAILED, retrying...\n", try);
+		acx100_schedule(HZ); /* better wait for a while... */
+	}
 
 	vfree(apfw_image);
 
@@ -686,6 +694,7 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 			acc2 += acx100_read_reg16(hw, ACX100_DATA_HI) << 16;
 
 			if (acc2 != acc1) {
+				acxlog(L_STD, "FATAL: firmware upload: data parts at offset %ld don't match!! (0x%08lx vs. 0x%08lx). Memory defective or timing issues, with DWL-xx0+?? Please report!\n", len, acc1, acc2);
 				result = 0;
 				break;
 			}
@@ -704,10 +713,13 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 		}
 	}
 
-	// sum control verification
+	/* sum control verification */
 	if (result != 0)
 		if (sum != apfw_image->chksum)
+		{
+			acxlog(L_STD, "FATAL: firmware upload: checksums don't match!!\n");
 			result = 0;
+		}
 
 	return result;
 }
@@ -1345,10 +1357,10 @@ static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	
 	switch (wlandev->radio_type) {
-		case 0x0d:
+		case RADIO_MAXIM_0D:
 			table = &dbm2val_maxim[0];
 			break;
-		case 0x11:
+		case RADIO_RFMD_11:
 			table = &dbm2val_rfmd[0];
 			break;
 		default:
@@ -1450,7 +1462,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			memset(ed_threshold, 0, sizeof(ed_threshold));
 			acx100_interrogate(wlandev, ed_threshold, ACX100_RID_DOT11_ED_THRESHOLD);
 			wlandev->ed_threshold = ed_threshold[4];
-			acxlog(L_INIT, "Got energy detect threshold %d\n", wlandev->ed_threshold);
+			acxlog(L_INIT, "Got Energy Detect (ED) threshold %d\n", wlandev->ed_threshold);
 			wlandev->get_mask &= ~GETSET_ED_THRESH;
 		}
 
@@ -1461,7 +1473,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			memset(cca, 0, sizeof(wlandev->cca));
 			acx100_interrogate(wlandev, cca, ACX100_RID_DOT11_CURRENT_CCA_MODE);
 			wlandev->cca = cca[4];
-			acxlog(L_INIT, "Got Channel Clear Assessment value %d\n", wlandev->cca);
+			acxlog(L_INIT, "Got Channel Clear Assessment (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) (CCA) value %d\n", wlandev->cca);
 			wlandev->get_mask &= ~GETSET_CCA;
 		}
 
@@ -1550,7 +1562,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 		unsigned char ed_threshold[4 + ACX100_RID_DOT11_ED_THRESHOLD_LEN];
 		memset(ed_threshold, 0, sizeof(ed_threshold));
 		ed_threshold[4] = wlandev->ed_threshold;
-		acxlog(L_INIT, "Updating energy detect threshold: %d\n",
+		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %d\n",
 					ed_threshold[4]);
 		acx100_configure(wlandev, &ed_threshold, ACX100_RID_DOT11_ED_THRESHOLD);
 		wlandev->set_mask &= ~GETSET_ED_THRESH;
@@ -1563,7 +1575,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 
 		memset(cca, 0, sizeof(cca));
 		cca[4] = wlandev->cca;
-		acxlog(L_INIT, "Updating Channel Clear Assessment value: 0x%02X\n", cca[4]);
+		acxlog(L_INIT, "Updating Channel Clear Assessment (CCA) value: 0x%02X\n", cca[4]);
 		acx100_configure(wlandev, &cca, ACX100_RID_DOT11_CURRENT_CCA_MODE);
 		wlandev->set_mask &= ~GETSET_CCA;
 	}
@@ -1612,7 +1624,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 
 		acxlog(L_INIT, "Updating xmt MSDU lifetime: %d\n",
 					wlandev->msdu_lifetime);
-		xmt_msdu_lifetime[4] = wlandev->msdu_lifetime;
+		*(UINT32 *)&xmt_msdu_lifetime[4] = wlandev->msdu_lifetime;
 		acx100_configure(wlandev, &xmt_msdu_lifetime, ACX100_RID_DOT11_MAX_XMIT_MSDU_LIFETIME);
 		wlandev->set_mask &= ~SET_MSDU_LIFETIME;
 	}
@@ -1838,7 +1850,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	acxlog(L_INIT, "Regulatory domain ID as read from EEPROM: 0x%x\n", wlandev->reg_dom_id);
 	wlandev->set_mask |= GETSET_REG_DOMAIN;
 
-	wlandev->msdu_lifetime = 5000; /* was 0x800, probably was too low */
+	wlandev->msdu_lifetime = 2048;
 	wlandev->set_mask |= SET_MSDU_LIFETIME;
 
 	wlandev->short_retry = 0x5;
@@ -1846,6 +1858,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->set_mask |= GETSET_RETRY;
 
 	wlandev->bitrateval = 110; /* FIXME: this used to be 220 (22Mbps), but since our rate adaptation doesn't work properly yet, we better start with a compatible value, since otherwise it breaks transfer */
+	wlandev->bitrate_auto = 1; /* FIXME: enable it by default, but it's not implemented yet. */
 
 	/* Supported Rates element - the rates here are given in units of
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
@@ -1862,7 +1875,11 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->rate_support2[3] = 0x96;	/* 11Mbps */
 	wlandev->rate_support2[4] = 0xac;	/* 22Mbps */
 
-	/* do 0 retries before falling back to lower rate */
+	/* # of retries before falling back to lower rate.
+	 * Setting it higher will enable fallback, but will thus cause
+	 * higher ping times due to retries.
+	 * In other words: this needs to be done in software
+	 * in order to be useful. */
 	wlandev->rate_fallback_retries = 0;
 	wlandev->set_mask |= SET_RATE_FALLBACK;
 
@@ -1879,6 +1896,7 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 
 	/* set some more defaults */
 	wlandev->tx_level_dbm = 20;
+	wlandev->tx_level_auto = 1;
 	wlandev->set_mask |= GETSET_TXPOWER;
 
 	wlandev->antenna = 0x8f;
@@ -2136,6 +2154,8 @@ int acx100_init_mac(netdevice_t * ndev)
 	int result = -1;
 	struct memmap pkt;
 	wlandevice_t *hw = (wlandevice_t *) ndev->priv;
+
+	FN_ENTER;
 
 	acxlog(L_BINDEBUG, "******************************************\n");
 	acxlog(L_BINDEBUG | L_INIT,

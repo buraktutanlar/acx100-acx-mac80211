@@ -1,25 +1,26 @@
 # set to 0 if you don't want any debugging code to be compiled in
 export ACX_DEBUG=1
 
-.PHONY: all config extract_firmware driver install clean
+.PHONY: all extract_firmware driver install clean
 
-all:	config driver
+all: driver
 
-config:
+config.mk: Configure
 	@./Configure
 
 extract_firmware: firmware
 	make -C firmware extract_firmware
 
-driver:
+driver: config.mk
 	make -C src
 
 install:
 	@echo "Sorry, we don't provide a system installation mechanism, since it would need to be distribution specific. Maybe you didn't read the part in the README file mentioning the installation details?"
 
 clean:
-	make -C src clean; \
+	make -C src clean
 	make -C firmware clean
+	rm -f config.mk
 
 distclean: 
 #	@echo "WARNING this will remove all binaries, including the \

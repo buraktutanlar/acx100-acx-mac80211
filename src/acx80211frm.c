@@ -48,7 +48,6 @@
 /* System Includes */
 
 #include <linux/config.h>
-#define WLAN_DBVAR      prism2_debug
 #include <linux/version.h>
 
 #include <linux/module.h>

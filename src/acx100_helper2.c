@@ -296,10 +296,11 @@ client_t *sta_list_alloc(UINT8 *address)
 			sta_list[i].used = 1;
 			sta_list[i].auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
 			sta_list[i].val0xe = 1;
+			FN_EXIT(1, (int)&(sta_list[i]));
 			return &(sta_list[i]);
 		}
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -454,8 +455,7 @@ int acx80211_rx(struct rxhostdescriptor *rxdesc, wlandevice_t * hw)
 				case WLAN_FSTYPE_CFACK_CFPOLL:
 				/*   see above.
 				   process_class_frame(rxdesc, hw, 3); */
-/* FIXME: is this a binary driver code flaw, the breaks are not present!?!?
- * indeed, this might be the case. */
+					break;
 				case WLAN_FSTYPE_NULL:
 					process_NULL_frame(rxdesc, hw, 3);
 				/* FIXME: same here, see above */
@@ -525,7 +525,7 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 		da = arg_0->hdr->a3.a2;
 		bssid = arg_0->hdr->a3.a3;
 	} else {
-		FN_EXIT(0, 0);
+		FN_EXIT(1, 1);
 		return 1;
 	}
 
@@ -554,6 +554,7 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 			}
 
 			if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
+				FN_EXIT(1, 0);
 				return 0;
 			}
 
@@ -596,7 +597,7 @@ UINT32 transmit_assocresp(wlan_fr_assocreq_t *arg_0,
 		}
 	}
 
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 1);
 	return 1;
 }
 
@@ -641,7 +642,7 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 		da = arg_0->hdr->a3.a2;
 		bssid = arg_0->hdr->a3.a3;
 	} else {
-		FN_EXIT(0, 0);
+		FN_EXIT(1, 0);
 		return 1;
 	}
 
@@ -721,7 +722,7 @@ UINT32 transmit_reassocresp(wlan_fr_reassocreq_t *arg_0, wlandevice_t *hw)
 
 		acx100_dma_tx_data(hw, tx_desc);
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 
 	return 0;
 }
@@ -775,7 +776,7 @@ int process_disassoc(wlan_fr_disassoc_t *arg_0, wlandevice_t *hw)
 		} else
 			res = 1;
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, res);
 	return res;
 }
 
@@ -826,7 +827,7 @@ int process_disassociate(wlan_fr_disassoc_t * req, wlandevice_t * hw)
 		} else
 			res = 1;
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, res);
 	return res;
 }
 
@@ -1324,8 +1325,8 @@ static UINT32 process_mgmt_frame(struct rxhostdescriptor * rxdesc, wlandevice_t 
 		}
 		break;
 	}
-	FN_EXIT(0, 0);
 
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -1359,7 +1360,7 @@ static int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw,
 #endif
 
 /*----------------------------------------------------------------
-* process_NULL_fame
+* process_NULL_frame
 * FIXME: rename to acx100_process_NULL_frame
 *
 * Arguments:
@@ -1373,6 +1374,7 @@ static int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw,
 * STATUS:
 *
 * Comment:
+*   Processing of Null Function ("nullfunc") frames.
 *
 *----------------------------------------------------------------*/
 
@@ -1382,15 +1384,14 @@ static int process_class_frame(struct rxhostdescriptor * skb, wlandevice_t * hw,
 static int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, int vala)
 {
 	UINT16 fc;
-	signed char *esi;
-	UINT8 *ebx;
+	signed char *esi = NULL;
+	UINT8 *ebx = NULL;
 	p80211_hdr_t *fr;
 	client_t *client;
+	client_t *resclt = NULL;
 	int result = 0;
-	client_t *resclt;
 
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	esi = NULL;
 	fr = (p80211_hdr_t*)&pb->data->buf;
 	if (hw->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
 		fr = (p80211_hdr_t*)((UINT8*)fr + 4);
@@ -1418,20 +1419,22 @@ static int process_NULL_frame(struct rxhostdescriptor * pb, wlandevice_t * hw, i
 	     client = client->next) {
 		if (!memcmp(ebx, client->address, WLAN_ADDR_LEN)) {
 			resclt = client;
-			goto end;
+			break;
 		}
 	}
-	resclt = NULL;
 
-      end:
 	if (resclt)
 		result = 0;
 	else {
+#if IS_IT_BROKEN
 		acxlog(L_BINDEBUG | L_XFER, "<transmit_deauth 7>\n");
 		transmit_deauthen(ebx, 0x0, hw, WLAN_MGMT_REASON_CLASS2_NONAUTH /* 6 */);
+#else
+		acxlog(L_STD, "received NULL frame from unknown client! We really shouldn't send deauthen here, right?\n");
+#endif
 		result = 1;
 	}
-      done:
+done:
 	return result;
 }
 
@@ -1528,21 +1531,21 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	hw->bss_table[hw->bss_table_count].fWEPPrivacy = (hdr->val0x22 >> 0x4) & 1;	/* "Privacy" field */
 	hw->bss_table[hw->bss_table_count].cap = hdr->val0x22;
 	memcpy(hw->bss_table[hw->bss_table_count].supp_rates,
-	       &pSuppRates[2], 0x8);
+	       &pSuppRates[2], pSuppRates[1]);
 	hw->bss_table[hw->bss_table_count].sir = mmt->level;
 	hw->bss_table[hw->bss_table_count].snr = mmt->snr;
 
 	a = hw->bss_table[hw->bss_table_count].address;
 	ss = &hw->bss_table[hw->bss_table_count];
 
-	acxlog(L_DEBUG, "Supported Rates: ");
+	acxlog(L_DEBUG, "Supported Rates:\n");
 	/* find max. transfer rate */
 	for (i=0; i < pSuppRates[1]; i++)
 	{
-		acxlog(L_DEBUG, "%s Rate: %d%sMbps, ",
+		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
 			(pSuppRates[2+i] & 0x80) ? "Basic" : "Operational",
-			(int)(pSuppRates[2+i] & ~0x80 / 2),
-			(pSuppRates[2+i] & 1) ? ".5" : "");
+			(int)((pSuppRates[2+i] & ~0x80) / 2),
+			(pSuppRates[2+i] & 1) ? ".5" : "", pSuppRates[2+i]);
 		if ((pSuppRates[2+i] & ~0x80) > max_rate)
 			max_rate = pSuppRates[2+i] & ~0x80;
 	}
@@ -1635,7 +1638,7 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
 		} else
 			res = 1;
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, res);
 	return res;
 }
 
@@ -1880,7 +1883,7 @@ int process_deauthen(wlan_fr_deauthen_t * arg_0, wlandevice_t * hw)
 	} else
 		result = 1;
 
-	FN_EXIT(0, 0);
+	FN_EXIT(1, result);
 	return result;
 }
 /*----------------------------------------------------------------
@@ -1925,7 +1928,7 @@ int process_deauthenticate(wlan_fr_deauthen_t * req, wlandevice_t * hw)
 			}
 		}
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 1);
 	return 1;
 }
 /*----------------------------------------------------------------
@@ -2005,7 +2008,7 @@ int transmit_deauthen(char *a, client_t *clt, wlandevice_t *wlandev, int reason)
 
 	acx100_dma_tx_data(wlandev, tx_desc);
 
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2710,7 +2713,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		       (int) wlandev->bss_table[idx].sir,
 		       (int) wlandev->bss_table[idx].snr);
 
-		if (!(wlandev->bss_table[idx].cap & 3))
+		if (!(wlandev->bss_table[idx].cap & (WLAN_SET_MGMT_CAP_INFO_ESS(1) | WLAN_SET_MGMT_CAP_INFO_IBSS(1))))
 		{
 			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
 			wlandev->bss_table[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);

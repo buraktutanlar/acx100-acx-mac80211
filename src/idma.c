@@ -37,7 +37,6 @@
  */
 
 #include <linux/config.h>
-#define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
 
 #include <linux/module.h>
@@ -465,7 +464,7 @@ void acx100_clean_tx_desc(wlandevice_t *wlandev)
 	FN_ENTER;
 
 	acx100_log_txbuffer(pDc);
-	acxlog(L_BUF, "cleaning up Tx bufs from %d.\n", pDc->tx_tail);
+	acxlog(L_BUF, "cleaning up Tx bufs from %d\n", pDc->tx_tail);
 
 	spin_lock_irqsave(&tx_lock, flags);
 
@@ -478,10 +477,23 @@ void acx100_clean_tx_desc(wlandevice_t *wlandev)
 		/* check if txdesc is marked as "Tx finished" and "owned" */
 		if ((pTxDesc->Ctl & DESC_CTL_DONE) == DESC_CTL_DONE) {
 
-			acxlog(L_BUF, "cleaning %d.\n", finger);
+			acxlog(L_BUF, "cleaning %d\n", finger);
 			
 			if (pTxDesc->error != 0) {
-				acxlog(L_STD, "Tx error occurred (error 0x%02X)!! (maybe distance too high?)\n", pTxDesc->error);
+				char *err;
+				
+				switch(pTxDesc->error) {
+					case 0x10:
+						err = "MSDU lifetime timeout? - change 'iwconfig retry lifetime XXX'";
+						break;
+					case 0x20:
+						err = "maybe distance too high? - change 'iwconfig txpower XXX'";
+						break;
+					default:
+						err = "unknown error";
+						break;
+				}
+				acxlog(L_STD, "Tx error occurred (error 0x%02X)!! (%s)\n", pTxDesc->error, err);
 				wlandev->stats.tx_carrier_errors++;
 				wlandev->stats.tx_errors++;
 			}

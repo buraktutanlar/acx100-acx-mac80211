@@ -54,7 +54,6 @@
 /*================================================================*/
 /* System Includes */
 #include <linux/config.h>
-#define WLAN_DBVAR	prism2_debug
 #include <linux/version.h>
 
 #include <linux/kernel.h>
@@ -144,6 +143,7 @@ static char *version = "TI acx100" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
 
 #ifdef ACX_DEBUG
 int debug = 0x9b;
+int acx100_debug_func_indent = 0;
 #endif
 
 int use_eth_name = 0;
@@ -315,16 +315,16 @@ void acx100_display_hardware_details(wlandevice_t *wlandev)
 	FN_ENTER;
 
 	switch(wlandev->radio_type) {
-		case 0x11:
-			radio_str = "RFMD";
-			break;
-		case 0x0d:
+		case RADIO_MAXIM_0D:
 			/* hmm, the DWL-650+ seems to have two variants,
 			 * according to a windows driver changelog comment:
 			 * RFMD and Maxim. */
 			radio_str = "Maxim";
 			break;
-		case 0x15:
+		case RADIO_RFMD_11:
+			radio_str = "RFMD";
+			break;
+		case RADIO_UNKNOWN_15:
 			radio_str = "UNKNOWN, used e.g. in DrayTek Vigor 520, please report the radio type name!";
 			break;
 		default:
@@ -468,9 +468,9 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Log the device */
 	acxlog(L_STD | L_INIT,
-	       "Found ACX100-based wireless network card, phymem1:0x%x, phymem2:0x%x, irq:%d, mem1:0x%x, mem2:0x%x\n",
+	       "Found ACX100-based wireless network card, phymem1:0x%x, phymem2:0x%x, irq:%d, mem1:0x%x, mem2:0x%x, compiled with wireless extensions v%d\n",
 	       (unsigned int) phymem1, (unsigned int) phymem2, pdev->irq,
-	       (unsigned int) mem1, (unsigned int) mem2);
+	       (unsigned int) mem1, (unsigned int) mem2, WIRELESS_EXT);
 
 	acxlog(L_INIT, "Allocating %d, %Xh bytes for wlandevice_t\n",sizeof(wlandevice_t),sizeof(wlandevice_t));
 	if ((wlandev = kmalloc(sizeof(wlandevice_t), GFP_KERNEL)) == NULL) {
@@ -992,6 +992,7 @@ static int acx100_open(netdevice_t * ndev)
 
 	wlandev->open = 1;
 
+	acxlog(L_INIT, "module count ++\n");
 	WLAN_MOD_INC_USE_COUNT;
 	result = 0;
 
@@ -1060,6 +1061,7 @@ static int acx100_close(netdevice_t *dev)
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
 
+	acxlog(L_INIT, "module count --\n");
 	WLAN_MOD_DEC_USE_COUNT;
 #ifdef BROKEN_LOCKING
 	spin_unlock_irq(&wlandev->lock);
@@ -1251,8 +1253,10 @@ static void acx100_tx_timeout(netdevice_t * dev)
  */
 static struct net_device_stats *acx100_get_stats(netdevice_t * dev)
 {
+	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
 	FN_ENTER;
-	return &((wlandevice_t *) dev->priv)->stats;
+	FN_EXIT(1, (int)&wlandev->stats);
+	return &wlandev->stats;
 }
 /*----------------------------------------------------------------
 * acx100_get_wireless_stats
@@ -1275,8 +1279,8 @@ static struct net_device_stats *acx100_get_stats(netdevice_t * dev)
 static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev)
 {
 	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
-
 	FN_ENTER;
+	FN_EXIT(1, (int)&wlandev->stats);
 	return &wlandev->wstats;
 }
 
@@ -1301,6 +1305,7 @@ static struct iw_statistics *acx100_get_wireless_stats(netdevice_t *dev)
 static void acx100_set_rx_mode(netdevice_t * netdev)
 {
 	FN_ENTER;
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -1339,6 +1344,7 @@ irqreturn_t acx100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * with other cards!) */
 	if (!irqtype) {
 		acxlog(L_IRQ, "IRQTYPE: %X, irq_mask: %X\n", irqtype, wlandev->irq_mask);
+		FN_EXIT(0, 0);
 		return IRQ_NONE;
 	}
 	else

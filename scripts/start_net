@@ -35,6 +35,7 @@ SYNC=`which sync`
 INSMOD=`which insmod`
 IFCONF=`which ifconfig`
 IWCONF=`which iwconfig`
+IWPRIV=`which iwpriv`
 ROUTE=`which route`
 SCRIPT_AT=`dirname $0`
 
@@ -112,6 +113,9 @@ fi
 
 fi
 
+# for notebook use - a power LED is sooo useless anyway ;-))
+#[[ $IWPRIV ]] && $IWPRIV $DEV set_led_power 0
+
 
 # Hehe, this can be done after iwconfigs now :)
 $IFCONF $DEV $IP netmask $NETMASK
@@ -127,8 +131,10 @@ if [[ -n "$GATEWAY" ]]; then
 fi
 
 # # fetch an IP address from DHCP
-# rm -f /etc/dhcpc/dhcpcd-wlan0.pid > /dev/null
-# dhcpcd -d wlan0 -t 5
+# rm -f /etc/dhcpc/dhcpcd-$DEV.pid > /dev/null
+# dhcpcd -d $DEV -t 5
+# OR
+# pump -i $DEV
 
 # just in case ;)
 $SYNC

@@ -80,19 +80,39 @@
 			 L_STATE | L_XFER | L_DATA | L_DEBUG | L_IOCTL | L_CTL)
 
 extern int debug;
+extern int acx100_debug_func_indent;
 
 #define acxlog(chan, args...) \
 	if (debug & (chan)) \
 		printk(KERN_WARNING args)
 
+#define FUNC_INDENT_INCREMENT 2
+
 #define FN_ENTER \
-	acxlog(L_FUNC, "==> %s\n", __func__)
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			printk("==> %s\n", __func__); \
+			acx100_debug_func_indent += FUNC_INDENT_INCREMENT; \
+		} \
+	} while (0)
+
 #define FN_EXIT(p, v) \
-	if (p) { \
-		acxlog(L_FUNC, "<== %s: %08x\n", __func__, v); \
-	} else { \
-		acxlog(L_FUNC, "<== %s\n", __func__); \
-	}
+	do { \
+		if (debug & L_FUNC) { \
+			int i; \
+			acx100_debug_func_indent -= FUNC_INDENT_INCREMENT; \
+			for (i = 0; i < acx100_debug_func_indent; i++) \
+				printk(" "); \
+			if (p) { \
+				printk("<== %s: %08x\n", __func__, v); \
+			} else { \
+				printk("<== %s\n", __func__); \
+			} \
+		} \
+	} while (0)
 
 #else /* ACX_DEBUG */
 
@@ -160,6 +180,11 @@ extern int debug;
 #define ACX100_RATEBIT_2			((UINT16)2)
 #define ACX100_RATEBIT_5dot5			((UINT16)4)
 #define ACX100_RATEBIT_11			((UINT16)8)
+
+
+#define RADIO_MAXIM_0D		0x0d
+#define RADIO_RFMD_11		0x11
+#define RADIO_UNKNOWN_15	0x15
 
 /*--- IRQ Constants ----------------------------------------------------------*/
 #define HOST_INT_TIMER			0x40
@@ -2152,7 +2177,7 @@ typedef struct acx100_addr3 {
 typedef struct wep_key {
 	UINT32 index;
 	UINT16 size;
-	UINT8 key[256];
+	UINT8 key[29];
 	UINT16 strange_filler;
 } wep_key_t;			/* size = 264 bytes (33*8) */
 /* FIXME: We don't have size 264! Or is there 2 bytes beyond the key
@@ -2225,7 +2250,7 @@ typedef struct bss_info {
 	size_t essid_len;		/* 0x8 */
 	char essid[IW_ESSID_MAX_SIZE+1];	/* 0xc this one INCLUDES the trailing \0 !! */
 	UINT16 fWEPPrivacy;	/* 0x2c */
-	char supp_rates[0x8];
+	unsigned char supp_rates[0x8];
 	UINT32 channel;		/* 0x64; strange, this is accessed as UINT16 once. oh well, probably doesn't matter */
 	UINT32 sir;		/* 0x78; Standard IR */
 	UINT32 snr;		/* 0x7c; Signal to Noise Ratio */
@@ -2262,7 +2287,7 @@ typedef struct wlandevice {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc_entry;
 #endif
-	/*** Managment timer ***/
+	/*** Management timer ***/
 	struct timer_list mgmt_timer;
 
 	/*** Locking ***/
@@ -2311,6 +2336,7 @@ typedef struct wlandevice {
 	char nick[IW_ESSID_MAX_SIZE+1]; /* see essid! */
 	UINT16 channel;		/* V3POS 22f0, V1POS b8 */
 	UINT8 bitrateval;	/* V3POS b8, V1POS ba */
+	char bitrate_auto;	/* whether to auto adjust bit rates */
 	UINT8 rate_fallback_retries;
 	unsigned char reg_dom_id;	/* reg domain setting */
 	UINT16 reg_dom_chanmask;
@@ -2328,6 +2354,7 @@ typedef struct wlandevice {
 	/*** PHY settings ***/
 	unsigned char tx_level_dbm;
 	unsigned char tx_level_val;
+	char tx_level_auto; /* whether to do automatic power adjustment */
 	unsigned char antenna;	/* antenna settings */
 	unsigned char ed_threshold;	/* energy detect threshold */
 	unsigned char cca;	/* clear channel assessment */
