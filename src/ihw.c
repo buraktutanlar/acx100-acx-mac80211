@@ -740,9 +740,9 @@ int acx100_is_mac_address_equal(UINT8 * one, UINT8 * two)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_copy_mac_address(UINT8 * to, UINT8 * from)
+void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from)
 {
-	memcpy(to, from, WLAN_ADDR_LEN);
+	memcpy(to, from, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -809,9 +809,9 @@ UINT8 acx100_is_mac_address_directed(mac_t * mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-void acx100_set_mac_address_broadcast(char *mac)
+void acx100_set_mac_address_broadcast(UINT8 *address)
 {
-	memset(mac, 0xff, WLAN_ADDR_LEN);
+	memset(address, 0xff, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------
@@ -831,12 +831,11 @@ void acx100_set_mac_address_broadcast(char *mac)
 * Comment:
 *
 *----------------------------------------------------------------*/
-int acx100_is_mac_address_broadcast(mac_t * mac)
+int acx100_is_mac_address_broadcast(const UINT8 * const address)
 {
-	if ((mac->vala == 0xffffffff) && (mac->valb == 0xffff)) {
-		return 1;
-	}
-	return 0;
+	static const unsigned char bcast[ETH_ALEN] =
+		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	return !memcmp(address, bcast, ETH_ALEN);
 }
 
 /*----------------------------------------------------------------

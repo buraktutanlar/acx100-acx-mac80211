@@ -1488,13 +1488,13 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 
 	/* filter out duplicate stations we already registered in our list */
 	for (station = 0; station < hw->bss_table_count; station++) {
-		UINT8 *a = hw->bss_table[station].address;
+		UINT8 *a = hw->bss_table[station].bssid;
 		acxlog(L_DEBUG,
 		       "checking station %ld [%02X %02X %02X %02X %02X %02X]\n",
 		       station, a[0], a[1], a[2], a[3], a[4], a[5]);
 		if (acx100_is_mac_address_equal
 		    (hdr->a4.a3,
-		     hw->bss_table[station].address)) {
+		     hw->bss_table[station].bssid)) {
 			acxlog(L_DEBUG,
 			       "station already in our list, no need to add.\n");
 			return;
@@ -1514,7 +1514,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	memset(&hw->bss_table[hw->bss_table_count], 0, sizeof(struct bss_info));
 
 	/* copy the BSSID element */
-	memcpy(hw->bss_table[hw->bss_table_count].address,
+	memcpy(hw->bss_table[hw->bss_table_count].bssid,
 	       hdr->a4.a3, WLAN_BSSID_LEN);
 
 	/* copy the ESSID element */
@@ -1535,7 +1535,7 @@ void acx100_process_probe_response(struct rxbuffer *mmt, wlandevice_t * hw,
 	hw->bss_table[hw->bss_table_count].sir = mmt->level;
 	hw->bss_table[hw->bss_table_count].snr = mmt->snr;
 
-	a = hw->bss_table[hw->bss_table_count].address;
+	a = hw->bss_table[hw->bss_table_count].bssid;
 	ss = &hw->bss_table[hw->bss_table_count];
 
 	acxlog(L_DEBUG, "Supported Rates:\n");
@@ -1665,29 +1665,31 @@ int process_assocresp(wlan_fr_assocresp_t * req, wlandevice_t * hw)
  */
 int process_reassocresp(wlan_fr_reassocresp_t * req, wlandevice_t * hw)
 {
-	p80211_hdr_t *hdr;
+	p80211_hdr_t *hdr = req->hdr;
+	int result = 4;
 
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
-	hdr = req->hdr;
 
 	// FIXME: toDS and fromDS = 1 ??
-	if (hdr->a3.fc & 0x300)
-		return 1;
-	else {
-		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ )
-			return 1;
-		if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
+	if (hdr->a3.fc & 0x300) {
+		result = 1;
+	} else {
+		if (hw->macmode == WLAN_MACMODE_NONE /* 0, Ad-Hoc */ ) {
+			result = 2;
+		} else if (acx100_is_mac_address_equal(hw->dev_addr, hdr->a3.a1 /* RA */)) {
 			if (req->status[0] == WLAN_MGMT_STATUS_SUCCESS) {
 				acx100_set_status(hw, ISTATUS_4_ASSOCIATED);
-			}
-			else
+			} else {
 				acxlog(L_STD | L_ASSOC, "Reassociation FAILED: response status code %d: \"%s\"!\n", req->status[0], get_status_string(req->status[0]));
-			return 0;
-		} else
-			return 1;
+			}
+			result = 0;
+		} else {
+			result = 3;
+		}
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, result);
+	return result;
 }
 
 /* process_authen()
@@ -2172,7 +2174,7 @@ int transmit_authen2(wlan_fr_authen_t * arg_0, client_t * sta_list,
 
 		acx100_dma_tx_data(hw, tx_desc);
 	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2209,6 +2211,7 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
+		FN_EXIT(1, 1);
 		return 1;
 	}
 
@@ -2251,7 +2254,7 @@ int transmit_authen3(wlan_fr_authen_t * arg_0, wlandevice_t * hw)
 	acxlog(L_BINDEBUG | L_ASSOC | L_XFER, "transmit_auth3!\n");
 
 	acx100_dma_tx_data(hw, tx_desc);
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2288,6 +2291,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
+		FN_EXIT(1, 1);
 		return 1;
 	}
 
@@ -2318,7 +2322,7 @@ int transmit_authen4(wlan_fr_authen_t *arg_0, wlandevice_t *hw)
 	tx_desc->total_length = hdesc_payload->length + hdesc_header->length;
 
 	acx100_dma_tx_data(hw, tx_desc);
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2357,6 +2361,7 @@ int transmit_assoc_req(wlandevice_t *hw)
 
 	acxlog(L_BINSTD | L_ASSOC, "Sending association request, awaiting response! NOT ASSOCIATED YET.\n");
 	if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
+		FN_EXIT(1, 1);
 		return 1;
 	}
 
@@ -2436,7 +2441,7 @@ int transmit_assoc_req(wlandevice_t *hw)
 	tx_desc->total_length = payload->length + header->length;
 
 	acx100_dma_tx_data(hw, tx_desc);
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2475,6 +2480,7 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 //	if (clt != NULL) {
 		if ((tx_desc = acx100_get_tx_desc(hw)) == NULL) {
+			FN_EXIT(1, 1);
 			return 1;
 		}
 
@@ -2506,9 +2512,10 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
 
 		/* FIXME: lengths missing! */
 		acx100_dma_tx_data(hw, tx_desc);
+		FN_EXIT(1, 1);
 		return 1;
 //	}
-	FN_EXIT(0, 0);
+	FN_EXIT(1, 0);
 	return 0;
 }
 
@@ -2535,9 +2542,11 @@ UINT32 transmit_disassoc(client_t *clt, wlandevice_t *hw)
  */
 void gen_challenge(challenge_text_t * d)
 {
+	FN_ENTER;
 	d->element_ID = 0x10;
 	d->length = 0x80;
 	get_ran(d->text, 0x80);
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -2572,6 +2581,7 @@ void get_ran(UINT8 *s, UINT32 stack)
 	UINT16 count, len;
 	UINT32 ran;
 
+	FN_ENTER;
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 	var_4 = 0;
 	seed[0] = 0;
@@ -2619,6 +2629,7 @@ void get_ran(UINT8 *s, UINT32 stack)
 			} while (count < stack);
 		}
 	}
+	FN_EXIT(0, 0);
 }
 
 /*----------------------------------------------------------------
@@ -2704,39 +2715,44 @@ void d11CompleteScan(wlandevice_t *wlandev)
 	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area.\n", wlandev->bss_table_count);
 
 	for (idx = 0; idx < wlandev->bss_table_count; idx++) {
+		struct bss_info *this_bss = &wlandev->bss_table[idx];
+
 		/* V3CHANGE: dbg msg in V1 only */
 		acxlog(L_BINDEBUG | L_ASSOC,
 		       "<Scan Table> %d: SSID=\"%s\",CH=%d,SIR=%d,SNR=%d\n",
 		       (int) idx,
-		       wlandev->bss_table[idx].essid,
-		       (int) wlandev->bss_table[idx].channel,
-		       (int) wlandev->bss_table[idx].sir,
-		       (int) wlandev->bss_table[idx].snr);
+		       this_bss->essid,
+		       (int) this_bss->channel,
+		       (int) this_bss->sir,
+		       (int) this_bss->snr);
 
-		if (!(wlandev->bss_table[idx].cap & (WLAN_SET_MGMT_CAP_INFO_ESS(1) | WLAN_SET_MGMT_CAP_INFO_IBSS(1))))
+		if (!acx100_is_mac_address_broadcast(wlandev->ap))
+			if (!acx100_is_mac_address_equal(this_bss->bssid, wlandev->ap))
+				continue;
+		if (!(this_bss->cap & (WLAN_SET_MGMT_CAP_INFO_ESS(1) | WLAN_SET_MGMT_CAP_INFO_IBSS(1))))
 		{
 			acxlog(L_ASSOC, "STRANGE: peer station has neither ESS (Managed) nor IBSS (Ad-Hoc) capability flag set: patching to assume Ad-Hoc!\n");
-			wlandev->bss_table[idx].cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
+			this_bss->cap |= WLAN_SET_MGMT_CAP_INFO_IBSS(1);
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%02x, needed_cap 0x%02x\n",
-		       wlandev->bss_table[idx].cap, needed_cap);
+		       this_bss->cap, needed_cap);
 
 		/* peer station doesn't support what we need? */
-		if (!((wlandev->bss_table[idx].cap & needed_cap) == needed_cap))
+		if (!((this_bss->cap & needed_cap) == needed_cap))
 			continue; /* keep looking */
 
-		if (!(wlandev->reg_dom_chanmask & (1 << (wlandev->bss_table[idx].channel - 1) ) ))
+		if (!(wlandev->reg_dom_chanmask & (1 << (this_bss->channel - 1) ) ))
 		{
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, wlandev->bss_table[idx].channel);
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %ld is using channel %ld, which is outside the channel range of the regulatory domain the driver is currently configured for: couldn't join in case of matching settings, might want to adapt your config!\n", idx, this_bss->channel);
 			continue; /* keep looking */
 		}
 
 		if ((!wlandev->essid_active)
-		 || (!memcmp(wlandev->bss_table[idx].essid, wlandev->essid, wlandev->essid_len)))
+		 || (!memcmp(this_bss->essid, wlandev->essid, wlandev->essid_len)))
 		{
 			acxlog(L_ASSOC,
 			       "ESSID matches: \"%s\" (station), \"%s\" (config)\n",
-			       wlandev->bss_table[idx].essid,
+			       this_bss->essid,
 			       (wlandev->essid_active) ? wlandev->essid : "[any]");
 			idx_found = idx;
 			found_station = 1;
@@ -2745,11 +2761,11 @@ void d11CompleteScan(wlandevice_t *wlandev)
 			/* stop searching if this station is
 			 * on the current channel, otherwise
 			 * keep looking for an even better match */
-			if (wlandev->bss_table[idx].channel == wlandev->channel)
+			if (this_bss->channel == wlandev->channel)
 				break;
 		}
 		else
-		if (wlandev->bss_table[idx].essid[0] == '\0')
+		if (this_bss->essid[0] == '\0')
 		{
 			/* hmm, station with empty SSID:
 			 * using hidden SSID broadcast?
@@ -2785,7 +2801,7 @@ void d11CompleteScan(wlandevice_t *wlandev)
 		wlandev->essid_for_assoc[essid_len] = '\0';
 		wlandev->channel = wlandev->bss_table[idx_found].channel;
 		memcpy(wlandev->address,
-		       wlandev->bss_table[idx_found].address, WLAN_ADDR_LEN);
+		       wlandev->bss_table[idx_found].bssid, WLAN_ADDR_LEN);
 
 		a = wlandev->address;
 		acxlog(L_STD | L_ASSOC,
@@ -2852,8 +2868,10 @@ void ActivatePowerSaveMode(wlandevice_t * hw, int vala)
 	acxlog(L_STATE, "%s: UNVERIFIED.\n", __func__);
 
 	acx100_interrogate(hw, &pm, ACX100_RID_POWER_MGMT);
-	if (pm.m.power.a != 0x81)
+	if (pm.m.power.a != 0x81) {
+		FN_EXIT(0, 0);
 		return;
+	}
 	pm.m.power.a = 0;
 	pm.m.power.b = 0;
 	pm.m.power.c = 0;

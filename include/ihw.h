@@ -70,11 +70,11 @@ int acx100_interrogate(wlandevice_t *hw, void *pdr, short type);
 int acx100_is_mac_address_zero(mac_t *mac);
 void acx100_clear_mac_address(mac_t *mac);
 int acx100_is_mac_address_equal(UINT8 *one, UINT8 *two);
-void acx100_copy_mac_address(UINT8 *from, UINT8 *to);
+void acx100_copy_mac_address(UINT8 *to, const UINT8 * const from);
 UINT8 acx100_is_mac_address_group(mac_t *mac);
 UINT8 acx100_is_mac_address_directed(mac_t *mac);
-void acx100_set_mac_address_broadcast(char *addr);
-int acx100_is_mac_address_broadcast(mac_t *mac);
+void acx100_set_mac_address_broadcast(UINT8 *address);
+int acx100_is_mac_address_broadcast(const UINT8 * const address);
 int acx100_is_mac_address_multicast(mac_t *mac);
 void acx100_log_mac_address(int level, UINT8 *mac);
 

@@ -173,9 +173,9 @@ int acx100_proc_output(char *buf, wlandevice_t *wlandev)
 	for (i = 0; i < wlandev->bss_table_count; i++) {
 		struct bss_info *bss = &wlandev->bss_table[i];
 		p += sprintf(p, " BSS %d  BSSID %02x:%02x:%02x:%02x:%02x:%02x  ESSID %s  channel %ld  WEP %s  Cap 0x%x  SIR %ld  SNR %ld\n", 
-			     i, bss->address[0], bss->address[1],
-			     bss->address[2], bss->address[3], bss->address[4],
-			     bss->address[5], bss->essid, bss->channel,
+			     i, bss->bssid[0], bss->bssid[1],
+			     bss->bssid[2], bss->bssid[3], bss->bssid[4],
+			     bss->bssid[5], bss->essid, bss->channel,
 			     bss->fWEPPrivacy ? "yes" : "no", bss->cap,
 			     bss->sir, bss->snr);
 	}
@@ -332,7 +332,8 @@ fail:
 
 int acx100_upload_fw(wlandevice_t * hw)
 {
-	int res1, res2;
+	int res1 = 0;
+	int res2 = 0;
 	firmware_image_t* apfw_image;
 	char filename[PATH_MAX];
 	int try;
@@ -508,7 +509,16 @@ firmware_image_t* acx100_read_fw(const char *file)
 		 * absolute path from a relative path... */
 		inf = filp_open(file, O_RDONLY, 0);
 		if (IS_ERR(inf)) {
-			acxlog(L_STD, "ERROR %ld trying to open firmware image file '%s'.\n", -PTR_ERR(inf), file);
+			char *err;
+
+			switch(-PTR_ERR(inf)) {
+				case 2: err = "file not found - make sure this EXACT filename is in eXaCtLy this directory!";
+					break;
+				default:
+					err = "unknown error";
+					break;
+			}
+			acxlog(L_STD, "ERROR %ld trying to open firmware image file '%s': %s\n", -PTR_ERR(inf), file, err);
 		} else {
 			if (inf->f_op && inf->f_op->read) {
 				offset = 0;
@@ -562,6 +572,8 @@ firmware_image_t* acx100_read_fw(const char *file)
 }
 
 
+#define NO_AUTO_INCREMENT	1
+
 /*----------------------------------------------------------------
 * acx100_write_fw
 * Used to be WriteACXImage
@@ -601,7 +613,12 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 	acx100_write_reg16(hw, ACX100_FW_4, 0);
 	acx100_write_reg16(hw, ACX100_FW_5, 0);
 	acx100_write_reg16(hw, ACX100_FW_2, 0);
+#if NO_AUTO_INCREMENT
+	acxlog(L_INIT, "not using auto increment for firmware loading.\n");
+	acx100_write_reg16(hw, ACX100_FW_3, 0);
+#else
 	acx100_write_reg16(hw, ACX100_FW_3, 1);
+#endif
 	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff);
 	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16);
 
@@ -623,6 +640,10 @@ int acx100_write_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, UINT
 			 * 32bit write to register ACX100_DATA_LO...
 			 * But maybe there are cards with 16bit interface
 			 * only */
+#if NO_AUTO_INCREMENT
+			acx100_write_reg16(hw, ACX100_FW_0, (offset + len - 4) & 0xffff);
+			acx100_write_reg16(hw, ACX100_FW_1, (offset + len - 4) >> 16);
+#endif
 			acx100_write_reg16(hw, ACX100_DATA_LO, acc & 0xffff);
 			acx100_write_reg16(hw, ACX100_DATA_HI, acc >> 16);
 			acc = 0;
@@ -677,7 +698,11 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 	acx100_write_reg16(hw, ACX100_FW_4, 0);
 	acx100_write_reg16(hw, ACX100_FW_5, 0);
 	acx100_write_reg16(hw, ACX100_FW_2, 0);
+#if NO_AUTO_INCREMENT
+	acx100_write_reg16(hw, ACX100_FW_3, 0);
+#else
 	acx100_write_reg16(hw, ACX100_FW_3, 1);
+#endif
 	acx100_write_reg16(hw, ACX100_FW_0, offset & 0xffff );
 	acx100_write_reg16(hw, ACX100_FW_1, offset >> 16 );
 
@@ -690,6 +715,10 @@ int acx100_validate_fw(wlandevice_t * hw, const firmware_image_t * apfw_image, U
 		counter--;
 
 		if (counter < 0) {
+#if NO_AUTO_INCREMENT
+			acx100_write_reg16(hw, ACX100_FW_0, (offset + len - 4) & 0xffff);
+			acx100_write_reg16(hw, ACX100_FW_1, (offset + len - 4) >> 16);
+#endif
 			acc2 = acx100_read_reg16(hw, ACX100_DATA_LO);
 			acc2 += acx100_read_reg16(hw, ACX100_DATA_HI) << 16;
 
@@ -1351,9 +1380,19 @@ int acx100_set_generic_beacon_probe_response_frame(wlandevice_t *
 static inline int acx100_set_tx_level(wlandevice_t *wlandev, UINT16 level)
 {
         unsigned char *table; 
-	/* FIXME!!!! this table is CRAP! It doesn't reflect actual dBm
-           values yet :-\ */
-	unsigned char dbm2val_maxim[21] = { 60, 57, 54, 51, 48, 45, 42, 39, 36, 33, 30, 27, 24, 21, 18, 15, 12, 9, 6, 3, 0};
+	/* since it can be assumed that at least the Maxim radio has a
+	 * maximum power output of 20dBm and since it also can be
+	 * assumed that these values drive the DAC responsible for
+	 * setting the linear Tx level, I'd guess that these values
+	 * should be the corresponding linear values for a dBm value,
+	 * in other words: calculate the values from that formula:
+	 * Y [dBm] = 10 * log (X [mW])
+	 * then scale the 0..63 value range onto the 1..100mW range (0..20 dBm)
+	 * and you're done...
+	 * Hopefully that's ok, but you never know if we're actually
+	 * right... (especially since Windows XP doesn't seem to show
+	 * actual Tx dBm values :-P) */
+	unsigned char dbm2val_maxim[21] = { 63, 63, 63, 62, 61, 61, 60, 60, 59, 58, 57, 55, 53, 50, 47, 43, 38, 31, 23, 13, 0};
 	unsigned char dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8, 10, 13, 16, 20, 25, 32, 41, 50, 63};
 	
 	switch (wlandev->radio_type) {
@@ -1909,6 +1948,8 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	wlandev->set_mask |= GETSET_CCA;
 
 	wlandev->set_mask |= SET_RXCONFIG;
+
+	acx100_set_mac_address_broadcast(wlandev->ap);
 
 	result = 1;
 

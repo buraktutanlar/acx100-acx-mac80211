@@ -383,6 +383,85 @@ static inline int acx100_ioctl_get_mode(struct net_device *dev, struct iw_reques
 	return 0;
 }
 
+/*------------------------------------------------------------------------------
+ * acx100_set_ap
+ * 
+ * Sets the MAC address of the AP to associate with 
+ *
+ * Arguments:
+ *
+ * Returns:
+ *
+ * Side effects:
+ *
+ * Call context: Process
+ *
+ * STATUS: NEW
+ *
+ *----------------------------------------------------------------------------*/
+static inline int acx100_ioctl_set_ap(struct net_device *dev,
+				      struct iw_request_info *info,
+				      struct sockaddr *awrq, char *extra)
+{
+	wlandevice_t *wlandev = (wlandevice_t *)dev->priv;
+	static const unsigned char off[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
+	int result = 0;
+	int i;
+	unsigned char *ap;
+
+	FN_ENTER;
+	if (!awrq) {
+		result = -EFAULT;
+		goto end;
+	}
+	if (awrq->sa_family != ARPHRD_ETHER) {
+                result = -EINVAL;
+		goto end;
+	}
+	
+	ap = awrq->sa_data;
+	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
+               ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
+
+	if (wlandev->macmode != WLAN_MACMODE_ESS_STA) {
+		result = -EINVAL;
+		goto end;
+	}
+
+	if (acx100_is_mac_address_broadcast(ap)) {
+		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
+		acx100_set_mac_address_broadcast(wlandev->ap);
+		acxlog(L_IOCTL, "Forcing reassociation\n");
+		acx100_scan_chan(wlandev);
+		result = -EINPROGRESS;
+	} else if (!memcmp(off, ap, ETH_ALEN)) {
+		/* "off" == 00:00:00:00:00:00 */
+		acx100_set_mac_address_broadcast(wlandev->ap);
+		acxlog(L_IOCTL, "Not reassociating\n");
+	} else {
+		/* AB:CD:EF:01:23:45 */
+		for (i = 0; i < wlandev->bss_table_count; i++) {
+			struct bss_info *bss = &wlandev->bss_table[i];
+			if (!memcmp(bss->bssid, ap, ETH_ALEN)) {
+				if ((!!wlandev->wep_enabled) != (!!bss->fWEPPrivacy)) {
+					result = -EINVAL;
+					goto end;
+                        	} else {
+					memcpy(wlandev->ap, ap, ETH_ALEN);
+					acxlog(L_IOCTL, "Forcing reassociation\n");
+					acx100_scan_chan(wlandev);
+					result = -EINPROGRESS;
+					goto end;
+				}
+			}
+                }
+	}
+
+end:
+	FN_EXIT(1, result);
+	return result;
+}
+
 static inline int acx100_ioctl_get_ap(struct net_device *dev, struct iw_request_info *info, struct sockaddr *awrq, char *extra)
 {
 	wlandevice_t *wlandev = (wlandevice_t *) dev->priv;
@@ -475,7 +554,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 				       wlandev->bss_table[i].essid,
 				       ap_table[i].essid_len);
 				memcpy(ap_table[i].address,
-				       wlandev->bss_table[i].address,
+				       wlandev->bss_table[i].bssid,
 				       WLAN_BSSID_LEN);
 
 				ap_table[i].cap = ((wlandev->bss_table[i].cap >> 1) ^ 1) & 1;	/* IBSS capability flag */
@@ -507,7 +586,7 @@ static inline int acx100_ioctl_get_aplist(struct net_device *dev, struct iw_requ
 			for (i = 0; i < wlandev->bss_table_count; i++) {
 
 				memcpy(addresses[i].sa_data,
-				       wlandev->bss_table[i].address,
+				       wlandev->bss_table[i].bssid,
 				       WLAN_BSSID_LEN);
 				addresses[i].sa_family = ARPHRD_ETHER;
 			}
@@ -566,9 +645,9 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *wlandev, char *ptr, cha
 	/* MAC address has to be added first */
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
-	memcpy(iwe.u.ap_addr.sa_data, bss->address, ETH_ALEN);
+	memcpy(iwe.u.ap_addr.sa_data, bss->bssid, ETH_ALEN);
 	acxlog(L_IOCTL, "scan, station address:\n");
-	acx100_log_mac_address(L_IOCTL, bss->address);
+	acx100_log_mac_address(L_IOCTL, bss->bssid);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_ADDR_LEN);
 
 	/* Add ESSID */
@@ -699,7 +778,7 @@ static inline int acx100_ioctl_set_essid(struct net_device *dev, struct iw_reque
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set ESSID <= %s\n", dwrq->pointer);
+	acxlog(L_IOCTL, "Set ESSID <= %s, length %d, flags 0x%04x\n", dwrq->pointer, len, dwrq->flags);
 
 	if (len <= 0) {
 		result = -EINVAL;
@@ -1657,7 +1736,7 @@ static inline int acx100_ioctl_set_short_preamble(struct net_device *dev, struct
 			descr = "auto (peer capability dependent)";
 
 			/* associated to a station? */
-			if (wlandev->station_assoc.address[0] != 0x00)
+			if (wlandev->station_assoc.bssid[0] != 0x00)
 				wlandev->preamble_flag = WLAN_GET_MGMT_CAP_INFO_SHORT(wlandev->station_assoc.cap);
 			break;
 	}
@@ -2186,7 +2265,7 @@ static const iw_handler acx100_ioctl_handler[] =
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) NULL,			/* [nothing] */
 #endif /* WE > 15 */
-	(iw_handler) NULL /* FIXME acx100_ioctl_set_ap */,	/* SIOCSIWAP */
+	(iw_handler) acx100_ioctl_set_ap,	/* SIOCSIWAP */
 	(iw_handler) acx100_ioctl_get_ap,	/* SIOCGIWAP */
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) acx100_ioctl_get_aplist,	/* SIOCGIWAPLIST */
@@ -2265,7 +2344,7 @@ const struct iw_handler_def acx100_ioctl_handler_def =
 /* Main function						  */
 /*================================================================*/
 /*----------------------------------------------------------------
-* acx100_ioctl
+* acx100_ioctl_main
 *
 *
 * Arguments:
@@ -2347,8 +2426,14 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 #if WIRELESS_EXT > 10
 	case SIOCGIWRANGE:
 		/* Get range of parameters */
-		result = acx100_ioctl_get_range(dev, NULL, &(iwr->u.data),
-						NULL);
+		{
+			struct iw_range range;
+			result = acx100_ioctl_get_range(dev, NULL,
+					&(iwr->u.data), (char *)&range);
+			if (copy_to_user(iwr->u.data.pointer, &range,
+					 sizeof(struct iw_range)))
+				result = -EFAULT;
+		}
 		break;
 #endif
 
@@ -2361,7 +2446,11 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 	/* case SIOCSIWTHRSPY: FIXME */
 	/* case SIOCGIWTHRSPY: FIXME */
 
-	/* case SIOCSIWAP: FIXME */
+	case SIOCSIWAP:
+		/* set access point by MAC address */
+		result = acx100_ioctl_set_ap(dev, NULL, &(iwr->u.ap_addr),
+					     NULL);
+		break;
 
 	case SIOCGIWAP:
 		/* get access point MAC address */

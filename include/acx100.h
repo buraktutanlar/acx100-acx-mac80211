@@ -2245,7 +2245,7 @@ typedef struct TIWLAN_DC {	/* V3 version */
 
 /*--- Scan table entry -------------------------------------------------------*/
 typedef struct bss_info {
-	char address[WLAN_BSSID_LEN];	/* 0x0 */
+	char bssid[WLAN_BSSID_LEN];	/* 0x0 */
 	UINT16 cap;		/* 0x6 */
 	size_t essid_len;		/* 0x8 */
 	char essid[IW_ESSID_MAX_SIZE+1];	/* 0xc this one INCLUDES the trailing \0 !! */
@@ -2327,6 +2327,7 @@ typedef struct wlandevice {
 	UINT8 dev_addr[MAX_ADDR_LEN];
 	UINT8 address[WLAN_ADDR_LEN];
 	UINT8 bssid[WLAN_ADDR_LEN];
+	UINT8 ap[ETH_ALEN];	/* The AP we want, FF:FF:FF:FF:FF:FF is any */
 	UINT32 macmode;		/* This is the mode we're currently in */
 	UINT32 mode;		/* That's the MAC mode we want */
 	char essid_active;	/* specific ESSID active, or select any? */
@@ -2382,7 +2383,6 @@ typedef struct wlandevice {
 	UINT32 wep_current_index;	/* V3POS 254, V1POS 25c not sure about this */
 	wep_key_t wep_keys[NUM_WEPKEYS];	/* V3POS 268 (it is NOT 260, but 260 plus offset 8!), V1POS 270 */
 	key_struct_t wep_key_struct[10];	/* V3POS 688 */
-	int hostwep;
 
 	/*** Card Rx/Tx management ***/
 	UINT16 rx_config_1;	/* V3POS 2820, V1POS 27f8 */
