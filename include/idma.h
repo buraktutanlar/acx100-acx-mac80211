@@ -99,6 +99,8 @@ typedef struct framehdr {
 
 #define	DESC_CTL_DONE		(DESC_CTL_USED_FOR_TX | DESC_CTL_FREE)
 
+#define DESC_CTL2_RTS		0x20
+
 typedef struct txdescriptor {
 	UINT pNextDesc;		/* 0x00 I think this is a pointer to the next txdescriptor */
 	UINT HostMemPtr;	/* V1_3POS 0x04 */
@@ -111,7 +113,7 @@ typedef struct txdescriptor {
 	UINT val0x20;
 
 	unsigned char Ctl;	/* V1_3POS 0x24 */
-	unsigned char something2;
+	unsigned char Ctl2;
 	unsigned char error;	/* V1_3POS 0x26 */
 	unsigned char AckFailures;	/* 0x27 */
 	UINT16 val0x28;

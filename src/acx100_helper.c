@@ -328,9 +328,11 @@ void acx100_reset_mac(wlandevice_t * hw)
 	FN_ENTER;
 
 #if (WLAN_HOSTIF!=WLAN_USB)
+	/* halt eCPU */
 	temp = acx100_read_reg16(hw, hw->io[IO_ACX_ECPU_CTRL]) | 0x1;
 	acx100_write_reg16(hw, hw->io[IO_ACX_ECPU_CTRL], temp);
 
+	/* now do soft reset of eCPU */
 	temp = acx100_read_reg16(hw, hw->io[IO_ACX_SOFT_RESET]) | 0x1;
 	acxlog(L_BINSTD, "%s: enable soft reset...\n", __func__);
 	acx100_write_reg16(hw, hw->io[IO_ACX_SOFT_RESET], temp);
@@ -340,8 +342,10 @@ void acx100_reset_mac(wlandevice_t * hw)
 
 	/* now reset bit again */
 	acxlog(L_BINSTD, "%s: disable soft reset and go to init mode...\n", __func__);
+	/* deassert eCPU reset */
 	acx100_write_reg16(hw, hw->io[IO_ACX_SOFT_RESET], temp & ~0x1);
 
+	/* now start a burst read from initial flash EEPROM */
 	temp = acx100_read_reg16(hw, hw->io[IO_ACX_EE_START]) | 0x1;
 	acx100_write_reg16(hw, hw->io[IO_ACX_EE_START], temp);
 #endif
@@ -1849,7 +1853,7 @@ void acx100_update_card_settings(wlandevice_t *wlandev, int init, int get_all, i
 			acx100_interrogate(wlandev, &dom, ACX100_RID_DOT11_CURRENT_REG_DOMAIN);
 			wlandev->reg_dom_id = dom.m.gp.bytes[0];
 			/* FIXME: should also set chanmask somehow */
-			acxlog(L_INIT, "Got regulatory domain %d\n", wlandev->reg_dom_id);
+			acxlog(L_INIT, "Got regulatory domain 0x%02x\n", wlandev->reg_dom_id);
 			wlandev->get_mask &= ~GETSET_REG_DOMAIN;
 		}
 	}
@@ -2250,8 +2254,10 @@ int acx100_set_defaults(wlandevice_t *wlandev)
 	acxlog(L_INIT, "Regulatory domain ID as read from EEPROM: 0x%x\n", wlandev->reg_dom_id);
 	wlandev->set_mask |= GETSET_REG_DOMAIN;
 
-	wlandev->msdu_lifetime = 2048;
+	wlandev->msdu_lifetime = 4096; /* used to be 2048, but FreeBSD driver changed it to 4096 to work properly in noisy wlans */
 	wlandev->set_mask |= SET_MSDU_LIFETIME;
+
+	wlandev->rts_threshold = 2312; /* max. size: disable RTS mechanism */
 
 	wlandev->short_retry = 0x5;
 	wlandev->long_retry = 0x3;

@@ -587,6 +587,11 @@ void acx100_dma_tx_data(wlandevice_t *wlandev, struct txdescriptor *tx_desc)
 	/* set autodma and reclaim and 1st mpdu */
 	tx_desc->Ctl |= DESC_CTL_AUTODMA | DESC_CTL_RECLAIM | DESC_CTL_FIRST_MPDU;
 
+	/* let chip do RTS/CTS handshaking before sending
+	 * in case packet size exceeds threshold */
+	if (tx_desc->total_length > wlandev->rts_threshold)
+		tx_desc->Ctl2 |= DESC_CTL2_RTS;
+
 	/* set rate */
 	if (WLAN_GET_FC_FTYPE(((p80211_hdr_t*)header->data)->a3.fc) == WLAN_FTYPE_MGMT) {
 		tx_desc->rate = 20;	/* 2Mbps for MGMT pkt compatibility */
@@ -1499,7 +1504,7 @@ void acx100_create_tx_desc_queue(TIWLAN_DC * pDc)
 		tx_desc->HostMemPtr = hostmemptr;
 		/* initialise ctl */
 		tx_desc->Ctl = DESC_CTL_INIT;
-		tx_desc->something2 = 0;
+		tx_desc->Ctl2 = 0;
 		/* point to next txdesc */
 		tx_desc->pNextDesc = mem_offs + sizeof(struct txdescriptor);
 		/* pointer to first txhostdesc */

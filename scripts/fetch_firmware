@@ -1,0 +1,149 @@
+#!/bin/sh
+
+DL_DIR=/tmp/acx100_driver_download
+ACX100_FILE_LOCATIONS="
+ftp://ftp.dlink.com/Wireless/dwl520+/Driver/dwl520+_drivers_307.zip
+http://www.d-link.de/docs/driver/dwl520+/AirPlus_v3.06.zip
+"
+ACX111_FILE_LOCATIONS="
+http://www.d-link.de/docs/driver/dwlg650+/DWL-G650+Utility+Driver.zip
+"
+
+find_driver_dir()
+{
+  ACXDIR=`pwd`
+  [ -f $ACXDIR/scripts/start_net ] && return
+  if [ -f $ACXDIR/../scripts/start_net ]; then
+    ACXDIR="$ACXDIR/.."
+    return
+  fi
+  echo "Couldn't determine base directory of ACX1xx driver, ABORTING!"
+  echo "Please restart this script from the driver's root directory!"
+  exit
+}
+
+find_card()
+{
+  LSPCI=`which lspci`
+  IDS_ACX100="104c:8400 104c:8401"
+  IDS_ACX111="104c:9066"
+  
+  if [ -z "$LSPCI" ]; then
+    echo "lspci not found! (package pciutils): Cannot determine wireless card type!"
+    let CARD_TYPE=0
+    return
+  fi
+  LSPCI_OUT=`${LSPCI} -n`
+  for card in $IDS_ACX100; do
+    if [ -n "`echo $LSPCI_OUT|grep $card`" ]; then
+      echo "DETECTED ACX100-based wireless card!"
+      let CARD_TYPE=1
+      return
+    fi
+  done
+  for card in $IDS_ACX111; do
+    if [ -n "`echo $LSPCI_OUT|grep $card`" ]; then
+      echo "DETECTED ACX111-based wireless card!"
+      let CARD_TYPE=2
+      return
+    fi
+  done
+  echo "COULD NOT DETECT any ACX100- or ACX111-based wireless cards on this system."
+  echo "Decided to fetch firmware files for BOTH chipsets..."
+  echo
+  let CARD_TYPE=0
+}
+
+find_downloader()
+{
+  echo "Locating a suitable download tool..."
+  WGET=`which wget`
+  if test -n $WGET; then
+    DL_STRING="$WGET -c -t 3"
+    return
+  fi
+  CURL=`which curl`
+  if test -n $CURL; then
+    DL_STRING="$CURL"
+    return
+  fi
+  SNARF=`which snarf`
+  if test -n $SNARF; then
+    DL_STRING="$SNARF"
+    return
+  fi
+  echo "None of the download tools wget, curl or snarf found on the system:"
+  echo "Cannot download a driver package containing firmware files, ABORTING!"
+  echo "Please report!!!"
+  exit 1
+}
+
+download_files()
+{
+  mkdir -p $DL_DIR
+  
+  pushd $DL_DIR 1>/dev/null
+    if [ $CARD_TYPE -lt 2 ]; then # 0 or 1
+      for site in $ACX100_FILE_LOCATIONS; do
+        FILE="`basename $site`"
+        ${DL_STRING} "$site"
+	[ -f "$FILE" ] && break
+      done
+    fi
+    if [ $CARD_TYPE -ne 1 ]; then # 0 or 2
+      for site in $ACX111_FILE_LOCATIONS; do
+        FILE="`basename $site`"
+        ${DL_STRING} "$site"
+	[ -f "$FILE" ] && break
+      done
+    fi
+  popd 1>/dev/null
+}
+
+extract_firmware()
+{
+  UNZIP=`which unzip`
+  if [ -z "$UNZIP" ]; then
+    # FIXME: gzip is rumoured to be semi-compatible with .zip. Usable?
+    echo "COULD NOT LOCATE required utility unzip: unable to extract firmware files, ABORTING!"
+    exit
+  fi
+  pushd $DL_DIR 1>/dev/null
+    for file in `find . -iname "*.zip"`; do
+      echo -n "Extracting driver file $file..."
+      ${UNZIP} -u $file
+      echo " Done."
+    done
+    if [ $CARD_TYPE -lt 2 ]; then
+      for files in RADIO0d.BIN RADIO11.BIN RADIO15.BIN WLANGEN.bin; do
+        FILE="`find . -name "$files"|tail -1`"
+	# need to convert to uppercase
+	if [ -n "`echo "$FILE"|grep WLANGEN.bin`" ]; then
+	  cp "$FILE" "$ACXDIR"/firmware/WLANGEN.BIN
+	else
+	  cp "$FILE" "$ACXDIR"/firmware/
+	fi
+      done
+    fi
+    if [ $CARD_TYPE -ne 1 ]; then
+      for files in TIACX111.BIN; do
+        FILE="`find . -name "$files"|tail -1`"
+	cp "$FILE" "$ACXDIR"/firmware/
+      done
+    fi
+  popd 1>/dev/null
+}
+
+# --- main ---
+
+find_driver_dir
+
+find_card
+
+find_downloader
+
+download_files
+
+extract_firmware
+
+echo "Finished! (Hopefully!) If something failed, then please report it!"

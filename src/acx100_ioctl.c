@@ -1001,6 +1001,31 @@ static inline int acx100_ioctl_get_rate(struct net_device *dev, struct iw_reques
 	return 0;
 }
 
+static inline int acx100_ioctl_set_rts(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	int val = vwrq->value;
+
+	if (vwrq->disabled)
+		val = 2312;
+	if ((val < 0) || (val > 2312))
+		return -EINVAL;
+
+	priv->rts_threshold = val;
+	return 0;
+		
+}
+
+static inline int acx100_ioctl_get_rts(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
+{
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+
+	vwrq->value = priv->rts_threshold;
+	vwrq->disabled = (vwrq->value >= 2312);
+	vwrq->fixed = 1;
+	return 0;
+}
+
 /*----------------------------------------------------------------
 * acx100_ioctl_set_encode
 *
@@ -2294,8 +2319,8 @@ static const iw_handler acx100_ioctl_handler[] =
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) acx100_ioctl_set_rate,	/* SIOCSIWRATE */
 	(iw_handler) acx100_ioctl_get_rate,	/* SIOCGIWRATE */
-	(iw_handler) NULL /* acx100_ioctl_set_rts FIXME */,	/* SIOCSIWRTS */
-	(iw_handler) NULL /* acx100_ioctl_get_rts FIXME */,	/* SIOCGIWRTS */
+	(iw_handler) acx100_ioctl_set_rts,	/* SIOCSIWRTS */
+	(iw_handler) acx100_ioctl_get_rts,	/* SIOCGIWRTS */
 	(iw_handler) NULL /* acx100_ioctl_set_frag FIXME */,	/* SIOCSIWFRAG */
 	(iw_handler) NULL /* acx100_ioctl_get_frag FIXME */,	/* SIOCGIWFRAG */
 	(iw_handler) acx100_ioctl_set_txpow,	/* SIOCSIWTXPOW */
@@ -2534,8 +2559,14 @@ int acx100_ioctl_main(netdevice_t * dev, struct ifreq *ifr, int cmd)
 					       NULL);
 		break;
 
-	/* case  SIOCSIWRTS: FIXME */
-	/* case  SIOCGIWRTS: FIXME */
+	case  SIOCSIWRTS:
+		/* set RTS threshold value */
+		result = acx100_ioctl_set_rts(dev, NULL, &(iwr->u.rts), NULL);
+		break;
+	case  SIOCGIWRTS:
+		/* get RTS threshold value */
+		result = acx100_ioctl_get_rts(dev, NULL,  &(iwr->u.rts), NULL);
+		break;
 
 	/* case  SIOCSIWFRAG: FIXME */
 	/* case  SIOCGIWFRAG: FIXME */

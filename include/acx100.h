@@ -2457,6 +2457,7 @@ typedef struct wlandevice {
 	char preamble_mode;	/* 0 == Long Preamble, 1 == Short, 2 == Auto */
 	char preamble_flag;	/* 0 == Long Preamble, 1 == Short */
 
+	UINT16 rts_threshold;
 	UINT32 short_retry;	/* V3POS 204, V1POS 20c */
 	UINT32 long_retry;	/* V3POS 208, V1POS 210 */
 	UINT16 msdu_lifetime;	/* V3POS 20c, V1POS 214 */

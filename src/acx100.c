@@ -227,6 +227,8 @@ static int acx100_probe_pci(struct pci_dev *pdev,
 			    const struct pci_device_id *id);
 static void acx100_remove_pci(struct pci_dev *pdev);
 
+static int acx100_suspend(struct pci_dev *pdev, u32 state);
+static int acx100_resume(struct pci_dev *pdev);
 static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
 
 
@@ -235,6 +237,8 @@ static struct pci_driver acx100_pci_drv_id = {
 	.id_table    = acx100_pci_id_tbl,
 	.probe       = acx100_probe_pci,
 	.remove      = __devexit_p(acx100_remove_pci),
+	.suspend     = acx100_suspend,
+	.resume      = acx100_resume
 };
 
 typedef struct acx100_device {
@@ -394,6 +398,54 @@ unsigned int acx100_setup_chip_type_properties(unsigned short device) {
 	}
 }
 
+void acx100_device_chain_add(struct net_device *netdev)
+{
+	wlandevice_t *priv = (struct wlandevice *) netdev->priv;
+
+	priv->prev_nd = root_acx100_dev.newest;
+	root_acx100_dev.newest = netdev;
+	priv->netdev = netdev;
+}
+
+void acx100_device_chain_remove(struct net_device *netdev)
+{
+	struct net_device *querydev;
+	struct net_device *olderdev;
+	struct net_device *newerdev;
+
+	querydev = (struct net_device *) root_acx100_dev.newest;
+	newerdev = NULL;
+	while (querydev != NULL) {
+		olderdev = ((struct wlandevice *) querydev->priv)->prev_nd;
+		if (strcmp(querydev->name, netdev->name) == 0) {
+			if (newerdev == NULL) {
+				/* if we were at the beginning of the
+				 * list, then it's the list head that
+				 * we need to update to point at the
+				 * next older device */
+				root_acx100_dev.newest = olderdev;
+			} else {
+				/* it's the device that is newer than us
+				 * that we need to update to point at
+				 * the device older than us */
+				((struct wlandevice *) newerdev->priv)->
+				    prev_nd = olderdev;
+			}
+			break;
+		}
+		/* "newerdev" is actually the device of the old iteration,
+		 * but since the list starts (root_acx100_dev.newest)
+		 * with the newest devices,
+		 * it's newer than the ones following.
+		 * Oh the joys of iterating from newest to oldest :-\ */
+		newerdev = querydev;
+
+		/* keep checking old devices for matches until we hit the end
+		 * of the list */
+		querydev = olderdev;
+	}
+}
+
 /*----------------------------------------------------------------
 * acx100_probe_pci
 *
@@ -450,6 +502,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem_region1_size;
 	unsigned long mem_region2 = 0;
 	unsigned long mem_region2_size;
+	char procbuf[80];
 
 	FN_ENTER;
 
@@ -640,9 +693,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	netdev->priv = wlandev;
 
 	/* register new netdev in linked list */
-	wlandev->prev_nd = root_acx100_dev.newest;
-	root_acx100_dev.newest = netdev;
-	wlandev->netdev = netdev;
+	acx100_device_chain_add(netdev);
 
 	if (pdev->irq == 0) {
 		acxlog(L_BINSTD | L_IRQ | L_INIT,
@@ -725,10 +776,12 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	wlandev->pm = pm_register(PM_PCI_DEV,PM_PCI_ID(pdev),
 			&acx100_pm_callback);
 
-        wlandev->proc_entry = create_proc_read_entry("driver/acx100", 0, 0,
+	sprintf(procbuf, "driver/acx100_%s", netdev->name);
+        wlandev->proc_entry = create_proc_read_entry(procbuf, 0, 0,
 						     acx100_read_proc, wlandev);
 
-        wlandev->proc_entry = create_proc_read_entry("driver/acx100_diag", 0, 0,
+	sprintf(procbuf, "driver/acx100_%s_diag", netdev->name);
+        wlandev->proc_entry = create_proc_read_entry(procbuf, 0, 0,
 						     acx100_read_proc_diag, wlandev);
 	result = 0;
 	goto done;
@@ -770,6 +823,10 @@ done:
 *
 * Deallocate PCI resources for the ACX100 chip.
 *
+* This should NOT execute any other hardware operations on the card,
+* since the card might already be ejected. Instead, that should be done
+* in cleanup_module, since the card is definitely still available there.
+*
 * Arguments:
 *	pdev		ptr to pci device structure containing info about
 *			pci configuration.
@@ -790,17 +847,11 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 {
 	struct net_device *netdev;
 	wlandevice_t *hw;
-	struct net_device *querydev;
-	struct net_device *olderdev;
-	struct net_device *newerdev;
 
 	FN_ENTER;
 
 	netdev = (struct net_device *) pci_get_drvdata(pdev);
 	hw = (struct wlandevice *) netdev->priv;
-
-        remove_proc_entry("driver/acx100_diag", NULL);
-        remove_proc_entry("driver/acx100", NULL);
 
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device */
@@ -809,51 +860,8 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 
 	pm_unregister(hw->pm);
 
-	/* disable both Tx and Rx to shut radio down properly */
-	acx100_issue_cmd(hw, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
-	acx100_issue_cmd(hw, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
-
-	/* disable power LED to save power :-) */
-	acxlog(L_INIT, "switching off power LED to save power. :-)\n");
-	acx100_power_led(hw, 0);
-
-	/* put the eCPU to sleep to save power
-	 * Halting is not possible currently,
-	 * since not supported by all firmware versions */
-	acx100_issue_cmd(hw, ACX100_CMD_SLEEP, 0, 0, 5000);
-
 	/* find our PCI device in the global acx100 list and remove it */
-	querydev = (struct net_device *) root_acx100_dev.newest;
-	newerdev = NULL;
-	while (querydev != NULL) {
-		olderdev = ((struct wlandevice *) querydev->priv)->prev_nd;
-		if (strcmp(querydev->name, netdev->name) == 0) {
-			if (newerdev == NULL) {
-				/* if we were at the beginning of the
-				 * list, then it's the list head that
-				 * we need to update to point at the
-				 * next older device */
-				root_acx100_dev.newest = olderdev;
-			} else {
-				/* it's the device that is newer than us
-				 * that we need to update to point at
-				 * the device older than us */
-				((struct wlandevice *) newerdev->priv)->
-				    prev_nd = olderdev;
-			}
-			break;
-		}
-		/* "newerdev" is actually the device of the old iteration,
-		 * but since the list starts (root_acx100_dev.newest)
-		 * with the newest devices,
-		 * it's newer than the ones following.
-		 * Oh the joys of iterating from newest to oldest :-\ */
-		newerdev = querydev;
-
-		/* keep checking old devices for matches until we hit the end
-		 * of the list */
-		querydev = olderdev;
-	}
+	acx100_device_chain_remove(netdev);
 
 	if (!hw->open)
 		acx100_down(netdev);
@@ -863,15 +871,9 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	acxlog(L_STD, "hw_unavailable++\n");
 	hw->hw_unavailable++;
 
-	/* stop our ecpu */
-	if(hw->chip_type == CHIPTYPE_ACX111) {
-		acx100_reset_mac(hw);
-	}
-
 	acx100_delete_dma_region(hw);
 
-	if (netdev)
-		kfree(netdev);
+	free_netdev(netdev);
 
 	iounmap((void *) hw->iobase);
 	iounmap((void *) hw->iobase2);
@@ -907,6 +909,30 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 	FN_EXIT(0, 0);
 }
 
+
+static int acx100_suspend(struct pci_dev *pdev, u32 state)
+{
+#if CRASHES_SOMEHOW
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	wlandevice_t *priv = netdev->priv;
+
+	FN_ENTER;
+	acxlog(L_STD, "acx100: unimplemented suspend handler called for %p!\n", priv);
+	FN_EXIT(0, 0);
+#endif
+	return 0;
+}
+
+static int acx100_resume(struct pci_dev *pdev)
+{
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	wlandevice_t *priv = netdev->priv;
+
+	FN_ENTER;
+	acxlog(L_STD, "acx100: unimplemented resume handler called for %p!\n", priv);
+	FN_EXIT(0, 0);
+	return 0;
+}
 
 static int acx100_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
@@ -1707,8 +1733,53 @@ static int __init acx100_init_module(void)
 
 static void __exit acx100_cleanup_module(void)
 {
+	struct net_device *netdev;
+	char procbuf[80];
+
 	FN_ENTER;
+	
+	/* Since the whole module is about to be unloaded,
+	 * we recursively shutdown all cards we handled instead
+	 * of doing it in remove_pci() (which will be activated by us
+	 * via pci_unregister_driver at the end).
+	 * remove_pci() might just get called after a card eject,
+	 * that's why hardware operations have to be done here instead
+	 * when the hardware is available. */
+
+	netdev = (struct net_device *) root_acx100_dev.newest;
+	while (netdev != NULL) {
+		wlandevice_t *priv = (struct wlandevice *) netdev->priv;
+
+		sprintf(procbuf, "driver/acx100_%s_diag", netdev->name);
+        	remove_proc_entry(procbuf, NULL);
+		sprintf(procbuf, "driver/acx100_%s", netdev->name);
+        	remove_proc_entry(procbuf, NULL);
+
+		/* disable both Tx and Rx to shut radio down properly */
+		acx100_issue_cmd(priv, ACX100_CMD_DISABLE_TX, NULL, 0, 5000);
+		acx100_issue_cmd(priv, ACX100_CMD_DISABLE_RX, NULL, 0, 5000);
+	
+		/* disable power LED to save power :-) */
+		acxlog(L_INIT, "switching off power LED to save power. :-)\n");
+		acx100_power_led(priv, 0);
+
+		/* put the eCPU to sleep to save power
+		 * Halting is not possible currently,
+		 * since not supported by all firmware versions */
+		acx100_issue_cmd(priv, ACX100_CMD_SLEEP, 0, 0, 5000);
+
+		/* stop our ecpu */
+		if(priv->chip_type == CHIPTYPE_ACX111) {
+			acx100_reset_mac(priv);
+		}
+
+		netdev = priv->prev_nd;
+	}
+
+	/* now let the pci layer recursively remove all PCI related things
+	 * (acx100_remove_pci()) */
 	pci_unregister_driver(&acx100_pci_drv_id);
+	
 	FN_EXIT(0, 0);
 }
 

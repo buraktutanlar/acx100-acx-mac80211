@@ -28,11 +28,11 @@ These chips are e.g. 802.11g capable, and they may be named TNETW1130/1230
 Initial ACX111 support is in the driver, but it's still a bit far from working,
 due to many changes compared to the ACX100.
 
-Also, due to similar card naming confusion (for further information, see
-bottom), people keep thinking certain cards they own work with this
-driver. Cards that are *NOT* based on ACX100 chipset (as opposed to
-the stupidly similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+,
-which *do* have ACX100) are:
+Also, due to confusion about similar card naming (for further information, see
+bottom), people keep thinking certain cards they own work with this driver.
+Cards that are *NOT* based on ACX100 chipset (as opposed to the stupidly
+similarly named ACX100 versions DWL-120+, DWL-520+ and DWL-650+, which *do*
+have ACX100) are:
 
 DWL-120 (PRISM2 chipset)
 DWL-520 (PRISM2)
@@ -46,11 +46,12 @@ DWL-G650, version B2 (Atheros AR5001)
 DWL-AG520 (Atheros AR5212)
 DWL-AB650 (Atheros AR5211)
 DWL-AG650 (Atheros AR5212)
-DWL-G520+ (TNETW1130: not fully supported yet, but it's being worked on!)
-DWL-G650+ (TNETW1130)
+DWL-G520+ (ACX111: not fully supported yet, but it's being worked on!)
+DWL-G650+ (ACX111)
+Netgear WG311 "v2" (ACX111, as opposed to v1, which is Atheros!)
 
 When looking at the DWL-G650 mess, I could puke again...
-Again, the card mentioned in the listing above will NOT work with this driver,
+Again, the cards mentioned in the listing above will NOT work with this driver,
 you will hopefully be able to find a different Linux driver supporting
 your card's chipset...
 Feel free to send us corrections/additions to this very confusing listing above.
@@ -70,8 +71,8 @@ due to strict 802.11 compliance checks in their firmware.
 
 HostAP support has not been implemented yet, but it's definitely possible.
 
-4x mode (aka "44Mbps") is NOT supported yet and will need several
-driver changes.
+The non-standard 4x mode (aka "44Mbps") is NOT supported yet and will need
+several driver changes.
 
 Many other things haven't been tested (properly) yet.
 
@@ -105,14 +106,22 @@ What to NOT do:
   You probably need the pcmcia-cs package for certain CardBus functions,
   though.
 
-About the firmware files:
+--- FIRMWARE INSTALLATION ---
+
+The firmware files are needed to drive the cards' onboard embedded
+wireless baseband CPU.
 We cannot ship this with our driver, so you will have to get it elsewhere.
-There are two options:
-a) you have a windows driver installed or have a zip file with all the
+There are three options:
+a) run "make fetch_firmware"
+   This will run the shell script scripts/fetch_firmware, will DOWNLOAD
+   driver packages from ACX1xx vendors, extract them and copy required
+   firmware files to the firmware/ directory.
+   Once run, you are (hopefully!) finished with the firmware section.
+b) you have a windows driver installed or have a zip file with all the
    necessary windows files in it (for example D-Link installer).
    This could be for ANY Windows version. All that matters here is that this
    driver package contains relatively recent firmware image files.
-b) you have a binary linux driver (not recommended, since these contain
+c) you have a binary linux driver (not recommended, since these contain
    much older firmware files)
 
 Certain DWL-650+ and 520+ cards and Planet cards use a Maxim radio instead of
@@ -238,7 +247,7 @@ NOTE that firmware_dir has to be given as an absolute path; a relative
 path will cause trouble during card reinit operations!!
 
 If you want the driver to use eth0 device name instead of wlan0,
-then e.g. load as:
+then load with an activated use_eth_name option, like:
 insmod src/acx100_pci.o firmware_dir=firmware use_eth_name=1
 
 For troubleshooting, see below.
@@ -246,7 +255,8 @@ For troubleshooting, see below.
 --- LINUX 2.6 INSTALLATION ---
 
 In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
-source tree and have to build the module "in-tree". You'll have to:
+source tree and have to build the module "in-tree" (i.e. not in a separate
+acx100 module directory!). You'll have to:
 
 1. Create a directory drivers/net/wireless/acx100 in your 2.6 source tree.
 2. Copy the files

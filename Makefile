@@ -1,7 +1,7 @@
 # set to 0 if you don't want any debugging code to be compiled in
 export ACX_DEBUG=1
 
-.PHONY: all extract_firmware driver install clean
+.PHONY: all extract_firmware fetch_firmware driver install clean
 
 all: driver
 
@@ -10,6 +10,9 @@ config.mk: Configure
 
 extract_firmware: firmware
 	make -C firmware extract_firmware
+
+fetch_firmware:
+	scripts/fetch_firmware
 
 driver: config.mk
 	make -C src
