@@ -53,13 +53,34 @@ Gabor Csuri said:
 
 0.1.0.11 (TIACX111.BIN,
 ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip):
+  Summary: Problematic.
   Works at least with DWL-G650+ HW/B1 (see above).
+  050311: the radio recalibration which our driver does tends to lock up the
+  firmware after some time (no IRQs coming through any more), so you're
+  strongly advised to NOT use this firmware version. I will try to modify our
+  driver somehow to make it not lock up, but I'm not convinced it will work.
 
 0.4.11.4 (FwRad16.bin, size 76208):
   Reported to work with German Reichelt noname card.
 
 1.2.0.30 (FwRad16.bin, http://www.ovislink.nl/WL8000.zip):
   Works at least with DWL-G650+ HW/B1 (see above).
+
+1.2.1.34 (Netgear Germany beta firmware 1.2B4, 20050310):
+7c2119a67417fe9090907c0b26483667  FW1130.BIN	76568
+fcd07de4b25e1d2aaf3b78b27c5b7ee9  FwRad16.bin	83320
+8a16b8e085d1ada13abc65305b59a6e5  FwRad17.bin	84912
+nothing known yet, but they added support for WPA (NOTE: we don't support WPA
+yet, not even WEP... :-\)
+
+2.3.1.31 (Safecom Dec. 2004 firmware, http://www.safecom.cn/code/product/sw/swlp-54108/driver.zip):
+7026826460376f6b174f9225bd7781b9  FwRad16.bin	92836
+95552544ca6d2b4e8c6aeb80b8ae7fdf  FwRad17.bin	94192
+a1fa9681e297b4e36e257090fc12265a  FwRad19.bin	96336
+Interestingly this contains a firmware for the previously unknown 0x19 radio
+type.
+Known so far: works successfully with some ACX111 PCI card.
+
 
 The latest firmware version (as of 041006, which exact version is it?)
 reportedly doesn't work well with this driver (and a WG311v2),

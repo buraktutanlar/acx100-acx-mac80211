@@ -317,7 +317,7 @@ void acx_get_info_state(wlandevice_t *priv)
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
 
-static const char * cmd_error_strings[] = {
+static const char * const cmd_error_strings[] = {
 	"Idle",
 	"Success",
 	"Unknown Command",
@@ -849,12 +849,10 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 	u16 len, offs = 0;
 
 	/* TODO implement and check other acx111 commands */
-	if(priv->chip_type == CHIPTYPE_ACX111 &&
-		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA /* acx111 has differing struct size */
-		 || type == ACX1xx_IE_DOT11_ED_THRESHOLD
-		 /*|| type == ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN*/
-		 || type == ACX1xx_IE_DOT11_CURRENT_CCA_MODE)) {
-		acxlog(L_INIT, "Configure Command 0x%02X not supported under acx111 (yet)\n", type);
+	if ((priv->chip_type == CHIPTYPE_ACX111) &&
+		(type == ACX1xx_IE_DOT11_CURRENT_ANTENNA)) /* acx111 has differing struct size */
+	{
+		acxlog(L_CTL, "Configure Command 0x%02X not supported under acx111 (yet)\n", type);
 
 		return NOT_OK;
 	}

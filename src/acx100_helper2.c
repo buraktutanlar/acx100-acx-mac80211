@@ -132,7 +132,7 @@ static alloc_p80211_mgmt_req_t alloc_p80211mgmt_req;
 
 static u16 CurrentAID = 1;
 
-static const char *state_str[] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "INVALID??" };
+static const char * const state_str[] = { "STARTED", "SCANNING", "WAIT_AUTH", "AUTHENTICATED", "ASSOCIATED", "INVALID??" };
 
 static const u8 bcast_addr[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 

@@ -244,7 +244,7 @@ inline void acx_carrier_on(netdevice_t *dev, const char *msg)
 Helper: updates short preamble, basic and oper rates, etc,
 (removing those unsupported by the peer)
 *----------------------------------------------------------------*/
-static u8
+static const u8
 dot11ratebyte[] = {
 	DOT11RATEBYTE_1,
 	DOT11RATEBYTE_2,
@@ -474,9 +474,12 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		priv->bss_table_count);
 	p += sprintf(p,
 		"ESSID \"%s\", essid_active %d, essid_len %d, essid_for_assoc \"%s\", nick \"%s\"\n"
+		"WEP ena %d, restricted %d, idx %d\n"
 		"monitor %d, monitor_setting %d\n",
 		priv->essid, priv->essid_active, (int)priv->essid_len,
 		priv->essid_for_assoc, priv->nick,
+		priv->wep_enabled, priv->wep_restricted,
+		priv->wep_current_index,
 		priv->monitor, priv->monitor_setting);
 	a = priv->dev_addr;
 	p += sprintf(p, "dev_addr  %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -1288,7 +1291,7 @@ int acx_upload_radio(wlandevice_t *priv)
 	acx_ie_memmap_t mm;
 	int res = NOT_OK, res1 = NOT_OK, res2 = NOT_OK;
 	firmware_image_t *radio_image=NULL;
-	radioinit_t radioinit;
+	acx_cmd_radioinit_t radioinit;
 	char *filename;
 	int try;
 	u32 size;
@@ -1603,7 +1606,7 @@ void acx111_set_wepkey( wlandevice_t *priv )
 }
 
 /*----------------------------------------------------------------
-* acx_init_wep
+* acx100_init_wep
 *
 *
 * Arguments:
@@ -1620,16 +1623,16 @@ void acx111_set_wepkey( wlandevice_t *priv )
 *
 *----------------------------------------------------------------*/
 
-/* acx_init_wep()
+/* acx100_init_wep()
  * STATUS: UNVERIFIED.
  * FIXME: this should probably be moved into the new card settings
  * management, but since we're also modifying the memory map layout here
  * due to the WEP key space we want, we should take care...
  */
-int acx_init_wep(wlandevice_t *priv)
+int acx100_init_wep(wlandevice_t *priv)
 {
 /*	int i;
-	acx100_wep_mgmt_t wep_mgmt;           size = 37 bytes */
+	acx100_cmd_wep_mgmt_t wep_mgmt;           size = 37 bytes */
 	acx100_ie_wep_options_t options;
 	ie_dot11WEPDefaultKeyID_t dk;
 	acx_ie_memmap_t pt;
@@ -1644,63 +1647,53 @@ int acx_init_wep(wlandevice_t *priv)
 
 	acxlog(L_BINDEBUG, "CodeEnd:%X\n", pt.CodeEnd);
 
-	if (priv->chip_type == CHIPTYPE_ACX111) {
-		acx111_set_wepkey( priv );
+	pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
+	pt.WEPCacheEnd   = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 
-		if (priv->wep_keys[priv->wep_current_index].size != 0) {
+	if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		acxlog(L_STD, "%s: ctlMemoryMapWrite FAILED\n", __func__);
+		goto fail;
+	}
+
+	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
+	options.WEPOption = (u8)0x00;
+
+	acxlog(L_ASSOC, "%s: writing WEP options.\n", __func__);
+	acx_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
+	
+	acx100_set_wepkey( priv );
+	
+	if (priv->wep_keys[priv->wep_current_index].size != 0) {
 		acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
 		dk.KeyID = priv->wep_current_index;
 		acx_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
-	    }
-	} else if (priv->chip_type == CHIPTYPE_ACX100) {
-		pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
-		pt.WEPCacheEnd   = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
-
-		if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "%s: ctlMemoryMapWrite FAILED\n", __func__);
-			goto fail;
-		}
-
-		options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10); /* let's choose maximum setting: 4 default keys, plus 10 other keys */
-		options.WEPOption = (u8)0x00;
-
-		acxlog(L_ASSOC, "%s: writing WEP options.\n", __func__);
-		acx_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
-		
-		acx100_set_wepkey( priv );
-		
-		if (priv->wep_keys[priv->wep_current_index].size != 0) {
-			acxlog(L_ASSOC, "setting active default WEP key number: %d.\n", priv->wep_current_index);
-			dk.KeyID = priv->wep_current_index;
-			acx_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
-		}
-		/* FIXME!!! wep_key_struct is filled nowhere! But priv
-		 * is initialized to 0, and we don't REALLY need those keys either */
+	}
+	/* FIXME!!! wep_key_struct is filled nowhere! But priv
+	 * is initialized to 0, and we don't REALLY need those keys either */
 /*		for (i = 0; i < 10; i++) {
-			if (priv->wep_key_struct[i].len != 0) {
-				MAC_COPY(wep_mgmt.MacAddr, priv->wep_key_struct[i].addr);
-				wep_mgmt.KeySize = cpu_to_le16(priv->wep_key_struct[i].len);
-				memcpy(&wep_mgmt.Key, priv->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
-				wep_mgmt.Action = cpu_to_le16(1);
-				acxlog(L_ASSOC, "writing WEP key %d (len %d).\n", i, le16_to_cpu(wep_mgmt.KeySize));
-				if (OK == acx_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt), ACX_CMD_TIMEOUT_DEFAULT)) {
-					priv->wep_key_struct[i].index = i;
-				}
+		if (priv->wep_key_struct[i].len != 0) {
+			MAC_COPY(wep_mgmt.MacAddr, priv->wep_key_struct[i].addr);
+			wep_mgmt.KeySize = cpu_to_le16(priv->wep_key_struct[i].len);
+			memcpy(&wep_mgmt.Key, priv->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
+			wep_mgmt.Action = cpu_to_le16(1);
+			acxlog(L_ASSOC, "writing WEP key %d (len %d).\n", i, le16_to_cpu(wep_mgmt.KeySize));
+			if (OK == acx_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt), ACX_CMD_TIMEOUT_DEFAULT)) {
+				priv->wep_key_struct[i].index = i;
 			}
-		} */
-
-		/* now retrieve the updated WEPCacheEnd pointer... */
-		if (OK != acx_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "ctlMemoryMapRead #2 FAILED\n");
-			goto fail;
 		}
-		/* ...and tell it to start allocating templates at that location */
-		pt.PacketTemplateStart = pt.WEPCacheEnd; /* no endianness conversion needed */
+	} */
 
-		if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
-			acxlog(L_STD, "ctlMemoryMapWrite #2 FAILED\n");
-			goto fail;
-		}
+	/* now retrieve the updated WEPCacheEnd pointer... */
+	if (OK != acx_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		acxlog(L_STD, "ctlMemoryMapRead #2 FAILED\n");
+		goto fail;
+	}
+	/* ...and tell it to start allocating templates at that location */
+	pt.PacketTemplateStart = pt.WEPCacheEnd; /* no endianness conversion needed */
+
+	if (OK != acx_configure(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		acxlog(L_STD, "ctlMemoryMapWrite #2 FAILED\n");
+		goto fail;
 	}
 	res = OK;
 
@@ -2459,25 +2452,24 @@ int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *co
 	return OK;
 }
 
-int acx111_recalib_radio(wlandevice_t *priv)
+int acx_recalib_radio(wlandevice_t *priv)
 {
-	acx111_cmd_radiocalib_t cal;
-
-	acxlog(L_STD, "recalibrating ACX111 radio. Not tested yet, please report status!!\n");
-	cal.methods = cpu_to_le32(0x8000000f); /* automatic recalibration, choose all methods */
-	cal.interval = cpu_to_le32(58594); /* automatic recalibration every 60 seconds (value in TUs) FIXME: what is the firmware default here?? */
-
-	return acx_issue_cmd(priv, ACX111_CMD_RADIOCALIB, &cal, sizeof(cal), ACX_CMD_TIMEOUT_DEFAULT);
-}
-
-int acx100_recalib_radio(wlandevice_t *priv)
-{
-	if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT)) &&
-	       (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT)) && */
-	    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, ACX_CMD_TIMEOUT_DEFAULT)) &&
-	    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, ACX_CMD_TIMEOUT_DEFAULT)) )
-		return OK;
-	return NOT_OK;
+	if (CHIPTYPE_ACX111 == priv->chip_type) {
+		acx111_cmd_radiocalib_t cal;
+	
+		acxlog(L_STD, "recalibrating ACX111 radio. Not tested yet, please report status!!\n");
+		cal.methods = cpu_to_le32(0x8000000f); /* automatic recalibration, choose all methods */
+		cal.interval = cpu_to_le32(58594); /* automatic recalibration every 60 seconds (value in TUs) FIXME: what is the firmware default here?? */
+	
+		return acx_issue_cmd(priv, ACX111_CMD_RADIOCALIB, &cal, sizeof(cal), ACX_CMD_TIMEOUT_DEFAULT);
+	} else {
+		if (/* (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT)) &&
+		    (OK == acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT)) && */
+		    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 0x1, ACX_CMD_TIMEOUT_DEFAULT)) &&
+		    (OK == acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, ACX_CMD_TIMEOUT_DEFAULT)) )
+			return OK;
+		return NOT_OK;
+	}
 }
 
 int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config)
@@ -2703,7 +2695,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	}
 
 	/* send a disassoc request in case it's required */
-	if (0 != (priv->set_mask & (GETSET_MODE|GETSET_ESSID|GETSET_CHANNEL|GETSET_ALL))) {
+	if (0 != (priv->set_mask & (GETSET_MODE|GETSET_ESSID|GETSET_CHANNEL|GETSET_WEP|GETSET_ALL))) {
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_joined) {
 			if (ISTATUS_4_ASSOCIATED == priv->status)
 			{
@@ -2761,21 +2753,37 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		}
 
 		if (0 != (priv->get_mask & (GETSET_ED_THRESH|GETSET_ALL))) {
-			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
+			if (priv->chip_type == CHIPTYPE_ACX100)
+			{
+				u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
 
-			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_interrogate(priv, ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
-			priv->ed_threshold = ed_threshold[4];
+				memset(ed_threshold, 0, sizeof(ed_threshold));
+				acx_interrogate(priv, ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
+				priv->ed_threshold = ed_threshold[4];
+			}
+			else
+			{
+				acxlog(L_INIT, "acx111 doesn't support ED\n");
+				priv->ed_threshold = 0;
+			}
 			acxlog(L_INIT, "Got Energy Detect (ED) threshold %d\n", priv->ed_threshold);
 			CLEAR_BIT(priv->get_mask, GETSET_ED_THRESH);
 		}
 
 		if (0 != (priv->get_mask & (GETSET_CCA|GETSET_ALL))) {
-			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+			if (priv->chip_type == CHIPTYPE_ACX100)
+			{
+				u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
-			memset(cca, 0, sizeof(priv->cca));
-			acx_interrogate(priv, cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
-			priv->cca = cca[4];
+				memset(cca, 0, sizeof(priv->cca));
+				acx_interrogate(priv, cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+				priv->cca = cca[4];
+			}
+			else
+			{
+				acxlog(L_INIT, "acx111 doesn't support CCA\n");
+				priv->cca = 0;
+			}
 			acxlog(L_INIT, "Got Channel Clear Assessment (CCA) value %d\n", priv->cca);
 			CLEAR_BIT(priv->get_mask, GETSET_CCA);
 		}
@@ -2836,26 +2844,6 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		acx_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
 	}
-	if (0 != (priv->set_mask & (GETSET_WEP|GETSET_ALL))) {
-		/* encode */
-		acxlog(L_INIT, "Updating WEP key settings\n");
-		{
-
-		    ie_dot11WEPDefaultKeyID_t dkey;
-
-		    if ( priv->chip_type == CHIPTYPE_ACX111 ) {
-			acx111_set_wepkey( priv );
-		    } else if ( priv->chip_type == CHIPTYPE_ACX100 ) {
-			acx100_set_wepkey( priv );
-		    }
-
-		    dkey.KeyID = priv->wep_current_index;
-		    acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.KeyID);
-		    acx_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
-		}
-		CLEAR_BIT(priv->set_mask, GETSET_WEP);
-	}
-
 	if (0 != (priv->set_mask & (GETSET_TXPOWER|GETSET_ALL))) {
 		acxlog(L_INIT, "Updating transmit power: %d dBm\n",
 					priv->tx_level_dbm);
@@ -2903,24 +2891,34 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (0 != (priv->set_mask & (GETSET_ED_THRESH|GETSET_ALL))) {
 		/* ed_threshold */
-		u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
-
-		memset(ed_threshold, 0, sizeof(ed_threshold));
-		ed_threshold[4] = priv->ed_threshold;
 		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %d\n",
-					ed_threshold[4]);
-		acx_configure(priv, &ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
+					priv->ed_threshold);
+		if (CHIPTYPE_ACX100 == priv->chip_type)
+		{
+			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
+
+			memset(ed_threshold, 0, sizeof(ed_threshold));
+			ed_threshold[4] = priv->ed_threshold;
+			acx_configure(priv, &ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
+		}
+		else
+			acxlog(L_INIT, "ACX111 doesn't support ED!\n");
 		CLEAR_BIT(priv->set_mask, GETSET_ED_THRESH);
 	}
 
 	if (0 != (priv->set_mask & (GETSET_CCA|GETSET_ALL))) {
 		/* CCA value */
-		u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+		acxlog(L_INIT, "Updating Channel Clear Assessment (CCA) value: 0x%02X\n", priv->cca);
+		if (CHIPTYPE_ACX100 == priv->chip_type)
+		{
+			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
-		memset(cca, 0, sizeof(cca));
-		cca[4] = priv->cca;
-		acxlog(L_INIT, "Updating Channel Clear Assessment (CCA) value: 0x%02X\n", cca[4]);
-		acx_configure(priv, &cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+			memset(cca, 0, sizeof(cca));
+			cca[4] = priv->cca;
+			acx_configure(priv, &cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+		}
+		else
+			acxlog(L_INIT, "ACX111 doesn't support CCA!\n");
 		CLEAR_BIT(priv->set_mask, GETSET_CCA);
 	}
 
@@ -2995,7 +2993,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (0 != (priv->set_mask & (SET_MSDU_LIFETIME|GETSET_ALL))) {
 		u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
-		acxlog(L_INIT, "Updating xmt MSDU lifetime: %d\n",
+		acxlog(L_INIT, "Updating Tx MSDU lifetime: %d\n",
 					priv->msdu_lifetime);
 		*(u32 *)&xmt_msdu_lifetime[4] = cpu_to_le32((u32)priv->msdu_lifetime);
 		acx_configure(priv, &xmt_msdu_lifetime, ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
@@ -3044,6 +3042,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		acx_configure(priv, &rx_config, ACX1xx_IE_RXCONFIG);
 		CLEAR_BIT(priv->set_mask, SET_RXCONFIG);
 	}
+
+	/* FIXME: (almost) the whole scanning stuff below should be put into
+	 * one single place at the end. But that's for the next work unit,
+	 * not now... */
 
 	if (0 != (priv->set_mask & (GETSET_MODE|GETSET_ALL))) {
 		if (ACX_MODE_3_MANAGED_AP == priv->macmode_wanted) {
@@ -3122,6 +3124,45 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			}
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_ESSID);
+	}
+
+	if (0 != (priv->set_mask & (GETSET_WEP|GETSET_ALL))) {
+		/* encode */
+
+		ie_dot11WEPDefaultKeyID_t dkey;
+#if DEBUG_WEP
+		struct {
+			u16 type ACX_PACKED;
+			u16 len ACX_PACKED;
+			u8  val ACX_PACKED;
+		} keyindic;
+#endif
+		acxlog(L_INIT, "Updating WEP key settings\n");
+
+		if ( priv->chip_type == CHIPTYPE_ACX111 ) {
+			acx111_set_wepkey( priv );
+		} else if ( priv->chip_type == CHIPTYPE_ACX100 ) {
+			acx100_set_wepkey( priv );
+		}
+
+		dkey.KeyID = priv->wep_current_index;
+		acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.KeyID);
+		acx_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
+#if DEBUG_WEP
+		keyindic.val = 3;
+		acx_configure(priv, &keyindic, ACX111_IE_KEY_CHOOSE);
+#endif
+		/* if we aren't scanning already, then start scanning now */
+		if (0 == scanning)
+		{
+			if (priv->chip_type == CHIPTYPE_ACX111) {
+				acx111_scan_chan(priv);
+			} else if (priv->chip_type == CHIPTYPE_ACX100) {
+				acx100_scan_chan(priv);
+			}
+			scanning = 1;
+		}
+		CLEAR_BIT(priv->set_mask, GETSET_WEP);
 	}
 
 	if (0 != (priv->set_mask & (SET_WEP_OPTIONS|GETSET_ALL))) {
@@ -3229,9 +3270,12 @@ static int acx_set_defaults(wlandevice_t *priv)
 	FN_ENTER;
 
 	/* query some settings from the card.
-	 * NOTE: for some settings such as e.g. CCA and ED, an initial query
-	 * is REQUIRED, otherwise the card won't work correctly!! */
-	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN|GETSET_CCA|GETSET_ED_THRESH;
+	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
+	 * query is REQUIRED, otherwise the card won't work correctly!! */
+	priv->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
+	/* Only ACX100 supports ED and CCA */
+	if (CHIPTYPE_ACX100 == priv->chip_type)
+		priv->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
 	acx_update_card_settings(priv, 1, 0, 0);
 
 	/* set our global interrupt mask */
@@ -3317,8 +3361,11 @@ static int acx_set_defaults(wlandevice_t *priv)
 	 * would require lots of thoughts about flexible code */
 	priv->defpeer.txrate.do_auto = 1;
 	priv->defpeer.txrate.pbcc511 = 0;
-	priv->defpeer.txrate.fallback_threshold = 12;
-	priv->defpeer.txrate.stepup_threshold = 5;
+	/* used to be 12 and 5, but then we don't fall back quickly
+	 * enough in case we have an invalid high rate allowed (e.g. 22M
+	 * in case of 11M-only peers) */
+	priv->defpeer.txrate.fallback_threshold = 3;
+	priv->defpeer.txrate.stepup_threshold = 10;
 	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
 		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
 		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
@@ -3489,10 +3536,7 @@ static void acx_after_interrupt_task(void *data)
 			int res = NOT_OK;
 
 			/* note that commands sometimes fail (card busy), so only clear flag if we were fully successful */
-			if (CHIPTYPE_ACX111 == priv->chip_type)
-				res = acx111_recalib_radio(priv);
-			else if (CHIPTYPE_ACX100 == priv->chip_type)
-				res = acx100_recalib_radio(priv);
+			res = acx_recalib_radio(priv);
 			if (res == OK)
 			{
 				acxlog(L_STD, "successfully recalibrated radio\n");
@@ -3762,6 +3806,10 @@ int acx_init_mac(netdevice_t *dev, u16 init)
 		   2. create station context and create dma regions
 		   3. init wep default keys 
 		*/
+#if DEBUG_WEP
+		struct ACX111FeatureConfig cfg;
+#endif
+
 		if (OK != acx111_init_packet_templates(priv)) 
 		    goto fail;
 
@@ -3769,12 +3817,16 @@ int acx_init_mac(netdevice_t *dev, u16 init)
 			acxlog(L_STD, "acx111_create_dma_regions FAILED\n");
 			goto fail;
 		}
+#if DEBUG_WEP
+		cfg.feature_options = 0;
+		cfg.data_flow_options = 0x80; /* don't decrypt WEP! */
+		if (OK != acx111_set_feature_config(priv, &cfg))
+			goto fail;
+#endif
 	} else if(priv->chip_type == CHIPTYPE_ACX100) {
-		/* if (OK != acx_init_wep(priv, &pkt)) 
-		    goto fail; */
-		if (OK != acx_init_wep(priv)) 
+		if (OK != acx100_init_wep(priv)) 
 		    goto fail;
-		acxlog(L_DEBUG,"between init_wep and init_packet_templates\n");
+		acxlog(L_DEBUG, "between init_wep and init_packet_templates\n");
 		if (OK != acx100_init_packet_templates(priv,&pkt)) 
 		    goto fail;
 
@@ -3796,6 +3848,8 @@ int acx_init_mac(netdevice_t *dev, u16 init)
 
 	MAC_COPY(dev->dev_addr, priv->dev_addr);
 
+	/* FIXME: this code shouldn't be necessary, it should be
+	 * done via SET_TEMPLATES instead... */
 	if (ACX_MODE_2_MANAGED_STA != priv->macmode_wanted) {
 		if (OK != acx_set_beacon_template(priv)) {
 		    acxlog(L_STD, "acx_set_beacon_template FAILED\n");

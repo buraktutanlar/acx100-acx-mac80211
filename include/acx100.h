@@ -159,6 +159,7 @@ extern unsigned int debug;
 #define RADIO_RALINK_15		0x15
 #define RADIO_RADIA_16		0x16	/* used in ACX111 cards (WG311v2, WL-121, ...) */
 #define RADIO_UNKNOWN_17	0x17	/* most likely *sometimes* used in ACX111 cards */
+#define RADIO_UNKNOWN_19	0x19	/* found FwRad19.bin in a Safecom driver; must be a ACX111 radio, does anyone know more?? */
 
 /*--- IRQ Constants ----------------------------------------------------------*/
 #define HOST_INT_RX_DATA	0x0001
@@ -344,7 +345,7 @@ typedef enum {
 #define ACX1xx_IE_DOT11_LONG_RETRY_LIMIT	0x1006
 #define ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	0x1007 /* configure default keys */
 #define ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	0x1008
-#define ACX1xx_IE_DOT11_UNKNOWN_1009		0x1009	/* mapped to some very boring binary table in FW150 */
+#define ACX1xx_IE_DOT11_GROUP_ADDR		0x1009
 #define ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN	0x100a
 #define ACX1xx_IE_DOT11_CURRENT_ANTENNA		0x100b
 #define ACX1xx_IE_DOT11_UNKNOWN_100C		0x100c	/* mapped to cfgInvalid in FW150 */
@@ -895,6 +896,7 @@ struct txrate_ctrl {
 	u16  cur;		      /* the Tx rate we currently use */
 	u8   pbcc511;		  /* Use PBCC at 5 and 11Mbit? (else CCK) */
 	u8   do_auto;		      /* Auto adjust Tx rates? */
+	u8   ignore_count;	/* no. of pkts to ignore (old rate byte set) */
 	u8   fallback_threshold;     /* 0-100 */
 	u8   fallback_count;
 	u8   stepup_threshold;	/* 0-100 */

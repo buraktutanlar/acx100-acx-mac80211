@@ -471,6 +471,9 @@ static void acx_display_hardware_details(wlandevice_t *priv)
 			 * additionally 802.11a capable, too */
 			radio_str = "802.11a/b/g radio in ACX111 cards?? Please report!!!";
 			break;
+		case RADIO_UNKNOWN_19:
+			radio_str = "A radio used by some Safecom cards?? Please report!!!";
+			break;
 		default:
 			radio_str = "UNKNOWN, please report the radio type name!";
 			break;
@@ -1207,10 +1210,6 @@ static void acx_up(netdevice_t *dev)
 	else {
 		acxlog(L_INIT, "ACX100 f/w ver < 1.9.3.e --> using h/w timer\n");
 	}
-	/* FIXME: explicitly calling this here doesn't seem too clean... */
-	if ( CHIPTYPE_ACX111 == priv->chip_type ) {
-	    acx_init_wep(priv);
-	}
 	acx_start(priv);
 	
 	/* acx_start_queue(dev, "on startup"); */
@@ -1528,6 +1527,9 @@ static void acx_tx_timeout(netdevice_t *dev)
 	
 	if ((acx_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
 		acx_wake_queue(dev, "after Tx timeout");
+#else
+	/* clean all tx descs, they may have been completely full */
+	acx_clean_tx_desc(priv);
 #endif
 
 	/* stall may have happened due to radio drift, so recalib radio */
@@ -1738,14 +1740,24 @@ static void acx_handle_info_irq(wlandevice_t *priv)
 		"internal watchdog reset was done",
 		"failed to send powersave (NULL frame) notification to AP",
 		"encrypt/decrypt on a packet has failed",
-		"(unknown)",
-		"MIC failure: fake WEP encrypt??"
+		"TKIP Tx keys disabled",
+		"TKIP Rx keys disabled",
+		"TKIP Rx: key ID not found",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"TKIP IV value exceeds thresh"
 	};
+#define INFO_LAST_ENTRY	16
 
 	acx_get_info_state(priv);
 	acxlog(L_STD | L_IRQ, "Got Info IRQ: status 0x%04x, type 0x%04x: %s\n",
 		priv->info_status, priv->info_type,
-		info_type_msg[(priv->info_type>5) ? 0 : priv->info_type]
+		info_type_msg[(priv->info_type>INFO_LAST_ENTRY) ? 0 : priv->info_type]
 	);
 }
 
@@ -1820,8 +1832,14 @@ static irqreturn_t acx_interrupt(/*@unused@*/ int irq, void *dev_id, /*@unused@*
 		acxlog(L_IRQ, "Got Rx Complete IRQ\n");
 	}
 	if (0 != (irqtype & HOST_INT_TX_COMPLETE)) {
-		/* don't clean up on each Tx complete, wait a bit */
-		if (++priv->tx_cnt_done % (priv->TxQueueCnt >> 2) == 0)
+		/* don't clean up on each Tx complete,
+		 * wait a bit, unless we're going towards full, in which case
+		 * we do it immediately, too (otherwise we might lockup
+		 * with a full Tx buffer if we go into
+		 * acx_clean_tx_desc() at a time when we won't wakeup
+		 * the net queue in there for some reason...) */
+		if ((++priv->tx_cnt_done % (priv->TxQueueCnt >> 2) == 0) ||
+		    (priv->TxQueueFree < (priv->TxQueueCnt >> 1)))
 		{
 #if TX_CLEANUP_IN_SOFTIRQ
 			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_TX_CLEANUP);

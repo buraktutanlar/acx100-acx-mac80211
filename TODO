@@ -21,6 +21,7 @@ JANITORIAL/EASY:
 * clean up and unify return value handling. Right now the driver seems to have
   a mess of different functions returning 0 as success, 1 as success, or some
   functions use -1 etc. pp.
+* ACX100_CTL_PREAMBLE and DESC_CTL_SHORT_PREAMBLE etc. unify
 - add .lsm file
 - AP out of range should be 44:44:44:44:44:44, not 00:00:00:00:00:00 (hmm, really?? iwevent interface seems to use 00, but wlan-ng seems to use 44; not sure)
 + automated hotplug configuration / configure module parameters / describe it!!!
@@ -39,7 +40,6 @@ JANITORIAL/EASY:
 - in the doc/ directory, add an intro and describe chipset details and
   interesting information about it
 - maybe add dbg msgs to all failure cases to spot any driver problems fast
-- ACX100_CTL_PREAMBLE and DESC_CTL_SHORT_PREAMBLE etc. unify
 
 BUGS:
 * modprobe: page allocation failure. order:4, mo de:0x21
@@ -48,6 +48,8 @@ BUGS:
 * figure out why on my Dell Inspiron 8000, the notebook refuses to suspend
   properly (immediate resume after power-off, urks!) when the ACX100 mini-PCI
   is installed
+* acx100_reset_dev enables IRQs, but IRQ handler not available yet!!!
+* /proc files won't get removed after card eject, only after driver unload!
 + switching from XFree86 to console may lead to "dead card" (no IRQs possible).
   Reinit only after eject/reinsert!!!
   IRQ problem!! Does PCI card have that as well? Or only a CardBus issue?
@@ -65,7 +67,6 @@ BUGS:
   https://sourceforge.net/forum/forum.php?thread_id=1049230&forum_id=257272
   IRQ loss has been reported to also happen when switching from text mode
   to frame buffer on Linux bootup
-* acx100_reset_dev enables IRQs, but IRQ handler not available yet!!!
 - when Tx is broken (no reception of peer),
   then it's possible to reactivate it using ACX100_CMD_ENABLE_TX and ENABLE_RX!!
   Does it happen in case of lots of traffic?
@@ -75,7 +76,6 @@ BUGS:
   GETSET_RETRY, GETSET_REG_DOMAIN, GETSET_WEP
   Maybe Tx disable is an overheating protection? It happens much more often with
   my *builtin* mini-PCI card... In this case we really shouldn't do anything about it in order to not destroy hardware... :-\
-- /proc files won't get removed after card eject, only after driver unload!
 - ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!! (not too problematic)
 - TxError0x20 (hint: also happens in any case where the firmware cannot send
   any packets currently, e.g. during station scan etc.)

@@ -103,9 +103,14 @@ typedef struct framehdr {
 
 #define	DESC_CTL_DONE		(DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
 
-#define DESC_CTL2_FCS		0x02
+#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
+#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
 #define DESC_CTL2_MORE_FRAG	0x04
+#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
+#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
 #define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
+#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
+#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
 /* Values for rate field (acx100 only) */
 #define RATE100_1              10

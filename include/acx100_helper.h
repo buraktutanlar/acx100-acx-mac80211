@@ -447,7 +447,7 @@ typedef struct {
 typedef struct {
     u32 offset ACX_PACKED;
     u32 len ACX_PACKED;
-} radioinit_t;
+} acx_cmd_radioinit_t;
 
 typedef struct acx100_ie_wep_options {
     u16	type ACX_PACKED;
@@ -475,7 +475,7 @@ typedef struct acx111WEPDefaultKey {
     u8	index ACX_PACKED;
     u8	defaultKeyNum ACX_PACKED;
     u8	counter[6] ACX_PACKED;
-    u8	key[29] ACX_PACKED;	/* check this! was Key[19]. */
+    u8	key[32] ACX_PACKED;	/* up to 32 bytes (for TKIP!) */
 } acx111WEPDefaultKey_t;
 
 typedef struct ie_dot11WEPDefaultKeyID {
@@ -484,20 +484,20 @@ typedef struct ie_dot11WEPDefaultKeyID {
     u8	KeyID ACX_PACKED;
 } ie_dot11WEPDefaultKeyID_t;
 
-typedef struct acx100_wep_mgmt {
+typedef struct acx100_cmd_wep_mgmt {
     u8	MacAddr[ETH_ALEN] ACX_PACKED;
     u16	Action ACX_PACKED;
     u16	KeySize ACX_PACKED;
     u8	Key[29] ACX_PACKED; /* 29*8 == 232bits == WEP256 */
-} acx100_wep_mgmt_t;
+} acx100_cmd_wep_mgmt_t;
 
 /* a helper struct for quick implementation of commands */
 typedef struct GenericPacket {
 	u8 bytes[32] ACX_PACKED;
 } GenericPacket_t;
 
-typedef struct  defaultkey {
-	u8 num ACX_PACKED;
+typedef struct defaultkey {
+	        UINT8 num;
 } defaultkey_t;
 
 typedef struct acx_ie_generic {
@@ -604,7 +604,7 @@ void acx_reset_mac(wlandevice_t *priv);
 /*@null@*/ firmware_image_t *acx_read_fw( const char *file, u32 *size);
 void acx100_set_wepkey(wlandevice_t *priv);
 void acx111_set_wepkey(wlandevice_t *priv);
-int acx_init_wep(wlandevice_t *priv);
+int acx100_init_wep(wlandevice_t *priv);
 void acx_initialize_rx_config(wlandevice_t *priv, unsigned int setting);
 void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all);
 void acx_init_task_scheduler(wlandevice_t *priv);
@@ -621,8 +621,7 @@ u16 acx_proc_unregister_entries(const struct net_device *dev);
 void acx_update_dot11_ratevector(wlandevice_t *priv);
 void acx_update_peerinfo(wlandevice_t *priv, struct peer *peer, struct bss_info *bsspeer);
 
-int acx111_recalib_radio(wlandevice_t *priv);
-int acx100_recalib_radio(wlandevice_t *priv);
+int acx_recalib_radio(wlandevice_t *priv);
 int acx111_get_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 int acx111_set_feature_config(wlandevice_t *priv, struct ACX111FeatureConfig *config);
 
