@@ -413,6 +413,9 @@ Example:
 insmod src/acx_pci.o ... debug=0xffff
 iwpriv wlan0 set_debug 0xffff
 
+If you want to prevent log messages from flooding your tty,
+then use setterm -msg or setterm -msglevel.
+
 -- log file --
 
 Log output of the driver gets written to the file which the

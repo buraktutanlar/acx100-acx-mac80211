@@ -1879,7 +1879,14 @@ static inline int acx100_set_tx_level(wlandevice_t *priv, UINT8 level)
 void acx100_scan_chan(wlandevice_t *priv)
 {
 	struct scan s;
+	memset(&s, 0, sizeof(struct scan));
 	FN_ENTER;
+	acxlog(L_INIT, "Starting radio scan\n");
+
+	if(priv->chip_type == CHIPTYPE_ACX111) {
+		acxlog(L_STD, "ERROR: trying to invoke acx100_scan_chan, but wlandevice == acx111!\n");
+		return;
+	}
 
 	/* now that we're starting a new scan, reset the number of stations
 	 * found in range back to 0.
@@ -1902,6 +1909,35 @@ void acx100_scan_chan(wlandevice_t *priv)
 	FN_EXIT(0, 0);
 }
 
+void acx111_scan_chan(wlandevice_t *priv) {
+
+	struct acx111_scan s;
+	memset(&s, 0, sizeof(struct acx111_scan));
+	FN_ENTER;
+	acxlog(L_INIT, "Starting radio scan\n");
+
+	s.count = 3;
+	s.channel_list_select = 0; /* scan every allowed channel */
+	/*s.channel_list_select = 1;*/ /* scan given channels */
+	s.reserved1 = 0;
+	s.reserved2 = 0;
+	/*s.rate = 0x0a;*/ /* 1 Mbs */
+	s.rate = 0x14; /* 2 Mbs */
+	/*s.rate = 0x0c;*/ /* 54 Mbs */
+	/*s.options = ACX_SCAN_ACTIVE;*/
+	s.options = ACX_SCAN_PASSIVE; 
+	/*s.options = ACX_SCAN_PASSIVE | ACX_SCAN_BACKGROUND;*/ /* do an passive background scan */
+	s.chan_duration = 50;
+	s.max_probe_delay = 200;
+	/*s.modulation = 0x40;*/ /* long preamble ? ofdm ? -> only for active scan*/
+	s.modulation = 0;
+	/*s.channel_list[0] = 6;
+	s.channel_list[1] = 4;*/
+
+	acx111_scan_chan_p(priv, &s);
+	FN_EXIT(0, 0);
+}
+
 /* AcxScanWithParam()
  * STATUS: should be ok.
  */
@@ -1913,6 +1949,18 @@ void acx100_scan_chan_p(wlandevice_t *priv, struct scan *s)
 	acx100_issue_cmd(priv, ACX100_CMD_SCAN, s, sizeof(struct scan), 5000);
 	FN_EXIT(0, 0);
 }
+
+/* AcxScanWithParam()
+ * STATUS: should be ok.
+ */
+void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s)
+{
+	FN_ENTER;
+	acx100_set_status(priv, ISTATUS_1_SCANNING);
+	acx100_issue_cmd(priv, ACX100_CMD_SCAN, s, sizeof(struct acx111_scan), 5000);
+	FN_EXIT(0, 0);
+}
+
 
 void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all)
 {
@@ -2348,7 +2396,11 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		} else {
 			if (0 == scanning)
 			{
-				acx100_scan_chan(priv);
+				if(priv->chip_type == CHIPTYPE_ACX100) {
+					acx100_scan_chan(priv);
+				} else if(priv->chip_type == CHIPTYPE_ACX111) {
+					acx111_scan_chan(priv);
+				}
 				scanning = 1;
 			}
 		}
@@ -2364,9 +2416,11 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 		if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
 
 			if (0 == scanning) {
+
+
 				/* stop any previous scan */
 				acx100_issue_cmd(priv, ACX100_CMD_STOP_SCAN, 0, 0, 5000);
-
+#warning Is this used anymore?
 				if(priv->chip_type == CHIPTYPE_ACX100) {
 					struct scan s;
 					s.count = 1;
@@ -2379,31 +2433,10 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 					acx100_scan_chan_p(priv, &s);
 				} else if(priv->chip_type == CHIPTYPE_ACX111) {
-
-					struct acx111_scan s;
-					memset(&s, 0, sizeof(struct acx111_scan));
-
-					s.count = 3;
-					s.channel_list_select = 0; /* scan every allowed channel */
-					/*s.channel_list_select = 1;*/ /* scan given channels */
-					s.reserved1 = 0;
-					s.reserved2 = 0;
-					s.rate = 0x0a; /* 1 Mbs */
-					/*s.rate = 0x0c;*/ /* 54 Mbs */
-					/*s.options = 0;*/ /* do an active scan */
-					s.options = 1; /* do an passive scan */
-					/*s.options = 3;*/ /* do an passive background scan */
-					s.chan_duration = 50;
-					s.max_probe_delay = 100;
-					/*s.modulation = 0x40;*/ /* long preamble ? ofdm ? */
-					s.modulation = 0;
-					s.channel_list[0] = 6;
-					s.channel_list[1] = 4;
-
-					acx111_scan_chan_p(priv, &s);
+					acx111_scan_chan(priv);
 				}
 				scanning = 1;
-			}
+			} 
 		}
 		priv->set_mask &= ~GETSET_CHANNEL;
 	}
@@ -2414,7 +2447,11 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 			/* if we aren't scanning already, then start scanning now */
 			if (0 == scanning)
 			{
-				acx100_scan_chan(priv);
+				if(priv->chip_type == CHIPTYPE_ACX100) {
+					acx100_scan_chan(priv);
+				} else if(priv->chip_type == CHIPTYPE_ACX111) {
+					acx111_scan_chan(priv);
+				}
 				scanning = 1;
 			}
 		}
@@ -2983,18 +3020,6 @@ done:
 	FN_EXIT(1, result);
 	return result;
 }
-
-/* AcxScanWithParam()
- * STATUS: should be ok.
- */
-void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s)
-{
-	FN_ENTER;
-	acx100_set_status(priv, ISTATUS_1_SCANNING);
-	acx100_issue_cmd(priv, ACX100_CMD_SCAN, s, sizeof(struct acx111_scan), 5000);
-	FN_EXIT(0, 0);
-}
-
 
 /*----------------------------------------------------------------
 * acx100_start
