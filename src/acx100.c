@@ -144,7 +144,7 @@ static dev_info_t dev_info = "TI acx100" DRIVER_SUFFIX;
 
 static char *version = "TI acx100" DRIVER_SUFFIX ".o: " WLAN_RELEASE;
 
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 int debug = 0x9b;
 #endif
 
@@ -1517,7 +1517,7 @@ void acx100_rx(struct rxhostdescriptor *rxdesc/* wlan_pb_t * pb */,
 
 #ifdef MODULE
 
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug level mask: 0x0000 - 0x1fff");
 #endif

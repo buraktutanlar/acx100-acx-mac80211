@@ -115,7 +115,7 @@ static const long acx100_channel_freq[] = {
 };
 
 static const struct iw_priv_args acx100_ioctl_private_args[] = {
-#ifdef DEBUG
+#ifdef ACX_DEBUG
 { cmd : ACX100_IOCTL_DEBUG,
 	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	get_args : 0,
