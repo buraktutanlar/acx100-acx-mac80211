@@ -341,9 +341,11 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	if (ISTATUS_4_ASSOCIATED == status) {
 		union iwreq_data wrqu;
 
+#if WIRELESS_EXT > 13 /* SIOCGIWSCAN */
 		wrqu.data.length = 0;
 		wrqu.data.flags = 0;
 		wireless_send_event(priv->netdev, SIOCGIWSCAN, &wrqu, NULL);
+#endif
 
 		wrqu.data.length = 0;
 		wrqu.data.flags = 0;
@@ -384,7 +386,7 @@ void acx100_set_status(wlandevice_t *priv, UINT16 status)
 	if ((priv->status == ISTATUS_1_SCANNING)
 	    || (priv->status == ISTATUS_5_UNKNOWN)) {
 		priv->scan_retries = 0;
-		acx100_set_timer(priv, 1500000); /* 1.5 s initial scan time (used to be 15s, corrected to 1.5)*/
+		acx100_set_timer(priv, 2500000); /* 2.5s initial scan time (used to be 1.5s, but failed to find WEP APs!) */
 	} else if (priv->status <= ISTATUS_3_AUTHENTICATED) {
 		priv->auth_assoc_retries = 0;
 		acx100_set_timer(priv, 1500000); /* 1.5 s */

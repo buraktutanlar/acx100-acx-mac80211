@@ -90,6 +90,15 @@ UINT8 DTIM_count;
 
 extern char *firmware_dir; /* declared in acx100.c, to keep together with other MODULE_PARMs */
 
+const UINT8 reg_domain_ids[] =
+		{(UINT8)0x10, (UINT8)0x20, (UINT8)0x30, (UINT8)0x31,
+		 (UINT8)0x32, (UINT8)0x40, (UINT8)0x41, (UINT8)0x51};
+/* stupid workaround for the fact that in C the size of an external array
+ * cannot be determined from within a second file */
+const UINT8 reg_domain_ids_len = (UINT8)sizeof(reg_domain_ids);
+const UINT16 reg_domain_channel_masks[] =
+	{0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x00f8};
+
 /* acx100_schedule()
  * Make sure to schedule away sometimes, in order to not hog the CPU too much.
  */
@@ -614,6 +623,7 @@ fail:
 *
 *----------------------------------------------------------------*/
 
+char default_firmware_dir[] = "/usr/share/acx";
 int acx100_upload_fw(wlandevice_t *priv)
 {
 	int res1 = 0;
@@ -623,12 +633,10 @@ int acx100_upload_fw(wlandevice_t *priv)
 	int try;
 
 	FN_ENTER;
-	if (!firmware_dir)
+	if (NULL == firmware_dir)
 	{
-		/* since the log will be flooded with other log messages after
-		 * this important one, make sure people do notice us */
-		acxlog(L_STD, "ERROR: no directory for firmware file specified, ABORTING. Make sure to set module parameter 'firmware_dir'! (specified as absolute path!)\n");
-		return 0;
+		firmware_dir = default_firmware_dir;
+		acxlog(L_STD, "Attention: no custom firmware directory specified (via module parameter firmware_dir), thus using our default firmware directory %s\n", firmware_dir);
 	}
 
 	filename = kmalloc(PATH_MAX, GFP_USER);
@@ -1903,6 +1911,11 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 	}
 #endif
 
+	if ((0 == init) && (0 == (ACX_STATE_IFACE_UP & priv->dev_state_mask))) {
+		acxlog(L_DEBUG, "iface not up, won't update card settings yet!\n");
+		return;
+	}
+
 	if (0 != get_all)
 		priv->get_mask |= GETSET_ALL;
 	if (0 != set_all)
@@ -2188,10 +2201,6 @@ void acx100_update_card_settings(wlandevice_t *priv, int init, int get_all, int 
 
 	if (0 != (priv->set_mask & (GETSET_REG_DOMAIN|GETSET_ALL))) {
 		/* reg_domain */
-		const UINT8 reg_domain_ids[] =
-			{(UINT8)0x10, (UINT8)0x20, (UINT8)0x30, (UINT8)0x31,
-			 (UINT8)0x32, (UINT8)0x40, (UINT8)0x41, (UINT8)0x51};
-		const UINT16 reg_domain_channel_masks[] = {0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x00f8};
 		memmap_t dom;
 		UINT16 i;
 
@@ -2754,7 +2763,7 @@ void acx100_join_bssid(wlandevice_t *priv)
 /* acx100_initmac()
  * STATUS: FINISHED.
  */
-int acx100_init_mac(netdevice_t *dev)
+int acx100_init_mac(netdevice_t *dev, UINT16 init)
 {
 	int result = -1;
 	acx100_memmap_t pkt;
@@ -2813,10 +2822,11 @@ int acx100_init_mac(netdevice_t *dev)
 		goto done;
 	}
 
-	if (0 == acx100_set_defaults(priv)) {
-		acxlog(L_STD, "acx100_set_defaults failed.\n");
-		goto done;
-	}
+	if (1 == init)
+		if (0 == acx100_set_defaults(priv)) {
+			acxlog(L_STD, "acx100_set_defaults failed.\n");
+			goto done;
+		}
 
 #if 0
 	/* FIXME: most likely that's not needed here,
@@ -2919,6 +2929,11 @@ void acx100_set_timer(wlandevice_t *priv, UINT32 timeout)
 	FN_ENTER;
 
 	acxlog(L_BINDEBUG | L_IRQ, "<acx100_set_timer> Elapse = %ld\n", timeout);
+	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
+		acxlog(L_STD, "ERROR: attempt to set the timer before the card interface is up! Please report with a debug=0xffff log!!\n");
+		return;
+	}
+
 	/* newer firmware versions abandoned timer configuration
 	 * FIXME: any other versions between 1.8.3 (working) and
 	 * 1.9.3.e (removed)? */
@@ -3011,12 +3026,9 @@ UINT16 acx100_read_eeprom_offset(wlandevice_t *priv,
 
 	FN_ENTER;
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], addr);
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 2);
-	acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CFG], cpu_to_le32(0));
+	acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_ADDR], cpu_to_le32(addr));
+	acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CTL], cpu_to_le32(2));
 
 	while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
 	{
@@ -3066,7 +3078,7 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 	UINT16 gpio_orig;
 	UINT16 i;
 	UINT8 *data_verify = NULL;
-	UINT16 count;
+	UINT32 count = 0;
 	
 	FN_ENTER;
 
@@ -3081,14 +3093,10 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
 
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], addr + i);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_DATA], *(charbuf + i));
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_DATA] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 1);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CFG], cpu_to_le32(0));
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_ADDR], cpu_to_le32(addr + i));
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_DATA], cpu_to_le32(*(charbuf + i)));
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CTL], cpu_to_le32(1));
 
 		while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
 		{
@@ -3115,12 +3123,9 @@ UINT16 acx100_write_eeprom_offset(wlandevice_t *priv, UINT16 addr, UINT16 len, U
 
 	for (i = 0; i < len; i++) {
 
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG], 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CFG] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR], addr + i);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_ADDR] + 0x2, 0);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL], 2);
-		acx100_write_reg16(priv, priv->io[IO_ACX_EEPROM_CTL] + 0x2, 0);
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CFG], cpu_to_le32(0));
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_ADDR], cpu_to_le32(addr + i));
+		acx100_write_reg32(priv, priv->io[IO_ACX_EEPROM_CTL], cpu_to_le32(2));
 
 		while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_EEPROM_CTL]))
 		{
@@ -3158,10 +3163,8 @@ UINT16 acx100_read_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 *charbuf)
 
 	FN_ENTER;
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR], reg);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL], 2);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL] + 0x2, 0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], cpu_to_le32(reg));
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], cpu_to_le32(2));
 
 	while (0 != acx100_read_reg16(priv, priv->io[IO_ACX_PHY_CTL]))
 	{
@@ -3193,12 +3196,9 @@ UINT16 acx100_write_phy_reg(wlandevice_t *priv, UINT16 reg, UINT8 value)
 
 	FN_ENTER;
 
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR], reg);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_ADDR] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA], value);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_DATA] + 0x2, 0);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL], 1);
-	acx100_write_reg16(priv, priv->io[IO_ACX_PHY_CTL] + 0x2, 0);
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_ADDR], cpu_to_le32(reg));
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_DATA], cpu_to_le32(value));
+	acx100_write_reg32(priv, priv->io[IO_ACX_PHY_CTL], cpu_to_le32(1));
 
 	acxlog(L_DEBUG, "radio PHY write 0x%02x -->  0x%04x\n", value, reg); 
 

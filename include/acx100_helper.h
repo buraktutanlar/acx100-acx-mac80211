@@ -331,7 +331,7 @@ typedef struct acx100_wep_mgmt {
 void acx100_schedule(long timeout);
 int acx100_reset_dev(netdevice_t *dev);
 void acx100_join_bssid(wlandevice_t *priv);
-int acx100_init_mac(netdevice_t *dev);
+int acx100_init_mac(netdevice_t *dev, UINT16 init);
 int acx100_set_defaults(wlandevice_t *priv);
 void acx100_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 int acx100_set_probe_response_template(wlandevice_t *priv);

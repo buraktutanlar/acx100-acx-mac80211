@@ -779,7 +779,7 @@ static void init_network_device(struct net_device *dev) {
 	dev->tx_timeout = &acx100usb_tx_timeout;
 	dev->watchdog_timeo = 4 * HZ;        /* 400 */
 #endif
-	result=acx100_init_mac(dev);
+	result=acx100_init_mac(dev, 1);
 	if (!result) {
 	  SET_MODULE_OWNER(dev);
 	}

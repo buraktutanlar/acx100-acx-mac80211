@@ -13,7 +13,8 @@ KERNELRELEASE=$(shell uname -r)
 KERNELDIR = /lib/modules/$(KERNELRELEASE)
 MODULE_PATH = net
 INSTALL = /usr/bin/install -c
-DEPMOD = $(shell which depmod)
+# work around issues with sudo users lacking /sbin in their path
+DEPMOD = $(shell test -f /sbin/depmod && echo /sbin/depmod || which depmod)
 LN = $(shell which ln)
 
 export CPPFLAGS += -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)

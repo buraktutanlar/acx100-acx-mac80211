@@ -720,6 +720,9 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->irq = pdev->irq;
 	dev->base_addr = pci_resource_start(pdev, 0); /* TODO this is maybe incompatible to ACX111 */
 
+	/* need to be able to restore PCI state after a suspend */
+	pci_save_state(pdev, priv->pci_state);
+
 	if (0 == acx100_reset_dev(dev)) {
 		acxlog(L_BINSTD | L_INIT,
 		       "%s: %s: MAC initialize failure!\n",
@@ -764,7 +767,7 @@ acx100_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail;
 	}
 
-	if (0 != acx100_init_mac(dev)) {
+	if (0 != acx100_init_mac(dev, 1)) {
 		acxlog(L_DEBUG | L_INIT,
 		       "Danger Will Robinson, MAC did not come back\n");
 		result = -EIO;
@@ -958,16 +961,22 @@ void __devexit acx100_remove_pci(struct pci_dev *pdev)
 }
 
 
+static int if_was_up = 0;
 static int acx100_suspend(struct pci_dev *pdev, /*@unused@*/ u32 state)
 {
-#if CRASHES_SOMEHOW
 	/*@unused@*/ struct net_device *dev = pci_get_drvdata(pdev);
 	wlandevice_t *priv = dev->priv;
 
 	FN_ENTER;
-	acxlog(L_STD, "acx100: unimplemented suspend handler called for %p!\n", priv);
+	acxlog(L_STD, "acx100: experimental suspend handler called for %p!\n", priv);
+	if (0 != netif_device_present(dev)) {
+		if_was_up = 1;
+		acx100_down(dev);
+	}
+	else
+		if_was_up = 0;
+	netif_device_detach(dev);
 	FN_EXIT(0, 0);
-#endif
 	return 0;
 }
 
@@ -977,19 +986,21 @@ static int acx100_resume(struct pci_dev *pdev)
 	/*@unused@*/ wlandevice_t *priv = dev->priv;
 
 	FN_ENTER;
-	acxlog(L_STD, "acx100: unimplemented resume handler called for %p!\n", priv);
-#if NOT_NEEDED
-	/* we probably shouldn't do this, since suspend/resume calls
-	 * remove_pci/probe_pci, so on resume our priv struct is unavailable
-	 * and thus settings cannot be restored easily (would need to
-	 * copy to temporary priv's for all cards we handle).
-	 * Also, doing that causes an OOPS right now.
-	 * All in all I guess PCI hotplug is supposed to take care of
-	 * reloading all card parameters by calling the card startup script.
-	 * I should really set up my driver installation properly, methinks ;-)
-	 */
+	acxlog(L_STD, "acx100: experimental resume handler called for %p!\n", priv);
+	pci_set_power_state(pdev, 0);
+	pci_restore_state(pdev, priv->pci_state);
+
+	acx100_reset_dev(dev);
+
+	acx100_init_mac(dev, 0);
+	
+	if (1 == if_was_up)
+		acx100_up(dev);
+	
+	/* now even reload all card parameters as they were before suspend,
+	 * and possibly be back in the network again already :-) */
 	acx100_update_card_settings(priv, 0, 0, 1);
-#endif
+	netif_device_attach(dev);
 	
 	FN_EXIT(0, 0);
 	return 0;

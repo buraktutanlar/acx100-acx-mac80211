@@ -243,10 +243,9 @@ static inline int acx100_ioctl_set_freq(struct net_device *dev, struct iw_reques
 		for (i = 0; i < (6 - fwrq->e); i++)
 			mult *= 10;
 
-		for (i = 0; i <= 13; i++)
-			if (fwrq->m ==
-			    acx100_channel_freq[i] * mult)
-				channel = i + 1;
+		for (i = 1; i <= 14; i++)
+			if (fwrq->m == acx100_channel_freq[i - 1] * mult)
+				channel = i;
 	}
 
 	if (channel > 14) {
@@ -652,7 +651,7 @@ static char *acx100_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *
 
 	/* Add frequency */
 	iwe.cmd = SIOCGIWFREQ;
-	iwe.u.freq.m = acx100_channel_freq[bss->channel] * 100000;
+	iwe.u.freq.m = acx100_channel_freq[bss->channel - 1] * 100000;
 	iwe.u.freq.e = 1;
 	acxlog(L_IOCTL, "scan, frequency: %d\n", iwe.u.freq.m);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_FREQ_LEN);
@@ -1413,11 +1412,11 @@ static inline int acx100_ioctl_get_range(struct net_device *dev, struct iw_reque
 		dwrq->length = sizeof(struct iw_range);
 		memset(range, 0, sizeof(struct iw_range));
 		range->num_channels = 0;
-		for (i = 0; i < 14; i++)
-			if (0 != (priv->reg_dom_chanmask & (1 << i)))
+		for (i = 1; i <= 14; i++)
+			if (0 != (priv->reg_dom_chanmask & (1 << (i - 1))))
 			{
-				range->freq[range->num_channels].i = i + 1;
-				range->freq[range->num_channels].m = acx100_channel_freq[i] * 100000;
+				range->freq[range->num_channels].i = i;
+				range->freq[range->num_channels].m = acx100_channel_freq[i - 1] * 100000;
 				range->freq[range->num_channels++].e = 1; /* MHz values */
 			}
 		range->num_frequency = (__u8)range->num_channels;
@@ -1757,9 +1756,10 @@ static inline int acx100_ioctl_set_debug(struct net_device *dev,
 }
 #endif
 
-static unsigned char reg_domain_ids[] = {0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51};
+extern const UINT8 reg_domain_ids[];
+extern const UINT8 reg_domain_ids_len;
 
-static char *reg_domain_strings[] =
+const char *reg_domain_strings[] =
 { "FCC (USA)        (1-11)",
   "DOC/IC (Canada)  (1-11)",
 	/* BTW: WLAN use in ETSI is regulated by
@@ -1793,7 +1793,7 @@ static char *reg_domain_strings[] =
 static inline int acx100_ioctl_list_reg_domain(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	int i;
-	char **entry;
+	const char **entry;
 
 	(void)printk("Domain/Country  Channels  Setting\n");
 	for (i = 0, entry = reg_domain_strings; *entry; i++, entry++)
@@ -1831,7 +1831,7 @@ static inline int acx100_ioctl_set_reg_domain(struct net_device *dev, struct iw_
 		goto end;
 	}
 
-	if ((*extra < 1) || ((size_t)*extra > sizeof(reg_domain_ids))) {
+	if ((*extra < 1) || ((size_t)*extra > reg_domain_ids_len)) {
 		result = -EINVAL;
 		goto end_unlock;
 	}
@@ -2560,6 +2560,7 @@ int acx_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 #if NOT_FINISHED_YET
+	/* FIXME: do proper interfacing to activate that! */
 	case SIOCSIWSCAN:
 		/* start a station scan */
 		result = acx100_ioctl_set_scan(iwr, priv);

@@ -2500,6 +2500,7 @@ typedef struct wlandevice {
 	UINT16		*io;
 
 	/*** Device state ***/
+	u32		pci_state[16];		/* saved PCI state for suspend/resume */
 	int		hw_unavailable;		/* indicates whether the hardware has been
 						 * suspended or ejected. actually a counter. */
 	UINT16		dev_state_mask;

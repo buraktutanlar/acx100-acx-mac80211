@@ -607,7 +607,7 @@ void acx_handle_tx_error(wlandevice_t *priv, txdesc_t *pTxDesc)
 	acxlog(L_STD, "Tx error occurred (error 0x%02X)!! (%s)\n", pTxDesc->error, err);
 	priv->stats.tx_errors++;
 
-#if WIRELESS_EXT > 12 /* wireless_send_event() */
+#if WIRELESS_EXT > 13 /* wireless_send_event() is WE12, IWEVTXDROP is WE13 */
 	if (0x30 & pTxDesc->error) {
 		/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 		 * all other errors mean we screwed up locally */
