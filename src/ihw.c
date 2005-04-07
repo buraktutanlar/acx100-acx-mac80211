@@ -64,10 +64,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#include <p80211hdr.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-#include <ihw.h>
+#include <acx.h>
 
 extern void acx_dump_bytes(void *,int);
 
@@ -647,7 +644,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
  *
  ****************************************************************************/
 
-static const u16 CtlLength[0x17] = {
+static const u16 CtlLength[] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
 	ACX1xx_IE_POWER_MGMT_LEN,
@@ -673,7 +670,7 @@ static const u16 CtlLength[0x17] = {
 	ACX111_IE_KEY_CHOOSE_LEN,
 };
 
-static const u16 CtlLengthDot11[0x14] = {
+static const u16 CtlLengthDot11[] = {
 	0,
 	ACX1xx_IE_DOT11_STATION_ID_LEN,
 	0,
@@ -847,10 +844,7 @@ void acx_log_mac_address(int level, const u8 *mac, const char* tail)
 	if (!(debug & level))
 		return;
 
-	printk(KERN_WARNING "%02X:%02X:%02X:%02X:%02X:%02X%s",
-		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-		tail
-	);
+	printk(KERN_WARNING MACSTR "%s",MAC(mac),tail);
 }
 
 /*----------------------------------------------------------------

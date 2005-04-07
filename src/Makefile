@@ -39,7 +39,7 @@ usb_objs = acx_usb_80211frm.o acx_usb_conv.o acx_usb_helper.o acx_usb_helper2.o 
 
 ifeq ($(PATCHLEVEL),) # PATCHLEVEL only set if acting as "kbuild 2.6 makefile"
 
-include $(ACX100_SRC)../config.mk
+-include $(ACX100_SRC)../config.mk
 
 USBCFLAGS =
 

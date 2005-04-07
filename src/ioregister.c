@@ -51,10 +51,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#include <p80211mgmt.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-#include <ioregister.h>
+#include <acx.h>
 
 /* we re-decided to go with statically created arrays,
  * since malloc'ing them and then inserting values would probably take away

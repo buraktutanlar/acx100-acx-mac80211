@@ -62,12 +62,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#include <p80211mgmt.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-#include <acx100_helper2.h>
-#include <ihw.h>
-#include <idma.h>
+#include <acx.h>
 
 /* About the locking:
  *  I only locked the device whenever calls to the hardware are made or
@@ -257,7 +252,7 @@ static inline int acx_ioctl_commit(struct net_device *dev,
 static inline int acx_ioctl_get_name(struct net_device *dev, struct iw_request_info *info, char *cwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	static const char *names[] = { "IEEE 802.11b+/g+", "IEEE 802.11b+" };
+	static const char * const names[] = { "IEEE 802.11b+/g+", "IEEE 802.11b+" };
 
 	strcpy(cwrq, names[(CHIPTYPE_ACX111 == priv->chip_type) ? 0 : 1]);
 
@@ -318,18 +313,11 @@ static int acx_ioctl_set_freq(struct net_device *dev, struct iw_request_info *in
 		goto end;
 	}
 
-	priv->channel = (u16)channel;
+	priv->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
-	if (ACX_MODE_3_MANAGED_AP == priv->macmode_wanted) {
-		/* hmm, AP mode? So simply set channel... */
-		acxlog(L_IOCTL, "Changing to channel %d\n", priv->channel);
-		SET_BIT(priv->set_mask, GETSET_TX|GETSET_RX);
-	}
-	else if (ACX_MODE_3_MANAGED_AP != priv->macmode_wanted) {
-		/* trigger scanning if we're a client... */
-		SET_BIT(priv->set_mask, GETSET_CHANNEL);
-	}
+	acxlog(L_IOCTL, "Changing to channel %d\n", channel);
+	SET_BIT(priv->set_mask, GETSET_CHANNEL);
 	acx_unlock(priv, &flags);
 	result = -EINPROGRESS; /* need to call commit handler */
 end:
@@ -369,35 +357,46 @@ static int acx_ioctl_set_mode(struct net_device *dev, struct iw_request_info *in
 	int result;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set Mode <== %i\n", *uwrq);
+	acxlog(L_IOCTL, "Set iwmode: %i\n", *uwrq);
 
 	result = acx_lock(priv, &flags);
 	if (result)
 		goto end;
 
 	switch(*uwrq) {
-		case IW_MODE_AUTO:
-			priv->macmode_wanted = ACX_MODE_FF_AUTO;
-			break;
-		case IW_MODE_ADHOC:
-			priv->macmode_wanted = ACX_MODE_0_IBSS_ADHOC;
-			break;
-		case IW_MODE_INFRA:
-			priv->macmode_wanted = ACX_MODE_2_MANAGED_STA;
-			break;
-		case IW_MODE_MASTER:
+	case IW_MODE_AUTO:
+		priv->mode = ACX_MODE_OFF;
+		break;
+	case IW_MODE_MONITOR:
+		priv->mode = ACX_MODE_MONITOR;
+		break;
+	case IW_MODE_ADHOC:
+		priv->mode = ACX_MODE_0_ADHOC;
+		break;
+	case IW_MODE_INFRA:
+		priv->mode = ACX_MODE_2_STA;
+		break;
+	case IW_MODE_MASTER:
 #define USE_OWN_MASTER_MODE_CODE 1
 #if USE_OWN_MASTER_MODE_CODE
-			acxlog(0xffff, "Master mode (HostAP) is very, very experimental! It might work partially, but better get prepared for nasty surprises at any time... ;-)\n");
-			priv->macmode_wanted = ACX_MODE_3_MANAGED_AP;
-			break;
+		acxlog(0xffff, "Master mode (HostAP) is very, very "
+			"experimental! It might work partially, but "
+			"better get prepared for nasty surprises "
+			"at any time... ;-)\n");
+		priv->mode = ACX_MODE_3_AP;
+		break;
 #else
-			acxlog(0xffff, "Master mode (HostAP) not supported! Can be supported once the driver switched to the new Linux 802.11 stack that's currently under development...\n");
-			/* fall through */
+		acxlog(0xffff, "Master mode (HostAP) not supported! "
+			"Can be supported once the driver switched "
+			"to the new Linux 802.11 stack that's currently "
+			"under development...\n");
+		/* fall through */
 #endif
-		default:
-			result = -EOPNOTSUPP;
-			goto end_unlock;
+	case IW_MODE_REPEAT:
+	case IW_MODE_SECOND:
+	default:
+		result = -EOPNOTSUPP;
+		goto end_unlock;
 	}
 
 	SET_BIT(priv->set_mask, GETSET_MODE);
@@ -413,53 +412,23 @@ end:
 static int acx_ioctl_get_mode(struct net_device *dev, struct iw_request_info *info, u32 *uwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int result;
+	int result = 0;
 
-#if SHOW_SPECIFIC_MACMODE_JOINED
-	if (priv->status != ISTATUS_4_ASSOCIATED)
-#endif
-	{ /* connection not up yet, so for now indicate the mode we want,
-	     not the one we are in */
-		switch (priv->macmode_wanted) {
-			case ACX_MODE_FF_AUTO:
-				*uwrq = IW_MODE_AUTO;
-				break;
-			case ACX_MODE_0_IBSS_ADHOC:
-				*uwrq = IW_MODE_ADHOC;
-				break;
-			case ACX_MODE_2_MANAGED_STA:
-				*uwrq = IW_MODE_INFRA;
-				break;
-			case ACX_MODE_3_MANAGED_AP:
-				*uwrq = IW_MODE_MASTER;
-				break;
-			default:
-				result = -EOPNOTSUPP;
-				goto end;
-		}
+	switch (priv->mode) {
+	case ACX_MODE_OFF:
+		*uwrq = IW_MODE_AUTO; break;
+	case ACX_MODE_MONITOR:
+		*uwrq = IW_MODE_MONITOR; break;
+	case ACX_MODE_0_ADHOC:
+		*uwrq = IW_MODE_ADHOC; break;
+	case ACX_MODE_2_STA:
+		*uwrq = IW_MODE_INFRA; break;
+	case ACX_MODE_3_AP:
+		*uwrq = IW_MODE_MASTER; break;
+	default:
+		result = -EOPNOTSUPP;
 	}
-#if SHOW_SPECIFIC_MACMODE_JOINED
-	else {
-		switch (priv->macmode_joined) {
-			case ACX_MODE_0_IBSS_ADHOC:
-				*uwrq = IW_MODE_ADHOC;
-				break;
-			case ACX_MODE_2_MANAGED_STA:
-				*uwrq = IW_MODE_INFRA;
-				break;
-			case ACX_MODE_3_MANAGED_AP:
-				*uwrq = IW_MODE_MASTER;
-				break;
-			default:
-				result = -EOPNOTSUPP;
-				goto end;
-		}
-	}
-#endif
-	result = 0;
-end:
 	acxlog(L_IOCTL, "Get Mode ==> %d\n", *uwrq);
-
 	return result;
 }
 
@@ -533,7 +502,6 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 				      struct sockaddr *awrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	static const u8 off[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 	int result = 0;
 	u16 i;
 	const unsigned char *ap;
@@ -549,27 +517,31 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 	}
 	
 	ap = awrq->sa_data;
-	acxlog(L_IOCTL, "Set AP <== %02x:%02x:%02x:%02x:%02x:%02x\n",
-               ap[0], ap[1], ap[2], ap[3], ap[4], ap[5]);
+	acxlog(L_IOCTL, "Set AP = "MACSTR"\n", MAC(ap));
 
 	/* We want to restrict to a specific AP when in Managed or Auto mode
 	 * only, right? */
-	if ((ACX_MODE_2_MANAGED_STA != priv->macmode_wanted)
-	&& (ACX_MODE_FF_AUTO != priv->macmode_wanted)) {
+	/* TODO: check that "iwconfig <if> ap <mac> mode managed" works
+	** (that is, that we can set ap _first_ and then set mode */
+	if ((ACX_MODE_2_STA != priv->mode)
+	 && (ACX_MODE_0_ADHOC != priv->mode)
+	) {
 		result = -EINVAL;
 		goto end;
 	}
 
-	if (OK == acx_is_mac_address_broadcast(ap)) {
+	if (mac_is_bcast(ap)) {
 		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
 		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
-		acx_scan_chan(priv);
+		SET_BIT(priv->set_mask, GETSET_RESCAN);
 		result = -EINPROGRESS;
 		goto end;
 	}
 
-	if (!memcmp(off, ap, ETH_ALEN)) {
+	/* FIXME: if there is a convention on what empty AP means,
+	** please add a comment about that. I don't know of any --vda */
+	if (mac_is_zero(ap)) {
 		/* "off" == 00:00:00:00:00:00 */
 		MAC_BCAST(priv->ap);
 		acxlog(L_IOCTL, "Not reassociating\n");
@@ -581,10 +553,10 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 
 		struct bss_info *bss = &priv->bss_table[i];
 
-		if (memcmp(bss->bssid, ap, ETH_ALEN) != 0)
+		if (!mac_is_equal(bss->bssid, ap))
 			continue;
 
-		if ((!!priv->wep_enabled) != !!(bss->caps & IEEE802_11_MGMT_CAP_WEP)) {
+		if ((!!priv->wep_enabled) != !!(bss->caps & WF_MGMT_CAP_PRIVACY)) {
 			acxlog(L_STD | L_IOCTL, "The WEP setting of the matching AP (%d) differs from our WEP setting --> will NOT restrict association to its BSSID!\n", i);
 			result = -EINVAL;
 			goto end;
@@ -592,7 +564,7 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 
 		MAC_COPY(priv->ap, ap);
 		acxlog(L_IOCTL, "Forcing reassociation\n");
-		acx_scan_chan(priv);
+		SET_BIT(priv->set_mask, GETSET_RESCAN);
 		result = -EINPROGRESS;
 		goto end;
         }
@@ -606,11 +578,11 @@ static inline int acx_ioctl_get_ap(struct net_device *dev, struct iw_request_inf
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	acxlog(L_IOCTL, "Get BSSID\n");
-	if (ISTATUS_4_ASSOCIATED == priv->status) {
+	if (ACX_STATUS_4_ASSOCIATED == priv->status) {
 		/* as seen in Aironet driver, airo.c */
 		MAC_COPY(awrq->sa_data, priv->bssid);
 	} else {
-		MAC_FILL(awrq->sa_data, 0x0);
+		MAC_ZERO(awrq->sa_data);
 	}
 	awrq->sa_family = ARPHRD_ETHER;
 	return OK;
@@ -646,21 +618,22 @@ static int acx_ioctl_get_aplist(struct net_device *dev, struct iw_request_info *
 	FN_ENTER;
 
 	/* in Master mode of course we don't have an AP list... */
-	if (ACX_MODE_3_MANAGED_AP == priv->macmode_joined) {
+	if (ACX_MODE_3_AP == priv->mode) {
 		result = -EOPNOTSUPP;
 		goto end;
 	}
 
 	for (i = 0; i < priv->bss_table_count; i++) {
-		MAC_COPY(address[i].sa_data, priv->bss_table[i].bssid);
+		struct bss_info *bss = &priv->bss_table[i];
+		MAC_COPY(address[i].sa_data, bss->bssid);
 		address[i].sa_family = ARPHRD_ETHER;
-		qual[i].level = priv->bss_table[i].sir;
-		qual[i].noise = priv->bss_table[i].snr;
+		qual[i].level = bss->sir;
+		qual[i].noise = bss->snr;
 #ifndef OLD_QUALITY
 		qual[i].qual = acx_signal_determine_quality(qual[i].level, qual[i].noise);
 #else
 		qual[i].qual = (qual[i].noise <= 100) ?
-			       100 - qual[i].noise : 0;;
+			       100 - qual[i].noise : 0;
 #endif
 		qual[i].updated = 0; /* no scan: level/noise/qual not updated */
 	}
@@ -690,8 +663,9 @@ static int acx_ioctl_set_scan(struct net_device *dev, struct iw_request_info *in
 		goto end;
 	}
 
-	acx_scan_chan(priv);
-
+	/* This is NOT a rescan for new AP!
+	** Do not use SET_BIT(GETSET_RESCAN); */
+	acx_cmd_start_scan(priv);
 	priv->scan_start = jiffies;
 	priv->scan_running = 1;
 	result = OK;
@@ -727,8 +701,8 @@ static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end
 	
 	/* Add mode */
 	iwe.cmd = SIOCGIWMODE;
-	if (bss->caps & (IEEE802_11_MGMT_CAP_ESS | IEEE802_11_MGMT_CAP_IBSS)) {
-		if (bss->caps & IEEE802_11_MGMT_CAP_ESS)
+	if (bss->caps & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)) {
+		if (bss->caps & WF_MGMT_CAP_ESS)
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
@@ -761,7 +735,7 @@ static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end
 
 	/* Add encryption */
 	iwe.cmd = SIOCGIWENCODE;
-	if (bss->caps & IEEE802_11_MGMT_CAP_WEP)
+	if (bss->caps & WF_MGMT_CAP_PRIVACY)
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
 	else
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
@@ -857,7 +831,7 @@ static int acx_ioctl_set_essid(struct net_device *dev, struct iw_request_info *i
 	int result;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "Set ESSID <== %s, length %d, flags 0x%04x\n", extra, len, dwrq->flags);
+	acxlog(L_IOCTL, "Set ESSID '%s', length %d, flags 0x%04x\n", extra, len, dwrq->flags);
 
 	if (len < 0) {
 		result = -EINVAL;
@@ -885,7 +859,7 @@ static int acx_ioctl_set_essid(struct net_device *dev, struct iw_request_info *i
 		priv->essid_active = 1;
 	}
 
-	SET_BIT(priv->set_mask, GETSET_ESSID);
+	SET_BIT(priv->set_mask, GETSET_RESCAN);
 
 end_unlock:
 	acx_unlock(priv, &flags);
@@ -961,7 +935,6 @@ static const unsigned int acx111_rate_tbl[] = {
     48000000,
     54000000,
 };
-#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 static int
 acx_ioctl_set_rate(struct net_device *dev,
@@ -1060,7 +1033,7 @@ acx_ioctl_set_rate(struct net_device *dev,
  
 	priv->ap_peer = priv->defpeer;
 	acx_update_dot11_ratevector(priv);
-	if (priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
+	if (priv->mode == ACX_MODE_2_STA)
 		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
 	
 	acx_unlock(priv, &flags);
@@ -1594,17 +1567,17 @@ static int acx_ioctl_get_iw_priv(struct iwreq *iwr)
 {
 	int result = -EINVAL;
 
-	if (iwr->u.data.pointer) {
-		result =
-		    verify_area(VERIFY_WRITE, iwr->u.data.pointer,
-				sizeof(acx_ioctl_private_args));
-		if (result)
-			return result;
+	if (!iwr->u.data.pointer)
+		return -EINVAL;
+	result = verify_area(VERIFY_WRITE, iwr->u.data.pointer,
+			sizeof(acx_ioctl_private_args));
+	if (result)
+		return result;
 
-		iwr->u.data.length = sizeof(acx_ioctl_private_args) / sizeof(acx_ioctl_private_args[0]);
-		if (copy_to_user(iwr->u.data.pointer, acx_ioctl_private_args, sizeof(acx_ioctl_private_args)) != 0)
-			result = -EFAULT;
-	}
+	iwr->u.data.length = VEC_SIZE(acx_ioctl_private_args);
+	if (copy_to_user(iwr->u.data.pointer, acx_ioctl_private_args, sizeof(acx_ioctl_private_args)) != 0)
+		result = -EFAULT;
+
 	return result;
 }
 #endif
@@ -1849,7 +1822,7 @@ static int acx_ioctl_set_debug(struct net_device *dev,
 extern const u8 reg_domain_ids[];
 extern const u8 reg_domain_ids_len;
 
-static const char *reg_domain_strings[] =
+static const char * const reg_domain_strings[] =
 { "FCC (USA)        (1-11)",
   "DOC/IC (Canada)  (1-11)",
 	/* BTW: WLAN use in ETSI is regulated by
@@ -1883,7 +1856,7 @@ static const char *reg_domain_strings[] =
 static int acx_ioctl_list_reg_domain(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	unsigned int i;
-	const char **entry;
+	const char * const *entry;
 
 	printk("Domain/Country  Channels  Setting\n");
 	for (i = 0, entry = reg_domain_strings; *entry; i++, entry++)
@@ -1986,7 +1959,7 @@ static int acx_ioctl_get_reg_domain(struct net_device *dev, struct iw_request_in
 * Comment:
 *
 *----------------------------------------------------------------*/
-static const char *preamble_modes[] = { "off", "on", "auto (peer capability dependent)", "unknown mode, error" };
+static const char * const preamble_modes[] = { "off", "on", "auto (peer capability dependent)", "unknown mode, error" };
 
 static int acx_ioctl_set_short_preamble(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
@@ -2023,11 +1996,11 @@ static int acx_ioctl_set_short_preamble(struct net_device *dev, struct iw_reques
 			/* associated to a peer? */
 			/* FIXME: this check breaks in case of an AP
 			 * with hidden (empty!) ESSID */
-			if (priv->status == ISTATUS_4_ASSOCIATED
+			if (priv->status == ACX_STATUS_4_ASSOCIATED
 			&& priv->station_assoc.bssid[0]
 			) {
 				priv->ap_peer.shortpre =
-				((priv->station_assoc.caps & IEEE802_11_MGMT_CAP_SHORT_PRE) == IEEE802_11_MGMT_CAP_SHORT_PRE);
+				((priv->station_assoc.caps & WF_MGMT_CAP_SHORT) == WF_MGMT_CAP_SHORT);
 			}
 			break;
 	}
@@ -2241,20 +2214,8 @@ end:
 
 /*----------------------------------------------------------------
 * acx_ioctl_wlansniff
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
 * STATUS: NEW
-*
-* Comment:
-*
+* can we just remove this in favor of monitor mode? --vda
 *----------------------------------------------------------------*/
 static int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
@@ -2271,10 +2232,9 @@ static int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_info *i
 		goto end;
 	}
 
-	priv->monitor = params[0];
 	/* not using printk() here, since it distorts kismet display
 	 * when printk messages activated */
-	acxlog(L_IOCTL, "setting monitor to: 0x%02X\n", priv->monitor);
+	acxlog(L_IOCTL, "setting monitor to: 0x%02X\n", params[0]);
 
 	switch (params[0]) {
 	case 0:
@@ -2288,13 +2248,10 @@ static int acx_ioctl_wlansniff(struct net_device *dev, struct iw_request_info *i
 		break;
 	}
 
-	if (priv->monitor)
-		priv->monitor_setting = 0x02; /* don't decrypt default key only, override decryption mechanism */
-	else
-		priv->monitor_setting = 0x00; /* don't decrypt default key only, don't override decryption */
-
-	acx_initialize_rx_config(priv, priv->monitor);
-	SET_BIT(priv->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
+	if (params[0]) {
+		priv->mode = ACX_MODE_MONITOR;
+		SET_BIT(priv->set_mask, GETSET_MODE);
+	}
 
 	if (enable) {
 		priv->channel = params[1];
@@ -2399,7 +2356,7 @@ static int acx_ioctl_dbg_get_io(struct net_device *dev, struct iw_request_info *
 		goto end;
 	}
 
-	switch(params[0]) {
+	switch (params[0]) {
 		case 0x0: /* Internal RAM */
 			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
 			break;
@@ -2439,7 +2396,7 @@ static int acx_ioctl_dbg_set_io(struct net_device *dev, struct iw_request_info *
 		goto end;
 	}
 
-	switch(params[0]) {
+	switch (params[0]) {
 		case 0x0: /* Internal RAM */
 			acxlog(L_IOCTL, "sorry, access to internal RAM not implemented yet.\n");
 			break;
@@ -2906,7 +2863,7 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 
 	priv->ap_peer = priv->defpeer;
 	acx_update_dot11_ratevector(priv);
-	if (priv->macmode_joined == ACX_MODE_2_MANAGED_STA)
+	if (priv->mode == ACX_MODE_2_STA)
 		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
 
 	acx_unlock(priv, &flags);
@@ -3071,7 +3028,7 @@ end:
 	return result;
 }
 
-static const char *scan_modes[] = { "active", "passive", "background" };
+static const char * const scan_modes[] = { "active", "passive", "background" };
 static int acx_ioctl_set_scan_params(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
@@ -3127,7 +3084,7 @@ end:
 	return result;
 }
 
-static const char *led_modes[] = { "off", "on", "LinkQuality" };
+static const char * const led_modes[] = { "off", "on", "LinkQuality" };
 static int acx100_ioctl_set_led_power(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
@@ -3272,9 +3229,9 @@ static const iw_handler acx_ioctl_private_handler[] =
 
 const struct iw_handler_def acx_ioctl_handler_def =
 {
-	.num_standard = sizeof(acx_ioctl_handler)/sizeof(iw_handler),
-	.num_private = sizeof(acx_ioctl_private_handler)/sizeof(iw_handler),
-	.num_private_args = sizeof(acx_ioctl_private_args)/sizeof(struct iw_priv_args),
+	.num_standard = VEC_SIZE(acx_ioctl_handler),
+	.num_private = VEC_SIZE(acx_ioctl_private_handler),
+	.num_private_args = VEC_SIZE(acx_ioctl_private_args),
 	.standard = (iw_handler *) acx_ioctl_handler,
 	.private = (iw_handler *) acx_ioctl_private_handler,
 	.private_args = (struct iw_priv_args *) acx_ioctl_private_args,

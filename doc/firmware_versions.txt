@@ -71,7 +71,8 @@ ftp://ftp.dlink.co.uk/wireless/dwl-g650+_rev_Ax/dwl-g650+_drv_v1.0.zip):
 fcd07de4b25e1d2aaf3b78b27c5b7ee9  FwRad16.bin	83320
 8a16b8e085d1ada13abc65305b59a6e5  FwRad17.bin	84912
 nothing known yet, but they added support for WPA (NOTE: we don't support WPA
-yet, not even WEP... :-\)
+yet...)
+WEP is working fine with this firmware (WEP64, WEP128)
 
 2.3.1.31 (Safecom Dec. 2004 firmware, http://www.safecom.cn/code/product/sw/swlp-54108/driver.zip):
 7026826460376f6b174f9225bd7781b9  FwRad16.bin	92836

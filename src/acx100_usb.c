@@ -84,15 +84,7 @@
 #undef WLAN_HOSTIF
 #define WLAN_HOSTIF WLAN_USB
 
-#include <wlan_compat.h>
-#include <p80211hdr.h>
-#include <p80211mgmt.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-#include <acx100_helper2.h>
-#include <acx100_conv.h>
-#include <idma.h>
-#include <ihw.h>
+#include <acx.h>
 
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
@@ -158,8 +150,10 @@ static inline void usb_set_intfdata(struct usb_interface *intf, void *data) {}
 
 char *firmware_dir;
 
+#if ACX_DEBUG
 /* unsigned int debug = L_DEBUG|L_ASSOC|L_INIT|L_STD; */
 unsigned int debug = L_STD; 
+#endif
 
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
@@ -248,9 +242,9 @@ void cleanup_module(void);
 static void acx100usb_tx_timeout(struct net_device *);
 #endif
 
-#if ACX_DEBUG
 int txbufsize;
 int rxbufsize;
+#if ACX_DEBUG
 static char * acx100usb_pstatus(int);
 extern void acx_dump_bytes(void *,int);
 static void dump_device(struct usb_device *);
@@ -1272,9 +1266,9 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 		SET_BIT(buf->hdr.hostData, (ACX100_USB_TXHI_ISDATA<<16));
 	}
 	addr=(((p80211_hdr_t *)(header->data))->a3.a3);
-	if (OK == acx_is_mac_address_directed((mac_t *)addr)) 
+	if (mac_is_directed(addr))
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_DIRECTED<<16)));
-	if (OK == acx_is_mac_address_broadcast(addr)) 
+	if (mac_is_bcast(addr))
 	    SET_BIT(buf->hdr.hostData, cpu_to_le32((ACX100_USB_TXHI_BROADCAST<<16)));
 	acxlog(L_DATA,"Dump of bulk out urb:\n");
 	if (debug&L_DATA) acx_dump_bytes(buf,size+sizeof(acx100_usb_txhdr_t));
@@ -1589,7 +1583,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	/* --------------------------------------
 	** there is no one to talk to...
 	** ----------------------------------- */
-	if (priv->status != ISTATUS_4_ASSOCIATED) {
+	if (priv->status != ACX_STATUS_4_ASSOCIATED) {
 		printk(KERN_INFO SHORTNAME "trying to xmit, but not associated yet: aborting.\n");
 		/* silently drop the packet, since we're not connected yet */
 		dev_kfree_skb(skb);
@@ -1813,8 +1807,11 @@ static void dump_device(struct usb_device *usbdev)
   printk(KERN_INFO "  tt: 0x%X\n",(unsigned int)(usbdev->tt));
   printk(KERN_INFO "  ttport: %d\n",(unsigned int)(usbdev->ttport));
   printk(KERN_INFO "  toggle[0]: 0x%X  toggle[1]: 0x%X\n",(unsigned int)(usbdev->toggle[0]),(unsigned int)(usbdev->toggle[1]));
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 9)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 8)
   /* halted removed in 2.6.9-rc1 */
+  /* DOH, Canbreak... err... Mandrake decided to do their very own very
+   * special version "2.6.8.1" which already includes this change, so we
+   * need to blacklist that version already (i.e. 2.6.8) */
   printk(KERN_INFO "  halted[0]: 0x%X  halted[1]: 0x%X\n",usbdev->halted[0],usbdev->halted[1]);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)

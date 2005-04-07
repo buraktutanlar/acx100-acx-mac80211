@@ -89,16 +89,6 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #endif /* ACX_DEBUG */
 
-
-#define ISTATUS_0_STARTED	0
-#define ISTATUS_1_SCANNING	1
-#define ISTATUS_2_WAIT_AUTH	2
-#define ISTATUS_3_AUTHENTICATED	3
-#define ISTATUS_4_ASSOCIATED	4
-/* TODO: ISTATUS_4_ASSOCIATED_IBSS, ISTATUS_4_ASSOCIATED_AP */
-
-
-
 typedef struct acx100_ie_queueconfig {
 	u16	type ACX_PACKED;
 	u16	len ACX_PACKED;
@@ -242,88 +232,162 @@ typedef struct acx111_ie_powermgmt {
 	u32 enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
 } acx111_ie_powermgmt_t;
 
-typedef struct sub3info {
-	u8 size ACX_PACKED;
-	u8 buf[0x4] ACX_PACKED;
-} sub3info_t;
 
-typedef struct subsubinfo {
-	u8 size ACX_PACKED;
-	struct sub3info buf ACX_PACKED;
-} subsubinfo_t;
-
-typedef struct subinfo {
-	u16 size ACX_PACKED;
-	char buf[0x8] ACX_PACKED;
-	struct subsubinfo buf2 ACX_PACKED;
-	char buf3[0x8] ACX_PACKED;
-} subinfo_t;
-
-typedef struct beaconinfo {
-	u16 size ACX_PACKED;
-	u16 status ACX_PACKED;
-	u8 addr1[0x6] ACX_PACKED;
-	u8 addr2[0x6] ACX_PACKED;
-	u8 addr3[0x6] ACX_PACKED;
-	struct subinfo inf ACX_PACKED;
-	u8 buf[0x1c] ACX_PACKED;
-} beaconinfo_t;
-
-typedef struct beacon {
-	u16 size ACX_PACKED;
-	struct beaconinfo inf ACX_PACKED;
-/*  u16 vala ACX_PACKED; */
-} beacon_t;
-
-#define ACX_SCAN_ACTIVE		0
-#define ACX_SCAN_PASSIVE	1
-#define ACX_SCAN_BACKGROUND	2
-
+/*
+** SCAN command structure
+**
+** even though acx100 scan rates match RATE100 constants,
+** acx111 ones do not match! Therefore we do not use RATE100 #defines */
+#define ACX_SCAN_RATE_1		10
+#define ACX_SCAN_RATE_2		20
+#define ACX_SCAN_RATE_5		55
+#define ACX_SCAN_RATE_11	110
+#define ACX_SCAN_RATE_22	220
+#define ACX_SCAN_OPT_ACTIVE	0x00	/* a bit mask */
+#define ACX_SCAN_OPT_PASSIVE	0x01
+/* Background scan: we go into Power Save mode (by transmitting
+** NULL data frame to AP with the power mgmt bit set), do the scan,
+** and then exit Power Save mode. A plus is that AP buffers frames
+** for us while we do background scan. Thus we avoid frame losses.
+** Background scan can be active or passive, just like normal one */
+#define ACX_SCAN_OPT_BACKGROUND	0x02
 typedef struct acx100_scan {
-	u16 count ACX_PACKED; /* number of scans to do, 0xffff == continuous */
+	u16 count ACX_PACKED;	/* number of scans to do, 0xffff == continuous */
 	u16 start_chan ACX_PACKED;
-	u16 flags ACX_PACKED; /* channel list mask; 0x8000 == all channels? */
-	u8 max_rate ACX_PACKED; /* max. probe rate */
-	u8 options ACX_PACKED; /* scan mode: 0 == active, 1 == passive, 2 == background */
+	u16 flags ACX_PACKED;	/* channel list mask; 0x8000 == all channels? */
+	u8 max_rate ACX_PACKED;	/* max. probe rate */
+	u8 options ACX_PACKED;	/* bit mask, see defines above */
 	u16 chan_duration ACX_PACKED;
 	u16 max_probe_delay ACX_PACKED;
 } acx100_scan_t;			/* length 0xc */
 
+#define ACX111_SCAN_RATE_6	0x0B
+#define ACX111_SCAN_RATE_9	0x0F
+#define ACX111_SCAN_RATE_12	0x0A
+#define ACX111_SCAN_RATE_18	0x0E
+#define ACX111_SCAN_RATE_24	0x09
+#define ACX111_SCAN_RATE_36	0x0D
+#define ACX111_SCAN_RATE_48	0x08
+#define ACX111_SCAN_RATE_54	0x0C
+#define ACX111_SCAN_OPT_5GHZ    0x04	/* else 2.4GHZ */
+#define ACX111_SCAN_MOD_SHORTPRE 0x01	/* you can combine SHORTPRE and PBCC */
+#define ACX111_SCAN_MOD_PBCC	0x80
+#define ACX111_SCAN_MOD_OFDM	0x40
 typedef struct acx111_scan {
-	u16 count ACX_PACKED; /* number of scans to do */
-	u8 channel_list_select ACX_PACKED;
+	u16 count ACX_PACKED;		/* number of scans to do */
+	u8 channel_list_select ACX_PACKED; /* 0: scan all channels, 1: from chan_list only */
 	u16 reserved1 ACX_PACKED;
 	u8 reserved2 ACX_PACKED;
 	u8 rate ACX_PACKED;
-	u8 options ACX_PACKED;
-	u16 chan_duration ACX_PACKED;
-	u16 max_probe_delay ACX_PACKED;
+	u8 options ACX_PACKED;		/* bit mask, see defines above */
+	u16 chan_duration ACX_PACKED;	/* min time to wait for reply on one channel in ms */
+					/* (active scan only) (802.11 section 11.1.3.2.2) */
+	u16 max_probe_delay ACX_PACKED; /* max time to wait for reply on one channel in ms (active scan) */
+					/* time to listen on a channel in ms (passive scan) */
 	u8 modulation ACX_PACKED;
-	u8 channel_list[26] ACX_PACKED;
+	u8 channel_list[26] ACX_PACKED;	/* bits 7:0 first byte: channels 8:1 */
+					/* bits 7:0 second byte: channels 16:9 */
+					/* 26 bytes is enough to cover 802.11a */
 } acx111_scan_t;
 
+
+/*
+** Radio calibration command structure
+*/
 typedef struct acx111_cmd_radiocalib {
 	u32 methods ACX_PACKED; /* 0x80000000 == automatic calibration by firmware, according to interval; Bits 0..3: select calibration methods to go through: calib based on DC, AfeDC, Tx mismatch, Tx equilization */
 	u32 interval ACX_PACKED;
 } acx111_cmd_radiocalib_t;
 
-typedef struct acx_tim {
-	u16 size ACX_PACKED;
-	u8 buf[0x100] ACX_PACKED;
-} acx_tim_t;
 
-typedef struct acx_proberesp {
-	u16 size ACX_PACKED;
-	char buf[0x54] ACX_PACKED;
-} acx_proberesp_t;
+/*
+** Packet template structures
+**
+** Packet templates store contents of Beacon, Probe response, Probe request,
+** Null data frame, and TIM data frame. Firmware automatically transmits
+** contents of template at appropriate time:
+** - Beacon: when configured as AP or Ad-hoc
+** - Probe response: when configured as AP or Ad-hoc, whenever
+**   a Probe request frame is received
+** - Probe request: when host issues SCAN command (active)
+** - Null data frame: when entering 802.11 power save mode
+** - TIM data: at the end of Beacon frames (if no TIM template
+**   is configured, then transmits default TIM)
+** NB: 
+** - size field must be set to size of actual template
+**   (NOT sizeof(struct) - templates are variable in length),
+**   size field is not itself counted.
+** - members flagged with an asterisk must be initialized with host,
+**   rest must be zero filled.
+** - variable length fields shown only in comments */
+typedef struct acx_template_tim {
+	u16	size ACX_PACKED;
+	u8	tim_eid ACX_PACKED;	/* 00 1 TIM IE ID * */
+	u8	len ACX_PACKED;		/* 01 1 Length * */
+	u8	dtim_cnt ACX_PACKED;	/* 02 1 DTIM Count */
+	u8	dtim_period ACX_PACKED;	/* 03 1 DTIM Period */
+	u8	bitmap_ctrl ACX_PACKED;	/* 04 1 Bitmap Control * (except bit0) */
+					/* 05 n Partial Virtual Bitmap * */
+	u8	variable[0x100 - 1-1-1-1-1] ACX_PACKED;
+} acx_template_tim_t;
 
-typedef struct acx_probereq {
-	u16 size ACX_PACKED;
-	char buf[0x44] ACX_PACKED;
-} acx_probereq_t;
+typedef struct acx100_template_probereq {
+	u16	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address * */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address * */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID * */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+	u8	timestamp[8] ACX_PACKED;/* 18 8 Timestamp */
+	u16	beacon_interval ACX_PACKED; /* 20 2 Beacon Interval * */
+	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
+		    			/* 24 n SSID * */
+					/* nn n Supported Rates * */
+	char	variable[0x44 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
+} acx100_template_probereq_t;
 
-/* as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
- * NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
+typedef struct acx111_template_probereq {
+	u16	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc */
+/* NB: I think fc must be set to WF_FSTYPE_PROBEREQi by host
+** or else you'll see Assoc Reqs (fc is left zeroed out
+** and AssocReq has numeric value of 0!) */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address * */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address * */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID * */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+		    			/* 18 n SSID * */
+					/* nn n Supported Rates * */
+	char	variable[0x44 - 2-2-6-6-6-2] ACX_PACKED;
+} acx111_template_probereq_t;
+
+typedef struct acx_template_proberesp {
+	u16 	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc * (bits [15:12] and [10:8] per 802.11 section 7.1.3.1) */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+	u8	timestamp[8] ACX_PACKED;/* 18 8 Timestamp */
+	u16	beacon_interval ACX_PACKED; /* 20 2 Beacon Interval * */
+	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
+					/* 24 n SSID * */
+					/* nn n Supported Rates * */
+					/* nn 1 DS Parameter Set * */
+	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
+} acx_template_proberesp_t;
+#define acx_template_beacon_t acx_template_proberesp_t
+#define acx_template_beacon acx_template_proberesp
+
+
+/*
+** JOIN command structure
+**
+** as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
+** NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
 typedef struct acx_joinbss {
 	u8 bssid[ETH_ALEN] ACX_PACKED;
 	u16 beacon_interval ACX_PACKED;
@@ -340,8 +404,8 @@ typedef struct acx_joinbss {
 	} u ACX_PACKED;
 	u8 genfrm_txrate ACX_PACKED;	/* generated frame (beacon, probe resp, RTS, PS poll) tx rate */
 	u8 genfrm_mod_pre ACX_PACKED;	/* generated frame modulation/preamble:
-				** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
-				** bit5: short pre */
+					** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
+					** bit5: short pre */
 	u8 macmode ACX_PACKED;		/* BSS Type, must be one of ACX_MODE_xxx */
 	u8 channel ACX_PACKED;
 	u8 essid_len ACX_PACKED;
@@ -356,7 +420,7 @@ typedef struct acx_joinbss {
 
 /* Looks like missing bits are used to indicate 11g rates!
 ** (it follows from the fact that constants below match 1:1 to RATE111_nn)
-** This was actually seen! Look at that Assoc Request,
+** This was actually seen! Look at that Assoc Request sent by acx111,
 ** it _does_ contain 11g rates in basic set:
 01:30:20.070772 Beacon (xxx) [1.0* 2.0* 5.5* 11.0* 6.0* 9.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit] ESS CH: 1
 01:30:20.074425 Authentication (Open System)-1: Succesful
@@ -373,54 +437,6 @@ typedef struct acx_joinbss {
 #define JOINBSS_RATES_BASIC111_11	0x0020
 #define JOINBSS_RATES_BASIC111_22	0x0100
 
-/*
- * I am temporarily redefining this because the above struct is somewhat wrong.
- *
- * NOTE: this is a generic struct for all sorts of different packet types.
- * As such I guess that someone got confused about structure layout.
- * In other words: it always has an "official" packet header (A4?)
- * and then a custom packet body.
- * The current form is probably a bit sub-optimal. However let's keep it
- * for now and then redefine it later. Or maybe change it now to have a
- * better struct layout for all sorts of management packets?
- */
-typedef struct acxp80211_hdr {
-	p80211_hdr_a3_t a4 ACX_PACKED;
-	u8 timestamp[8] ACX_PACKED;	/* this contains the Logical Link Control data
-				   the first three bytes are the dsap, ssap and control
-				   respectively. the following 3 bytes are either ieee_oui
-				   or an RFC. See p80211conv.c/h for more. */
-	u16 beacon_interval ACX_PACKED;
-	u16 caps ACX_PACKED;
-	u8 info[0x30] ACX_PACKED;	/* 0x24 */
-	/*
-	 * info[1] is essid_len
-	 * &info[2] is essid (max. 32 chars)
-	 * FIXME: huh, then sizeof(info) == 0x18 cannot be correct! Adjusting
-	 * to 0x30, which extends to end of this struct
-	 */
-/*  p80211_hdr_a4_t b4 ACX_PACKED; */
-} acxp80211_hdr_t;		/* size: 0x54 */
-
-/* struct used for Beacon and for Probe Response frames */
-typedef struct acxp80211_beacon_prb_resp {
-	p80211_hdr_a3_t hdr ACX_PACKED;     /* 24 Bytes */
-	u8 timestamp[8] ACX_PACKED;      /* 8 Bytes */
-	u16 beacon_interval ACX_PACKED;  /* 2 Bytes */
-	u16 caps ACX_PACKED;             /* 2 Bytes */
-	u8 info[48] ACX_PACKED;          /* 48 Bytes */
-#if INFO_CONSISTS_OF
-	u8 ssid[1+1+IW_ESSID_MAX_SIZE] ACX_PACKED; /* 34 Bytes */
-	u8 supp_rates[1+1+8] ACX_PACKED; /* 10 Bytes */
-	u8 ds_parms[1+1+1] ACX_PACKED; /* 3 Bytes */
-	u8 filler ACX_PACKED;		/* 1 Byte alignment filler */
-#endif
-} acxp80211_beacon_prb_resp_t;
-
-typedef struct acxp80211_packet {
-	u16 size ACX_PACKED; /* packet len indicator for firmware */
-	struct acxp80211_hdr hdr ACX_PACKED; /* actual packet */
-} acxp80211_packet_t;		/* size: 0x56 */
 
 typedef struct mem_read_write {
     u16 addr ACX_PACKED;
@@ -428,11 +444,6 @@ typedef struct mem_read_write {
     u32 len ACX_PACKED;
     u32 data ACX_PACKED;
 } mem_read_write_t;
-
-typedef struct acxp80211_beacon_prb_resp_template {
-	u16 size ACX_PACKED; /* packet len indicator for firmware */
-	struct acxp80211_beacon_prb_resp pkt ACX_PACKED;
-} acxp80211_beacon_prb_resp_template_t;
 
 typedef struct acxp80211_nullframe {
 	u16 size ACX_PACKED;
@@ -469,7 +480,7 @@ typedef struct ie_dot11WEPDefaultKey {
 
 typedef struct acx111WEPDefaultKey {
     u8	MacAddr[ETH_ALEN] ACX_PACKED;
-    u8	action ACX_PACKED;
+    u16	action ACX_PACKED; /* NOTE: this is a u16, NOT a u8!! */
     u16	reserved ACX_PACKED;
     u8	keySize ACX_PACKED;
     u8	type ACX_PACKED;
@@ -498,7 +509,7 @@ typedef struct GenericPacket {
 } GenericPacket_t;
 
 typedef struct defaultkey {
-	        UINT8 num;
+	UINT8 num;
 } defaultkey_t;
 
 typedef struct acx_ie_generic {
@@ -622,7 +633,7 @@ static inline void acx_carrier_on(netdevice_t *dev, const char *msg)
 
 void acx_schedule(long timeout);
 int acx_reset_dev(netdevice_t *dev);
-void acx_join_bssid(wlandevice_t *priv);
+void acx_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid);
 int acx_init_mac(netdevice_t *dev, u16 init);
 void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 void acx_set_timer(wlandevice_t *priv, u32 time);
@@ -645,9 +656,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 void acx_init_task_scheduler(wlandevice_t *priv);
 void acx_flush_task_scheduler(void);
 void acx_schedule_after_interrupt_task(wlandevice_t *priv, unsigned int set_flag);
-void acx_scan_chan(wlandevice_t *priv);
-void acx100_scan_chan_p(wlandevice_t *priv, acx100_scan_t *s);
-void acx111_scan_chan_p(wlandevice_t *priv, struct acx111_scan *s);
+void acx_cmd_start_scan(wlandevice_t *priv);
 int acx_upload_radio(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 u16 acx_proc_register_entries(const struct net_device *dev);

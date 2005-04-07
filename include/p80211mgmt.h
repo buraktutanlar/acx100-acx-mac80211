@@ -74,7 +74,8 @@
 /*-- values 7-15 reserved --*/
 #define WLAN_EID_CHALLENGE	16
 /*-- values 17-31 reserved for challenge text extension --*/
-/*-- values 32-255 reserved --*/
+#define WLAN_EID_ERP_INFO	42
+#define WLAN_EID_EXT_RATES	50
 
 /*-- Reason Codes -------------------------------*/
 #define WLAN_MGMT_REASON_RSVD			0
@@ -181,6 +182,16 @@
 #define WLAN_SET_MGMT_CAP_INFO_PBCC(n)		((n) << 6)
 #define WLAN_SET_MGMT_CAP_INFO_AGILITY(n)	((n) << 7)
 
+enum {
+IEEE16(WF_MGMT_CAP_ESS,		0x01)
+IEEE16(WF_MGMT_CAP_IBSS,	0x02)
+IEEE16(WF_MGMT_CAP_CFPOLLABLE,	0x04)
+IEEE16(WF_MGMT_CAP_CFPOLLREQ,	0x08)
+IEEE16(WF_MGMT_CAP_PRIVACY,	0x10)
+IEEE16(WF_MGMT_CAP_SHORT,	0x20)
+IEEE16(WF_MGMT_CAP_PBCC,	0x40)
+IEEE16(WF_MGMT_CAP_AGILITY,	0x80)
+};
 
 /*================================================================*/
 /* Types */
@@ -257,10 +268,71 @@ __WLAN_PRAGMA_PACKDFLT__
 	u8 challenge[1] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ wlan_ie_challenge_t;
 __WLAN_PRAGMA_PACKDFLT__
+
+/* helpers */
+static inline char* wlan_fill_ie_ssid(char *p, int len, char *ssid)
+{
+	struct wlan_ie_ssid *ie = (void*)p;
+	ie->eid = WLAN_EID_SSID;
+	ie->len = len;
+	memcpy(ie->ssid, ssid, len);
+	return p + len + 2;
+}
+static inline char* wlan_fill_ie_rates(char *p, int len, char *rates)
+{
+	struct wlan_ie_supp_rates *ie = (void*)p;
+	/* supported rates (1 to 8) octets) */
+	ie->eid = WLAN_EID_SUPP_RATES;
+	ie->len = len;
+	memcpy(ie->rates, rates, len);
+	return p + len + 2;
+}
+static inline char* wlan_fill_ie_rates_ext(char *p, int len, char *rates)
+{
+	struct wlan_ie_supp_rates *ie = (void*)p;
+	/* ext supported rates */
+	ie->eid = WLAN_EID_EXT_RATES;
+	ie->len = len;
+	memcpy(ie->rates, rates, len);
+	return p + len + 2;
+}
+static inline char* wlan_fill_ie_ds_parms(char *p, int channel)
+{
+	struct wlan_ie_ds_parms *ie = (void*)p;
+	ie->eid = WLAN_EID_DS_PARMS;
+	ie->len = 1;
+	ie->curr_ch = channel;
+	return p + sizeof(*ie);
+}
+static inline char* wlan_fill_ie_ibss_parms(char *p, int atim_win)
+{
+	struct wlan_ie_ibss_parms *ie = (void*)p;
+	ie->eid = WLAN_EID_IBSS_PARMS;
+	ie->len = 2;
+	ie->atim_win = atim_win;
+	return p + sizeof(*ie);
+}
+static inline char* wlan_fill_ie_tim(char *p,
+		int rem, int period, int bcast, int ofs, int len, char *vbm)
+{
+	struct wlan_ie_tim *ie = (void*)p;
+	/* supported rates (1 to 8) octets) */
+	ie->eid = WLAN_EID_TIM;
+	ie->len = len + 3;
+	ie->dtim_cnt = rem;
+	ie->dtim_period = period;
+	ie->bitmap_ctl = ofs | (bcast!=0);
+	if(vbm)
+		memcpy(ie->virt_bm, vbm, len); /* min 1 byte */
+	else
+		ie->virt_bm[0] = 0;
+	return p + len + 3 + 2;
+}
+
 /*-------------------------------------------------*/
 /*  Frame Types  */
 /* prototype structure, all mgmt frame types will start with these members */
-    typedef struct wlan_fr_mgmt {
+typedef struct wlan_fr_mgmt {
 	u16 type;
 	u16 len;		/* DOES NOT include CRC !!!! */
 	u8 *buf;
@@ -290,10 +362,33 @@ typedef struct wlan_fr_beacon {
 	wlan_ie_ds_parms_t *ds_parms;
 	wlan_ie_cf_parms_t *cf_parms;
 	wlan_ie_ibss_parms_t *ibss_parms;
-	wlan_ie_tim_t *tim;
+	wlan_ie_tim_t *tim;	/* in beacon only, not proberesp */
 
 } wlan_fr_beacon_t;
-
+#define wlan_fr_proberesp wlan_fr_beacon
+#define wlan_fr_proberesp_t wlan_fr_beacon_t
+#if 0
+/*-- Probe Response -------------------------------*/
+typedef struct wlan_fr_proberesp {
+	u16 type;
+	u16 len;
+	u8 *buf;
+	p80211_hdr_t *hdr;
+	/* used for target specific data, skb in Linux */
+	void *priv;
+	/*-- fixed fields -----------*/
+	UINT64 *ts;
+	u16 *bcn_int;
+	u16 *cap_info;
+	/*-- info elements ----------*/
+	wlan_ie_ssid_t *ssid;
+	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_fh_parms_t *fh_parms;
+	wlan_ie_ds_parms_t *ds_parms;
+	wlan_ie_cf_parms_t *cf_parms;
+	wlan_ie_ibss_parms_t *ibss_parms;
+} wlan_fr_proberesp_t;
+#endif
 
 /*-- IBSS ATIM ------------------------------------*/
 typedef struct wlan_fr_ibssatim {
@@ -409,27 +504,6 @@ typedef struct wlan_fr_probereq {
 	wlan_ie_supp_rates_t *supp_rates;
 
 } wlan_fr_probereq_t;
-
-/*-- Probe Response -------------------------------*/
-typedef struct wlan_fr_proberesp {
-	u16 type;
-	u16 len;
-	u8 *buf;
-	p80211_hdr_t *hdr;
-	/* used for target specific data, skb in Linux */
-	void *priv;
-	/*-- fixed fields -----------*/
-	UINT64 *ts;
-	u16 *bcn_int;
-	u16 *cap_info;
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_fh_parms_t *fh_parms;
-	wlan_ie_ds_parms_t *ds_parms;
-	wlan_ie_cf_parms_t *cf_parms;
-	wlan_ie_ibss_parms_t *ibss_parms;
-} wlan_fr_proberesp_t;
 
 /*-- Authentication -------------------------------*/
 typedef struct wlan_fr_authen {

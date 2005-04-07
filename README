@@ -137,16 +137,16 @@ Again, the cards mentioned in the listing above will NOT work with this driver
 supporting your card's chipset... (try Google "[CHIPSET] Linux")
 Feel free to send us corrections/additions to this very confusing listing above.
 
-=== STATUS AS OF 050318 ===
+=== STATUS AS OF 050407 ===
 
 Status Matrix:
 
 		ACX100			ACX100 USB		ACX111
 Rates		1/2/5.5/11/22 (+auto)	1/2/5.5/11/22		all up to 54Mb (+auto)
 5GHz		--			--			NIY (any hardware?)
-Ad-Hoc		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64-/128-/256-)
-Managed		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64-/128-/256-)
-Auto mode	*			*			*
+Ad-Hoc		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64*/128*/256?)
+Managed		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64?/128?/256?)
+Auto mode	- (DISABLED recently!!)	- (dito)		- (dito)
 Master		-			-			-
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
@@ -157,10 +157,9 @@ still is a bit experimental.
 We're still not totally sure about the status of WEP support:
 ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
-ACX111: not working yet, hopefully we'll get it to work soon (very actively
-working on it).
-If you need encryption, you might want to use projects like OpenVPN or others
-instead for now.
+ACX111: WEP **FINALLY** working (thanks HEAPS to Luis Padilla Visdomine for
+magically pin-pointing the very hard to find issue - you're our hero!!).
+If you need encryption that is much more secure than WEP, you might want to use projects like OpenVPN or others.
 
 Also, SMP appears to be problematic (locking issues); if you have SMP,
 then turn it off. We will attempt to clean this up as soon as possible.
@@ -220,7 +219,9 @@ since this seeks to list all requirements in full):
 * the package containing iwconfig, iwpriv & Co. needs to be installed
 	on your system (on Debian: package wireless-tools)
 * the Linux hotplug package is required for automatic setup of CardBus cards
-  and for proper ACX100 USB cards operation
+  and for proper ACX100 USB cards operation, and in case of a 2.6.x kernel
+  optionally for firmware binary hotplug loading (this will require a loaded
+  firmware_class.ko module as well)
 
 What to NOT do:
 * believe that this has much to do with PCMCIA. The ACX1xx cards are
@@ -352,7 +353,8 @@ NOTE: For ACX111 cards even recently there are both a combined firmware
 (TIACX111.BIN or FwRad16.bin) and a non-combined firmware (FW1130.BIN?)
 available (see further below).
 Occasionally a firmware is also called GPLUS.BIN originally.
-Rename to TIACX111.BIN in this case.
+You need to rename it to TIACX111.BIN in this case (especially in newer
+driver versions, which limited possible filename alternatives!!).
 Note that D-Link makes a driver download distinction between the DWL-G650+ Rev. Ax and Bx: they are both ACX111, but contain different firmware images!
 This could mean that there might be hardware differences between various ACX111
 implementations, and thus you might need to use a specific firmware for your
@@ -441,7 +443,8 @@ In order to get the driver to autoload properly, you could add e.g. to
  /etc/modprobe.d/acx_wlan (or /etc/modprobe.conf):
 options acx_pci firmware_dir=/absolute/path/to/firmware_files debug=0x0
 options acx_usb firmware_dir=/absolute/path/to/firmware_files debug=0x0
-and run update-modules (this will be added to "make install" soon).
+and run (on Debian; not sure with other systems) update-modules
+(this will be added to "make install" soon).
 
 Once you insert the card, the driver will then load automatically
 without error (and will shut down the interface once you eject the card).
@@ -486,7 +489,7 @@ In case the card somehow managed to trash its EEPROM (or EEPROM weakness),
 you would thus at least be able to restore the EEPROM (once we develop
 an EEPROM restore option which doesn't exist yet...).
 This would also help in case Windows trashed the card EEPROM somehow.
-I already managed to resurrect some DROP DEAD network card's EEPROM
+I already managed to resurrect some DROP DEAD cable network card's EEPROM
 (most likely trashed by XP driver) once, and from that time on
 everybody around me called me a wizard ;-)
 Needless to say this is an even better idea once we actually implement
@@ -584,6 +587,9 @@ and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
 Running "depmod -ae" might actually fix the problem already, though.
 
+"acx_pci: Unknown symbol release_firmware"?
+Load the firmware_class.ko module
+
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
 strange PCI init failures), and it should be kernel CardBus support, not
@@ -645,6 +651,11 @@ If you get messages similar to
 This shouldn't happen any more, unless you have very little memory,
 in which case buying more RAM (which is always VERY important in Linux!) may
 help.
+
+A huge delay when loading the firmware files means that the driver is
+trying to load the firmware via Linux 2.6.x hotplug firmware loader,
+but the firmware file isn't where it expects it, so after a long timeout
+the driver can continue with the old firmware upload method.
 
 -- Driver locked up the box (OOPS etc.) --
 Umm... ouch!

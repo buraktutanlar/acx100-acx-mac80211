@@ -38,30 +38,6 @@
 #ifndef __ACX_ACX100_HELPER2_H
 #define __ACX_ACX100_HELPER2_H
 
-typedef struct acx_frame {
-	char val0x0[0x26];
-	u16 val0x26;
-	acx_addr3_t fr;
-} acx_frame_t;
-
-typedef struct alloc_p80211mgmt_req_t {
-	union {
-		wlan_fr_mgmt_t mgmt;
-		wlan_fr_assocreq_t assocreq;
-		wlan_fr_reassocreq_t reassocreq;
-		wlan_fr_assocresp_t assocresp;
-		wlan_fr_reassocresp_t reassocresp;
-		wlan_fr_beacon_t beacon;
-		wlan_fr_disassoc_t disassoc;
-		wlan_fr_authen_t authen;
-		wlan_fr_deauthen_t deauthen;
-		wlan_fr_proberesp_t proberesp;
-	} a;
-} alloc_p80211_mgmt_req_t;
-
-typedef struct rxhostdescriptor rxhostdescriptor_t;
-typedef struct rxbuffer rxbuffer_t;
-
 #define MAX_NUMBER_OF_SITE 31
 
 typedef struct ssid {
@@ -107,7 +83,8 @@ typedef struct challenge_text {
 } challenge_text_t;
 
 
-
+/* Warning. Several types used in below structs are
+** in fact variable length. Use structs with such fields with caution */
 typedef struct auth_frame_body {
 	u16 auth_alg ACX_PACKED;
 	u16 auth_seq ACX_PACKED;
@@ -161,34 +138,22 @@ typedef struct proberesp_frame_body {
 	cfps_t cfps ACX_PACKED;
 } proberesp_frame_body_t;
 
-typedef struct TxData {
-	u16 frame_control ACX_PACKED;	/* 0x0 */
-	u16 duration_id ACX_PACKED;	/* 0x2 */
-	u8 da[ETH_ALEN] ACX_PACKED;	/* 0x4 */
-	u8 sa[ETH_ALEN] ACX_PACKED;	/* 0xa */
-	u8 bssid[ETH_ALEN] ACX_PACKED;	/* 0x10 */
-	u16 sequence_control ACX_PACKED;	/* 0x16 */
-	union {
-		auth_frame_body_t auth ACX_PACKED;
-		deauthen_frame_body_t deauthen ACX_PACKED;
-		/* assocreq_frame_body_t does not exist, since it
-		 * contains variable-length members, thus it's no static
-		 * struct */
-		assocresp_frame_body_t assocresp ACX_PACKED;
-		reassocresp_frame_body_t reassocreq ACX_PACKED;
-		reassocresp_frame_body_t reassocresp ACX_PACKED;
-		disassoc_frame_body_t disassoc ACX_PACKED;
-		probereq_frame_body_t probereq ACX_PACKED;
-		proberesp_frame_body_t proberesp ACX_PACKED;
-		char * raw[2400-24] ACX_PACKED;
-	} body ACX_PACKED;
-} TxData;			/* size: 2400 */
-
 void acx_sta_list_init(wlandevice_t *priv);
-const char *acx_get_status_name(u16 status);
 void acx_set_status(wlandevice_t *priv, u16 status);
-int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdescriptor_t *desc);
+int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdesc_t *desc);
 u32 acx_transmit_disassoc(client_t *arg_0, wlandevice_t *priv);
 void acx_timer(unsigned long a);
 void acx_complete_dot11_scan(wlandevice_t *priv);
+
+#define COUNT_STATE_STR	6
+
+static inline const char *acx_get_status_name(u16 status)
+{
+	extern const char * const g_wlan_state_str[COUNT_STATE_STR];
+	return g_wlan_state_str[
+		(status < COUNT_STATE_STR) ?
+			status : COUNT_STATE_STR-1
+		];
+}
+
 #endif /* __ACX_ACX100_HELPER2_H */

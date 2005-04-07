@@ -578,6 +578,18 @@ typedef void irqreturn_t;
 #define host2ieee16(n)	__cpu_to_le16(n)
 #define host2ieee32(n)	__cpu_to_le32(n)
 
+/* for constants */
+#ifdef __LITTLE_ENDIAN
+ #define IEEE16(a,n)     a = n, a##i = n,
+#else
+ #ifdef __BIG_ENDIAN
+  /* shifts would produce gcc warnings. Oh well... */
+  #define IEEE16(a,n)     a = n, a##i = ((n&0xff)*256 + ((n&0xff00)/256)),
+ #else
+  #error give me endianness or give me death
+ #endif
+#endif
+
 #if (WLAN_CPU_FAMILY == WLAN_PPC)
 #define wlan_inw(a)                     in_be16((unsigned short *)((a)+_IO_BASE))
 #define wlan_inw_le16_to_cpu(a)         inw((a))

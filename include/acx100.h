@@ -121,35 +121,98 @@ enum {
    (used for the 'bottom half' of the interrupt routine) */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+
 /* #define NEWER_KERNELS_ONLY 1 */
 #define USE_WORKER_TASKS
+#define WORK_STRUCT struct work_struct
+#define SCHEDULE_WORK schedule_work
+#define FLUSH_SCHEDULED_WORK flush_scheduled_work
+
 #else
+
 #define USE_QUEUE_TASKS
+#define WORK_STRUCT struct tq_struct
+#define SCHEDULE_WORK schedule_task
+#define INIT_WORK(work, func, ndev) \
+      do { \
+              (work)->routine = (func); \
+              (work)->data = (ndev); \
+      } while(0)
+#define FLUSH_SCHEDULED_WORK flush_scheduled_tasks
+
 #endif
 
-#define MAC_COPY(dst, src) \
-	*(u32 *)(dst) = *(u32 *)(src); \
-	*(u16 *)(((u8 *)(dst))+4) = *(u16 *)(((u8 *)(src))+4); \
 
-#define MAC_COPY_UNUSED1(dst, src) \
-{ \
-	int i; \
-	for (i = 0; i < ETH_ALEN; i++) \
-		*(((u8 *)(dst))+i) = *(((u8 *)(src))+i); \
+
+/*============================================================================*
+ * Random helpers                                                             *
+ *============================================================================*/
+static inline void MAC_COPY(u8 *mac, const u8 *src)
+{
+	*(u32*)mac = *(u32*)src;
+	((u16*)mac)[2] = ((u16*)src)[2];
+	/* kernel's memcpy will do the same: memcpy(dst, src, ETH_ALEN); */
 }
 
-#define MAC_COPY_UNUSED2(dst, src) memcpy((dst), (src), ETH_ALEN);
-
-#define MAC_FILL(dst, val) \
-{ \
-	int i; \
-	for (i = 0; i < ETH_ALEN; i++) \
-		*(((u8 *)(dst))+i) = (val); \
+static inline void MAC_FILL(u8 *mac, u8 val)
+{
+	memset(mac, val, ETH_ALEN);
 }
 
-#define MAC_BCAST(dst)	MAC_FILL((dst), 0xff)
+static inline void MAC_BCAST(u8 *mac)
+{
+        ((u16*)mac)[2] = *(u32*)mac = -1;
+}
+
+static inline void MAC_ZERO(u8 *mac)
+{
+        ((u16*)mac)[2] = *(u32*)mac = 0;
+}
+
+static inline int mac_is_equal(const u8 *a, const u8 *b)
+{
+	/* can't beat this */
+	return memcmp(a, b, ETH_ALEN) == 0;
+}
+
+static inline int mac_is_bcast(const u8 *mac)
+{
+	/* AND together 4 first bytes with sign-entended 2 last bytes
+	** Only bcast address gives 0xffffffff. +1 gives 0 */
+	return ( *(s32*)mac & ((s16*)mac)[2] ) + 1 == 0;
+}
+
+static inline int mac_is_zero(const u8 *mac)
+{
+	return ( *(u32*)mac | ((u16*)mac)[2] ) == 0;
+}
+
+static inline int mac_is_directed(const u8 *mac)
+{
+	return (mac[0] & 1)==0;
+}
+
+static inline int mac_is_mcast(const u8 *mac)
+{
+	return (mac[0] & 1) && !mac_is_bcast(mac);
+}
+
+#define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
+#define MAC(bytevector) \
+	((unsigned char *)bytevector)[0], \
+	((unsigned char *)bytevector)[1], \
+	((unsigned char *)bytevector)[2], \
+	((unsigned char *)bytevector)[3], \
+	((unsigned char *)bytevector)[4], \
+	((unsigned char *)bytevector)[5]
+				
 
 #define ACX_PACKED __WLAN_ATTRIB_PACK__
+
+#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
+
+#define CLEAR_BIT(val, mask) ((val) &= ~(mask))
+#define SET_BIT(val, mask) ((val) |= (mask))
 
 /*============================================================================*
  * Constants                                                                  *
@@ -160,9 +223,6 @@ enum {
 #define DEFAULT_RTS_THRESHOLD	2312	/* max. size: disable RTS mechanism */
 #define DEFAULT_BEACON_INTERVAL	100
 
-
-#define CLEAR_BIT(val, mask) ((val) &= ~(mask))
-#define SET_BIT(val, mask) ((val) |= (mask))
 
 #define OK	0x0
 #define NOT_OK	0x1
@@ -752,23 +812,6 @@ typedef struct fw_ver {
 	u32 hw_id ACX_PACKED;
 } fw_ver_t;
 
-/*--- IEEE 802.11 header -----------------------------------------------------*/
-/* FIXME: acx_addr3_t should probably actually be discarded in favour of the
- * identical linux-wlan-ng p80211_hdr_t. An even better choice would be to use
- * the kernel's struct ieee80_11_hdr from driver/net/wireless/ieee802_11.h */
-typedef struct acx_addr3 {
-	/* IEEE 802.11-1999.pdf chapter 7 might help */
-	u16 frame_control ACX_PACKED;	/* 0x00, wlan-ng name */
-	u16 duration_id ACX_PACKED;	/* 0x02, wlan-ng name */
-	char address1[0x6] ACX_PACKED;	/* 0x04, wlan-ng name */
-	char address2[0x6] ACX_PACKED;	/* 0x0a */
-	char address3[0x6] ACX_PACKED;	/* 0x10 */
-	u16 sequence_control ACX_PACKED;	/* 0x16 */
-	u8 *val0x18 ACX_PACKED;
-	struct sk_buff *val0x1c ACX_PACKED;
-	struct sk_buff *val0x20 ACX_PACKED;
-} acx_addr3_t;
-
 /*--- WEP stuff --------------------------------------------------------------*/
 #define DOT11_MAX_DEFAULT_WEP_KEYS	4
 #define MAX_KEYLEN			32
@@ -801,20 +844,26 @@ typedef struct key_struct {
 
 
 /* non-firmware struct --> no packing necessary */
+enum {
+	CLIENT_EMPTY_SLOT_0 = 0,
+	CLIENT_EXIST_1 = 1,
+	CLIENT_AUTHENTICATED_2 = 2,
+	CLIENT_ASSOCIATED_3 = 3,
+};
 typedef struct client {
-	u8 used;		/* 0x0 */
-	u16 aid;		/* association ID */
-	char address[ETH_ALEN];	/* 0x3 */
-	u8 val0x8;
-	u16 val0xa;
-	u16 auth_alg;
-	u16 val0xe;
-	u8 *val0x10;		/* points to some data, don't know what yet */
-	u32 unkn0x14;
-	u8 val0x18[0x80];	/* 0x18, used by acx_process_authen() */
-	u16 val0x98;
-	u16 val0x9a;
-	u8 pad5[8];		/* 0x9c */
+	u8	used;		/* misnamed, more like 'status' */
+	u16	aid;		/* association ID */
+	char	address[ETH_ALEN];
+	u8	ps;		/* client's auth req had PWRMGT bit in fc */
+	u16	cap_info;	/* from client's assoc req */
+	u16	auth_alg;
+	u16	auth_step;
+	u8	*ratevec;	/* from client's assoc req */
+	u32	unkn0x14;
+	u8	challenge_text[WLAN_CHALLENGE_LEN];
+	u16	seq;		/* from client's auth req */
+	u16	ratemask;	/* bit 0=1Mbit..bit5=22Mbit */
+	u8	pad5[8];	/* 0x9c */
 	struct client *next;	/* 0xa4 */
 } client_t;
 
@@ -875,16 +924,6 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 } TIWLAN_DC;
 
-/*--- 802.11 Management capabilities -----------------------------------------*/
-#define IEEE802_11_MGMT_CAP_ESS		(1 << 0)
-#define IEEE802_11_MGMT_CAP_IBSS	(1 << 1)
-#define IEEE802_11_MGMT_CAP_CFP_ABLE	(1 << 2)
-#define IEEE802_11_MGMT_CAP_CFP_REQ	(1 << 3)
-#define IEEE802_11_MGMT_CAP_WEP		(1 << 4)
-#define IEEE802_11_MGMT_CAP_SHORT_PRE	(1 << 5)
-#define IEEE802_11_MGMT_CAP_PBCC	(1 << 6)
-#define IEEE802_11_MGMT_CAP_CHAN_AGIL	(1 << 7)
-
 /*--- 802.11 Basic Service Set info ------------------------------------------*/
 /* non-firmware struct --> no packing necessary */
 typedef struct bss_info {
@@ -894,7 +933,7 @@ typedef struct bss_info {
 	size_t essid_len;	/* Length of ESSID (FIXME: \0 included?) */
 	u16 caps;		/* 802.11 capabilities information */
 	u8 channel;		/* 802.11 channel */
-	u16 wep;	/* WEP flag (FIXME: redundant, bit 4 in caps) */
+	u16 wep;		/* WEP flag (FIXME: redundant, bit 4 in caps) */
 	unsigned char supp_rates[64]; /* FIXME: 802.11b section 7.3.2.2 allows 8 rates, but 802.11g devices seem to allow for many more: how many exactly? */
 	u32 sir;		/* 0x78; Standard IR */
 	u32 snr;		/* 0x7c; Signal to Noise Ratio */
@@ -904,18 +943,25 @@ typedef struct bss_info {
 /*============================================================================*
  * Main acx100 per-device data structure (netdev->priv)                       *
  *============================================================================*/
-
 #define ACX_STATE_FW_LOADED	0x01
 #define ACX_STATE_IFACE_UP	0x02
 
-/* MAC mode (BSS type) defines for ACX100.
+/* MAC mode (BSS type) defines
  * Note that they shouldn't be redefined, since they are also used
  * during communication with firmware */
-#define ACX_MODE_0_IBSS_ADHOC	0
+#define ACX_MODE_0_ADHOC	0
 #define ACX_MODE_1_UNUSED	1
-#define ACX_MODE_2_MANAGED_STA	2
-#define ACX_MODE_3_MANAGED_AP	3
-#define ACX_MODE_FF_AUTO	0xff	/* pseudo mode - not ACX100 related! (accept both Ad-Hoc and Managed stations for association) */
+#define ACX_MODE_2_STA		2
+#define ACX_MODE_3_AP		3
+/* These are our own inventions. Do not send such modes to firmware */
+#define ACX_MODE_MONITOR	0xfe
+#define ACX_MODE_OFF		0xff
+/* 'Submode': identifies exact status of ADHOC/STA host */
+#define ACX_STATUS_0_STOPPED		0
+#define ACX_STATUS_1_SCANNING		1
+#define ACX_STATUS_2_WAIT_AUTH		2
+#define ACX_STATUS_3_AUTHENTICATED	3
+#define ACX_STATUS_4_ASSOCIATED		4
 
 /* non-firmware struct --> no packing necessary */
 struct txrate_ctrl {
@@ -928,7 +974,7 @@ struct txrate_ctrl {
 	u8   fallback_count;
 	u8   stepup_threshold;	/* 0-100 */
 	u8   stepup_count;
-	//TODO: unsigned long txcnt[];
+	/* TODO: unsigned long txcnt[]; */
 };
 
 /* non-firmware struct --> no packing necessary */
@@ -1029,20 +1075,14 @@ typedef struct wlandevice {
 	int		hw_unavailable;		/* indicates whether the hardware has been
 						 * suspended or ejected. actually a counter. */
 	u16		dev_state_mask;
-	int		monitor;		/* whether the device is in monitor mode */
-	int		monitor_setting;
 	u8		led_power;		/* power LED status */
 	u32		get_mask;		/* mask of settings to fetch from the card */
 	u32		set_mask;		/* mask of settings to write to the card */
 
-	u8		irqs_active;	/* whether irq sending is activated */
+	u8		irqs_active;		/* whether irq sending is activated */
 	u16		irq_status;
-	u8		after_interrupt_jobs; /* mini job list for doing actions after an interrupt occurred */
-#ifdef USE_WORKER_TASKS
-	struct work_struct after_interrupt_task; /* our task for after interrupt actions */
-#else
-	struct tq_struct after_interrupt_task; /* our task for after interrupt actions */
-#endif
+	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
+	WORK_STRUCT	after_interrupt_task;	/* our task for after interrupt actions */
 
 	/*** scanning ***/
 	u16		scan_count;		/* number of times to do channel scan */
@@ -1056,13 +1096,11 @@ typedef struct wlandevice {
 			
 	/*** Wireless network settings ***/
 	u8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over from the network device's MAC address (ifconfig) when it makes sense only */
-	u8		address[ETH_ALEN];	/* the BSSID before joining */
 	u8		bssid[ETH_ALEN];	/* the BSSID after having joined */
 	u8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
-	u16		aid;			/* The Association ID send from the AP */
-	u16		macmode_wanted;		/* That's the MAC mode we want (iwconfig) */
-	u16		macmode_chosen;		/* That's the MAC mode we chose after browsing the station list */
-	u16		macmode_joined;		/* This is the MAC mode we're currently in */
+	u16		aid;			/* The Association ID sent from the AP */
+	u16		mode;			/* mode from iwconfig */
+	u16		status;			/* 802.11 association status */
 	u8		essid_active;		/* specific ESSID active, or select any? */
 	u8		essid_len;		/* to avoid dozens of strlen() */
 	char		essid[IW_ESSID_MAX_SIZE+1];	/* V3POS 84; essid; INCLUDES \0 termination for easy printf - but many places simply want the string data memcpy'd plus a length indicator! Keep that in mind... */
@@ -1071,7 +1109,6 @@ typedef struct wlandevice {
 	u16		channel;		/* V3POS 22f0, V1POS b8 */
 	u8		reg_dom_id;		/* reg domain setting */
 	u16		reg_dom_chanmask;
-	u16		status;			/* 802.11 association status */
 	u16		auth_or_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	u16		bss_table_count;	/* # of active BSS scan table entries */
@@ -1081,8 +1118,9 @@ typedef struct wlandevice {
 	unsigned long	scan_start;		/* FIXME type?? */
 	u16		scan_retries;		/* V3POS 2826, V1POS 27fe */
 
-	client_t	sta_list[32];		/* should those two be of */
-	client_t	*sta_hash_tab[64];	/* equal size? */
+	/* stations known to us (if we're an ap) */
+	client_t	sta_list[32];		/* tab is larger than list, so that */
+	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
 
 	u16		last_seq_ctrl;		/* duplicate packet detection */
 
@@ -1177,12 +1215,6 @@ typedef struct wlandevice {
 #endif
 } wlandevice_t;
 
-/*-- MAC modes --*/
-#define WLAN_MACMODE_NONE	0
-#define WLAN_MACMODE_IBSS_STA	1
-#define WLAN_MACMODE_ESS_STA	2
-#define WLAN_MACMODE_ESS_AP	3
-
 /*-- rx_config_1 bitfield --*/
 /*  bit     description
  *    13   include additional header (length etc.) *required*
@@ -1255,7 +1287,8 @@ typedef struct wlandevice {
 #define GETSET_RETRY		0x00002000L
 #define GETSET_REG_DOMAIN	0x00004000L
 #define GETSET_CHANNEL		0x00008000L
-#define GETSET_ESSID		0x00010000L
+/* Used when ESSID changes etc and we need to scan for AP anew */
+#define GETSET_RESCAN		0x00010000L	
 #define GETSET_MODE		0x00020000L
 #define GETSET_WEP		0x00040000L
 #define SET_WEP_OPTIONS		0x00080000L
@@ -1340,9 +1373,6 @@ extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 }
 #endif /* BROKEN_LOCKING */
 
-/* FIXME: LINUX_VERSION_CODE < KERNEL_VERSION(2,4,XX) ?? (not defined in XX=10
- * defined in XX=21, someone care to do a binary search of that range to find
- * the exact version this went in? */
 #ifndef ARPHRD_IEEE80211_PRISM
 #define ARPHRD_IEEE80211_PRISM 802
 #endif

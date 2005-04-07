@@ -61,11 +61,7 @@ extern void acx_dump_bytes(void *,int);
 /*================================================================*/
 /* Project Includes */
 
-#include <p80211hdr.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-#include <ihw.h>
-#include <acx100.h>
+#include <acx.h>
 
 
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
@@ -401,10 +397,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 
 void acx_log_mac_address(int level, u8 * mac, const char* tail) {
 	if (debug & level) {
-		printk("%02X:%02X:%02X:%02X:%02X:%02X%s",
-			mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-			tail
-		);
+		printk(MACSTR"%s", MAC(mac), tail);
 	}
 }
 

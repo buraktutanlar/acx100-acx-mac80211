@@ -49,7 +49,6 @@
  * Constants                                                                  *
  *============================================================================*/
 
-#define WLAN_ETHADDR_LEN	6
 #define WLAN_IEEE_OUI_LEN	3
 
 #define WLAN_ETHCONV_ENCAP	1
@@ -66,8 +65,8 @@
 
 /* local ether header type */
 typedef struct wlan_ethhdr {
-	u8 daddr[WLAN_ETHADDR_LEN] ACX_PACKED;
-	u8 saddr[WLAN_ETHADDR_LEN] ACX_PACKED;
+	u8 daddr[ETH_ALEN] ACX_PACKED;
+	u8 saddr[ETH_ALEN] ACX_PACKED;
 	u16 type ACX_PACKED;
 } wlan_ethhdr_t;
 
@@ -84,20 +83,15 @@ typedef struct wlan_snap {
 	u16 type ACX_PACKED;
 } wlan_snap_t;
 
-/* FIXME: Circular include trick */
-struct wlandevice;
-struct txdescriptor;
-struct rxhostdescriptor;
-
 /*============================================================================*
  * Function Declarations                                                      *
  *============================================================================*/
 
 int acx_ether_to_txdesc(struct wlandevice *priv,
-			   struct txdescriptor *txdesc, const struct sk_buff *skb);
+			struct txdescriptor *txdesc, const struct sk_buff *skb);
 /*@null@*/ struct sk_buff *acx_rxdesc_to_ether(struct wlandevice *priv,
-				       const struct rxhostdescriptor *rxdesc);
+			const struct rxhostdescriptor *rxdesc);
 void acx_rxdesc_to_txdesc(const struct rxhostdescriptor *rxhostdesc,
-			     struct txdescriptor *txdesc);
+			struct txdescriptor *txdesc);
 
 #endif /* __ACX_ACX100_CONV_H */

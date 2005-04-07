@@ -66,19 +66,20 @@ typedef struct rxbuffer {
 	u8	phy_level ACX_PACKED;		/* 0x6 PHY stat */
 	u8	phy_snr ACX_PACKED;		/* 0x7 PHY stat */
 	u32	time ACX_PACKED;		/* 0x8 timestamp upon MAC rcv first byte */
-	acx_addr3_t buf ACX_PACKED;	/* 0x0c 0x18 */
-	u8	data[ACX100_BAP_DATALEN_MAX] ACX_PACKED;
-} rxb_t;	/* 0x956 */
+	wlan_hdr_a3_t hdr_a3 ACX_PACKED;	/* 0x0c 0x18 */
+	u8	data_a3[ACX100_BAP_DATALEN_MAX] ACX_PACKED;
+	/* can add hdr/data_a4 if needed */
+} rxbuffer_t;	/* 0x956 */
 
 typedef struct txbuffer {
 	u8 data[WLAN_MAX_ETHFRM_LEN-WLAN_ETHHDR_LEN] ACX_PACKED;
-} txb_t;
+} txbuffer_t;
 
 /* This struct must contain the header of a packet. A header can maximally
  * contain a type 4 802.11 header + a LLC + a SNAP, amounting to 38 bytes */
 typedef struct framehdr {
 	char data[0x26] ACX_PACKED;
-} frmhdr_t;
+} framehdr_t;
 
 /* figure out tx descriptor pointer, depending on different acx100 or acx111
  * tx descriptor length */
@@ -113,23 +114,23 @@ typedef struct framehdr {
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
 /* Values for rate field (acx100 only) */
-#define RATE100_1              10
-#define RATE100_2              20
-#define RATE100_5              55
-#define RATE100_11             110
-#define RATE100_22             220
+#define RATE100_1		10
+#define RATE100_2		20
+#define RATE100_5		55
+#define RATE100_11		110
+#define RATE100_22		220
 /* This bit denotes use of PBCC:
 ** (PBCC encoding usable with 11 and 22 Mbps speeds only) */
-#define RATE100_PBCC511                0x80
+#define RATE100_PBCC511		0x80
 /* Where did these come from? */
-#define RATE100_6_G            0x0D
-#define RATE100_9_G            0x0F
-#define RATE100_12_G           0x05
-#define RATE100_18_G           0x07
-#define RATE100_24_G           0x09
-#define RATE100_36_G           0x0B
-#define RATE100_48_G           0x01
-#define RATE100_54_G           0x03
+#define RATE100_6_G		0x0D
+#define RATE100_9_G		0x0F
+#define RATE100_12_G		0x05
+#define RATE100_18_G		0x07
+#define RATE100_24_G		0x09
+#define RATE100_36_G		0x0B
+#define RATE100_48_G		0x01
+#define RATE100_54_G		0x03
 
 /* Bit values for rate111 field */
 #define RATE111_1		0x0001	/* DBPSK */
@@ -328,15 +329,15 @@ typedef struct rxhostdescriptor {
 	ACX_PTR	data_phy ACX_PACKED;			/* 0x00 [struct rxbuffer *] */
 	u16	data_offset ACX_PACKED;			/* 0x04 */
 	u16	reserved ACX_PACKED;			/* 0x06 */
-	u16	Ctl_16 ACX_PACKED;				/* 0x08; 16bit value, endianness!! */
-	u16	length ACX_PACKED;				/* 0x0a */
-	ACX_PTR	desc_phy_next ACX_PACKED;			/* 0x0c [struct rxhostdescriptor *] */
-	ACX_PTR	pNext ACX_PACKED;				/* 0x10 [struct rxhostdescriptor *] */
-	u32	Status ACX_PACKED;				/* 0x14 */
+	u16	Ctl_16 ACX_PACKED;			/* 0x08; 16bit value, endianness!! */
+	u16	length ACX_PACKED;			/* 0x0a */
+	ACX_PTR	desc_phy_next ACX_PACKED;		/* 0x0c [struct rxhostdescriptor *] */
+	ACX_PTR	pNext ACX_PACKED;			/* 0x10 [struct rxhostdescriptor *] */
+	u32	Status ACX_PACKED;			/* 0x14 */
 /* From here on you can use this area as you want (variable length, too!) */
 	struct	rxhostdescriptor *desc_phy ACX_PACKED;	/* 0x18 */
 	struct	rxbuffer *data ACX_PACKED;
-} rxhostdesc_t;		/* size: variable, currently 0x20  */
+} rxhostdesc_t;		/* size: variable, currently 0x20 */
 
 typedef struct acx100_ie_memblocksize {
 	u16 type ACX_PACKED;

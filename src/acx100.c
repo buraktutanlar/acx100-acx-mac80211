@@ -103,17 +103,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#include <version.h>
-#include <p80211hdr.h>
-#include <p80211mgmt.h>
-#include <acx100.h>
-#include <acx100_conv.h>
-#include <p80211types.h>
-#include <acx100_helper.h>
-#include <acx100_helper2.h>
-#include <idma.h>
-#include <ihw.h>
-#include <ioregister.h>
+#include <acx.h>
 
 /********************************************************************/
 /* Module information                                               */
@@ -1109,7 +1099,7 @@ static int acx_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
 	if (OK != acx_init_mac(dev, 0)) {
-		acxlog(L_DEBUG, "rsm: init_mac FAILED\n");
+		acxlog(L_STD, "rsm: init_mac FAILED\n");
 		goto fail;
 	}
 	acxlog(L_DEBUG, "rsm: init MAC done\n");
@@ -1133,12 +1123,6 @@ fail: /* we need to return OK here anyway, right? */
 
 /*----------------------------------------------------------------
 * acx_up
-*
-*
-* Arguments:
-*	dev: netdevice structure that contains the private priv
-* Returns:
-*	void
 * Side effects:
 *	- Enables on-card interrupt requests
 *	- calls acx_start
@@ -1155,6 +1139,16 @@ static void acx_up(netdevice_t *dev)
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 
 	FN_ENTER;
+
+	switch (priv->mode) {
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_2_STA:
+		/* TODO: add actual scan cmd to hw here.... */
+		acx_set_status(priv, ACX_STATUS_1_SCANNING); break;
+	case ACX_MODE_3_AP:
+	case ACX_MODE_MONITOR:
+		acx_set_status(priv, ACX_STATUS_4_ASSOCIATED); break;
+	}
 
 	acx_enable_irq(priv);
 	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111) ) /* FIXME: first version? */ {
@@ -1176,12 +1170,6 @@ static void acx_up(netdevice_t *dev)
 
 /*----------------------------------------------------------------
 * acx_down
-*
-*
-* Arguments:
-*	dev: netdevice structure that contains the private priv
-* Returns:
-*	void
 * Side effects:
 *	- disables on-card interrupt request
 * Call context:
@@ -1204,7 +1192,7 @@ static void acx_down(netdevice_t *dev)
 	 * end all remaining work now... */
 	acx_flush_task_scheduler();
 
-	acx_set_status(priv, ISTATUS_0_STARTED);
+	acx_set_status(priv, ACX_STATUS_0_STOPPED);
 
 	if ((priv->firmware_numver >= 0x0109030e) || (priv->chip_type == CHIPTYPE_ACX111)) { /* FIXME: first version? */
 		/* newer firmware versions don't use a hardware timer any more */
@@ -1365,9 +1353,9 @@ static int acx_close(netdevice_t *dev)
 static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 {
 	int txresult = NOT_OK;
-	unsigned long flags;
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	struct txdescriptor *tx_desc;
+	unsigned long flags;
 	unsigned int templen;
 
 	FN_ENTER;
@@ -1378,23 +1366,22 @@ static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		goto fail_no_unlock;
 	}
 	if (unlikely(!priv)) {
-		txresult = NOT_OK;
 		goto fail_no_unlock;
 	}
-	if (unlikely(0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		txresult = NOT_OK;
+	if (unlikely(!(priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		goto fail_no_unlock;
+	}
+	if (unlikely(priv->mode == ACX_MODE_OFF)) {
 		goto fail_no_unlock;
 	}
 	if (unlikely(acx_lock(priv, &flags))) {
-		txresult = NOT_OK;
 		goto fail_no_unlock;
 	}
 	if (unlikely(acx_queue_stopped(dev))) {
 		acxlog(L_BINSTD, "%s: called when queue stopped\n", __func__);
-		txresult = NOT_OK;
 		goto fail;
 	}
-	if (unlikely(ISTATUS_4_ASSOCIATED != priv->status)) {
+	if (unlikely(ACX_STATUS_4_ASSOCIATED != priv->status)) {
 		acxlog(L_XFER, "Trying to xmit, but not associated yet: aborting...\n");
 		/* silently drop the packet, since we're not connected yet */
 		txresult = OK;
@@ -1479,7 +1466,7 @@ static void acx_tx_timeout(netdevice_t *dev)
 	/* clean all tx descs, they may have been completely full */
 	acx_clean_tx_desc_emergency(priv);
 	
-	if ((acx_queue_stopped(dev)) && (ISTATUS_4_ASSOCIATED == priv->status))
+	if (acx_queue_stopped(dev) && (ACX_STATUS_4_ASSOCIATED == priv->status))
 		acx_wake_queue(dev, "after Tx timeout");
 #else
 	/* clean all tx descs, they may have been completely full */
@@ -1688,7 +1675,7 @@ static void acx_disable_irq(wlandevice_t *priv)
 
 static void acx_handle_info_irq(wlandevice_t *priv)
 {
-	static const char *info_type_msg[] = {
+	static const char * const info_type_msg[] = {
 		"(unknown)",
 		"scan complete",
 		"WEP key not found",

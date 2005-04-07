@@ -63,30 +63,7 @@
 /*================================================================*/
 /* Project Includes */
 
-#include <p80211hdr.h>
-#include <p80211mgmt.h>
-#include <acx100.h>
-#include <acx100_helper.h>
-
-/*================================================================*/
-/* Local Constants */
-
-
-/*================================================================*/
-/* Local Types */
-
-
-/*================================================================*/
-/* Local statics */
-
-
-/*================================================================*/
-/* Local Function Declarations */
-
-
-/*================================================================*/
-/* Local Function Definitions */
-
+#include <acx.h>
 
 #if UNUSED
 /*--------------------------------------------------------------
@@ -1051,6 +1028,7 @@ void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t * f)
 * STATUS: UNVERIFIED. NONV3.
 * 
 --------------------------------------------------------------*/
+/* TODO: decoding of beacon and proberesp can be merged (very similar structure) */
 void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 {
 	wlan_ie_t *ie_ptr;
