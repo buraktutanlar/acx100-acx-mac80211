@@ -1761,7 +1761,7 @@ static void acx_create_rx_desc_queue(TIWLAN_DC *pDc)
 			acxlog(L_DEBUG, "rx descriptor %u @ 0x%p\n", i, rx_desc);
 			rx_desc = pDc->pRxDescQPool =
 				(struct rxdescriptor *) (priv->iobase2 +
-				     rx_desc->pNextDesc);
+				     le32_to_cpu(rx_desc->pNextDesc));
 		}
 	} else {
 		/* we didn't pre-calculate pRxDescQPool in case of ACX100 */

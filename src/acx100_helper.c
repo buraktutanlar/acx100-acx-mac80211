@@ -65,6 +65,7 @@
 #include <linux/slab.h>
 #include <asm/io.h>
 #include <linux/proc_fs.h>
+#include <linux/pci.h>
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>

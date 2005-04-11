@@ -2625,8 +2625,8 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 		              "Mod/Pre (dynamic) 0x%X\n",
 			      i,
 			      pRxDesc,
-			      pRxDesc->pNextDesc,
-			      pRxDesc->ACXMemPtr,
+			      le32_to_cpu(pRxDesc->pNextDesc),
+			      le32_to_cpu(pRxDesc->ACXMemPtr),
 			      pRxDesc->Ctl_8,
 			      pRxDesc->rate,
 			      pRxDesc->error,
@@ -2643,7 +2643,7 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 	for (i = 0; i < pDc->rx_pool_count; i++) {
 
 		acxlog(L_STD, "\ndump host rxdescriptor %d:\n"
-		              "mem pos 0x%X\n"
+		              "mem pos %p\n"
 		              "buffer mem pos 0x%X\n"
 		              "buffer mem offset 0x%X\n"
 		              "CTL 0x%X\n"
@@ -2651,11 +2651,11 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 		              "next 0x%X\n"
 		              "Status 0x%X\n",
 			      i,
-			      (u32)rx_host_desc,
-			      (u32)rx_host_desc->data_phy,
+			      rx_host_desc,
+			      (u32)le32_to_cpu(rx_host_desc->data_phy),
 			      rx_host_desc->data_offset,
 			      le16_to_cpu(rx_host_desc->Ctl_16),
-			      rx_host_desc->length,
+			      le16_to_cpu(rx_host_desc->length),
 			      (u32)rx_host_desc->desc_phy_next,
 			      rx_host_desc->Status);
 
@@ -2671,7 +2671,7 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 
 		acxlog(L_STD, "\ndump internal txdescriptor %d:\n"
 		              "size 0x%X\n"
-		              "mem pos 0x%X\n"
+		              "mem pos %p\n"
 		              "next 0x%X\n"
 		              "acx mem pointer (dynamic) 0x%X\n"
 		              "host mem pointer (dynamic) 0x%X\n"
@@ -2682,11 +2682,11 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 		              "Rate (dynamic) 0x%X\n",
 			      i,
 			      sizeof(struct txdescriptor),
-			      (u32)tx_desc,
-			      tx_desc->pNextDesc,
-			      tx_desc->AcxMemPtr,
-			      tx_desc->HostMemPtr,
-			      tx_desc->total_length,
+			      tx_desc,
+			      le32_to_cpu(tx_desc->pNextDesc),
+			      le32_to_cpu(tx_desc->AcxMemPtr),
+			      le32_to_cpu(tx_desc->HostMemPtr),
+			      le16_to_cpu(tx_desc->total_length),
 			      tx_desc->Ctl_8,
 			      tx_desc->Ctl2_8, tx_desc->error,
 			      tx_desc->u.r1.rate);
@@ -2703,7 +2703,7 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 	for (i = 0; i < pDc->tx_pool_count * 2; i++) {
 
 		acxlog(L_STD, "\ndump host txdescriptor %d:\n"
-		              "mem pos 0x%X\n"
+		              "mem pos %p\n"
 		              "buffer mem pos 0x%X\n"
 		              "buffer mem offset 0x%X\n"
 		              "CTL 0x%X\n"
@@ -2711,13 +2711,13 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 		              "next 0x%X\n"
 		              "Status 0x%X\n",
 			      i,
-			      (u32)tx_host_desc,
-			      (u32)tx_host_desc->data_phy,
+			      tx_host_desc,
+			      (u32)le32_to_cpu(tx_host_desc->data_phy),
 			      tx_host_desc->data_offset,
 			      le16_to_cpu(tx_host_desc->Ctl_16),
-			      tx_host_desc->length,
-			      (u32)tx_host_desc->desc_phy_next,
-			      tx_host_desc->Status);
+			      le16_to_cpu(tx_host_desc->length),
+			      (u32)le32_to_cpu(tx_host_desc->desc_phy_next),
+			      le32_to_cpu(tx_host_desc->Status));
 
 		tx_host_desc++;
 

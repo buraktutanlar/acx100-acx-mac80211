@@ -587,8 +587,9 @@ and you should make sure to compile the driver with the same build settings
 that you used for compiling the kernel.
 Running "depmod -ae" might actually fix the problem already, though.
 
+insmod message "Unknown symbol in module" and then in syslog
 "acx_pci: Unknown symbol release_firmware"?
-Load the firmware_class.ko module
+Load the firmware_class.ko module.
 
 - CardBus specific -
 You need to make sure you're having CardBus support (otherwise you'll have
