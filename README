@@ -147,7 +147,7 @@ Rates		1/2/5.5/11/22 (+auto)	1/2/5.5/11/22		all up to 54Mb (+auto)
 Ad-Hoc		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64*/128*/256?)
 Managed		* (WEP64*/128*/256*)	* (WEP64?/128*/256?)	* (WEP64?/128?/256?)
 Auto mode	- (DISABLED recently!!)	- (dito)		- (dito)
-Master		-			-			-
+Master		?			?			?
 Change Tx power	* (hardware)		- (may do via FW only)	-
 Config antennas	* (currently via FW)	?			-
 Sensitivity	* (hardware)		- (no go since USB?)	* (various F/W settings)
@@ -167,11 +167,11 @@ Please report any trouble here!
 
 Furthermore, associating with some access points might still be problematic
 due to strict 802.11 compliance checks in their firmware (which we fail
-to meet, of course).
+to meet, of course). This should also be better now thanks to the very
+astonishing work done by Denis Vlasenko. [050420]
 
-Master mode support (aka HostAP) has not really been implemented yet.
-It won't be supported for quite a while (only with new generic
-Linux 802.11 stack), don't hold your breath. [041111]
+Master mode support (aka HostAP) has not been implemented fully yet.
+It looks like it will be working very soon, though. [050420]
 
 The non-standard 4x (4X) mode (aka "44Mbps") is not supported yet and will need
 several driver changes. Don't hold your breath, this is really low priority.
@@ -283,14 +283,14 @@ cp Win2000/WLANGEN.bin Win2000/WLANGEN.BIN Win2000/RADIO0d.BIN Win2000/RADIO11.B
 mv firmware/WLANGEN.bin firmware/WLANGEN.BIN
 Ready to roll. :)
 
-Longer background explanation (READ IN CASE OF PROBLEMS!):
+Longer background explanation (PLEASE READ IN CASE OF PROBLEMS!):
 
 The firmware used by the windows driver consists of several files normally
 named WLANGEN.BIN, RADIO0d.BIN and RADIO11.BIN which can be found in
 the c:\winnt\system32 directory, or in the install archive.
 Place these files in the firmware directory, and you are ready to roll.
 MAKE SURE THAT THE CASE SeNsItIvItY OF THE FILENAME CHARACTERS IS EXACTLY
-AS WRITTEN ABOVE!! Otherwise the driver will NOT find the image files...
+AS WRITTEN ABOVE!! Otherwise the driver will not find the image files...
 
 Note that earlier versions of the windows driver shipped with both a new
 firmware file plus its individual radio files (small firmware plus RFMD

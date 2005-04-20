@@ -503,7 +503,6 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	int result = 0;
-	u16 i;
 	const unsigned char *ap;
 
 	FN_ENTER;
@@ -519,55 +518,28 @@ static int acx_ioctl_set_ap(struct net_device *dev,
 	ap = awrq->sa_data;
 	acxlog(L_IOCTL, "Set AP = "MACSTR"\n", MAC(ap));
 
-	/* We want to restrict to a specific AP when in Managed or Auto mode
-	 * only, right? */
-	/* TODO: check that "iwconfig <if> ap <mac> mode managed" works
-	** (that is, that we can set ap _first_ and then set mode */
-	if ((ACX_MODE_2_STA != priv->mode)
-	 && (ACX_MODE_0_ADHOC != priv->mode)
-	) {
-		result = -EINVAL;
-		goto end;
+	MAC_COPY(priv->ap, ap);
+
+	/* We want to start rescan in managed or ad-hoc mode,
+	** otherwise just set priv->ap.
+	** "iwconfig <if> ap <mac> mode managed": we must be able
+	** to set ap _first_ and _then_ set mode */
+	switch (priv->mode) {
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_2_STA:
+		/* FIXME: if there is a convention on what zero AP means,
+		** please add a comment about that. I don't know of any --vda */
+		if (mac_is_zero(ap)) {
+			/* "off" == 00:00:00:00:00:00 */
+			MAC_BCAST(priv->ap);
+			acxlog(L_IOCTL, "Not reassociating\n");
+		} else {
+			acxlog(L_IOCTL, "Forcing reassociation\n");
+			SET_BIT(priv->set_mask, GETSET_RESCAN);
+		}
+		break;
 	}
-
-	if (mac_is_bcast(ap)) {
-		/* "any" == "auto" == FF:FF:FF:FF:FF:FF */
-		MAC_BCAST(priv->ap);
-		acxlog(L_IOCTL, "Forcing reassociation\n");
-		SET_BIT(priv->set_mask, GETSET_RESCAN);
-		result = -EINPROGRESS;
-		goto end;
-	}
-
-	/* FIXME: if there is a convention on what empty AP means,
-	** please add a comment about that. I don't know of any --vda */
-	if (mac_is_zero(ap)) {
-		/* "off" == 00:00:00:00:00:00 */
-		MAC_BCAST(priv->ap);
-		acxlog(L_IOCTL, "Not reassociating\n");
-		goto end;
-	}
-
-	/* AB:CD:EF:01:23:45 */
-	for (i = 0; i < priv->bss_table_count; i++) {
-
-		struct bss_info *bss = &priv->bss_table[i];
-
-		if (!mac_is_equal(bss->bssid, ap))
-			continue;
-
-		if ((!!priv->wep_enabled) != !!(bss->caps & WF_MGMT_CAP_PRIVACY)) {
-			acxlog(L_STD | L_IOCTL, "The WEP setting of the matching AP (%d) differs from our WEP setting --> will NOT restrict association to its BSSID!\n", i);
-			result = -EINVAL;
-			goto end;
-        	}
-
-		MAC_COPY(priv->ap, ap);
-		acxlog(L_IOCTL, "Forcing reassociation\n");
-		SET_BIT(priv->set_mask, GETSET_RESCAN);
-		result = -EINPROGRESS;
-		goto end;
-        }
+	result = -EINPROGRESS;
 end:
 	FN_EXIT1(result);
 	return result;
@@ -612,39 +584,40 @@ static int acx_ioctl_get_aplist(struct net_device *dev, struct iw_request_info *
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	struct sockaddr *address = (struct sockaddr *) extra;
 	struct iw_quality qual[IW_MAX_AP];
-	u16 i;
+	int i,cur;
 	int result = OK;
 
 	FN_ENTER;
 
-	/* in Master mode of course we don't have an AP list... */
-	if (ACX_MODE_3_AP == priv->mode) {
+	/* we have AP list only in STA mode */
+	if (ACX_MODE_2_STA != priv->mode) {
 		result = -EOPNOTSUPP;
 		goto end;
 	}
 
-	for (i = 0; i < priv->bss_table_count; i++) {
-		struct bss_info *bss = &priv->bss_table[i];
-		MAC_COPY(address[i].sa_data, bss->bssid);
-		address[i].sa_family = ARPHRD_ETHER;
-		qual[i].level = bss->sir;
-		qual[i].noise = bss->snr;
+	cur = 0;
+	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+		struct client *bss = &priv->sta_list[i];
+		if (!bss->used) continue;
+		MAC_COPY(address[cur].sa_data, bss->bssid);
+		address[cur].sa_family = ARPHRD_ETHER;
+		qual[cur].level = bss->sir;
+		qual[cur].noise = bss->snr;
 #ifndef OLD_QUALITY
-		qual[i].qual = acx_signal_determine_quality(qual[i].level, qual[i].noise);
+		qual[cur].qual = acx_signal_determine_quality(qual[cur].level, qual[cur].noise);
 #else
-		qual[i].qual = (qual[i].noise <= 100) ?
-			       100 - qual[i].noise : 0;
+		qual[cur].qual = (qual[cur].noise <= 100) ?
+			       100 - qual[cur].noise : 0;
 #endif
-		qual[i].updated = 0; /* no scan: level/noise/qual not updated */
+		qual[cur].updated = 0; /* no scan: level/noise/qual not updated */
+		cur++;
 	}
-	if (i) {
+	if (cur) {
 		dwrq->flags = 1;
-		memcpy(extra + sizeof(struct sockaddr)*i, &qual,
-				sizeof(struct iw_quality)*i);
+		memcpy(extra + sizeof(struct sockaddr)*cur, &qual,
+				sizeof(struct iw_quality)*cur);
 	}
-
-	dwrq->length = priv->bss_table_count;
-
+	dwrq->length = cur;
 end:
 	FN_EXIT1(result);
 	return result;
@@ -676,10 +649,9 @@ end:
 }
 
 #if WIRELESS_EXT > 13
-static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end_buf, struct bss_info *bss)
+static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end_buf, struct client *bss)
 {
 	struct iw_event iwe;
-	unsigned int i;
 	char *ptr_rate;
 
 	FN_ENTER;
@@ -701,8 +673,8 @@ static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end
 	
 	/* Add mode */
 	iwe.cmd = SIOCGIWMODE;
-	if (bss->caps & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)) {
-		if (bss->caps & WF_MGMT_CAP_ESS)
+	if (bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)) {
+		if (bss->cap_info & WF_MGMT_CAP_ESS)
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
@@ -735,7 +707,7 @@ static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end
 
 	/* Add encryption */
 	iwe.cmd = SIOCGIWENCODE;
-	if (bss->caps & WF_MGMT_CAP_PRIVACY)
+	if (bss->cap_info & WF_MGMT_CAP_PRIVACY)
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
 	else
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
@@ -747,11 +719,20 @@ static char *acx_ioctl_scan_add_station(wlandevice_t *priv, char *ptr, char *end
 	iwe.cmd = SIOCGIWRATE;
 	iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
 	ptr_rate = ptr + IW_EV_LCP_LEN;
-	for (i = 0; 0 != bss->supp_rates[i]; i++) {
-		iwe.u.bitrate.value = (bss->supp_rates[i] & ~0x80) * 500000; /* units of 500kb/s */
-		acxlog(L_IOCTL, "scan, rate: %d [%02x]\n", iwe.u.bitrate.value, bss->supp_rates[i]);
-		ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf, &iwe, IW_EV_PARAM_LEN);
-	}
+
+	{
+	u16 rate = bss->rate_cap;
+	const u8* p = bitpos2ratebyte;
+	while (rate) {
+		if (rate & 1) {
+			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
+			acxlog(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
+			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf, &iwe, IW_EV_PARAM_LEN);
+		}
+		rate >>= 1;
+		p++;
+	}}
+
 	if ((ptr_rate - ptr) > (ptrdiff_t)IW_EV_LCP_LEN)
 		ptr = ptr_rate;
 
@@ -765,7 +746,7 @@ static int acx_ioctl_get_scan(struct net_device *dev, struct iw_request_info *in
 {
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	char *ptr = extra;
-	unsigned int i;
+	int i;
 	int result = OK;
 
 	FN_ENTER;
@@ -792,9 +773,9 @@ static int acx_ioctl_get_scan(struct net_device *dev, struct iw_request_info *in
 	}
 #endif
 
-	for (i = 0; i < priv->bss_table_count; i++) {
-		struct bss_info *bss = &priv->bss_table[i];
-
+	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+		struct client *bss = &priv->sta_list[i];
+		if (!bss->used) continue;
 		ptr = acx_ioctl_scan_add_station(priv, ptr, extra + IW_SCAN_MAX_DATA, bss);
 	}
 	dwrq->length = ptr - extra;
@@ -902,24 +883,39 @@ static int acx_ioctl_get_essid(struct net_device *dev, struct iw_request_info *i
 * Comment:
 *
 *----------------------------------------------------------------*/
-
 static void
-acx_print_txrate(const char *msg, struct txrate_ctrl *txrate)
+update_client_rates(wlandevice_t *priv, u16 rate)
 {
-	acxlog(L_IOCTL, "%s: cfg %04x cur %04x auto %d pbcc511 %d\n",
-		msg, txrate->cfg, txrate->cur, txrate->do_auto, txrate->pbcc511
-	);
+	int i;
+	for(i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+		client_t *clt = &priv->sta_list[i];
+		if (!clt->used)	continue;
+		clt->rate_cfg = (clt->rate_cap & rate);
+		if (!clt->rate_cfg) {
+			/* no compatible rates left: kick client */
+			printk("Client %d kicked: rates are incompatible\n", i);
+			acx_sta_list_del(priv, clt);
+			continue;
+		}
+		clt->rate_cur &= clt->rate_cfg;
+		if (!clt->rate_cur) {
+			/* current rate become invalid, choose a valid one */
+			int cur = 1;
+			while (!(cur & clt->rate_cfg)) cur<<=1;
+			clt->rate_cur = cur;
+		}
+		clt->fallback_count = clt->stepup_count = 0;
+	}
+	switch (priv->mode) {
+	case ACX_MODE_2_STA:
+		if (!priv->ap_client->used) {
+			/* Owwww... we kicked our AP!! :) */
+			SET_BIT(priv->set_mask, GETSET_RESCAN);
+		}
+	}
 }
 
-static void
-acx_print_rateinfo(wlandevice_t *priv)
-{
-	acx_print_txrate("default tx base rate", &priv->defpeer.txbase);
-	acx_print_txrate("default tx oper rate", &priv->defpeer.txrate);
-	acx_print_txrate("ap tx base rate", &priv->ap_peer.txbase);
-	acx_print_txrate("ap tx oper rate", &priv->ap_peer.txrate);
-}
-
+/* maps bits from acx111 rate to rate in Mbits */
 static const unsigned int acx111_rate_tbl[] = {
      1000000,
      2000000,
@@ -945,6 +941,7 @@ acx_ioctl_set_rate(struct net_device *dev,
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
 	u16 txrate_cfg = 1;
 	unsigned long flags;
+	int autorate;
 	int result = -EINVAL;
 
 	FN_ENTER;
@@ -953,14 +950,13 @@ acx_ioctl_set_rate(struct net_device *dev,
 	       vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
 
 	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
-		int i;
+		int i = VEC_SIZE(acx111_rate_tbl)-1;
 		if(vwrq->value == -1)
 			/* "iwconfig rate auto" --> choose highest */
 			vwrq->value = (CHIPTYPE_ACX100 == priv->chip_type) ? 22000000 : 54000000;
-		i = VEC_SIZE(acx111_rate_tbl)-1;
 		while(i >= 0) {
 			if(vwrq->value == acx111_rate_tbl[i]) {
-				while(i--) txrate_cfg <<= 1;
+				txrate_cfg <<= i;
 				i = 0;
 				break;
 			}
@@ -974,7 +970,14 @@ acx_ioctl_set_rate(struct net_device *dev,
 		result = -EOPNOTSUPP;
 		goto end;
 	}
-	/* now: only one bit is set in txrate_cfg */
+	/* now: only one bit is set in txrate_cfg, corresponding to
+	** indicated rate */
+
+	autorate = (vwrq->fixed == 0) && (RATE111_1 != txrate_cfg);
+	if(autorate) {
+		/* convert 00100000 -> 00111111 */
+		txrate_cfg = (txrate_cfg<<1)-1;
+	}
 
 	if (CHIPTYPE_ACX100 == priv->chip_type) {
 		txrate_cfg &= RATE111_ACX100_COMPAT;
@@ -982,65 +985,23 @@ acx_ioctl_set_rate(struct net_device *dev,
 			result = -ENOTSUPP; /* rate is not supported by acx100 */
 			goto end;
 		}
-
-		/* always do 001000 => 001111 conversion, then mask again.
-		 *
-		 * We need to have all lower rates available, even
-		 * without auto rate, since these are being used
-		 * to calculate the 802.11 basic/operational rate vector
-		 * and a normal iwconfig rate should ALWAYS have all
-		 * lower rates set as basic rates (we are not able to
-		 * configure lower rates individually here!).
-		 * As a consequence of setting all lower bits here,
-		 * the acx111 rate mask actually used for Tx
-		 * needs to be limited to the highest bit again on Tx
-		 * when not in auto mode.
-		 * or we should instead perhaps add another variable
-		 * for that to avoid the calculation on Tx... */
-		txrate_cfg = (txrate_cfg<<1)-1;
-		txrate_cfg &= RATE111_ACX100_COMPAT;
-	} else {
-		/* always do 001000 => 001111 conversion */
-		txrate_cfg = (txrate_cfg<<1)-1;
 	}
 
 	result = acx_lock(priv, &flags);
 	if (result)
 		goto end;
 
-	priv->defpeer.txrate.cfg = txrate_cfg;
-	priv->defpeer.txrate.cur = txrate_cfg;
-	priv->defpeer.txrate.pbcc511 = 0;
-	priv->defpeer.txrate.do_auto = (vwrq->fixed == 0);
-
-	if (priv->defpeer.txrate.do_auto) {
-		if (RATE111_1 == txrate_cfg) { /* auto rate with 1Mbps max. useless */
-			priv->defpeer.txrate.do_auto = 0;
-		} else {
-			/* start with slowest allowed rate, to adapt properly to distant/slow peers */
-			unsigned int i = priv->defpeer.txrate.cur;
-
-			while (priv->defpeer.txrate.cur & (i >> 1)) i>>=1;
-			priv->defpeer.txrate.cur &= i;
-				
-			priv->defpeer.txrate.fallback_count = 0;
-			priv->defpeer.txrate.stepup_count = 0;
-		}
-	}
-	priv->defpeer.txbase = priv->defpeer.txrate;
-	if (priv->defpeer.txrate.do_auto) /* only do that in auto mode, non-auto will be able to use one specific Tx rate only anyway */
-		priv->defpeer.txbase.cfg &= RATE111_80211B_COMPAT; /* only use 802.11b base rates, for standard 802.11b H/W compatibility */
- 
-	priv->ap_peer = priv->defpeer;
+	priv->rate_auto = autorate;
+	priv->rate_oper = txrate_cfg;
+	priv->rate_basic = txrate_cfg;
+	if (autorate) /* only do that in auto mode, non-auto will be able to use one specific Tx rate only anyway */
+		priv->rate_basic &= RATE111_80211B_COMPAT; /* only use 802.11b base rates, for standard 802.11b H/W compatibility */
+	priv->rate_bcast = 1 << highest_bit(txrate_cfg);
 	acx_update_dot11_ratevector(priv);
-	if (priv->mode == ACX_MODE_2_STA)
-		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
-	
-	acx_unlock(priv, &flags);
-
-	acx_print_rateinfo(priv);
+	update_client_rates(priv, txrate_cfg);
 
 	SET_BIT(priv->set_mask, SET_RATE_FALLBACK);
+	acx_unlock(priv, &flags);
 	result = -EINPROGRESS;
 end:
 	FN_EXIT1(result);
@@ -1069,16 +1030,10 @@ acx_ioctl_get_rate(struct net_device *dev,
 		struct iw_param *vwrq,
 		char *extra)
 {
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	unsigned int n = 0;
 	/* TODO: remember rate of last tx, show it. think about multiple peers... */
-	u16 t = priv->defpeer.txrate.cur;
 
-	acx_print_rateinfo(priv);
-
-	/* find highest nonzero bit pos */
-	while (t>0xf) { t>>=4; n+=4; }
-	while (t>1) { t>>=1; n++; }
+	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	int n = highest_bit(priv->rate_oper);
  
 	if (n >= VEC_SIZE(acx111_rate_tbl)) {
 		printk(KERN_ERR "acx_ioctl_get_rate: driver BUG! n=%d. please report\n",n);
@@ -1086,7 +1041,7 @@ acx_ioctl_get_rate(struct net_device *dev,
 	}
 
 	vwrq->value = acx111_rate_tbl[n];
-	vwrq->fixed = !priv->defpeer.txrate.do_auto;
+	vwrq->fixed = !priv->rate_auto;
 	vwrq->disabled = 0;
 	return OK;
 }
@@ -1959,12 +1914,18 @@ static int acx_ioctl_get_reg_domain(struct net_device *dev, struct iw_request_in
 * Comment:
 *
 *----------------------------------------------------------------*/
-static const char * const preamble_modes[] = { "off", "on", "auto (peer capability dependent)", "unknown mode, error" };
+static const char * const preamble_modes[] = {
+	"off",
+	"on",
+	"auto (peer capability dependent)",
+	"unknown mode, error"
+};
 
 static int acx_ioctl_set_short_preamble(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
 	unsigned long flags;
+	int i;
 	int result;
 
 	FN_ENTER;
@@ -1981,31 +1942,43 @@ static int acx_ioctl_set_short_preamble(struct net_device *dev, struct iw_reques
 
 	priv->preamble_mode = (u8)*extra;
 	switch (priv->preamble_mode) {
-		case 0:
-			priv->defpeer.shortpre = 0;
-			priv->ap_peer.shortpre = 0;
-			break;
-		case 1:
-			priv->defpeer.shortpre = 1;
-			priv->ap_peer.shortpre = 1;
-			break;
-		case 2:
-			priv->defpeer.shortpre = 0;
-			priv->ap_peer.shortpre = 0;
-
-			/* associated to a peer? */
-			/* FIXME: this check breaks in case of an AP
-			 * with hidden (empty!) ESSID */
-			if (priv->status == ACX_STATUS_4_ASSOCIATED
-			&& priv->station_assoc.bssid[0]
-			) {
-				priv->ap_peer.shortpre =
-				((priv->station_assoc.caps & WF_MGMT_CAP_SHORT) == WF_MGMT_CAP_SHORT);
+	case 0: /* long */
+		priv->preamble_cur = 0;
+		break;
+	case 1:
+		/* short, kick incapable peers */
+		priv->preamble_cur = 1;
+		for(i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+			client_t *clt = &priv->sta_list[i];
+			if (!clt->used) continue;
+			if (!(clt->cap_info & WF_MGMT_CAP_SHORT)) {
+				clt->used = CLIENT_EMPTY_SLOT_0;
 			}
-			break;
+		}
+		switch (priv->mode) {
+		case ACX_MODE_2_STA:
+			if (priv->ap_client && !priv->ap_client->used) {
+				/* We kicked our AP :) */
+				SET_BIT(priv->set_mask, GETSET_RESCAN);
+			}
+		}
+		break;
+	case 2: /* auto. short only if all peers are short-capable */
+		priv->preamble_cur = 1;
+		for(i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+			client_t *clt = &priv->sta_list[i];
+			if (!clt->used) continue;
+			if (!(clt->cap_info & WF_MGMT_CAP_SHORT)) {
+				priv->preamble_cur = 0;
+				break;
+			}
+		}
+		break;
 	}
 	acx_unlock(priv, &flags);
-	printk("new Short Preamble setting: %s\n", preamble_modes[priv->preamble_mode]);
+	printk("new short preamble setting: configured %s, active %s\n",
+			preamble_modes[priv->preamble_mode],
+			preamble_modes[priv->preamble_cur]);
 	result = OK;
 end:
 	FN_EXIT1(result);
@@ -2032,9 +2005,10 @@ end:
 static int acx_ioctl_get_short_preamble(struct net_device *dev, struct iw_request_info *info, struct iw_param *vwrq, char *extra)
 {
 	wlandevice_t *priv = (wlandevice_t *)dev->priv;
-	unsigned int idx = (priv->preamble_mode <= 2) ? priv->preamble_mode : 3;
 
-	printk("current Short Preamble setting: %s\n", preamble_modes[idx]);
+	printk("current short preamble setting: configured %s, active %s\n",
+			preamble_modes[priv->preamble_mode],
+			preamble_modes[priv->preamble_cur]);
 
 	*extra = (char)priv->preamble_mode;
 
@@ -2734,20 +2708,32 @@ static int acx111_ioctl_info(struct net_device *dev, struct iw_request_info *inf
 
 /*----------------------------------------------------------------
 * acx_ioctl_set_rates
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: NEW
-*
-* Comment:
-*
+* This ioctl takes string parameter. Examples:
+* iwpriv wlan0 SetRates "1,2"
+*	use 1 and 2 Mbit rates, both are in basic rate set
+* iwpriv wlan0 SetRates "1,2 5,11"
+*	use 1,2,5.5,11 Mbit rates. 1 and 2 are basic
+* iwpriv wlan0 SetRates "1,2 5c,11c"
+*	same ('c' means 'CCK modulation' and it is a default for 5 and 11)
+* iwpriv wlan0 SetRates "1,2 5p,11p"
+*	use 1,2,5.5,11 Mbit, 1,2 are basic. 5 and 11 are using PBCC
+* iwpriv wlan0 SetRates "1,2,5,11 22p"
+*	use 1,2,5.5,11,22 Mbit. 1,2,5.5 and 11 are basic. 22 is using PBCC
+*	(this is the maximum acx100 can do (modulo x4 mode))
+* iwpriv wlan0 SetRates "1,2,5,11 22"
+*	same. 802.11 defines only PBCC modulation
+*	for 22 and 33 Mbit rates, so there is no ambiguity
+* iwpriv wlan0 SetRates "1,2,5,11 6o,9o,12o,18o,24o,36o,48o,54o"
+*	1,2,5.5 and 11 are basic. 11g OFDM rates are enabled but
+*	they are not in basic rate set.	22 Mbit is disabled.
+* iwpriv wlan0 SetRates "1,2,5,11 6,9,12,18,24,36,48,54"
+*	same. OFDM is default for 11g rates except 22 and 33 Mbit,
+*	thus 'o' is optional
+* iwpriv wlan0 SetRates "1,2,5,11 6d,9d,12d,18d,24d,36d,48d,54d"
+*	1,2,5.5 and 11 are basic. 11g CCK-OFDM rates are enabled
+*	(acx111 does not support CCK-OFDM, driver will reject this cmd)
+* iwpriv wlan0 SetRates "6,9,12 18,24,36,48,54"
+*	6,9,12 are basic, rest of 11g rates is enabled. Using OFDM
 *----------------------------------------------------------------*/
 #include "setrate.c"
 
@@ -2810,29 +2796,6 @@ verify_rate(u32 rate, int chip_type)
 	return 0;
 }
  
-static void
-fill_txrate(struct txrate_ctrl *txrate, u32 rate)
-{
-	txrate->fallback_count = 0;
-	txrate->stepup_count = 0;
- 
-	txrate->pbcc511 = ( (rate & ((RATE111_11+RATE111_5)<<16)) !=0 );
- 
-	rate = ((rate>>16) | rate) & RATE111_ALL;
-	txrate->cfg = rate;
-	txrate->cur = rate;
- 
-	/* true only if more than one bit is set in rate */
-	txrate->do_auto = ( (rate^(rate-1)) < rate );
-
-	if (txrate->do_auto) {
-		/* start with slowest allowed rate, to adapt properly to distant/slow peers */
-		u32 lowbit = 1;
-		while ((rate & lowbit) == 0) lowbit<<=1;
-		txrate->cur = lowbit;
-	}
-}
-
 static int
 acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
@@ -2846,32 +2809,34 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 
 	acxlog(L_IOCTL, "set_rates %s\n", extra);
 	result = fill_ratemasks(extra, &brate, &orate, acx111_supported, acx111_gen_mask, 0);
-	if(result) goto end;
+	if (result) goto end;
 	SET_BIT(orate, brate);
 	acxlog(L_IOCTL, "brate %08x orate %08x\n", brate, orate);
 
 	result = verify_rate(brate, priv->chip_type);
-	if(result) goto end;
+	if (result) goto end;
 	result = verify_rate(orate, priv->chip_type);
-	if(result) goto end;
+	if (result) goto end;
 
 	result = acx_lock(priv, &flags);
-	if(result) goto end;
- 
-	fill_txrate( &priv->defpeer.txbase, brate);
-	fill_txrate( &priv->defpeer.txrate, orate);
+	if (result) goto end;
 
-	priv->ap_peer = priv->defpeer;
+	priv->rate_basic = brate;
+	priv->rate_oper = orate;
+	/* TODO: ideally, we shall monitor highest basic rate
+	** which was successfully sent to every peer
+	** (say, last we checked, everybody could hear 5.5 Mbits)
+	** and use that for bcasts when we want to reach all peers.
+	** For beacons, we probably shall use lowest basic rate
+	** because we want to reach all *potential* new peers too */
+	priv->rate_bcast = 1 << highest_bit(brate);
+	priv->rate_auto = !has_only_one_bit(orate);
+	update_client_rates(priv, orate);
+	/* TODO: get rid of ratevector, build it only when needed */
 	acx_update_dot11_ratevector(priv);
-	if (priv->mode == ACX_MODE_2_STA)
-		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc);
-
-	acx_unlock(priv, &flags);
-
-	acx_print_rateinfo(priv);
 
 	SET_BIT(priv->set_mask, SET_RATE_FALLBACK);
-
+	acx_unlock(priv, &flags);
 	result = -EINPROGRESS;
 end:
 	FN_EXIT1(result);

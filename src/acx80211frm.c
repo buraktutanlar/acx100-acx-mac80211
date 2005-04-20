@@ -57,55 +57,15 @@
 #include <net/iw_handler.h>
 #endif
 
-#include <wlan_compat.h>
-
 
 /*================================================================*/
 /* Project Includes */
 
 #include <acx.h>
 
+#define WLAN_ASSERT(c)
+
 #if UNUSED
-/*--------------------------------------------------------------
-* p80211addr_to_str
-*
-* Formats a 6 byte IEEE 802 address as a string of the form
-* xx:xx:xx:xx:xx:xx  where the bytes are in hex.  No library
-* functions are used to enhance portability.
-*
-* Arguments:
-*	buf	char buffer, destination for string format
-*		48 bit address.  Must be at least 18 bytes long.
-*	addr	u8 buffer containing the ieee802 48 bit address
-*		we're converting from.
-*
-* Returns:
-*	nothing
-*
-* Side effects:
-*	the contents of the space pointed to by buf is filled
-*	with the textual representation of addr.
-* 
-* STATUS: UNVERIFIED. NONV3.
-* 
---------------------------------------------------------------*/
-void p802addr_to_str(char *buf, u8 *addr)
-{
-	int addrindex;
-	char c;
-
-	for (addrindex = 0; addrindex < ETH_ALEN; addrindex++) {
-		c = '0' + (((unsigned)addr[addrindex]) >> 4);
-		if(c>'9') c+='a'-'9'-1;
-		*buf++ = c;
-		c = '0' + (addr[addrindex] & 0x0f);
-		if(c>'9') c+='a'-'9'-1;
-		*buf++ = c;
-		*buf++ = ':';
-	}
-	buf[-1] = '\0';
-}
-
 /*--------------------------------------------------------------
 * acx_mgmt_encode_beacon
 *
@@ -142,7 +102,7 @@ void acx_mgmt_encode_beacon(wlan_fr_beacon_t * f)
 	WLAN_ASSERT(f->len >= WLAN_BEACON_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->ts = (u64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_BEACON_OFF_TS);
 	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_BEACON_OFF_BCN_INT);
@@ -192,7 +152,7 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
                     WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc))); */
 
 	/*-- Fixed Fields ----*/
-	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->ts = (u64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_BEACON_OFF_TS);
 	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_BEACON_OFF_BCN_INT);
@@ -209,6 +169,9 @@ void acx_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 			break;
 		case WLAN_EID_SUPP_RATES:
 			f->supp_rates = (wlan_ie_supp_rates_t *) ie_ptr;
+			break;
+		case WLAN_EID_EXT_RATES:
+			f->ext_rates = (wlan_ie_supp_rates_t *) ie_ptr;
 			break;
 		case WLAN_EID_FH_PARMS:
 			f->fh_parms = (wlan_ie_fh_parms_t *) ie_ptr;
@@ -510,6 +473,9 @@ void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t * f)
 		case WLAN_EID_SUPP_RATES:
 			f->supp_rates = (wlan_ie_supp_rates_t *) ie_ptr;
 			break;
+		case WLAN_EID_EXT_RATES:
+			f->ext_rates = (wlan_ie_supp_rates_t *) ie_ptr;
+			break;
 		default:
 			/*
 			   acx_log(L_DEBUG,
@@ -732,6 +698,9 @@ void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 		case WLAN_EID_SUPP_RATES:
 			f->supp_rates = (wlan_ie_supp_rates_t *) ie_ptr;
 			break;
+		case WLAN_EID_EXT_RATES:
+			f->ext_rates = (wlan_ie_supp_rates_t *) ie_ptr;
+			break;
 		default:
 			/*
 			   WLAN_LOG_WARNING1(
@@ -938,6 +907,9 @@ void acx_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 		case WLAN_EID_SUPP_RATES:
 			f->supp_rates = (wlan_ie_supp_rates_t *) ie_ptr;
 			break;
+		case WLAN_EID_EXT_RATES:
+			f->ext_rates = (wlan_ie_supp_rates_t *) ie_ptr;
+			break;
 		default:
 /*
                         WLAN_LOG_WARNING1(
@@ -990,7 +962,7 @@ void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t * f)
 	WLAN_ASSERT(f->len >= WLAN_PROBERESP_FR_MAXLEN);
 
 	/*-- Fixed Fields ----*/
-	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->ts = (u64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_PROBERESP_OFF_TS);
 	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_PROBERESP_OFF_BCN_INT);
@@ -1042,7 +1014,7 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 		    WLAN_GET_FC_FSTYPE(ieee2host16(f->hdr->a3.fc)));
 
 	/*-- Fixed Fields ----*/
-	f->ts = (UINT64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
+	f->ts = (u64 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 			    + WLAN_PROBERESP_OFF_TS);
 	f->bcn_int = (u16 *) (WLAN_HDR_A3_DATAP(&(f->hdr->a3))
 				 + WLAN_PROBERESP_OFF_BCN_INT);
@@ -1059,6 +1031,9 @@ void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 			break;
 		case WLAN_EID_SUPP_RATES:
 			f->supp_rates = (wlan_ie_supp_rates_t *) ie_ptr;
+			break;
+		case WLAN_EID_EXT_RATES:
+			f->ext_rates = (wlan_ie_supp_rates_t *) ie_ptr;
 			break;
 		case WLAN_EID_FH_PARMS:
 			f->fh_parms = (wlan_ie_fh_parms_t *) ie_ptr;

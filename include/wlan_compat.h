@@ -1,47 +1,3 @@
-/* include/wlan_compat.h
- *
- * --------------------------------------------------------------------
- *
- * Copyright (C) 2003  ACX100 Open Source Project
- *
- *   The contents of this file are subject to the Mozilla Public
- *   License Version 1.1 (the "License"); you may not use this file
- *   except in compliance with the License. You may obtain a copy of
- *   the License at http://www.mozilla.org/MPL/
- *
- *   Software distributed under the License is distributed on an "AS
- *   IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- *   implied. See the License for the specific language governing
- *   rights and limitations under the License.
- *
- *   Alternatively, the contents of this file may be used under the
- *   terms of the GNU Public License version 2 (the "GPL"), in which
- *   case the provisions of the GPL are applicable instead of the
- *   above.  If you wish to allow the use of your version of this file
- *   only under the terms of the GPL and not to allow others to use
- *   your version of this file under the MPL, indicate your decision
- *   by deleting the provisions above and replace them with the notice
- *   and other provisions required by the GPL.  If you do not delete
- *   the provisions above, a recipient may use your version of this
- *   file under either the MPL or the GPL.
- *
- * --------------------------------------------------------------------
- *
- * This code is based on elements which are
- * Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
- * info@linux-wlan.com
- * http://www.linux-wlan.com
- *
- * --------------------------------------------------------------------
- *
- * Inquiries regarding the ACX100 Open Source Project can be
- * made directly to:
- *
- * acx100-users@lists.sf.net
- * http://acx100.sf.net
- *
- * --------------------------------------------------------------------
- */
 #ifndef __ACX_WLAN_COMPAT_H
 #define __ACX_WLAN_COMPAT_H
 
@@ -89,9 +45,6 @@
 #define WLAN_ALPHAARCH			7
 #define WLAN_MIPSARCH			9
 #define WLAN_HPPAARCH			10
-/* WLAN_OS */
-#define WLAN_LINUX_KERNEL		1
-#define WLAN_LINUX_USER			2
 /* WLAN_HOSTIF (generally set on the command line, not detected) */
 #define WLAN_PCMCIA			1
 #define WLAN_ISA			2
@@ -103,13 +56,6 @@
 /*       PCI.  It's a PLX chip that is a PCI to PCMCIA adapter, but it   */
 /*       isn't a real PCMCIA host interface adapter providing all the    */
 /*       card&socket services.                                           */
-
-/* Lets try to figure out what we've got.  Kernel mode or User mode? */
-#if defined(__KERNEL__)
-#define WLAN_OS				WLAN_LINUX_KERNEL
-#else
-#define WLAN_OS				WLAN_LINUX_USER
-#endif
 
 #ifdef __powerpc__
 #ifndef __ppc__
@@ -123,64 +69,62 @@
 #endif
 #endif
 
-#if defined(__KERNEL__)
 #if defined(__x86_64__)
-#define WLAN_CPU_FAMILY		WLAN_x86_64
-#define WLAN_SYSARCH		WLAN_PCAT
+ #define WLAN_CPU_FAMILY	WLAN_x86_64
+ #define WLAN_SYSARCH		WLAN_PCAT
 #elif defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
-#define WLAN_CPU_FAMILY		WLAN_Ix86
-#define WLAN_CPU_CORE		WLAN_I386CORE
-#define WLAN_CPU_PART		WLAN_I386PART
-#define WLAN_SYSARCH		WLAN_PCAT
+ #define WLAN_CPU_FAMILY	WLAN_Ix86
+ #define WLAN_CPU_CORE		WLAN_I386CORE
+ #define WLAN_CPU_PART		WLAN_I386PART
+ #define WLAN_SYSARCH		WLAN_PCAT
 #elif defined(__ppc__)
-#define WLAN_CPU_FAMILY		WLAN_PPC
-#define WLAN_CPU_CORE		WLAN_PPCCORE
-#if defined(CONFIG_MBX)
-#define WLAN_CPU_PART	WLAN_MPC860
-#define WLAN_SYSARCH	WLAN_MBX
-#elif defined(CONFIG_RPXLITE)
-#define WLAN_CPU_PART	WLAN_MPC823
-#define WLAN_SYSARCH	WLAN_RPX
-#elif defined(CONFIG_RPXCLASSIC)
-#define WLAN_CPU_PART	WLAN_MPC860
-#define WLAN_SYSARCH	WLAN_RPX
-#else
-#define WLAN_CPU_PART	WLAN_PPCPART
-#define WLAN_SYSARCH	WLAN_PMAC
-#endif
+ #define WLAN_CPU_FAMILY	WLAN_PPC
+ #define WLAN_CPU_CORE		WLAN_PPCCORE
+ #if defined(CONFIG_MBX)
+  #define WLAN_CPU_PART		WLAN_MPC860
+  #define WLAN_SYSARCH		WLAN_MBX
+ #elif defined(CONFIG_RPXLITE)
+  #define WLAN_CPU_PART		WLAN_MPC823
+  #define WLAN_SYSARCH		WLAN_RPX
+ #elif defined(CONFIG_RPXCLASSIC)
+  #define WLAN_CPU_PART		WLAN_MPC860
+  #define WLAN_SYSARCH		WLAN_RPX
+ #else
+  #define WLAN_CPU_PART		WLAN_PPCPART
+  #define WLAN_SYSARCH		WLAN_PMAC
+ #endif
 #elif defined(__arm__)
-#define WLAN_CPU_FAMILY		WLAN_ARM
-#define WLAN_CPU_CORE		WLAN_ARMCORE
-#define WLAN_CPU_PART		WLAN_ARM_PART
-#define WLAN_SYSARCH		WLAN_SKIFF
+ #define WLAN_CPU_FAMILY	WLAN_ARM
+ #define WLAN_CPU_CORE		WLAN_ARMCORE
+ #define WLAN_CPU_PART		WLAN_ARM_PART
+ #define WLAN_SYSARCH		WLAN_SKIFF
 #elif defined(__alpha__)
-#define WLAN_CPU_FAMILY		WLAN_ALPHA
-#define WLAN_CPU_CORE		WLAN_ALPHACORE
-#define WLAN_CPU_PART		WLAN_ALPHAPART
-#define WLAN_SYSARCH		WLAN_ALPHAARCH
+ #define WLAN_CPU_FAMILY	WLAN_ALPHA
+ #define WLAN_CPU_CORE		WLAN_ALPHACORE
+ #define WLAN_CPU_PART		WLAN_ALPHAPART
+ #define WLAN_SYSARCH		WLAN_ALPHAARCH
 #elif defined(__mips__)
-#define WLAN_CPU_FAMILY		WLAN_MIPS
-#define WLAN_CPU_CORE		WLAN_MIPSCORE
-#define WLAN_CPU_PART		WLAN_MIPSPART
-#define WLAN_SYSARCH		WLAN_MIPSARCH
+ #define WLAN_CPU_FAMILY	WLAN_MIPS
+ #define WLAN_CPU_CORE		WLAN_MIPSCORE
+ #define WLAN_CPU_PART		WLAN_MIPSPART
+ #define WLAN_SYSARCH		WLAN_MIPSARCH
 #elif defined(__hppa__)
-#define WLAN_CPU_FAMILY		WLAN_HPPA
-#define WLAN_CPU_CORE		WLAN_HPPACORE
-#define WLAN_CPU_PART		WLAN_HPPAPART
-#define WLAN_SYSARCH		WLAN_HPPAARCH
+ #define WLAN_CPU_FAMILY	WLAN_HPPA
+ #define WLAN_CPU_CORE		WLAN_HPPACORE
+ #define WLAN_CPU_PART		WLAN_HPPAPART
+ #define WLAN_SYSARCH		WLAN_HPPAARCH
 #elif defined(__sparc__)
-#define WLAN_CPU_FAMILY		WLAN_SPARC
-#define WLAN_SYSARCH		WLAN_SPARC
+ #define WLAN_CPU_FAMILY	WLAN_SPARC
+ #define WLAN_SYSARCH		WLAN_SPARC
 #elif defined(__sh__)
-#define WLAN_CPU_FAMILY		WLAN_SH
-#define WLAN_SYSARCH		WLAN_SHARCH
-#ifndef __LITTLE_ENDIAN__
-#define __LITTLE_ENDIAN__
-#endif
+ #define WLAN_CPU_FAMILY	WLAN_SH
+ #define WLAN_SYSARCH		WLAN_SHARCH
+ #ifndef __LITTLE_ENDIAN__
+  #define __LITTLE_ENDIAN__
+ #endif
 #else
-#error "No CPU identified!"
+ #error "No CPU identified!"
 #endif
-#endif				/* __KERNEL__ */
 
 /*
    Some big endian machines implicitly do all I/O in little endian mode.
@@ -200,9 +144,23 @@
 #endif
 
 /*=============================================================*/
+/*------ Hardware Portability Macros --------------------------*/
+/*=============================================================*/
+#if (WLAN_CPU_FAMILY == WLAN_PPC)
+#define wlan_inw(a)                     in_be16((unsigned short *)((a)+_IO_BASE))
+#define wlan_inw_le16_to_cpu(a)         inw((a))
+#define wlan_outw(v,a)                  out_be16((unsigned short *)((a)+_IO_BASE), (v))
+#define wlan_outw_cpu_to_le16(v,a)      outw((v),(a))
+#else
+#define wlan_inw(a)                     inw((a))
+#define wlan_inw_le16_to_cpu(a)         __cpu_to_le16(inw((a)))
+#define wlan_outw(v,a)                  outw((v),(a))
+#define wlan_outw_cpu_to_le16(v,a)      outw(__cpu_to_le16((v)),(a))
+#endif
+
+/*=============================================================*/
 /*------ Bit settings -----------------------------------------*/
 /*=============================================================*/
-
 #define BIT0	0x00000001
 #define BIT1	0x00000002
 #define BIT2	0x00000004
@@ -236,343 +194,6 @@
 #define BIT30	0x40000000
 #define BIT31	0x80000000
 
-typedef __u8 UINT8;
-typedef __u16 UINT16;
-typedef __u32 UINT32;
-
-typedef __s8 INT8;
-typedef __s16 INT16;
-typedef __s32 INT32;
-
-typedef __u32 UINT;
-typedef __s32 INT;
-
-typedef __u64 UINT64;
-typedef __s64 INT64;
-
-#define UINT8_MAX	(0xffUL)
-#define UINT16_MAX	(0xffffUL)
-#define UINT32_MAX	(0xffffffffUL)
-
-#define INT8_MAX	(0x7fL)
-#define INT16_MAX	(0x7fffL)
-#define INT32_MAX	(0x7fffffffL)
-
-/*=============================================================*/
-/*------ Compiler Portability Macros --------------------------*/
-/*=============================================================*/
-#define __WLAN_ATTRIB_PACK__		__attribute__ ((packed))
-#define __WLAN_PRAGMA_PACK1__
-#define __WLAN_PRAGMA_PACKDFLT__
-#define __WLAN_INLINE__			inline
-#define WLAN_MIN_ARRAY			0
-
-/*=============================================================*/
-/*------ OS Portability Macros --------------------------------*/
-/*=============================================================*/
-
-#ifndef WLAN_DBVAR
-#define WLAN_DBVAR	wlan_debug
-#endif
-
-#if (WLAN_OS == WLAN_LINUX_KERNEL)
-#define WLAN_LOG_ERROR0(x) printk(KERN_ERR "%s: " x , __FUNCTION__ );
-#define WLAN_LOG_ERROR1(x,n) printk(KERN_ERR "%s: " x , __FUNCTION__ , (n));
-#define WLAN_LOG_ERROR2(x,n1,n2) printk(KERN_ERR "%s: " x , __FUNCTION__ , (n1), (n2));
-#define WLAN_LOG_ERROR3(x,n1,n2,n3) printk(KERN_ERR "%s: " x , __FUNCTION__, (n1), (n2), (n3));
-#define WLAN_LOG_ERROR4(x,n1,n2,n3,n4) printk(KERN_ERR "%s: " x , __FUNCTION__, (n1), (n2), (n3), (n4));
-
-#define WLAN_LOG_WARNING0(x) printk(KERN_WARNING "%s: " x , __FUNCTION__);
-#define WLAN_LOG_WARNING1(x,n) printk(KERN_WARNING "%s: " x , __FUNCTION__, (n));
-#define WLAN_LOG_WARNING2(x,n1,n2) printk(KERN_WARNING "%s: " x , __FUNCTION__, (n1), (n2));
-#define WLAN_LOG_WARNING3(x,n1,n2,n3) printk(KERN_WARNING "%s: " x , __FUNCTION__, (n1), (n2), (n3));
-#define WLAN_LOG_WARNING4(x,n1,n2,n3,n4) printk(KERN_WARNING "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4));
-
-#define WLAN_LOG_NOTICE0(x) printk(KERN_NOTICE "%s: " x , __FUNCTION__);
-#define WLAN_LOG_NOTICE1(x,n) printk(KERN_NOTICE "%s: " x , __FUNCTION__, (n));
-#define WLAN_LOG_NOTICE2(x,n1,n2) printk(KERN_NOTICE "%s: " x , __FUNCTION__, (n1), (n2));
-#define WLAN_LOG_NOTICE3(x,n1,n2,n3) printk(KERN_NOTICE "%s: " x , __FUNCTION__, (n1), (n2), (n3));
-#define WLAN_LOG_NOTICE4(x,n1,n2,n3,n4) printk(KERN_NOTICE "%s: " x , __FUNCTION__, (n1), (n2), (n3), (n4));
-
-#define WLAN_LOG_INFO0(x) printk(KERN_INFO x);
-#define WLAN_LOG_INFO1(x,n) printk(KERN_INFO x, (n));
-#define WLAN_LOG_INFO2(x,n1,n2) printk(KERN_INFO x, (n1), (n2));
-#define WLAN_LOG_INFO3(x,n1,n2,n3) printk(KERN_INFO x, (n1), (n2), (n3));
-#define WLAN_LOG_INFO4(x,n1,n2,n3,n4) printk(KERN_INFO x, (n1), (n2), (n3), (n4));
-#define WLAN_LOG_INFO5(x,n1,n2,n3,n4,n5) printk(KERN_INFO x, (n1), (n2), (n3), (n4), (n5));
-
-#if defined(WLAN_INCLUDE_DEBUG)
-#define WLAN_ASSERT(c) if ((!(c)) && WLAN_DBVAR >= 1) { \
-			WLAN_LOG_DEBUG0(1, "Assertion failure!\n"); }
-#define WLAN_HEX_DUMP( l, x, p, n)	if( WLAN_DBVAR >= (l) ){ \
-			int __i__; \
-			printk(KERN_DEBUG x ":"); \
-			for( __i__=0; __i__ < (n); __i__++) \
-				printk( " %02x", ((UINT8*)(p))[__i__]); \
-			printk("\n"); }
-
-#define DBFENTER { if ( WLAN_DBVAR >= 4 ){ WLAN_LOG_DEBUG0(3,"Enter\n"); } }
-#define DBFEXIT  { if ( WLAN_DBVAR >= 4 ){ WLAN_LOG_DEBUG0(3,"Exit\n"); } }
-
-#define WLAN_LOG_DEBUG0(l,x) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x ,  __FUNCTION__ );
-#define WLAN_LOG_DEBUG1(l,x,n) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n));
-#define WLAN_LOG_DEBUG2(l,x,n1,n2) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2));
-#define WLAN_LOG_DEBUG3(l,x,n1,n2,n3) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3));
-#define WLAN_LOG_DEBUG4(l,x,n1,n2,n3,n4) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4));
-#define WLAN_LOG_DEBUG5(l,x,n1,n2,n3,n4,n5) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4), (n5));
-#define WLAN_LOG_DEBUG6(l,x,n1,n2,n3,n4,n5,n6) if ( WLAN_DBVAR >= (l)) printk(KERN_DEBUG "%s: " x , __FUNCTION__ , (n1), (n2), (n3), (n4), (n5), (n6));
-#else
-#define WLAN_ASSERT(c)
-#define WLAN_HEX_DUMP( l, s, p, n)
-
-#define DBFENTER
-#define DBFEXIT
-
-#define WLAN_LOG_DEBUG0(l, s)
-#define WLAN_LOG_DEBUG1(l, s,n)
-#define WLAN_LOG_DEBUG2(l, s,n1,n2)
-#define WLAN_LOG_DEBUG3(l, s,n1,n2,n3)
-#define WLAN_LOG_DEBUG4(l, s,n1,n2,n3,n4)
-#define WLAN_LOG_DEBUG5(l, s,n1,n2,n3,n4,n5)
-#endif
-#else
-#define WLAN_LOG_ERROR0(s)
-#define WLAN_LOG_ERROR1(s,n)
-#define WLAN_LOG_ERROR2(s,n1,n2)
-#define WLAN_LOG_ERROR3(s,n1,n2,n3)
-#define WLAN_LOG_ERROR4(s,n1,n2,n3,n4)
-
-#define WLAN_LOG_WARNING0(s)
-#define WLAN_LOG_WARNING1(s,n)
-#define WLAN_LOG_WARNING2(s,n1,n2)
-#define WLAN_LOG_WARNING3(s,n1,n2,n3)
-#define WLAN_LOG_WARNING4(s,n1,n2,n3,n4)
-
-#define WLAN_LOG_NOTICE0(s)
-#define WLAN_LOG_NOTICE1(s,n)
-#define WLAN_LOG_NOTICE2(s,n1,n2)
-#define WLAN_LOG_NOTICE3(s,n1,n2,n3)
-#define WLAN_LOG_NOTICE4(s,n1,n2,n3,n4)
-
-#define WLAN_ASSERT(c)
-#define WLAN_HEX_DUMP( l, s, p, n)
-
-#define DBFENTER
-#define DBFEXIT
-
-#define WLAN_LOG_INFO0(s)
-#define WLAN_LOG_INFO1(s,n)
-#define WLAN_LOG_INFO2(s,n1,n2)
-#define WLAN_LOG_INFO3(s,n1,n2,n3)
-#define WLAN_LOG_INFO4(s,n1,n2,n3,n4)
-#define WLAN_LOG_INFO5(s,n1,n2,n3,n4,n5)
-
-#define WLAN_LOG_DEBUG0(l, s)
-#define WLAN_LOG_DEBUG1(l, s,n)
-#define WLAN_LOG_DEBUG2(l, s,n1,n2)
-#define WLAN_LOG_DEBUG3(l, s,n1,n2,n3)
-#define WLAN_LOG_DEBUG4(l, s,n1,n2,n3,n4)
-#define WLAN_LOG_DEBUG5(l, s,n1,n2,n3,n4,n5)
-#endif
-
-#define wlan_ms_per_tick		(1000UL / (wlan_ticks_per_sec))
-#define wlan_ms_to_ticks(n)		( (n) / (wlan_ms_per_tick))
-#define wlan_tu2ticks(n)		( (n) / (wlan_ms_per_tick))
-#define WLAN_INT_DISABLE(n)		{ save_flags((n)); cli(); }
-#define WLAN_INT_ENABLE(n)		{ sti(); restore_flags((n)); }
-
-#ifdef CONFIG_SMP
-#define __SMP__			1
-#endif
-
-#ifndef KERNEL_VERSION
-#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,17))
-#define CONFIG_NETLINK		1
-#endif
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0))
-#define kfree_s(a, b)	kfree((a))
-/* #define p80211pb_kfree_s(a,b) kfree((a)) */
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18))
-#ifndef init_waitqueue_head
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,0,16))
-#define init_waitqueue_head(p)  (*(p) = NULL)
-#else
-#define init_waitqueue_head(p)  init_waitqueue(p)
-#endif
-typedef struct wait_queue *wait_queue_head_t;
-typedef struct wait_queue wait_queue_t;
-#define set_current_state(b)  { current->state = (b); mb(); }
-#define init_waitqueue_entry(a, b) { (a)->task = current; }
-#endif
-#endif
-
-#ifndef wait_event_interruptible_timeout
-/* retval == 0; signal met; we're good. */
-/* retval < 0; interrupted by signal. */
-/* retval > 0; timed out. */
-#define __wait_event_interruptible_timeout(wq, condition, timeout, ret)   \
-do {                                                                      \
-        int __ret = 0;                                                    \
-        if (!(condition)) {                                               \
-          wait_queue_t __wait;                                            \
-          unsigned long expire;                                           \
-          init_waitqueue_entry(&__wait, current);                         \
-	                                                                  \
-          expire = timeout + jiffies;                                     \
-          add_wait_queue(&wq, &__wait);                                   \
-          for (;;) {                                                      \
-                  set_current_state(TASK_INTERRUPTIBLE);                  \
-                  if (condition)                                          \
-                          break;                                          \
-                  if (jiffies > expire) {                                 \
-                          ret = jiffies - expire;                         \
-                          break;                                          \
-                  }                                                       \
-                  if (!signal_pending(current)) {                         \
-                          schedule_timeout(timeout);                      \
-                          continue;                                       \
-                  }                                                       \
-                  ret = -ERESTARTSYS;                                     \
-                  break;                                                  \
-          }                                                               \
-          set_current_state(TASK_RUNNING);                                \
-          remove_wait_queue(&wq, &__wait);                                \
-	}                                                                 \
-} while (0)
-
-#define wait_event_interruptible_timeout(wq, condition, timeout)	\
-({									\
-	int __ret = 0;							\
-	if (!(condition))						\
-		__wait_event_interruptible_timeout(wq, condition,	\
-						timeout, __ret);	\
-	__ret;								\
-})
-
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,1,90))
-#define spin_lock(l)            do { } while (0)
-#define spin_unlock(l)          do { } while (0)
-#define spin_lock_irqsave(l,f)  do { save_flags(f); cli(); } while (0)
-#define spin_unlock_irqrestore(l,f) do { restore_flags(f); } while (0)
-#define spin_lock_init(s)       do { } while (0)
-#define spin_trylock(l)         (1)
-typedef int spinlock_t;
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
-#ifdef CONFIG_SMP
-#define spin_is_locked(x)       (*(volatile char *)(&(x)->lock) <= 0)
-#else
-#define spin_is_locked(l)       (0)
-#endif
-#endif
-
-#ifdef _LINUX_PROC_FS_H
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,25))
-
-extern inline struct proc_dir_entry *create_proc_read_entry(const char
-							    *name,
-							    mode_t mode,
-							    struct
-							    proc_dir_entry
-							    *base,
-							    read_proc_t *
-							    read_proc,
-							    void *data)
-{
-	struct proc_dir_entry *res = create_proc_entry(name, mode, base);
-	if (res) {
-		res->read_proc = read_proc;
-		res->data = data;
-	}
-	return res;
-}
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,29))
-#ifndef proc_mkdir
-#define proc_mkdir(name, root) create_proc_entry(name, S_IFDIR, root)
-#endif
-#endif
-#endif				/* _LINUX_PROC_FS_H */
-
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,38))
-typedef struct device netdevice_t;
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4))
-typedef struct net_device netdevice_t;
-#else
-#undef netdevice_t
-typedef struct net_device netdevice_t;
-#endif
-
-#ifdef WIRELESS_EXT
-#if (WIRELESS_EXT < 13)
-struct iw_request_info {
-	__u16 cmd;		/* Wireless Extension command */
-	__u16 flags;		/* More to come ;-) */
-};
-#endif
-#endif
-
-/* Workqueue / task queue backwards compatibility stuff */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-#include <linux/workqueue.h>
-#else
-#include <linux/tqueue.h>
-#define work_struct tq_struct
-#define INIT_WORK INIT_TQUEUE
-#define schedule_work schedule_task
-#endif
-
-/* Interrupt handler backwards compatibility stuff */
-#ifndef IRQ_NONE
-#define IRQ_NONE
-#define IRQ_HANDLED
-typedef void irqreturn_t;
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,1,18))
-#define MODULE_PARM(a,b)        extern int __bogus_decl
-#define MODULE_AUTHOR(a)        extern int __bogus_decl
-#define MODULE_DESCRIPTION(a)   extern int __bogus_decl
-#define MODULE_SUPPORTED_DEVICE(a) extern int __bogus_decl
-#undef  GET_USE_COUNT
-#define GET_USE_COUNT(m)        mod_use_count_
-#endif
-
-#ifndef MODULE_LICENSE
-#define MODULE_LICENSE(m)       extern int __bogus_decl
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)  /* more or less */
-#define WLAN_MOD_INC_USE_COUNT	MOD_INC_USE_COUNT
-#define WLAN_MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT
-#else
-#define WLAN_MOD_INC_USE_COUNT
-#define WLAN_MOD_DEC_USE_COUNT
-#endif 
-
-/* TODO:  Do we care about this? */
-#ifndef MODULE_DEVICE_TABLE
-#define MODULE_DEVICE_TABLE(foo,bar)
-#endif
-
-#define wlan_minutes2ticks(a) ((a)*(wlan_ticks_per_sec *  60))
-#define wlan_seconds2ticks(a) ((a)*(wlan_ticks_per_sec))
-
-/*=============================================================*/
-/*------ Hardware Portability Macros --------------------------*/
-/*=============================================================*/
-
 #define ieee2host16(n)	__le16_to_cpu(n)
 #define ieee2host32(n)	__le32_to_cpu(n)
 #define host2ieee16(n)	__cpu_to_le16(n)
@@ -590,58 +211,88 @@ typedef void irqreturn_t;
  #endif
 #endif
 
-#if (WLAN_CPU_FAMILY == WLAN_PPC)
-#define wlan_inw(a)                     in_be16((unsigned short *)((a)+_IO_BASE))
-#define wlan_inw_le16_to_cpu(a)         inw((a))
-#define wlan_outw(v,a)                  out_be16((unsigned short *)((a)+_IO_BASE), (v))
-#define wlan_outw_cpu_to_le16(v,a)      outw((v),(a))
+/*=============================================================*/
+/*------ Compiler Portability Macros --------------------------*/
+/*=============================================================*/
+#define __WLAN_ATTRIB_PACK__		__attribute__ ((packed))
+#define __WLAN_PRAGMA_PACK1__
+#define __WLAN_PRAGMA_PACKDFLT__
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,38))
+ typedef struct device netdevice_t;
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4))
+ typedef struct net_device netdevice_t;
 #else
-#define wlan_inw(a)                     inw((a))
-#define wlan_inw_le16_to_cpu(a)         __cpu_to_le16(inw((a)))
-#define wlan_outw(v,a)                  outw((v),(a))
-#define wlan_outw_cpu_to_le16(v,a)      outw(__cpu_to_le16((v)),(a))
+ #undef netdevice_t
+ typedef struct net_device netdevice_t;
 #endif
 
-/*=============================================================*/
-/*--- General Macros ------------------------------------------*/
-/*=============================================================*/
+#ifdef WIRELESS_EXT
+#if (WIRELESS_EXT < 13)
+struct iw_request_info {
+	__u16 cmd;		/* Wireless Extension command */
+	__u16 flags;		/* More to come ;-) */
+};
+#endif
+#endif
 
-#define wlan_max(a, b) (((a) > (b)) ? (a) : (b))
-#define wlan_min(a, b) (((a) < (b)) ? (a) : (b))
+/* Interrupt handler backwards compatibility stuff */
+#ifndef IRQ_NONE
+#define IRQ_NONE
+#define IRQ_HANDLED
+typedef void irqreturn_t;
+#endif
 
-#define wlan_isprint(c)	(((c) > (0x19)) && ((c) < (0x7f)))
 
-#define wlan_hexchar(x) (((x) < 0x0a) ? ('0' + (x)) : ('a' + ((x) - 0x0a)))
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)  /* more or less */
+#define WLAN_MOD_INC_USE_COUNT	MOD_INC_USE_COUNT
+#define WLAN_MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT
+#else
+#define WLAN_MOD_INC_USE_COUNT
+#define WLAN_MOD_DEC_USE_COUNT
+#endif 
 
-/* Create a string of printable chars from something that might not be */
-/* It's recommended that the str be 4*len + 1 bytes long */
-#define wlan_mkprintstr(buf, buflen, str, strlen) \
-{ \
-	int i = 0; \
-	int j = 0; \
-	memset(str, 0, (strlen)); \
-	for (i = 0; i < (buflen); i++) { \
-		if ( wlan_isprint((buf)[i]) ) { \
-			(str)[j] = (buf)[i]; \
-			j++; \
-		} else { \
-			(str)[j] = '\\'; \
-			(str)[j+1] = 'x'; \
-			(str)[j+2] = wlan_hexchar(((buf)[i] & 0xf0) >> 4); \
-			(str)[j+3] = wlan_hexchar(((buf)[i] & 0x0f)); \
-			j += 4; \
-		} \
-	} \
-}
+#ifndef ARPHRD_IEEE80211_PRISM
+#define ARPHRD_IEEE80211_PRISM 802
+#endif
 
-/*=============================================================*/
-/*--- Variables -----------------------------------------------*/
-/*=============================================================*/
+#define ETH_P_80211_RAW         (ETH_P_ECONET + 1)
 
-extern int wlan_debug;
-extern int wlan_ethconv;	/* What's the default ethconv? */
+/*============================================================================*
+ * Constants                                                                  *
+ *============================================================================*/
 
-/*=============================================================*/
-/*--- Functions -----------------------------------------------*/
-/*=============================================================*/
+#define WLAN_IEEE_OUI_LEN     3
+
+#define WLAN_ETHCONV_ENCAP    1
+#define WLAN_ETHCONV_RFC1042  2
+#define WLAN_ETHCONV_8021h    3
+
+#define WLAN_MIN_ETHFRM_LEN   60
+#define WLAN_MAX_ETHFRM_LEN   1514
+#define WLAN_ETHHDR_LEN               14
+
+/*============================================================================*
+ * Types                                                                      *
+ *============================================================================*/
+
+/* local ether header type */
+typedef struct wlan_ethhdr {
+      u8 daddr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+      u8 saddr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+      u16 type __WLAN_ATTRIB_PACK__;
+} wlan_ethhdr_t;
+
+/* local llc header type */
+typedef struct wlan_llc {
+      u8 dsap __WLAN_ATTRIB_PACK__;
+      u8 ssap __WLAN_ATTRIB_PACK__;
+      u8 ctl __WLAN_ATTRIB_PACK__;
+} wlan_llc_t;
+
+/* local snap header type */
+typedef struct wlan_snap {
+      u8 oui[WLAN_IEEE_OUI_LEN] __WLAN_ATTRIB_PACK__;
+      u16 type __WLAN_ATTRIB_PACK__;
+} wlan_snap_t;
 #endif /* __ACX_WLAN_COMPAT_H */

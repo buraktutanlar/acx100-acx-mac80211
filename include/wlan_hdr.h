@@ -42,27 +42,12 @@
  *
  * --------------------------------------------------------------------
  */
-#ifndef __ACX_P80211HDR_H
-#define __ACX_P80211HDR_H
-
-/*================================================================*/
-/* System Includes */
-
-/*================================================================*/
-/* Project Includes */
-
-#ifndef __ACX_WLAN_COMPAT_H
-#include <wlan/wlan_compat.h>
-#endif
-
 
 /*================================================================*/
 /* Constants */
 
 /*--- Sizes -----------------------------------------------*/
-#define WLAN_ADDR_LEN			6
 #define WLAN_CRC_LEN			4
-#define WLAN_BSSID_LEN			6
 #define WLAN_BSS_TS_LEN			8
 #define WLAN_HDR_A3_LEN			24
 #define WLAN_HDR_A4_LEN			30
@@ -149,6 +134,7 @@
 /*                        SET_FC_FSTYPE(WLAN_FSTYPE_RTS) );   */
 /*------------------------------------------------------------*/
 
+/* Always 0 for current 802.11 standards */
 #define WLAN_GET_FC_PVER(n)	 (((u16)(n)) & (BIT0 | BIT1))
 #define WLAN_GET_FC_FTYPE(n)	((((u16)(n)) & (BIT2 | BIT3)) >> 2)
 #define WLAN_GET_FC_FSTYPE(n)	((((u16)(n)) & (BIT4|BIT5|BIT6|BIT7)) >> 4)
@@ -156,7 +142,17 @@
 #define WLAN_GET_FC_FROMDS(n)	((((u16)(n)) & (BIT9)) >> 9)
 #define WLAN_GET_FC_MOREFRAG(n) ((((u16)(n)) & (BIT10)) >> 10)
 #define WLAN_GET_FC_RETRY(n)	((((u16)(n)) & (BIT11)) >> 11)
+/* Indicates PS mode in which STA will be after successful completion
+** of current frame exchange sequence. Always 0 for AP frames */
 #define WLAN_GET_FC_PWRMGT(n)	((((u16)(n)) & (BIT12)) >> 12)
+/* What MoreData=1 means:
+** From AP to STA in PS mode: don't sleep yet, I have more frames for you
+** From Contention-Free (CF) Pollable STA in response to a CF-Poll:
+**   STA has buffered frames for transmission in response to next CF-Poll
+** Bcast/mcast frames transmitted from AP:
+**   when additional bcast/mcast frames remain to be transmitted by AP
+**   during this beacon interval
+** In all other cases MoreData=0 */
 #define WLAN_GET_FC_MOREDATA(n) ((((u16)(n)) & (BIT13)) >> 13)
 #define WLAN_GET_FC_ISWEP(n)	((((u16)(n)) & (BIT14)) >> 14)
 #define WLAN_GET_FC_ORDER(n)	((((u16)(n)) & (BIT15)) >> 15)
@@ -203,12 +199,6 @@
 /* printf("the frame subtype is %x", WF_FC_FTYPEi & rx.fc);   */
 /* tx.fc = WF_FTYPE_CTLi | WF_FSTYPE_RTSi;                    */
 /*------------------------------------------------------------*/
-#ifdef __LITTLE_ENDIAN
-#define IEEE16(a,n)     a = n, a##i = n,
-#else
-/* shifts would produce gcc warnings. Oh well... */
-#define IEEE16(a,n)     a = n, a##i = ((n&0xff)*256 + ((n&0xff00)/256)),
-#endif
 
 enum {
 /*--- Frame Control Field -------------------------------------*/
@@ -273,20 +263,20 @@ typedef u8 wlan_bss_ts_t[WLAN_BSS_TS_LEN];
 __WLAN_PRAGMA_PACK1__ typedef struct p80211_hdr_a3 {
 	u16 fc __WLAN_ATTRIB_PACK__;
 	u16 dur __WLAN_ATTRIB_PACK__;
-	u8 a1[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8 a2[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8 a3[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	u8 a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8 a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8 a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	u16 seq __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ p80211_hdr_a3_t;
 
 __WLAN_PRAGMA_PACKDFLT__ __WLAN_PRAGMA_PACK1__ typedef struct p80211_hdr_a4 {
 	u16 fc __WLAN_ATTRIB_PACK__;
 	u16 dur __WLAN_ATTRIB_PACK__;
-	u8 a1[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8 a2[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8 a3[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	u8 a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8 a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8 a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	u16 seq __WLAN_ATTRIB_PACK__;
-	u8 a4[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	u8 a4[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 } __WLAN_ATTRIB_PACK__ p80211_hdr_a4_t;
 
 __WLAN_PRAGMA_PACKDFLT__ typedef union p80211_hdr {
@@ -304,69 +294,69 @@ typedef struct wlan_hdr {
 		** seq: [0:3] frag#, [4:15] seq# - used for dup detection
 		** (dups from retries have same seq#) */
 		struct {
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	ta[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} std;
 		struct {
-			u8	a1[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	a2[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	a3[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
-			u8	a4[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	a4[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} numbered;
 		struct { /* ad-hoc peer->peer (to/from DS = 0/0) */
-			u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
 		} ibss;
 		struct { /* ap->sta (to/from DS = 0/1) */
-			u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
 		} fromap;
 		struct { /* sta->ap (to/from DS = 1/0) */
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
 		} toap;
 		struct { /* wds->wds (to/from DS = 1/1), the only 4addr pkt */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	ta[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
-			u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} wds;
 		struct { /* all management packets */
-			u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 			u16	seq __WLAN_ATTRIB_PACK__;
 		} mgmt;
 		struct { /* has no body, just a FCS */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	ta[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} rts;
 		struct { /* has no body, just a FCS */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} cts;
 		struct { /* has no body, just a FCS */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} ack;
 		struct { /* has no body, just a FCS */
 			/* NB: this one holds Assoc ID in dur field */
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	ta[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} pspoll;
 		struct { /* has no body, just a FCS */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} cfend;
 		struct { /* has no body, just a FCS */
-			u8	ra[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-			u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+			u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+			u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 		} cfendcfack;
 	} addr;
 } wlan_hdr_t;
@@ -375,28 +365,17 @@ typedef struct wlan_hdr {
 typedef struct wlan_hdr_mgmt {
 	u16	fc __WLAN_ATTRIB_PACK__;
 	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	da[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	u16	seq __WLAN_ATTRIB_PACK__;
 } wlan_hdr_mgmt_t;
 
 typedef struct wlan_hdr_a3 {
 	u16	fc __WLAN_ATTRIB_PACK__;
 	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	a1[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8	a2[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
-	u8	a3[WLAN_ADDR_LEN] __WLAN_ATTRIB_PACK__;
+	u8	a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8	a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
+	u8	a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
 	u16	seq __WLAN_ATTRIB_PACK__;
 } wlan_hdr_a3_t;
-
-/*================================================================*/
-/* Extern Declarations */
-
-
-/*================================================================*/
-/* Function Declarations */
-
-void p802addr_to_str(char *buf, u8 * addr);
-
-#endif /* __ACX_P80211HDR_H */

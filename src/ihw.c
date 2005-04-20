@@ -53,8 +53,6 @@
 #include <net/iw_handler.h>
 #endif
 
-#include <wlan_compat.h>
-
 #include <linux/pci.h>
 
 #include <linux/etherdevice.h>
@@ -125,7 +123,6 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
 #ifndef INLINE_IO
 /* Pull in definitions */
 #define INLINE_IO /* defined to nothing. functions will be out-of-line */
-#include <acx_ioreg.h>
 #endif
 
 /*****************************************************************************
@@ -134,6 +131,7 @@ static void acx100usb_control_complete(struct urb *urb, struct pt_regs *regs)
  *
  ****************************************************************************/
 
+#if (WLAN_HOSTIF!=WLAN_USB)
 /* Info mailbox format:
 2 bytes: type
 2 bytes: status
@@ -261,6 +259,7 @@ void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_s
 		val <<= 16;
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
 }
+#endif /* WLAN_HOSTIF!=WLAN_USB */
 
 /*----------------------------------------------------------------
 * acx_write_cmd_param
@@ -713,7 +712,7 @@ static const u16 CtlLengthDot11[] = {
 *----------------------------------------------------------------*/
 int acx_configure(wlandevice_t *priv, void *pdr, short type)
 {
-	u16 len, offs = 0;
+	u16 len, offs;
 
 	/* TODO implement and check other acx111 commands */
 	if ((priv->chip_type == CHIPTYPE_ACX111) &&
@@ -821,31 +820,6 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
  * MAC Address Stuff
  *
  ****************************************************************************/
-
-/*----------------------------------------------------------------
-* acx_log_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: NEW
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-void acx_log_mac_address(int level, const u8 *mac, const char* tail)
-{
-	if (!(debug & level))
-		return;
-
-	printk(KERN_WARNING MACSTR "%s",MAC(mac),tail);
-}
 
 /*----------------------------------------------------------------
 * acx_power_led

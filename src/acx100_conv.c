@@ -69,42 +69,29 @@
 * acx_rxdesc_to_txdesc
 *
 * Converts a rx descriptor to a tx descriptor.
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: 
-*	FINISHED
-*
-* Comment:
-*
+* Used in AP mode to prepare packets from one STA for tx to the other
 *----------------------------------------------------------------*/
 
 void acx_rxdesc_to_txdesc(const struct rxhostdescriptor *rxhostdesc,
 				struct txdescriptor *txdesc)
 {
-	struct txhostdescriptor *payload;
-	struct txhostdescriptor *header;
+	struct txhostdescriptor *head;
+	struct txhostdescriptor *body;
+	int body_len;
 	
-	header = txdesc->fixed_size.s.host_desc;
-	payload = header + 1;
+	head = txdesc->fixed_size.s.host_desc;
+	body = head + 1;
 	
-	payload->data_offset = 0;
-	header->data_offset = 0;
+	head->data_offset = 0;
+	body->data_offset = 0;
 	
-	memcpy(header->data, &rxhostdesc->data->hdr_a3, WLAN_HDR_A3_LEN);
+	body_len = RXBUF_BYTES_RCVD(rxhostdesc->data) - WLAN_HDR_A3_LEN;
+	memcpy(head->data, &rxhostdesc->data->hdr_a3, WLAN_HDR_A3_LEN);
+	memcpy(body->data, &rxhostdesc->data->data_a3, body_len);
 
-	/* BUG??? rxhostdesc->data->data was 12 bytes farther that 
-	** in reality because wlan_hdr was erroneously defined to have 3 extra void*
-	** fields... Bug should have been mangling AP bridged packets. Fixed */
-	memcpy(payload->data, &rxhostdesc->data->data_a3,
-		MAC_CNT_RCVD(rxhostdesc->data) - WLAN_HDR_A3_LEN);
-
+	head->length = cpu_to_le16(WLAN_HDR_A3_LEN);
+	body->length = cpu_to_le16(body_len);
+	txdesc->total_length = cpu_to_le16(body_len + WLAN_HDR_A3_LEN);
 }
 
 /*----------------------------------------------------------------
@@ -375,23 +362,12 @@ fail:
 * This function extracts the src and dest address from the 802.11
 * frame to use in the construction of the eth frame.
 *
-* Arguments:
+* STATUS: FINISHED
 *
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: 
-*	FINISHED
-*
-* Comment:  
-*	Based largely on p80211conv.c of the linux-wlan-ng project
-*
+* Based largely on p80211conv.c of the linux-wlan-ng project
 *----------------------------------------------------------------*/
 
-/*@null@*/ struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, const struct
+struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, const struct
 		rxhostdescriptor *rx_desc)
 {
 	union p80211_hdr *w_hdr;
@@ -409,17 +385,13 @@ fail:
 
 	FN_ENTER;
 
-	payload_length = MAC_CNT_RCVD(rx_desc->data) - WLAN_HDR_A3_LEN;
-	payload_offset = WLAN_HDR_A3_LEN;
-
-	w_hdr = (p80211_hdr_t*)&rx_desc->data->hdr_a3;
-
-	/* check if additional header is included */
-	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
-		/* Mmm, strange, when receiving a packet, 4 bytes precede the packet. Is it the CRC ? */
-		w_hdr = (p80211_hdr_t*)(((u8*)w_hdr) + WLAN_CRC_LEN);
-		payload_length -= WLAN_CRC_LEN;
-	}
+	/* This looks complex because it must handle possible
+	** phy header in rxbuff */
+	w_hdr = acx_get_p80211_hdr(priv, rx_desc->data);
+	payload_offset = WLAN_HDR_A3_LEN; /* it is relative to w_hdr */
+	payload_length = RXBUF_BYTES_USED(rx_desc->data) /* entire rxbuff... */
+		- ((u8*)w_hdr - (u8*)rx_desc->data) /* minus space before 802.11 frame */
+		- WLAN_HDR_A3_LEN; /* minus 802.11 header */
 
 	/* setup some vars for convenience */
 	fc = w_hdr->a3.fc;
@@ -437,8 +409,8 @@ fail:
 		saddr = w_hdr->a3.a2;
 		break;
 	default: /* WF_FC_FROMTODSi */
-		payload_offset = WLAN_HDR_A4_LEN;
-		payload_length -= ( WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN );
+		payload_offset += (WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN);
+		payload_length -= (WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN);
 		if (0 > payload_length) {
 			acxlog(L_STD, "A4 frame too short!\n");
 			FN_EXIT1((int)NULL);
@@ -632,8 +604,8 @@ fail:
 #if DEBUG_CONVERT
 	if (debug & L_DATA) {
 		int i;
-		printk("p802.11 frame [%d]:", MAC_CNT_RCVD(rx_desc->data));
-		for (i = 0; i < MAC_CNT_RCVD(rx_desc->data); i++)
+		printk("p802.11 frame [%d]:", RXBUF_BYTES_RCVD(rx_desc->data));
+		for (i = 0; i < RXBUF_BYTES_RCVD(rx_desc->data); i++)
 			printk(" %02x", ((u8 *) w_hdr)[i]);
 		printk("\n");
 

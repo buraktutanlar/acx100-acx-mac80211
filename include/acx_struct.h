@@ -42,18 +42,10 @@
  *
  * --------------------------------------------------------------------
  */
-#ifndef __ACX_ACX100_H
-#define __ACX_ACX100_H
 
 #if (WLAN_HOSTIF==WLAN_USB)
 #include <linux/usb.h>
 #endif
-
-/* whether to do Tx descriptor cleanup in softirq (i.e. not in IRQ
- * handler) or not. Note that doing it later does slightly increase
- * system load, so still do that stuff in the IRQ handler for now,
- * even if that probably means worse latency */
-#define TX_CLEANUP_IN_SOFTIRQ 0
 
 /*============================================================================*
  * Debug / log functionality                                                  *
@@ -120,8 +112,8 @@ enum {
 /* Use worker_queues for 2.5/2.6 Kernels and queue tasks for 2.4 Kernels 
    (used for the 'bottom half' of the interrupt routine) */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
+#include <linux/workqueue.h>
 /* #define NEWER_KERNELS_ONLY 1 */
 #define USE_WORKER_TASKS
 #define WORK_STRUCT struct work_struct
@@ -129,15 +121,15 @@ enum {
 #define FLUSH_SCHEDULED_WORK flush_scheduled_work
 
 #else
-
+#include <linux/tqueue.h>
 #define USE_QUEUE_TASKS
 #define WORK_STRUCT struct tq_struct
 #define SCHEDULE_WORK schedule_task
 #define INIT_WORK(work, func, ndev) \
-      do { \
-              (work)->routine = (func); \
-              (work)->data = (ndev); \
-      } while(0)
+	do { \
+		(work)->routine = (func); \
+		(work)->data = (ndev); \
+	} while(0)
 #define FLUSH_SCHEDULED_WORK flush_scheduled_tasks
 
 #endif
@@ -195,6 +187,30 @@ static inline int mac_is_directed(const u8 *mac)
 static inline int mac_is_mcast(const u8 *mac)
 {
 	return (mac[0] & 1) && !mac_is_bcast(mac);
+}
+
+/* undefined if v==0 */
+static inline int lowest_bit(u16 v)
+{
+	int n = 0;
+	while (!(v & 0xf)) { v>>=4; n+=4; }
+	while (!(v & 1)) { v>>=1; n++; }
+	return n;
+}
+
+/* undefined if v==0 */
+static inline int highest_bit(u16 v)
+{
+	int n = 0;
+	while (v>0xf) { v>>=4; n+=4; }
+	while (v>1) { v>>=1; n++; }
+	return n;
+}
+
+/* undefined if v==0 */
+static inline int has_only_one_bit(u16 v)
+{
+	return ((v-1) ^ v) >= v;
 }
 
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -842,29 +858,48 @@ typedef struct key_struct {
 	u8 key[29];		/* 0x12; is this long enough??? */
 } key_struct_t;			/* size = 276. FIXME: where is the remaining space?? */
 
-
-/* non-firmware struct --> no packing necessary */
+/*--- Client (peer) info -----------------------------------------------------*/
+/* priv->sta_list[] is used for:
+** accumulating and processing of scan results
+** keeping client info in AP mode
+** keeping AP info in STA mode (AP is the only one 'client')
+** keeping peer info in ad-hoc mode
+** non-firmware struct --> no packing necessary */
+/* TODO: implement continuous beacon reception,
+** keep sta_list[] updated */
 enum {
 	CLIENT_EMPTY_SLOT_0 = 0,
 	CLIENT_EXIST_1 = 1,
 	CLIENT_AUTHENTICATED_2 = 2,
 	CLIENT_ASSOCIATED_3 = 3,
+	CLIENT_JOIN_CANDIDATE = 4,
 };
 typedef struct client {
-	u8	used;		/* misnamed, more like 'status' */
-	u16	aid;		/* association ID */
-	char	address[ETH_ALEN];
-	u8	ps;		/* client's auth req had PWRMGT bit in fc */
-	u16	cap_info;	/* from client's assoc req */
-	u16	auth_alg;
-	u16	auth_step;
-	u8	*ratevec;	/* from client's assoc req */
-	u32	unkn0x14;
+	struct client *next;
+	long	mtime;			/* last time we heard it, in jiffies */
+	u32	sir;			/* Standard IR */
+	u32	snr;			/* Signal to Noise Ratio */
+	u16	aid;			/* association ID */
+	u16	seq;			/* from client's auth req */
+	u16	auth_alg;		/* from client's auth req */
+	u16	cap_info;		/* from client's assoc req */
+	u16	rate_cap;		/* what client supports */
+	u16	rate_cfg;		/* what is allowed (by iwconfig etc) */
+	u16	rate_cur;		/* currently used rate mask */
+	u8	rate_100;		/* currently used rate byte (acx100 only) */
+	u8	used;			/* misnamed, more like 'status' */
+	u8	address[ETH_ALEN];
+	u8	bssid[ETH_ALEN];	/* ad-hoc hosts can have bssid != mac */
+	u8	auth_step;
+	u8	ignore_count;
+	u8	fallback_count;
+	u8	stepup_count;
+	u8	essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
+	size_t	essid_len;		/* Length of ESSID (without '\0') */
+/* FIXME: this one is too damn big */
 	u8	challenge_text[WLAN_CHALLENGE_LEN];
-	u16	seq;		/* from client's auth req */
-	u16	ratemask;	/* bit 0=1Mbit..bit5=22Mbit */
-	u8	pad5[8];	/* 0x9c */
-	struct client *next;	/* 0xa4 */
+	u8	channel;
+	u16	beacon_interval;
 } client_t;
 
 /*--- Tx and Rx descriptor ring buffer administration ------------------------*/
@@ -924,22 +959,6 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	dma_addr_t	RxBufferPoolPhyAddr;	/* *rxdescq2; 0x74 */
 } TIWLAN_DC;
 
-/*--- 802.11 Basic Service Set info ------------------------------------------*/
-/* non-firmware struct --> no packing necessary */
-typedef struct bss_info {
-	u8 bssid[ETH_ALEN];	/* BSSID (network ID of the device) */
-	u8 mac_addr[ETH_ALEN];	/* MAC address of the station's device */
-	u8 essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
-	size_t essid_len;	/* Length of ESSID (FIXME: \0 included?) */
-	u16 caps;		/* 802.11 capabilities information */
-	u8 channel;		/* 802.11 channel */
-	u16 wep;		/* WEP flag (FIXME: redundant, bit 4 in caps) */
-	unsigned char supp_rates[64]; /* FIXME: 802.11b section 7.3.2.2 allows 8 rates, but 802.11g devices seem to allow for many more: how many exactly? */
-	u32 sir;		/* 0x78; Standard IR */
-	u32 snr;		/* 0x7c; Signal to Noise Ratio */
-	u16 beacon_interval;	/* 802.11 beacon interval */
-} bss_info_t;				/* 132 0x84 */
-
 /*============================================================================*
  * Main acx100 per-device data structure (netdev->priv)                       *
  *============================================================================*/
@@ -962,27 +981,6 @@ typedef struct bss_info {
 #define ACX_STATUS_2_WAIT_AUTH		2
 #define ACX_STATUS_3_AUTHENTICATED	3
 #define ACX_STATUS_4_ASSOCIATED		4
-
-/* non-firmware struct --> no packing necessary */
-struct txrate_ctrl {
-	u16  cfg;		      /* Tx rate from iwconfig */
-	u16  cur;		      /* the Tx rate we currently use */
-	u8   pbcc511;		  /* Use PBCC at 5 and 11Mbit? (else CCK) */
-	u8   do_auto;		      /* Auto adjust Tx rates? */
-	u8   ignore_count;	/* no. of pkts to ignore (old rate byte set) */
-	u8   fallback_threshold;     /* 0-100 */
-	u8   fallback_count;
-	u8   stepup_threshold;	/* 0-100 */
-	u8   stepup_count;
-	/* TODO: unsigned long txcnt[]; */
-};
-
-/* non-firmware struct --> no packing necessary */
-struct peer {
-	struct txrate_ctrl txbase;      /* For basic rates */
-	struct txrate_ctrl txrate;      /* For operational rates */
-	u8   shortpre;		 /* 0 == Long Preamble, 1 == Short */
-};
 
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
  * acx_priv_t) */
@@ -1098,7 +1096,7 @@ typedef struct wlandevice {
 	u8		dev_addr[MAX_ADDR_LEN]; /* copy of the device address (ifconfig hw ether) that we actually use for 802.11; copied over from the network device's MAC address (ifconfig) when it makes sense only */
 	u8		bssid[ETH_ALEN];	/* the BSSID after having joined */
 	u8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
-	u16		aid;			/* The Association ID sent from the AP */
+	u16		aid;			/* The Association ID sent from the AP / last used AID if we're an AP */
 	u16		mode;			/* mode from iwconfig */
 	u16		status;			/* 802.11 association status */
 	u8		essid_active;		/* specific ESSID active, or select any? */
@@ -1111,9 +1109,6 @@ typedef struct wlandevice {
 	u16		reg_dom_chanmask;
 	u16		auth_or_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
-	u16		bss_table_count;	/* # of active BSS scan table entries */
-	struct		bss_info bss_table[32];	/* BSS scan table */
-	struct		bss_info station_assoc;	/* the station we're currently associated to */
 	u8		scan_running;
 	unsigned long	scan_start;		/* FIXME type?? */
 	u16		scan_retries;		/* V3POS 2826, V1POS 27fe */
@@ -1121,6 +1116,7 @@ typedef struct wlandevice {
 	/* stations known to us (if we're an ap) */
 	client_t	sta_list[32];		/* tab is larger than list, so that */
 	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
+	client_t	*ap_client;		/* this one is our AP (STA mode only) */
 
 	u16		last_seq_ctrl;		/* duplicate packet detection */
 
@@ -1132,8 +1128,14 @@ typedef struct wlandevice {
 	u16		ps_enhanced_transition_time;
 
 	/*** PHY settings ***/
-	struct peer	defpeer;
-	struct peer	ap_peer;
+	u8		fallback_threshold;
+	u8		stepup_threshold;
+	u16		rate_basic;
+	u16		rate_oper;
+	u16		rate_bcast;
+	u8		rate_auto;		/* false if "iwconfig rate N" (WITHOUT 'auto'!) */
+	u8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
+	u8		preamble_cur;
 
 	u8		tx_disabled;
 	u8		tx_level_dbm;
@@ -1144,8 +1146,6 @@ typedef struct wlandevice {
 	unsigned long	brange_time_last_state_change;	/* time the power LED was last changed */
 	u8		brange_last_state;					/* last state of the LED */
 	u8		brange_max_quality;					/* maximum quality that equates to full speed */
-
-	u8		preamble_mode;		/* 0 == Long Preamble, 1 == Short, 2 == Auto */
 
 	u8		sensitivity;
 	u8		antenna;		/* antenna settings */
@@ -1215,10 +1215,13 @@ typedef struct wlandevice {
 #endif
 } wlandevice_t;
 
-/*-- rx_config_1 bitfield --*/
+/* For use with ACX1xx_IE_RXCONFIG */
 /*  bit     description
  *    13   include additional header (length etc.) *required*
- *    10   receive frames from own SSID only
+ *		struct is defined in 'struct rxbuffer'
+ *		is this bit acx100 only? does acx111 always put the header,
+ *		and bit setting is irrelevant? --vda
+ *    10   receive frames only with SSID used in last join cmd
  *     9   discard broadcast (01:xx:xx:xx:xx:xx in mac)
  *     8   receive packets for multicast address 1
  *     7   receive packets for multicast address 0
@@ -1227,10 +1230,10 @@ typedef struct wlandevice {
  *     4   discard frames with foreign destination MAC address
  *     3   promiscuous mode (receive ALL frames, disable filter)
  *     2   include FCS
- *     1   include additional header (802.11 phy?)
+ *     1   include phy header
  *     0   ???
  */
-#define RX_CFG1_PLUS_ADDIT_HDR		0x2000 /* ACX100 only!! */
+#define RX_CFG1_INCLUDE_RXBUF_HDR	0x2000 /* ACX100 only!! */
 #define RX_CFG1_FILTER_SSID		0x0400
 #define RX_CFG1_FILTER_BCAST		0x0200
 #define RX_CFG1_RCV_MC_ADDR1		0x0100
@@ -1240,9 +1243,7 @@ typedef struct wlandevice {
 #define RX_CFG1_FILTER_MAC		0x0010
 #define RX_CFG1_RCV_PROMISCUOUS		0x0008
 #define RX_CFG1_INCLUDE_FCS		0x0004
-#define RX_CFG1_INCLUDE_ADDIT_HDR	0x0002
-
-/*-- rx_config_2 bitfield --*/
+#define RX_CFG1_INCLUDE_PHY_HDR		(WANT_PHY_HDR ? 0x0002 : 0)
 /*  bit     description
  *    11   receive association requests etc.
  *    10   receive authentication frames
@@ -1254,7 +1255,7 @@ typedef struct wlandevice {
  *     4   receive management frames
  *     3   receive probe requests
  *     2   receive probe responses
- *     1   receive ack frames
+ *     1   receive RTS/CTS/ACK frames
  *     0   receive other
  */
 #define RX_CFG2_RCV_ASSOC_REQ		0x0800
@@ -1269,6 +1270,15 @@ typedef struct wlandevice {
 #define RX_CFG2_RCV_PROBE_RESP		0x0004
 #define RX_CFG2_RCV_ACK_FRAMES		0x0002
 #define RX_CFG2_RCV_OTHER		0x0001
+
+/* For use with ACX1xx_IE_FEATURE_CONFIG */
+#define FEATURE1_80MHZ_CLOCK	0x00000040L
+#define FEATURE1_4X		0x00000020L
+#define FEATURE1_LOW_RX		0x00000008L
+#define FEATURE1_EXTRA_LOW_RX	0x00000001L
+
+#define FEATURE2_SNIFFER	0x00000080L
+#define FEATURE2_NO_TXCRYPT	0x00000001L
 
 /*-- get and set mask values --*/
 #define GETSET_LED_POWER	0x00000001L
@@ -1315,66 +1325,957 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 extern char *firmware_dir;
 #endif
 
-/*============================================================================*
- * Locking and synchronization functions                                      *
- *============================================================================*/
+/*============================================================================*/
+#define MAX_NUMBER_OF_SITE 31
 
-/* These functions *must* be inline or they will break horribly on SPARC, due
- * to its weird semantics for save/restore flags. extern inline should prevent
- * the kernel from linking or module from loading if they are not inlined. */
+typedef struct ssid {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 inf[32] ACX_PACKED;
+} ssid_t;
 
-#ifdef BROKEN_LOCKING
-extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
-{
-	local_irq_save(*flags);
-	if (!spin_trylock(&priv->lock)) {
-		printk("ARGH! Lock already taken in %s\n", __func__);
-		local_irq_restore(*flags);
-		return -EFAULT;
-	} else {
-		printk("Lock given out in %s\n", __func__);
-	}
-	if (priv->hw_unavailable) {
-		printk(KERN_WARNING
-		       "acx_lock() called with hw_unavailable (dev=%p)\n",
-		       priv->netdev);
-		spin_unlock_irqrestore(&priv->lock, *flags);
-		return -EBUSY;
-	}
-	return OK;
-}
+typedef struct rates {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 sup_rates[8] ACX_PACKED;
+} rates_t;
 
-extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
-{
-	/* printk(KERN_WARNING "unlock\n"); */
-	spin_unlock_irqrestore(&priv->lock, *flags);
-	/* printk(KERN_WARNING "/unlock\n"); */
-}
+typedef struct fhps {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u16 dwell_time ACX_PACKED;
+	u8 hop_set ACX_PACKED;
+	u8 hop_pattern ACX_PACKED;
+	u8 hop_index ACX_PACKED;
+} fhps_t;
 
-#else /* BROKEN_LOCKING */
+typedef struct dsps {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 curr_channel ACX_PACKED;
+} dsps_t;
 
-extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
-{
-	/* do nothing and be quiet */
-	/*@-noeffect@*/
-	(void)*priv;
-	(void)*flags;
-	/*@=noeffect@*/
-	return OK;
-}
+typedef struct cfps {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 cfp_count ACX_PACKED;
+	u8 cfp_period ACX_PACKED;
+	u16 cfp_max_dur ACX_PACKED;
+	u16 cfp_dur_rem ACX_PACKED;
+} cfps_t;
 
-extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
-{
-	/* do nothing and be quiet */
-	/*@-noeffect@*/
-	(void)*priv;
-	(void)*flags;
-	/*@=noeffect@*/
-}
-#endif /* BROKEN_LOCKING */
+typedef struct challenge_text {
+	u8 element_ID ACX_PACKED;
+	u8 length ACX_PACKED;
+	u8 text[253] ACX_PACKED;
+} challenge_text_t;
 
-#ifndef ARPHRD_IEEE80211_PRISM
-#define ARPHRD_IEEE80211_PRISM 802
+
+/* Warning. Several types used in below structs are
+** in fact variable length. Use structs with such fields with caution */
+typedef struct auth_frame_body {
+	u16 auth_alg ACX_PACKED;
+	u16 auth_seq ACX_PACKED;
+	u16 status ACX_PACKED;
+	challenge_text_t challenge ACX_PACKED;
+} auth_frame_body_t;
+
+typedef struct assocresp_frame_body {
+	u16 cap_info ACX_PACKED;
+	u16 status ACX_PACKED;
+	u16 aid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+} assocresp_frame_body_t;
+
+typedef struct reassocreq_frame_body {
+	u16 cap_info ACX_PACKED;
+	u16 listen_int ACX_PACKED;
+	u8 current_ap[6] ACX_PACKED;
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+} reassocreq_frame_body_t;
+
+typedef struct reassocresp_frame_body {
+	u16 cap_info ACX_PACKED;
+	u16 status ACX_PACKED;
+	u16 aid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+} reassocresp_frame_body_t;
+
+typedef struct deauthen_frame_body {
+	u16 reason ACX_PACKED;
+} deauthen_frame_body_t;
+
+typedef struct disassoc_frame_body {
+	u16 reason ACX_PACKED;
+} disassoc_frame_body_t;
+
+typedef struct probereq_frame_body {
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+} probereq_frame_body_t;
+
+typedef struct proberesp_frame_body {
+	u8 timestamp[8] ACX_PACKED;
+	u16 beacon_int ACX_PACKED;
+	u16 cap_info ACX_PACKED;
+	ssid_t ssid ACX_PACKED;
+	rates_t rates ACX_PACKED;
+	fhps_t fhps ACX_PACKED;
+	dsps_t dsps ACX_PACKED;
+	cfps_t cfps ACX_PACKED;
+} proberesp_frame_body_t;
+
+
+
+
+typedef struct acx100_ie_queueconfig {
+	u16	type ACX_PACKED;
+	u16	len ACX_PACKED;
+	u32	AreaSize ACX_PACKED;
+	u32	RxQueueStart ACX_PACKED;
+	u8	QueueOptions ACX_PACKED; /* queue options, val0xd */
+	u8	NumTxQueues ACX_PACKED;	 /* # tx queues, val0xe */
+	u8	NumRxDesc ACX_PACKED;	 /* for USB only */
+	u8	padf2 ACX_PACKED;	 /* # rx buffers */
+	u32	QueueEnd ACX_PACKED;
+	u32	HostQueueEnd ACX_PACKED; /* QueueEnd2 */
+	u32	TxQueueStart ACX_PACKED;
+	u8	TxQueuePri ACX_PACKED;
+	u8	NumTxDesc ACX_PACKED;
+	u16	pad ACX_PACKED;
+} acx100_ie_queueconfig_t;
+
+typedef struct acx111_ie_queueconfig {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	u32 tx_memory_block_address ACX_PACKED;
+	u32 rx_memory_block_address ACX_PACKED;
+	u32 rx1_queue_address ACX_PACKED;
+	u32 reserved1 ACX_PACKED;
+	u32 tx1_queue_address ACX_PACKED;
+	u8  tx1_attributes ACX_PACKED;
+	u16 reserved2 ACX_PACKED;
+	u8  reserved3 ACX_PACKED;
+} acx111_ie_queueconfig_t;
+
+typedef struct acx100_ie_memconfigoption {
+	u16	type ACX_PACKED;
+	u16	len ACX_PACKED;
+	u32	DMA_config ACX_PACKED;
+	u32  pRxHostDesc ACX_PACKED; /* val0x8 */
+	u32	rx_mem ACX_PACKED;
+	u32	tx_mem ACX_PACKED;
+	u16	RxBlockNum ACX_PACKED;
+	u16	TxBlockNum ACX_PACKED;
+} acx100_ie_memconfigoption_t;
+
+typedef struct acx111_ie_memoryconfig {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	u16 no_of_stations ACX_PACKED;
+	u16 memory_block_size ACX_PACKED;
+	u8 tx_rx_memory_block_allocation ACX_PACKED;
+	u8 count_rx_queues ACX_PACKED;
+	u8 count_tx_queues ACX_PACKED;
+	u8 options ACX_PACKED;
+	u8 fragmentation ACX_PACKED;
+	u16 reserved1 ACX_PACKED;
+	u8 reserved2 ACX_PACKED;
+
+	/* start of rx1 block */
+	u8 rx_queue1_count_descs ACX_PACKED;
+	u8 rx_queue1_reserved1 ACX_PACKED;
+	u8 rx_queue1_type ACX_PACKED; /* must be set to 7 */
+	u8 rx_queue1_prio ACX_PACKED; /* must be set to 0 */
+	u32 rx_queue1_host_rx_start ACX_PACKED;
+	/* end of rx1 block */
+
+	/* start of tx1 block */
+	u8 tx_queue1_count_descs ACX_PACKED;
+	u8 tx_queue1_reserved1 ACX_PACKED;
+	u8 tx_queue1_reserved2 ACX_PACKED;
+	u8 tx_queue1_attributes ACX_PACKED;
+	/* end of tx1 block */
+} acx111_ie_memoryconfig_t;
+
+typedef struct acx_ie_memmap {
+	u16	type ACX_PACKED;
+	u16	len ACX_PACKED;
+	u32	CodeStart ACX_PACKED;
+	u32	CodeEnd ACX_PACKED;
+	u32	WEPCacheStart ACX_PACKED;
+	u32	WEPCacheEnd ACX_PACKED;
+	u32	PacketTemplateStart ACX_PACKED;
+	u32	PacketTemplateEnd ACX_PACKED;
+	u32	QueueStart ACX_PACKED;
+	u32	QueueEnd ACX_PACKED;
+	u32	PoolStart ACX_PACKED;
+	u32	PoolEnd ACX_PACKED;
+} acx_ie_memmap_t;
+
+typedef struct ACX111FeatureConfig {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	u32 feature_options ACX_PACKED;
+	u32 data_flow_options ACX_PACKED;
+} ACX111FeatureConfig_t;
+
+typedef struct ACX111TxLevel {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	u8 level ACX_PACKED;
+} ACX111TxLevel_t;
+
+#if MAYBE_BOGUS
+typedef struct wep {
+	u16 vala ACX_PACKED;
+
+	u8 wep_key[MAX_KEYLEN] ACX_PACKED;
+	char key_name[0x16] ACX_PACKED;
+} wep_t;
 #endif
 
-#endif /* __ACX_ACX100_H */
+typedef struct associd {
+	u16 vala ACX_PACKED;
+} associd_t;
+
+#define PS_CFG_ENABLE		0x80
+#define PS_CFG_PENDING		0x40 /* status flag when entering PS */
+#define PS_CFG_WAKEUP_MODE_MASK	0x07
+#define PS_CFG_WAKEUP_BY_HOST	0x03
+#define PS_CFG_WAKEUP_EACH_ITVL	0x02
+#define PS_CFG_WAKEUP_ON_DTIM	0x01
+#define PS_CFG_WAKEUP_ALL_BEAC	0x00
+
+#define PS_OPT_ENA_ENHANCED_PS	0x04 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set in the TIM; newer firmwares only(?) */
+#define PS_OPT_STILL_RCV_BCASTS	0x01
+
+typedef struct acx100_ie_powermgmt {
+	u32	type ACX_PACKED;
+	u32	len ACX_PACKED;
+	u8 wakeup_cfg ACX_PACKED;
+	u8 listen_interval ACX_PACKED; /* for EACH_ITVL: wake up every "beacon units" interval */
+	u8 options ACX_PACKED;
+	u8 hangover_period ACX_PACKED; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
+	u16 enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
+} acx100_ie_powermgmt_t;
+
+typedef struct acx111_ie_powermgmt {
+	u32	type ACX_PACKED;
+	u32	len ACX_PACKED;
+	u8	wakeup_cfg ACX_PACKED;
+	u8	listen_interval ACX_PACKED; /* for EACH_ITVL: wake up every "beacon units" interval */
+	u8	options ACX_PACKED;
+	u8	hangover_period ACX_PACKED; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
+	u32	beaconRxTime ACX_PACKED;
+	u32 enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
+} acx111_ie_powermgmt_t;
+
+
+/*
+** SCAN command structure
+**
+** even though acx100 scan rates match RATE100 constants,
+** acx111 ones do not match! Therefore we do not use RATE100 #defines */
+#define ACX_SCAN_RATE_1		10
+#define ACX_SCAN_RATE_2		20
+#define ACX_SCAN_RATE_5		55
+#define ACX_SCAN_RATE_11	110
+#define ACX_SCAN_RATE_22	220
+#define ACX_SCAN_OPT_ACTIVE	0x00	/* a bit mask */
+#define ACX_SCAN_OPT_PASSIVE	0x01
+/* Background scan: we go into Power Save mode (by transmitting
+** NULL data frame to AP with the power mgmt bit set), do the scan,
+** and then exit Power Save mode. A plus is that AP buffers frames
+** for us while we do background scan. Thus we avoid frame losses.
+** Background scan can be active or passive, just like normal one */
+#define ACX_SCAN_OPT_BACKGROUND	0x02
+typedef struct acx100_scan {
+	u16 count ACX_PACKED;	/* number of scans to do, 0xffff == continuous */
+	u16 start_chan ACX_PACKED;
+	u16 flags ACX_PACKED;	/* channel list mask; 0x8000 == all channels? */
+	u8 max_rate ACX_PACKED;	/* max. probe rate */
+	u8 options ACX_PACKED;	/* bit mask, see defines above */
+	u16 chan_duration ACX_PACKED;
+	u16 max_probe_delay ACX_PACKED;
+} acx100_scan_t;			/* length 0xc */
+
+#define ACX111_SCAN_RATE_6	0x0B
+#define ACX111_SCAN_RATE_9	0x0F
+#define ACX111_SCAN_RATE_12	0x0A
+#define ACX111_SCAN_RATE_18	0x0E
+#define ACX111_SCAN_RATE_24	0x09
+#define ACX111_SCAN_RATE_36	0x0D
+#define ACX111_SCAN_RATE_48	0x08
+#define ACX111_SCAN_RATE_54	0x0C
+#define ACX111_SCAN_OPT_5GHZ    0x04	/* else 2.4GHZ */
+#define ACX111_SCAN_MOD_SHORTPRE 0x01	/* you can combine SHORTPRE and PBCC */
+#define ACX111_SCAN_MOD_PBCC	0x80
+#define ACX111_SCAN_MOD_OFDM	0x40
+typedef struct acx111_scan {
+	u16 count ACX_PACKED;		/* number of scans to do */
+	u8 channel_list_select ACX_PACKED; /* 0: scan all channels, 1: from chan_list only */
+	u16 reserved1 ACX_PACKED;
+	u8 reserved2 ACX_PACKED;
+	u8 rate ACX_PACKED;
+	u8 options ACX_PACKED;		/* bit mask, see defines above */
+	u16 chan_duration ACX_PACKED;	/* min time to wait for reply on one channel in ms */
+					/* (active scan only) (802.11 section 11.1.3.2.2) */
+	u16 max_probe_delay ACX_PACKED; /* max time to wait for reply on one channel in ms (active scan) */
+					/* time to listen on a channel in ms (passive scan) */
+	u8 modulation ACX_PACKED;
+	u8 channel_list[26] ACX_PACKED;	/* bits 7:0 first byte: channels 8:1 */
+					/* bits 7:0 second byte: channels 16:9 */
+					/* 26 bytes is enough to cover 802.11a */
+} acx111_scan_t;
+
+
+/*
+** Radio calibration command structure
+*/
+typedef struct acx111_cmd_radiocalib {
+	u32 methods ACX_PACKED; /* 0x80000000 == automatic calibration by firmware, according to interval; Bits 0..3: select calibration methods to go through: calib based on DC, AfeDC, Tx mismatch, Tx equilization */
+	u32 interval ACX_PACKED;
+} acx111_cmd_radiocalib_t;
+
+
+/*
+** Packet template structures
+**
+** Packet templates store contents of Beacon, Probe response, Probe request,
+** Null data frame, and TIM data frame. Firmware automatically transmits
+** contents of template at appropriate time:
+** - Beacon: when configured as AP or Ad-hoc
+** - Probe response: when configured as AP or Ad-hoc, whenever
+**   a Probe request frame is received
+** - Probe request: when host issues SCAN command (active)
+** - Null data frame: when entering 802.11 power save mode
+** - TIM data: at the end of Beacon frames (if no TIM template
+**   is configured, then transmits default TIM)
+** NB: 
+** - size field must be set to size of actual template
+**   (NOT sizeof(struct) - templates are variable in length),
+**   size field is not itself counted.
+** - members flagged with an asterisk must be initialized with host,
+**   rest must be zero filled.
+** - variable length fields shown only in comments */
+typedef struct acx_template_tim {
+	u16	size ACX_PACKED;
+	u8	tim_eid ACX_PACKED;	/* 00 1 TIM IE ID * */
+	u8	len ACX_PACKED;		/* 01 1 Length * */
+	u8	dtim_cnt ACX_PACKED;	/* 02 1 DTIM Count */
+	u8	dtim_period ACX_PACKED;	/* 03 1 DTIM Period */
+	u8	bitmap_ctrl ACX_PACKED;	/* 04 1 Bitmap Control * (except bit0) */
+					/* 05 n Partial Virtual Bitmap * */
+	u8	variable[0x100 - 1-1-1-1-1] ACX_PACKED;
+} acx_template_tim_t;
+
+typedef struct acx100_template_probereq {
+	u16	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address * */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address * */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID * */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+	u8	timestamp[8] ACX_PACKED;/* 18 8 Timestamp */
+	u16	beacon_interval ACX_PACKED; /* 20 2 Beacon Interval * */
+	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
+		    			/* 24 n SSID * */
+					/* nn n Supported Rates * */
+	char	variable[0x44 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
+} acx100_template_probereq_t;
+
+typedef struct acx111_template_probereq {
+	u16	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc */
+/* NB: I think fc must be set to WF_FSTYPE_PROBEREQi by host
+** or else you'll see Assoc Reqs (fc is left zeroed out
+** and AssocReq has numeric value of 0!) */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address * */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address * */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID * */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+		    			/* 18 n SSID * */
+					/* nn n Supported Rates * */
+	char	variable[0x44 - 2-2-6-6-6-2] ACX_PACKED;
+} acx111_template_probereq_t;
+
+typedef struct acx_template_proberesp {
+	u16 	size ACX_PACKED;
+	u16	fc ACX_PACKED;		/* 00 2 fc * (bits [15:12] and [10:8] per 802.11 section 7.1.3.1) */
+	u16	dur ACX_PACKED;		/* 02 2 Duration */
+	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address */
+	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address */
+	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID */
+	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
+	u8	timestamp[8] ACX_PACKED;/* 18 8 Timestamp */
+	u16	beacon_interval ACX_PACKED; /* 20 2 Beacon Interval * */
+	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
+					/* 24 n SSID * */
+					/* nn n Supported Rates * */
+					/* nn 1 DS Parameter Set * */
+	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
+} acx_template_proberesp_t;
+#define acx_template_beacon_t acx_template_proberesp_t
+#define acx_template_beacon acx_template_proberesp
+
+
+/*
+** JOIN command structure
+**
+** as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
+** NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
+typedef struct acx_joinbss {
+	u8 bssid[ETH_ALEN] ACX_PACKED;
+	u16 beacon_interval ACX_PACKED;
+	union {
+		struct {
+			u8 dtim_interval ACX_PACKED;
+			u8 rates_basic ACX_PACKED;
+			u8 rates_supported ACX_PACKED;
+		} acx100 ACX_PACKED;
+		struct {
+			u16 rates_basic ACX_PACKED;
+			u8 dtim_interval ACX_PACKED;
+		} acx111 ACX_PACKED;
+	} u ACX_PACKED;
+	u8 genfrm_txrate ACX_PACKED;	/* generated frame (beacon, probe resp, RTS, PS poll) tx rate */
+	u8 genfrm_mod_pre ACX_PACKED;	/* generated frame modulation/preamble:
+					** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
+					** bit5: short pre */
+	u8 macmode ACX_PACKED;		/* BSS Type, must be one of ACX_MODE_xxx */
+	u8 channel ACX_PACKED;
+	u8 essid_len ACX_PACKED;
+	char essid[IW_ESSID_MAX_SIZE] ACX_PACKED;	
+} acx_joinbss_t;
+
+#define JOINBSS_RATES_1		0x01
+#define JOINBSS_RATES_2		0x02
+#define JOINBSS_RATES_5		0x04
+#define JOINBSS_RATES_11	0x08
+#define JOINBSS_RATES_22	0x10
+
+/* Looks like missing bits are used to indicate 11g rates!
+** (it follows from the fact that constants below match 1:1 to RATE111_nn)
+** This was actually seen! Look at that Assoc Request sent by acx111,
+** it _does_ contain 11g rates in basic set:
+01:30:20.070772 Beacon (xxx) [1.0* 2.0* 5.5* 11.0* 6.0* 9.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit] ESS CH: 1
+01:30:20.074425 Authentication (Open System)-1: Succesful
+01:30:20.076539 Authentication (Open System)-2:
+01:30:20.076620 Acknowledgment
+01:30:20.088546 Assoc Request (xxx) [1.0* 2.0* 5.5* 6.0* 9.0* 11.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit]
+01:30:20.122413 Assoc Response AID(1) :: Succesful
+01:30:20.122679 Acknowledgment
+01:30:20.173204 Beacon (xxx) [1.0* 2.0* 5.5* 11.0* 6.0* 9.0* 12.0* 18.0* 24.0* 36.0* 48.0* 54.0* Mbit] ESS CH: 1
+*/
+#define JOINBSS_RATES_BASIC111_1	0x0001
+#define JOINBSS_RATES_BASIC111_2	0x0002
+#define JOINBSS_RATES_BASIC111_5	0x0004
+#define JOINBSS_RATES_BASIC111_11	0x0020
+#define JOINBSS_RATES_BASIC111_22	0x0100
+
+
+typedef struct mem_read_write {
+    u16 addr ACX_PACKED;
+    u16 type ACX_PACKED; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg. */
+    u32 len ACX_PACKED;
+    u32 data ACX_PACKED;
+} mem_read_write_t;
+
+typedef struct acxp80211_nullframe {
+	u16 size ACX_PACKED;
+	struct p80211_hdr_a3 hdr ACX_PACKED;
+} acxp80211_nullframe_t;
+
+typedef struct {
+    u32 chksum ACX_PACKED;
+    u32 size ACX_PACKED;
+    u8 data[1] ACX_PACKED; /* the byte array of the actual firmware... */
+} firmware_image_t;
+
+typedef struct {
+    u32 offset ACX_PACKED;
+    u32 len ACX_PACKED;
+} acx_cmd_radioinit_t;
+
+typedef struct acx100_ie_wep_options {
+    u16	type ACX_PACKED;
+    u16	len ACX_PACKED;
+    u16	NumKeys ACX_PACKED;	/* max # of keys */
+    u8	WEPOption ACX_PACKED;	/* 0 == decrypt default key only, 1 == override decrypt */
+    u8	Pad ACX_PACKED;		/* used only for acx111 */
+} acx100_ie_wep_options_t;
+
+typedef struct ie_dot11WEPDefaultKey {
+    u16	type ACX_PACKED;
+    u16	len ACX_PACKED;
+    u8	action ACX_PACKED;
+    u8	keySize ACX_PACKED;
+    u8	defaultKeyNum ACX_PACKED;
+    u8	key[29] ACX_PACKED;	/* check this! was Key[19]. */
+} ie_dot11WEPDefaultKey_t;
+
+typedef struct acx111WEPDefaultKey {
+    u8	MacAddr[ETH_ALEN] ACX_PACKED;
+    u16	action ACX_PACKED; /* NOTE: this is a u16, NOT a u8!! */
+    u16	reserved ACX_PACKED;
+    u8	keySize ACX_PACKED;
+    u8	type ACX_PACKED;
+    u8	index ACX_PACKED;
+    u8	defaultKeyNum ACX_PACKED;
+    u8	counter[6] ACX_PACKED;
+    u8	key[32] ACX_PACKED;	/* up to 32 bytes (for TKIP!) */
+} acx111WEPDefaultKey_t;
+
+typedef struct ie_dot11WEPDefaultKeyID {
+    u16	type ACX_PACKED;
+    u16	len ACX_PACKED;
+    u8	KeyID ACX_PACKED;
+} ie_dot11WEPDefaultKeyID_t;
+
+typedef struct acx100_cmd_wep_mgmt {
+    u8	MacAddr[ETH_ALEN] ACX_PACKED;
+    u16	Action ACX_PACKED;
+    u16	KeySize ACX_PACKED;
+    u8	Key[29] ACX_PACKED; /* 29*8 == 232bits == WEP256 */
+} acx100_cmd_wep_mgmt_t;
+
+/* a helper struct for quick implementation of commands */
+typedef struct GenericPacket {
+	u8 bytes[32] ACX_PACKED;
+} GenericPacket_t;
+
+typedef struct defaultkey {
+	u8 num;
+} defaultkey_t;
+
+typedef struct acx_ie_generic {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	union data {
+		struct GenericPacket gp ACX_PACKED;
+		/* struct wep wp ACX_PACKED; */
+		struct associd asid ACX_PACKED;
+		struct defaultkey dkey ACX_PACKED;
+	} m ACX_PACKED;
+} acx_ie_generic_t;
+
+/* Config Option structs */
+
+typedef struct co_antennas {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u8	list[2] ACX_PACKED;
+} co_antennas_t;
+
+typedef struct co_powerlevels {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u16	list[8] ACX_PACKED;
+} co_powerlevels_t;
+
+typedef struct co_datarates {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u8	list[8] ACX_PACKED;
+} co_datarates_t;
+
+typedef struct co_domains {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u8	list[6] ACX_PACKED;
+} co_domains_t;
+
+typedef struct co_product_id {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u8	list[128] ACX_PACKED;
+} co_product_id_t;
+
+typedef struct co_manuf_id {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    u8	list[128] ACX_PACKED;
+} co_manuf_t;
+
+typedef struct co_fixed {
+    u8	type ACX_PACKED;
+    u8	len ACX_PACKED;
+    char	NVSv[8] ACX_PACKED;
+    u8	MAC[6] ACX_PACKED;
+    u16	probe_delay ACX_PACKED;
+    u32	eof_memory ACX_PACKED;
+    u8	dot11CCAModes ACX_PACKED;
+    u8	dot11Diversity ACX_PACKED;
+    u8	dot11ShortPreambleOption ACX_PACKED;
+    u8	dot11PBCCOption ACX_PACKED;
+    u8	dot11ChannelAgility ACX_PACKED;
+    u8	dot11PhyType ACX_PACKED;
+/*    u8	dot11TempType ACX_PACKED;
+    u8	num_var ACX_PACKED;           seems to be erased     */
+} co_fixed_t;
+
+
+typedef struct acx_configoption {
+    co_fixed_t			configoption_fixed ACX_PACKED;
+    co_antennas_t		antennas ACX_PACKED;
+    co_powerlevels_t		power_levels ACX_PACKED;
+    co_datarates_t		data_rates ACX_PACKED;
+    co_domains_t		domains ACX_PACKED;
+    co_product_id_t		product_id ACX_PACKED;
+    co_manuf_t			manufacturer ACX_PACKED;
+} acx_configoption_t;
+
+
+/*= idma.h ===================================================================*/
+/* I've hoped it's a 802.11 PHY header, but no...
+ * so far, I've seen on acx111:
+ * 0000 3a00 0000 0000 IBBS Beacons
+ * 0000 3c00 0000 0000 ESS Beacons
+ * 0000 2700 0000 0000 Probe requests
+ * --vda
+ */
+typedef struct phy_hdr {
+	u8	unknown[4] ACX_PACKED;
+	u8	acx111_unknown[4] ACX_PACKED;
+} phy_hdr_t;
+
+/* seems to be a bit similar to hfa384x_rx_frame.
+ * These fields are still not quite obvious, though.
+ * Some seem to have different meanings... */
+
+#define RXBUF_HDRSIZE 12
+#define PHY_HDR(rxbuf) ((phy_hdr_t*)&rxbuf->hdr_a3)
+#define RXBUF_BYTES_RCVD(rxbuf) (le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff)
+#define RXBUF_BYTES_USED(rxbuf) \
+		((le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff) + RXBUF_HDRSIZE)
+
+typedef struct rxbuffer {
+	u16	mac_cnt_rcvd ACX_PACKED;	/* 0x0, only 12 bits are len! (0xfff) */
+	u8	mac_cnt_mblks ACX_PACKED;	/* 0x2 */
+	u8	mac_status ACX_PACKED;		/* 0x3 */
+	u8	phy_stat_baseband ACX_PACKED;	/* 0x4 bit 0x80: used LNA (Low-Noise Amplifier) */
+	u8	phy_plcp_signal ACX_PACKED;	/* 0x5 */
+	u8	phy_level ACX_PACKED;		/* 0x6 PHY stat */
+	u8	phy_snr ACX_PACKED;		/* 0x7 PHY stat */
+	u32	time ACX_PACKED;		/* 0x8 timestamp upon MAC rcv first byte */
+/* 4-byte (acx100) or 8-byte (acx111) phy header will be here
+** if RX_CFG1_INCLUDE_PHY_HDR is in effect:
+**	phy_hdr_t phy 			*/
+	wlan_hdr_a3_t hdr_a3 ACX_PACKED;	/* 0x0c 0x18 */
+	u8	data_a3[ACX100_BAP_DATALEN_MAX] ACX_PACKED;
+	/* can add hdr/data_a4 if needed */
+} rxbuffer_t;	/* 0x956 */
+
+typedef struct txbuffer {
+	u8 data[WLAN_MAX_ETHFRM_LEN-WLAN_ETHHDR_LEN] ACX_PACKED;
+} txbuffer_t;
+
+/* This struct must contain the header of a packet. A header can maximally
+ * contain a type 4 802.11 header + a LLC + a SNAP, amounting to 38 bytes */
+typedef struct framehdr {
+	char data[0x26] ACX_PACKED;
+} framehdr_t;
+
+/* figure out tx descriptor pointer, depending on different acx100 or acx111
+ * tx descriptor length */
+#define GET_TX_DESC_PTR(dc, index) \
+	(struct txdescriptor *) (((u8 *)(dc)->pTxDescQPool) + ((index) * dc->TxDescrSize))
+#define GET_NEXT_TX_DESC_PTR(dc, txdesc) \
+	(struct txdescriptor *) (((u8 *)(txdesc)) + (dc)->TxDescrSize)
+
+/* flags:
+ * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
+ */
+#define DESC_CTL_SHORT_PREAMBLE 0x01	/* Preamble type: 0 = long; 1 = short */
+#define DESC_CTL_FIRSTFRAG      0x02	/* This is the 1st frag of the frame */
+#define DESC_CTL_AUTODMA        0x04	
+#define DESC_CTL_RECLAIM        0x08	/* ready to reuse */
+#define DESC_CTL_HOSTDONE       0x20	/* host has finished processing */
+#define DESC_CTL_ACXDONE        0x40    /* acx1xx has finished processing */
+#define DESC_CTL_HOSTOWN        0x80    /* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
+
+#define	DESC_CTL_INIT		(DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM | \
+				 DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG)
+
+#define	DESC_CTL_DONE		(DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
+
+#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
+#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
+#define DESC_CTL2_MORE_FRAG	0x04
+#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
+#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
+#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
+#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
+#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
+
+/* Values for rate field (acx100 only) */
+#define RATE100_1		10
+#define RATE100_2		20
+#define RATE100_5		55
+#define RATE100_11		110
+#define RATE100_22		220
+/* This bit denotes use of PBCC:
+** (PBCC encoding usable with 11 and 22 Mbps speeds only) */
+#define RATE100_PBCC511		0x80
+/* Where did these come from? */
+#define RATE100_6_G		0x0D
+#define RATE100_9_G		0x0F
+#define RATE100_12_G		0x05
+#define RATE100_18_G		0x07
+#define RATE100_24_G		0x09
+#define RATE100_36_G		0x0B
+#define RATE100_48_G		0x01
+#define RATE100_54_G		0x03
+
+/* Bit values for rate111 field */
+#define RATE111_1		0x0001	/* DBPSK */
+#define RATE111_2		0x0002	/* DQPSK */
+#define RATE111_5		0x0004	/* CCK or PBCC */
+#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
+#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
+#define RATE111_11		0x0020	/* CCK or PBCC */
+#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
+#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
+#define RATE111_22		0x0100	/* PBCC */
+#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
+#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
+#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
+#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
+#define RATE111_RESERVED	0x2000
+#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
+#define RATE111_SHORTPRE	0x8000  /* short preamble */
+/* Special 'try everything' value */
+#define RATE111_ALL		0x1fff
+/* These bits denote acx100 compatible settings */
+#define RATE111_ACX100_COMPAT	0x0127
+/* These bits denote 802.11b compatible settings */
+#define RATE111_80211B_COMPAT	0x0027
+
+/* For the sake of humanity, here are all 11b/11g/11a rates and modulations:
+     11b 11g 11a
+     --- --- ---
+ 1  |B  |B  |
+ 2  |Q  |Q  |
+ 5.5|Cp |C p|
+ 6  |   |Od |O
+ 9  |   |od |o
+11  |Cp |C p|
+12  |   |Od |O
+18  |   |od |o
+22  |   |  p|
+24  |   |Od |O
+33  |   |  p|
+36  |   |od |o
+48  |   |od |o
+54  |   |od |o
+
+Mandatory:
+ B - DBPSK
+ Q - DQPSK
+ C - CCK
+ O - OFDM
+Optional:
+ o - OFDM
+ d - CCK-OFDM (also known as DSSS-OFDM)
+ p - PBCC
+
+DBPSK = Differential Binary Phase Shift Keying
+DQPSK = Differential Quaternary Phase Shift Keying
+DSSS = Direct Sequence Spread Spectrum
+CCK = Complementary Code Keying, a form of DSSS
+PBCC = Packet Binary Convolutional Coding
+OFDM = Orthogonal Frequency Division Multiplexing
+
+The term CCK-OFDM may be used interchangeably with DSSS-OFDM
+(the IEEE 802.11g-2003 standard uses the latter terminology).
+In the CCK-OFDM, the PLCP header of the frame uses the CCK form of DSSS,
+while the PLCP payload (the MAC frame) is modulated using OFDM.
+
+Basically, you must use CCK-OFDM if you have mixed 11b/11g environment,
+or else (pure OFDM) 11b equipment may not realize that AP
+is sending a packet and start sending its own one.
+Sadly, looks like acx111 does not support CCK-OFDM, only pure OFDM.
+
+Re PBCC: avoid using it. It makes sense only if you have
+TI "11b+" hardware. You _must_ use PBCC in order to reach 22Mbps on it.
+
+Preambles:
+
+Long preamble (at 1Mbit rate, takes 144 us):
+    16 bytes	ones
+     2 bytes	0xF3A0 (lsb sent first)
+PLCP header follows (at 1Mbit also):
+     1 byte	Signal: speed, in 0.1Mbit units, except for:
+		33Mbit: 33 (instead of 330 - doesn't fit in octet)
+		all CCK-OFDM rates: 30
+     1 byte	Service
+	0,1,4:	reserved
+	2:	1=locked clock
+	3:	1=PBCC
+	5:	Length Extension (PBCC 22,33Mbit (11g only))  <-
+	6:	Length Extension (PBCC 22,33Mbit (11g only))  <- BLACK MAGIC HERE
+	7:	Length Extension                              <-
+     2 bytes	Length (time needed to tx this frame)
+		a) 5.5 Mbit/s CCK
+		   Length = octets*8/5.5, rounded up to integer
+		b) 11 Mbit/s CCK
+		   Length = octets*8/11, rounded up to integer
+		   Service bit 7:
+			0 = rounding took less than 8/11
+			1 = rounding took more than or equal to 8/11
+		c) 5.5 Mbit/s PBCC
+		   Length = (octets+1)*8/5.5, rounded up to integer
+		d) 11 Mbit/s PBCC
+		   Length = (octets+1)*8/11, rounded up to integer
+		   Service bit 7:
+			0 = rounding took less than 8/11
+			1 = rounding took more than or equal to 8/11
+		e) 22 Mbit/s PBCC
+		   Length = (octets+1)*8/22, rounded up to integer
+		   Service bits 6,7:
+			00 = rounding took less than 8/22ths
+			01 = rounding took 8/22...15/22ths
+			10 = rounding took 16/22ths or more.
+		f) 33 Mbit/s PBCC
+		   Length = (octets+1)*8/33, rounded up to integer
+		   Service bits 5,6,7:
+			000 rounding took less than 8/33
+			001 rounding took 8/33...15/33
+			010 rounding took 16/33...23/33
+			011 rounding took 24/33...31/33
+			100 rounding took 32/33 or more
+     2 bytes	CRC
+
+PSDU follows (up to 2346 bytes at selected rate)
+
+While Signal value alone is not enough to determine rate and modulation,
+Signal+Service is always sufficient.
+
+Short preamble (at 1Mbit rate, takes 72 us):
+     7 bytes	zeroes
+     2 bytes	0x05CF (lsb sent first)
+PLCP header follows *at 2Mbit/s*. Format is the same as in long preamble.
+PSDU follows (up to 2346 bytes at selected rate)
+
+OFDM preamble is completely different, uses OFDM
+modulation from the start and thus easily identifiable.
+Not shown here.
+*/
+
+/* some fields here are actually pointers,
+ * but they have to remain u32, since using ptr instead
+ * (8 bytes on 64bit systems!!) would disrupt the fixed descriptor
+ * format the acx firmware expects in the non-user area.
+ * Since we need to cram an 8 byte ptr into 4 bytes, this probably
+ * means that ACX related data needs to remain in low memory
+ * (address value needs <= 4 bytes) on 64bit
+ * (alternatively we need to cope with the shorted value somehow) */
+typedef u32 ACX_PTR;
+typedef struct txdescriptor {
+	ACX_PTR	pNextDesc ACX_PACKED;		/* pointer to next txdescriptor */
+	ACX_PTR	HostMemPtr ACX_PACKED;
+	ACX_PTR	AcxMemPtr ACX_PACKED;
+	u32	tx_time ACX_PACKED;
+	u16	total_length ACX_PACKED;
+	u16	Reserved ACX_PACKED;
+	/* the following 16 bytes do not change when acx100 owns the descriptor */
+	union { /* we need to add a union here with a *fixed* size of 16, since ptrlen AMD64 (8) != ptrlen x86 (4) */
+		struct {
+			struct client *txc ACX_PACKED;
+			struct txhostdescriptor *host_desc ACX_PACKED;
+		} s ACX_PACKED;
+		struct {
+			u32 d1 ACX_PACKED;
+			u32 d2 ACX_PACKED;
+			u32 d3 ACX_PACKED;
+			u32 d4 ACX_PACKED;
+		} dummy ACX_PACKED;
+	} fixed_size ACX_PACKED;
+	u8	Ctl_8 ACX_PACKED;			/* 0x24, 8bit value */
+	u8	Ctl2_8 ACX_PACKED;			/* 0x25, 8bit value */
+	u8	error ACX_PACKED;			/* 0x26 */
+	u8	ack_failures ACX_PACKED;		/* 0x27 */
+	u8	rts_failures ACX_PACKED;		/* 0x28 */
+	u8	rts_ok ACX_PACKED;			/* 0x29 */
+	union {
+    		struct {
+			u8	rate ACX_PACKED;	/* 0x2a */
+			u8	queue_ctrl ACX_PACKED;	/* 0x2b */
+    		} r1 ACX_PACKED;
+    		struct {
+			u16  rate111 ACX_PACKED;
+    		} r2 ACX_PACKED;
+	} u ACX_PACKED;
+	u32	queue_info ACX_PACKED;			/* 0x2c (acx100, 'reserved' on acx111) */
+} txdesc_t;		/* size : 48 = 0x30 */
+/* NOTE: The acx111 txdescriptor structure is 4 byte larger */
+/* There are 4 more 'reserved' bytes. tx alloc code takes this into account */
+
+typedef struct txhostdescriptor {
+	ACX_PTR	data_phy ACX_PACKED;			/* 0x00 [u8 *] */
+	u16	data_offset ACX_PACKED;			/* 0x04 */
+	u16	reserved ACX_PACKED;			/* 0x06 */
+	u16	Ctl_16 ACX_PACKED; /* 16bit value, endianness!! */
+	u16	length ACX_PACKED;			/* 0x0a */
+	ACX_PTR	desc_phy_next ACX_PACKED;		/* 0x0c [txhostdescriptor *] */
+	ACX_PTR	pNext ACX_PACKED;			/* 0x10 [txhostdescriptor *] */
+	u32	Status ACX_PACKED;			/* 0x14, unused on Tx */
+/* From here on you can use this area as you want (variable length, too!) */
+	struct	txhostdescriptor *desc_phy ACX_PACKED;	/* 0x18 [txhostdescriptor *] */
+	u8	*data ACX_PACKED;
+} txhostdesc_t;		/* size: variable, currently 0x20 */
+
+typedef struct rxdescriptor {
+	ACX_PTR	pNextDesc ACX_PACKED;			/* 0x00 */
+	ACX_PTR	HostMemPtr ACX_PACKED;			/* 0x04 */
+	ACX_PTR	ACXMemPtr ACX_PACKED;			/* 0x08 */
+	u32	rx_time ACX_PACKED;			/* 0x0c */
+	u16	total_length ACX_PACKED;		/* 0x10 */
+	u16	WEP_length ACX_PACKED;			/* 0x12 */
+	u32	WEP_ofs ACX_PACKED;			/* 0x14 */
+	u8	driverWorkspace[16] ACX_PACKED;		/* 0x18 */
+#if 0
+	u32	val0x18 ACX_PACKED;			/* 0x18 the following 16 bytes do not change when acx100 owns the descriptor */
+	u32	val0x1c ACX_PACKED;			/* 0x1c */
+	u32	val0x20 ACX_PACKED;			/* 0x20 */
+	struct	rxbuffer *val0x24 ACX_PACKED;		/* 0x24 */
+#endif 
+
+	u8	Ctl_8 ACX_PACKED;
+	u8	rate ACX_PACKED;
+	u8	error ACX_PACKED;
+	u8	SNR ACX_PACKED;				/* Signal-to-Noise Ratio */
+	u8	RxLevel ACX_PACKED;
+	u8	queue_ctrl ACX_PACKED;
+	u16	unknown ACX_PACKED;
+	u32	val0x30 ACX_PACKED;
+} rxdesc_t;		/* size 52 = 0x34 */
+
+typedef struct rxhostdescriptor {
+	ACX_PTR	data_phy ACX_PACKED;			/* 0x00 [struct rxbuffer *] */
+	u16	data_offset ACX_PACKED;			/* 0x04 */
+	u16	reserved ACX_PACKED;			/* 0x06 */
+	u16	Ctl_16 ACX_PACKED;			/* 0x08; 16bit value, endianness!! */
+	u16	length ACX_PACKED;			/* 0x0a */
+	ACX_PTR	desc_phy_next ACX_PACKED;		/* 0x0c [struct rxhostdescriptor *] */
+	ACX_PTR	pNext ACX_PACKED;			/* 0x10 [struct rxhostdescriptor *] */
+	u32	Status ACX_PACKED;			/* 0x14 */
+/* From here on you can use this area as you want (variable length, too!) */
+	struct	rxhostdescriptor *desc_phy ACX_PACKED;	/* 0x18 */
+	struct	rxbuffer *data ACX_PACKED;
+} rxhostdesc_t;		/* size: variable, currently 0x20 */
+
+typedef struct acx100_ie_memblocksize {
+	u16 type ACX_PACKED;
+	u16 len ACX_PACKED;
+	u16 size ACX_PACKED;
+} acx100_ie_memblocksize_t;
+
+/*============================================================================*
+ * Global data                                                                *
+ *============================================================================*/
+extern const u8 bitpos2ratebyte[];

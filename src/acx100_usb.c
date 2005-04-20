@@ -699,7 +699,11 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	if (firmware_dir) sprintf(filename,"%s/ACX100_USB.bin",firmware_dir);
 	else sprintf(filename,"/usr/share/acx/ACX100_USB.bin");
 	acxlog(L_INIT,"loading firmware %s\n",filename);
+#ifdef USE_FW_LOADER_26
 	firmware=(char *)acx_read_fw(&usbdev->dev, filename, &size);
+#else
+	firmware=(char *)acx_read_fw(filename, &size);
+#endif
 	if (!firmware) {
 		kfree(usbbuf);
 		return(-EIO);
@@ -1036,7 +1040,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 		 * ---------------------------------------- */
 		if (priv->rxtruncation) {
 			ptr=(rxbuffer_t *)&(priv->rxtruncbuf);
-			packetsize=MAC_CNT_RCVD(ptr)+ACX100_RXBUF_HDRSIZE;
+			packetsize=RXBUF_BYTES_RCVD(ptr)+RXBUF_HDRSIZE;
 			rxdesc=&(ticontext->pRxHostDescQPool[ticontext->rx_tail]);
 			SET_BIT(rxdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 			rxdesc->Status=cpu_to_le32(0xF0000000);	/* set the MSB, FIXME: shouldn't that be MSBit instead??? (BIT31) */
@@ -1065,7 +1069,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 				memcpy(((char *)(rxdesc->data))+priv->rxtruncsize,(char *)ptr,packetsize-priv->rxtruncsize);
 #if ACX_DEBUG			
 				acxlog(L_USBRXTX,"full trailing packet + 12 bytes:\n");
-				if (debug&L_USBRXTX) acx_dump_bytes(ptr,(packetsize-priv->rxtruncsize)+ACX100_RXBUF_HDRSIZE);
+				if (debug&L_USBRXTX) acx_dump_bytes(ptr,(packetsize-priv->rxtruncsize)+RXBUF_HDRSIZE);
 #endif
 				priv->rxtruncation=0;
 				offset=(packetsize-priv->rxtruncsize);
@@ -1076,7 +1080,7 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			acxlog(L_USBRXTX,"post-merge offset: %d usbsize: %d remsize=%d\n",offset,size,remsize);
 		}
 		while (offset<size) {
-			packetsize=MAC_CNT_RCVD(ptr)+ACX100_RXBUF_HDRSIZE;
+			packetsize=RXBUF_BYTES_RCVD(ptr)+RXBUF_HDRSIZE;
 			acxlog(L_USBRXTX,"packet with packetsize=%d\n",packetsize);
 			if (packetsize>sizeof(rxbuffer_t)) {
 				printk(KERN_ERR "packetsize exceeded (got %d , max %d, usbsize=%d)\n",packetsize,sizeof(rxbuffer_t),size);
@@ -1086,20 +1090,20 @@ static void acx100usb_complete_rx(struct urb *urb, struct pt_regs *regs)
 			 * skip zero-length packets...
 			 * ----------------------------- */
 			if (packetsize==0) {
-				offset+=ACX100_RXBUF_HDRSIZE;
-				remsize-=ACX100_RXBUF_HDRSIZE;
+				offset+=RXBUF_HDRSIZE;
+				remsize-=RXBUF_HDRSIZE;
 				acxlog(L_USBRXTX,"packetsize=0, new offs=%d new rem=%d header follows:\n",offset,remsize);
 #if ACX_DEBUG
 				if (debug&L_USBRXTX) acx_dump_bytes(ptr,12);
 #endif
-				ptr=(rxbuffer_t *)(((char *)ptr)+ACX100_RXBUF_HDRSIZE);
+				ptr=(rxbuffer_t *)(((char *)ptr)+RXBUF_HDRSIZE);
 				continue;
 			}
 			/* -------------------------------
 			 * if packet has no information,
 			 * skip it..
 			 * ---------------------------- */
-			if (remsize<=ACX100_RXBUF_HDRSIZE) {
+			if (remsize<=RXBUF_HDRSIZE) {
 			}
 			if (packetsize>remsize) {
 				/* -----------------------------------
@@ -1256,7 +1260,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 	buf->hdr.ctrl1=0;
 	buf->hdr.ctrl2=0;
 	buf->hdr.hostData=cpu_to_le32(size|(desc->u.r1.rate)<<24);
-	if (1 == priv->defpeer.shortpre) /* vda: TODO: when to use ap_peer? */
+	if (1 == priv->preamble_cur)
 		SET_BIT(buf->hdr.ctrl1, DESC_CTL_SHORT_PREAMBLE);
 	SET_BIT(buf->hdr.ctrl1, DESC_CTL_FIRSTFRAG);
 	buf->hdr.txRate=desc->u.r1.rate;
@@ -1275,7 +1279,7 @@ static void acx100usb_prepare_tx(wlandevice_t *priv,struct txdescriptor *desc) {
 
 
 	if (priv->bulktx_urbs[bufindex]->status==-EINPROGRESS) {
-		printk(KERN_WARNING SHORTNAME "trying to subma a tx urb while already in progress\n");
+		printk(KERN_WARNING SHORTNAME "trying to submit a tx urb while already in progress\n");
 	}
 	
 	priv->usb_txsize=size+sizeof(acx100_usb_txhdr_t);

@@ -1,6 +1,3 @@
-#ifndef __ACX_MONITOR_H
-#define __ACX_MONITOR_H
-
 /* required structs for prism header emulation (monitor mode) */
 #define WLAN_DEVNAMELEN_MAX 16
 
@@ -16,20 +13,28 @@
 #define DIDmsg_lnxind_wlansniffrm_istx		0x9041
 #define DIDmsg_lnxind_wlansniffrm_frmlen	0xA041
 
+    __WLAN_PRAGMA_PACK1__ typedef struct p80211item_uint32 {
+	u32 did __WLAN_ATTRIB_PACK__;
+	u16 status __WLAN_ATTRIB_PACK__;
+	u16 len __WLAN_ATTRIB_PACK__;
+	u32 data __WLAN_ATTRIB_PACK__;
+} __WLAN_ATTRIB_PACK__ p80211item_uint32_t;
+__WLAN_PRAGMA_PACKDFLT__
+
 typedef struct p80211msg_lnxind_wlansniffrm {
-	uint32_t msgcode ACX_PACKED;
-	uint32_t msglen ACX_PACKED;
-	uint8_t devname[WLAN_DEVNAMELEN_MAX] ACX_PACKED;
-	p80211item_uint32_t hosttime ACX_PACKED;
-	p80211item_uint32_t mactime ACX_PACKED;
-	p80211item_uint32_t channel ACX_PACKED;
-	p80211item_uint32_t rssi ACX_PACKED;
-	p80211item_uint32_t sq ACX_PACKED;
-	p80211item_uint32_t signal ACX_PACKED;
-	p80211item_uint32_t noise ACX_PACKED;
-	p80211item_uint32_t rate ACX_PACKED;
-	p80211item_uint32_t istx ACX_PACKED;
-	p80211item_uint32_t frmlen ACX_PACKED;
+	uint32_t msgcode __WLAN_ATTRIB_PACK__;
+	uint32_t msglen __WLAN_ATTRIB_PACK__;
+	uint8_t devname[WLAN_DEVNAMELEN_MAX] __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t hosttime __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t mactime __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t channel __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t rssi __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t sq __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t signal __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t noise __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t rate __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t istx __WLAN_ATTRIB_PACK__;
+	p80211item_uint32_t frmlen __WLAN_ATTRIB_PACK__;
 } p80211msg_lnxind_wlansniffrm_t;
 
 #define P80211ENUM_truth_false				0
@@ -64,5 +69,3 @@ typedef struct p80211msg_lnxind_wlansniffrm {
 #define P80211ENUM_msgitem_status_unknown		13
 #define P80211ENUM_msgitem_status_invalid_did		14
 #define P80211ENUM_msgitem_status_missing_print_func	15
-
-#endif /* __ACX_MONITOR_H */

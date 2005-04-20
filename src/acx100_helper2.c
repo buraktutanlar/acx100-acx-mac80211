@@ -68,8 +68,6 @@
 #include <asm/uaccess.h>
 #include <asm/string.h>
 
-#include <wlan_compat.h>
-
 #include <linux/ioport.h>
 #include <linux/pm.h>
 
@@ -84,9 +82,7 @@
 #include <acx.h>
 
 static client_t *acx_sta_list_alloc(wlandevice_t *priv);
-static client_t *acx_sta_list_add(wlandevice_t *priv, const u8 *address);
 static client_t *acx_sta_list_get_from_hash(wlandevice_t *priv, const u8 *address);
-static client_t *acx_sta_list_get(wlandevice_t *priv, const u8 *address);
 static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *arg_0,
 		                          wlandevice_t *priv);
 static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *arg_0,
@@ -119,9 +115,6 @@ static int acx_transmit_authen4(const wlan_fr_authen_t *arg_0, wlandevice_t *pri
 static int acx_transmit_assoc_req(wlandevice_t *priv);
 static void ActivatePowerSaveMode(wlandevice_t *priv, /*@unused@*/ int vala);
 
-
-static u16 CurrentAID = 1;
-
 static const u8 bcast_addr[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 const char * const g_wlan_state_str[COUNT_STATE_STR] = { /* global! */
@@ -149,10 +142,8 @@ static inline client_t *acx_sta_list_alloc(wlandevice_t *priv)
 
 	FN_ENTER;
 	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
-		if (priv->sta_list[i].used == 0) {
-			priv->sta_list[i].used = CLIENT_EXIST_1;
-			priv->sta_list[i].auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
-			priv->sta_list[i].auth_step = 1;
+		if (!priv->sta_list[i].used) {
+			memset(&priv->sta_list[i], 0, sizeof(priv->sta_list[i]));
 			FN_EXIT1((int)&(priv->sta_list[i]));
 			return &(priv->sta_list[i]);
 		}
@@ -164,7 +155,7 @@ static inline client_t *acx_sta_list_alloc(wlandevice_t *priv)
 /*----------------------------------------------------------------
 * acx_sta_list_add
 *----------------------------------------------------------------*/
-static client_t *acx_sta_list_add(wlandevice_t *priv, const u8 *address)
+client_t *acx_sta_list_add(wlandevice_t *priv, const u8 *address)
 {
 	client_t *client;
 	int index;
@@ -174,8 +165,18 @@ static client_t *acx_sta_list_add(wlandevice_t *priv, const u8 *address)
 	client = acx_sta_list_alloc(priv);
 	if (!client)
 		goto done;
+
 	MAC_COPY(client->address, address);
 	client->used = CLIENT_EXIST_1;
+	client->auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
+	client->auth_step = 1;
+	/* give some tentative peer rate values
+	** (needed because peer may do auth without probing us first,
+	** thus we have no idea of peer's ratevector yet).
+	** Will be overwritten by scanning or assoc code */
+	client->rate_cap = priv->rate_basic;
+	client->rate_cfg = priv->rate_basic;
+	client->rate_cur = 1 << lowest_bit(priv->rate_basic);
 
 	index = address[5] % VEC_SIZE(priv->sta_hash_tab);
 	client->next = priv->sta_hash_tab[index];
@@ -197,9 +198,32 @@ static inline client_t *acx_sta_list_get_from_hash(wlandevice_t *priv, const u8 
 }
 
 /*----------------------------------------------------------------
+* acx_sta_list_del
+*----------------------------------------------------------------*/
+void acx_sta_list_del(wlandevice_t *priv, client_t *victim)
+{
+	client_t *client, *next;
+
+	client = acx_sta_list_get_from_hash(priv, victim->address);
+	next = client;
+	/* tricky. next = client on first iteration only,
+	** on all other iters next = client->next */
+	while (next) {
+		if (next == victim) {
+			client->next = victim->next;
+			/* Overkill. Not a hot path... */
+			memset(victim, 0, sizeof(*victim));
+			break;
+		}
+		client = next;
+		next = client->next;
+	}
+}
+
+/*----------------------------------------------------------------
 * acx_sta_list_get
 *----------------------------------------------------------------*/
-static client_t *acx_sta_list_get(wlandevice_t *priv, const u8 *address)
+client_t *acx_sta_list_get(wlandevice_t *priv, const u8 *address)
 {
 	client_t *client;
 	FN_ENTER;
@@ -213,7 +237,10 @@ static client_t *acx_sta_list_get(wlandevice_t *priv, const u8 *address)
 	return client;
 }
 
-static client_t *acx_sta_list_get_or_add(wlandevice_t *priv, const u8 *address)
+/*----------------------------------------------------------------
+* acx_sta_list_get_or_add
+*----------------------------------------------------------------*/
+client_t *acx_sta_list_get_or_add(wlandevice_t *priv, const u8 *address)
 {
 	client_t *client = acx_sta_list_get(priv, address);
 	if (!client)
@@ -315,16 +342,6 @@ void acx_set_status(wlandevice_t *priv, u16 new_status)
 	FN_EXIT0();
 }
 
-static inline p80211_hdr_t *acx_get_p80211_hdr(wlandevice_t *priv, const rxhostdesc_t *rxdesc)
-{
-	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
-		/* take into account additional header in front of packet */
-		return (p80211_hdr_t *)((u8 *)&rxdesc->data->hdr_a3 + 4);
-	} else {
-		return (p80211_hdr_t *)&rxdesc->data->hdr_a3;
-	}
-}
-
 /*------------------------------------------------------------------------------
  * acx_rx_ieee802_11_frame
  *
@@ -350,8 +367,8 @@ int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdesc_t *rxdesc)
 
 	FN_ENTER;
 
-	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
-/*	printk("Rx_CONFIG_1 = %X\n",priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR); */
+	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc->data);
+/*	printk("Rx_CONFIG_1 = %X\n",priv->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR); */
 
 	/* see IEEE 802.11-1999.pdf chapter 7 "MAC frame formats" */
 	ftype = p80211_hdr->a3.fc & WF_FC_FTYPEi;
@@ -362,6 +379,14 @@ int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdesc_t *rxdesc)
 	case WF_FTYPE_DATAi:
 		switch (fstype) {
 		case WF_FSTYPE_DATAONLYi:
+			if (unlikely(p80211_hdr->a3.seq == priv->last_seq_ctrl)) {
+				acxlog(L_STD, "rx: DUP pkt (seq %u)!\n", priv->last_seq_ctrl);
+				/* simply discard it and indicate error */
+				priv->stats.rx_errors++;
+				break;
+			}
+			else
+				priv->last_seq_ctrl = p80211_hdr->a3.seq;
 			switch (priv->mode) {
 			case ACX_MODE_3_AP:
 				result = acx_process_data_frame_master(rxdesc, priv);
@@ -410,8 +435,51 @@ int acx_rx_ieee802_11_frame(wlandevice_t *priv, rxhostdesc_t *rxdesc)
 
 /*----------------------------------------------------------------
 * acx_transmit_assocresp
+*
+* We are an AP here
+*
 * STATUS: should be ok, but UNVERIFIED.
 *----------------------------------------------------------------*/
+static const u8
+dot11ratebyte[] = {
+	DOT11RATEBYTE_1,
+	DOT11RATEBYTE_2,
+	DOT11RATEBYTE_5_5,
+	DOT11RATEBYTE_6_G,
+	DOT11RATEBYTE_9_G,
+	DOT11RATEBYTE_11,
+	DOT11RATEBYTE_12_G,
+	DOT11RATEBYTE_18_G,
+	DOT11RATEBYTE_22,
+	DOT11RATEBYTE_24_G,
+	DOT11RATEBYTE_36_G,
+	DOT11RATEBYTE_48_G,
+	DOT11RATEBYTE_54_G,
+};
+
+static int
+find_pos(const u8 *p, int size, u8 v)
+{
+	int i;
+	for (i = 0; i < size; i++)
+		if (p[i] == v)
+			return i;
+	/* printk a message about strange byte? */
+	return 0;
+}
+
+static void
+add_bits_to_ratemasks(u8* ratevec, int len, u16* brate, u16* orate)
+{
+	while (len--) {
+		int n = 1 << find_pos(dot11ratebyte, sizeof(dot11ratebyte), *ratevec & 0x7f);
+		if (*ratevec & 0x80)
+			*brate |= n;
+		*orate |= n;
+		ratevec++;
+	}
+}
+
 static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 			  wlandevice_t *priv)
 {
@@ -425,8 +493,6 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	const u8 *sa;
 	const u8 *bssid;
 	client_t *clt;
-
-	static const u8 ratemask[] = { 0, 1, 3, 7, 0xf, 0x1f };
 
 	FN_ENTER;
 
@@ -443,7 +509,7 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	}
 
 	/* Assoc without auth is a big no-no */
-	if (clt->used == CLIENT_EXIST_1) {
+	if (clt->used != CLIENT_AUTHENTICATED_2) {
 		acx_transmit_deauthen(da, clt, priv, WLAN_MGMT_REASON_CLASS2_NONAUTH);
 		FN_EXIT0();
 		return NOT_OK;
@@ -452,29 +518,19 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	clt->used = CLIENT_ASSOCIATED_3;
 
 	if (clt->aid == 0) {
-		clt->aid = CurrentAID;
-		CurrentAID++;
+		clt->aid = ++priv->aid;
 	}
-	clt->cap_info = ieee2host16(*(req->listen_int));
-
-#if THIS_IS_A_BUG /* FIXME! TODO! */
-	/* Looks like wrong fields of req were used here... */
-	clt->cap_info = ieee2host16(*(req->listen_int));
-	memcpy(clt->ratevec, req->ssid, req->ssid->len);
-	if (req->ssid->len < sizeof(ratemask)) {
-		clt->ratemask = ratemask[req->ssid->len];
-#else
 	clt->cap_info = ieee2host16(*(req->cap_info));
-	/* NB: it will crash here because clt->ratevec is NULL -
-	** client is memset to 0 and never modified.
-	** (in other words, we have 2 bugs here :) */
-	/* memcpy(clt->ratevec, req->supp_rates, req->supp_rates->len); */
-	if (req->supp_rates->len < sizeof(ratemask)) {
-		clt->ratemask = ratemask[req->supp_rates->len];
-#endif
-	} else {
-		clt->ratemask = 0x1f; /* 1,2,5,11,22 Mbit */
-	}
+	/* We cheat here a bit. We don't really care which rates are flagged
+	** as basic by the client, so we stuff them in single ratemask */
+	clt->rate_cap = 0;
+	if (req->supp_rates)
+		add_bits_to_ratemasks(req->supp_rates->rates,
+			req->supp_rates->len, &clt->rate_cap, &clt->rate_cap);
+	if (req->ext_rates)
+		add_bits_to_ratemasks(req->ext_rates->rates,
+			req->ext_rates->len, &clt->rate_cap, &clt->rate_cap);
+	/* TODO: what shall we do if it doesn't support whole basic rate set? */
 
 	tx_desc = acx_get_tx_desc(priv);
 	if (!tx_desc) {
@@ -501,6 +557,7 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	body->status = host2ieee16(0);
 	body->aid = host2ieee16(clt->aid);
 	p = wlan_fill_ie_rates((char*)&body->rates, priv->rate_supported_len, priv->rate_supported);
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
 	hdesc_body->length = cpu_to_le16(p - (char*)hdesc_body->data);
 	hdesc_body->data_offset = 0;
@@ -547,32 +604,20 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *req, wlandevice_
 	/* huh. why do we set first AUTH, then ASSOC? */
 	clt->used = CLIENT_ASSOCIATED_3;
 	if (clt->aid == 0) {
-		clt->aid = CurrentAID;
-		CurrentAID++;
+		clt->aid = ++priv->aid;
 	}
-	clt->cap_info = ieee2host16(*(req->cap_info));
-
-	/* NB: it will crash here because clt->ratevec is NULL -
-	** client is memset to 0 and never modified */
-	/* memcpy(clt->ratevec, req->supp_rates, req->supp_rates->len); */
-
-	switch (req->supp_rates->len) {
-	case 1:
-		clt->ratemask = 1;	/* 1 Mbit only */
-		break;
-	case 2:
-		clt->ratemask = 3;	/* 1,2 Mbits */
-		break;
-	case 3:
-		clt->ratemask = 7;	/*  1,2,5 Mbits */
-		break;
-	case 4:
-		clt->ratemask = 0xf;	/* 1,2,5,11 Mbits */
-		break;
-	default:
-		clt->ratemask = 0x1f;	/* 1,2,5,11,22 Mbits */
-		break;
-	}
+	if (req->cap_info)
+		clt->cap_info = ieee2host16(*(req->cap_info));
+	/* We cheat here a bit. We don't really care which rates are flagged
+	** as basic by the client, so we stuff them in single ratemask */
+	clt->rate_cap = 0;
+	if (req->supp_rates)
+		add_bits_to_ratemasks(req->supp_rates->rates,
+			req->supp_rates->len, &clt->rate_cap, &clt->rate_cap);
+	if (req->ext_rates)
+		add_bits_to_ratemasks(req->ext_rates->rates,
+			req->ext_rates->len, &clt->rate_cap, &clt->rate_cap);
+	/* TODO: what shall we do if it doesn't support whole basic rate set? */
 
 	tx_desc = acx_get_tx_desc(priv);
 	if (!tx_desc) {
@@ -585,7 +630,7 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *req, wlandevice_
 	head = (void*)hdesc_head->data;
 	body = (void*)hdesc_body->data;
 
-	head->fc = WF_FSTYPE_REASSOCRESPi;	/* 0x30 */
+	head->fc = WF_FSTYPE_REASSOCRESPi;
 	head->dur = req->hdr->a3.dur;
 	MAC_COPY(head->da, da);
 	MAC_COPY(head->sa, sa);
@@ -595,10 +640,16 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *req, wlandevice_
 	hdesc_head->length = cpu_to_le16(WLAN_HDR_A3_LEN);
 	hdesc_head->data_offset = 0;
 
+	/* IEs: 1. caps */
 	body->cap_info = host2ieee16(priv->capabilities);
+	/* 2. status code */
 	body->status = host2ieee16(0);
+	/* 3. AID */
 	body->aid = host2ieee16(clt->aid);
+	/* 4. supp rates */
 	p = wlan_fill_ie_rates((char*)&body->rates, priv->rate_supported_len, priv->rate_supported);
+	/* 5. ext supp rates */
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
 	hdesc_body->length = cpu_to_le16(p - (char*)hdesc_body->data);
 	hdesc_body->data_offset = 0;
@@ -680,16 +731,14 @@ end:
 *----------------------------------------------------------------*/
 static int acx_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 {
-	const client_t *clt, *var_24 = NULL;
 	p80211_hdr_t* p80211_hdr;
-	struct txdescriptor *tx_desc;
-	u8 esi = 0;
-	int result = NOT_OK;
+	struct txdescriptor *txdesc;
 	const u8 *da, *sa, *bssid;
+	int result = NOT_OK;
 
 	FN_ENTER;
 
-        p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
+        p80211_hdr = acx_get_p80211_hdr(priv, rxdesc->data);
 
 	switch (WF_FC_FROMTODSi & p80211_hdr->a3.fc) {
 	case 0:
@@ -717,61 +766,26 @@ static int acx_process_data_frame_master(struct rxhostdescriptor *rxdesc, wlande
 		goto done;
 	}
 
-	/* huh. bcast client? --vda*/
-	/* total mess. supposed to be the part where AP passes packets
-	** from one STA to the other */
-	clt = acx_sta_list_get(priv, bcast_addr);
-	if (!clt || (clt->used != CLIENT_ASSOCIATED_3)) {
-		acx_transmit_deauthen(bcast_addr, 0, priv, WLAN_MGMT_REASON_RSVD /* 0 */);
-		acxlog(L_STD, "frame error #2??\n");
-		priv->stats.rx_errors++;
-		goto fail;
-	} else {
-		esi = 2;
-		/* check if the da is not broadcast */
-		if (!mac_is_bcast(da)) {
-			if ((signed char) da[0x0] >= 0) {
-				esi = 0;
-				var_24 = acx_sta_list_get(priv, da);
-				if (!var_24) {
-					goto station_not_found;
-				}
-				if (var_24->used != 0x3) {
-					goto fail;
-				}
-			} else {
-				esi = 1;
-			}
-		}
-		if (var_24 == NULL) {
-		      station_not_found:
-			if (esi == 0) {
-				acx_rx(rxdesc, priv);
-				result = NOT_OK;
-				goto fail;
-			}
-		}
-		if ((esi == 0) || (esi == 2)) {
-			/* repackage, tx, and hope it someday reaches its destination */
-			MAC_COPY(p80211_hdr->a3.a1, da);
-			MAC_COPY(p80211_hdr->a3.a2, bssid);
-			MAC_COPY(p80211_hdr->a3.a3, sa);
-			/* To_DS = 0, From_DS = 1 */
-			p80211_hdr->a3.fc = WF_FC_FROMDSi + WF_FTYPE_DATAi;
-
-			tx_desc = acx_get_tx_desc(priv);
-			if (!tx_desc) {
-				return NOT_OK;
-			}
-
-			acx_rxdesc_to_txdesc(rxdesc, tx_desc);
-			acx_dma_tx_data(priv, tx_desc);
-
-			if (esi != 2) {
-				goto done;
-			}
-		}
+	if (mac_is_equal(priv->dev_addr, da)) {
+		/* this one is for us */
 		acx_rx(rxdesc, priv);
+		goto done;
+	} else {
+		/* repackage, tx, and hope it someday reaches its destination */
+		/* order is important, we do it in-place */
+		MAC_COPY(p80211_hdr->a3.a1, da);
+		MAC_COPY(p80211_hdr->a3.a3, sa);
+		MAC_COPY(p80211_hdr->a3.a2, priv->bssid);
+		/* To_DS = 0, From_DS = 1 */
+		p80211_hdr->a3.fc = WF_FC_FROMDSi + WF_FTYPE_DATAi;
+
+		txdesc = acx_get_tx_desc(priv);
+		if (!txdesc) {
+			result = NOT_OK;
+			goto fail;
+		}
+		acx_rxdesc_to_txdesc(rxdesc, txdesc);
+		acx_dma_tx_data(priv, txdesc);
 	}
 done:
 	result = OK;
@@ -795,7 +809,7 @@ static int acx_process_data_frame_client(struct rxhostdescriptor *rxdesc, wlande
 
 	if (ACX_STATUS_4_ASSOCIATED != priv->status) goto drop;
 
-	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
+	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc->data);
 
 	switch (WF_FC_FROMTODSi & p80211_hdr->a3.fc) {
 	case 0:	/* ad-hoc data frame */
@@ -903,7 +917,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 
 	FN_ENTER;
 
-	hdr = acx_get_p80211_hdr(priv, rxdesc);
+	hdr = acx_get_p80211_hdr(priv, rxdesc->data);
 
 	/* Management frames never have these set */
 	if (WF_FC_FROMTODSi & hdr->a3.fc) {
@@ -911,7 +925,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		return NOT_OK;
 	}
 
-	len = MAC_CNT_RCVD(rxdesc->data);
+	len = RXBUF_BYTES_RCVD(rxdesc->data);
 	if (WF_FC_ISWEPi & hdr->a3.fc)
 		len -= 0x10;
 
@@ -964,7 +978,8 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		parsed.assocreq.buf = (void*)hdr;
 		parsed.assocreq.len = len;
 		acx_mgmt_decode_assocreq(&parsed.assocreq);
-		if (mac_is_equal(hdr->a3.a2, priv->bssid)) {
+		if (mac_is_equal(hdr->a3.a1, priv->bssid)
+		 && mac_is_equal(hdr->a3.a3, priv->bssid)) {
 			acx_transmit_assocresp(&parsed.assocreq, priv);
 		}
 		break;
@@ -998,10 +1013,11 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		acx_process_reassocresp(&parsed.reassocresp, priv);
 		break;
 	case WF_FSTYPE_PROBEREQi:
-		if (ap) {
-			acxlog(L_ASSOC, "FIXME: since we're supposed to be "
-				"an AP, we need to return a "
-				"Probe Response packet!\n");
+		if (ap || adhoc) {
+			/* FIXME: since we're supposed to be an AP,
+			** we need to return a Probe Response packet.
+			** Currently firmware is doing it for us,
+			** but firmware is buggy! See comment elsewhere --vda */
 		}
 		break;
 	case WF_FSTYPE_PROBERESPi:
@@ -1044,9 +1060,7 @@ static u32 acx_process_mgmt_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 		parsed.authen.buf = (void*)hdr;
 		parsed.authen.len = len;
 		acx_mgmt_decode_authen(&parsed.authen);
-		if (mac_is_equal(priv->bssid, hdr->a3.a2)) {
-			acx_process_authen(&parsed.authen, priv);
-		}
+		acx_process_authen(&parsed.authen, priv);
 		break;
 	case WF_FSTYPE_DEAUTHENi:
 		if (!sta && !ap)
@@ -1132,7 +1146,7 @@ static int acx_process_NULL_frame(struct rxhostdescriptor *rxdesc, wlandevice_t 
 	const client_t *client;
 	int result = NOT_OK;
 
-	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc);
+	p80211_hdr = acx_get_p80211_hdr(priv, rxdesc->data);
 		
 	switch (WF_FC_FROMTODSi & p80211_hdr->a3.fc) {
 	case 0:
@@ -1175,123 +1189,76 @@ done:
 
 /*----------------------------------------------------------------
 * acx_process_probe_response
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
 * STATUS: working on it.  UNVERIFIED.
-*
-* Comment:
-*
 *----------------------------------------------------------------*/
 static void acx_process_probe_response(wlan_fr_proberesp_t *req, const struct rxbuffer *mmt, wlandevice_t *priv)
 {
-	struct bss_info *newbss;
+	struct client *bss;
 	p80211_hdr_t *hdr;
-	unsigned int station;
-	u8 rate_count;
-	unsigned int i, max_rate = 0;
 
 	FN_ENTER;
 
-	acxlog(L_ASSOC, "previous bss_table_count: %u\n", priv->bss_table_count);
-
 	hdr = req->hdr;
-
-	/* uh oh, we found more sites/stations than we can handle with
-	 * our current setup: pull the emergency brake and stop scanning! */
-	if (priv->bss_table_count > MAX_NUMBER_OF_SITE) {
-		acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
-		acx_set_status(priv, ACX_STATUS_2_WAIT_AUTH);
-
-		acxlog(L_BINDEBUG | L_ASSOC,
-		       "<Scan Beacon> bss_table_count > MAX_NUMBER_OF_SITE\n");
-		FN_EXIT0();
-		return;
-	}
 
 	if (mac_is_equal(hdr->a3.a3, priv->dev_addr)) {
 		acxlog(L_ASSOC, "huh, scan found our own MAC!?\n");
 		FN_EXIT0();
 		return; /* just skip this one silently */
 	}
-			
-	/* filter out duplicate stations we already registered in our list */
-	for (station = 0; station < priv->bss_table_count; station++) {
-		u8 *a = priv->bss_table[station].bssid;
-		acxlog(L_DEBUG,
-			"checking station %u ["MACSTR"]\n",
-			station, MAC(a));
-		if (mac_is_equal(hdr->a3.a3, priv->bss_table[station].bssid)) {
-			acxlog(L_DEBUG,
-			       "station already in our list, no need to add\n");
-			FN_EXIT0();
-			return;
-		}
+	
+	bss = acx_sta_list_get_or_add(priv, hdr->a3.a3);
+	if (!bss) {
+		/* uh oh, we found more sites/stations than we can handle with
+		 * our current setup: pull the emergency brake and stop scanning! */
+		acx_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
+		/* TODO: a nice comment what below call achieves --vda */
+		acx_set_status(priv, ACX_STATUS_2_WAIT_AUTH);
+		FN_EXIT0();
+		return;
 	}
 
-	newbss = &priv->bss_table[priv->bss_table_count];
-
-	/* Let's completely zero out the entry that we're
-	 * going to fill next in order to not risk any corruption. */
-	memset(newbss, 0, sizeof(struct bss_info));
-
-	/* copy the BSSID element */
-	MAC_COPY(newbss->bssid, hdr->a3.a3);
-	/* copy the MAC address element (source address) */
-	MAC_COPY(newbss->mac_addr, hdr->a3.a2);
+	bss->mtime = jiffies;
+	/* get_or_add filled bss->address */
+	MAC_COPY(bss->bssid, hdr->a3.a3);
 
 	/* copy the ESSID element */
-	if (req->ssid->len <= IW_ESSID_MAX_SIZE) {
-		newbss->essid_len = req->ssid->len;
-		memcpy(newbss->essid, req->ssid->ssid, req->ssid->len);
-		newbss->essid[req->ssid->len] = '\0';
+	if (req->ssid && req->ssid->len <= IW_ESSID_MAX_SIZE) {
+		bss->essid_len = req->ssid->len;
+		memcpy(bss->essid, req->ssid->ssid, req->ssid->len);
+		bss->essid[req->ssid->len] = '\0';
 	}
 	else {
 		acxlog(L_STD, "huh, ESSID overflow in scanned station data?\n");
 	}
 
-	newbss->channel = req->ds_parms->curr_ch;
-	newbss->wep = (ieee2host16(*req->cap_info) & WF_MGMT_CAP_PRIVACY);
-	newbss->caps = ieee2host16(*req->cap_info);
+	if (req->ds_parms)
+		bss->channel = req->ds_parms->curr_ch;
+	if (req->cap_info)
+		bss->cap_info = ieee2host16(*req->cap_info);
 
-	rate_count = req->supp_rates->len;
-	if (rate_count >= sizeof(req->supp_rates->rates))
-		rate_count = sizeof(req->supp_rates->rates) - 1;
-	memcpy(newbss->supp_rates, req->supp_rates->rates, rate_count);
-	newbss->supp_rates[rate_count] = '\0';
-	/* now, one just uses strlen() on it to know how many rates are there */
- 
-	newbss->sir = acx_signal_to_winlevel(mmt->phy_level);
-	newbss->snr = acx_signal_to_winlevel(mmt->phy_snr);
+	bss->sir = acx_signal_to_winlevel(mmt->phy_level);
+	bss->snr = acx_signal_to_winlevel(mmt->phy_snr);
 
-	/* find max. transfer rate and do optional debug log */
-	acxlog(L_DEBUG, "Peer - Supported Rates:\n");
-	for (i=0; i < rate_count; i++) {
-		int rate = req->supp_rates->rates[i];
-		acxlog(L_DEBUG, "%s Rate: %d%sMbps (0x%02X)\n",
-			(rate & 0x80) ? "Basic" : "Operational",
-			(rate & ~0x80) / 2, (rate & 1) ? ".5" : "", rate);
-		if ((rate & ~0x80) > max_rate)
-			max_rate = rate & ~0x80;
-	}
+	bss->rate_cfg = 0;	/* basic */
+	bss->rate_cap = 0;	/* operational */
+	bss->rate_cur = 0;
+	if (req->supp_rates)
+		add_bits_to_ratemasks(req->supp_rates->rates,
+			req->supp_rates->len, &bss->rate_cfg, &bss->rate_cap);
+	if (req->ext_rates)
+		add_bits_to_ratemasks(req->ext_rates->rates,
+			req->ext_rates->len, &bss->rate_cfg, &bss->rate_cap);
+	if (bss->rate_cfg)
+		bss->rate_cur = 1 << lowest_bit(bss->rate_cfg);
 
 	acxlog(L_STD | L_ASSOC,
-		"found and registered station %u: ESSID \"%s\" on channel %d, "
-		"BSSID "MACSTR", %s/%d%sMbps, caps 0x%04x, SIR %d, SNR %d\n",
-		priv->bss_table_count, newbss->essid, newbss->channel,
-		MAC(newbss->bssid),
-        	(newbss->caps & WF_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
-		max_rate / 2, (max_rate & 1) ? ".5" : "",
-		newbss->caps, newbss->sir, newbss->snr);
+		"found and registered station: ESSID \"%s\" on channel %d, "
+		"BSSID "MACSTR", %s, caps 0x%04x, SIR %d, SNR %d\n",
+		bss->essid, bss->channel,
+		MAC(bss->bssid),
+        	(bss->cap_info & WF_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "Access Point",
+		bss->cap_info, bss->sir, bss->snr);
 
-	/* found one station --> increment counter */
-	priv->bss_table_count++;
 	FN_EXIT0();
 }
 
@@ -1313,7 +1280,8 @@ static const char * const status_str[] = {
   "Association denied due to requesting station not supporting the PBCC Modulation option. TRANSLATION: Bug in ACX100 driver?",
   "Association denied due to requesting station not supporting the Channel Agility option. TRANSLATION: Bug in ACX100 driver?"
 };
-static inline const char * const get_status_string(int status)
+
+static inline const char *get_status_string(int status)
 {
 	unsigned int idx = status < VEC_SIZE(status_str) ? status : 2;
 	return status_str[idx];
@@ -1381,57 +1349,64 @@ end:
 /*----------------------------------------------------------------
  * acx_process_authen()
  * STATUS: FINISHED, UNVERIFIED.
- * Called only in AP mode
+ * Called only in STA_SCAN or AP mode
  *----------------------------------------------------------------*/
 static int acx_process_authen(const wlan_fr_authen_t *req, wlandevice_t *priv)
 {
 	const p80211_hdr_t *hdr;
 	client_t *clt;
+	wlan_ie_challenge_t *chal;
 	u16 alg,seq,status;
-	int result = NOT_OK;
+	int ap,result;
 
 	FN_ENTER;
 
-	/* Does this ever happens? */
-	if (!priv) {
-		result = NOT_OK;
-		goto end;
-	}
-
 	hdr = req->hdr;
-	alg = ieee2host16(*(req->auth_alg));
-	seq = ieee2host16(*(req->auth_seq));
-	status = ieee2host16(*(req->status));
 
 	acx_log_mac_address(L_ASSOC, priv->dev_addr, " ");
 	acx_log_mac_address(L_ASSOC, hdr->a3.a1, " ");
 	acx_log_mac_address(L_ASSOC, hdr->a3.a2, " ");
 	acx_log_mac_address(L_ASSOC, hdr->a3.a3, " ");
 	acx_log_mac_address(L_ASSOC, priv->bssid, "\n");
-	
-	if ((!mac_is_equal(priv->dev_addr, hdr->a3.a1))
-	 && (!mac_is_equal(priv->bssid, hdr->a3.a1))
-	) {
+
+	/* TODO: move first check into acx_rx_ieee802_11_frame(),
+	** it's not auth specific */
+	if (!mac_is_equal(priv->dev_addr, hdr->a3.a1)
+	 || !mac_is_equal(priv->bssid, hdr->a3.a3)) {
 		result = OK;
 		goto end;
 	}
 
+	alg = ieee2host16(*(req->auth_alg));
+	seq = ieee2host16(*(req->auth_seq));
+	status = ieee2host16(*(req->status));
+
+	ap = (priv->mode == ACX_MODE_3_AP);
+
 	if (priv->auth_alg <= 1) {
 		if (priv->auth_alg != alg) {
 			acxlog(L_ASSOC, "authentication algorithm mismatch: "
-				"want: %d, req: %d\n", priv->auth_alg,alg);
+				"want: %d, req: %d\n", priv->auth_alg, alg);
 			result = NOT_OK;
 			goto end;
 		}
 	}
-	acxlog(L_ASSOC,"Algorithm is ok\n");
+	acxlog(L_ASSOC, "Algorithm is ok\n");
 
-	/* I think this must be done in AP mode only */
-	clt = acx_sta_list_get_or_add(priv, hdr->a3.a2);
-	if (!clt) {
-		acxlog(L_ASSOC, "Could not allocate room for this client\n");
-		result = NOT_OK;
-		goto end;
+	if (ap) {
+		clt = acx_sta_list_get_or_add(priv, hdr->a3.a2);
+		if (!clt) {
+			acxlog(L_ASSOC, "could not allocate room for client\n");
+			result = NOT_OK;
+			goto end;
+		}
+	} else {
+		clt = priv->ap_client;
+		if (!mac_is_equal(clt->address, hdr->a3.a2)) {
+			acxlog(L_ASSOC, "assoc frame from rogue AP?!\n");
+			result = NOT_OK;
+			goto end;
+		}
 	}
 
 	/* now check which step in the authentication sequence we are
@@ -1439,12 +1414,12 @@ static int acx_process_authen(const wlan_fr_authen_t *req, wlandevice_t *priv)
 	acxlog(L_ASSOC, "acx_process_authen auth seq step %d\n",seq);
 	switch (seq) {
 	case 1:
-		if (ACX_MODE_3_AP != priv->mode)
+		if (!ap)
 			break;
 		acx_transmit_authen2(req, clt, priv);
 		break;
 	case 2:
-		if (ACX_MODE_2_STA != priv->mode)
+		if (ap)
 			break;
 		if (status == WLAN_MGMT_STATUS_SUCCESS) {
 			if (alg == WLAN_AUTH_ALG_OPENSYSTEM) {
@@ -1463,30 +1438,19 @@ static int acx_process_authen(const wlan_fr_authen_t *req, wlandevice_t *priv)
 		}
 		break;
 	case 3:
-		if ((ACX_MODE_3_AP != priv->mode)
-		    || (clt->auth_alg != WLAN_AUTH_ALG_SHAREDKEY)
-		    || (alg != WLAN_AUTH_ALG_SHAREDKEY)
-		    || (clt->auth_step != 2))
+		if (!ap)
 			break;
-		/* acxlog(L_STD,
-		       "FIXME: TODO: huh??? incompatible data type!\n");
-		currclt = (client_t *)req->challenge;
-		if (0 == memcmp(currclt->address, clt->challenge_text, 0x80)
-		    && ( (currclt->aid & 0xff) != 0x10 )
-		    && ( (currclt->aid >> 8) != 0x80 ))...
-		*/
-		
-		/* NB Andreas: variable 'currclnt' got aliased by compiler here.
-		   currclt's stack slot was reused for entirely different thing!
-		   also memcmp check and &&'s seem to be wrong   -- vda */
-		{
-		wlan_ie_challenge_t *chal = req->challenge;
-		if (memcmp(chal->challenge, clt->challenge_text, WLAN_CHALLENGE_LEN)
+		if ((clt->auth_alg != WLAN_AUTH_ALG_SHAREDKEY)
+		 || (alg != WLAN_AUTH_ALG_SHAREDKEY)
+		 || (clt->auth_step != 2))
+			break;
+		chal = req->challenge;
+		if (!chal
+		 || memcmp(chal->challenge, clt->challenge_text, WLAN_CHALLENGE_LEN)
 		 || (chal->eid != WLAN_EID_CHALLENGE)
 		 || (chal->len != WLAN_CHALLENGE_LEN)
 		)
 			break;
-		}
 		acx_transmit_authen4(req, priv);
 		MAC_COPY(clt->address, hdr->a3.a2);
 		clt->used = CLIENT_AUTHENTICATED_2;
@@ -1494,7 +1458,7 @@ static int acx_process_authen(const wlan_fr_authen_t *req, wlandevice_t *priv)
 		clt->seq = ieee2host16(hdr->a3.seq);
 		break;
 	case 4:
-		if (ACX_MODE_2_STA != priv->mode)
+		if (ap)
 			break;
 		/* ok, we're through: we're authenticated. Woohoo!! */
 		acx_set_status(priv, ACX_STATUS_3_AUTHENTICATED);
@@ -1850,7 +1814,7 @@ static int acx_transmit_authen1(wlandevice_t *priv)
 * acx_transmit_authen2
 * STATUS: UNVERIFIED. (not binary compatible yet)
 *----------------------------------------------------------------*/
-static int acx_transmit_authen2(const wlan_fr_authen_t *req, client_t *sta_list,
+static int acx_transmit_authen2(const wlan_fr_authen_t *req, client_t *clt,
 		      wlandevice_t *priv)
 {
 	struct txdescriptor *tx_desc;
@@ -1862,16 +1826,18 @@ static int acx_transmit_authen2(const wlan_fr_authen_t *req, client_t *sta_list,
 
 	FN_ENTER;
 
-	if (!sta_list) {
+	if (!clt) {
 		FN_EXIT1(OK);
 		return OK;
 	}
 
-	MAC_COPY(sta_list->address, req->hdr->a3.a2);
-	sta_list->ps = ((WF_FC_PWRMGTi & req->hdr->a3.fc) != 0);
-	sta_list->auth_alg = ieee2host16(*(req->auth_alg));
-	sta_list->auth_step = 2;
-	sta_list->seq = ieee2host16(req->hdr->a3.seq);
+	MAC_COPY(clt->address, req->hdr->a3.a2);
+#if UNUSED
+	clt->ps = ((WF_FC_PWRMGTi & req->hdr->a3.fc) != 0);
+#endif
+	clt->auth_alg = ieee2host16(*(req->auth_alg));
+	clt->auth_step = 2;
+	clt->seq = ieee2host16(req->hdr->a3.seq);
 
 	tx_desc = acx_get_tx_desc(priv);
 	if (!tx_desc) {
@@ -1901,10 +1867,10 @@ static int acx_transmit_authen2(const wlan_fr_authen_t *req, client_t *sta_list,
 
 	packet_len = WLAN_HDR_A3_LEN + 2 + 2 + 2;
 	if (ieee2host16(*(req->auth_alg)) == WLAN_AUTH_ALG_OPENSYSTEM) {
-		sta_list->used = CLIENT_AUTHENTICATED_2;
+		clt->used = CLIENT_AUTHENTICATED_2;
 	} else {	/* shared key */
 		acx_gen_challenge(&body->challenge);
-		memcpy(&sta_list->challenge_text, body->challenge.text, WLAN_CHALLENGE_LEN);
+		memcpy(&clt->challenge_text, body->challenge.text, WLAN_CHALLENGE_LEN);
 		packet_len += 2 + 2 + 2 + 1+1+WLAN_CHALLENGE_LEN;
 	}
 
@@ -2036,6 +2002,8 @@ static int acx_transmit_authen4(const wlan_fr_authen_t *req, wlandevice_t *priv)
 /*----------------------------------------------------------------
 * acx_transmit_assoc_req
 * STATUS: almost ok, but UNVERIFIED.
+*
+* priv->ap_client is a current candidate AP here
 *----------------------------------------------------------------*/
 static int acx_transmit_assoc_req(wlandevice_t *priv)
 {
@@ -2062,7 +2030,7 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	head = (void*)hdesc_head->data;
 	body = (void*)hdesc_body->data;
 
-	head->fc = WF_FSTYPE_ASSOCREQi;  /* 0x00 */;
+	head->fc = WF_FSTYPE_ASSOCREQi;
 	head->dur = host2ieee16(0x8000);
 	MAC_COPY(head->da, priv->bssid);
 	MAC_COPY(head->sa, priv->dev_addr);
@@ -2077,6 +2045,21 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 #if BROKEN
 	cap = host2ieee16(priv->capabilities & ~WF_MGMT_CAP_IBSS);
 #else
+	/* 802.11 7.3.1.4 Capability Information field
+	** APs set the ESS subfield to 1 and the IBSS subfield to 0 within
+	** Beacon or Probe Response management frames. STAs within an IBSS
+	** set the ESS subfield to 0 and the IBSS subfield to 1 in transmitted
+	** Beacon or Probe Response management frames
+	**
+	** APs set the Privacy subfield to 1 within transmitted Beacon,
+	** Probe Response, Association Response, and Reassociation Response
+	** if WEP is required for all data type frames within the BSS.
+	** STAs within an IBSS set the Privacy subfield to 1 in Beacon
+	** or Probe Response management frames if WEP is required
+	** for all data type frames within the IBSS
+	**
+	** So far it seems we deviate from above. Why? */
+
 	/* FIXME: is it correct that we have to manually patc^H^H^H^Hadjust the
 	 * Capabilities like that?
 	 * I'd venture that priv->capabilities
@@ -2088,24 +2071,37 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	/*
 	cap = host2ieee16((priv->capabilities & ~WF_MGMT_CAP_IBSS) | WF_MGMT_CAP_ESS);
 	*/
-	cap = WF_MGMT_CAP_ESSi;
+	/* cap = WF_MGMT_CAP_ESSi;
+	** mega-huh?? we are NOT an AP here!!!
+	** If this was required due to (buggy) AP not liking us
+	** otherwise - say so in comments! --vda */
+	cap = 0;
+
 	if (priv->wep_restricted)
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACYi);
+
+	/* Probably we can just set these always, because our hw is
+	** capable of shortpre and PBCC --vda */
 	/* only ask for short preamble if the peer station supports it */
-	if (priv->station_assoc.caps & WF_MGMT_CAP_SHORT)
+	if (priv->ap_client->cap_info & WF_MGMT_CAP_SHORT)
 		SET_BIT(cap, WF_MGMT_CAP_SHORTi);
 	/* only ask for PBCC support if the peer station supports it */
-	if (priv->station_assoc.caps & WF_MGMT_CAP_PBCC)
+	if (priv->ap_client->cap_info & WF_MGMT_CAP_PBCC)
 		SET_BIT(cap, WF_MGMT_CAP_PBCCi);
 #endif
 	acxlog(L_ASSOC, "association: requesting capabilities 0x%04X\n", cap);
+
+	/* IEs: 1. caps */
 	*(u16*)p = cap;	p += 2;
-	/* add listen interval */
+	/* 2. listen interval */
 	*(u16*)p = host2ieee16(priv->listen_interval); p += 2;
-	/* add ESSID */
+	/* 3. ESSID */
 	p = wlan_fill_ie_ssid(p, strlen(priv->essid_for_assoc), priv->essid_for_assoc);
-	/* add rates */
+	/* 4. supp rates */
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
+	/* 5. ext supp rates */
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
+
 	/* calculate lengths */
 	packet_len = WLAN_HDR_A3_LEN + (p - body);
 
@@ -2183,22 +2179,22 @@ u32 acx_transmit_disassoc(client_t *clt, wlandevice_t *priv)
 * acx_complete_dot11_scan
 * STATUS: FINISHED.
 * Called just after scanning, when we decided to join ESS or IBSS.
-* Iterates thru priv->bss_table:
+* Iterates thru priv->sta_list:
 *	if priv->ap is not bcast, will join only specified
 *	ESS or IBSS with this bssid
 *	checks peers' caps for ESS/IBSS bit
-*	checks peer's SSID, allows exact match or hidden SSID
+*	checks peers' SSID, allows exact match or hidden SSID
 * If station to join is chosen:
-*	copies bss_info struct of it to priv->station_assoc
+*	points priv->ap_client to the chosen struct client
 *	sets priv->essid_for_assoc for future assoc attempt
 * Auth/assoc is not yet performed
 *----------------------------------------------------------------*/
 void acx_complete_dot11_scan(wlandevice_t *priv)
 {
-	unsigned int idx;
+	struct client *bss;
 	u16 needed_cap;
-	s32 idx_found = -1;
-	u32 found_station = 0;
+	int i;
+	int idx_found = -1;
 
 	FN_ENTER;
 
@@ -2215,56 +2211,60 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 		goto end;
 	}
 	
-	acxlog(L_BINDEBUG | L_ASSOC, "Radio scan found %d stations in this area\n",
-		priv->bss_table_count);
-
-	for (idx = 0; idx < priv->bss_table_count; idx++) {
-		struct bss_info *bss = &priv->bss_table[idx];
+	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+		bss = &priv->sta_list[i];
+		if (!bss->used) continue;
 
 		acxlog(L_BINDEBUG | L_ASSOC,
-			"<Scan Table> %d: SSID=\"%s\",CH=%d,SIR=%d,SNR=%d\n",
-			idx, bss->essid, bss->channel, bss->sir, bss->snr);
+			"<Scan Table>: SSID=\"%s\",CH=%d,SIR=%d,SNR=%d\n",
+			bss->essid, bss->channel, bss->sir, bss->snr);
 
 		if (!mac_is_bcast(priv->ap))
 			if (!mac_is_equal(bss->bssid, priv->ap))
 				continue; /* keep looking */
 
 		/* broken peer with no mode flags set? */
-		if (!(bss->caps & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS))) {
+		if (!(bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS))) {
 			acxlog(L_ASSOC, "STRANGE: peer station announces "
 				"neither ESS (Managed) nor IBSS (Ad-Hoc) "
 				"capability. Won't try to join it\n");
 			continue;
 		}
 		acxlog(L_ASSOC, "peer_cap 0x%04x, needed_cap 0x%04x\n",
-		       bss->caps, needed_cap);
+		       bss->cap_info, needed_cap);
 
-		/* peer station doesn't support what we need? */
-		if ((bss->caps & needed_cap) != needed_cap)
+		/* does peer station support what we need? */
+		if ((bss->cap_info & needed_cap) != needed_cap)
 			continue; /* keep looking */
 
+		/* strange peer with NO basic rates?! */
+		if (!bss->rate_cfg)
+			continue;
+
+		/* do we support all basic rates of this peer? */
+		if ((bss->rate_cfg & priv->rate_oper) != bss->rate_cfg)
+			continue;
+
 		if ( !(priv->reg_dom_chanmask & (1<<(bss->channel-1))) ) {
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station %d "
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station "
 				"is using channel %d, which is outside "
 				"the channel range of the regulatory domain "
 				"the driver is currently configured for: "
 				"couldn't join in case of matching settings, "
 				"might want to adapt your config!\n",
-				idx, bss->channel);
+				bss->channel);
 			continue; /* keep looking */
 		}
 
-		if ((0 == priv->essid_active)
-		/* FIXME: bss->essid can be LONGER than ours! strcmp? */
-		 || (0 == memcmp(bss->essid, priv->essid, priv->essid_len))
-		) {
+		if (!priv->essid_active || !strcmp(bss->essid, priv->essid)) {
 			acxlog(L_ASSOC,
 			       "found station with matching ESSID! (\"%s\" "
 			       "station, \"%s\" config)\n",
 			       bss->essid,
 			       (priv->essid_active) ? priv->essid : "[any]");
-			idx_found = idx;
-			found_station = 1;
+			/* TODO: continue looking for peer with better SNR */
+			bss->used = CLIENT_JOIN_CANDIDATE;
+			idx_found = i;
 
 			/* stop searching if this station is
 			 * on the current channel, otherwise
@@ -2272,8 +2272,8 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			if (bss->channel == priv->channel)
 				break;
 		} else
-		if (('\0' == bss->essid[0])
-		 || ( (1 == strlen(bss->essid)) && (' ' == bss->essid[0]) )
+		if (!bss->essid[0]
+		 || ((' ' == bss->essid[0]) && !bss->essid[1])
 		) {
 			/* hmm, station with empty or single-space SSID:
 			 * using hidden SSID broadcast?
@@ -2282,8 +2282,8 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			** of APs with hidden SSID you'd try?
 			** We should use Probe requests to get Probe responses
 			** and check for real SSID (are those never hidden?) */
-			idx_found = idx;
-			found_station = 1;
+			bss->used = CLIENT_JOIN_CANDIDATE;
+			idx_found = i;
 			acxlog(L_ASSOC, "found station with empty or "
 				"single-space (hidden) SSID, considering "
 				"for assoc attempt\n");
@@ -2297,12 +2297,16 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 		}
 	}
 
-	if (found_station) {
+	/* TODO: iterate thru join candidates instead */
+	/* TODO: rescan if not associated within some timeout */
+	if (idx_found != -1) {
 		char *essid_src;
 		size_t essid_len;
 
-		memcpy(&priv->station_assoc, &priv->bss_table[idx_found], sizeof(struct bss_info));
-		if (priv->station_assoc.essid[0] == '\0') {
+		bss = &priv->sta_list[idx_found];
+		priv->ap_client = bss;
+
+		if (bss->essid[0] == '\0') {
 			/* if the ESSID of the station we found is empty
 			 * (no broadcast), then use user configured ESSID
 			 * instead */
@@ -2310,24 +2314,27 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			essid_len = priv->essid_len;
 		}
 		else {
-			essid_src = priv->bss_table[idx_found].essid;
-			essid_len = strlen(priv->bss_table[idx_found].essid);
+			essid_src = bss->essid;
+			essid_len = strlen(bss->essid);
 		}
 		
 		acx_update_capabilities(priv);
 
 		memcpy(priv->essid_for_assoc, essid_src, essid_len);
 		priv->essid_for_assoc[essid_len] = '\0';
-		priv->channel = priv->station_assoc.channel;
-		MAC_COPY(priv->bssid, priv->station_assoc.bssid);
+		priv->channel = bss->channel;
+		MAC_COPY(priv->bssid, bss->bssid);
+
+		bss->rate_cfg = (bss->rate_cap & priv->rate_oper);
+		bss->rate_cur = 1 << lowest_bit(bss->rate_cfg);
+		bss->rate_100 = RATE100_1;	/* quick & dirty. FIXME */
 
 		acxlog(L_STD | L_ASSOC,
-		       "%s: matching station FOUND (idx %d), JOINING ("MACSTR")\n",
-		       __func__, idx_found, MAC(priv->bssid));
+		       "%s: matching station found: "MACSTR", joining\n",
+		       __func__, MAC(priv->bssid));
 
 		/* Inform firmware on our decision */
 		acx_cmd_join_bssid(priv, priv->bssid);
-		acx_update_peerinfo(priv, &priv->ap_peer, &priv->station_assoc); /* e.g. shortpre */
 
 		if (ACX_MODE_0_ADHOC == priv->mode) {
 			acx_set_status(priv, ACX_STATUS_4_ASSOCIATED);
@@ -2348,8 +2355,8 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			acx_cmd_join_bssid(priv, priv->bssid);
 			acx_set_status(priv, ACX_STATUS_4_ASSOCIATED);
 		} else {
-			/* FIXME: we shall scan again! What if AP
-			** was just temporarily powered off? */
+			/* we shall scan again, AP can be
+			** just temporarily powered off */
 			acxlog(L_STD | L_ASSOC,
 				"%s: no matching station found in range yet\n",
 			       __func__);
@@ -2438,7 +2445,7 @@ void acx_timer(unsigned long address)
 
 	switch (priv->status) {
 	case ACX_STATUS_1_SCANNING:
-		if ((++priv->scan_retries < 5) && (0 == priv->bss_table_count)) {
+		if (++priv->scan_retries < 5) {
 			acx_set_timer(priv, 1000000);
 #if 0
 			acx_interrogate(priv,&status,ACX1xx_IE_SCAN_STATUS);
@@ -2449,7 +2456,7 @@ void acx_timer(unsigned long address)
 #endif
 			acxlog(L_ASSOC, "continuing scan (attempt %d).\n", priv->scan_retries);
 		} else {
-			acxlog(L_ASSOC, "Stopping scan (%s).\n", priv->bss_table_count ? "stations found" : "scan timeout");
+			acxlog(L_ASSOC, "Stopping scan");
 			/* stop the scan when we leave the interrupt context */
 			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_STOP_SCAN);
 			/* HACK: set the IRQ bit, since we won't get a

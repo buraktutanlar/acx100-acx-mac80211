@@ -46,8 +46,6 @@
 #include <net/iw_handler.h>
 #endif /* WE >= 13 */
 
-#include <wlan_compat.h>
-
 #include <linux/pci.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
 #include <linux/dma-mapping.h>
@@ -179,28 +177,24 @@ static void acx_free_desc_queues(TIWLAN_DC *pDc)
 * Comment:
 *
 *----------------------------------------------------------------*/
-
-/* NB: this table maps RATE111 bits to ACX100 tx descr constants */
-static const u8 bitpos2rate100[] = {
-	RATE100_1	,
-	RATE100_2	,
-	RATE100_5	,
-	0		,
-	0		,
-	RATE100_11	,
-	0		,
-	0		,
-	RATE100_22	,
+/* TODO: default client is a quick and dirty hack
+** Need to have per-device one with proper rate params */
+struct client default_client = {
+	.address = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
+	.bssid = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
+	.rate_cap = RATE111_2,
+	.rate_cfg = RATE111_2,
+	.rate_cur = RATE111_2,
+	.rate_100 = RATE100_2,
+	.cap_info = 0
 };
 
 void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 {
-	struct peer *peer;
-	struct txrate_ctrl *txrate;
 	struct txhostdescriptor *header;
 	struct txhostdescriptor *payload;
+	client_t *clt;
 	int header_len, payload_len;
-	u16 fc;
 	u8 Ctl_8, Ctl2_8;
 #if (WLAN_HOSTIF!=WLAN_USB)
 	unsigned long flags;
@@ -244,28 +238,37 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
 #endif
+	switch (priv->mode) {
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_3_AP:
+		clt = acx_sta_list_get(priv, ((p80211_hdr_t*)header->data)->a3.a1);
+		if (!clt)
+			clt = &default_client;
+		break;
+	case ACX_MODE_2_STA:
+		clt = priv->ap_client;
+		if (!clt) clt = &default_client;
+		break;
+	default: /* ACX_MODE_OFF, ACX_MODE_MONITOR */
+		clt = &default_client;
+		break;
+	}
 
-	/* TODO: we really need ASSOCIATED_TO_AP/_TO_IBSS */
-	if(priv->status == ACX_STATUS_4_ASSOCIATED
-	&& priv->station_assoc.bssid[0] == 0
-	)
-		peer = &priv->ap_peer;
-	else
-		peer = &priv->defpeer;
+	if(!clt->rate_cur) {
+		printk("acx driver bug! bad ratemask\n");
+		goto end;
+	}
 
-	fc = le16_to_cpu(((p80211_hdr_t*)header->data)->a3.fc);
-	if ((fc & WF_FC_FTYPE) == WF_FTYPE_MGMT)
-		txrate = &peer->txbase;
-	else
-		txrate = &peer->txrate;
- 
-	tx_desc->fixed_size.s.txc = txrate; /* used in tx cleanup routine for auto rate and accounting */
+	tx_desc->fixed_size.s.txc = clt; /* used in tx cleanup routine for auto rate and accounting */
  
 	if (CHIPTYPE_ACX111 == priv->chip_type) {
 		/* note that if !tx_desc->do_auto, txrate->cur
 		** has only one nonzero bit */
 		tx_desc->u.r2.rate111 = cpu_to_le16(
-			txrate->cur | (txrate->pbcc511 ? RATE111_PBCC511 : 0)
+			clt->rate_cur
+#if TODO_FIGURE_OUT_WHEN_TO_SET_THIS
+| (txrate->pbcc511 ? RATE111_PBCC511 : 0)
+#endif
 			/* WARNING: I was never able to make it work with prism54 AP.
 			** It was falling down to 1Mbit where shortpre is not applicable,
 			** and not working at all at "5,11 basic rates only" setting.
@@ -274,41 +277,28 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			/*| ((peer->shortpre && txrate->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
 			);
 
-		if(header_len != sizeof(struct framehdr)) {
+		if (header_len != sizeof(struct framehdr)) {
 			acxlog(L_DATA, "UHOH, packet has a different length than struct framehdr (0x%X vs. 0x%X)\n", header_len, sizeof(struct framehdr));
 
 			/* copy the data at the right place */
+			/* FIXME: its a second memcpy on the tx path. what a shame */
 			memcpy(header->data + header_len, payload->data, payload_len);
 		}
 
 		header_len += payload_len;
 		header->length = cpu_to_le16(header_len);
+
 	} else { /* ACX100 */
-		/* FIXME: this expensive calculation part should be stored
-		 * in advance whenever rate config changes! */
-
-		/* set rate */
-		/* find pos of highest nonzero bit */
-		int n = 0;
-		u16 t = txrate->cur;
-		while(t>0x7) { t>>=3; n+=3; }
-		while(t>1) { t>>=1; n++; }
-
-		if (n >= sizeof(bitpos2rate100) || bitpos2rate100[n] == 0) {
-			printk(KERN_ERR "%s: driver BUG! n=%d. please report\n", __func__, n);
-			n = 0;
-		}
-		n = bitpos2rate100[n];
-
+		tx_desc->u.r1.rate = clt->rate_100;
+#if TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (txrate->pbcc511) {
 			if (n == RATE100_5 || n == RATE100_11)
 				n |= RATE100_PBCC511;
 		}
-		tx_desc->u.r1.rate = n;
  
 		if (peer->shortpre && (txrate->cur != RATE111_1))
 			SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE); /* set Short Preamble */
-
+#endif
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(Ctl_8, DESC_CTL_AUTODMA | DESC_CTL_RECLAIM | DESC_CTL_FIRSTFRAG);
 	}
@@ -368,6 +358,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			acx_dump_bytes(payload->data, payload_len);
 		}
 	}
+end:
 	FN_EXIT0();
 }
 
@@ -456,24 +447,40 @@ static void acx_handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finge
 }
 
 /* Theory of operation:
-priv->txrate.cfg is a bitmask of allowed (configured) rates.
-It is set as a result of iwconfig rate N [auto]
-or iwpriv set_rates "N,N,N N,N,N" commands.
-It can be fixed (e.g. 0x0080 == 18Mbit only),
-auto (0x00ff == 18Mbit or any lower value),
-and code handles any bitmask (0x1081 == try 54Mbit,18Mbit,1Mbit _only_).
+** client->rate_cap is a bitmask of rates client is capable of.
+** client->rate_cfg is a bitmask of allowed (configured) rates.
+** It is set as a result of iwconfig rate N [auto]
+** or iwpriv set_rates "N,N,N N,N,N" commands.
+** It can be fixed (e.g. 0x0080 == 18Mbit only),
+** auto (0x00ff == 18Mbit or any lower value),
+** and code handles any bitmask (0x1081 == try 54Mbit,18Mbit,1Mbit _only_).
+** 
+** client->rate_cur is a value for rate111 field in tx descriptor.
+** It is always set to txrate_cfg sans zero or more most significant
+** bits. This routine handles selection of new rate_cur value depending on
+** outcome of last tx event.
+**
+** client->rate_100 is a precalculated rate value for acx100
+** (we can do without it, but will need to calculate it on each tx).
+** 
+** You cannot configure mixed usage of 5.5 and/or 11Mbit rate
+** with PBCC and CCK modulation. Either both at CCK or both at PBCC.
+** In theory you can implement it, but so far it is considered not worth doing.
+** 
+** 22Mbit, of course, is PBCC always. */
 
-priv->txrate.cur is a value for rate111 field in tx descriptor.
-It is always set to txrate_cfg sans zero or more most significant
-bits. This routine handles selection of txrate_curr depending on
-outcome of last tx event.
-
-You cannot configure mixed usage of 5.5 and/or 11Mbit rate
-with PBCC and CCK modulation. Either both at CCK or both at PBCC.
-In theory you can implement it, but so far it is considered not worth doing.
-
-22Mbit, of course, is PBCC always.
-*/
+/* maps RATE111 bits to ACX100 tx descr constants */
+static const u8 bitpos2rate100[] = {
+	RATE100_1	,
+	RATE100_2	,
+	RATE100_5	,
+	RATE100_2	,/* should not happen */
+	RATE100_2	,/* should not happen */
+	RATE100_11	,
+	RATE100_2	,/* should not happen */
+	RATE100_2	,/* should not happen */
+	RATE100_22	,
+};
 
 /* maps acx100 tx descr rate field to acx111 one */
 static u16
@@ -494,10 +501,10 @@ rate100to111(u8 r)
 }
 
 static void
-acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int idx, u8 rate100, u16 rate111, u8 error)
+acx_handle_txrate_auto(wlandevice_t *priv, struct client *txc, unsigned int idx, u8 rate100, u16 rate111, u8 error)
 {
 	u16 sent_rate;
-	u16 cur = txc->cur;
+	u16 cur = txc->rate_cur;
 	int slower_rate_was_used;
 
 	/* FIXME: need to implement some kind of rate success memory
@@ -506,15 +513,21 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int
 	 * doesn't really help to stupidly count fallback/stepup,
 	 * since one invalid rate will spoil the party anyway
 	 * (such as 22M in case of 11M-only peers) */
- 
+
+	/* vda: hmm. current code will do this:
+	** 1. send packets at 11 Mbit, stepup++
+	** 2. will try to send at 22Mbit. hardware will see no ACK,
+	**    retries at 11Mbit, success. code notes that used rate
+	**    is lower. stepup = 0, fallback++
+	** 3. repeat step 2 fallback_count times. Fall back to
+	**    11Mbit. go to step 1.
+	** If stepup_count is large (say, 16) and fallback_count
+	** is small (3), this wouldn't be too bad wrt throughput */
+
 	/* do some preparations, i.e. calculate the one rate that was
 	 * used to send this packet */
 	if (CHIPTYPE_ACX111 == priv->chip_type) {
-		int n = 0;
-		sent_rate = rate111 & RATE111_ALL;
-		while (sent_rate>7) { sent_rate>>=3; n+=3; }
-		while (sent_rate>1) { sent_rate>>=1; n++; }
-		sent_rate = 1<<n;
+		sent_rate = 1 << highest_bit(rate111 & RATE111_ALL);
 	} else {
 		sent_rate = rate100to111(rate100);
 	}
@@ -523,9 +536,9 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int
  
 	/* now do the actual auto rate management */
 	acxlog(L_DEBUG, "tx: sent_rate %s mask %04x/%04x/%04x, __=%d/%d, ^^=%d/%d\n",
-		(txc->ignore_count > 0) ? "IGN" : "OK", sent_rate, cur, txc->cfg,
-		txc->fallback_count, txc->fallback_threshold,
-		txc->stepup_count, txc->stepup_threshold
+		(txc->ignore_count > 0) ? "IGN" : "OK", sent_rate, cur, txc->rate_cfg,
+		txc->fallback_count, priv->fallback_threshold,
+		txc->stepup_count, priv->stepup_threshold
 	);
 
 	/* we need to ignore old packets already in the tx queue since
@@ -543,7 +556,7 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int
 	
 	if (slower_rate_was_used || (error & 0x30)) {
 		txc->stepup_count = 0;
-		if (++txc->fallback_count <= txc->fallback_threshold) 
+		if (++txc->fallback_count <= priv->fallback_threshold) 
 			return;
 		txc->fallback_count = 0;
 
@@ -554,12 +567,12 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int
 
 		if (cur) { /* we can't disable all rates! */
 			acxlog(L_XFER, "tx: falling back to sent_rate mask %04x\n", cur);
-			txc->cur = cur;
+			txc->rate_cur = cur;
 			txc->ignore_count = priv->TxQueueCnt - priv->TxQueueFree;
 		}
 	} else if (!slower_rate_was_used) {
 		txc->fallback_count = 0;
-		if (++txc->stepup_count <= txc->stepup_threshold)
+		if (++txc->stepup_count <= priv->stepup_threshold)
 			return;
 		txc->stepup_count = 0;
 
@@ -570,18 +583,29 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct txrate_ctrl *txc, unsigned int
 		 * current set, but is an allowed cfg */
 		while (1) {
 			sent_rate <<= 1;
-			if (sent_rate > txc->cfg)
+			if (sent_rate > txc->rate_cfg)
 				/* no higher rates allowed by config */
 				return;
-			if (!(cur & sent_rate) && (txc->cfg & sent_rate))
+			if (!(cur & sent_rate) && (txc->rate_cfg & sent_rate))
 				/* found */
 				break;
 			/* not found, try higher one */
 		}
 		SET_BIT(cur, sent_rate);
 		acxlog(L_XFER, "tx: stepping up to sent_rate mask %04x\n", cur);
-		txc->cur = cur;
+		txc->rate_cur = cur;
+		/* FIXME: totally bogus - we could be sending to many peers at once... */
 		txc->ignore_count = priv->TxQueueCnt - priv->TxQueueFree;
+	}
+
+	/* calculate acx100 style rate byte if needed */
+	if (CHIPTYPE_ACX100 == priv->chip_type) {
+		int n = highest_bit(cur);
+		if (n >= VEC_SIZE(bitpos2rate100)) {
+			printk(KERN_ERR "%s: driver BUG! n=%d. please report\n", __func__, n);
+			cur = 0;
+		}
+		txc->rate_100 = bitpos2rate100[n];
 	}
 }
  
@@ -676,7 +700,7 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 	u8 error, ack_failures, rts_failures, rts_ok, r100; /* keep old desc status */
 	u16 r111;
 	unsigned int num_cleaned = 0, num_processed = 0;
-	struct txrate_ctrl *txc;
+	struct client *txc;
 
 	FN_ENTER;
 
@@ -758,13 +782,7 @@ inline void acx_clean_tx_desc(wlandevice_t *priv)
 
 		/* do rate handling */
 		txc = pTxDesc->fixed_size.s.txc;
-		if (txc != &priv->defpeer.txbase
-		&&  txc != &priv->defpeer.txrate
-		&&  txc != &priv->ap_peer.txbase
-		&&  txc != &priv->ap_peer.txrate
-		) {
-			printk(KERN_WARNING "Probable BUG in acx100 driver: txdescr->txc %08x is bad!\n", (u32)txc);
-		} else if (txc->do_auto) {
+		if (priv->rate_auto) {
 			acx_handle_txrate_auto(priv, txc, finger, r100, r111, error);
 		}
 
@@ -827,65 +845,42 @@ void acx_clean_tx_desc_emergency(wlandevice_t *priv)
 
 /*----------------------------------------------------------------
 * acx_rxmonitor
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS:
-*
-* Comment:
-*
 *----------------------------------------------------------------*/
 
-static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
+static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *rxbuf)
 {
-	unsigned int packet_len = MAC_CNT_RCVD(buf);
 	p80211msg_lnxind_wlansniffrm_t *msg;
-
-	int payload_offset = 0;
-	unsigned int skb_len;
 	struct sk_buff *skb;
 	void *datap;
+	unsigned int skb_len;
+	int payload_offset;
 
 	FN_ENTER;
-
-	if (!(priv->rx_config_1 & RX_CFG1_PLUS_ADDIT_HDR)) {
-		printk("rx_config_1 is missing RX_CFG1_PLUS_ADDIT_HDR\n");
-		FN_EXIT0();
-		return;
-	}
-
-	if (priv->rx_config_1 & RX_CFG1_PLUS_ADDIT_HDR)	{
-		payload_offset += 3*4; /* status words         */
-		packet_len     += 3*4; /* length is w/o status */
-	}
-		
-	if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR)
-		payload_offset += 4;   /* phy header   */
 
 	/* we are in big luck: the acx100 doesn't modify any of the fields */
 	/* in the 802.11 frame. just pass this packet into the PF_PACKET */
 	/* subsystem. yeah. */
 
-	skb_len = packet_len - payload_offset;
+	if (!(priv->rx_config_1 & RX_CFG1_INCLUDE_RXBUF_HDR)) {
+		printk("rx_config_1 is missing RX_CFG1_INCLUDE_RXBUF_HDR\n");
+		FN_EXIT0();
+		return;
+	}
 
-	if (priv->netdev->type == ARPHRD_IEEE80211_PRISM)
-		skb_len += sizeof(p80211msg_lnxind_wlansniffrm_t);
+	payload_offset = ((u8*)acx_get_p80211_hdr(priv, rxbuf) - (u8*)rxbuf);
+	skb_len = RXBUF_BYTES_USED(rxbuf) - payload_offset;
 
-		/* sanity check */
+	/* sanity check */
 	if (skb_len > (WLAN_HDR_A4_LEN + WLAN_DATA_MAXLEN + WLAN_CRC_LEN)) {
 		printk("monitor mode panic: oversized frame!\n");
 		FN_EXIT0();
 		return;
 	}
 
-		/* allocate skb */
+	if (priv->netdev->type == ARPHRD_IEEE80211_PRISM)
+		skb_len += sizeof(p80211msg_lnxind_wlansniffrm_t);
+
+	/* allocate skb */
 	skb = dev_alloc_skb(skb_len);
 	if (!skb) {
 		printk("alloc_skb FAILED trying to allocate %d bytes\n", skb_len);
@@ -914,7 +909,7 @@ static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
 		msg->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
 		msg->mactime.status = 0;
 		msg->mactime.len = 4;
-		msg->mactime.data = buf->time;
+		msg->mactime.data = rxbuf->time;
 		
 		msg->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 		msg->channel.status = 0;
@@ -934,12 +929,12 @@ static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
 		msg->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 		msg->signal.status = 0;
 		msg->signal.len = 4;
-		msg->signal.data = buf->phy_snr;
+		msg->signal.data = rxbuf->phy_snr;
 
 		msg->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 		msg->noise.status = 0;
 		msg->noise.len = 4;
-		msg->noise.data = buf->phy_level;
+		msg->noise.data = rxbuf->phy_level;
 
 		msg->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 		msg->rate.status = P80211ENUM_msgitem_status_no_value; /* FIXME */
@@ -959,7 +954,7 @@ static void acx_rxmonitor(wlandevice_t *priv, const struct rxbuffer *buf)
 		msg->frmlen.data = skb_len;
 	}
 
-	memcpy(datap, ((unsigned char*)buf)+payload_offset, skb_len);
+	memcpy(datap, ((unsigned char*)rxbuf)+payload_offset, skb_len);
 
 	skb->dev = priv->netdev;
 	skb->dev->last_rx = jiffies;
@@ -984,9 +979,8 @@ u8 acx_signal_to_winlevel(u8 rawlevel)
 	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
 	u8 winlevel = ((4 + (rawlevel * 5)) / 8);
 
-	if(winlevel>100)
-		winlevel=100;
-
+	if (winlevel > 100)
+		winlevel = 100;
 	return winlevel;
 }
 
@@ -1106,20 +1100,9 @@ void acx_process_rx_desc(wlandevice_t *priv)
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
 		acxlog(L_BUFR, "%s: using curr_idx %d, rx_tail is now %d\n", __func__, curr_idx, pDc->rx_tail);
-
-		if (priv->rx_config_1 & RX_CFG1_INCLUDE_ADDIT_HDR) {
-			/* take into account additional header in front of packet */
-			if(CHIPTYPE_ACX111 == priv->chip_type) {
-				buf = (p80211_hdr_t*)((u8*)&pRxHostDesc->data->hdr_a3 + 8);
-			} else {
-				buf = (p80211_hdr_t*)((u8*)&pRxHostDesc->data->hdr_a3 + 4);
-			}
-		} else {
-			buf = (p80211_hdr_t *)&pRxHostDesc->data->hdr_a3;
-		}
-
-		rmb();
-		buf_len = MAC_CNT_RCVD(pRxHostDesc->data);
+		buf = acx_get_p80211_hdr(priv, pRxHostDesc->data);
+		rmb(); /* why? --vda */
+		buf_len = RXBUF_BYTES_RCVD(pRxHostDesc->data);
 
 		/* FIXME: maybe it is ieee2host16? Use XXi consts then */
 		if ( ((WF_FC_FSTYPE & le16_to_cpu(buf->a3.fc)) != WF_FSTYPE_BEACON)
@@ -1170,7 +1153,7 @@ void acx_process_rx_desc(wlandevice_t *priv)
 		 * address of the device that's managing our BSSID.
 		 * Disable it for now, since it removes information (levels
 		 * from different peers) and slows the Rx path. */
-		if (mac_is_equal(buf->a3.a2, priv->station_assoc.mac_addr)) {
+		if (mac_is_equal(buf->a3.a2, priv->ap_client->address)) {
 #endif
 			priv->wstats.qual.level = acx_signal_to_winlevel(pRxHostDesc->data->phy_level);
 			priv->wstats.qual.noise = acx_signal_to_winlevel(pRxHostDesc->data->phy_snr);

@@ -53,8 +53,6 @@ extern void acx_dump_bytes(void *,int);
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
 
-#include <wlan_compat.h>
-
 #include <linux/pci.h>
 
 
@@ -376,31 +374,6 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
  * MAC Address Stuff
  *
  ****************************************************************************/
-
-/*----------------------------------------------------------------
-* acx_log_mac_address
-*
-*
-* Arguments:
-*
-* Returns:
-*
-* Side effects:
-*
-* Call context:
-*
-* STATUS: NEW
-*
-* Comment:
-*
-*----------------------------------------------------------------*/
-
-void acx_log_mac_address(int level, u8 * mac, const char* tail) {
-	if (debug & level) {
-		printk(MACSTR"%s", MAC(mac), tail);
-	}
-}
-
 
 /*----------------------------------------------------------------
 * acx_power_led

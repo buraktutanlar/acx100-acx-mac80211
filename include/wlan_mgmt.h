@@ -42,23 +42,6 @@
  *
  * --------------------------------------------------------------------
  */
-#ifndef __ACX_P80211MGMT_H
-#define __ACX_P80211MGMT_H
-
-/*================================================================*/
-/* System Includes */
-
-/*================================================================*/
-/* Project Includes */
-
-#ifndef  _WLAN_COMPAT_H
-#include <wlan_compat.h>
-#endif
-
-#ifndef  _P80211HDR_H
-#include <p80211hdr.h>
-#endif
-
 
 /*================================================================*/
 /* Constants */
@@ -71,7 +54,11 @@
 #define WLAN_EID_CF_PARMS	4
 #define WLAN_EID_TIM		5
 #define WLAN_EID_IBSS_PARMS	6
-/*-- values 7-15 reserved --*/
+#define WLAN_EID_COUNTRY	7 /* 802.11d */
+#define WLAN_EID_FH_HOP_PARMS	8 /* 802.11d */
+#define WLAN_EID_FH_TABLE	9 /* 802.11d */
+#define WLAN_EID_REQUEST	10 /* 802.11d */
+/*-- values 11-15 reserved --*/
 #define WLAN_EID_CHALLENGE	16
 /*-- values 17-31 reserved for challenge text extension --*/
 #define WLAN_EID_ERP_INFO	42
@@ -105,8 +92,6 @@
 #define WLAN_MGMT_STATUS_ASSOC_DENIED_NOSHORT	19
 #define WLAN_MGMT_STATUS_ASSOC_DENIED_NOPBCC	20
 #define WLAN_MGMT_STATUS_ASSOC_DENIED_NOAGILITY	21
-
-
 
 /*-- Auth Algorithm Field ---------------------------*/
 #define WLAN_AUTH_ALG_OPENSYSTEM		0
@@ -160,37 +145,39 @@
 
 /*================================================================*/
 /* Macros */
-
-/*-- Capability Field ---------------------------*/
-#define WLAN_GET_MGMT_CAP_INFO_ESS(n)		((n) & BIT0)
-#define WLAN_GET_MGMT_CAP_INFO_IBSS(n)		(((n) & BIT1) >> 1)
-#define WLAN_GET_MGMT_CAP_INFO_CFPOLLABLE(n)	(((n) & BIT2) >> 2)
-#define WLAN_GET_MGMT_CAP_INFO_CFPOLLREQ(n)	(((n) & BIT3) >> 3)
-#define WLAN_GET_MGMT_CAP_INFO_PRIVACY(n)	(((n) & BIT4) >> 4)
-  /* p80211b additions */
-#define WLAN_GET_MGMT_CAP_INFO_SHORT(n)		(((n) & BIT5) >> 5)
-#define WLAN_GET_MGMT_CAP_INFO_PBCC(n)		(((n) & BIT6) >> 6)
-#define WLAN_GET_MGMT_CAP_INFO_AGILITY(n)	(((n) & BIT7) >> 7)
-
-#define WLAN_SET_MGMT_CAP_INFO_ESS(n)		(n)
-#define WLAN_SET_MGMT_CAP_INFO_IBSS(n)		((n) << 1)
-#define WLAN_SET_MGMT_CAP_INFO_CFPOLLABLE(n)	((n) << 2)
-#define WLAN_SET_MGMT_CAP_INFO_CFPOLLREQ(n)	((n) << 3)
-#define WLAN_SET_MGMT_CAP_INFO_PRIVACY(n)	((n) << 4)
-  /* p80211b additions */
-#define WLAN_SET_MGMT_CAP_INFO_SHORT(n)		((n) << 5)
-#define WLAN_SET_MGMT_CAP_INFO_PBCC(n)		((n) << 6)
-#define WLAN_SET_MGMT_CAP_INFO_AGILITY(n)	((n) << 7)
-
 enum {
-IEEE16(WF_MGMT_CAP_ESS,		0x01)
-IEEE16(WF_MGMT_CAP_IBSS,	0x02)
-IEEE16(WF_MGMT_CAP_CFPOLLABLE,	0x04)
-IEEE16(WF_MGMT_CAP_CFPOLLREQ,	0x08)
-IEEE16(WF_MGMT_CAP_PRIVACY,	0x10)
-IEEE16(WF_MGMT_CAP_SHORT,	0x20)
-IEEE16(WF_MGMT_CAP_PBCC,	0x40)
-IEEE16(WF_MGMT_CAP_AGILITY,	0x80)
+IEEE16(WF_MGMT_CAP_ESS,		0x0001)
+IEEE16(WF_MGMT_CAP_IBSS,	0x0002)
+/* In (re)assoc request frames by STA:
+** Pollable=0, PollReq=0: STA is not CF-Pollable
+** 0 1: STA is CF-Pollable, not requesting to be placed on the CF-Polling list
+** 1 0: STA is CF-Pollable, requesting to be placed on the CF-Polling list
+** 1 1: STA is CF-Pollable, requesting never to be polled
+** In beacon, proberesp, (re)assoc resp frames by AP:
+** 0 0: No point coordinator at AP
+** 0 1: Point coordinator at AP for delivery only (no polling)
+** 1 0: Point coordinator at AP for delivery and polling
+** 1 1: Reserved  */
+IEEE16(WF_MGMT_CAP_CFPOLLABLE,	0x0004)
+IEEE16(WF_MGMT_CAP_CFPOLLREQ,	0x0008)
+/* 1=non-WEP data frames are disallowed */
+IEEE16(WF_MGMT_CAP_PRIVACY,	0x0010)
+/* In beacon,  proberesp, (re)assocresp by AP/AdHoc:
+** 1=use of shortpre is allowed ("I can receive shortpre") */
+IEEE16(WF_MGMT_CAP_SHORT,	0x0020)
+IEEE16(WF_MGMT_CAP_PBCC,	0x0040)
+IEEE16(WF_MGMT_CAP_AGILITY,	0x0080)
+/* In (re)assoc request frames by STA:
+** 1=short slot time implemented and enabled
+**   NB: AP shall use long slot time beginning at the next Beacon after assoc
+**   of STA with this bit set to 0
+** In beacon, proberesp, (re)assoc resp frames by AP:
+** currently used slot time value: 0/1 - long/short */
+IEEE16(WF_MGMT_CAP_SHORTSLOT,	0x0400)
+/* In (re)assoc request frames by STA: 1=CCK-OFDM is implemented and enabled
+** In beacon, proberesp, (re)assoc resp frames by AP/AdHoc:
+** 1=CCK-OFDM is allowed */
+IEEE16(WF_MGMT_CAP_CCKOFDM,	0x2000)
 };
 
 /*================================================================*/
@@ -278,22 +265,35 @@ static inline char* wlan_fill_ie_ssid(char *p, int len, char *ssid)
 	memcpy(ie->ssid, ssid, len);
 	return p + len + 2;
 }
+/* This controls whether we create 802.11g 'ext supported rates' IEs
+** or just create overlong 'supported rates' IEs instead
+** (non-11g compliant) */
+#define WE_OBEY_802_11G 1
 static inline char* wlan_fill_ie_rates(char *p, int len, char *rates)
 {
 	struct wlan_ie_supp_rates *ie = (void*)p;
-	/* supported rates (1 to 8) octets) */
+#if WE_OBEY_802_11G
+	if (len > 8 ) len = 8;
+#endif
+	/* supported rates (1 to 8 octets) */
 	ie->eid = WLAN_EID_SUPP_RATES;
 	ie->len = len;
 	memcpy(ie->rates, rates, len);
 	return p + len + 2;
 }
+/* This one wouldn't create an IE at all if not needed */
 static inline char* wlan_fill_ie_rates_ext(char *p, int len, char *rates)
 {
 	struct wlan_ie_supp_rates *ie = (void*)p;
+#if !WE_OBEY_802_11G
+	return p;
+#endif
+	len -= 8;
+	if (len < 0) return p;
 	/* ext supported rates */
 	ie->eid = WLAN_EID_EXT_RATES;
 	ie->len = len;
-	memcpy(ie->rates, rates, len);
+	memcpy(ie->rates, rates+8, len);
 	return p + len + 2;
 }
 static inline char* wlan_fill_ie_ds_parms(char *p, int channel)
@@ -316,7 +316,6 @@ static inline char* wlan_fill_ie_tim(char *p,
 		int rem, int period, int bcast, int ofs, int len, char *vbm)
 {
 	struct wlan_ie_tim *ie = (void*)p;
-	/* supported rates (1 to 8) octets) */
 	ie->eid = WLAN_EID_TIM;
 	ie->len = len + 3;
 	ie->dtim_cnt = rem;
@@ -352,12 +351,13 @@ typedef struct wlan_fr_beacon {
 	/* used for target specific data, skb in Linux */
 	void *priv;
 	/*-- fixed fields -----------*/
-	UINT64 *ts;
+	u64 *ts;
 	u16 *bcn_int;
 	u16 *cap_info;
 	/*-- info elements ----------*/
 	wlan_ie_ssid_t *ssid;
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 	wlan_ie_fh_parms_t *fh_parms;
 	wlan_ie_ds_parms_t *ds_parms;
 	wlan_ie_cf_parms_t *cf_parms;
@@ -367,28 +367,6 @@ typedef struct wlan_fr_beacon {
 } wlan_fr_beacon_t;
 #define wlan_fr_proberesp wlan_fr_beacon
 #define wlan_fr_proberesp_t wlan_fr_beacon_t
-#if 0
-/*-- Probe Response -------------------------------*/
-typedef struct wlan_fr_proberesp {
-	u16 type;
-	u16 len;
-	u8 *buf;
-	p80211_hdr_t *hdr;
-	/* used for target specific data, skb in Linux */
-	void *priv;
-	/*-- fixed fields -----------*/
-	UINT64 *ts;
-	u16 *bcn_int;
-	u16 *cap_info;
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_fh_parms_t *fh_parms;
-	wlan_ie_ds_parms_t *ds_parms;
-	wlan_ie_cf_parms_t *cf_parms;
-	wlan_ie_ibss_parms_t *ibss_parms;
-} wlan_fr_proberesp_t;
-#endif
 
 /*-- IBSS ATIM ------------------------------------*/
 typedef struct wlan_fr_ibssatim {
@@ -435,6 +413,7 @@ typedef struct wlan_fr_assocreq {
 	/*-- info elements ----------*/
 	wlan_ie_ssid_t *ssid;
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 
 } wlan_fr_assocreq_t;
 
@@ -452,6 +431,7 @@ typedef struct wlan_fr_assocresp {
 	u16 *aid;
 	/*-- info elements ----------*/
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 
 } wlan_fr_assocresp_t;
 
@@ -470,6 +450,7 @@ typedef struct wlan_fr_reassocreq {
 	/*-- info elements ----------*/
 	wlan_ie_ssid_t *ssid;
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 
 } wlan_fr_reassocreq_t;
 
@@ -487,6 +468,7 @@ typedef struct wlan_fr_reassocresp {
 	u16 *aid;
 	/*-- info elements ----------*/
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 
 } wlan_fr_reassocresp_t;
 
@@ -502,6 +484,7 @@ typedef struct wlan_fr_probereq {
 	/*-- info elements ----------*/
 	wlan_ie_ssid_t *ssid;
 	wlan_ie_supp_rates_t *supp_rates;
+	wlan_ie_supp_rates_t *ext_rates;
 
 } wlan_fr_probereq_t;
 
@@ -537,10 +520,26 @@ typedef struct wlan_fr_deauthen {
 
 } wlan_fr_deauthen_t;
 
-
-/*================================================================*/
-/* Extern Declarations */
-
-
-
-#endif /* __ACX_P80211MGMT_H */
+/* TODO: rename to wlan_XXX, they have nothing acx related */
+void acx_mgmt_decode_ibssatim(wlan_fr_ibssatim_t *f);
+void acx_mgmt_encode_ibssatim(wlan_fr_ibssatim_t *f);
+void acx_mgmt_decode_assocreq(wlan_fr_assocreq_t *f);
+void acx_mgmt_decode_assocresp(wlan_fr_assocresp_t *f);
+void acx_mgmt_decode_authen(wlan_fr_authen_t *f);
+void acx_mgmt_decode_beacon(wlan_fr_beacon_t *f);
+void acx_mgmt_decode_deauthen(wlan_fr_deauthen_t *f);
+void acx_mgmt_decode_disassoc(wlan_fr_disassoc_t *f);
+void acx_mgmt_decode_probereq(wlan_fr_probereq_t *f);
+void acx_mgmt_decode_proberesp(wlan_fr_proberesp_t *f);
+void acx_mgmt_decode_reassocreq(wlan_fr_reassocreq_t *f);
+void acx_mgmt_decode_reassocresp(wlan_fr_reassocresp_t *f);
+void acx_mgmt_encode_assocreq(wlan_fr_assocreq_t *f);
+void acx_mgmt_encode_assocresp(wlan_fr_assocresp_t *f);
+void acx_mgmt_encode_authen(wlan_fr_authen_t *f);
+void acx_mgmt_encode_beacon(wlan_fr_beacon_t *f);
+void acx_mgmt_encode_deauthen(wlan_fr_deauthen_t *f);
+void acx_mgmt_encode_disassoc(wlan_fr_disassoc_t *f);
+void acx_mgmt_encode_probereq(wlan_fr_probereq_t *f);
+void acx_mgmt_encode_proberesp(wlan_fr_proberesp_t *f);
+void acx_mgmt_encode_reassocreq(wlan_fr_reassocreq_t *f);
+void acx_mgmt_encode_reassocresp(wlan_fr_reassocresp_t *f);

@@ -51,6 +51,8 @@ void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
 
 #else
 
+#include <linux/pci.h> /* readl() etc. */
+
 INLINE_IO u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32

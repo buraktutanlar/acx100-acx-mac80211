@@ -190,8 +190,8 @@ void acx_schedule(long timeout)
 Helper: updates short preamble, basic and oper rates, etc,
 (removing those unsupported by the peer)
 *----------------------------------------------------------------*/
-static const u8
-dot11ratebyte[] = {
+const u8
+bitpos2ratebyte[] = {
 	DOT11RATEBYTE_1,
 	DOT11RATEBYTE_2,
 	DOT11RATEBYTE_5_5,
@@ -207,66 +207,16 @@ dot11ratebyte[] = {
 	DOT11RATEBYTE_54_G,
 };
 
-static int
-find_pos(const u8 *p, int size, u8 v)
-{
-	int i;
-	for (i = 0; i < size; i++)
-		if (p[i] == v)
-			return i;
-	/* printk a message about strange byte? */
-	return 0;
-}
-
-void
-acx_update_peerinfo(wlandevice_t *priv, struct peer *peerinfo, struct bss_info *bss_peer)
-{
-	const u8 *peer_rate = bss_peer->supp_rates;
-	u16 bmask = 0; /* basic rates */
-	u16 omask = 0; /* operational rates */
-
-	FN_ENTER;
-
-	if ((priv->preamble_mode == 2) /* auto mode? */
-	 && (bss_peer->caps & WF_MGMT_CAP_SHORT)
-	) {
-		peerinfo->shortpre =
-		((bss_peer->caps & WF_MGMT_CAP_SHORT) == WF_MGMT_CAP_SHORT);
-	}
-
-	while (*peer_rate) {
-		int n = find_pos(dot11ratebyte, sizeof(dot11ratebyte), *peer_rate & 0x7f);
-		if (*peer_rate & 0x80)
-			bmask |= 1<<n;
-		else
-			omask |= 1<<n;
-		peer_rate++;
-	}
-	omask |= bmask;
-
-	bmask &= priv->defpeer.txbase.cfg;
-	omask &= priv->defpeer.txrate.cfg;
-	if (bmask)
-		peerinfo->txbase.cfg = bmask;
-	else
-		printk(KERN_WARNING "Incompatible basic rates\n");
-	if (omask)
-		peerinfo->txrate.cfg = omask;
-	else
-		printk(KERN_WARNING "Incompatible operational rates\n");
-	FN_EXIT0();
-}
-
 /*----------------------------------------------------------------
-Helper: updates priv->rate_supported[_len] according to txrate/txbase.cfg
+Helper: updates priv->rate_supported[_len] according to rate_{basic,oper}
 *----------------------------------------------------------------*/
 void
 acx_update_dot11_ratevector(wlandevice_t *priv)
 {
-	u16 ocfg = priv->defpeer.txrate.cfg;
-	u16 bcfg = priv->defpeer.txbase.cfg;
+	u16 bcfg = priv->rate_basic;
+	u16 ocfg = priv->rate_oper;
 	u8 *supp = priv->rate_supported;
-	const u8 *dot11 = dot11ratebyte;
+	const u8 *dot11 = bitpos2ratebyte;
 
 	FN_ENTER;
 
@@ -328,24 +278,22 @@ static int acx_proc_output(char *buf, wlandevice_t *priv)
 		"radio type:\t\t\t0x%02x\n" /* TODO: add radio type string from acx_display_hardware_details */
 		"form factor:\t\t\t0x%02x\n" /* TODO: add form factor string from acx_display_hardware_details */
 		"EEPROM version:\t\t\t0x%02x\n"
-		"firmware version:\t\t%s (0x%08x)\n"
-		"BSS table has %u entries:\n",
+		"firmware version:\t\t%s (0x%08x)\n",
 		WLAN_RELEASE_SUB,
 		WIRELESS_EXT,
 		priv->chip_name, priv->firmware_id,
 		priv->radio_type,
 		priv->form_factor,
 		priv->eeprom_version,
-		(char *)priv->firmware_version, priv->firmware_numver,
-		priv->bss_table_count);
+		(char *)priv->firmware_version, priv->firmware_numver);
 
-	for (i = 0; i < priv->bss_table_count; i++) {
-		struct bss_info *bss = &priv->bss_table[i];
+	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
+		struct client *bss = &priv->sta_list[i];
+		if (!bss->used) continue;
 		p += sprintf(p, "BSS %u BSSID "MACSTR" ESSID %s channel %u "
-			"WEP %s Cap 0x%x SIR %u SNR %u\n",
+			"Cap 0x%x SIR %u SNR %u\n",
 			i, MAC(bss->bssid), (char*)bss->essid, bss->channel,
-			bss->wep ? "yes" : "no", bss->caps,
-			bss->sir, bss->snr);
+			bss->cap_info, bss->sir, bss->snr);
 	}
 	p += sprintf(p, "status:\t\t\t%u (%s)\n",
 			priv->status, acx_get_status_name(priv->status));
@@ -401,20 +349,22 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		"*** network status ***\n"
 		"dev_state_mask 0x%04x\n"
 		"status %u (%s), "
-		"acx_mode %u, channel %u, "
+		"mode %u, channel %u, "
 		"reg_dom_id 0x%02X, reg_dom_chanmask 0x%04x, "
-		"txrate_auto %d, txrate_curr %04x, txrate_cfg %04x, "
+		/* "txrate_auto %d, txrate_curr %04x, txrate_cfg %04x, "
 		"txrate_fallbacks %d/%d, "
 		"txrate_stepups %d/%d, "
-		"bss_table_count %d\n",
+		"bss_table_count %d\n" */
+		,
 		priv->dev_state_mask,
 		priv->status, acx_get_status_name(priv->status),
 		priv->mode, priv->channel,
-		priv->reg_dom_id, priv->reg_dom_chanmask,
-		priv->defpeer.txrate.do_auto, priv->defpeer.txrate.cur, priv->defpeer.txrate.cfg,
+		priv->reg_dom_id, priv->reg_dom_chanmask
+		/* priv->defpeer.txrate.do_auto, priv->defpeer.txrate.cur, priv->defpeer.txrate.cfg,
 		priv->defpeer.txrate.fallback_count, priv->defpeer.txrate.fallback_threshold,
 		priv->defpeer.txrate.stepup_count, priv->defpeer.txrate.stepup_threshold,
-		priv->bss_table_count);
+		priv->bss_table_count */
+		);
 	p += sprintf(p,
 		"ESSID \"%s\", essid_active %d, essid_len %d, essid_for_assoc \"%s\", nick \"%s\"\n"
 		"WEP ena %d, restricted %d, idx %d\n",
@@ -768,7 +718,11 @@ void acx_reset_mac(wlandevice_t *priv)
 #ifdef USE_FW_LOADER_LEGACY
 static char * const default_firmware_dir = "/usr/share/acx";
 #endif
+#ifdef USE_FW_LOADER_26
 firmware_image_t* acx_read_fw(struct device *dev, const char *file, u32 *size)
+#else
+firmware_image_t* acx_read_fw(const char *file, u32 *size)
+#endif
 {
 	firmware_image_t *res = NULL;
 
@@ -1126,7 +1080,11 @@ static int acx_upload_fw(wlandevice_t *priv)
 	} else
 		filename = "WLANGEN.BIN";
 	
+#ifdef USE_FW_LOADER_26
 	apfw_image = acx_read_fw(&priv->pdev->dev, filename, &size);
+#else
+	apfw_image = acx_read_fw(filename, &size);
+#endif
 	if (NULL == apfw_image) {
 		acxlog(L_STD, "acx_read_fw FAILED\n");
 		FN_EXIT1(NOT_OK);
@@ -1197,7 +1155,11 @@ int acx_upload_radio(wlandevice_t *priv)
 	offset = le32_to_cpu(mm.CodeEnd);
 
 	sprintf(filename,"RADIO%02x.BIN", priv->radio_type);
+#ifdef USE_FW_LOADER_26
 	radio_image = acx_read_fw(&priv->pdev->dev, filename, &size);
+#else
+	radio_image = acx_read_fw(filename, &size);
+#endif
 
 /*
  * 0d = RADIO0d.BIN = Maxim chipset
@@ -1778,6 +1740,7 @@ static int acx_set_tim_template(wlandevice_t *priv)
 *
 * NB: we use the fact that 
 * struct acx_template_proberesp and struct acx_template_beacon are the same
+* (well, almost...)
 *
 * [802.11] Beacon's body consist of these IEs:
 * 1 Timestamp
@@ -1789,10 +1752,24 @@ static int acx_set_tim_template(wlandevice_t *priv)
 * 7 DS Parameter Set (direct sequence PHYs only)
 * 8 CF Parameter Set (only if PCF is supported)
 * 9 IBSS Parameter Set (ad-hoc only)
-* 10 TIM (AP only, beacon only) (see 802.11 7.3.2.6)
+*
+* Beacon only:
+* 10 TIM (AP only) (see 802.11 7.3.2.6)
+* 11 Country Information (802.11d)
+* 12 FH Parameters (802.11d)
+* 13 FH Pattern Table (802.11d)
 * ... (?!! did not yet find relevant PDF file... --vda)
 * 19 ERP Information (extended rate PHYs)
 * 20 Extended Supported Rates (if more than 8 rates)
+*
+* Proberesp only:
+* 10 Country information (802.11d)
+* 11 FH Parameters (802.11d)
+* 12 FH Pattern Table (802.11d)
+* 13-n Requested information elements (802.11d)
+* ????
+* 18 ERP Information (extended rate PHYs)
+* 19 Extended Supported Rates (if more than 8 rates)
 *----------------------------------------------------------------*/
 static int acx_fill_beacon_or_proberesp_template(wlandevice_t *priv,
 					struct acx_template_beacon *templ,
@@ -1813,11 +1790,10 @@ static int acx_fill_beacon_or_proberesp_template(wlandevice_t *priv,
 
 	p = templ->variable;
 	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
-	p = wlan_fill_ie_rates(p, (priv->rate_supported_len <= 8) ? priv->rate_supported_len : 8, priv->rate_supported);
+	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
 	p = wlan_fill_ie_ds_parms(p, priv->channel);
 	/* NB: should go AFTER tim, but acx seem to keep tim last always */
-	if (priv->rate_supported_len > 8)
-		p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len - 8, priv->rate_supported + 8);
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
 	switch (priv->mode) {
 	case ACX_MODE_0_ADHOC:
@@ -2090,6 +2066,9 @@ static void acx100_set_probe_request_template(wlandevice_t *priv)
 	acxlog(L_ASSOC, "SSID = %s, len = %i\n", priv->essid, priv->essid_len);
 	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
+	/* FIXME: should these be here or AFTER ds_parms? */
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
+	/* HUH?? who said it must be here? I've found nothing in 802.11! --vda*/
 	p = wlan_fill_ie_ds_parms(p, priv->channel);
 	frame_len = p - (char*)&probereq;
 	probereq.size = frame_len - 2;
@@ -2116,6 +2095,7 @@ static void acx111_set_probe_request_template(wlandevice_t *priv)
 	p = probereq.variable;
 	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 	frame_len = p - (char*)&probereq;
 	probereq.size = frame_len - 2;
 
@@ -2405,6 +2385,22 @@ void acx_cmd_start_scan(wlandevice_t *priv)
 * acx_set_status (FIXME: acx_set_status shouldn't do that).
 * init = 1 if called from acx_start or acx_set_defaults
 *----------------------------------------------------------------*/
+static void sens_radio_16_17(wlandevice_t *priv)
+{
+	u32 feature1,feature2;
+	if ((priv->sensitivity < 1) || (priv->sensitivity > 3)) {
+		acxlog(L_STD, "invalid sensitivity setting (1..3), setting to 1\n");
+		priv->sensitivity = 1;
+	}
+	acx111_get_feature_config(priv, &feature1, &feature2);
+	CLEAR_BIT(feature1, FEATURE1_LOW_RX|FEATURE1_EXTRA_LOW_RX);
+	if (priv->sensitivity > 1)
+		SET_BIT(feature1, FEATURE1_LOW_RX);
+	if (priv->sensitivity > 2)
+		SET_BIT(feature1, FEATURE1_EXTRA_LOW_RX);
+	acx111_feature_set(priv, feature1, feature2);
+}
+
 void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set_all)
 {
 #ifdef BROKEN_LOCKING
@@ -2580,6 +2576,12 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 				acxlog(L_STD, "acx_set_beacon_template FAILED\n");
 			if (OK != acx_set_tim_template(priv))
 				acxlog(L_STD, "acx_set_tim_template FAILED\n");
+			/* BTW acx111 firmware would not send probe responses
+			** if probe request does not have all basic rates flagged
+			** by 0x80! Thus firmware does not conform to 802.11,
+			** it should ignore 0x80 bit in ratevector from STA.
+			** We can 'fix' it by not using this template and
+			** sending probe responses by hand. TODO --vda */
 			if (OK != acx_set_probe_response_template(priv))
 				acxlog(L_STD, "acx_set_probe_response_template FAILED\n");
 		}
@@ -2594,7 +2596,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
 
 		/* configure to not do fallbacks when not in auto rate mode */
-		rate[4] = (0 != priv->defpeer.txrate.do_auto) ? /* priv->txrate_fallback_retries */ 1 : 0;
+		rate[4] = (priv->rate_auto) ? /* priv->txrate_fallback_retries */ 1 : 0;
 		acxlog(L_INIT, "Updating Tx fallback to %d retries\n", rate[4]);
 		acx_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
@@ -2613,27 +2615,20 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (GETSET_SENSITIVITY|GETSET_ALL)) {
 		acxlog(L_INIT, "Updating sensitivity value: %d\n",
 					priv->sensitivity);
-		if ((RADIO_RFMD_11 == priv->radio_type)
-		|| (RADIO_MAXIM_0D == priv->radio_type)
-		|| (RADIO_RALINK_15 == priv->radio_type)) {
+		switch (priv->radio_type) {
+		case RADIO_RFMD_11:
+		case RADIO_MAXIM_0D:
+		case RADIO_RALINK_15:
 			acx_write_phy_reg(priv, 0x30, priv->sensitivity);
-		} else
-		if ((RADIO_RADIA_16 == priv->radio_type)
-		|| (RADIO_UNKNOWN_17 == priv->radio_type)) {
-			u32 feature_options = 0;
-			if ((priv->sensitivity < 1) || (priv->sensitivity > 3)) {
-				acxlog(L_STD, "invalid sensitivity setting (1..3), setting to 1.\n");
-				priv->sensitivity = 1;
-			}
-			if (priv->sensitivity > 1)
-				SET_BIT(feature_options, 0x04); /* set low power packets */
-			if (priv->sensitivity > 2)
-				SET_BIT(feature_options, 0x01); /* set extremely low power packets */
-			acx111_set_feature_config(priv, 0x05, 0, 0); /* mask out old low power flags */
-			acx111_set_feature_config(priv, feature_options, 0, 1); /* add new low power flags */
-
-		} else {
-			acxlog(L_STD, "Don't know how to modify sensitivity for radio type 0x%02x, please try to add that!\n", priv->radio_type);
+			break;
+		case RADIO_RADIA_16:
+		case RADIO_UNKNOWN_17:
+			sens_radio_16_17(priv);
+			break;
+		default:
+			acxlog(L_STD, "Don't know how to modify sensitivity "
+				"for radio type 0x%02x, please try to add that!\n",
+				priv->radio_type);
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_SENSITIVITY);
 	}
@@ -2807,35 +2802,43 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (GETSET_MODE|GETSET_ALL)) {
 		switch (priv->mode) {
 		case ACX_MODE_3_AP:
-			/* do some preparations for Master mode;
-			 * note that (parts of) this may still be quite hackish */
+			acx_sta_list_init(priv);
+			priv->aid = 0;
+			priv->ap_client = NULL;
+			acx111_feature_off(priv, 0, FEATURE2_NO_TXCRYPT|FEATURE2_SNIFFER);
 			MAC_COPY(priv->bssid, priv->dev_addr);
-			priv->defpeer = priv->ap_peer;
 			/* start sending beacons */
 			acx_cmd_join_bssid(priv, priv->bssid);
-			/* This basically says "we're connected" */
+			/* this basically says "we're connected" */
 			acx_set_status(priv, ACX_STATUS_4_ASSOCIATED);
 			break;
 		case ACX_MODE_MONITOR:
+			acx111_feature_on(priv, 0, FEATURE2_NO_TXCRYPT|FEATURE2_SNIFFER);
 			/* TODO: what exactly do we want here? */
-			/* priv->netdev->type = ARPHRD_ETHER;
-			priv->netdev->type = ARPHRD_IEEE80211; */
+			/* priv->netdev->type = ARPHRD_ETHER; */
+			/* priv->netdev->type = ARPHRD_IEEE80211; */
 			priv->netdev->type = ARPHRD_IEEE80211_PRISM;
-			/* This stops beacons (invalid macmode...) */
+			/* this stops beacons (invalid macmode...) */
 			acx_cmd_join_bssid(priv, priv->bssid);
-			/* This basically says "we're connected" */
+			/* this basically says "we're connected" */
 			acx_set_status(priv, ACX_STATUS_4_ASSOCIATED);
 			SET_BIT(priv->set_mask, SET_RXCONFIG|SET_WEP_OPTIONS);
 			break;
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
-			/* We want to start looking for peer or AP */
+			acx111_feature_off(priv, 0, FEATURE2_NO_TXCRYPT|FEATURE2_SNIFFER);
+			priv->aid = 0;
+			priv->ap_client = NULL;
+			/* we want to start looking for peer or AP */
 			start_scan = 1;
 			break;
 		case ACX_MODE_OFF:
 			/* TODO: disable RX/TX, stop any scanning activity etc: */
 			/* priv->tx_disabled = 1; */
 			/* SET_BIT(priv->set_mask, GETSET_RX|GETSET_TX); */
+
+			/* This stops beacons (invalid macmode...) */
+			acx_cmd_join_bssid(priv, priv->bssid);
 			acx_set_status(priv, ACX_STATUS_0_STOPPED);
 			break;
 		}
@@ -2843,13 +2846,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	}
 
 	if (priv->set_mask & (SET_RXCONFIG|GETSET_ALL)) {
-		/* TODO: this can be folded into acx_initialize_rx_config() */
-		u8 rx_config[4 + ACX1xx_IE_RXCONFIG_LEN];
-		acx_initialize_rx_config(priv, priv->mode == ACX_MODE_MONITOR);
-		acxlog(L_INIT, "setting RXconfig to %04x:%04x\n", priv->rx_config_1, priv->rx_config_2);
-		*(u16 *) &rx_config[0x4] = cpu_to_le16(priv->rx_config_1);
-		*(u16 *) &rx_config[0x6] = cpu_to_le16(priv->rx_config_2);
-		acx_configure(priv, &rx_config, ACX1xx_IE_RXCONFIG);
+		acx_initialize_rx_config(priv);
 		CLEAR_BIT(priv->set_mask, SET_RXCONFIG);
 	}
 
@@ -2916,7 +2913,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		switch (priv->mode) {
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
-			priv->bss_table_count = 0;
+			acx_sta_list_init(priv);
 			/* TODO: check for races with
 			** acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_STOP_SCAN) */
 			/* stop any previous scan
@@ -2949,55 +2946,84 @@ end:
 	FN_EXIT0();
 }
 
-void acx_initialize_rx_config(wlandevice_t *priv, unsigned int setting)
+void acx_initialize_rx_config(wlandevice_t *priv)
 {
-	switch (setting) {
-		case 0: /* normal mode */
-			priv->rx_config_1 = (u16)
-				(/* RX_CFG1_FILTER_SSID |
-				 RX_CFG1_FILTER_BSSID | */
-				 RX_CFG1_FILTER_MAC /* |
-				 RX_CFG1_RCV_PROMISCUOUS */ /*|
-				 RX_CFG1_INCLUDE_ADDIT_HDR*/);
+	struct {
+		u16	id ACX_PACKED;
+		u16	len ACX_PACKED;
+		u16	rx_cfg1 ACX_PACKED;
+		u16	rx_cfg2 ACX_PACKED;
+	} cfg;
 
-			priv->rx_config_2 = (u16)
-				(RX_CFG2_RCV_ASSOC_REQ |
-				 RX_CFG2_RCV_AUTH_FRAMES |
-				 RX_CFG2_RCV_BEACON_FRAMES |
-				 RX_CFG2_RCV_CONTENTION_FREE |
-				 RX_CFG2_RCV_CTRL_FRAMES |
-				 RX_CFG2_RCV_DATA_FRAMES |
-				 RX_CFG2_RCV_MGMT_FRAMES |
-				 RX_CFG2_RCV_PROBE_REQ |
-				 RX_CFG2_RCV_PROBE_RESP |
-				 RX_CFG2_RCV_OTHER);
-			break;
-		case 1: /* monitor mode - receive everything that's possible! */
-			priv->rx_config_1 = (u16)
-				(RX_CFG1_RCV_PROMISCUOUS |
-				 RX_CFG1_INCLUDE_FCS /*|
-				 RX_CFG1_INCLUDE_ADDIT_HDR*/);
-			
-			priv->rx_config_2 = (u16)
-				(RX_CFG2_RCV_ASSOC_REQ |
-				 RX_CFG2_RCV_AUTH_FRAMES |
-				 RX_CFG2_RCV_BEACON_FRAMES |
-				 RX_CFG2_RCV_CONTENTION_FREE |
-				 RX_CFG2_RCV_CTRL_FRAMES |
-				 RX_CFG2_RCV_DATA_FRAMES |
-				 RX_CFG2_RCV_BROKEN_FRAMES |
-				 RX_CFG2_RCV_MGMT_FRAMES |
-				 RX_CFG2_RCV_PROBE_REQ |
-				 RX_CFG2_RCV_PROBE_RESP |
-				 RX_CFG2_RCV_ACK_FRAMES |
-				 RX_CFG2_RCV_OTHER);
-			break;
+	switch (priv->mode) {
+	case ACX_MODE_OFF:
+		priv->rx_config_1 = (u16) (0
+			/*| RX_CFG1_RCV_PROMISCUOUS */
+			/*| RX_CFG1_INCLUDE_FCS */
+			/*| RX_CFG1_INCLUDE_PHY_HDR */);
+		priv->rx_config_2 = (u16) (0
+			/*| RX_CFG2_RCV_ASSOC_REQ	*/
+			/*| RX_CFG2_RCV_AUTH_FRAMES	*/
+			/*| RX_CFG2_RCV_BEACON_FRAMES	*/
+			/*| RX_CFG2_RCV_CONTENTION_FREE	*/
+			/*| RX_CFG2_RCV_CTRL_FRAMES	*/
+			/*| RX_CFG2_RCV_DATA_FRAMES	*/
+			/*| RX_CFG2_RCV_BROKEN_FRAMES	*/
+			/*| RX_CFG2_RCV_MGMT_FRAMES	*/
+			/*| RX_CFG2_RCV_PROBE_REQ	*/
+			/*| RX_CFG2_RCV_PROBE_RESP	*/
+			/*| RX_CFG2_RCV_ACK_FRAMES	*/
+			/*| RX_CFG2_RCV_OTHER		*/);
+		break;
+	case ACX_MODE_MONITOR:
+		priv->rx_config_1 = (u16) (0
+			| RX_CFG1_RCV_PROMISCUOUS
+			/* | RX_CFG1_INCLUDE_FCS */
+			/* | RX_CFG1_INCLUDE_PHY_HDR */);
+		priv->rx_config_2 = (u16) (0
+			| RX_CFG2_RCV_ASSOC_REQ
+			| RX_CFG2_RCV_AUTH_FRAMES
+			| RX_CFG2_RCV_BEACON_FRAMES
+			| RX_CFG2_RCV_CONTENTION_FREE
+			| RX_CFG2_RCV_CTRL_FRAMES
+			| RX_CFG2_RCV_DATA_FRAMES
+			| RX_CFG2_RCV_BROKEN_FRAMES
+			| RX_CFG2_RCV_MGMT_FRAMES
+			| RX_CFG2_RCV_PROBE_REQ
+			| RX_CFG2_RCV_PROBE_RESP
+			| RX_CFG2_RCV_ACK_FRAMES
+			| RX_CFG2_RCV_OTHER);
+		break;
+	default:
+		priv->rx_config_1 = (u16) (0
+			/*| RX_CFG1_FILTER_SSID */
+			/*| RX_CFG1_FILTER_BSSID */
+			| RX_CFG1_FILTER_MAC
+			/*| RX_CFG1_RCV_PROMISCUOUS */
+			/*| RX_CFG1_INCLUDE_PHY_HDR */);
+		priv->rx_config_2 = (u16) (0
+			| RX_CFG2_RCV_ASSOC_REQ
+			| RX_CFG2_RCV_AUTH_FRAMES
+			| RX_CFG2_RCV_BEACON_FRAMES
+			| RX_CFG2_RCV_CONTENTION_FREE
+			| RX_CFG2_RCV_CTRL_FRAMES
+			| RX_CFG2_RCV_DATA_FRAMES
+			| RX_CFG2_RCV_MGMT_FRAMES
+			| RX_CFG2_RCV_PROBE_REQ
+			| RX_CFG2_RCV_PROBE_RESP
+			| RX_CFG2_RCV_OTHER);
+		break;
 	}
 #if DEBUG_WEP
 	if (CHIPTYPE_ACX100 == priv->chip_type)
 		/* only ACX100 supports that */
 #endif
-		priv->rx_config_1 |= RX_CFG1_PLUS_ADDIT_HDR;
+		priv->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
+
+	acxlog(L_INIT, "setting RXconfig to %04x:%04x\n", priv->rx_config_1, priv->rx_config_2);
+	cfg.rx_cfg1 = cpu_to_le16(priv->rx_config_1);
+	cfg.rx_cfg2 = cpu_to_le16(priv->rx_config_2);
+	acx_configure(priv, &cfg, ACX1xx_IE_RXCONFIG);
 }
 
 /*----------------------------------------------------------------
@@ -3133,7 +3159,6 @@ static void acx_after_interrupt_task(void *data)
 		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_STOP_SCAN);
 	}
 	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
-
 		/* FIXME: the AID is supposed to be set after assoc to
 		 * an AP only, not Ad-Hoc. AFAIK this code part here
 		 * will be invoked in non-Ad-Hoc only, so it should be ok */
@@ -3236,20 +3261,25 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8* bssid)
 		** defined with JOINBSS_RATES_BASIC111_nnn.
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
-		tmp.u.acx111.rates_basic = cpu_to_le16(priv->defpeer.txbase.cfg);
-		acxlog(L_ASSOC, "%s rates_basic 0x%04x, rates_supported 0x%04x\n", __func__, priv->defpeer.txbase.cfg, priv->defpeer.txrate.cfg);
+		tmp.u.acx111.rates_basic = cpu_to_le16(priv->rate_basic);
+		acxlog(L_ASSOC, "%s rates_basic %04x, rates_supported %04x\n",
+			__func__, priv->rate_basic, priv->rate_oper);
 	} else {
 		tmp.u.acx100.dtim_interval = dtim_interval;
-		tmp.u.acx100.rates_basic = rate111to5bits(priv->defpeer.txbase.cfg);
-		tmp.u.acx100.rates_supported = rate111to5bits(priv->defpeer.txrate.cfg);
-		acxlog(L_ASSOC, "%s rates_basic 0x%04x --> 0x%02x, rates_supported 0x%04x --> 0x%02x\n", __func__, priv->defpeer.txbase.cfg, tmp.u.acx100.rates_basic, priv->defpeer.txrate.cfg, tmp.u.acx100.rates_supported);
+		tmp.u.acx100.rates_basic = rate111to5bits(priv->rate_basic);
+		tmp.u.acx100.rates_supported = rate111to5bits(priv->rate_oper);
+		acxlog(L_ASSOC, "%s rates_basic %04x->%02x, "
+			"rates_supported %04x->%02x\n",
+			__func__,
+			priv->rate_basic, tmp.u.acx100.rates_basic,
+			priv->rate_oper, tmp.u.acx100.rates_supported);
 	}
 
 	/* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
 	** will be sent (rate/modulation/preamble) */
 	n = 0;
 	{
-		u16 t = priv->defpeer.txbase.cfg;
+		u16 t = priv->rate_basic;
 		/* calculate number of highest bit set in t */
 		while(t>1) { t>>=1; n++; }
 	}
@@ -3381,29 +3411,16 @@ static int acx_set_defaults(wlandevice_t *priv)
 	priv->long_retry = 4; /* max. retries for long (RTS) packets */
 	SET_BIT(priv->set_mask, GETSET_RETRY);
 
-	/* FIXME: should be unified with the set_rate() ioctl to have
-	 * one common function to call for "easy" (i.e. non-set_rates())
-	 * rate setup. Maybe even unify with set_rates(), but this
-	 * would require lots of thoughts about flexible code */
-	priv->defpeer.txrate.do_auto = 1;
-	priv->defpeer.txrate.pbcc511 = 0;
-	/* used to be 12 and 5, but then we don't fall back quickly
-	 * enough in case we have an invalid high rate allowed (e.g. 22M
-	 * in case of 11M-only peers) */
-	priv->defpeer.txrate.fallback_threshold = 3;
-	priv->defpeer.txrate.stepup_threshold = 10;
-	if ( priv->chip_type == CHIPTYPE_ACX111 ) { 
-		priv->defpeer.txrate.cfg = RATE111_ALL; /* allow all available rates */
-		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
+	priv->fallback_threshold = 3;
+	priv->stepup_threshold = 10;
+	priv->rate_bcast = RATE111_2;
+	priv->rate_basic = RATE111_1 | RATE111_2;
+	priv->rate_auto = 0;
+	if (priv->chip_type == CHIPTYPE_ACX111) { 
+		priv->rate_oper = RATE111_ALL;
 	} else {
-		priv->defpeer.txrate.cfg = RATE111_ALL & RATE111_ACX100_COMPAT; /* allow all available rates */
-		priv->defpeer.txrate.cur = RATE111_ALL & 0x0001; /* but start with slowest rate, to adapt properly to distant/slow peers */
+		priv->rate_oper = RATE111_ACX100_COMPAT;
 	}
-	priv->defpeer.txbase = priv->defpeer.txrate;
-	if (priv->defpeer.txrate.do_auto) /* only do that in auto mode, non-auto will be able to use one specific Tx rate only anyway */
-		priv->defpeer.txbase.cfg &= RATE111_80211B_COMPAT; /* only use 802.11b base rates, for standard 802.11b H/W compatibility */
-	priv->defpeer.shortpre = 0;
-	priv->ap_peer = priv->defpeer;
 
 	/* configure card to do rate fallback when in auto rate mode. */
 	SET_BIT(priv->set_mask, SET_RATE_FALLBACK);
@@ -3419,7 +3436,7 @@ static int acx_set_defaults(wlandevice_t *priv)
 	priv->promiscuous = 0;
 	priv->mc_count = 0;
 
-	acx_initialize_rx_config(priv, 0);
+	acx_initialize_rx_config(priv);
 	SET_BIT(priv->set_mask, SET_RXCONFIG);
 
 	/* set some more defaults */
@@ -3502,7 +3519,8 @@ int acx_init_mac(netdevice_t *dev, u16 init)
 			goto fail;
 		}
 #if DEBUG_WEP
-		if (OK != acx111_set_feature_config(priv, 0, 0x80 /* don't decrypt WEP! */, 1))
+		/* don't decrypt WEP in firmware */
+		if (OK != acx111_feature_on(priv, 0, FEATURE2_SNIFFER))
 			goto fail;
 #endif
 	} else {
@@ -3902,8 +3920,9 @@ fail:
 
 u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 {
-	FN_ENTER;
 #if (WLAN_HOSTIF!=WLAN_USB)
+	FN_ENTER;
+
 	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
 	/* FIXME: we don't use 32bit access here since mprusko said that
 	 * it results in distorted sensitivity on his card (huh!?!?
@@ -3917,6 +3936,8 @@ u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 	acx_write_reg32(priv, IO_ACX_PHY_CTL, 1);
 #else
 	mem_read_write_t mem;
+
+	FN_ENTER;
 
 	mem.addr = cpu_to_le16(reg);
 	mem.type = cpu_to_le16(0x82);

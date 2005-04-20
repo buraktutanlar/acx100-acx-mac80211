@@ -88,8 +88,6 @@
 #endif
 #include <linux/netdevice.h>
 
-#include <wlan_compat.h>
-
 #include <linux/ioport.h>
 
 #include <linux/pci.h>
@@ -305,7 +303,6 @@ static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev);
 
 static irqreturn_t acx_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void acx_set_multicast_list(netdevice_t *dev);
-void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 
 static int acx_open(netdevice_t *dev);
 static int acx_close(netdevice_t *dev);
@@ -1948,7 +1945,7 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv)
 	if (likely(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		struct sk_buff *skb;
 		skb = acx_rxdesc_to_ether(priv, rxdesc);
-		if (likely(skb)) {
+		if (likely(NULL != skb)) {
 			netif_rx(skb);
 			priv->netdev->last_rx = jiffies;
 			priv->stats.rx_packets++;
