@@ -224,7 +224,7 @@ void acx_update_dot11_ratevector(wlandevice_t *priv);
 
 int acx_recalib_radio(wlandevice_t *priv);
 int acx111_get_feature_config(wlandevice_t *priv, u32 *feature_options, u32 *data_flow_options);
-int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_flow_options, int mode /* 0 == remove, 1 == add, 2 == set */);
+int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_flow_options, unsigned int mode /* 0 == remove, 1 == add, 2 == set */);
 static inline int acx111_feature_off(wlandevice_t *priv, u32 f, u32 d)
 {
 	return acx111_set_feature_config(priv, f, d, 0);

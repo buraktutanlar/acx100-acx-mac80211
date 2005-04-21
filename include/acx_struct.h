@@ -190,18 +190,18 @@ static inline int mac_is_mcast(const u8 *mac)
 }
 
 /* undefined if v==0 */
-static inline int lowest_bit(u16 v)
+static inline unsigned int lowest_bit(u16 v)
 {
-	int n = 0;
+	unsigned int n = 0;
 	while (!(v & 0xf)) { v>>=4; n+=4; }
 	while (!(v & 1)) { v>>=1; n++; }
 	return n;
 }
 
 /* undefined if v==0 */
-static inline int highest_bit(u16 v)
+static inline unsigned int highest_bit(u16 v)
 {
-	int n = 0;
+	unsigned int n = 0;
 	while (v>0xf) { v>>=4; n+=4; }
 	while (v>1) { v>>=1; n++; }
 	return n;
@@ -840,8 +840,8 @@ typedef struct fw_ver {
 
 /* non-firmware struct --> no packing necessary */
 typedef struct wep_key {
+	size_t size; /* most often used member first */
 	u8 index;
-	size_t size;
 	u8 key[29];
 	u16 strange_filler;
 } wep_key_t;			/* size = 264 bytes (33*8) */
@@ -876,7 +876,7 @@ enum {
 };
 typedef struct client {
 	struct client *next;
-	long	mtime;			/* last time we heard it, in jiffies */
+	unsigned long	mtime;		/* last time we heard it, in jiffies */
 	u32	sir;			/* Standard IR */
 	u32	snr;			/* Signal to Noise Ratio */
 	u16	aid;			/* association ID */
@@ -917,9 +917,9 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	u16		TxDescrSize;		/* size per tx descr; ACX111 = ACX100 + 4 */
 	struct	txdescriptor	*pTxDescQPool;	/* V13POS 0x1c, official name */
 	spinlock_t	tx_lock;
-	u32		tx_pool_count;		/* 0x20 indicates # of ring buffer pool entries */
-	u32		tx_head;		/* 0x24 current ring buffer pool member index */
-	u32		tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
+	unsigned int	tx_pool_count;		/* 0x20 indicates # of ring buffer pool entries */
+	unsigned int	tx_head;		/* 0x24 current ring buffer pool member index */
+	unsigned int	tx_tail;		/* 0x34,pool_idx2 is not correct, I'm
 						 * just using it as a ring watch
 						 * official name */
 	struct	framehdr	*pFrameHdrQPool;/* 0x28 */
@@ -941,8 +941,8 @@ typedef struct TIWLAN_DC {	/* V3 version */
 	   The Adress is relative to the host memory mapping!! */
 	struct	rxdescriptor	*pRxDescQPool;	/* V1POS 0x74, V3POS 0x50 */
 	spinlock_t	rx_lock;
-	u32		rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
-	u32		rx_tail;		/* 0x6c */
+	unsigned int	rx_pool_count;		/* V1POS 0x78, V3POS 0X54 */
+	unsigned int	rx_tail;		/* 0x6c */
 	/* u32		val0x50; */	/* V1POS:0x50, some size NOT USED */
 	/* u32		val0x54; */	/* 0x54, official name NOT USED */
 
@@ -1070,7 +1070,7 @@ typedef struct wlandevice {
 	   then it made its way into 2.6.10 */
 	u32		pci_state[16];		/* saved PCI state for suspend/resume */
 #endif
-	int		hw_unavailable;		/* indicates whether the hardware has been
+	unsigned int	hw_unavailable;		/* indicates whether the hardware has been
 						 * suspended or ejected. actually a counter. */
 	u16		dev_state_mask;
 	u8		led_power;		/* power LED status */
@@ -1110,7 +1110,7 @@ typedef struct wlandevice {
 	u16		auth_or_assoc_retries;	/* V3POS 2827, V1POS 27ff */
 
 	u8		scan_running;
-	unsigned long	scan_start;		/* FIXME type?? */
+	unsigned long	scan_start;		/* YES, jiffies is defined as "unsigned long" */
 	u16		scan_retries;		/* V3POS 2826, V1POS 27fe */
 
 	/* stations known to us (if we're an ap) */
@@ -1205,14 +1205,6 @@ typedef struct wlandevice {
 
 	/*** Unknown ***/
 	u8		dtim_interval;		/* V3POS 2302 */
-#if UNUSED
-	u8		val0x2324_0;		/* V3POS 2324 */
-	u8		val0x2324_2;
-	u8		val0x2324_4;
-	u8		val0x2324_5;
-	u8		val0x2324_6;
-	u8		val0x2324_7;
-#endif
 } wlandevice_t;
 
 /* For use with ACX1xx_IE_RXCONFIG */

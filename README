@@ -501,6 +501,12 @@ where the firmware files are? Use kernel boot parameter acx_firmware_dir=XXX.
 Card insertion driver autoloading? You need to configure PCI hotplug layer,
 *NOT* pcmcia-cs layer!
 
+Use separate driver instances for multiple cards? Enable include/acx_config.h
+SEPARATE_DRIVER_INSTANCES config setting (Linux 2.4.x only for now!!).
+insmod acx_pci -o acx100_pci.wlan0 card=1 interface=wlan0
+will then load a separate driver *only* for the first card in your system,
+giving it the wlan0 interface.
+
 Need to change MAC address? Use ifconfig wlan0 hw ether 112233445566
 NOTE: make sure card interface is down! (driver will only update MAC
 when not associated: needs reinit of card parts)

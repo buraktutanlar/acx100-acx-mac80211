@@ -908,7 +908,7 @@ update_client_rates(wlandevice_t *priv, u16 rate)
 	}
 	switch (priv->mode) {
 	case ACX_MODE_2_STA:
-		if (!priv->ap_client->used) {
+		if (priv->ap_client && !priv->ap_client->used) {
 			/* Owwww... we kicked our AP!! :) */
 			SET_BIT(priv->set_mask, GETSET_RESCAN);
 		}
@@ -1033,7 +1033,7 @@ acx_ioctl_get_rate(struct net_device *dev,
 	/* TODO: remember rate of last tx, show it. think about multiple peers... */
 
 	wlandevice_t *priv = (wlandevice_t *) dev->priv;
-	int n = highest_bit(priv->rate_oper);
+	unsigned int n = highest_bit(priv->rate_oper);
  
 	if (n >= VEC_SIZE(acx111_rate_tbl)) {
 		printk(KERN_ERR "acx_ioctl_get_rate: driver BUG! n=%d. please report\n",n);

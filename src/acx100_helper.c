@@ -1843,7 +1843,7 @@ static int acx_set_beacon_template(wlandevice_t *priv)
 	FN_ENTER;
 
 	len = acx_fill_beacon_or_proberesp_template(priv, &bcn, WF_FSTYPE_BEACON);
-	acxlog(L_BINDEBUG, "Beacon length:%d\n", len);
+	acxlog(L_BINDEBUG, "Beacon length:%i\n", len);
 
 	result = acx_issue_cmd(priv, ACX1xx_CMD_CONFIG_BEACON, &bcn, len, ACX_CMD_TIMEOUT_DEFAULT);
 
@@ -2046,7 +2046,7 @@ success:
 static void acx100_set_probe_request_template(wlandevice_t *priv)
 {
 	struct acx100_template_probereq probereq;
-	char *p;
+	const char *p;
 	unsigned int frame_len;
 	
 	FN_ENTER;
@@ -2080,7 +2080,7 @@ static void acx100_set_probe_request_template(wlandevice_t *priv)
 static void acx111_set_probe_request_template(wlandevice_t *priv)
 {
 	struct acx111_template_probereq probereq;
-	char *p;
+	const char *p;
 	int frame_len;
 	
 	FN_ENTER;
@@ -2160,7 +2160,7 @@ static inline int acx100_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 			acxlog(L_STD, "FIXME: unknown/unsupported radio type, cannot modify Tx power level yet!\n");
 			return NOT_OK;
 	}
-	acxlog(L_STD, "changing radio power level to %d dBm (%d)\n", level_dbm, table[level_dbm]);
+	acxlog(L_STD, "changing radio power level to %u dBm (%u)\n", level_dbm, table[level_dbm]);
 	acx_write_phy_reg(priv, 0x11, table[level_dbm]);
 #endif
 	return OK;
@@ -2233,7 +2233,7 @@ int acx111_get_feature_config(wlandevice_t *priv, u32 *feature_options, u32 *dat
 	return OK;
 }
 
-int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_flow_options, int mode /* 0 == remove, 1 == add, 2 == set */)
+int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_flow_options, unsigned int mode /* 0 == remove, 1 == add, 2 == set */)
 {
 	struct ACX111FeatureConfig fc;
 
@@ -2262,7 +2262,7 @@ int acx111_set_feature_config(wlandevice_t *priv, u32 feature_options, u32 data_
 	}
 
 	acxlog(L_DEBUG,
-		"input is feature 0x%X dataflow 0x%X mode %d: setting feature 0x%X dataflow 0x%X\n", feature_options, data_flow_options, mode, le32_to_cpu(fc.feature_options), le32_to_cpu(fc.data_flow_options));
+		"input is feature 0x%X dataflow 0x%X mode %u: setting feature 0x%X dataflow 0x%X\n", feature_options, data_flow_options, mode, le32_to_cpu(fc.feature_options), le32_to_cpu(fc.data_flow_options));
 
 	if (OK != acx_configure(priv, &fc, ACX1xx_IE_FEATURE_CONFIG)) {
 		acxlog(L_INIT, "Error setting feature config\n");
@@ -2470,17 +2470,17 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->get_mask & (GETSET_STATION_ID|GETSET_ALL)) {
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
-		u8 *paddr;
-		int i;
+		const u8 *paddr;
+		unsigned int u;
 
 		acx_interrogate(priv, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 		paddr = &stationID[4];
-		for (i = 0; i < ETH_ALEN; i++) {
+		for (u = 0; u < ETH_ALEN; u++) {
 			/* we copy the MAC address (reversed in
 			 * the card) to the netdevice's MAC
 			 * address, and on ifup it will be
 			 * copied into iwpriv->dev_addr */
-			priv->netdev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
+			priv->netdev->dev_addr[ETH_ALEN - 1 - u] = paddr[u];
 		}
 		CLEAR_BIT(priv->get_mask, GETSET_STATION_ID);
 	}
@@ -2494,7 +2494,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			acxlog(L_STD, "Don't know how to get sensitivity for radio type 0x%02x, please try to add that!\n", priv->radio_type);
 			priv->sensitivity = 0;
 		}
-		acxlog(L_INIT, "Got sensitivity value %d\n", priv->sensitivity);
+		acxlog(L_INIT, "Got sensitivity value %u\n", priv->sensitivity);
 
 		CLEAR_BIT(priv->get_mask, GETSET_SENSITIVITY);
 	}
@@ -2520,7 +2520,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			acxlog(L_INIT, "acx111 doesn't support ED\n");
 			priv->ed_threshold = 0;
 		}
-		acxlog(L_INIT, "Got Energy Detect (ED) threshold %d\n", priv->ed_threshold);
+		acxlog(L_INIT, "Got Energy Detect (ED) threshold %u\n", priv->ed_threshold);
 		CLEAR_BIT(priv->get_mask, GETSET_ED_THRESH);
 	}
 
@@ -2535,7 +2535,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 			acxlog(L_INIT, "acx111 doesn't support CCA\n");
 			priv->cca = 0;
 		}
-		acxlog(L_INIT, "Got Channel Clear Assessment (CCA) value %d\n", priv->cca);
+		acxlog(L_INIT, "Got Channel Clear Assessment (CCA) value %u\n", priv->cca);
 		CLEAR_BIT(priv->get_mask, GETSET_CCA);
 	}
 
@@ -2552,15 +2552,15 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (GETSET_STATION_ID|GETSET_ALL)) {
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
 		u8 *paddr;
-		int i;
+		unsigned int u;
 
 		paddr = &stationID[4];
-		for (i = 0; i < ETH_ALEN; i++) {
+		for (u = 0; u < ETH_ALEN; u++) {
 			/* copy the MAC address we obtained when we noticed
 			 * that the ethernet iface's MAC changed 
 			 * to the card (reversed in
 			 * the card!) */
-			paddr[i] = priv->dev_addr[ETH_ALEN - 1 - i];
+			paddr[u] = priv->dev_addr[ETH_ALEN - 1 - u];
 		}
 		acx_configure(priv, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 		CLEAR_BIT(priv->set_mask, GETSET_STATION_ID);
@@ -2597,12 +2597,12 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 		/* configure to not do fallbacks when not in auto rate mode */
 		rate[4] = (priv->rate_auto) ? /* priv->txrate_fallback_retries */ 1 : 0;
-		acxlog(L_INIT, "Updating Tx fallback to %d retries\n", rate[4]);
+		acxlog(L_INIT, "Updating Tx fallback to %u retries\n", rate[4]);
 		acx_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
 	}
 	if (priv->set_mask & (GETSET_TXPOWER|GETSET_ALL)) {
-		acxlog(L_INIT, "Updating transmit power: %d dBm\n",
+		acxlog(L_INIT, "Updating transmit power: %u dBm\n",
 					priv->tx_level_dbm);
 		if (priv->chip_type == CHIPTYPE_ACX111) {
 			acx111_set_tx_level(priv, priv->tx_level_dbm);
@@ -2613,7 +2613,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	}
 
 	if (priv->set_mask & (GETSET_SENSITIVITY|GETSET_ALL)) {
-		acxlog(L_INIT, "Updating sensitivity value: %d\n",
+		acxlog(L_INIT, "Updating sensitivity value: %u\n",
 					priv->sensitivity);
 		switch (priv->radio_type) {
 		case RADIO_RFMD_11:
@@ -2647,7 +2647,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->set_mask & (GETSET_ED_THRESH|GETSET_ALL)) {
 		/* ed_threshold */
-		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %d\n",
+		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %u\n",
 					priv->ed_threshold);
 		if (CHIPTYPE_ACX100 == priv->chip_type) {
 			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
@@ -2678,7 +2678,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->set_mask & (GETSET_LED_POWER|GETSET_ALL)) {
 		/* Enable Tx */
-		acxlog(L_INIT, "Updating power LED status: %d\n", priv->led_power);
+		acxlog(L_INIT, "Updating power LED status: %u\n", priv->led_power);
 		acx_power_led(priv, priv->led_power);
 		CLEAR_BIT(priv->set_mask, GETSET_LED_POWER);
 	}
@@ -2690,9 +2690,9 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		acx100_ie_powermgmt_t pm;
 
 		/* change 802.11 power save mode settings */
-		acxlog(L_INIT, "Updating 802.11 power save mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", priv->ps_wakeup_cfg, priv->ps_listen_interval, priv->ps_options, priv->ps_hangover_period, priv->ps_enhanced_transition_time);
+		acxlog(L_INIT, "Updating 802.11 power save mode settings: wakeup_cfg 0x%02x, listen interval %u, options 0x%02x, hangover period %u, enhanced_ps_transition_time %d\n", priv->ps_wakeup_cfg, priv->ps_listen_interval, priv->ps_options, priv->ps_hangover_period, priv->ps_enhanced_transition_time);
 		acx_interrogate(priv, &pm, ACX100_IE_POWER_MGMT);
-		acxlog(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02x, listen interval %d, options 0x%02x, hangover period %d, enhanced_ps_transition_time %d\n", pm.wakeup_cfg, pm.listen_interval, pm.options, pm.hangover_period, pm.enhanced_ps_transition_time);
+		acxlog(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02x, listen interval %u, options 0x%02x, hangover period %u, enhanced_ps_transition_time %d\n", pm.wakeup_cfg, pm.listen_interval, pm.options, pm.hangover_period, pm.enhanced_ps_transition_time);
 		pm.wakeup_cfg = priv->ps_wakeup_cfg;
 		pm.listen_interval = priv->ps_listen_interval;
 		pm.options = priv->ps_options;
@@ -2715,7 +2715,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->set_mask & (GETSET_CHANNEL|GETSET_ALL)) {
 		/* channel */
-		acxlog(L_INIT, "Updating channel: %d\n", priv->channel);
+		acxlog(L_INIT, "Updating channel: %u\n", priv->channel);
 		switch (priv->mode) {
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
@@ -2738,7 +2738,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->set_mask & (GETSET_RX|GETSET_ALL)) {
 		/* Enable Rx */
-		acxlog(L_INIT, "Updating: enable Rx on channel: %d\n", priv->channel);
+		acxlog(L_INIT, "Updating: enable Rx on channel: %u\n", priv->channel);
 		acx_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 0x1, ACX_CMD_TIMEOUT_DEFAULT); 
 		CLEAR_BIT(priv->set_mask, GETSET_RX);
 	}
@@ -2747,7 +2747,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
 		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
 
-		acxlog(L_INIT, "Updating short retry limit: %d, long retry limit: %d\n",
+		acxlog(L_INIT, "Updating short retry limit: %u, long retry limit: %u\n",
 					priv->short_retry, priv->long_retry);
 		short_retry[0x4] = priv->short_retry;
 		long_retry[0x4] = priv->long_retry;
@@ -2759,7 +2759,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (SET_MSDU_LIFETIME|GETSET_ALL)) {
 		u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
-		acxlog(L_INIT, "Updating Tx MSDU lifetime: %d\n",
+		acxlog(L_INIT, "Updating Tx MSDU lifetime: %u\n",
 					priv->msdu_lifetime);
 		*(u32 *)&xmt_msdu_lifetime[4] = cpu_to_le32((u32)priv->msdu_lifetime);
 		acx_configure(priv, &xmt_msdu_lifetime, ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
@@ -2769,30 +2769,30 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 	if (priv->set_mask & (GETSET_REG_DOMAIN|GETSET_ALL)) {
 		/* reg_domain */
 		acx_ie_generic_t dom;
-		int i;
+		unsigned int u;
 
 		acxlog(L_INIT, "Updating regulatory domain: 0x%02X\n",
 					priv->reg_dom_id);
-		for (i = 0; i < sizeof(reg_domain_ids); i++)
-			if (reg_domain_ids[i] == priv->reg_dom_id)
+		for (u = 0; u < sizeof(reg_domain_ids); u++)
+			if (reg_domain_ids[u] == priv->reg_dom_id)
 				break;
 
-		if (sizeof(reg_domain_ids) == i) {
+		if (sizeof(reg_domain_ids) == u) {
 			acxlog(L_STD, "Invalid or unsupported regulatory domain 0x%02X specified, falling back to FCC (USA)! Please report if this sounds fishy!\n", priv->reg_dom_id);
-			i = 0;
-			priv->reg_dom_id = reg_domain_ids[i];
+			u = 0;
+			priv->reg_dom_id = reg_domain_ids[u];
 		}
 
-		priv->reg_dom_chanmask = reg_domain_channel_masks[i];
+		priv->reg_dom_chanmask = reg_domain_channel_masks[u];
 		dom.m.gp.bytes[0] = priv->reg_dom_id;
 		acx_configure(priv, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 		if (0 == (priv->reg_dom_chanmask & (1 << (priv->channel - 1) ) ))
 		{ /* hmm, need to adjust our channel setting to reside within our
 		domain */
-			for (i = 1; i <= 14; i++)
-				if (priv->reg_dom_chanmask & (1 << (i - 1)) ) {
-					acxlog(L_STD, "adjusting selected channel from %d to %d due to new regulatory domain.\n", priv->channel, i);
-					priv->channel = i;
+			for (u = 1; u <= 14; u++)
+				if (priv->reg_dom_chanmask & (1 << (u - 1)) ) {
+					acxlog(L_STD, "adjusting selected channel from %u to %u due to new regulatory domain.\n", priv->channel, u);
+					priv->channel = u;
 					break;
 				}
 		}
@@ -2880,7 +2880,7 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		}
 
 		dkey.KeyID = priv->wep_current_index;
-		acxlog(L_INIT, "Setting WEP key %d as default.\n", dkey.KeyID);
+		acxlog(L_INIT, "Setting WEP key %u as default.\n", dkey.KeyID);
 		acx_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
 #if DEBUG_WEP
 		keyindic.val = 3;
@@ -3230,7 +3230,7 @@ extern void bug_joinbss_must_be_0x30_bytes_in_length(void);
 /* NB: content of beacons/probe responses depend on template.
 ** It is not initialized here! (maybe it should be) */
 void
-acx_cmd_join_bssid(wlandevice_t *priv, const u8* bssid)
+acx_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 {
 	unsigned int i, n;
 	acx_joinbss_t tmp;
@@ -3284,7 +3284,7 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8* bssid)
 		while(t>1) { t>>=1; n++; }
 	}
 	if (n >= sizeof(bitpos2genframe_txrate)) {
-		printk(KERN_ERR "join_bssid: driver BUG! n=%d. please report\n", n);
+		printk(KERN_ERR "join_bssid: driver BUG! n=%u. please report\n", n);
 		n = 0;
 	}
 	/* look up what value the highest basic rate actually is */
@@ -3307,7 +3307,7 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8* bssid)
 #endif
 
 	acxlog(L_ASSOC | L_BINDEBUG,
-		"<%s> BSS_Type = %d\n", __func__, tmp.macmode);
+		"<%s> BSS_Type = %u\n", __func__, tmp.macmode);
 	acxlog(L_ASSOC | L_BINDEBUG,
 		"<%s> JoinBSSID MAC:"MACSTR"\n", __func__, MAC(priv->bssid));
 
@@ -3643,7 +3643,7 @@ void acx_set_timer(wlandevice_t *priv, u32 timeout)
 {
 	FN_ENTER;
 
-	acxlog(L_BINDEBUG | L_IRQ, "<%s> Elapse = %d\n", __func__, timeout);
+	acxlog(L_BINDEBUG | L_IRQ, "<%s> Elapse = %u\n", __func__, timeout);
 	if (0 == (priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		acxlog(L_STD, "attempt to set the timer when the card interface is not up!\n");
 		FN_EXIT0();
@@ -3895,7 +3895,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 		}
 	}
 
-	acxlog(L_DEBUG, "count was %d\n", count);
+	acxlog(L_DEBUG, "count was %u\n", count);
 	*charbuf = acx_read_reg8(priv, IO_ACX_PHY_DATA);
 	
 #ifdef BROKEN_KILLS_TRAFFIC
@@ -3974,7 +3974,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	
 	co2.antennas.type = pEle[0];
 	co2.antennas.len = pEle[1];
-	acxlog(L_DEBUG, "AntennaID : %02X  Length: %02X, Data: ", co2.antennas.type, co2.antennas.len);
+	acxlog(L_DEBUG, "AntennaID : %02X  Len: %02X, Data: ", co2.antennas.type, co2.antennas.len);
 	for (i=0;i<pEle[1];i++) {
 		co2.antennas.list[i] = pEle[i+2];
 		acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3984,7 +3984,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	pEle += pEle[1] + 2;	
 	co2.power_levels.type = pEle[0];
 	co2.power_levels.len = pEle[1];
-	acxlog(L_DEBUG, "PowerLevelID : %02X  Length: %02X, Data: ", co2.power_levels.type, co2.power_levels.len);
+	acxlog(L_DEBUG, "PowerLevelID : %02X  Len: %02X, Data: ", co2.power_levels.type, co2.power_levels.len);
 	for (i=0;i<pEle[1]*2;i++) {
 		co2.power_levels.list[i] = pEle[i+2];
 		acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -3994,7 +3994,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	pEle += pEle[1]*2 + 2;	
 	co2.data_rates.type = pEle[0];
 	co2.data_rates.len = pEle[1];
-	acxlog(L_DEBUG, "DataRatesID : %02X  Length: %02X, Data: ", co2.data_rates.type, co2.data_rates.len);
+	acxlog(L_DEBUG, "DataRatesID : %02X  Len: %02X, Data: ", co2.data_rates.type, co2.data_rates.len);
 	for (i=0;i<pEle[1];i++) {
 		co2.data_rates.list[i] = pEle[i+2];
 		acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -4004,7 +4004,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	pEle += pEle[1] + 2;
 	co2.domains.type = pEle[0];
 	co2.domains.len = pEle[1];
-	acxlog(L_DEBUG, "DomainID : %02X  Length: %02X, Data: ", co2.domains.type, co2.domains.len);
+	acxlog(L_DEBUG, "DomainID : %02X  Len: %02X, Data: ", co2.domains.type, co2.domains.len);
 	for (i=0;i<pEle[1];i++) {
 		co2.domains.list[i] = pEle[i+2];
 		acxlog(L_DEBUG, " %02X", pEle[i+2]);
@@ -4017,7 +4017,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	for (i=0;i<pEle[1];i++) {
 		co2.product_id.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ProductID : %02X  Length: %02X, Data: %.*s\n", co2.product_id.type, co2.product_id.len, co2.product_id.len, (char *)co2.product_id.list);
+	acxlog(L_DEBUG, "ProductID : %02X  Len: %02X, Data: %.*s\n", co2.product_id.type, co2.product_id.len, co2.product_id.len, (char *)co2.product_id.list);
 
 	pEle += pEle[1] + 2;	
 	co2.manufacturer.type = pEle[0];
@@ -4025,7 +4025,7 @@ void acx111_read_configoption(wlandevice_t *priv)
 	for (i=0;i<pEle[1];i++) {
 		co2.manufacturer.list[i] = pEle[i+2];
 	}
-	acxlog(L_DEBUG, "ManufacturerID : %02X  Length: %02X, Data: %.*s\n", co2.manufacturer.type, co2.manufacturer.len, co2.manufacturer.len, (char *)co2.manufacturer.list);
+	acxlog(L_DEBUG, "ManufacturerID : %02X  Len: %02X, Data: %.*s\n", co2.manufacturer.type, co2.manufacturer.len, co2.manufacturer.len, (char *)co2.manufacturer.list);
 
 /*
 	acxlog(L_DEBUG, "EEPROM part : \n");

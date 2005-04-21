@@ -158,6 +158,10 @@ MODULE_LICENSE("Dual MPL/GPL");
 unsigned int debug = L_BIN|L_ASSOC|L_INIT|L_STD;
 #endif
 
+#if SEPARATE_DRIVER_INSTANCES
+int card = 0;
+char *interface;
+#endif /* SEPARATE_DRIVER_INSTANCES */
 unsigned int use_eth_name = 0;
 
 #ifdef USE_FW_LOADER_LEGACY
@@ -620,8 +624,34 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	const char *devname_template;
 	u32 hardware_info;
 
+#if SEPARATE_DRIVER_INSTANCES
+	struct pci_dev *tdev;
+	unsigned int inited;
+	static int turn = 0;
+#endif /* SEPARATE_DRIVER_INSTANCES */
+
 	FN_ENTER;
 
+#if SEPARATE_DRIVER_INSTANCES
+	if (card) {
+		turn++;
+		inited=0;
+		pci_for_each_dev(tdev) {
+			if (tdev->vendor != PCI_VENDOR_ID_TI)
+				continue;
+			
+			if (tdev == pdev)
+				break;
+			if (pci_get_drvdata(tdev))
+				inited++;
+		}
+		if (inited + turn != card) {
+			FN_EXIT1(result);
+			return -ENODEV;
+		}
+	}
+#endif /* SEPARATE_DRIVER_INSTANCES */
+	
 	/* FIXME: flag device somehow to make sure ioctls don't have access
 	 * to uninitialized structures before init is finished */
 
@@ -808,7 +838,13 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_reset;
 	}
 
+#if SEPARATE_DRIVER_INSTANCES
+	if (card && interface)
+		devname_template = interface;
+	else
+#endif /* SEPARATE_DRIVER_INSTANCES */
 	devname_template = (1 == use_eth_name) ? "eth%d" : "wlan%d";
+
 	if (dev_alloc_name(dev, devname_template) < 0) {
 		result = -EIO;
 		goto fail_alloc_name;
@@ -977,7 +1013,11 @@ static void __devexit acx_remove_pci(struct pci_dev *pdev)
 		goto end;
 	}
 
+#if SEPARATE_DRIVER_INSTANCES
+	if (dev)
+#endif /* SEPARATE_DRIVER_INSTANCES */
 	priv = (struct wlandevice *) dev->priv;
+
 	if (!priv) {
 		acxlog(L_STD, "%s: card not used. Skipping any release code\n", __func__);
 		goto end;
@@ -2004,6 +2044,12 @@ MODULE_PARM_DESC(use_eth_name, "Allocate device ethX instead of wlanX");
 #ifdef USE_FW_LOADER_LEGACY
 MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
 #endif
+#if SEPARATE_DRIVER_INSTANCES
+MODULE_PARM(card, "i");
+MODULE_PARM_DESC(card, "Associate only with card-th acx100 card from this driver instance");
+MODULE_PARM(interface, "s");
+MODULE_PARM_DESC(interface, "Desired interface name for this driver instance");
+#endif /* SEPARATE_DRIVER_INSTANCES */
 /*@=fullinitblock@*/
 
 static int __init acx_init_module(void)

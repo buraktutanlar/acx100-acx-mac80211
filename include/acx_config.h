@@ -9,3 +9,10 @@
  * system load, so still do that stuff in the IRQ handler for now,
  * even if that probably means worse latency */
 #define TX_CLEANUP_IN_SOFTIRQ 0
+
+/* set to 1 if you want to have 1 driver per card instead of 1 single driver
+ * managing all cards (of a particular bus type) in your system
+ * Useful e.g. if you need to reinitialize single cards from time to time
+ * LINUX 2.4.X ONLY!! (pci_for_each_dev()) Feel free to implement 2.6.x
+ * compatibility... */
+#define SEPARATE_DRIVER_INSTANCES 0

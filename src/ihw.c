@@ -334,7 +334,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	u16 cmd_status;
 
 	FN_ENTER;
-	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
+	acxlog(L_CTL, "%s cmd 0x%X timeout %u.\n", __func__, cmd, timeout);
 
 	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		acxlog(L_CTL, "firmware not loaded yet, cannot execute command!!\n");
@@ -342,12 +342,12 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	}
 	
 	if ((debug & L_DEBUG) && (cmd != ACX1xx_CMD_INTERROGATE)) {
-		acxlog(L_DEBUG,"input pdr (len=%d):\n",paramlen);
+		acxlog(L_DEBUG,"input pdr (len=%u):\n",paramlen);
 		acx_dump_bytes(pcmdparam, paramlen);
 	}
 
 	/*** wait for ACX100 to become idle for our command submission ***/
-	for (counter = 2000; counter > 0; counter--) {
+	for (counter = 2000; counter; counter--) {
 		/* Auwtsh, busy-waiting!
 		 * Hmm, yeah, but this function is probably supposed to be
 		 * finished ASAP, so it's probably not such a terribly good
@@ -438,7 +438,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 
 	if (!(irqtype & HOST_INT_CMD_COMPLETE)) {
 		acxlog(0xffff,
-			"Polling for an IRQ FAILED with %X, cmd_status %d, irqs_active %d, irq_status %X. Bailing.\n",
+			"Polling for an IRQ FAILED with %X, cmd_status %u, irqs_active %u, irq_status %X. Bailing.\n",
 			irqtype, cmd_status, priv->irqs_active, priv->irq_status);
 		if (debug & 0xffff)
 			dump_stack();
@@ -466,7 +466,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 			if (cmd == ACX1xx_CMD_INTERROGATE) {
 				acx_read_cmd_param(priv, pcmdparam, paramlen);
 				if (debug & L_DEBUG) {
-        				acxlog(L_DEBUG,"output pdr (len=%d):\n",paramlen);
+        				acxlog(L_DEBUG,"output pdr (len=%u):\n",paramlen);
         				acx_dump_bytes(pcmdparam, paramlen);
 				}
 			}
@@ -479,14 +479,15 @@ done:
 	return result;
 }
 #else
-int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int paramlen,u32 timeout) {
+int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int paramlen,u32 timeout)
+{
 	int result,skipridheader,blocklen,inpipe,outpipe,acklen=sizeof(priv->ctrlin);
 	int ucode,delcount;
 	struct usb_device *usbdev;
 
 	FN_ENTER;
-	acxlog(L_CTL, "%s cmd 0x%X timeout %d.\n", __func__, cmd, timeout);
-	acxlog(L_CTL,"paramlen=%d type=%d\n",paramlen,(pdr)?le16_to_cpu(((acx_ie_generic_t *)pdr)->type):-1);
+	acxlog(L_CTL, "%s cmd 0x%X timeout %u.\n", __func__, cmd, timeout);
+	acxlog(L_CTL,"paramlen=%u type=%d\n",paramlen,(pdr)?le16_to_cpu(((acx_ie_generic_t *)pdr)->type):-1);
 	skipridheader=0;
 	/* ----------------------------------------------------
 	** get context from wlandevice
@@ -509,7 +510,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 		}
 		if (skipridheader) acklen=paramlen;
 		else acklen=4+paramlen; /* acklen -> expected length of ACK from USB device */
-		acxlog(L_CTL,"sending interrogate: cmd=%d status=%d rid=%d frmlen=%d\n",le16_to_cpu(priv->ctrlout.cmd),le16_to_cpu(priv->ctrlout.status),le16_to_cpu(priv->ctrlout.u.rridreq.rid),le16_to_cpu(priv->ctrlout.u.rridreq.frmlen));
+		acxlog(L_CTL,"sending interrogate: cmd=%u status=%u rid=%u frmlen=%u\n",le16_to_cpu(priv->ctrlout.cmd),le16_to_cpu(priv->ctrlout.status),le16_to_cpu(priv->ctrlout.u.rridreq.rid),le16_to_cpu(priv->ctrlout.u.rridreq.frmlen));
 	} else if (cmd==ACX1xx_CMD_CONFIGURE) {
 		/* -------------------------------------------------
 		** setup configure command...
@@ -535,7 +536,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	inpipe =usb_rcvctrlpipe(usbdev,0);
 	acxlog(L_CTL,"ctrl inpipe=0x%X outpipe=0x%X\n",inpipe,outpipe);
 #if ACX_DEBUG
-	acxlog(L_CTL,"sending USB control msg (out) (blocklen=%d)\n",blocklen);
+	acxlog(L_CTL,"sending USB control msg (out) (blocklen=%i)\n",blocklen);
 	if (debug&L_DATA) acx_dump_bytes(&(priv->ctrlout),blocklen);
 #endif
 	/* --------------------------------------
@@ -547,7 +548,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"WARNING: CTRL MESSAGE FAILED WITH ERRCODE %d\n",ucode);
+		acxlog(L_STD,"WARNING: CTRL MESSAGE FAILED WITH ERRCODE %i\n",ucode);
 		FN_EXIT0();
 		return NOT_OK;
 	}
@@ -568,7 +569,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	** check the result
 	** ------------------------------ */
 	result=priv->ctrl_urb->actual_length;
-	acxlog(L_CTL,"wrote=%d bytes (status=%d)\n",result,priv->ctrl_urb->status);
+	acxlog(L_CTL,"wrote=%i bytes (status=%u)\n",result,priv->ctrl_urb->status);
 	if (result<0) {
 		FN_EXIT0();
 		return NOT_OK;
@@ -576,7 +577,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	/* --------------------------------------
 	** Check for device acknowledge ...
 	** -------------------------------------- */
-	acxlog(L_CTL,"sending USB control msg (in) (acklen=%d) sizeof(acx100_usbin_t)=%d\n",acklen,sizeof(acx100_usbin_t));
+	acxlog(L_CTL,"sending USB control msg (in) (acklen=%i) sizeof(acx100_usbin_t)=%d\n",acklen,sizeof(acx100_usbin_t));
 	priv->ctrlin.status=0; /* delete old status flag -> set to fail */
 	FILL_SETUP_PACKET(priv->usb_setup,USB_TYPE_VENDOR|USB_DIR_IN,ACX100_USB_UNKNOWN_REQ1,0,0,acklen)
 	usb_fill_control_urb(priv->ctrl_urb,usbdev,inpipe,priv->usb_setup,&(priv->ctrlin),acklen,(usb_complete_t)acx100usb_control_complete,priv);
@@ -584,7 +585,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	/* priv->ctrl_urb->timeout=timeout; */
 	ucode=submit_urb(priv->ctrl_urb, GFP_KERNEL);
 	if (ucode!=0) {
-		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %d\n",ucode);
+		acxlog(L_STD,"ctrl message (ack) FAILED with errcode %i\n",ucode);
 		FN_EXIT0();
 		return NOT_OK;
 	}
@@ -605,27 +606,27 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	** check the result
 	** ------------------------------ */
 	result=priv->ctrl_urb->actual_length;
-	acxlog(L_CTL,"read=%d bytes\n",result);
+	acxlog(L_CTL,"read=%i bytes\n",result);
 	if (result < 0) {
 		FN_EXIT0();
 		return NOT_OK;
 	}
 	if (le16_to_cpu(priv->ctrlin.status)!=1) {
-		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %d\n",le16_to_cpu(priv->ctrlin.status));
+		acxlog(L_DEBUG,"WARNING: COMMAND RETURNED STATUS %u\n",le16_to_cpu(priv->ctrlin.status));
 	}
 	if (cmd==ACX1xx_CMD_INTERROGATE) {
 		if ((pdr)&&(paramlen>0)) {
 			if (skipridheader) {
 				memcpy(pdr,&(priv->ctrlin.u.rmemresp.data),paramlen-4);
-				acxlog(L_CTL,"response frame: cmd=%d status=%d\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status));
+				acxlog(L_CTL,"response frame: cmd=%u status=%u\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status));
 				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen-4);
 				if (debug&L_DATA) 
 				    acx_dump_bytes(pdr,paramlen-4);
 			}
 			else {
 				memcpy(pdr,&(priv->ctrlin.u.rridresp.rid),paramlen);
-				acxlog(L_CTL,"response frame: cmd=%d status=%d rid=%d frmlen=%d\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status),le16_to_cpu(priv->ctrlin.u.rridresp.rid),le16_to_cpu(priv->ctrlin.u.rridresp.frmlen));
-				acxlog(L_DATA,"incoming bytes (%d):\n",paramlen);
+				acxlog(L_CTL,"response frame: cmd=%u status=%u rid=%u frmlen=%u\n",le16_to_cpu(priv->ctrlin.cmd),le16_to_cpu(priv->ctrlin.status),le16_to_cpu(priv->ctrlin.u.rridresp.rid),le16_to_cpu(priv->ctrlin.u.rridresp.frmlen));
+				acxlog(L_DATA,"incoming bytes (%u):\n",paramlen);
 				if (debug&L_DATA)
 				    acx_dump_bytes(pdr,paramlen);
 			}
@@ -731,7 +732,7 @@ int acx_configure(wlandevice_t *priv, void *pdr, short type)
 	if (unlikely(len==0)) {
 		acxlog(L_DEBUG,"WARNING: ENCOUNTERED ZEROLENGTH TYPE (%x)\n",type);
 	}
-	acxlog(L_XFER,"configuring: type=0x%X len=%d\n",type,len);
+	acxlog(L_XFER,"configuring: type=0x%X len=%u\n",type,len);
 	
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 #if (WLAN_HOSTIF==WLAN_USB)
@@ -808,7 +809,7 @@ int acx_interrogate(wlandevice_t *priv, void *pdr, short type)
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 #endif
 
-	acxlog(L_CTL,"interrogating: type=0x%X len=%d\n",type,len);
+	acxlog(L_CTL,"interrogating: type=0x%X len=%u\n",type,len);
 
 	return acx_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr,
 		len + 4, ACX_CMD_TIMEOUT_DEFAULT);
