@@ -285,7 +285,7 @@ static int acx_proc_output(char *buf, wlandevice_t *priv)
 		priv->radio_type,
 		priv->form_factor,
 		priv->eeprom_version,
-		(char *)priv->firmware_version, priv->firmware_numver);
+		priv->firmware_version, priv->firmware_numver);
 
 	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
 		struct client *bss = &priv->sta_list[i];
@@ -421,11 +421,13 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 		p += sprintf(p,
 			"\n"
 			"*** Firmware ***\n"
+			"version \"%s\"\n"
 			"tx_desc_overfl %u, rx_OutOfMem %u, rx_hdr_overfl %u, rx_hdr_use_next %u\n"
 			"rx_dropped_frame %u, rx_frame_ptr_err %u, rx_xfr_hint_trig %u, rx_dma_req %u\n"
 			"rx_dma_err %u, tx_dma_req %u, tx_dma_err %u, cmd_cplt %u, fiq %u\n"
 			"rx_hdrs %u, rx_cmplt %u, rx_mem_overfl %u, rx_rdys %u, irqs %u\n"
 			"acx_trans_procs %u, decrypt_done %u, dma_0_done %u, dma_1_done %u\n",
+			priv->firmware_version,
 			le32_to_cpu(fw_stats->tx_desc_of), le32_to_cpu(fw_stats->rx_oom), le32_to_cpu(fw_stats->rx_hdr_of), le32_to_cpu(fw_stats->rx_hdr_use_next),
 			le32_to_cpu(fw_stats->rx_dropped_frame), le32_to_cpu(fw_stats->rx_frame_ptr_err), le32_to_cpu(fw_stats->rx_xfr_hint_trig), le32_to_cpu(fw_stats->rx_dma_req),
 			le32_to_cpu(fw_stats->rx_dma_err), le32_to_cpu(fw_stats->tx_dma_req), le32_to_cpu(fw_stats->tx_dma_err), le32_to_cpu(fw_stats->cmd_cplt), le32_to_cpu(fw_stats->fiq),

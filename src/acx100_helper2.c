@@ -1269,7 +1269,7 @@ static const char * const status_str[] = {
   "Reserved error code", "Reserved error code",
   "Cannot support all requested capabilities in the Capability Information field. TRANSLATION: Bug in ACX100 driver?",
   "Reassociation denied due to reason outside the scope of 802.11b standard. TRANSLATION: Bug in ACX100 driver?",
-  "Association denied due to reason outside the scope of 802.11b standard. TRANSLATION: peer station perhaps has MAC filtering enabled, FIX IT!",
+  "Association denied due to reason outside the scope of 802.11b standard. TRANSLATION: peer station may have MAC filtering enabled or assoc to wrong AP (BUG), FIX IT!",
   "Responding station does not support the specified authentication algorithm. TRANSLATION: invalid network data or bug in ACX100 driver?",
   "Received an Authentication frame with transaction sequence number out of expected sequence. TRANSLATION: Bug in ACX100 driver?",
   "Authentication rejected because of challenge failure. TRANSLATION: Bug in ACX100 driver?",
@@ -2011,7 +2011,7 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	struct txhostdescriptor *hdesc_head;
 	struct txhostdescriptor *hdesc_body;
 	struct wlan_hdr_mgmt *head;
-	char *body,*p;
+	char *body,*p, *prate;
 	unsigned int packet_len;
 	u16 cap;
 
@@ -2042,10 +2042,14 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 
 	p = body;
 	/* now start filling the AssocReq frame body */
-#if BROKEN
-	cap = host2ieee16(priv->capabilities & ~WF_MGMT_CAP_IBSS);
-#else
-	/* 802.11 7.3.1.4 Capability Information field
+
+	/* since this assoc request will most likely only get
+	 * sent in the STA to AP case (and not when Ad-Hoc IBSS),
+	 * the cap combination indicated here will thus be
+	 * WF_MGMT_CAP_ESSi *always* (no IBSS ever)
+	 * The specs are more than non-obvious on all that:
+	 * 
+	 * 802.11 7.3.1.4 Capability Information field
 	** APs set the ESS subfield to 1 and the IBSS subfield to 0 within
 	** Beacon or Probe Response management frames. STAs within an IBSS
 	** set the ESS subfield to 0 and the IBSS subfield to 1 in transmitted
@@ -2056,28 +2060,16 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	** if WEP is required for all data type frames within the BSS.
 	** STAs within an IBSS set the Privacy subfield to 1 in Beacon
 	** or Probe Response management frames if WEP is required
-	** for all data type frames within the IBSS
-	**
-	** So far it seems we deviate from above. Why? */
+	** for all data type frames within the IBSS */
 
-	/* FIXME: is it correct that we have to manually patc^H^H^H^Hadjust the
-	 * Capabilities like that?
-	 * I'd venture that priv->capabilities
-	 * (acx_update_capabilities()) should have set that
-	 * beforehand maybe...
-	 * Anyway, now Managed network association works properly
-	 * without failing.
-	 */
-	/*
-	cap = host2ieee16((priv->capabilities & ~WF_MGMT_CAP_IBSS) | WF_MGMT_CAP_ESS);
-	*/
-	/* cap = WF_MGMT_CAP_ESSi;
-	** mega-huh?? we are NOT an AP here!!!
-	** If this was required due to (buggy) AP not liking us
-	** otherwise - say so in comments! --vda */
-	cap = 0;
+	/* note that returning 0 will be refused by several APs...
+	 * (so this indicates that you're probably supposed to
+	 * "confirm" the ESS mode) */
+	cap = WF_MGMT_CAP_ESSi;
 
-	if (priv->wep_restricted)
+	/* this one used to be a check on wep_restricted,
+	 * but more likely it's wep_enabled instead */
+	if (priv->wep_enabled)
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACYi);
 
 	/* Probably we can just set these always, because our hw is
@@ -2088,8 +2080,6 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	/* only ask for PBCC support if the peer station supports it */
 	if (priv->ap_client->cap_info & WF_MGMT_CAP_PBCC)
 		SET_BIT(cap, WF_MGMT_CAP_PBCCi);
-#endif
-	acxlog(L_ASSOC, "association: requesting capabilities 0x%04X\n", cap);
 
 	/* IEs: 1. caps */
 	*(u16*)p = cap;	p += 2;
@@ -2098,12 +2088,21 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	/* 3. ESSID */
 	p = wlan_fill_ie_ssid(p, strlen(priv->essid_for_assoc), priv->essid_for_assoc);
 	/* 4. supp rates */
+	prate = p;
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
 	/* 5. ext supp rates */
 	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
+	if (debug & L_DEBUG)
+	{
+		acxlog(L_DEBUG, "association: rates element\n");
+		acx_dump_bytes(prate, (int)p - (int)prate);
+	}
+
 	/* calculate lengths */
 	packet_len = WLAN_HDR_A3_LEN + (p - body);
+
+	acxlog(L_ASSOC, "association: requesting caps 0x%04X, ESSID %s\n", cap, priv->essid_for_assoc);
 
 	hdesc_body->length = cpu_to_le16(packet_len - WLAN_HDR_A3_LEN);
 	hdesc_body->data_offset = 0;
@@ -2239,20 +2238,26 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 
 		/* strange peer with NO basic rates?! */
 		if (!bss->rate_cfg)
+		{
+			acxlog(L_ASSOC, "skip strange peer %i: NO rates\n", i);
 			continue;
+		}
 
 		/* do we support all basic rates of this peer? */
 		if ((bss->rate_cfg & priv->rate_oper) != bss->rate_cfg)
+		{
+			acxlog(L_ASSOC, "skip peer %i: incompatible basic rates (AP requests 0x%04x, we have 0x%04x)\n", i, bss->rate_cfg, priv->rate_oper);
 			continue;
+		}
 
 		if ( !(priv->reg_dom_chanmask & (1<<(bss->channel-1))) ) {
-			acxlog(L_STD|L_ASSOC, "WARNING: peer station "
+			acxlog(L_STD|L_ASSOC, "WARNING: peer station %d "
 				"is using channel %d, which is outside "
 				"the channel range of the regulatory domain "
 				"the driver is currently configured for: "
 				"couldn't join in case of matching settings, "
 				"might want to adapt your config!\n",
-				bss->channel);
+				i, bss->channel);
 			continue; /* keep looking */
 		}
 
@@ -2283,7 +2288,8 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			** We should use Probe requests to get Probe responses
 			** and check for real SSID (are those never hidden?) */
 			bss->used = CLIENT_JOIN_CANDIDATE;
-			idx_found = i;
+			if (idx_found == -1)
+				idx_found = i;
 			acxlog(L_ASSOC, "found station with empty or "
 				"single-space (hidden) SSID, considering "
 				"for assoc attempt\n");

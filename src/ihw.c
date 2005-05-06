@@ -64,8 +64,6 @@
 
 #include <acx.h>
 
-extern void acx_dump_bytes(void *,int);
-
 #if (WLAN_HOSTIF==WLAN_USB)
 /* try to make it compile for both 2.4.x and 2.6.x kernels */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)

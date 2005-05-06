@@ -73,6 +73,7 @@ fcd07de4b25e1d2aaf3b78b27c5b7ee9  FwRad16.bin	83320
 nothing known yet, but they added support for WPA (NOTE: we don't support WPA
 yet...)
 WEP is working fine with this firmware (WEP64, WEP128)
+Works with DWL-G520+ h/w A2, yet doesn't work at all with h/w A1!?
 
 2.3.1.31 (Safecom Dec. 2004 firmware, http://www.safecom.cn/code/product/sw/swlp-54108/driver.zip):
 7026826460376f6b174f9225bd7781b9  FwRad16.bin	92836

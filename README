@@ -154,6 +154,11 @@ Sensitivity	* (hardware)		- (no go since USB?)	* (various F/W settings)
 
 Currently this driver for standard ACX100, ACX100 USB and ACX111 cards
 still is a bit experimental.
+There's no development roadmap since I don't have much time and thus I cannot
+say accurately enough when features will be implemented. You might want
+to look at the TODO file for things planned in the future (in order of
+importance).
+
 We're still not totally sure about the status of WEP support:
 ACX100: Many situations should work, but it might still not work properly
 or fail sometimes.
@@ -675,13 +680,15 @@ Then please file a bug report. Thanks!
 
 This could also happen due to some PCI bus incompatibility (the ACX100
 states a PCI2.2 requirement!!). If you happen to have a SB Live! card and
-lose sound or have crashes when using the ACX100 card, then try
-loading the ACX100 card driver BEFORE loading the SB Live! (this managed
-to fix sound for one person)
-Hmm, OTOH someone else reported that inserting the ACX100 card AFTER
+lose sound or have crashes when using an ACX card (both 802.11b *and* 802.11g
+chipsets are affected, according to reports!), then try loading the ACX1xx
+driver BEFORE loading the SB Live! (this managed to fix sound for one person)
+Hmm, OTOH someone else reported that inserting the WLAN card AFTER
 bootup manages to fix it. So simply try swapping the sound/network
 module init sequence.
-Also, using an SB Live! with ACX100 may result in crashes and data corruption.
+Also, using an SB Live! with ACX1xx may result in crashes and data corruption.
+You might choose to avoid any potential issues by getting rid of either
+the ACX card (much preferred; reason: TI support policy...) or the SB Live!
 
 -- Wireless config failure --
 
@@ -760,6 +767,9 @@ iwconfig rts might help.
 Multicast not working? The driver is currently not fully handling multicast.
 See https://sourceforge.net/forum/message.php?msg_id=2361212 for discussion
 and (semi-)solutions.
+
+IRQ lockup (no more IRQs from card) after some time? Try booting with or
+without ACPI enabled, has been reported once to fix it.
 
 If you are still having trouble, then make sure that you didn't get an iwconfig
 version incompatibility warning. This can mess up terribly many settings :-(

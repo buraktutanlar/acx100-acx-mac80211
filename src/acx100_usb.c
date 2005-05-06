@@ -246,7 +246,6 @@ int txbufsize;
 int rxbufsize;
 #if ACX_DEBUG
 static char * acx100usb_pstatus(int);
-extern void acx_dump_bytes(void *,int);
 static void dump_device(struct usb_device *);
 static void dump_device_descriptor(struct usb_device_descriptor *);
 #if USB_24
@@ -683,7 +682,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	unsigned int offset=8,len,inpipe,outpipe;
 	u32 size;
 	int result;
-	u16 *csptr;
+	u32 *csptr;
 	char filename[128],*firmware,*usbbuf;
 	FN_ENTER;
 	usbbuf = kmalloc(ACX100_USB_RWMEM_MAXLEN,GFP_KERNEL);
@@ -696,8 +695,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		kfree(usbbuf);
 		return(-EINVAL);
 	}
-	if (firmware_dir) sprintf(filename,"%s/ACX100_USB.bin",firmware_dir);
-	else sprintf(filename,"/usr/share/acx/ACX100_USB.bin");
+	strcpy(filename, "ACX100_USB.bin");
 	acxlog(L_INIT,"loading firmware %s\n",filename);
 #ifdef USE_FW_LOADER_26
 	firmware=(char *)acx_read_fw(&usbdev->dev, filename, &size);
@@ -741,15 +739,15 @@ static int acx100usb_boot(struct usb_device *usbdev)
 	** finally, send the checksum and reboot
 	** the device...
 	** -------------------------------------- */
-	csptr=(u16 *)firmware;
-	result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,csptr[0],csptr[1],NULL,0,3000); /* this triggers the reboot ? */
+	csptr=(u32 *)firmware;
+	result=usb_control_msg(usbdev,outpipe,ACX100_USB_UPLOAD_FW,USB_TYPE_VENDOR|USB_DIR_OUT,le32_to_cpu(*csptr) & 0xffff, le32_to_cpu(*csptr) >> 16, NULL,0,3000); /* this triggers the reboot ? */
 	if (result<0) {
 		printk(KERN_ERR SHORTNAME "error %d during tx of checksum, aborting\n",result);
 		kfree(usbbuf);
 		vfree(firmware);
 		return(result);
 	}
-	result=usb_control_msg(usbdev,inpipe,ACX100_USB_ACK_CS,USB_TYPE_VENDOR|USB_DIR_IN,csptr[0],csptr[1],usbbuf,8,3000);
+	result=usb_control_msg(usbdev,inpipe,ACX100_USB_ACK_CS,USB_TYPE_VENDOR|USB_DIR_IN,le32_to_cpu(*csptr) & 0xffff, le32_to_cpu(*csptr) >> 16, usbbuf,8,3000);
 	if (result<0) {
 		printk(KERN_ERR SHORTNAME "error %d during ACK of checksum, aborting\n",result);
 		kfree(usbbuf);
@@ -757,7 +755,7 @@ static int acx100usb_boot(struct usb_device *usbdev)
 		return(result);
 	}
 	vfree(firmware);
-	if (((u16 *)usbbuf)[0]!=0x10) {
+	if (*usbbuf!=0x10) {
 		kfree(usbbuf);
 		printk(KERN_ERR SHORTNAME "invalid checksum?\n");
 		return(-EINVAL);

@@ -693,7 +693,7 @@ static inline void acx_log_txbuffer(const TIWLAN_DC *pDc)
 #define NEW_SPIN_UNLOCK(x) spin_unlock(x)
 #endif
 
-inline void acx_clean_tx_desc(wlandevice_t *priv)
+unsigned int acx_clean_tx_desc(wlandevice_t *priv)
 {
 	TIWLAN_DC *pDc = &priv->dc;
 	txdesc_t *pTxDesc;
@@ -811,7 +811,8 @@ next:
 	OLD_SPIN_UNLOCK(&pDc->tx_lock);
 
 
-	FN_EXIT0();
+	FN_EXIT1(num_cleaned);
+	return num_cleaned;
 }
 
 /* clean *all* Tx descriptors, and regardless of their previous state.

@@ -86,7 +86,11 @@ modules:
 	make -C $(KERNEL_BUILD) SUBDIRS=$(PWD) $(TMPOUT) \
 		MODVERDIR=$(PWD) WLAN_HOSTIF=WLAN_USB modules
 	@echo
-	@echo "*** Compilation finished. Make sure to copy required firmware files to /usr/share/acx/ before proceeding! ***"
+	@echo "**************************"
+	@echo "Compilation finished."
+	@echo "Make sure to copy required firmware files to /usr/share/acx/ or where your hotplug"
+	@echo "scripts expect (default /lib/firmware) before proceeding!" 
+	@echo "**************************"
 
 all: modules
 
@@ -118,7 +122,11 @@ usb_objs = acx_usb_main.o acx_usb_ihw.o acx_usb_helper.o acx_usb_ioctl.o acx_usb
 
 all: acx_pci.o acx_usb.o
 	@echo
-	@echo "*** Compilation finished. Make sure to copy required firmware files to /usr/share/acx/ before proceeding! ***"
+	@echo "**************************"
+	@echo "Compilation finished."
+	@echo "Make sure to copy required firmware files to /usr/share/acx/ or where your hotplug"
+	@echo "scripts expect (default /lib/firmware) before proceeding!" 
+	@echo "**************************"
 
 acx_pci.o: $(pci_objs)
 	$(LD) $(LDFLAGS) -o $@ $^

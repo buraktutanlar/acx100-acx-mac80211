@@ -1366,6 +1366,7 @@ static int acx_close(netdevice_t *dev)
 	spin_unlock_irq(&priv->lock);
 #endif
 
+	acxlog(L_STD, "CLOSED DEVICE\n");
 	FN_EXIT0();
 	return OK;
 }
@@ -1492,29 +1493,37 @@ fail_no_unlock:
 static void acx_tx_timeout(netdevice_t *dev)
 {
 	wlandevice_t *priv;
+	unsigned int tx_num_cleaned;
 
 	FN_ENTER;
 	
 	priv = (wlandevice_t *)dev->priv;
 
-/* hmm, maybe it is still better to clean the ring buffer, despite firmware
- * issues?? */
-#if DOH_SEEMS_TO_CONFUSE_FIRMWARE_UNFORTUNATELY
-	/* clean all tx descs, they may have been completely full */
-	acx_clean_tx_desc_emergency(priv);
+	/* clean processed tx descs, they may have been completely full */
+	tx_num_cleaned = acx_clean_tx_desc(priv);
+
+	/* nothing cleaned, yet (almost) no free buffers available?
+	 * --> clean all tx descs, no matter which status!!
+	 * Note that I strongly suspect that doing emergency cleaning
+	 * may confuse the firmware. This is a last ditch effort to get
+	 * ANYTHING to work again...
+	 * Hmm, should we do locking for TxQueueFree access? I don't think
+	 * we need it...
+	 */
+	if ((priv->TxQueueFree <= 2) && (tx_num_cleaned == 0))
+	{
+		printk("acx: FAILED to free any of the many full tx buffers in timeout handler, switching to emergency freeing; be prepared for final failure... please report!\n");
+		acx_clean_tx_desc_emergency(priv);
+	}
 	
 	if (acx_queue_stopped(dev) && (ACX_STATUS_4_ASSOCIATED == priv->status))
 		acx_wake_queue(dev, "after Tx timeout");
-#else
-	/* clean all tx descs, they may have been completely full */
-	acx_clean_tx_desc(priv);
-#endif
 
 	/* stall may have happened due to radio drift, so recalib radio */
 	acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 			
-	printk("acx100: Tx timeout!\n");
-
+	/* do unimportant work last */
+	printk("acx: Tx timeout!\n");
 	priv->stats.tx_errors++;
 
 	FN_EXIT0();
