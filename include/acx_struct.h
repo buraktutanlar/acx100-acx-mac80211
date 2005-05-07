@@ -1303,9 +1303,15 @@ void acx_rx(struct rxhostdescriptor *rxdesc, wlandevice_t *priv);
 /*============================================================================*
  * Firmware loading                                                           *
  *============================================================================*/
+/* Doh, 2.4.x also has CONFIG_FW_LOADER_MODULE
+ * (but doesn't have the new device model yet which we require!)
+ * FIXME: exact version that introduced new device handling? */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
 #if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
 #define USE_FW_LOADER_26 1
 #endif
+#endif
+
 #define USE_FW_LOADER_LEGACY 1
 
 #ifdef USE_FW_LOADER_26

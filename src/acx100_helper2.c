@@ -2246,8 +2246,14 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 		/* do we support all basic rates of this peer? */
 		if ((bss->rate_cfg & priv->rate_oper) != bss->rate_cfg)
 		{
+/* we probably need to have all rates as operational rates,
+   even in case of an 11M-only configuration */
+#if THIS_IS_TROUBLESOME
 			acxlog(L_ASSOC, "skip peer %i: incompatible basic rates (AP requests 0x%04x, we have 0x%04x)\n", i, bss->rate_cfg, priv->rate_oper);
 			continue;
+#else
+			acxlog(L_ASSOC, "peer %i: incompatible basic rates (AP requests 0x%04x, we have 0x%04x). Considering anyway...\n", i, bss->rate_cfg, priv->rate_oper);
+#endif
 		}
 
 		if ( !(priv->reg_dom_chanmask & (1<<(bss->channel-1))) ) {
