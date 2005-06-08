@@ -224,7 +224,7 @@ int acx_ether_to_txdesc(wlandevice_t *priv,
 	}
 
 	header = tx_desc->fixed_size.s.host_desc;
-	if ((unsigned long)0xffffffff == (unsigned long)header) /* FIXME: happens on card eject; better method? */
+	if (unlikely((unsigned long)0xffffffff == (unsigned long)header)) /* FIXME: happens on card eject; better method? */
 		return NOT_OK;
 	payload = header + 1;
 
@@ -377,7 +377,7 @@ struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, const struct
 	struct sk_buff *skb;
 	const u8 *daddr;
 	const u8 *saddr;
-	u8 *e_payload;
+	const u8 *e_payload;
 	int buflen;
 	int payload_length;
 	unsigned int payload_offset;
@@ -411,7 +411,7 @@ struct sk_buff *acx_rxdesc_to_ether(wlandevice_t *priv, const struct
 	default: /* WF_FC_FROMTODSi */
 		payload_offset += (WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN);
 		payload_length -= (WLAN_HDR_A4_LEN - WLAN_HDR_A3_LEN);
-		if (0 > payload_length) {
+		if (unlikely(0 > payload_length)) {
 			acxlog(L_STD, "A4 frame too short!\n");
 			FN_EXIT1((int)NULL);
 			return NULL;

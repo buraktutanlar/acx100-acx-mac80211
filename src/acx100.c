@@ -521,7 +521,7 @@ static void acx_show_card_eeprom_id(wlandevice_t *priv)
 
 static inline void acx_device_chain_add(struct net_device *dev)
 {
-	wlandevice_t *priv = (struct wlandevice *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	priv->prev_nd = root_acx_dev.newest;
 	/*@-temptrans@*/
@@ -783,7 +783,7 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv->membase2 = phymem2;
 	priv->iobase2 = mem2;
 
-	priv->mgmt_timer.function = (void *)0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
+	priv->mgmt_timer.function = (void (*)(unsigned long))0x0000dead; /* to find crashes due to weird driver access to unconfigured interface (ifup) */
 
 #ifdef NONESSENTIAL_FEATURES
 	acx_show_card_eeprom_id(priv);
@@ -806,6 +806,9 @@ acx_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev->priv = priv;
 
+#ifdef SET_MODULE_OWNER
+	SET_MODULE_OWNER(dev);
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 70)
 	/* this define and its netdev member exist since 2.5.70 */
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -1089,7 +1092,7 @@ static int if_was_up = 0; /* FIXME: HACK, do it correctly sometime instead */
 static int acx_suspend(struct pci_dev *pdev, /*@unused@*/ u32 state)
 {
 	/*@unused@*/ struct net_device *dev = pci_get_drvdata(pdev);
-	wlandevice_t *priv = dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 	acxlog(L_STD, "acx100: experimental suspend handler called for %p!\n", priv);
@@ -1173,7 +1176,7 @@ fail: /* we need to return OK here anyway, right? */
 *----------------------------------------------------------------*/
 static void acx_up(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 
@@ -1218,7 +1221,7 @@ static void acx_up(netdevice_t *dev)
 *----------------------------------------------------------------*/
 static void acx_down(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 
@@ -1265,7 +1268,7 @@ static void acx_down(netdevice_t *dev)
 
 static int acx_open(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	int result = OK;
 	unsigned long flags;
 
@@ -1335,7 +1338,7 @@ done:
 
 static int acx_close(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 
@@ -1391,7 +1394,7 @@ static int acx_close(netdevice_t *dev)
 static int acx_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 {
 	int txresult = NOT_OK;
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	struct txdescriptor *tx_desc;
 	unsigned long flags;
 	unsigned int templen;
@@ -1552,7 +1555,7 @@ static void acx_tx_timeout(netdevice_t *dev)
  */
 static struct net_device_stats *acx_get_stats(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 #if ANNOYING_GETS_CALLED_TOO_OFTEN
 	FN_ENTER;
 	FN_EXIT1((int)&priv->stats);
@@ -1580,7 +1583,7 @@ static struct net_device_stats *acx_get_stats(netdevice_t *dev)
 
 static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	FN_ENTER;
 	FN_EXIT1((int)&priv->wstats);
 	return &priv->wstats;
@@ -1606,7 +1609,7 @@ static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev)
 
 static void acx_set_multicast_list(netdevice_t *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 
@@ -1647,7 +1650,7 @@ static inline void acx_update_link_quality_led(wlandevice_t *priv)
 		qual = priv->brange_max_quality;
 
 	if (time_after(jiffies, priv->brange_time_last_state_change +
-				(HZ/2 - HZ/2 * (long) qual/priv->brange_max_quality ) )) {
+				(HZ/2 - HZ/2 * (unsigned long) qual/priv->brange_max_quality ) )) {
 		acx_power_led(priv, (priv->brange_last_state == 0));
 		priv->brange_last_state ^= 1; /* toggle */
 		priv->brange_time_last_state_change = jiffies;
@@ -2081,7 +2084,7 @@ static int __init acx_init_module(void)
 #endif
 
 #if (ACX_IO_WIDTH==32)
-	acxlog(L_STD, "acx100: Compiled to use 32bit I/O access (faster, however I/O timing issues might occur, such as firmware upload failure!) instead of 16bit access\n");
+	acxlog(L_STD, "acx100: Compiled to use 32bit I/O access (faster, however I/O timing issues might occur, such as non-working firmware upload!) instead of 16bit access\n");
 #else
 	acxlog(L_STD, "acx100: Warning: compiled to use 16bit I/O access only (compatibility mode). Set Makefile ACX_IO_WIDTH=32 to use slightly problematic 32bit mode\n");
 #endif
@@ -2136,7 +2139,7 @@ static void __exit acx_cleanup_module(void)
 
 	dev = root_acx_dev.newest;
 	while (dev != NULL) {
-		wlandevice_t *priv = (struct wlandevice *) dev->priv;
+		wlandevice_t *priv = acx_netdev_priv((struct net_device *)dev); /* doh, netdev_priv() doesn't have const! */
 
 		/* disable both Tx and Rx to shut radio down properly */
 		acx_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0, ACX_CMD_TIMEOUT_DEFAULT);
@@ -2166,6 +2169,7 @@ static void __exit acx_cleanup_module(void)
 			/* halt eCPU */
 			temp = acx_read_reg16(priv, IO_ACX_ECPU_CTRL) | 0x1;
 			acx_write_reg16(priv, IO_ACX_ECPU_CTRL, temp);
+			acx_write_flush(priv);
 
 		}
 

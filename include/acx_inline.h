@@ -48,6 +48,7 @@ u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset);
 void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val);
 void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val);
 void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
+void acx_write_flush(wlandevice_t *priv);
 
 #else
 
@@ -56,40 +57,54 @@ void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val);
 INLINE_IO u32 acx_read_reg32(wlandevice_t *priv, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32
-	return readl(priv->iobase + priv->io[offset]);
+	return readl((u8 *)priv->iobase + priv->io[offset]);
 #else 
-	return readw(priv->iobase + priv->io[offset])
-	    + (readw(priv->iobase + priv->io[offset] + 2) << 16);
+	return readw((u8 *)priv->iobase + priv->io[offset])
+	    + (readw((u8 *)priv->iobase + priv->io[offset] + 2) << 16);
 #endif
 }
 
 INLINE_IO u16 acx_read_reg16(wlandevice_t *priv, unsigned int offset)
 {
-	return readw(priv->iobase + priv->io[offset]);
+	return readw((u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO u8 acx_read_reg8(wlandevice_t *priv, unsigned int offset)
 {
-	return readb(priv->iobase + priv->io[offset]);
+	return readb((u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO void acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
 {
 #if ACX_IO_WIDTH == 32
-	writel(val, priv->iobase + priv->io[offset]);
+	writel(val, (u8 *)priv->iobase + priv->io[offset]);
 #else 
-	writew(val & 0xffff, priv->iobase + priv->io[offset]);
-	writew(val >> 16, priv->iobase + priv->io[offset] + 2);
+	writew(val & 0xffff, (u8 *)priv->iobase + priv->io[offset]);
+	writew(val >> 16, (u8 *)priv->iobase + priv->io[offset] + 2);
 #endif
 }
 
 INLINE_IO void acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val)
 {
-	writew(val, priv->iobase + priv->io[offset]);
+	writew(val, (u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO void acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
 {
-	writeb(val, priv->iobase + priv->io[offset]);
+	writeb(val, (u8 *)priv->iobase + priv->io[offset]);
 }
+
+/* Handle PCI posting properly:
+ * Make sure that writes reach the adapter in case they require to be executed
+ * *before* the next write, by reading a random (and safely accessible) register.
+ * This call has to be made if there is no read following (which would flush the data
+ * to the adapter), yet the written data has to reach the adapter immediately. */
+INLINE_IO void acx_write_flush(wlandevice_t *priv)
+{
+	/* readb(priv->iobase + priv->io[IO_ACX_INFO_MAILBOX_OFFS]); */
+	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
+	 * which should also be safe): */
+	readb(priv->iobase);
+}
+
 #endif

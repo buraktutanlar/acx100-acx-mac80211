@@ -488,7 +488,7 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	struct txhostdescriptor *hdesc_body;
 	struct wlan_hdr_mgmt *head;
 	struct assocresp_frame_body *body;
-	char *p;
+	u8 *p;
 	const u8 *da;
 	const u8 *sa;
 	const u8 *bssid;
@@ -556,13 +556,13 @@ static u32 acx_transmit_assocresp(const wlan_fr_assocreq_t *req,
 	body->cap_info = host2ieee16(priv->capabilities);
 	body->status = host2ieee16(0);
 	body->aid = host2ieee16(clt->aid);
-	p = wlan_fill_ie_rates((char*)&body->rates, priv->rate_supported_len, priv->rate_supported);
+	p = wlan_fill_ie_rates((u8*)&body->rates, priv->rate_supported_len, priv->rate_supported);
 	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
-	hdesc_body->length = cpu_to_le16(p - (char*)hdesc_body->data);
+	hdesc_body->length = cpu_to_le16(p - (u8*)hdesc_body->data);
 	hdesc_body->data_offset = 0;
 
-	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + p - (char*)hdesc_body->data);
+	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + p - (u8*)hdesc_body->data);
 
 	acx_dma_tx_data(priv, tx_desc);
 
@@ -581,7 +581,7 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *req, wlandevice_
 	struct txhostdescriptor *hdesc_body;
 	struct wlan_hdr_mgmt *head;
 	struct reassocresp_frame_body *body;
-	char *p;
+	u8 *p;
 	const u8 *da;
 	const u8 *sa;
 	const u8 *bssid;
@@ -647,14 +647,14 @@ static u32 acx_transmit_reassocresp(const wlan_fr_reassocreq_t *req, wlandevice_
 	/* 3. AID */
 	body->aid = host2ieee16(clt->aid);
 	/* 4. supp rates */
-	p = wlan_fill_ie_rates((char*)&body->rates, priv->rate_supported_len, priv->rate_supported);
+	p = wlan_fill_ie_rates((u8*)&body->rates, priv->rate_supported_len, priv->rate_supported);
 	/* 5. ext supp rates */
 	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
 
-	hdesc_body->length = cpu_to_le16(p - (char*)hdesc_body->data);
+	hdesc_body->length = cpu_to_le16(p - (u8*)hdesc_body->data);
 	hdesc_body->data_offset = 0;
 
-	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + p - (char*)hdesc_body->data);
+	tx_desc->total_length = cpu_to_le16(WLAN_HDR_A3_LEN + p - (u8*)hdesc_body->data);
 
 	acx_dma_tx_data(priv, tx_desc);
 
@@ -2011,7 +2011,7 @@ static int acx_transmit_assoc_req(wlandevice_t *priv)
 	struct txhostdescriptor *hdesc_head;
 	struct txhostdescriptor *hdesc_body;
 	struct wlan_hdr_mgmt *head;
-	char *body,*p, *prate;
+	u8 *body, *p, *prate;
 	unsigned int packet_len;
 	u16 cap;
 
@@ -2223,7 +2223,7 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 				continue; /* keep looking */
 
 		/* broken peer with no mode flags set? */
-		if (!(bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS))) {
+		if (unlikely(!(bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)))) {
 			acxlog(L_ASSOC, "STRANGE: peer station announces "
 				"neither ESS (Managed) nor IBSS (Ad-Hoc) "
 				"capability. Won't try to join it\n");
@@ -2237,7 +2237,7 @@ void acx_complete_dot11_scan(wlandevice_t *priv)
 			continue; /* keep looking */
 
 		/* strange peer with NO basic rates?! */
-		if (!bss->rate_cfg)
+		if (unlikely(!bss->rate_cfg))
 		{
 			acxlog(L_ASSOC, "skip strange peer %i: NO rates\n", i);
 			continue;

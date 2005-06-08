@@ -838,7 +838,7 @@ static int init_network_device(struct net_device *dev) {
 
 static int acx100usb_open(struct net_device *dev)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	int i;
 
 	FN_ENTER;
@@ -1550,7 +1550,7 @@ static int acx100usb_close(struct net_device *dev)
 static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	int txresult = 0;
 	unsigned long flags;
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	struct txdescriptor *tx_desc;
 	int templen;
 
@@ -1622,7 +1622,7 @@ static int acx100usb_start_xmit(struct sk_buff *skb, netdevice_t * dev) {
 	** get the next free tx descriptor...
 	** -------------------------------- */
 	tx_desc = acx_get_tx_desc(priv);
-	if (!tx_desc) {
+	if (unlikely(!tx_desc)) {
 		acxlog(L_BINSTD,"BUG: txdesc ring full\n");
 		txresult = 1;
 		goto end;
@@ -1661,7 +1661,7 @@ end:
 
 
 static struct net_device_stats *acx_get_stats(netdevice_t *dev) {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	FN_ENTER;
 	FN_EXIT1((int)&priv->stats);
 	return &priv->stats;
@@ -1670,7 +1670,7 @@ static struct net_device_stats *acx_get_stats(netdevice_t *dev) {
 
 
 static struct iw_statistics *acx_get_wireless_stats(netdevice_t *dev) {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	FN_ENTER;
 	FN_EXIT1((int)&priv->stats);
 	return &priv->wstats;

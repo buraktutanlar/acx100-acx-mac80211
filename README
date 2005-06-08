@@ -379,7 +379,7 @@ In order to use the acx100 driver with Linux 2.6 you'll need a complete 2.6
 source tree.
 
 In order to build the module outside of a 2.6 kernel tree, just use the
-normal method as described for 2.4.x above (you'll most likely need to
+normal method as described for 2.4.x below (you'll most likely need to
 compile it as root since it needs write access in your kernel source
 directory).
 
@@ -517,6 +517,7 @@ NOTE: make sure card interface is down! (driver will only update MAC
 when not associated: needs reinit of card parts)
 Also, this will only work in case your AP's MAC filter doesn't deny your new
 MAC!
+BTW, a nice tool for this might be the "GNU MAC Changer".
 
 Wireless traffic monitoring (promiscuous mode) with Kismet? Set card type
 Orinoco in kismet.conf (in case of an older Kismet release which didn't know
@@ -715,6 +716,10 @@ association to the wireless network!
 It's of no use to try to associate to a set of access points using
 Ad-Hoc mode, or maybe the other way around (to use Managed mode to
 associate with a card set to Peer).
+NOTE that we recently abandoned the Auto mode setting; you need to do an
+explicit configuration by specifying Managed or Ad-Hoc mode, otherwise
+the driver won't do anything (policy: "don't connect to random networks
+if the user isn't sure what he wants").
 Further, the ESSID is CaSe SEnsITivE!
 Since the driver is currently doing passive scan only, your peer station HAS
 to be configured to send Beacon frames (100ms Beacon period works best).

@@ -315,7 +315,7 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 
 	FN_ENTER;
 
-	p += sprintf(p, "*** Rx buf ***\n");
+	p += sprintf(p, "** Rx buf **\n");
 	spin_lock_irqsave(&pDc->rx_lock, flags);
 	for (i = 0; i < pDc->rx_pool_count; i++) {
 		rtl = (i == pDc->rx_tail) ? " [tail]" : "";
@@ -328,7 +328,7 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	}
 	spin_unlock_irqrestore(&pDc->rx_lock, flags);
 	spin_lock_irqsave(&pDc->tx_lock, flags);
-	p += sprintf(p, "*** Tx buf (free %d, Linux netqueue %s) ***\n", priv->TxQueueFree,
+	p += sprintf(p, "** Tx buf (free %d, Linux netqueue %s) **\n", priv->TxQueueFree,
 				acx_queue_stopped(priv->netdev) ? "STOPPED" : "running");
 	pTxDesc = pDc->pTxDescQPool;
 	for (i = 0; i < pDc->tx_pool_count; i++) {
@@ -346,7 +346,7 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	spin_unlock_irqrestore(&pDc->tx_lock, flags);
 	p += sprintf(p,
 		"\n"
-		"*** network status ***\n"
+		"** network status **\n"
 		"dev_state_mask 0x%04x\n"
 		"status %u (%s), "
 		"mode %u, channel %u, "
@@ -378,7 +378,7 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 
 	p += sprintf(p,
 		"\n"
-		"*** PHY status ***\n"
+		"** PHY status **\n"
 		"tx_disabled %d, tx_level_dbm %d, tx_level_val %d, tx_level_auto %d\n"
 		"sensitivity %d, antenna 0x%02x, ed_threshold %d, cca %d, preamble_mode %d\n"
 		"rts_threshold %d, short_retry %d, long_retry %d, msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
@@ -388,7 +388,7 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 
 	p += sprintf(p,
 		"\n"
-		"*** TIWLAN_DC ***\n"
+		"** TIWLAN_DC **\n"
 		"ui32ACXTxQueueStart %u, ui32ACXRxQueueStart %u\n"
 		"pTxBufferPool %p, TxBufferPoolSize %u, TxBufferPoolPhyAddr %08llx\n"
 		"TxDescrSize %u, pTxDescQPool %p, tx_lock %d, tx_pool_count %u\n"
@@ -415,12 +415,12 @@ static int acx_proc_diag_output(char *buf, wlandevice_t *priv)
 	if (OK != acx_interrogate(priv, fw_stats, ACX1xx_IE_FIRMWARE_STATISTICS))
 		p += sprintf(p,
 			"\n"
-			"*** Firmware ***\n"
+			"** Firmware **\n"
 			"QUERY FAILED!!\n");
 	else {
 		p += sprintf(p,
 			"\n"
-			"*** Firmware ***\n"
+			"** Firmware **\n"
 			"version \"%s\"\n"
 			"tx_desc_overfl %u, rx_OutOfMem %u, rx_hdr_overfl %u, rx_hdr_use_next %u\n"
 			"rx_dropped_frame %u, rx_frame_ptr_err %u, rx_xfr_hint_trig %u, rx_dma_req %u\n"
@@ -530,7 +530,7 @@ static int acx_read_proc(char *buf, char **start, off_t offset, int count,
 	return length;
 }
 
-int acx_read_proc_diag(char *buf, char **start, off_t offset, int count,
+static int acx_read_proc_diag(char *buf, char **start, off_t offset, int count,
 		     int *eof, void *data)
 {
 	wlandevice_t *priv = (wlandevice_t *)data;
@@ -594,10 +594,10 @@ static int acx_read_proc_phy(char *buf, char **start, off_t offset, int count,
 }
 
 static const char * const proc_files[] = { "", "_diag", "_eeprom", "_phy" };
-static void * const acx_proc_funcs[] = { acx_read_proc, acx_read_proc_diag, acx_read_proc_eeprom, acx_read_proc_phy };
-u16 manage_proc_entries(const struct net_device *dev, int remove)
+static read_proc_t * const acx_proc_funcs[] = { acx_read_proc, acx_read_proc_diag, acx_read_proc_eeprom, acx_read_proc_phy };
+static u16 manage_proc_entries(const struct net_device *dev, int remove)
 {
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv((struct net_device *)dev); /* doh, netdev_priv() doesn't have const! */
 	char procbuf[80];
 	int i;
 
@@ -666,9 +666,12 @@ void acx_reset_mac(wlandevice_t *priv)
 	temp = acx_read_reg16(priv, IO_ACX_SOFT_RESET) | 0x1;
 	acxlog(L_BINSTD, "%s: enable soft reset...\n", __func__);
 	acx_write_reg16(priv, IO_ACX_SOFT_RESET, temp);
+	acx_write_flush(priv);
 
+#if NO_LONGER_NECESSARY_SINCE_FLUSHING_ABOVE_RIGHT /* FIXME: remove if ok */
 	/* used to be for loop 65536; do scheduled delay instead */
 	acx_schedule(HZ / 100);
+#endif
 
 	/* now reset bit again */
 	acxlog(L_BINSTD, "%s: disable soft reset and go to init mode...\n", __func__);
@@ -678,10 +681,14 @@ void acx_reset_mac(wlandevice_t *priv)
 	/* now start a burst read from initial flash EEPROM */
 	temp = acx_read_reg16(priv, IO_ACX_EE_START) | 0x1;
 	acx_write_reg16(priv, IO_ACX_EE_START, temp);
-#endif
+	acx_write_flush(priv);
 
+#if NO_LONGER_NECESSARY_SINCE_FLUSHING_ABOVE_RIGHT /* FIXME: remove if ok */
 	/* used to be for loop 65536; do scheduled delay instead */
 	acx_schedule(HZ / 100);
+#endif
+
+#endif
 
 	FN_EXIT0();
 }
@@ -765,13 +772,13 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 
 	/* Read in whole file then check the size */
 	page = __get_free_page(GFP_KERNEL);
-	if (0 == page) {
+	if (unlikely(0 == page)) {
 		acxlog(L_STD, "Unable to allocate memory for firmware loading\n");
 		goto fail;
 	}
 
 	filename = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (!filename) {
+	if (unlikely(!filename)) {
 		acxlog(L_STD, "Unable to allocate memory for firmware loading\n");
 		goto fail;
 	}
@@ -799,7 +806,7 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 	inf = filp_open(filename, O_RDONLY, 0);
 	kfree(filename);
 	if (OK != IS_ERR(inf)) {
-		char *err;
+		const char *err;
 
 		switch(-PTR_ERR(inf)) {
 			case 2: err = "file not found - make sure this EXACT filename is in eXaCtLy this directory!";
@@ -812,7 +819,7 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 		goto fail;
 	}
 
-	if ((NULL == inf->f_op) || (NULL == inf->f_op->read)) {
+	if (unlikely((NULL == inf->f_op) || (NULL == inf->f_op->read))) {
 		acxlog(L_STD, "ERROR: %s does not have a read method\n", file);
 		goto fail_close;
 	}
@@ -821,7 +828,7 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 	do {
 		retval = inf->f_op->read(inf, buffer, PAGE_SIZE, &inf->f_pos);
 
-		if (0 > retval) {
+		if (unlikely(0 > retval)) {
 			acxlog(L_STD, "ERROR %d reading firmware image file '%s'.\n", -retval, file);
 			if (NULL != res)
 				vfree(res);
@@ -845,6 +852,11 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 				}
 				acxlog(L_STD, "Allocated %u bytes for firmware module loading.\n", *size);
 			}
+			if ((unlikely(offset + retval > *size)))
+			{
+				acxlog(0xffff, "ERROR: allocation was less than firmware image size!\n");
+				goto fail_close;
+			}
 			memcpy((u8*)res + offset, buffer, retval);
 			offset += retval;
 		}
@@ -853,12 +865,12 @@ firmware_image_t* acx_read_fw(const char *file, u32 *size)
 fail_close:
 	retval = filp_close(inf, NULL);
 
-	if (retval) {
+	if (unlikely(retval)) {
 		acxlog(L_STD, "ERROR %d closing %s\n", -retval, file);
 	}
 
-	if ((NULL != res) && (offset != le32_to_cpu(res->size) + 8)) {
-		acxlog(L_STD,"Firmware is reporting a different size 0x%08x to read 0x%08x\n", le32_to_cpu(res->size) + 8, offset);
+	if (unlikely((NULL != res) && (offset != le32_to_cpu(res->size) + 8))) {
+		acxlog(L_STD,"Firmware is reporting a different size (0x%08x; 0x%08x was read)\n", le32_to_cpu(res->size) + 8, offset);
 		vfree(res);
 		res = NULL;
 	}
@@ -915,14 +927,15 @@ static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, 
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+	acx_write_flush(priv); /* make sure all cfg regs are written before we write data */ 
 #endif
 
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure host indirect memory access address?? */
 
 	len = 0;
 	size = le32_to_cpu(apfw_image->size) & (~3);
 
-	while (len < size) {
+	while (likely(len < size)) {
 		v32 = be32_to_cpu(*(u32*)image);
 		sum += image[0]+image[1]+image[2]+image[3];
 		image += 4;
@@ -934,6 +947,7 @@ static int acx_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, 
 		 * only */
 #if NO_AUTO_INCREMENT
 		acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		acx_write_flush(priv); /* make sure all cfg regs are written before we write data */ 
 #endif
 		acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, v32);
 
@@ -988,17 +1002,17 @@ static int acx_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_imag
 	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1);
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
 #endif
 
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset);
 
 	len = 0;
 	size = le32_to_cpu(apfw_image->size) & (~3);
 
-	while (len < size) {
+	while (likely(len < size)) {
 		v32 = be32_to_cpu(*(u32*)image);
 		image += 4;
 		len += 4;
@@ -1060,7 +1074,7 @@ static int acx_upload_fw(wlandevice_t *priv)
 	int res1 = NOT_OK;
 	int res2 = NOT_OK;
 	firmware_image_t *apfw_image = NULL;
-	char *filename;
+	const char *filename;
 	int try;
 	u32 size;
 
@@ -1087,7 +1101,7 @@ static int acx_upload_fw(wlandevice_t *priv)
 #else
 	apfw_image = acx_read_fw(filename, &size);
 #endif
-	if (NULL == apfw_image) {
+	if (unlikely(NULL == apfw_image)) {
 		acxlog(L_STD, "acx_read_fw FAILED\n");
 		FN_EXIT1(NOT_OK);
 		return NOT_OK;
@@ -1249,9 +1263,9 @@ static int acx_verify_init(wlandevice_t *priv)
 			acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
 			break;
 		}
-
 		/* used to be for loop 65535; do scheduled delay instead */
 		acx_schedule(HZ / 20); /* HZ / 50 resulted in 24 schedules for ACX100 on my machine, so better schedule away longer for greater efficiency, decrease loop count */
+		rmb();
 	}
 
 	FN_EXIT1(result);
@@ -1281,7 +1295,7 @@ static int acx_verify_init(wlandevice_t *priv)
 int acx_reset_dev(netdevice_t *dev)
 {
 	int result = NOT_OK;
-	wlandevice_t *priv = (wlandevice_t *)dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 	u16 vala = 0;
 
 	FN_ENTER;
@@ -1404,8 +1418,8 @@ static void acx_init_mboxes(wlandevice_t *priv)
 		"<== Get the mailbox pointers from the scratch pad registers\n",
 		cmd_offs,
 		info_offs);
-	priv->CommandParameters = priv->iobase2 + cmd_offs + 0x4;
-	priv->InfoParameters = priv->iobase2 + info_offs + 0x4;
+	priv->CommandParameters = (u8 *)priv->iobase2 + cmd_offs + 0x4;
+	priv->InfoParameters = (u8 *)priv->iobase2 + info_offs + 0x4;
 	acxlog(L_BINDEBUG,
 		"CommandParameters = [ 0x%p ]\n"
 		"InfoParameters = [ 0x%p ]\n",
@@ -1422,7 +1436,7 @@ void acx100_set_wepkey( wlandevice_t *priv )
    
   for ( i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++ ) {
     if ( priv->wep_keys[i].size != 0 ) {
-      acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
+      acxlog(L_INIT, "Setting WEP key: %d with total size: %d\n", i, priv->wep_keys[i].size);
       dk.action = 1;
       dk.keySize = priv->wep_keys[i].size;
       dk.defaultKeyNum = i;
@@ -1439,7 +1453,7 @@ void acx111_set_wepkey( wlandevice_t *priv )
                                                                                 
   for ( i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++ ) {
     if ( priv->wep_keys[i].size != 0 ) {
-      acxlog(L_INIT, "Setting WEP key: %d with size: %d\n", i, priv->wep_keys[i].size);
+      acxlog(L_INIT, "Setting WEP key: %d with total size: %d\n", i, priv->wep_keys[i].size);
       memset(&dk, 0, sizeof(dk));
       dk.action = cpu_to_le16(1); /* "add key"; yes, that's a 16bit value */
       dk.keySize = priv->wep_keys[i].size;
@@ -1778,7 +1792,7 @@ static int acx_fill_beacon_or_proberesp_template(wlandevice_t *priv,
 					u16 fc /* in host order! */)
 {
 	int len;
-	char *p;
+	u8 *p;
 
 	FN_ENTER;
 	memset(templ, 0, sizeof(*templ));
@@ -1806,7 +1820,7 @@ static int acx_fill_beacon_or_proberesp_template(wlandevice_t *priv,
 		break;
 	}
 
-	len = p - (char*)templ;
+	len = p - (u8*)templ;
 	templ->fc = cpu_to_le16(WF_FTYPE_MGMT | fc);
 	/* - 2: do not count 'u16 size' field */
 	templ->size = cpu_to_le16(len - 2);
@@ -2279,7 +2293,7 @@ int acx_recalib_radio(wlandevice_t *priv)
 	if (CHIPTYPE_ACX111 == priv->chip_type) {
 		acx111_cmd_radiocalib_t cal;
 	
-		acxlog(L_STD, "recalibrating ACX111 radio. Not tested yet, please report status!!\n");
+		acxlog(L_STD, "recalibrating ACX111 radio.\n");
 		cal.methods = cpu_to_le32(0x8000000f); /* automatic recalibration, choose all methods */
 		cal.interval = cpu_to_le32(58594); /* automatic recalibration every 60 seconds (value in TUs) FIXME: what is the firmware default here?? */
 	
@@ -2360,7 +2374,7 @@ static void acx111_scan_chan(wlandevice_t *priv)
 
 	s.chan_duration = cpu_to_le16(priv->scan_duration);
 	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
-	/*s.modulation = 0x40;*/ /* long preamble ? OFDM ? -> only for active scan */
+	/*s.modulation = 0x40;*/ /* long preamble? OFDM? -> only for active scan */
 	s.modulation = 0;
 	/*s.channel_list[0] = 6;
 	s.channel_list[1] = 4;*/
@@ -2513,10 +2527,10 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 
 	if (priv->get_mask & (GETSET_ED_THRESH|GETSET_ALL)) {
 		if (priv->chip_type == CHIPTYPE_ACX100)	{
-			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
+			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
 
 			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_interrogate(priv, ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
+			acx_interrogate(priv, ed_threshold, ACX100_IE_DOT11_ED_THRESHOLD);
 			priv->ed_threshold = ed_threshold[4];
 		} else {
 			acxlog(L_INIT, "acx111 doesn't support ED\n");
@@ -2652,11 +2666,11 @@ void acx_update_card_settings(wlandevice_t *priv, int init, int get_all, int set
 		acxlog(L_INIT, "Updating Energy Detect (ED) threshold: %u\n",
 					priv->ed_threshold);
 		if (CHIPTYPE_ACX100 == priv->chip_type) {
-			u8 ed_threshold[4 + ACX1xx_IE_DOT11_ED_THRESHOLD_LEN];
+			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
 
 			memset(ed_threshold, 0, sizeof(ed_threshold));
 			ed_threshold[4] = priv->ed_threshold;
-			acx_configure(priv, &ed_threshold, ACX1xx_IE_DOT11_ED_THRESHOLD);
+			acx_configure(priv, &ed_threshold, ACX100_IE_DOT11_ED_THRESHOLD);
 		}
 		else
 			acxlog(L_INIT, "ACX111 doesn't support ED!\n");
@@ -3104,6 +3118,9 @@ static void acx_after_interrupt_task(void *data)
 		 * hopefully ACX111 also does a
 		 * recalibration here */
 
+		/* clear flag beforehand, since we want to make sure it's cleared; then only set it again on specific circumstances */
+		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+
 		/* better wait a bit between recalibrations to
 		 * prevent overheating due to torturing the card
 		 * into working too long despite high temperature
@@ -3116,7 +3133,6 @@ static void acx_after_interrupt_task(void *data)
 
 			if (++silence_msg <= 5)
 				acxlog(L_STD, "less than " GET_STRING(RECALIB_PAUSE) " minutes since last radio recalibration (maybe card too hot?): not recalibrating!\n");
-			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		} else {
 			static unsigned int recalib_failure_count = 0;
 			int res = NOT_OK;
@@ -3125,7 +3141,6 @@ static void acx_after_interrupt_task(void *data)
 			res = acx_recalib_radio(priv);
 			if (res == OK) {
 				acxlog(L_STD, "successfully recalibrated radio\n");
-				CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 				priv->time_last_recalib_success = jiffies;
 				recalib_failure_count = 0;
 			} else {
@@ -3238,6 +3253,7 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 	acx_joinbss_t tmp;
 	u8 dtim_interval;
 	
+	/* compile-time check for proper size of fixed-size struct */
 	if (sizeof(acx_joinbss_t) != 0x30)
 		bug_joinbss_must_be_0x30_bytes_in_length();
 	
@@ -3285,7 +3301,7 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 		/* calculate number of highest bit set in t */
 		while(t>1) { t>>=1; n++; }
 	}
-	if (n >= sizeof(bitpos2genframe_txrate)) {
+	if (unlikely(n >= sizeof(bitpos2genframe_txrate))) {
 		printk(KERN_ERR "join_bssid: driver BUG! n=%u. please report\n", n);
 		n = 0;
 	}
@@ -3301,7 +3317,9 @@ acx_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 	/* NOTE: the code memcpy'd essid_len + 1 before, which is WRONG! */
 	memcpy(tmp.essid, priv->essid, tmp.essid_len);
 	acx_issue_cmd(priv, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11, ACX_CMD_TIMEOUT_DEFAULT);
-/* What's this?? */
+/* we probably don't want to copy the exact same BSSID back...
+   Or is there any way for the BSSID after the join to have changed?
+   (someone must have had some thoughts when he wrote that code, no?) */
 #if 0
 	for (i = 0; i < ETH_ALEN; i++) {
 		priv->bssid[ETH_ALEN - 1 - i] = tmp.bssid[i];
@@ -3484,7 +3502,7 @@ int acx_init_mac(netdevice_t *dev, u16 init)
 {
 	int result = NOT_OK;
 	acx_ie_memmap_t pkt;
-	wlandevice_t *priv = (wlandevice_t *) dev->priv;
+	wlandevice_t *priv = acx_netdev_priv(dev);
 
 	FN_ENTER;
 
@@ -3747,6 +3765,7 @@ u16 acx_read_eeprom_offset(wlandevice_t *priv,
 
 	acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
 	acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr);
+	acx_write_flush(priv); /* make sure all data is written to adapter *before* we tell it to start */
 	acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
 	while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
@@ -3754,10 +3773,11 @@ u16 acx_read_eeprom_offset(wlandevice_t *priv,
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
-		if (++count > 0xffff) {
+		if (unlikely(++count > 0xffff)) {
 			acxlog(L_BINSTD, "%s: timeout waiting for read EEPROM cmd\n", __func__);
 			goto fail;
 		}
+		rmb();
 	}
 
 	*charbuf = acx_read_reg8(priv, IO_ACX_EEPROM_DATA);
@@ -3798,21 +3818,27 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 	u8 *data_verify = NULL;
 	unsigned int count = 0;
 	
-	acxlog(0xffff, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing (THIS HAS NEVER BEEN TESTED!), I will abort that now.\n");
+	acxlog(0xffff, "WARNING: I would write to EEPROM now. Since I really DON'T want to unless you know what you're doing (THIS CODE WILL PROBABLY NOT WORK YET!), I will abort that now. And definitely make sure to make a /proc/driver/acx_wlan0_eeprom backup copy first!!! (the EEPROM content includes the PCI config header!! If you kill important stuff, then you WILL get in trouble and people DID get in trouble already)\n");
 	return 0;
 	
 	FN_ENTER;
 
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
-	 * to be able to write to the EEPROM */
+	 * to be able to write to the EEPROM.
+	 * NOTE: an EEPROM writing success has been reported,
+	 * but you probably have to modify GPIO_OUT, too,
+	 * and you probably need to activate a different GPIO
+	 * line instead! */
 	gpio_orig = acx_read_reg16(priv, IO_ACX_GPIO_OE);
 	acx_write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig & ~1);
+	acx_write_flush(priv);
 	
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
 		acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
 		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
 		acx_write_reg32(priv, IO_ACX_EEPROM_DATA, *(charbuf + i));
+		acx_write_flush(priv);
 		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 1);
 
 		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
@@ -3820,15 +3846,17 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 			 * doesn't seem to work here at all:
 			 * awful delay, sometimes also failure.
 			 * Doesn't matter anyway (only small delay). */
-			if (++count > 0xffff) {
+			if (unlikely(++count > 0xffff)) {
 				acxlog(L_BINSTD, "%s: WARNING, DANGER!!!! Timeout waiting for write EEPROM cmd\n", __func__);
 				goto fail;
 			}
+			rmb();
 		}
 	}
 
 	/* disable EEPROM writing */
 	acx_write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig);
+	acx_write_flush(priv);
 
 	/* now start a verification run */
 	data_verify = kmalloc(len, GFP_KERNEL);
@@ -3840,6 +3868,7 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 
 		acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
 		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
+		acx_write_flush(priv);
 		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
 		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
@@ -3847,10 +3876,11 @@ u16 acx_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *cha
 			 * doesn't seem to work here at all:
 			 * awful delay, sometimes also failure.
 			 * Doesn't matter anyway (only small delay). */
-			if (++count > 0xffff) {
+			if (unlikely(++count > 0xffff)) {
 				acxlog(L_BINSTD, "%s: timeout waiting for read EEPROM cmd\n", __func__);
 				goto fail;
 			}
+			rmb();
 		}
 
 		data_verify[i] = acx_read_reg16(priv, IO_ACX_EEPROM_DATA);
@@ -3877,9 +3907,11 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 
 #ifdef BROKEN_KILLS_TRAFFIC
 	acx_write_reg32(priv, IO_ACX_ENABLE, 0x0); /* disable Rx/Tx */
+	acx_write_flush(priv);
 #endif
 
 	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
+	acx_write_flush(priv); /* make sure all data is written to adapter before we tell it to start */
 	acx_write_reg32(priv, IO_ACX_PHY_CTL, 2);
 
 	while (acx_read_reg32(priv, IO_ACX_PHY_CTL)) {
@@ -3887,7 +3919,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
-		if (++count > 0xffff) {
+		if (unlikely(++count > 0xffff)) {
 			acxlog(L_BINSTD, "%s: timeout waiting for read phy cmd\n", __func__);
 			*charbuf = 0;
 #ifdef BROKEN_KILLS_TRAFFIC
@@ -3895,6 +3927,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 #endif
 			goto fail;
 		}
+		rmb();
 	}
 
 	acxlog(L_DEBUG, "count was %u\n", count);
@@ -3902,6 +3935,7 @@ u16 acx_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	
 #ifdef BROKEN_KILLS_TRAFFIC
 	acx_write_reg32(priv, IO_ACX_ENABLE, 0x3); /* reenable Rx/Tx */
+	acx_write_flush(priv);
 #endif
 #else
 	mem_read_write_t mem;
@@ -3925,17 +3959,18 @@ u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	FN_ENTER;
 
-	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
-	/* FIXME: we don't use 32bit access here since mprusko said that
+	/* FIXME: we didn't use 32bit access here since mprusko said that
 	 * it results in distorted sensitivity on his card (huh!?!?
 	 * doesn't happen with my setup...)
-	 * Maybe we actually need a delay similar to the one in the read
-	 * function, due to some radio chipsets being too slow...
+	 * But with the access reordering and flushing it
+	 * shouldn't happen any more...
 	 * FIXME: which radio is in the problematic card? My working one
 	 * is 0x11 */
-	acx_write_reg16(priv, IO_ACX_PHY_DATA, value);
-	acx_write_reg16(priv, IO_ACX_PHY_DATA + 2, 0);
+	acx_write_reg32(priv, IO_ACX_PHY_DATA, value);
+	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
+	acx_write_flush(priv); /* make sure all data is written to adapter *before* we tell it to go ahead */
 	acx_write_reg32(priv, IO_ACX_PHY_CTL, 1);
+	acx_write_flush(priv);
 #else
 	mem_read_write_t mem;
 
@@ -3957,8 +3992,8 @@ u16 acx_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
  * rename ALL relevant definitions to indicate actual card scope! */
 void acx111_read_configoption(wlandevice_t *priv)
 {
-	acx_configoption_t	co;
-	acx_configoption_t	co2;
+	acx111_ie_configoption_t	co;
+	acx111_ie_configoption_t	co2;
 	unsigned int	i;
 	const u8	*pEle;
 	

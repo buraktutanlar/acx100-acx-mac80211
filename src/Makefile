@@ -17,7 +17,7 @@ INSTALL = /usr/bin/install -c
 DEPMOD = $(shell test -f /sbin/depmod && echo /sbin/depmod || which depmod)
 LN = $(shell which ln)
 # driver flags common to all kernel versions and configurations
-#COMMON_COMPILE_FLAGS = -msoft-float -pedantic -Werror
+#COMMON_COMPILE_FLAGS = -msoft-float -pedantic -Wwrite-strings -Wmissing-declarations
 COMMON_COMPILE_FLAGS = -msoft-float
 #COMMON_DRIVER_DEFINES = -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH) -DPOWER_SAVE_80211=1
 COMMON_DRIVER_DEFINES = -DACX_DEBUG=$(ACX_DEBUG) -DACX_IO_WIDTH=$(ACX_IO_WIDTH)
@@ -89,7 +89,7 @@ modules:
 	@echo "**************************"
 	@echo "Compilation finished."
 	@echo "Make sure to copy required firmware files to /usr/share/acx/ or where your hotplug"
-	@echo "scripts expect (default /lib/firmware) before proceeding!" 
+	@echo "scripts expect (default /lib/firmware/) before proceeding!" 
 	@echo "**************************"
 
 all: modules
@@ -125,7 +125,7 @@ all: acx_pci.o acx_usb.o
 	@echo "**************************"
 	@echo "Compilation finished."
 	@echo "Make sure to copy required firmware files to /usr/share/acx/ or where your hotplug"
-	@echo "scripts expect (default /lib/firmware) before proceeding!" 
+	@echo "scripts expect (default /lib/firmware/) before proceeding!" 
 	@echo "**************************"
 
 acx_pci.o: $(pci_objs)

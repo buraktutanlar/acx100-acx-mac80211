@@ -161,6 +161,7 @@ void acx_get_info_state(wlandevice_t *priv)
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
 		acx_read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS));
 
+	acx_write_flush(priv); /* make sure we only read the data once all cfg registers are written */
 	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 	priv->info_type = (u16)value;
@@ -168,7 +169,9 @@ void acx_get_info_state(wlandevice_t *priv)
 
 	/* inform hw that we have read this info message */
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, priv->info_type | 0x00010000);
+	wmb(); /* make sure the flag is already written to memory *before* the ACK */
 	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK); /* now bother hw to notice it */
+	acx_write_flush(priv);
 
 	acxlog(L_CTL, "info_type 0x%04x, info_status 0x%04x\n", priv->info_type, priv->info_status);
 }
@@ -220,6 +223,8 @@ void acx_get_cmd_state(wlandevice_t *priv)
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, 
 		acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
 
+	/* make sure we only read the data once all config registers are written */
+	acx_write_flush(priv);
 	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 	priv->cmd_type = (u16)value;
@@ -255,7 +260,10 @@ void acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val, unsigned int is_s
 
 	if (is_status)
 		val <<= 16;
+	/* make sure we only write the data once all config registers are written */
+	acx_write_flush(priv);
 	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
+	acx_write_flush(priv);
 }
 #endif /* WLAN_HOSTIF!=WLAN_USB */
 
@@ -389,6 +397,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 	
 	/*** execute command ***/
 	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
+	acx_write_flush(priv);
 
 	/*** wait for IRQ to occur, then ACK it ***/
 
@@ -405,6 +414,7 @@ int acx_issue_cmd(wlandevice_t *priv, unsigned int cmd,
 		 * In theory, yes, but the timeout can be HUGE,
 		 * so better schedule away sometimes */
 		if (!priv->irqs_active) {
+			rmb();
 			irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
 			if (irqtype & HOST_INT_CMD_COMPLETE) {
 				acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
@@ -557,7 +567,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	while (priv->ctrl_urb->status==-EINPROGRESS) {
 		udelay(1000);
 		delcount++;
-		if (delcount>USB_CTRL_HARD_TIMEOUT) {
+		if (unlikely(delcount>USB_CTRL_HARD_TIMEOUT)) {
 			acxlog(L_STD,"ERROR, USB device is not responding!\n");
 			FN_EXIT0();
 			return NOT_OK;
@@ -594,7 +604,7 @@ int acx_issue_cmd(wlandevice_t *priv,unsigned int cmd,void *pdr,unsigned int par
 	while (priv->ctrl_urb->status==-EINPROGRESS) {
 		udelay(1000);
 		delcount++;
-		if (delcount>USB_CTRL_HARD_TIMEOUT) {
+		if (unlikely(delcount>USB_CTRL_HARD_TIMEOUT)) {
 			acxlog(L_STD,"ERROR, USB device is not responsive!\n");
 			FN_EXIT0();
 			return NOT_OK;
@@ -684,7 +694,7 @@ static const u16 CtlLengthDot11[] = {
 	0,
 	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
 	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
-	ACX1xx_IE_DOT11_ED_THRESHOLD_LEN,
+	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
 	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
 	0,
 	0,

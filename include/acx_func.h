@@ -96,7 +96,7 @@ void log_fn_exit_v(const char *funcname, int v);
  * the kernel from linking or module from loading if they are not inlined. */
 
 #ifdef BROKEN_LOCKING
-extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
+static inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	local_irq_save(*flags);
 	if (!spin_trylock(&priv->lock)) {
@@ -116,7 +116,7 @@ extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 	return OK;
 }
 
-extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
+static inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* printk(KERN_WARNING "unlock\n"); */
 	spin_unlock_irqrestore(&priv->lock, *flags);
@@ -125,7 +125,7 @@ extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 
 #else /* BROKEN_LOCKING */
 
-extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
+static inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
 	/*@-noeffect@*/
@@ -135,7 +135,7 @@ extern inline int acx_lock(wlandevice_t *priv, unsigned long *flags)
 	return OK;
 }
 
-extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
+static inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 {
 	/* do nothing and be quiet */
 	/*@-noeffect@*/
@@ -144,6 +144,13 @@ extern inline void acx_unlock(wlandevice_t *priv, unsigned long *flags)
 	/*@=noeffect@*/
 }
 #endif /* BROKEN_LOCKING */
+
+/* transitional define (before we go towards a real netdev_priv() layout)
+ * DON'T erroneously use a netdev_priv() instead - it's different for now!
+ *
+ * BTW, the new netdev_priv() is available in >= 2.4.27, >= 2.6.3 */
+#define acx_netdev_priv(dev) (void *)((dev)->priv)
+
 static inline void acx_stop_queue(netdevice_t *dev, const char *msg)
 {
 	netif_stop_queue(dev);

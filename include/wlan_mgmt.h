@@ -257,7 +257,7 @@ __WLAN_PRAGMA_PACKDFLT__
 __WLAN_PRAGMA_PACKDFLT__
 
 /* helpers */
-static inline char* wlan_fill_ie_ssid(char *p, int len, char *ssid)
+static inline u8* wlan_fill_ie_ssid(u8 *p, int len, const char *ssid)
 {
 	struct wlan_ie_ssid *ie = (void*)p;
 	ie->eid = WLAN_EID_SSID;
@@ -269,7 +269,7 @@ static inline char* wlan_fill_ie_ssid(char *p, int len, char *ssid)
 ** or just create overlong 'supported rates' IEs instead
 ** (non-11g compliant) */
 #define WE_OBEY_802_11G 1
-static inline char* wlan_fill_ie_rates(char *p, int len, char *rates)
+static inline u8* wlan_fill_ie_rates(u8 *p, int len, const u8 *rates)
 {
 	struct wlan_ie_supp_rates *ie = (void*)p;
 #if WE_OBEY_802_11G
@@ -282,7 +282,7 @@ static inline char* wlan_fill_ie_rates(char *p, int len, char *rates)
 	return p + len + 2;
 }
 /* This one wouldn't create an IE at all if not needed */
-static inline char* wlan_fill_ie_rates_ext(char *p, int len, char *rates)
+static inline u8* wlan_fill_ie_rates_ext(u8 *p, int len, const u8 *rates)
 {
 	struct wlan_ie_supp_rates *ie = (void*)p;
 #if !WE_OBEY_802_11G
@@ -296,7 +296,7 @@ static inline char* wlan_fill_ie_rates_ext(char *p, int len, char *rates)
 	memcpy(ie->rates, rates+8, len);
 	return p + len + 2;
 }
-static inline char* wlan_fill_ie_ds_parms(char *p, int channel)
+static inline u8* wlan_fill_ie_ds_parms(u8 *p, int channel)
 {
 	struct wlan_ie_ds_parms *ie = (void*)p;
 	ie->eid = WLAN_EID_DS_PARMS;
@@ -304,7 +304,7 @@ static inline char* wlan_fill_ie_ds_parms(char *p, int channel)
 	ie->curr_ch = channel;
 	return p + sizeof(*ie);
 }
-static inline char* wlan_fill_ie_ibss_parms(char *p, int atim_win)
+static inline u8* wlan_fill_ie_ibss_parms(u8 *p, int atim_win)
 {
 	struct wlan_ie_ibss_parms *ie = (void*)p;
 	ie->eid = WLAN_EID_IBSS_PARMS;
@@ -312,8 +312,8 @@ static inline char* wlan_fill_ie_ibss_parms(char *p, int atim_win)
 	ie->atim_win = atim_win;
 	return p + sizeof(*ie);
 }
-static inline char* wlan_fill_ie_tim(char *p,
-		int rem, int period, int bcast, int ofs, int len, char *vbm)
+static inline u8* wlan_fill_ie_tim(u8 *p,
+		int rem, int period, int bcast, int ofs, int len, const u8 *vbm)
 {
 	struct wlan_ie_tim *ie = (void*)p;
 	ie->eid = WLAN_EID_TIM;

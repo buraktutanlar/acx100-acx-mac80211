@@ -254,7 +254,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 		break;
 	}
 
-	if(!clt->rate_cur) {
+	if(unlikely(!clt->rate_cur)) {
 		printk("acx driver bug! bad ratemask\n");
 		goto end;
 	}
@@ -278,7 +278,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 			| (txrate->pbcc511 ? RATE111_PBCC511 : 0)
 #endif
 
-		if (header_len != sizeof(struct framehdr)) {
+		if (unlikely(header_len != sizeof(struct framehdr))) {
 			acxlog(L_DATA, "UHOH, packet has a different length than struct framehdr (0x%X vs. 0x%X)\n", header_len, sizeof(struct framehdr));
 
 			/* copy the data at the right place */
@@ -309,7 +309,7 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 #if (WLAN_HOSTIF!=WLAN_USB)
 	/* clears Ctl DESC_CTL_HOSTOWN bit, thus telling that the descriptors are now owned by the acx100; do this as LAST operation */
 	CLEAR_BIT(Ctl_8, DESC_CTL_HOSTOWN);
-	wmb(); /* make sure everything else is written */
+	wmb(); /* make sure everything else is written before we release our descriptor to the adapter here */
 	CLEAR_BIT(header->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 	CLEAR_BIT(payload->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
@@ -320,13 +320,16 @@ void acx_dma_tx_data(wlandevice_t *priv, struct txdescriptor *tx_desc)
 	spin_unlock_irqrestore(&priv->dc.tx_lock, flags);
 
 	tx_desc->tx_time = cpu_to_le32(jiffies);
+	wmb(); /* make sure all descr writes finish before we tell the adapter that it's its turn now */
 	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+	acx_write_flush(priv);
 #else
 	/* write back modified flags */
 	tx_desc->Ctl2_8 = Ctl2_8;
 	tx_desc->Ctl_8 = Ctl_8;
 
 	tx_desc->tx_time = cpu_to_le32(jiffies);
+	wmb(); /* make sure all descr writes finish before we tell the adapter that it's its turn now */
 	acx100usb_tx_data(priv, tx_desc);
 #endif
 	/* log the packet content AFTER sending it,
@@ -602,7 +605,7 @@ acx_handle_txrate_auto(wlandevice_t *priv, struct client *txc, unsigned int idx,
 	/* calculate acx100 style rate byte if needed */
 	if (CHIPTYPE_ACX100 == priv->chip_type) {
 		unsigned int n = highest_bit(cur);
-		if (n >= VEC_SIZE(bitpos2rate100)) {
+		if (unlikely(n >= VEC_SIZE(bitpos2rate100))) {
 			printk(KERN_ERR "%s: driver BUG! n=%u. please report\n", __func__, n);
 			cur = 0;
 		}
@@ -764,7 +767,7 @@ unsigned int acx_clean_tx_desc(wlandevice_t *priv)
 		 * descriptor is finished since it set Ctl_8 accordingly:
 		 * if _OWN is set at the beginning instead, our own get_tx
 		 * might choose a Tx desc that isn't fully cleared
-		 * (in case of bad locking) */
+		 * (in case of bad locking). */
 		pTxDesc->Ctl_8 = DESC_CTL_HOSTOWN;
 		priv->TxQueueFree++;
 		num_cleaned++;
@@ -1040,9 +1043,15 @@ static inline void acx_log_rxbuffer(const TIWLAN_DC *pDc)
 /* currently we don't need to lock anything, since we access Rx
  * descriptors from one IRQ handler only (which is locked), here.
  * Will need to use spin_lock() when adding user context Rx descriptor
- * access. */
+ * access.
+ * Same with memory barriers, but ONLY in case of CPU related things (this does
+ * NOT apply to operations that still need to be in proper order when seen from the
+ * external device!).
+ * */
 #define RX_SPIN_LOCK(lock)
 #define RX_SPIN_UNLOCK(lock)
+#define RX_RMB()
+#define RX_WMB()
 
 /*------------------------------------------------------------------------------
  * acx_process_rx_desc
@@ -1102,8 +1111,8 @@ void acx_process_rx_desc(wlandevice_t *priv)
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
 		acxlog(L_BUFR, "%s: using curr_idx %u, rx_tail is now %u\n", __func__, curr_idx, pDc->rx_tail);
+		rmb();
 		buf = acx_get_p80211_hdr(priv, pRxHostDesc->data);
-		rmb(); /* why? --vda */
 		buf_len = RXBUF_BYTES_RCVD(pRxHostDesc->data);
 
 		/* FIXME: maybe it is ieee2host16? Use XXi consts then */
@@ -1173,8 +1182,8 @@ void acx_process_rx_desc(wlandevice_t *priv)
 
 		RX_SPIN_LOCK(&pDc->rx_lock);
 		pRxHostDesc->Status = 0;
-		wmb(); /* DON'T reorder mem access here, CTL_OWN LAST! */
-		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN)); /* Host no longer owns this */
+		wmb(); /* make sure adapter sees CTL_HOSTOWN change only after all other fields have been written */
+		CLEAR_BIT(pRxHostDesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN)); /* Host no longer owns this, needs to be LAST */
 
 		/* ok, descriptor is handled, now check the next descriptor */
 		curr_idx = pDc->rx_tail;
@@ -2170,10 +2179,10 @@ int acx111_create_dma_regions(wlandevice_t *priv)
 		       pDc->ui32ACXRxQueueStart,
 		       pDc->ui32ACXTxQueueStart);
 
-	pDc->pRxDescQPool = (struct rxdescriptor *) (priv->iobase2 +
+	pDc->pRxDescQPool = (struct rxdescriptor *) ((u8 *)priv->iobase2 +
 				     pDc->ui32ACXRxQueueStart);
 
-	pDc->pTxDescQPool = (struct txdescriptor *) (priv->iobase2 +
+	pDc->pTxDescQPool = (struct txdescriptor *) ((u8 *)priv->iobase2 +
 				     pDc->ui32ACXTxQueueStart);
 
 	acx_create_tx_desc_queue(pDc);

@@ -290,6 +290,7 @@ static inline int has_only_one_bit(u16 v)
    of letting the firmware do it might confuse the firmware's state 
    machine */
 
+/* SEE WARNINGS BELOW!! */
 typedef enum {
 	IO_ACX_SOFT_RESET = 0,
 
@@ -333,6 +334,7 @@ typedef enum {
 	END_OF_IO_ENUM /* LEAVE THIS AT THE END, USED TO FIGURE OUT THE LENGTH */
 
 } IO_INDICES;
+/* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION OF THE I/O ARRAYS!!!! ***** */
 
 /* Values for IO_ACX_INT_TRIG register */
 #define INT_TRIG_RXPRC		0x08	/* inform hw that rx descriptor in queue needs processing */
@@ -454,7 +456,7 @@ typedef enum {
 #define ACX1xx_IE_DOT11_UNKNOWN_100C		0x100c	/* mapped to cfgInvalid in FW150 */
 #define ACX1xx_IE_DOT11_TX_POWER_LEVEL		0x100d
 #define ACX1xx_IE_DOT11_CURRENT_CCA_MODE	0x100e
-#define ACX1xx_IE_DOT11_ED_THRESHOLD		0x100f
+#define ACX100_IE_DOT11_ED_THRESHOLD		0x100f
 #define ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	0x1010	/* set default key ID */
 #define ACX100_IE_DOT11_UNKNOWN_1011		0x1011	/* mapped to cfgInvalid in FW150 */
 #define ACX100_IE_DOT11_UNKNOWN_1012		0x1012	/* mapped to cfgInvalid in FW150 */
@@ -499,7 +501,7 @@ typedef enum {
 #endif
 #define ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN		0x01
 #define ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN		0x01
-#define ACX1xx_IE_DOT11_ED_THRESHOLD_LEN		0x04
+#define ACX100_IE_DOT11_ED_THRESHOLD_LEN		0x04
 #define ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN		0x01
 
 /*============================================================================*
@@ -872,7 +874,7 @@ enum {
 	CLIENT_EXIST_1 = 1,
 	CLIENT_AUTHENTICATED_2 = 2,
 	CLIENT_ASSOCIATED_3 = 3,
-	CLIENT_JOIN_CANDIDATE = 4,
+	CLIENT_JOIN_CANDIDATE = 4
 };
 typedef struct client {
 	struct client *next;
@@ -894,10 +896,10 @@ typedef struct client {
 	u8	ignore_count;
 	u8	fallback_count;
 	u8	stepup_count;
-	u8	essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
+	char	essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
 	size_t	essid_len;		/* Length of ESSID (without '\0') */
 /* FIXME: this one is too damn big */
-	u8	challenge_text[WLAN_CHALLENGE_LEN];
+	char	challenge_text[WLAN_CHALLENGE_LEN];
 	u8	channel;
 	u16	beacon_interval;
 } client_t;
@@ -1043,9 +1045,12 @@ typedef struct wlandevice {
 	spinlock_t	lock;			/* mutex for concurrent accesses to structure */
 
 	/*** Hardware identification ***/
+	unsigned int	chip_type;
+	const char	*chip_name;
 	u8		form_factor;
 	u8		radio_type;
 	u8		eeprom_version;
+	u8		bus_type;
 
 	/*** Firmware identification ***/
 	char		firmware_version[20];
@@ -1056,13 +1061,10 @@ typedef struct wlandevice {
 	u16		irq_mask;		/* interrupts types to mask out (not wanted) with many IRQs activated */
 	u16		irq_mask_off;		/* interrupts types to mask out (not wanted) with IRQs off */
 
-	unsigned long	membase;		/* 10 */
-	unsigned long	membase2;		/* 14 */
-	void 		*iobase;		/* 18 */
-	void		*iobase2;		/* 1c */
-	unsigned int	chip_type;
-	const char	*chip_name;
-	u8		bus_type;
+	unsigned long	membase;
+	unsigned long	membase2;
+	void 		*iobase;
+	void		*iobase2;
 
 	/*** Device state ***/
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 10)
@@ -1329,7 +1331,7 @@ extern char *firmware_dir;
 typedef struct ssid {
 	u8 element_ID ACX_PACKED;
 	u8 length ACX_PACKED;
-	u8 inf[32] ACX_PACKED;
+	char inf[32] ACX_PACKED;
 } ssid_t;
 
 typedef struct rates {
@@ -1365,7 +1367,7 @@ typedef struct cfps {
 typedef struct challenge_text {
 	u8 element_ID ACX_PACKED;
 	u8 length ACX_PACKED;
-	u8 text[253] ACX_PACKED;
+	char text[253] ACX_PACKED;
 } challenge_text_t;
 
 
@@ -1682,7 +1684,7 @@ typedef struct acx100_template_probereq {
 	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
 		    			/* 24 n SSID * */
 					/* nn n Supported Rates * */
-	char	variable[0x44 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
+	u8	variable[0x44 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
 } acx100_template_probereq_t;
 
 typedef struct acx111_template_probereq {
@@ -1698,7 +1700,7 @@ typedef struct acx111_template_probereq {
 	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
 		    			/* 18 n SSID * */
 					/* nn n Supported Rates * */
-	char	variable[0x44 - 2-2-6-6-6-2] ACX_PACKED;
+	u8	variable[0x44 - 2-2-6-6-6-2] ACX_PACKED;
 } acx111_template_probereq_t;
 
 typedef struct acx_template_proberesp {
@@ -1917,7 +1919,7 @@ typedef struct co_fixed {
 } co_fixed_t;
 
 
-typedef struct acx_configoption {
+typedef struct acx111_ie_configoption {
     co_fixed_t			configoption_fixed ACX_PACKED;
     co_antennas_t		antennas ACX_PACKED;
     co_powerlevels_t		power_levels ACX_PACKED;
@@ -1925,7 +1927,7 @@ typedef struct acx_configoption {
     co_domains_t		domains ACX_PACKED;
     co_product_id_t		product_id ACX_PACKED;
     co_manuf_t			manufacturer ACX_PACKED;
-} acx_configoption_t;
+} acx111_ie_configoption_t;
 
 
 /*= idma.h ===================================================================*/
@@ -1975,7 +1977,7 @@ typedef struct txbuffer {
 /* This struct must contain the header of a packet. A header can maximally
  * contain a type 4 802.11 header + a LLC + a SNAP, amounting to 38 bytes */
 typedef struct framehdr {
-	char data[0x26] ACX_PACKED;
+	u8 data[0x26] ACX_PACKED;
 } framehdr_t;
 
 /* figure out tx descriptor pointer, depending on different acx100 or acx111
