@@ -1,0 +1,230 @@
+TODO:
+e100.c: pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr, sizeof(struct rfd), PCI_DMA_FROMDEVICE);
+do we need to do something like above for rxhostdescs/rxbufs?
+
+[20050916]
+* fix bogus MTU handling, add ability to change MTU
+* fix WLAN_DATA_MAXLEN: 2312 -> 2304
+* version bump to 0.3.10
+
+[20050915]
+* by popular request default mode is 'managed'
+* empty handler for EID 7 (country info) is added
+* fix 'timer not started - iface is not up'
+* tx[host]desc micro optimizations
+* version bump to 0.3.9
+
+[20050914]
+* tx[host]desc ring workings brought a bit back to two-hostdesc
+  scheme. This is an attempt to fix weird WG311v2 bug.
+  I still fail to understand how same chip with same fw can
+  work for me but do not work for a WG311v2 owner. Mystery.
+* README updated
+* version bump to 0.3.8
+
+[20050913]
+* variable and fields with awful names renamed
+* a few fields dropped (they had constant values)
+* small optimization to acx_l_clean_tx_desc()
+* version bump to 0.3.7
+
+[20050912]
+* stop using 16 byte "private area" in txdesc - fw bug makes it unreliable
+* better logging of DUPs
+* version bump to 0.3.6
+
+[20050911]
+* use alloc_netdev/free_netdev/netdev_priv
+* acx_inline.h incorporated into pci.c
+* helper.c + helper2.c = common.c
+* marking static functions
+* enable IE_DOT11_CURRENT_ANTENNA for acx111
+* version bump to 0.3.5
+
+[20050910]
+* minor fixes, 2.6.13-mm2 integration
+
+[20050905]
+* TIWLAN_DC is dead, ui32ACX[TR]xQueueStart is dead
+* massive mucking with PCI and USB resulting in:
+  acx_pci.o + acx_usb.o = acx.o  ;)
+  Why? Here's why:
+    text    data     bss     dec     hex filename
+  116199     452      40  116691   1c7d3 acx.o
+  103435     244      20  103699   19513 acx_pci.o
+   81732     196      32   81960   14028 acx_usb.o
+* helper.c is PCI/USB independent now. It was the last one.
+* both modular and non-modular builds, PCI, USB, PCI+USB,
+  seem to compile successfully!
+* version bump to 0.3.4
+
+[20050904]
+* acx_stop_queue() locking reviewed and mostly fixed
+* 2.4isms in USB code are officially dead
+* added debug stuff for discovering interrogate/configure IEs
+* version bump to 0.3.3
+
+[20050903]
+* locking bug on error path fixed
+* issue_cmd() logging made more sane
+* issue_cmd() callers may abstain from printing issue_cmd() errors:
+  issue_cmd() itself gives enough info
+* version bump to 0.3.2
+
+[20050902]
+* kill bogus configure() call in acx100_s_create_dma_regions()
+
+[20050901]
+* acx100_s_create_dma_regions: hopefully fixed for USB
+  (problem found with help of Carlos Martin <carlosmn@gmail.com> - thanks!)
+* a load of cleanups:
+* acx_s_create_tx_desc_queue -> acx_create_tx_desc_queue
+  (it doesn't sleep)
+* struct acxp80211_nullframe -> acx_template_nullframe
+* xXBUFFERCOUNT_ACXnn -> xXBUFCNT_ACXnn
+* xXBUFFERCOUNT_USB -> USB_xXBUFCNT: these are _unrelated_ to xXBUFCNT_ACXnn,
+  should have visibly different names
+* TODOs added (we have a few really Pascalish/Windowish names,
+  and some misleading ones)
+* version bump to 0.3.1
+
+[20050830]
+* finally kill warning about acx_s_activate_power_save_mode()
+* struct acx100_ie_memconfigoption: convert pRxHostDesc to acx_ptr type
+* massive move of device-independent code from helper.c to helper2.c
+
+[20050829]
+* dummy handler for NONERP EID (47) added
+
+[20050823]
+* driver submitted for kernel inclusion
+* #defines renamed: CONFIG_ACX_{PCI,USB} -> ACX_{PCI,USB}
+  (needed for correct compilation of two modules from the same source)
+* version bump to 0.3.0
+* sizes:
+   text    data     bss     dec     hex filename
+  78242     264       8   78514   132b2 drivers/net/wireless/acx/acx_pci.o
+  60622     208      20   60850    edb2 drivers/net/wireless/acx/acx_usb.o
+
+[20050822]
+* idma.c is incorporated into helper.c
+* lots of cosmetic work: comments, struct member shuffling,
+  etc. TIWLAN_DC and other PCI data structs are #ifdef'ed
+  to be PCI-only. A few todos added. Extra #include's removed.
+* added sem locking debug printout code (for amd64 debug)
+* beacon tx rate and beacon ratevector is updated according to
+  "iwconfig rate" command immediately (required mode change before).
+
+[20050821]
+* Switch to wrapper functions for dealing with "tx buffers"
+  (memory areas where we create packets for tx. For USB, it's just
+  a part of wlandevice_t, for PCI it's a DMAable buffer pointed to
+  by txhostdesc).
+* Completely hide nature of PCI txdescs under opaque pointer type tx_t*
+* acx_l_ether_to_txdesc -> acx_l_ether_to_txbuf, not using knowledge
+  of PCI txdesc anymore.
+* Massive surgery on usb.c, cutting all paths into PCI code.
+* PCI code moved to pci.c - USB don't need these pieces anymore
+* acx111 and acx100 txhostdesc creation unified into single function
+
+[20050816]
+* PCI code switched to single-txdesc scheme
+* version bump to 0.2.5
+
+[20050815]
+* dev_kfree_skb -> dev_kfree_skb_any
+
+[20050814]
+* Auto rate was reset to lowest rate by scanning code
+  (AP beacons did it every tenth of a second!). Fixed.
+* USB rx no longer uses PCI-style rx descriptor ring.
+  tx ring elimination needs 'single-descriptor' setup
+  to be developed for acx100 (patch exists for acx111).
+* Very strange sem locking problems are reported on amd64.
+  Code which misbehaves looks fine. I do not know what's going on.
+  Workaround: turn off preemption.
+
+[20050812]
+* acx100 was failing to find out radio module #,
+  and wanted to load radio module 00. Must be fixed now.
+* USB: more simplifications
+
+[20050810]
+* USB: simplified command submission code, removed some
+  wlandevice_t fields (now unused)
+
+[20050808]
+* USB changes: nuked global statics, simplified issue_cmd,
+  shortened wlandevice_t. Added some TODOs :)
+
+[20050807]
+* restart scan if AP is not found
+* remove use_eth_name parameter. It was deprecated
+* disable legacy firmware loader for 2.6. Driver printed a warning
+  about need to switch to hotplug.
+* WARNING: new names for firmware images!
+  Driver will try to load the following images:
+  PCI driver:
+    'tiacxNNNcMM' (NNN=100/111, MM=radio module ID (in uppercase hex)):
+    combined firmware for specified chipset and radio.
+    failing that, it will try to load images named
+    'tiacxNNN' (NNN=100/111): main firmware for specified chipset
+    and 'tiacxNNNrMM': corresponding radio module.
+    For example, my firmware is in file named 'tiacx111c16'.
+    Alternatively, I may remove it and use pair of files
+    'tiacx111' and 'tiacx111r16' instead.
+  USB driver: loads image named 'tiacx100usb'
+  Hint: you can keep both old and new image names (via symlinks
+  or just by copying files) if you need to run older driver.
+* fix "Debug: sleeping function called from invalid context..." for USB
+* ACX_{PCI,USB} -> CONFIG_ACX_{PCI,USB} in preparation to 2.6 merge
+* version bump to 0.2.4
+
+[20050804]
+* 'Fixed' deadlock on flush_scheduled_work (need a better fix eventually)
+* We didn't completely disable IRQs on ifdown -> "Disabling IRQ#NN"
+  on second modprobe. Fixed.
+
+[20050802]
+* removed some // comments in order to please Andreas
+* moved a field to PCI-only part of wlandevice_t
+* Random Version Bump (tm) to 0.2.3
+* no code changes
+
+[20050730]
+* Basically just incorporating acx-20050722.acx100fixed.patch
+  This is a bit of a backward step, because instead of figuring out
+  why active scanning doesn't work for acx100, we just disable it.
+  acx100 owners encouraged to try to make it work
+
+[20050729]
+* Added some IE IDs
+
+[20050726]
+* added probe request config to acx100_s_init_packet_templates,
+  maybe acx100 is working now
+
+[20050721]
+* del_timer_sync() sem lockup on SMP maybe fixed
+
+[20050720]
+* lots of amd64 warnings fixed, thanks to Matan Peled <chaosite@gmail.com>
+
+[20050710]
+* {tx,rx}hostdesc->desc_phy removed (was not used)
+* netdev->type of ARPHRD_IEEE80211_PRISM was sticking forever
+  after monitor mode. Fixed
+* monitor mode tx is working again
+* rate reporting added in monitor mode packet header
+
+[20050709]
+* moved PCI specific ioctls to pci.c
+* ioctl.c is PCI/USB independent now
+
+[20050708]
+* Fixed one apparent bug (wlandevice_t had different
+  layout for PCI and USB - conv.c would die horribly)
+* Massive code shuffling with only trivial code changes.
+  Mostly sorting out PCI/USB stuff into relevant files.
+* ihw.c eliminated
+* helper2.c is PCI/USB independent now
