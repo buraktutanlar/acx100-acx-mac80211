@@ -556,6 +556,7 @@ acx_get_wlan_hdr(wlandevice_t *priv, const rxbuffer_t *rxbuf)
 }
 
 struct sk_buff *acx_rxbuf_to_ether(struct wlandevice *priv, rxbuffer_t *rxbuf);
+int acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
 
 void acx_l_power_led(wlandevice_t *priv, int enable);
 
@@ -607,7 +608,6 @@ void acx100usb_l_tx_data(wlandevice_t *priv, struct txdesc *desc);
 int acx_s_set_defaults(wlandevice_t *priv);
 void acx_init_mboxes(wlandevice_t *priv);
 
-int acx_l_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
 
 #if !ACX_DEBUG
 static inline const char* acx_get_packet_type_string(u16 fc) { return ""; }

@@ -1168,21 +1168,18 @@ acx_init_mboxes(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_s_issue_cmd_timeo
-* Excecutes a command in the command mailbox
-*
-* Arguments:
-*   *pcmdparam = an pointer to the data. The data mustn't include
-*                the 4 byte command header!
-*
-* NB: we do _not_ take lock inside, so be sure to not touch anything
-* which may interfere with IRQ handler operation
-*
-* TODO: busy wait is a bit silly, so:
-* 1) stop doing many iters - go to sleep after first
-* 2) go to waitqueue based approach: wait, not poll!
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_issue_cmd_timeo
+**
+** Sends command to fw, extract result
+**
+** NB: we do _not_ take lock inside, so be sure to not touch anything
+** which may interfere with IRQ handler operation
+**
+** TODO: busy wait is a bit silly, so:
+** 1) stop doing many iters - go to sleep after first
+** 2) go to waitqueue based approach: wait, not poll!
+*/
 #undef FUNC
 #define FUNC "issue_cmd"
 
@@ -1369,9 +1366,9 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_s_get_firmware_version
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_get_firmware_version
+*/
 static void
 acx_s_get_firmware_version(wlandevice_t *priv)
 {
@@ -1456,18 +1453,11 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_display_hardware_details
-*
-* Arguments:
-*	priv: ptr to wlandevice that contains all the details
-*	  displayed by this function
-* Call context:
-*	acx_probe_pci
-* Comment:
-*	This function will display strings to the system log according
-* to device form_factor and radio type. It will needed to be
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_display_hardware_details
+**
+** Displays hw/fw version, radio type etc...
+*/
 static void
 acx_display_hardware_details(wlandevice_t *priv)
 {
@@ -1710,9 +1700,9 @@ acx_free_desc_queues(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_s_delete_dma_regions
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_delete_dma_regions
+*/
 static void
 acx_s_delete_dma_regions(wlandevice_t *priv)
 {
@@ -1734,29 +1724,20 @@ acx_s_delete_dma_regions(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_probe_pci
-*
-* Probe routine called when a PCI device w/ matching ID is found.
-* Here's the sequence:
-*   - Allocate the PCI resources.
-*   - Read the PCMCIA attribute memory to make sure we have a WLAN card
-*   - Reset the MAC
-*   - Initialize the dev and wlan data
-*   - Initialize the MAC
-*
-* Arguments:
-*	pdev		ptr to pci device structure containing info about
-*			pci configuration.
-*	id		ptr to the device id entry that matched this device.
-*
-* Returns:
-*	zero		- success
-*	negative	- failed
-*
-* Call context:
-*	process thread
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_probe_pci
+**
+** Probe routine called when a PCI device w/ matching ID is found.
+** Here's the sequence:
+**   - Allocate the PCI resources.
+**   - Read the PCMCIA attribute memory to make sure we have a WLAN card
+**   - Reset the MAC
+**   - Initialize the dev and wlan data
+**   - Initialize the MAC
+**
+** pdev	- ptr to pci device structure containing info about pci configuration
+** id	- ptr to the device id entry that matched this device
+*/
 static const u16
 IO_ACX100[] =
 {
@@ -2173,22 +2154,17 @@ done:
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_remove_pci
-*
-* Deallocate PCI resources for the ACX100 chip.
-*
-* This should NOT execute any other hardware operations on the card,
-* since the card might already be ejected. Instead, that should be done
-* in cleanup_module, since the card is most likely still available there.
-*
-* Arguments:
-*	pdev		ptr to PCI device structure containing info about
-*			PCI configuration.
-*
-* Call context:
-*	process thread
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_remove_pci
+**
+** Deallocate PCI resources for the acx chip.
+**
+** This should NOT execute any other hardware operations on the card,
+** since the card might already be ejected. Instead, that should be done
+** in cleanup_module, since the card is most likely still available there.
+**
+** pdev - ptr to PCI device structure containing info about pci configuration
+*/
 static void __devexit
 acx_e_remove_pci(struct pci_dev *pdev)
 {
@@ -2256,9 +2232,7 @@ acx_e_remove_pci(struct pci_dev *pdev)
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
 	 * by a netdev timeout handler execution
-	 * expecting to see a working dev...)
-	 * But don't use free_netdev() here,
-	 * it's supported by newer kernels only */
+	 * expecting to see a working dev...) */
 	free_netdev(dev);
 
 	/* put device into ACPI D3 mode (shutdown) */
@@ -2359,18 +2333,15 @@ fail: /* we need to return OK here anyway, right? */
 #endif /* CONFIG_PM */
 
 
-/*----------------------------------------------------------------
-* acx_s_up
-*
-* Side effects:
-*	- Enables on-card interrupt requests
-*	- calls acx_start
-* Call context:
-*	- process thread
-* Comment:
-*	This function is called by acx_open (when ifconfig sets the
-*	device as up).
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_up
+**
+** This function is called by acx_e_open (when ifconfig sets the device as up)
+**
+** Side effects:
+** - Enables on-card interrupt requests
+** - calls acx_start
+*/
 static void
 acx_s_up(netdevice_t *dev)
 {
@@ -2409,16 +2380,14 @@ acx_s_up(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_s_down
-*
-* Side effects:
-*	- disables on-card interrupt request
-* Call context:
-*	process thread
-* Comment:
-*	this disables the netdevice
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_down
+**
+** This disables the netdevice
+**
+** Side effects:
+** - disables on-card interrupt request
+*/
 static void
 acx_s_down(netdevice_t *dev)
 {
@@ -2471,22 +2440,17 @@ acx_s_down(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_open
-*
-* WLAN device open method.  Called from p80211netdev when kernel
-* device open (start) method is called in response to the
-* SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
-* from clear to set.
-*
-* Returns:
-*	0	success
-*	>0	f/w reported error
-*	<0	driver reported error
-*
-* Call context:
-*	process thread
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_open
+**
+** Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
+** from clear to set. In other words: ifconfig up.
+**
+** Returns:
+**	0	success
+**	>0	f/w reported error
+**	<0	driver reported error
+*/
 static int
 acx_e_open(netdevice_t *dev)
 {
@@ -2528,23 +2492,17 @@ done:
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_close
-*
-* WLAN device close method.  Called from network core when kernel
-* device close method is called in response to the
-* SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
-* from set to clear.
-* (i.e. called for "ifconfig DEV down")
-*
-* Returns:
-*	0	success
-*	>0	f/w reported error
-*	<0	driver reported error
-*
-* Call context:
-*	process thread
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_close
+**
+** Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
+** from set to clear. I.e. called by "ifconfig DEV down"
+**
+** Returns:
+**	0	success
+**	>0	f/w reported error
+**	<0	driver reported error
+*/
 static int
 acx_e_close(netdevice_t *dev)
 {
@@ -2581,11 +2539,11 @@ acx_e_close(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_i_tx_timeout
-*
-* Called from network core. Must not sleep!
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_i_tx_timeout
+**
+** Called from network core. Must not sleep!
+*/
 static void
 acx_i_tx_timeout(netdevice_t *dev)
 {
@@ -2631,9 +2589,9 @@ acx_i_tx_timeout(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_get_stats
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_get_stats
+*/
 static struct net_device_stats*
 acx_e_get_stats(netdevice_t *dev)
 {
@@ -2642,9 +2600,9 @@ acx_e_get_stats(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_get_wireless_stats
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_get_wireless_stats
+*/
 static struct iw_statistics*
 acx_e_get_wireless_stats(netdevice_t *dev)
 {
@@ -2653,10 +2611,10 @@ acx_e_get_wireless_stats(netdevice_t *dev)
 }
 
 
-/*----------------------------------------------------------------
-* acx_i_set_multicast_list
-* FIXME: most likely needs refinement
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_i_set_multicast_list
+** FIXME: most likely needs refinement
+*/
 static void
 acx_i_set_multicast_list(netdevice_t *dev)
 {
@@ -2708,9 +2666,9 @@ acx_l_update_link_quality_led(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_enable_irq
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_enable_irq
+*/
 static void
 acx_l_enable_irq(wlandevice_t *priv)
 {
@@ -2722,9 +2680,9 @@ acx_l_enable_irq(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_disable_irq
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_disable_irq
+*/
 static void
 acx_l_disable_irq(wlandevice_t *priv)
 {
@@ -2779,11 +2737,11 @@ acx_l_handle_info_irq(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_i_interrupt
-*
-* IRQ handler (atomic context, must not sleep, blah, blah)
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_i_interrupt
+**
+** IRQ handler (atomic context, must not sleep, blah, blah)
+*/
 static void
 acx_log_unusual_irq(u16 irqtype) {
 	/*
@@ -2991,9 +2949,9 @@ none:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_power_led
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_power_led
+*/
 void
 acx_l_power_led(wlandevice_t *priv, int enable)
 {
@@ -3843,9 +3801,9 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_log_txbuffer
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_log_txbuffer
+*/
 #if !ACX_DEBUG
 static inline void acx_l_log_txbuffer(const wlandevice_t *priv) {}
 #else
@@ -3868,26 +3826,26 @@ acx_l_log_txbuffer(wlandevice_t *priv)
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_l_clean_tx_desc
-*
-* This function resets the txdescs' status when the ACX100
-* signals the TX done IRQ (txdescs have been processed), starting with
-* the pool index of the descriptor which we would use next,
-* in order to make sure that we can be as fast as possible
-* in filling new txdescs.
-* Oops, now we have our own index, so everytime we get called we know
-* where the next packet to be cleaned is.
-* Hmm, still need to loop through the whole ring buffer now,
-* since we lost sync for some reason when ping flooding or so...
-* (somehow we don't get the IRQ for acx_l_clean_tx_desc any more when
-* too many packets are being sent!)
-* FIXME: currently we only process one packet, but this gets out of
-* sync for some reason when ping flooding, so we need to loop,
-* but the previous smart loop implementation causes the ping latency
-* to rise dramatically (~3000 ms), at least on CardBus PheeNet WL-0022.
-* Dunno what to do :-\
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_clean_tx_desc
+**
+** This function resets the txdescs' status when the ACX100
+** signals the TX done IRQ (txdescs have been processed), starting with
+** the pool index of the descriptor which we would use next,
+** in order to make sure that we can be as fast as possible
+** in filling new txdescs.
+** Oops, now we have our own index, so everytime we get called we know
+** where the next packet to be cleaned is.
+** Hmm, still need to loop through the whole ring buffer now,
+** since we lost sync for some reason when ping flooding or so...
+** (somehow we don't get the IRQ for acx_l_clean_tx_desc any more when
+** too many packets are being sent!)
+** FIXME: currently we only process one packet, but this gets out of
+** sync for some reason when ping flooding, so we need to loop,
+** but the previous smart loop implementation causes the ping latency
+** to rise dramatically (~3000 ms), at least on CardBus PheeNet WL-0022.
+** Dunno what to do :-\
+*/
 unsigned int
 acx_l_clean_tx_desc(wlandevice_t *priv)
 {
@@ -4025,11 +3983,11 @@ acx_l_clean_tx_desc_emergency(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_log_rxbuffer
-*
-* Called from IRQ context only
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_log_rxbuffer
+**
+** Called from IRQ context only
+*/
 #if !ACX_DEBUG
 static inline void acx_l_log_rxbuffer(const wlandevice_t *priv) {}
 #else
@@ -4123,9 +4081,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_s_create_tx_host_desc_queue
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_create_tx_host_desc_queue
+*/
 static inline void*
 acx_alloc_coherent(struct pci_dev *hwdev, size_t size,
 			dma_addr_t *dma_handle, int flag)
@@ -4712,18 +4670,11 @@ acx100_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_init_module
-*
-* Module initialization routine, called once at module load time.
-*
-* Returns:
-*	0	- success
-*	~0	- failure, module is unloaded.
-*
-* Call context:
-*	process thread (insmod or modprobe)
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_init_module
+**
+** Module initialization routine, called once at module load time
+*/
 int __init
 acxpci_e_init_module(void)
 {
@@ -4754,15 +4705,12 @@ acxpci_e_init_module(void)
 }
 
 
-/*----------------------------------------------------------------
-* acx_e_cleanup_module
-*
-* Called at module unload time.  This is our last chance to
-* clean up after ourselves.
-*
-* Call context:
-*	process thread
-----------------------------------------------------------------*/
+/***********************************************************************
+** acx_e_cleanup_module
+**
+** Called at module unload time. This is our last chance to
+** clean up after ourselves.
+*/
 void __exit
 acxpci_e_cleanup_module(void)
 {

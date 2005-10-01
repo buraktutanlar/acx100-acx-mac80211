@@ -2400,7 +2400,7 @@ acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		txresult = NOT_OK;
 		goto end;
 	}
-	len = acx_l_ether_to_txbuf(priv, txbuf, skb);
+	len = acx_ether_to_txbuf(priv, txbuf, skb);
 	if (len < 0) {
 		/* Error in packet conversion */
 		txresult = NOT_OK;

@@ -113,7 +113,7 @@ static int acx100usb_boot(struct usb_device *);
 static struct net_device_stats * acx_e_get_stats(struct net_device *);
 static struct iw_statistics *acx_e_get_wireless_stats(struct net_device *);
 
-static void acx100usb_l_poll_rx(wlandevice_t *, int number);
+static void acx100usb_l_poll_rx(wlandevice_t *, usb_rx_t* rx);
 
 static void acx100usb_i_tx_timeout(struct net_device *);
 
@@ -950,7 +950,7 @@ acx100usb_e_open(struct net_device *dev)
 
 	acx_lock(priv, flags);
 	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-		acx100usb_l_poll_rx(priv, i);
+		acx100usb_l_poll_rx(priv, &priv->usb_rx[i]);
 	}
 	acx_unlock(priv, flags);
 
@@ -968,24 +968,18 @@ acx100usb_e_open(struct net_device *dev)
 ** This function (re)initiates a bulk-in USB transfer on given urb
 */
 static void
-acx100usb_l_poll_rx(wlandevice_t *priv, int number)
+acx100usb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 {
 	struct usb_device *usbdev;
-	rxbuffer_t *inbuf;
-	acx_usb_bulk_context_t *rxcon;
 	struct urb *rxurb;
 	int errcode;
 	unsigned int inpipe;
 
 	FN_ENTER;
 
-	rxcon = &priv->usb_rx[number].rxc;
-	inbuf = &priv->usb_rx[number].bulkin;
-	rxurb = priv->usb_rx[number].urb;
+	rxurb = rx->urb;
 	usbdev = priv->usbdev;
 
-	rxcon->device = priv;
-	rxcon->number = number;
 	inpipe = usb_rcvbulkpipe(usbdev, priv->bulkinep);
 	if (rxurb->status == -EINPROGRESS) {
 		printk(KERN_ERR "acx: error, rx triggered while rx urb in progress\n");
@@ -994,23 +988,23 @@ acx100usb_l_poll_rx(wlandevice_t *priv, int number)
 		 */
 		usb_unlink_urb(rxurb);
 	} else if (rxurb->status == -ECONNRESET) {
-		acxlog(L_USBRXTX, "acx_usb: _poll_rx: connection reset.\n");
+		acxlog(L_USBRXTX, "acx_usb: _poll_rx: connection reset\n");
 		goto end;
 	}
 	rxurb->actual_length = 0;
 	usb_fill_bulk_urb(rxurb, usbdev, inpipe,
-		inbuf, /* dataptr */
+		&rx->bulkin, /* dataptr */
 		RXBUFSIZE, /* size */
 		acx100usb_i_complete_rx, /* handler */
-		rxcon /* handler param */
+		rx /* handler param */
 	);
 	rxurb->transfer_flags = URB_ASYNC_UNLINK;
 	
 	/* ATOMIC: we may be called from complete_rx() usb callback */
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
-	acxlog(L_USBRXTX, "SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
-			number, inpipe, (int) RXBUFSIZE, errcode);
+	acxlog(L_USBRXTX, "SUBMIT RX (%p) inpipe=0x%X size=%d errcode=%d\n",
+			rx, inpipe, (int) RXBUFSIZE, errcode);
 end: 
 	FN_EXIT0;
 }
@@ -1034,14 +1028,16 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	wlandevice_t *priv;
 	rxbuffer_t *ptr;
 	rxbuffer_t *inbuf;
+	usb_rx_t *rx;
 	unsigned long flags;
-	int size, number, remsize, packetsize;
+	int size, remsize, packetsize;
 
 	FN_ENTER;
 
 	BUG_ON(!urb->context);
 
-	priv = ((acx_usb_bulk_context_t *)urb->context)->device;
+	rx = (usb_rx_t *)urb->context;
+	priv = rx->priv;
 
 	acx_lock(priv, flags);
 
@@ -1054,15 +1050,12 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		goto end_unlock;
 	}
 	
-	number = ((acx_usb_bulk_context_t *)urb->context)->number;
+	inbuf = &rx->bulkin;
 	size = urb->actual_length;
 	remsize = size;
 
-	acxlog(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
-				number, urb->status, size);
-
-	inbuf = &priv->usb_rx[number].bulkin;
-	ptr = inbuf;
+	acxlog(L_USBRXTX, "RETURN RX (%p) status=%d size=%d\n",
+				rx, urb->status, size);
 
 	/* check if the transfer was aborted */
 	switch (urb->status) {
@@ -1070,7 +1063,6 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		break;
 	case -EOVERFLOW:
 		printk(KERN_ERR "acx: error in rx, data overrun -> emergency stop\n");
-		priv->rxtruncsize = 0; /* Not valid anymore. */
 		/* LOCKING BUG! acx100usb_e_close(priv->netdev); */
 		goto end_unlock;
 	case -ECONNRESET:
@@ -1093,11 +1085,12 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	** FIXME: this code can only handle truncation
 	** of consecutive packets!
 	*/
+	ptr = inbuf;
 	if (priv->rxtruncsize) {
 		int tail_size;
 
 		ptr = &priv->rxtruncbuf;
-		packetsize = RXBUF_BYTES_RCVD(ptr) + RXBUF_HDRSIZE;
+		packetsize = RXBUF_BYTES_USED(ptr);
 		if (acx_debug & L_USBRXTX) {
 			printk("handling truncated frame (truncsize=%d size=%d "
 					"packetsize(from trunc)=%d)\n",
@@ -1151,7 +1144,7 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 				remsize);
 			break;
 		}
-		packetsize = RXBUF_BYTES_RCVD(ptr) + RXBUF_HDRSIZE;
+		packetsize = RXBUF_BYTES_USED(ptr);
 		acxlog(L_USBRXTX, "packet with packetsize=%d\n", packetsize);
 		if (packetsize > sizeof(rxbuffer_t)) {
 			printk("acx: packet exceeds max wlan "
@@ -1201,10 +1194,10 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 
 do_poll_rx:
 	/* receive of frame completed, now look for the next one */
-	acx100usb_l_poll_rx(priv, number);
+	acx100usb_l_poll_rx(priv, rx);
 end_unlock:
 	acx_unlock(priv, flags);
-end:
+/* end: */
 	FN_EXIT0;
 }
 
@@ -1240,12 +1233,6 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	FN_ENTER;
 
 	BUG_ON(!urb->context);
-
-	if (!urb->context) {
-		printk(KERN_ERR "acx: error, NULL context in tx completion callback\n");
-		/* FIXME: real error-handling code must go here! */
-		goto end;
-	}
 
 	tx = (usb_tx_t *)urb->context;
 	priv = tx->priv;
@@ -1283,7 +1270,7 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 
 end_unlock: 
 	acx_unlock(priv, flags);
-end:
+/* end: */
 	FN_EXIT0;
 }
 

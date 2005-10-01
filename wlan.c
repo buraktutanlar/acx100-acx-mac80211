@@ -128,6 +128,10 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		/* was seen: 07 06 47 42 20 01 0D 14 */
 		case WLAN_EID_NONERP:
 		/* was seen from WRT54GS with OpenWrt: 2F 01 07 */
+		case WLAN_EID_UNKNOWN133:
+		/* was seen by David Bronaugh <dbronaugh@linuxboxen.org> from ???? */
+		/* 85 1E 00 00 84 12 07 00 FF 00 11 00 61 70 63 31 */
+		/* 63 73 72 30 34 32 00 00 00 00 00 00 00 00 00 25 */
 		case WLAN_EID_GENERIC:
 		/* WPA: hostap code:
 			if (pos[1] >= 4 &&
@@ -349,6 +353,11 @@ wlan_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 		case WLAN_EID_IBSS_PARMS:
 			f->ibss_parms = (wlan_ie_ibss_parms_t *) ie_ptr;
 			break;
+#ifdef DONT_DO_IT_ADD_REAL_HANDLING_INSTEAD
+		case WLAN_EID_COUNTRY:
+			break;
+		...
+#endif
 		default:
 			LOG_BAD_EID(f->hdr, f->len, ie_ptr);
 			break;

@@ -43,22 +43,20 @@
 #include "acx.h"
 
 
-/*----------------------------------------------------------------
-* proto_is_stt
-*
-* Searches the 802.1h Selective Translation Table for a given
-* protocol.
-*
-* Arguments:
-*	prottype	protocol number (in host order) to search for.
-*
-* Returns:
-*	1 - if the table is empty or a match is found.
-*	0 - if the table is non-empty and a match is not found.
-*
-* Comment:
-*	Based largely on p80211conv.c of the linux-wlan-ng project
-*----------------------------------------------------------------*/
+/***********************************************************************
+** proto_is_stt
+**
+** Searches the 802.1h Selective Translation Table for a given
+** protocol.
+**
+** prottype - protocol number (in host order) to search for.
+**
+** Returns:
+**	1 - if the table is empty or a match is found.
+**	0 - if the table is non-empty and a match is not found.
+**
+** Based largely on p80211conv.c of the linux-wlan-ng project
+*/
 static inline int
 proto_is_stt(unsigned int proto)
 {
@@ -122,21 +120,20 @@ oui_is_8021h(const struct wlan_snap *snap)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_ether_to_txbuf
-*
-* Uses the contents of the ether frame to build the elements of
-* the 802.11 frame.
-*
-* We don't actually set up the frame header here.  That's the
-* MAC's job.  We're only handling conversion of DIXII or 802.3+LLC
-* frames to something that works with 802.11.
-*
-* Comment:
-*	Based largely on p80211conv.c of the linux-wlan-ng project
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ether_to_txbuf
+**
+** Uses the contents of the ether frame to build the elements of
+** the 802.11 frame.
+**
+** We don't actually set up the frame header here.  That's the
+** MAC's job.  We're only handling conversion of DIXII or 802.3+LLC
+** frames to something that works with 802.11.
+**
+** Based largely on p80211conv.c of the linux-wlan-ng project
+*/
 int
-acx_l_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
+acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 {
 	struct wlan_hdr_a3 *w_hdr;
 	struct wlan_ethhdr *e_hdr;
@@ -261,17 +258,17 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_rxbuf_to_ether
-*
-* Uses the contents of a received 802.11 frame to build an ether
-* frame.
-*
-* This function extracts the src and dest address from the 802.11
-* frame to use in the construction of the eth frame.
-*
-* Based largely on p80211conv.c of the linux-wlan-ng project
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_rxbuf_to_ether
+**
+** Uses the contents of a received 802.11 frame to build an ether
+** frame.
+**
+** This function extracts the src and dest address from the 802.11
+** frame to use in the construction of the eth frame.
+**
+** Based largely on p80211conv.c of the linux-wlan-ng project
+*/
 struct sk_buff*
 acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 {

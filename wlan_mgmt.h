@@ -60,6 +60,7 @@
 #define WLAN_EID_NONERP		47	/* was seen from WRT54GS with OpenWrt */
 #define WLAN_EID_RSN		48
 #define WLAN_EID_EXT_RATES	50
+#define WLAN_EID_UNKNOWN133	133
 #define WLAN_EID_GENERIC	221
 
 #if 0

@@ -536,7 +536,7 @@ phy_plcp_signal: 1 byte:
 phy_level: 1 byte:
     receive AGC gain level (can be used to measure receive signal strength)
 
-fphy_snr: 1 byte:
+phy_snr: 1 byte:
     estimated noise power of equalized receive signal
     at input of FEC decoder (can be used to measure receive signal quality)
 
@@ -990,8 +990,6 @@ struct rxhostdesc {
 #define USB_TXBUF_HD_BROADCAST  0x40000
 /* Size of header (everything up to data[]) */
 #define USB_TXBUF_HDRSIZE	14
-
-#define USB_RX_PADDING 32
 typedef struct usb_txbuffer {
 	u16	desc ACX_PACKED;
 	u16	MPDUlen ACX_PACKED;
@@ -1004,11 +1002,6 @@ typedef struct usb_txbuffer {
 	/* wlan packet content is placed here: */
 	u8	data[WLAN_A4FR_MAXLEN_WEP_FCS] ACX_PACKED;
 } usb_txbuffer_t;
-
-typedef struct {
-	void	*device;
-	int	number;
-} acx_usb_bulk_context_t;
 
 typedef struct usb_tx {
 	unsigned	busy:1;
@@ -1023,10 +1016,7 @@ typedef struct usb_rx {
 	unsigned	busy:1;
 	struct urb	*urb;
 	wlandevice_t	*priv;
-	acx_usb_bulk_context_t	rxc;
 	rxbuffer_t	bulkin;
-	/* This should be a multiple of 64. */
-	u8		padding[32];
 } usb_rx_t;
 #endif /* ACX_USB */
 
