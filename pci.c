@@ -2986,7 +2986,7 @@ acx111pci_ioctl_info(
 	struct iw_param *vwrq,
 	char *extra)
 {
-#if ACX_DEBUG
+#if ACX_DEBUG > 1
 	wlandevice_t *priv = netdev_priv(dev);
 	rxdesc_t *rxdesc;
 	txdesc_t *txdesc;
@@ -3439,7 +3439,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 /* not working (looks like good fcs is still added) */
 			+ DESC_CTL2_FCS		/* don't add the FCS */
 /* not tested */
-			+ DESC_CTL2_MORE_FRAG	
+			+ DESC_CTL2_MORE_FRAG
 /* not tested */
 			+ DESC_CTL2_RETRY	/* don't increase retry field */
 /* not tested */
@@ -3518,7 +3518,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
 //TODO: should it be a mmiowb() instead? we are protecting against race with write[bwl]()
 	/* flush writes before we tell the adapter that it's its turn now */
-	wmb(); 
+	wmb();
 	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 	acx_write_flush(priv);
 
@@ -4154,9 +4154,13 @@ acx_s_create_tx_host_desc_queue(wlandevice_t *priv)
 ** has hostdesc.length = 3 (or larger)
 ** Storing NULL into hostdesc.desc_phy_next
 ** doesn't seem to help.
-*/
-/* It is not known whether we need to have 'extra' second
+**
+** It is not known whether we need to have 'extra' second
 ** txhostdescs for acx100. Maybe it is acx111-only bug.
+**
+** Update: acx111 WG311v2 is even more bogus than this.
+** We will initialize two hostdesc so that they point
+** to adjacent memory areas.
 */
 	hostdesc = priv->txhostdesc_start;
 	hostdesc_phy = priv->txhostdesc_startphy;
@@ -4198,32 +4202,22 @@ acx_s_create_tx_host_desc_queue(wlandevice_t *priv)
 #endif
 	for (i = 0; i < TX_CNT*2; i++) {
 		hostdesc_phy += sizeof(txhostdesc_t);
-		if (!(i & 1)) {
-			hostdesc->data_phy = cpu2acx(txbuf_phy);
-			/* done by memset(0): hostdesc->data_offset = 0; */
-			/* hostdesc->reserved = ... */
-			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-			/* hostdesc->length = ... */
-			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-			/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			hostdesc->data = txbuf;
 
+		hostdesc->data_phy = cpu2acx(txbuf_phy);
+		/* done by memset(0): hostdesc->data_offset = 0; */
+		/* hostdesc->reserved = ... */
+		hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+		/* hostdesc->length = ... */
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
+		/* hostdesc->Status = ... */
+		/* ->data is a non-hardware field: */
+		hostdesc->data = txbuf;
+
+		if (!(i & 1)) {
 			txbuf += WLAN_HDR_A3_LEN;
 			txbuf_phy += WLAN_HDR_A3_LEN;
 		} else {
-			hostdesc->data_phy = cpu2acx(txbuf_phy);
-			/* done by memset(0): hostdesc->data_offset = 0; */
-			/* hostdesc->reserved = ... */
-			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-			/* hostdesc->length = ...; */
-			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-			/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			hostdesc->data = txbuf;
-
 			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
 			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
 		}

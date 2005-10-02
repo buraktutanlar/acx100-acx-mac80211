@@ -7,9 +7,20 @@ config ACX
 
 	This driver supports Host AP mode that allows
 	your computer to act as an IEEE 802.11 access point.
-	This driver is quite new and experimental.
+	This driver is new and experimental.
 
-	These chipsets need their firmware loaded at startup.
+	Texas Instruments did not take part in development of this driver
+	in any way, shape or form.
+
+	The driver can be compiled as a module and will be named "acx".
+
+config ACX_PCI
+	bool "TI acx100/acx111 802.11b/g PCI"
+	depends on PCI && ACX
+	---help---
+	Include PCI and CardBus support in acx.
+
+	acx chipsets need their firmware loaded at startup.
 	You will need to provide a firmware image via hotplug.
 
 	Firmware may be in a form of single image 40-100kb in size
@@ -32,17 +43,6 @@ config ACX
 	Firmware files are not covered by GPL and are not distributed
 	with this driver for legal reasons.
 
-	Texas Instruments did not take part in development of this driver
-	in any way, shape or form.
-
-	The driver can be compiled as a module and will be named "acx".
-
-config ACX_PCI
-	bool "TI acx100/acx111 802.11b/g PCI"
-	depends on PCI && ACX
-	---help---
-	Include PCI and CardBus support in acx.
-
 config ACX_USB
 	bool "TI acx100/acx111 802.11b/g USB"
 	depends on USB && ACX && BROKEN
@@ -51,3 +51,12 @@ config ACX_USB
 
 	There is only one currently known device in this category,
 	D-Link DWL-120+, but newer devices seem to be on the horizon.
+
+	acx chipsets need their firmware loaded at startup.
+	You will need to provide a firmware image via hotplug.
+	
+	Firmware for USB device is requested from hotplug
+	by the 'tiacx100usb' name.
+
+	Firmware files are not covered by GPL and are not distributed
+	with this driver for legal reasons.

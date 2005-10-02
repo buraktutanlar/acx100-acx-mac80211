@@ -128,6 +128,9 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		/* was seen: 07 06 47 42 20 01 0D 14 */
 		case WLAN_EID_NONERP:
 		/* was seen from WRT54GS with OpenWrt: 2F 01 07 */
+		case WLAN_EID_UNKNOWN128:
+		/* was seen by Jacek Jablonski <conexion2000@gmail.com> from Orinoco AP */
+		/* 80 06 00 60 1D 2C 3B 00 */
 		case WLAN_EID_UNKNOWN133:
 		/* was seen by David Bronaugh <dbronaugh@linuxboxen.org> from ???? */
 		/* 85 1E 00 00 84 12 07 00 FF 00 11 00 61 70 63 31 */

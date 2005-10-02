@@ -520,12 +520,17 @@ get_status_string(unsigned int status)
 void
 acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr)
 {
-	acxlog(L_ASSOC, "acx: unknown EID %d in mgmt frame at offset %d\n",
-				ie_ptr->eid, (int) ((u8*)ie_ptr - (u8*)hdr));
-	if (acx_debug & (L_DATA|L_ASSOC)) {
-		printk("frame (%s): ",
+	if (acx_debug & L_ASSOC) {
+		int offset = (u8*)ie_ptr - (u8*)hdr;
+		printk("acx: unknown EID %d in mgmt frame at offset %d. IE: ",
+				ie_ptr->eid, offset);
+	/* IE len can be bogus, IE can extend past packet end. Oh well... */
+		acx_dump_bytes(ie_ptr, ie_ptr->len);
+		if (acx_debug & L_DATA) {
+			printk("frame (%s): ",
 			acx_get_packet_type_string(le16_to_cpu(hdr->fc)));
-		acx_dump_bytes(hdr, len);
+			acx_dump_bytes(hdr, len);
+		}
 	}
 }
 
@@ -4678,7 +4683,7 @@ acx_s_read_fw(const char *file, u32 *size)
 	const struct firmware *fw_entry;
 
 	res = NULL;
-	acxlog(L_DEBUG, "requesting firmware image '%s'\n", file);
+	acxlog(L_INIT, "requesting firmware image '%s'\n", file);
 	if (!request_firmware(&fw_entry, file, dev)) {
 		*size = 8;
 		if (fw_entry->size >= 8)
@@ -4732,7 +4737,7 @@ release_ret:
 			"using default %s\n", firmware_dir);
 	}
 	snprintf(filename, PATH_MAX, "%s/%s", firmware_dir, file);
-	acxlog(L_DEBUG, "reading firmware image '%s'\n", filename);
+	acxlog(L_INIT, "reading firmware image '%s'\n", filename);
 
 	buffer = (char*)page;
 

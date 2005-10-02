@@ -170,7 +170,6 @@ acx100usb_driver = {
 **
 ** In light of this, timeout is just for paranoid reasons...
 */
-
 static void
 acx_unlink_urb(struct urb* urb)
 {
@@ -185,28 +184,10 @@ acx_unlink_urb(struct urb* urb)
 			mdelay(1);
 		}
 		if (!timeout) {
-			printk("acx_usb: unlink timeout!\n");
+			printk("acx_usb: urb unlink timeout!\n");
 		}
 	}
 }
-
-#if 0
-/*
- * Nobody uses this anymore. These don't happen in the same
- * place now.
- */
-static void
-acx_unlink_and_free_urb(struct urb* urb)
-{
-	if (!urb)
-		return;
-
-	acx_unlink_urb(urb);
-
-	/* just a refcounted kfree, safe undef lock */
-	usb_free_urb(urb);
-}
-#endif /* #if 0 */
 
 
 /***********************************************************************
@@ -999,13 +980,13 @@ acx100usb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 		rx /* handler param */
 	);
 	rxurb->transfer_flags = URB_ASYNC_UNLINK;
-	
+
 	/* ATOMIC: we may be called from complete_rx() usb callback */
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
 	acxlog(L_USBRXTX, "SUBMIT RX (%p) inpipe=0x%X size=%d errcode=%d\n",
 			rx, inpipe, (int) RXBUFSIZE, errcode);
-end: 
+end:
 	FN_EXIT0;
 }
 
@@ -1049,7 +1030,7 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		acxlog(L_USBRXTX, "not doing anything.\n");
 		goto end_unlock;
 	}
-	
+
 	inbuf = &rx->bulkin;
 	size = urb->actual_length;
 	remsize = size;
@@ -1268,7 +1249,7 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	priv->tx_free++;
 	tx->busy = 0;
 
-end_unlock: 
+end_unlock:
 	acx_unlock(priv, flags);
 /* end: */
 	FN_EXIT0;

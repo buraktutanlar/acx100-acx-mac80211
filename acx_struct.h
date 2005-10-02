@@ -1223,7 +1223,7 @@ struct wlandevice {
 
 /*** PCI/USB/... must be last or else hw agnostic code breaks horribly ***/
 	/* hack to let common code compile. FIXME */
-	dma_addr_t	rxhostdesc_startphy;	
+	dma_addr_t	rxhostdesc_startphy;
 
 	/*** PCI stuff ***/
 #ifdef ACX_PCI

@@ -2,6 +2,12 @@ TODO:
 e100.c: pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr, sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 do we need to do something like above for rxhostdescs/rxbufs?
 
+[20051003]
+* several usb fixes by Carlos Martin <carlosmn@gmail.com> - thanks!
+* unknown IE logging made less noisy
+* few unknown IEs added to the growing collection
+* version bump to 0.3.11
+
 [20050916]
 * fix bogus MTU handling, add ability to change MTU
 * fix WLAN_DATA_MAXLEN: 2312 -> 2304
