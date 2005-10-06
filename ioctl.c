@@ -50,7 +50,7 @@
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
-/* someone broke SET/GET convention: SETs must have even position, GETs odd */
+/* SET/GET convention: SETs must have even position, GETs odd */
 #define ACX100_IOCTL SIOCIWFIRSTPRIV
 enum {
 	ACX100_IOCTL_DEBUG = ACX100_IOCTL,
@@ -705,7 +705,8 @@ acx_s_scan_add_station(
 		if (rate & 1) {
 			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
 			acxlog(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
-			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf, &iwe, IW_EV_PARAM_LEN);
+			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf,
+						&iwe, IW_EV_PARAM_LEN);
 		}
 		rate >>= 1;
 		p++;
@@ -935,9 +936,8 @@ acx_ioctl_set_rate(
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL,
-	       "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
-	       vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
+	acxlog(L_IOCTL, "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
+		vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
 
 	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
 		int i = VEC_SIZE(acx111_rate_tbl)-1;
@@ -1076,9 +1076,9 @@ acx_ioctl_set_encode(
 	int result;
 
 	FN_ENTER;
-	acxlog(L_IOCTL,
-	       "Set Encoding flags=0x%04X, size=%d, key: %s\n",
-	       dwrq->flags, dwrq->length, extra ? "set" : "No key");
+
+	acxlog(L_IOCTL, "Set Encoding flags=0x%04X, size=%d, key: %s\n",
+			dwrq->flags, dwrq->length, extra ? "set" : "No key");
 
 	acx_sem_lock(priv);
 
@@ -1093,33 +1093,34 @@ acx_ioctl_set_encode(
 			if (dwrq->length > 29)
 				dwrq->length = 29; /* restrict it */
 
-			if (dwrq->length > 13)
-				priv->wep_keys[index].size = 29; /* 29*8 == 232, WEP256 */
-			else
-			if (dwrq->length > 5)
-				priv->wep_keys[index].size = 13; /* 13*8 == 104bit, WEP128 */
-			else
-			if (dwrq->length > 0)
-				priv->wep_keys[index].size = 5; /* 5*8 == 40bit, WEP64 */
-			else
+			if (dwrq->length > 13) {
+				/* 29*8 == 232, WEP256 */
+				priv->wep_keys[index].size = 29;
+			} else if (dwrq->length > 5) {
+				/* 13*8 == 104bit, WEP128 */
+				priv->wep_keys[index].size = 13;
+			} else if (dwrq->length > 0) {
+				/* 5*8 == 40bit, WEP64 */
+				priv->wep_keys[index].size = 5;
+			} else {
 				/* disable key */
 				priv->wep_keys[index].size = 0;
+			}
 
-			memset(priv->wep_keys[index].key, 0, sizeof(priv->wep_keys[index].key));
+			memset(priv->wep_keys[index].key, 0,
+				sizeof(priv->wep_keys[index].key));
 			memcpy(priv->wep_keys[index].key, extra, dwrq->length);
 		}
-
 	} else {
 		/* set transmit key */
 		if ((index >= 0) && (index <= 3))
 			priv->wep_current_index = index;
-		else
-			if (0 == (dwrq->flags & IW_ENCODE_MODE)) {
-				/* complain if we were not just setting
-				 * the key mode */
-				result =  -EINVAL;
-				goto end_unlock;
-			}
+		else if (0 == (dwrq->flags & IW_ENCODE_MODE)) {
+			/* complain if we were not just setting
+			 * the key mode */
+			result = -EINVAL;
+			goto end_unlock;
+		}
 	}
 
 	priv->wep_enabled = !(dwrq->flags & IW_ENCODE_DISABLED);
@@ -1137,13 +1138,11 @@ acx_ioctl_set_encode(
 	SET_BIT(priv->set_mask, GETSET_WEP);
 
 	acxlog(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
-	       dwrq->length, extra,
-	       dwrq->flags);
+		dwrq->length, extra, dwrq->flags);
 
 	for (index = 0; index <= 3; index++) {
 		if (priv->wep_keys[index].size) {
-			acxlog(L_IOCTL,
-				"index=%d, size=%d, key at 0x%p\n",
+			acxlog(L_IOCTL,	"index=%d, size=%d, key at 0x%p\n",
 				priv->wep_keys[index].index,
 				(int) priv->wep_keys[index].size,
 				priv->wep_keys[index].key);
@@ -1172,20 +1171,20 @@ acx_ioctl_get_encode(
 	wlandevice_t *priv = netdev_priv(dev);
 	int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 
+	FN_ENTER;
+
 	if (priv->wep_enabled == 0) {
 		dwrq->flags = IW_ENCODE_DISABLED;
-
 	} else {
 		if ((index < 0) || (index > 3))
 			index = (int)priv->wep_current_index;
 
-		dwrq->flags =
-			(priv->wep_restricted == 1) ? IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
+		dwrq->flags = (priv->wep_restricted == 1) ?
+				IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
 		dwrq->length = priv->wep_keys[index].size;
 
-		memcpy(extra,
-			     priv->wep_keys[index].key,
-			     priv->wep_keys[index].size);
+		memcpy(extra, priv->wep_keys[index].key,
+			      priv->wep_keys[index].size);
 	}
 
 	/* set the current index */
@@ -1195,6 +1194,7 @@ acx_ioctl_get_encode(
 	       dwrq->length, dwrq->pointer,
 	       dwrq->flags);
 
+	FN_EXIT1(OK);
 	return OK;
 }
 
@@ -1209,12 +1209,18 @@ acx_ioctl_set_power(
 	char *extra)
 {
 	wlandevice_t *priv = netdev_priv(dev);
+	int result = -EINPROGRESS;
+
+	FN_ENTER;
 
 	acxlog(L_IOCTL, "Set 802.11 Power Save flags=0x%04X\n", vwrq->flags);
+
+	acx_sem_lock(priv);
+
 	if (vwrq->disabled) {
 		CLEAR_BIT(priv->ps_wakeup_cfg, PS_CFG_ENABLE);
 		SET_BIT(priv->set_mask, GETSET_POWER_80211);
-		return -EINPROGRESS;
+		goto end;
 	}
 	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {
 		u16 ps_timeout = (vwrq->value * 1024) / 1000;
@@ -1235,6 +1241,7 @@ acx_ioctl_set_power(
 		CLEAR_BIT(priv->ps_wakeup_cfg, PS_CFG_WAKEUP_MODE_MASK);
 		SET_BIT(priv->ps_wakeup_cfg, PS_CFG_WAKEUP_EACH_ITVL);
 	}
+
 	switch (vwrq->flags & IW_POWER_MODE) {
 		/* FIXME: are we doing the right thing here? */
 		case IW_POWER_UNICAST_R:
@@ -1250,14 +1257,17 @@ acx_ioctl_set_power(
 			break;
 		default:
 			acxlog(L_IOCTL, "unknown PS mode\n");
-			return -EINVAL;
+			result = -EINVAL;
+			goto end;
 	}
 
 	SET_BIT(priv->ps_wakeup_cfg, PS_CFG_ENABLE);
 	SET_BIT(priv->set_mask, GETSET_POWER_80211);
+end:
+	acx_sem_unlock(priv);
 
-	return -EINPROGRESS;
-
+	FN_EXIT1(result);
+	return result;
 }
 
 
@@ -1271,6 +1281,8 @@ acx_ioctl_get_power(
 	char *extra)
 {
 	wlandevice_t *priv = netdev_priv(dev);
+
+	FN_ENTER;
 
 	acxlog(L_IOCTL, "Get 802.11 Power Save flags = 0x%04X\n", vwrq->flags);
 	vwrq->disabled = ((priv->ps_wakeup_cfg & PS_CFG_ENABLE) == 0);
@@ -1288,6 +1300,7 @@ acx_ioctl_get_power(
 	else
 		SET_BIT(vwrq->flags, IW_POWER_UNICAST_R);
 
+	FN_EXIT1(OK);
 	return OK;
 }
 
@@ -1304,6 +1317,8 @@ acx_ioctl_get_txpow(
 {
 	wlandevice_t *priv = netdev_priv(dev);
 
+	FN_ENTER;
+
 	vwrq->flags = IW_TXPOW_DBM;
 	vwrq->disabled = 0;
 	vwrq->fixed = 1;
@@ -1311,6 +1326,7 @@ acx_ioctl_get_txpow(
 
 	acxlog(L_IOCTL, "get txpower:%d dBm\n", priv->tx_level_dbm);
 
+	FN_EXIT1(OK);
 	return OK;
 }
 
@@ -1329,13 +1345,14 @@ acx_ioctl_set_txpow(
 	int result;
 
 	FN_ENTER;
+
 	acxlog(L_IOCTL, "set txpower:%d, disabled:%d, flags:0x%04X\n",
 			vwrq->value, vwrq->disabled, vwrq->flags);
 
 	acx_sem_lock(priv);
 
 	if (vwrq->disabled != priv->tx_disabled) {
-		SET_BIT(priv->set_mask, GETSET_TX); /* Tx status needs update later */
+		SET_BIT(priv->set_mask, GETSET_TX);
 	}
 
 	priv->tx_disabled = vwrq->disabled;
@@ -1373,85 +1390,92 @@ acx_ioctl_get_range(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	if (dwrq->pointer != NULL) {
-		struct iw_range *range = (struct iw_range *)extra;
-		wlandevice_t *priv = netdev_priv(dev);
-		unsigned int i;
+	struct iw_range *range = (struct iw_range *)extra;
+	wlandevice_t *priv = netdev_priv(dev);
+	int i,n;
 
-		dwrq->length = sizeof(struct iw_range);
-		memset(range, 0, sizeof(struct iw_range));
-		range->num_channels = 0;
-		for (i = 1; i <= 14; i++) {
-			if (priv->reg_dom_chanmask & (1 << (i - 1))) {
-				range->freq[range->num_channels].i = i;
-				range->freq[range->num_channels].m = acx_channel_freq[i - 1] * 100000;
-				range->freq[range->num_channels++].e = 1; /* MHz values */
-			}
+	FN_ENTER;
+
+	if (!dwrq->pointer)
+		goto end;
+
+	dwrq->length = sizeof(struct iw_range);
+	memset(range, 0, sizeof(struct iw_range));
+	n = 0;
+	for (i = 1; i <= 14; i++) {
+		if (priv->reg_dom_chanmask & (1 << (i - 1))) {
+			range->freq[n].i = i;
+			range->freq[n].m = acx_channel_freq[i - 1] * 100000;
+			range->freq[n].e = 1; /* units are MHz */
+			n++;
 		}
-		range->num_frequency = range->num_channels;
-
-		range->min_rts = 0;
-		range->max_rts = 2312;
-		/* range->min_frag = 256;
-		 * range->max_frag = 2312;
-		 */
-
-		range->encoding_size[0] = 5;
-		range->encoding_size[1] = 13;
-		range->encoding_size[2] = 29;
-		range->num_encoding_sizes = 3;
-		range->max_encoding_tokens = 4;
-
-		range->min_pmp = 0;
-		range->max_pmp = 5000000;
-		range->min_pmt = 0;
-		range->max_pmt = 65535 * 1000;
-		range->pmp_flags = IW_POWER_PERIOD;
-		range->pmt_flags = IW_POWER_TIMEOUT;
-		range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
-
-		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
-			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
-		range->num_txpower = IW_MAX_TXPOWER;
-		range->txpower_capa = IW_TXPOW_DBM;
-
-		range->we_version_compiled = WIRELESS_EXT;
-		range->we_version_source = 0x9;
-
-		range->retry_capa = IW_RETRY_LIMIT;
-		range->retry_flags = IW_RETRY_LIMIT;
-		range->min_retry = 1;
-		range->max_retry = 255;
-
-		range->r_time_flags = IW_RETRY_LIFETIME;
-		range->min_r_time = 0;
-		/* FIXME: lifetime ranges and orders of magnitude are strange?? */
-		range->max_r_time = 65535;
-
-		if (IS_USB(priv))
-			range->sensitivity = 0;
-		else if (IS_ACX111(priv))
-			range->sensitivity = 3;
-		else
-			range->sensitivity = 255;
-
-		for (i=0; i < priv->rate_supported_len; i++) {
-			range->bitrate[i] = (priv->rate_supported[i] & ~0x80) * 500000;
-			/* never happens, but keep it, to be safe: */
-			if (range->bitrate[i] == 0)
-				break;
-		}
-		range->num_bitrates = i;
-
-		range->max_qual.qual = 100;
-		range->max_qual.level = 100;
-		range->max_qual.noise = 100;
-		/* TODO: better values */
-		range->avg_qual.qual = 90;
-		range->avg_qual.level = 80;
-		range->avg_qual.noise = 2;
 	}
+	range->num_channels = n;
+	range->num_frequency = n;
 
+	range->min_rts = 0;
+	range->max_rts = 2312;
+	/* range->min_frag = 256;
+	 * range->max_frag = 2312;
+	 */
+
+	range->encoding_size[0] = 5;
+	range->encoding_size[1] = 13;
+	range->encoding_size[2] = 29;
+	range->num_encoding_sizes = 3;
+	range->max_encoding_tokens = 4;
+
+	range->min_pmp = 0;
+	range->max_pmp = 5000000;
+	range->min_pmt = 0;
+	range->max_pmt = 65535 * 1000;
+	range->pmp_flags = IW_POWER_PERIOD;
+	range->pmt_flags = IW_POWER_TIMEOUT;
+	range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
+
+	for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
+		range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
+	range->num_txpower = IW_MAX_TXPOWER;
+	range->txpower_capa = IW_TXPOW_DBM;
+
+	range->we_version_compiled = WIRELESS_EXT;
+	range->we_version_source = 0x9;
+
+	range->retry_capa = IW_RETRY_LIMIT;
+	range->retry_flags = IW_RETRY_LIMIT;
+	range->min_retry = 1;
+	range->max_retry = 255;
+
+	range->r_time_flags = IW_RETRY_LIFETIME;
+	range->min_r_time = 0;
+	/* FIXME: lifetime ranges and orders of magnitude are strange?? */
+	range->max_r_time = 65535;
+
+	if (IS_USB(priv))
+		range->sensitivity = 0;
+	else if (IS_ACX111(priv))
+		range->sensitivity = 3;
+	else
+		range->sensitivity = 255;
+
+	for (i=0; i < priv->rate_supported_len; i++) {
+		range->bitrate[i] = (priv->rate_supported[i] & ~0x80) * 500000;
+		/* never happens, but keep it, to be safe: */
+		if (range->bitrate[i] == 0)
+			break;
+	}
+	range->num_bitrates = i;
+
+	range->max_qual.qual = 100;
+	range->max_qual.level = 100;
+	range->max_qual.noise = 100;
+	/* TODO: better values */
+	range->avg_qual.qual = 90;
+	range->avg_qual.level = 80;
+	range->avg_qual.noise = 2;
+
+end:
+	FN_EXIT1(OK);
 	return OK;
 }
 
@@ -1480,7 +1504,8 @@ acx_ioctl_get_iw_priv(struct iwreq *iwr)
 		return result;
 
 	iwr->u.data.length = VEC_SIZE(acx_ioctl_private_args);
-	if (copy_to_user(iwr->u.data.pointer, acx_ioctl_private_args, sizeof(acx_ioctl_private_args)) != 0)
+	if (copy_to_user(iwr->u.data.pointer,
+	    acx_ioctl_private_args, sizeof(acx_ioctl_private_args)) != 0)
 		result = -EFAULT;
 
 	return result;
@@ -1559,6 +1584,8 @@ acx_ioctl_get_retry(
 	unsigned int modifier = vwrq->flags & IW_RETRY_MODIFIER;
 	int result;
 
+	FN_ENTER;
+
 	acx_sem_lock(priv);
 
 	/* return the short retry number by default */
@@ -1581,6 +1608,7 @@ acx_ioctl_get_retry(
 
 	acx_sem_unlock(priv);
 
+	FN_EXIT1(result);
 	return result;
 }
 
@@ -2304,27 +2332,29 @@ acx_ioctl_get_phy_chan_busy_percentage(
 		u32 busytime ACX_PACKED;
 		u32 totaltime ACX_PACKED;
 	} usage;
+	int result;
 
 	acx_sem_lock(priv);
 
-	if (OK != acx_s_interrogate(priv, &usage, ACX1xx_IE_MEDIUM_USAGE))
-		goto bad_unlock;
+	if (OK != acx_s_interrogate(priv, &usage, ACX1xx_IE_MEDIUM_USAGE)) {
+		result = NOT_OK;
+		goto end_unlock;
+	}
 
+	usage.busytime = le32_to_cpu(usage.busytime);
+	usage.totaltime = le32_to_cpu(usage.totaltime);
 	printk("%s: average busy percentage since last invocation: %d%% "
-		"(microseconds: %u of %u)\n",
+		"(%u of %u microseconds)\n",
 		dev->name,
-		100 * (le32_to_cpu(usage.busytime) / 100) / (le32_to_cpu(usage.totaltime) / 100),
-		le32_to_cpu(usage.busytime), le32_to_cpu(usage.totaltime));
-		/* prevent calculation overflow */
+		usage.busytime / ((usage.totaltime / 100) + 1),
+		usage.busytime, usage.totaltime);
 
+	result = OK;
+
+end_unlock:
 	acx_sem_unlock(priv);
 
-	return OK;
-
-bad_unlock:
-	acx_sem_unlock(priv);
-
-	return NOT_OK;
+	return result;
 }
 
 

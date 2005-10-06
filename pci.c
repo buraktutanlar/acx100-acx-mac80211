@@ -3319,16 +3319,19 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	txdesc = get_txdesc(priv, priv->tx_head);
 	ctl8 = txdesc->Ctl_8;
+//2test	if (ctl8 & DESC_CTL_ACXDONE) {
+//2test		printk("acx: tx_head:%d Ctl8:0x%02X\n", priv->tx_head, ctl8);
+//2test	}
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_DONE))) {
+//2test	if (unlikely(!(ctl8 & DESC_CTL_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
-		/* FIXME: this causes a deadlock situation (endless
-		 * loop) in case the current descriptor remains busy,
-		 * so handle it a bit better in the future!! */
-		printk("acx: BUG: tx_head->Ctl8=0x%02X, (0x%02X & "
+//FIXME: this does happen sometimes! (several user reports)
+		printk("acx: BUG: tx_head:%d Ctl8:0x%02X (0x%02X & "
 			"0x"DESC_CTL_DONE_STR") != 0x"DESC_CTL_HOSTOWN_STR
 			": failed to find free tx descr\n",
-			ctl8, ctl8);
+			priv->tx_head, ctl8, ctl8);
+//2test		printk("acx: BUG: tx_head:%d Ctl8:0x%02X - failed to find free tx descr\n",priv->tx_head, ctl8
 		txdesc = NULL;
 		goto end;
 	}
