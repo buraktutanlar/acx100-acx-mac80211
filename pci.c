@@ -3395,6 +3395,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* fw doesn't tx such packets anyhow */
 	if (len < WLAN_HDR_A3_LEN)
 		goto end;
+//we leave tx descriptor unused?!
 
 	hostdesc1 = acx_get_txhostdesc(priv, txdesc);
 	hostdesc2 = hostdesc1 + 1;

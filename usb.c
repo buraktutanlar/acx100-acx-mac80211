@@ -169,6 +169,9 @@ acx100usb_driver = {
 ** directly (drivers/usb/core/urb.c))
 **
 ** In light of this, timeout is just for paranoid reasons...
+*
+* Actually, it's useful for debugging. If we reach timeout, we're doing
+* something wrong with the urbs.
 */
 static void
 acx_unlink_urb(struct urb* urb)
@@ -561,11 +564,6 @@ acx100usb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 				(int) TXBUFSIZE, (int) RXBUFSIZE);
 
 	priv->tx_free = ACX100_USB_NUM_BULK_URBS;
-	/* already done by memset:
-	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-		priv->usb_tx[i].busy = 0;
-	}
-	*/
 
 	/* Allocate the RX/TX containers. */
 	priv->usb_tx = kmalloc(sizeof(usb_tx_t) * ACX100_USB_NUM_BULK_URBS,
@@ -589,7 +587,6 @@ acx100usb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			goto end_nomem;
 		}
 		priv->usb_rx[i].urb->status = 0;
-
 		priv->usb_rx[i].priv = priv;
 
 		priv->usb_tx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -598,7 +595,6 @@ acx100usb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			goto end_nomem;
 		}
 		priv->usb_tx[i].urb->status = 0;
-
 		priv->usb_tx[i].priv = priv;
 	}
 
@@ -632,12 +628,19 @@ end_nomem:
 	printk(msg, result);
 
 	if (dev) {
-		for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-			usb_free_urb(priv->usb_rx[i].urb);
-			usb_free_urb(priv->usb_tx[i].urb);
+		if (priv->usb_rx) {
+			for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++)
+				usb_free_urb(priv->usb_rx[i].urb);
+			kfree(priv->usb_rx);
+		}
+		if (priv->usb_tx) {
+			for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++)
+				usb_free_urb(priv->usb_tx[i].urb);
+			kfree(priv->usb_tx);
 		}
 		free_netdev(dev);
 	}
+
 	result = -ENOMEM;
 	goto end;
 
@@ -1450,8 +1453,6 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	/* now schedule the USB transfer */
 	usbdev = priv->usbdev;
 	outpipe = usb_sndbulkpipe(usbdev, priv->bulkoutep);
-//can be removed, please try & test:
-	tx->priv = priv;
 
 	usb_fill_bulk_urb(txurb, usbdev, outpipe,
 		txbuf, /* dataptr */
