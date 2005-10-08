@@ -613,7 +613,8 @@ acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offse
 		acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, v32);
 	}
 
-	acxlog(L_DEBUG, "%s: firmware written\n", __func__);
+	acxlog(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
+			size, sum, le32_to_cpu(apfw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
 	return (sum != le32_to_cpu(apfw_image->chksum));
