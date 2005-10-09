@@ -3822,11 +3822,14 @@ acx_l_log_txbuffer(wlandevice_t *priv)
 	/* no locks here, since it's entirely non-critical code */
 	txdesc = priv->txdesc_start;
 	if (!txdesc) return;
+	printk("tx: desc->Ctl8's:");
 	for (i = 0; i < TX_CNT; i++) {
-		if ((txdesc->Ctl_8 & DESC_CTL_DONE) == DESC_CTL_DONE)
-			printk("tx: buf %d done\n", i);
+		//if ((txdesc->Ctl_8 & DESC_CTL_DONE) == DESC_CTL_DONE)
+		//	printk("tx: buf %d done\n", i);
+		printk(" %02X", txdesc->Ctl_8);
 		txdesc = move_txdesc(priv, txdesc, 1);
 	}
+	printk("\n");
 }
 #endif
 
@@ -3877,11 +3880,16 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 
 		/* abort if txdesc is not marked as "Tx finished" and "owned" */
 		if ((txdesc->Ctl_8 & DESC_CTL_DONE) != DESC_CTL_DONE) {
-			/* we do need to have at least one cleaned,
-			 * otherwise we wouldn't get called in the first place
-			 */
-			if (num_cleaned)
-				break;
+			/* Moan a lot if none was cleaned */
+			if (!num_cleaned) {
+				if (!(acx_debug & L_DEBUG))
+					acx_l_log_txbuffer(priv);
+				printk("%s: clean_tx_desc: tail is not free. "
+					"tail:%d head:%d. Please report\n",
+					priv->netdev->name,
+					priv->tx_tail, priv->tx_head);
+			}
+			break;
 		}
 
 		/* remember descr values... */
