@@ -385,14 +385,16 @@ acxusb_s_issue_cmd_timeo_debug(
 	}
 
 //check for result==buflen+4? Was seen:
-//interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
-//issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
-//ctrl inpipe=0x80000280 outpipe=0x80000200
-//sending USB control msg (out) (blocklen=8)
-//01 00 00 00 0F 10 04 00
-//wrote 8 bytes
-//sending USB control msg (in) (acklen=12) sizeof(loc->data
-//read 4 bytes <==== MUST BE 12!!
+/*
+interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
+issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
+ctrl inpipe=0x80000280 outpipe=0x80000200
+sending USB control msg (out) (blocklen=8)
+01 00 00 00 0F 10 04 00
+wrote 8 bytes
+sending USB control msg (in) (acklen=12) sizeof(loc->data
+read 4 bytes <==== MUST BE 12!!
+*/
 
 	cmd_status = le16_to_cpu(loc->status);
 	if (cmd_status != 1) {

@@ -209,14 +209,16 @@ enum { acx_debug = 0 };
 
 /***********************************************************************
 ** Tx/Rx buffer sizes and watermarks
-*/
-/* BTW, this will alloc and use DMAable buffers of
+**
+** This will alloc and use DMAable buffers of
 ** WLAN_A4FR_MAXLEN_WEP_FCS * (RX_CNT + TX_CNT) bytes
 ** RX/TX_CNT=32 -> ~150k DMA buffers
 ** RX/TX_CNT=16 -> ~75k DMA buffers
+**
+** 2005-10-10: reduced memory usage by lowering both to 16
 */
-#define RX_CNT 32
-#define TX_CNT 32
+#define RX_CNT 16
+#define TX_CNT 16
 
 /* we clean up txdescs when we have N free txdesc: */
 #define TX_START_CLEAN (TX_CNT - (TX_CNT/4))
@@ -279,18 +281,10 @@ DEF_IE(1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	,0x1008, 0x04);
 DEF_IE(1xx_IE_DOT11_GROUP_ADDR		,0x1009, -1);
 DEF_IE(1xx_IE_DOT11_CURRENT_REG_DOMAIN	,0x100a, 0x02);
 //It's harmless to have larger struct. Use USB case always.
-////#ifdef ACX_PCI
-////DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x01);
-////#else
-DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);
-////#endif
+DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);	/* in fact len=1 for PCI */
 DEF_IE(1xx_IE_DOT11_UNKNOWN_100C	,0x100c, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01);
-////#ifdef ACX_PCI
-////DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x01);
-////#else
-DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);
-////#endif
+DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);	/* in fact len=1 for PCI */
 //USB doesn't return anything - len==0?!
 DEF_IE(100_IE_DOT11_ED_THRESHOLD	,0x100f, 0x04);
 DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID */

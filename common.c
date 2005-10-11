@@ -525,7 +525,7 @@ acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr)
 		printk("acx: unknown EID %d in mgmt frame at offset %d. IE: ",
 				ie_ptr->eid, offset);
 	/* IE len can be bogus, IE can extend past packet end. Oh well... */
-		acx_dump_bytes(ie_ptr, ie_ptr->len);
+		acx_dump_bytes(ie_ptr, ie_ptr->len + 2);
 		if (acx_debug & L_DATA) {
 			printk("frame (%s): ",
 			acx_get_packet_type_string(le16_to_cpu(hdr->fc)));
@@ -2146,6 +2146,9 @@ end:
 ** 1/64 threshold was chosen by running "ping -A"
 ** It gave "rx: 59 DUPs in 2878 packets" only with 4 parallel
 ** "ping -A" streams running. */
+/* 2005-10-11: bumped up to 1/8
+** subtract a $smallint from dup_count in order to
+** avoid "2 DUPs in 19 packets" messages */
 static inline int
 acx_l_handle_dup(wlandevice_t *priv, u16 seq)
 {
@@ -2153,7 +2156,7 @@ acx_l_handle_dup(wlandevice_t *priv, u16 seq)
 		priv->nondup_count++;
 		if (time_after(jiffies, priv->dup_msg_expiry)) {
 			/* Log only if more than 1 dup in 64 packets */
-			if (priv->nondup_count/64 < priv->dup_count) {
+			if (priv->nondup_count/8 < priv->dup_count-5) {
 				printk(KERN_INFO "%s: rx: %d DUPs in "
 					"%d packets received in 10 secs\n",
 					priv->netdev->name,
@@ -2757,7 +2760,7 @@ acx_i_timer(unsigned long address)
 			acxlog(L_ASSOC, "stopping scan\n");
 			/* send stop_scan cmd when we leave the interrupt context,
 			 * and make a decision what to do next (COMPLETE_SCAN) */
-			acx_schedule_after_interrupt_task(priv,
+			acx_schedule_task(priv,
 				ACX_AFTER_IRQ_CMD_STOP_SCAN + ACX_AFTER_IRQ_COMPLETE_SCAN);
 		}
 		break;
@@ -2773,7 +2776,7 @@ acx_i_timer(unsigned long address)
 			       "authen1 request reply timeout, giving up\n");
 			/* we are a STA, need to find AP anyhow */
 			acx_set_status(priv, ACX_STATUS_1_SCANNING);
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_RESTART_SCAN);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_RESTART_SCAN);
 		}
 		/* used to be 1500000, but some other driver uses 2.5s */
 		acx_set_timer(priv, 2500000);
@@ -2790,7 +2793,7 @@ acx_i_timer(unsigned long address)
 				"association request reply timeout, giving up\n");
 			/* we are a STA, need to find AP anyhow */
 			acx_set_status(priv, ACX_STATUS_1_SCANNING);
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_RESTART_SCAN);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_RESTART_SCAN);
 		}
 		acx_set_timer(priv, 2500000); /* see above */
 		break;
@@ -3240,7 +3243,7 @@ acx_l_process_disassoc_from_ap(wlandevice_t *priv, const wlan_fr_disassoc_t *req
 				WLAN_MGMT_REASON_DEAUTH_LEAVING);
 		/* Start scan anew */
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
-		acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 end:
 	FN_EXIT0;
@@ -3264,7 +3267,7 @@ acx_l_process_deauth_from_ap(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 		acxlog(L_DEBUG, "AP sent us deauth packet\n");
 		/* not needed: acx_set_status(priv, ACX_STATUS_1_SCANNING) */
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
-		acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 end:
 	FN_EXIT0;
@@ -3739,7 +3742,7 @@ acx_l_process_probe_response(wlandevice_t *priv, wlan_fr_proberesp_t *req,
 	if (STA_LIST_ADD_CAN_FAIL && !bss) {
 		/* uh oh, we found more sites/stations than we can handle with
 		 * our current setup: pull the emergency brake and stop scanning! */
-		acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_STOP_SCAN);
+		acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_STOP_SCAN);
 		/* TODO: a nice comment what below call achieves --vda */
 		acx_set_status(priv, ACX_STATUS_2_WAIT_AUTH);
 		goto ok;
@@ -3814,7 +3817,7 @@ acx_l_process_assocresp(wlandevice_t *priv, const wlan_fr_assocresp_t *req)
 		if (WLAN_MGMT_STATUS_SUCCESS == st) {
 			priv->aid = ieee2host16(*(req->aid));
 			/* tell the card we are associated when we are out of interrupt context */
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_ASSOCIATE);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_ASSOCIATE);
 		} else {
 
 			/* TODO: we shall delete peer from sta_list, and try other candidates... */
@@ -6266,7 +6269,7 @@ acx_s_after_interrupt_recalib(wlandevice_t *priv)
 
 		if (++priv->recalib_failure_count <= 5) {
 			priv->recalib_time_last_attempt = jiffies;
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
 	}
 }
@@ -6370,13 +6373,13 @@ end:
 
 
 /***********************************************************************
-** acx_schedule_after_interrupt_task
+** acx_schedule_task
 **
 ** Schedule the call of the after_interrupt method after leaving
 ** the interrupt context.
 */
 void
-acx_schedule_after_interrupt_task(wlandevice_t *priv, unsigned int set_flag)
+acx_schedule_task(wlandevice_t *priv, unsigned int set_flag)
 {
 	SET_BIT(priv->after_interrupt_jobs, set_flag);
 	SCHEDULE_WORK(&priv->after_interrupt_task);

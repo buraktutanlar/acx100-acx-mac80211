@@ -2578,7 +2578,7 @@ acx_i_tx_timeout(netdevice_t *dev)
 		acx_wake_queue(dev, "after tx timeout");
 
 	/* stall may have happened due to radio drift, so recalib radio */
-	acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+	acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 
 	/* do unimportant work last */
 	printk("%s: tx timeout!\n", dev->name);
@@ -2642,7 +2642,7 @@ acx_i_set_multicast_list(netdevice_t *dev)
 	}
 
 	/* cannot update card settings directly here, atomic context */
-	acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
 	acx_unlock(priv, flags);
 
@@ -2863,7 +2863,7 @@ while (--irqcount) {
 		 * the net queue in there for some reason...) */
 		if (priv->tx_free <= TX_START_CLEAN) {
 #if TX_CLEANUP_IN_SOFTIRQ
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_TX_CLEANUP);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_TX_CLEANUP);
 #else
 			acx_l_clean_tx_desc(priv);
 #endif
@@ -2887,7 +2887,7 @@ while (--irqcount) {
 		if (irqtype & HOST_INT_SCAN_COMPLETE) {
 			acxlog(L_IRQ, "got Scan_Complete IRQ\n");
 			/* need to do that in process context */
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_COMPLETE_SCAN);
+			acx_schedule_task(priv, ACX_AFTER_IRQ_COMPLETE_SCAN);
 			/* remember that fw is not scanning anymore */
 			SET_BIT(priv->irq_status, HOST_INT_SCAN_COMPLETE);
 		}
@@ -3314,45 +3314,33 @@ tx_t*
 acxpci_l_alloc_tx(wlandevice_t* priv)
 {
 	struct txdesc *txdesc;
+	int head;
 	u8 ctl8;
 
 	FN_ENTER;
 
-	txdesc = get_txdesc(priv, priv->tx_head);
+	head = priv->tx_head;
+	txdesc = get_txdesc(priv, head);
 	ctl8 = txdesc->Ctl_8;
-//2test	if (ctl8 & DESC_CTL_ACXDONE) {
-//2test		printk("acx: tx_head:%d Ctl8:0x%02X\n", priv->tx_head, ctl8);
-//2test	}
-	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_DONE))) {
-//2test	if (unlikely(!(ctl8 & DESC_CTL_HOSTOWN))) {
+
+	/* 2005-10-11: there were several bug reports on this happening
+	** but now cause seems to be understood & fixed */
+	if (unlikely(DESC_CTL_HOSTOWN != ctl8)) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
-//FIXME: this does happen sometimes! (several user reports)
-		printk("acx: BUG: tx_head:%d Ctl8:0x%02X (0x%02X & "
-			"0x"DESC_CTL_DONE_STR") != 0x"DESC_CTL_HOSTOWN_STR
-			": failed to find free tx descr\n",
-			priv->tx_head, ctl8, ctl8);
-//2test		printk("acx: BUG: tx_head:%d Ctl8:0x%02X - failed to find free tx descr\n",priv->tx_head, ctl8
+		printk("acx: BUG: tx_head:%d Ctl8:0x%02X (expected "
+			"0x"DESC_CTL_HOSTOWN_STR"): failed to find "
+			"free tx descr\n", head, ctl8);
 		txdesc = NULL;
 		goto end;
 	}
 
 	priv->tx_free--;
 	acxlog(L_BUFT, "tx: got desc %u, %u remain\n",
-			priv->tx_head, priv->tx_free);
+			head, priv->tx_free);
 
-/*
- * This comment is probably not entirely correct, needs further discussion
- * (restored commented-out code below to fix Tx ring buffer overflow,
- * since it's much better to have a slightly less efficiently used ring
- * buffer rather than one which easily overflows):
- *
- * This doesn't do anything other than limit our maximum number of
- * buffers used at a single time (we might as well just declare
- * TX_STOP_QUEUE less descriptors when we open up.) We should just let it
- * slide here, and back off TX_STOP_QUEUE in acx_l_clean_tx_desc, when given the
- * opportunity to let the queue start back up.
- */
+	/* Keep a few free descs between head and tail of tx ring.
+	** It is not absolutely needed, just feels safer */
 	if (priv->tx_free < TX_STOP_QUEUE) {
 		acxlog(L_BUF, "stop queue (%u tx desc left)\n",
 				priv->tx_free);
@@ -3360,7 +3348,7 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 	}
 
 	/* returning current descriptor, so advance to next free one */
-	priv->tx_head = (priv->tx_head + 1) % TX_CNT;
+	priv->tx_head = (head + 1) % TX_CNT;
 end:
 	FN_EXIT0;
 
@@ -3396,7 +3384,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* fw doesn't tx such packets anyhow */
 	if (len < WLAN_HDR_A3_LEN)
 		goto end;
-//we leave tx descriptor unused?!
+//we leave tx descriptor unused?! This is going to upset acx_l_clean_tx_desc!
 
 	hostdesc1 = acx_get_txhostdesc(priv, txdesc);
 	hostdesc2 = hostdesc1 + 1;
@@ -3628,10 +3616,9 @@ acx_l_handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 					"before it's too late!\n",
 					priv->netdev->name);
 			if (priv->retry_errors_msg_ratelimit == 20)
-				printk("disabling above "
-					"notification message\n");
+				printk("disabling above message\n");
 
-			acx_schedule_after_interrupt_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+			acx_schedule_task(priv,	ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
 		break;
 	case 0x40:
@@ -3824,8 +3811,6 @@ acx_l_log_txbuffer(wlandevice_t *priv)
 	if (!txdesc) return;
 	printk("tx: desc->Ctl8's:");
 	for (i = 0; i < TX_CNT; i++) {
-		//if ((txdesc->Ctl_8 & DESC_CTL_DONE) == DESC_CTL_DONE)
-		//	printk("tx: buf %d done\n", i);
 		printk(" %02X", txdesc->Ctl_8);
 		txdesc = move_txdesc(priv, txdesc, 1);
 	}
@@ -3872,13 +3857,25 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 
 	acxlog(L_BUFT, "tx: cleaning up bufs from %u\n", priv->tx_tail);
 
+	/* We know first descr which is not free yet. We advance it as far
+	** as we see correct bits set in following descs (if next desc
+	** is NOT free, we shouldn't advance at all). We know that in
+	** front of tx_tail may be "holes" with isolated free descs.
+	** We will catch up when all intermediate descs will be freed also */
+
 	finger = priv->tx_tail;
 	num_cleaned = 0;
 	to_process = TX_CNT;
 	do {
 		txdesc = get_txdesc(priv, finger);
 
-		/* abort if txdesc is not marked as "Tx finished" and "owned" */
+//FIXME: if we allocated txdesc on tx path but then decided to NOT use it, then we will see "non-free" desc here and tx will stall!
+/* try with:	if it's not a 'skipped' desc ...
+		if (txdesc->Ctl_8 != DESC_CTL_HOSTOWN) && ...
+   alternatively keep free descs marked with DESC_CTL_DONE, not just DESC_CTL_HOSTOWN...
+*/
+
+		/* stop if not marked as "tx finished" and "host owned" */
 		if ((txdesc->Ctl_8 & DESC_CTL_DONE) != DESC_CTL_DONE) {
 			/* Moan a lot if none was cleaned */
 			if (!num_cleaned) {

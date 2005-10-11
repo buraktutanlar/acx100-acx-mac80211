@@ -2,6 +2,116 @@ TODO:
 e100.c: pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr, sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 do we need to do something like above for rxhostdescs/rxbufs?
 
+TODO: from Efthym <efthym@gmx.net>:
+13:12:42 wlan0: rx: 31 DUPs in 551 packets received in 10 sec
+13:12:48 wlan0: tx error 0x20, buf 20! (excessive Tx retries 
+13:12:48 wlan0: tx error 0x20, buf 21! (excessive Tx retries 
+13:12:48 wlan0: several excessive Tx retry errors occurred, a
+13:12:48 wlan0: tx error 0x20, buf 22! (excessive Tx retries 
+13:12:48 wlan0: tx error 0x20, buf 23! (excessive Tx retries 
+13:12:48 wlan0: tx error 0x20, buf 24! (excessive Tx retries 
+13:12:48 wlan0: recalibrating radio
+13:12:48 wlan0: successfully recalibrated radio
+13:12:52 wlan0: tx error 0x20, buf 25! (excessive Tx retries 
+13:12:52 wlan0: several excessive Tx retry errors occurred, a
+13:12:52 wlan0: tx error 0x20, buf 26! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 27! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 28! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 29! (excessive Tx retries 
+13:12:52 wlan0: several excessive Tx retry errors occurred, a
+13:12:52 wlan0: tx error 0x20, buf 30! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 31! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 00! (excessive Tx retries 
+13:12:52 wlan0: less than 5 minutes since last radio recalibr
+13:12:58 wlan0: tx error 0x20, buf 01! (excessive Tx retries 
+13:12:58 wlan0: several excessive Tx retry errors occurred, a
+13:12:58 wlan0: tx error 0x20, buf 02! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 03! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 04! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 05! (excessive Tx retries 
+13:12:58 wlan0: several excessive Tx retry errors occurred, a
+13:12:58 disabling above notification message
+13:12:58 wlan0: tx error 0x20, buf 06! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 07!
+13:12:58 wlan0: tx error 0x20, buf 08!
+13:12:58 wlan0: less than 5 minutes since last radio recalibr
+13:13:06 wlan0: tx error 0x20, buf 09!
+13:13:06 wlan0: tx error 0x20, buf 10!
+13:13:06 wlan0: tx error 0x20, buf 11!
+13:13:06 wlan0: tx error 0x20, buf 12!
+13:13:06 wlan0: tx error 0x20, buf 13!
+13:13:06 wlan0: tx error 0x20, buf 14!
+13:13:06 wlan0: tx error 0x20, buf 15!
+13:13:06 wlan0: tx error 0x20, buf 16!
+13:13:06 wlan0: less than 5 minutes since last radio recalibr
+13:13:18 wlan0: tx error 0x20, buf 17!
+13:13:18 wlan0: tx error 0x20, buf 18!
+13:13:18 wlan0: tx error 0x20, buf 19!
+13:13:18 wlan0: tx error 0x20, buf 20!
+13:13:18 wlan0: tx error 0x20, buf 21!
+13:13:18 wlan0: tx error 0x20, buf 22!
+13:13:18 wlan0: tx error 0x20, buf 23!
+13:13:18 wlan0: tx error 0x20, buf 24!
+13:13:18 wlan0: less than 5 minutes since last radio recalibr
+13:13:25 wlan0: tx error 0x20, buf 25!
+13:13:25 wlan0: tx error 0x20, buf 26!
+13:13:25 wlan0: tx error 0x20, buf 27!
+13:13:25 wlan0: tx error 0x20, buf 28!
+13:13:25 wlan0: tx error 0x20, buf 29!
+13:13:25 wlan0: tx error 0x20, buf 30!
+13:13:25 wlan0: tx error 0x20, buf 31!
+13:13:25 wlan0: tx error 0x20, buf 00!
+13:13:25 wlan0: less than 5 minutes since last radio recalibr
+13:13:25 disabling above message
+13:13:32 wlan0: tx error 0x20, buf 01!
+13:13:32 wlan0: tx error 0x20, buf 02!
+13:13:32 wlan0: tx error 0x20, buf 03!
+13:13:32 wlan0: tx error 0x20, buf 04!
+13:13:32 wlan0: tx error 0x20, buf 05!
+13:13:32 wlan0: tx error 0x20, buf 06!
+13:13:32 wlan0: tx error 0x20, buf 07!
+13:13:32 wlan0: tx error 0x20, buf 08!
+13:13:41 wlan0: tx error 0x20, buf 09!
+13:13:41 wlan0: tx error 0x20, buf 10!
+13:13:41 wlan0: tx error 0x20, buf 11!
+13:13:41 wlan0: tx error 0x20, buf 12!
+13:13:41 wlan0: tx error 0x20, buf 13!
+13:13:41 wlan0: tx error 0x20, buf 14!
+13:13:41 wlan0: tx error 0x20, buf 15!
+13:13:41 wlan0: tx error 0x20, buf 16!
+13:13:51 wlan0: tx error 0x20, buf 17!
+13:13:51 wlan0: tx error 0x20, buf 18!
+13:13:51 wlan0: tx error 0x20, buf 19!
+13:13:51 wlan0: tx error 0x20, buf 20!
+13:13:51 wlan0: tx error 0x20, buf 21!
+13:13:51 wlan0: tx error 0x20, buf 22!
+13:13:51 wlan0: tx error 0x20, buf 23!
+13:13:51 wlan0: tx error 0x20, buf 24!
+13:14:02 wlan0: tx error 0x20, buf 25!
+13:14:02 wlan0: tx error 0x20, buf 26!
+13:14:02 wlan0: tx error 0x20, buf 27!
+13:14:02 wlan0: tx error 0x20, buf 28!
+13:14:02 wlan0: tx error 0x20, buf 29!
+13:14:02 wlan0: tx error 0x20, buf 30!
+13:14:02 wlan0: tx error 0x20, buf 31!
+13:14:02 wlan0: tx error 0x20, buf 00!
+13:14:13 wlan0: tx error 0x20, buf 01!
+13:14:13 wlan0: tx error 0x20, buf 02!
+13:14:13 wlan0: tx error 0x20, buf 03!
+13:14:13 wlan0: tx error 0x20, buf 04!
+13:14:13 wlan0: tx error 0x20, buf 05!
+13:14:13 wlan0: tx error 0x20, buf 06!
+13:14:13 wlan0: tx error 0x20, buf 07!
+13:14:13 wlan0: tx error 0x20, buf 08!
+
+
+[20051012] 0.3.12
+* acx_l_clean_tx_desc bug fixed - was stopping tx completely
+  at high load. (It seems there exists yet another similar bug!)
+* "unknown IE" dump was 2 bytes too short - fixed
+* DUP logging made less noisy
+* another usb fix by Carlos Martin <carlosmn@gmail.com>
+
 [20051003]
 * several usb fixes by Carlos Martin <carlosmn@gmail.com> - thanks!
 * unknown IE logging made less noisy

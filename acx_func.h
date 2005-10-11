@@ -527,11 +527,12 @@ firmware_image_t *acx_s_read_fw(const char *file, u32 *size);
 #endif
 void acx_s_initialize_rx_config(wlandevice_t *priv);
 void acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all);
-void acx_init_task_scheduler(wlandevice_t *priv);
-void acx_schedule_after_interrupt_task(wlandevice_t *priv, unsigned int set_flag);
 int acx_s_upload_radio(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 void acx_l_update_ratevector(wlandevice_t *priv);
+
+void acx_init_task_scheduler(wlandevice_t *priv);
+void acx_schedule_task(wlandevice_t *priv, unsigned int set_flag);
 
 int acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
 
