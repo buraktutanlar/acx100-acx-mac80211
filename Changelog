@@ -105,6 +105,10 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 08!
 
 
+[20051013]
+* trying to fix "yet another similar bug"
+* usb fix by Carlos Martin
+
 [20051012] 0.3.12
 * acx_l_clean_tx_desc bug fixed - was stopping tx completely
   at high load. (It seems there exists yet another similar bug!)

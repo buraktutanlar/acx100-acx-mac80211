@@ -3325,11 +3325,11 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	/* 2005-10-11: there were several bug reports on this happening
 	** but now cause seems to be understood & fixed */
-	if (unlikely(DESC_CTL_HOSTOWN != ctl8)) {
-		/* whoops, descr at current index is not free, so probably
-		 * ring buffer already full */
+	if (unlikely(DESC_CTL_DONE != ctl8)) {
+		/* whoops, descr at current index is not free, so
+		 * ring buffer completely full??! */
 		printk("acx: BUG: tx_head:%d Ctl8:0x%02X (expected "
-			"0x"DESC_CTL_HOSTOWN_STR"): failed to find "
+			"0x"DESC_CTL_DONE_STR"): failed to find "
 			"free tx descr\n", head, ctl8);
 		txdesc = NULL;
 		goto end;
@@ -3384,7 +3384,6 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* fw doesn't tx such packets anyhow */
 	if (len < WLAN_HDR_A3_LEN)
 		goto end;
-//we leave tx descriptor unused?! This is going to upset acx_l_clean_tx_desc!
 
 	hostdesc1 = acx_get_txhostdesc(priv, txdesc);
 	hostdesc2 = hostdesc1 + 1;
@@ -3496,9 +3495,9 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* don't need to clean ack/rts statistics here, already
 	 * done on descr cleanup */
 
-	/* clears Ctl DESC_CTL_HOSTOWN bit, thus telling that the descriptors
-	 * are now owned by the acx100; do this as LAST operation */
-	CLEAR_BIT(Ctl_8, DESC_CTL_HOSTOWN);
+	/* clears Ctl DESC_CTL_DONE bits, thus telling that the descriptors
+	 * are now owned by the acx; do this as LAST operation */
+	CLEAR_BIT(Ctl_8, DESC_CTL_DONE);
 	/* flush writes before we release hostdesc to the adapter here */
 	wmb();
 	CLEAR_BIT(hostdesc1->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
@@ -3846,7 +3845,6 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 	struct client *txc;
 	int finger;
 	int num_cleaned;
-	int to_process;
 	u16 r111;
 	u8 error, ack_failures, rts_failures, rts_ok, r100;
 
@@ -3865,15 +3863,13 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 
 	finger = priv->tx_tail;
 	num_cleaned = 0;
-	to_process = TX_CNT;
-	do {
+	while (finger != priv->tx_head) {
 		txdesc = get_txdesc(priv, finger);
 
-//FIXME: if we allocated txdesc on tx path but then decided to NOT use it, then we will see "non-free" desc here and tx will stall!
-/* try with:	if it's not a 'skipped' desc ...
-		if (txdesc->Ctl_8 != DESC_CTL_HOSTOWN) && ...
-   alternatively keep free descs marked with DESC_CTL_DONE, not just DESC_CTL_HOSTOWN...
-*/
+		/* If we allocated txdesc on tx path but then decided
+		** to NOT use it, then it will be left as a free "bubble"
+		** in the "allocated for tx" part of the ring.
+		** We may meet it on the next ring pass here. */
 
 		/* stop if not marked as "tx finished" and "host owned" */
 		if ((txdesc->Ctl_8 & DESC_CTL_DONE) != DESC_CTL_DONE) {
@@ -3889,7 +3885,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 			break;
 		}
 
-		/* remember descr values... */
+		/* remember desc values... */
 		error = txdesc->error;
 		ack_failures = txdesc->ack_failures;
 		rts_failures = txdesc->rts_failures;
@@ -3913,23 +3909,28 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 			wireless_send_event(priv->netdev, IWEVTXDROP, &wrqu, NULL);
 		}
 #endif
-		/* ...and free the descr */
+		/* ...and free the desc */
 		txdesc->error = 0;
 		txdesc->ack_failures = 0;
 		txdesc->rts_failures = 0;
 		txdesc->rts_ok = 0;
-		/* signal host owning it LAST, since ACX already knows that this
-		 * descriptor is finished since it set Ctl_8 accordingly:
-		 * if _OWN is set at the beginning instead, our own get_tx
-		 * might choose a Tx desc that isn't fully cleared
-		 * (in case of bad locking). */
-		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+
+		/* Signal host owning it LAST, since ACX already knows that this
+		** descriptor is finished since it set Ctl_8 accordingly.
+		** NB: older code was setting it to HOSTOWN.
+		** This would cause problem if txdesc got allocated but not
+		** submitted for tx (left as a "bubble") */
+
+		/* TODO: we may avoid setting this at all (just slightly modify
+		** check in alloc_tx) since DESC_CTL_DONE bits are already set */
+
+		txdesc->Ctl_8 = DESC_CTL_DONE;
 		priv->tx_free++;
 		num_cleaned++;
 
 		if ((priv->tx_free >= TX_START_QUEUE)
-		&& (priv->status == ACX_STATUS_4_ASSOCIATED)
-		&& (acx_queue_stopped(priv->netdev))
+		 && (priv->status == ACX_STATUS_4_ASSOCIATED)
+		 && (acx_queue_stopped(priv->netdev))
 		) {
 			acxlog(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
 					priv->tx_free);
@@ -3957,7 +3958,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
-	} while (--to_process);
+	}
 
 	/* remember last position */
 	priv->tx_tail = finger;
@@ -3972,7 +3973,7 @@ void
 acx_l_clean_tx_desc_emergency(wlandevice_t *priv)
 {
 	txdesc_t *txdesc;
-	unsigned int i;
+	int i;
 
 	FN_ENTER;
 
@@ -3984,7 +3985,7 @@ acx_l_clean_tx_desc_emergency(wlandevice_t *priv)
 		txdesc->rts_failures = 0;
 		txdesc->rts_ok = 0;
 		txdesc->error = 0;
-		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+		txdesc->Ctl_8 = DESC_CTL_DONE;
 	}
 
 	priv->tx_free = TX_CNT;
@@ -4030,8 +4031,7 @@ void
 acx_l_process_rx_desc(wlandevice_t *priv)
 {
 	rxhostdesc_t *hostdesc;
-	/* unsigned int curr_idx; */
-	unsigned int count = 0;
+	int count,tail;
 
 	FN_ENTER;
 
@@ -4042,26 +4042,25 @@ acx_l_process_rx_desc(wlandevice_t *priv)
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to handle. */
+	count = RX_CNT;
+	tail = priv->rx_tail;
 	while (1) {
-		/* curr_idx = priv->rx_tail; */
-		hostdesc = &priv->rxhostdesc_start[priv->rx_tail];
-		priv->rx_tail = (priv->rx_tail + 1) % RX_CNT;
+		hostdesc = &priv->rxhostdesc_start[tail];
+		/* advance tail regardless of outcome of the below test */
+		tail = (tail + 1) % RX_CNT;
+
 		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		 && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL))) {
-			/* found it! */
-			break;
-		}
-		count++;
-		if (unlikely(count > RX_CNT)) {
-			/* hmm, no luck: all descriptors empty, bail out */
+		 && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;		/* found it! */
+
+		if (--count)	/* hmm, no luck: all descs empty, bail out */
 			goto end;
-		}
 	}
 
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
 		acxlog(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
-			priv->rx_tail, hostdesc->Ctl_16, hostdesc->Status);
+			tail, hostdesc->Ctl_16, hostdesc->Status);
 
 		acx_l_process_rxbuf(priv, hostdesc->data);
 
@@ -4072,21 +4071,17 @@ acx_l_process_rx_desc(wlandevice_t *priv)
 		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		/* curr_idx = priv->rx_tail; */
-		hostdesc = &priv->rxhostdesc_start[priv->rx_tail];
+		hostdesc = &priv->rxhostdesc_start[tail];
 
 		/* if next descriptor is empty, then bail out */
-		/* FIXME: is this check really entirely correct?? */
-		/*
-//FIXME: inconsistent with check in prev while() loop
-		if (!(hostdesc->Ctl & cpu_to_le16(DESC_CTL_HOSTOWN))
-		 && !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL))) */
-		if (!(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		 || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break;
 
-		priv->rx_tail = (priv->rx_tail + 1) % RX_CNT;
+		tail = (tail + 1) % RX_CNT;
 	}
 end:
+	priv->rx_tail = tail;
 	FN_EXIT0;
 }
 
@@ -4373,7 +4368,7 @@ acx_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 		/* FIXME: do we have to do the hostmemptr stuff here?? */
 		for (i = 0; i < TX_CNT; i++) {
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
-			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+			txdesc->Ctl_8 = DESC_CTL_DONE;
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(txhostdesc_t);
@@ -4517,12 +4512,9 @@ acxpci_s_proc_diag_output(char *p, wlandevice_t *priv)
 		thd = (i == priv->tx_head) ? " [head]" : "";
 		ttl = (i == priv->tx_tail) ? " [tail]" : "";
 		if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
-			p += sprintf(p, "%02u DONE   (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
+			p += sprintf(p, "%02u free (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
 		else
-		if (!(txdesc->Ctl_8 & DESC_CTL_HOSTOWN))
-			p += sprintf(p, "%02u TxWait (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
-		else
-			p += sprintf(p, "%02u empty  (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
+			p += sprintf(p, "%02u tx   (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
 		txdesc = move_txdesc(priv, txdesc, 1);
 	}
 	p += sprintf(p,

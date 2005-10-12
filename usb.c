@@ -958,13 +958,15 @@ acx100usb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 {
 	struct usb_device *usbdev;
 	struct urb *rxurb;
-	int errcode;
+	int errcode, rxnum;
 	unsigned int inpipe;
 
 	FN_ENTER;
 
 	rxurb = rx->urb;
 	usbdev = priv->usbdev;
+
+	rxnum = rx - priv->usb_rx;
 
 	inpipe = usb_rcvbulkpipe(usbdev, priv->bulkinep);
 	if (rxurb->status == -EINPROGRESS) {
@@ -989,8 +991,8 @@ acx100usb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 	/* ATOMIC: we may be called from complete_rx() usb callback */
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
-	acxlog(L_USBRXTX, "SUBMIT RX (%p) inpipe=0x%X size=%d errcode=%d\n",
-			rx, inpipe, (int) RXBUFSIZE, errcode);
+	acxlog(L_USBRXTX, "SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
+			rxnum, inpipe, (int) RXBUFSIZE, errcode);
 end:
 	FN_EXIT0;
 }
@@ -1016,7 +1018,7 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	rxbuffer_t *inbuf;
 	usb_rx_t *rx;
 	unsigned long flags;
-	int size, remsize, packetsize;
+	int size, remsize, packetsize, rxnum;
 
 	FN_ENTER;
 
@@ -1039,9 +1041,13 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	inbuf = &rx->bulkin;
 	size = urb->actual_length;
 	remsize = size;
+	rxnum = rx - priv->usb_rx;
 
-	acxlog(L_USBRXTX, "RETURN RX (%p) status=%d size=%d\n",
-				rx, urb->status, size);
+	acxlog(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
+				rxnum, urb->status, size);
+
+	if(size > sizeof(rxbuffer_t))
+		printk("acx_usb: rx too large: %d bytes, lease report\n", size);
 
 	/* check if the transfer was aborted */
 	switch (urb->status) {
@@ -1215,6 +1221,7 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	wlandevice_t *priv;
 	usb_tx_t *tx;
 	unsigned long flags;
+	int txnum;
 
 	FN_ENTER;
 
@@ -1222,6 +1229,8 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 
 	tx = (usb_tx_t *)urb->context;
 	priv = tx->priv;
+
+	txnum = tx - priv->usb_tx;
 
 	acx_lock(priv, flags);
 
@@ -1232,14 +1241,18 @@ acx100usb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		acxlog(L_USBRXTX, "not doing anything\n");
 		goto end_unlock;
+		/*FIXME: Do the priv->tx_free++? */
 	}
 
-	acxlog(L_USBRXTX, "RETURN TX (%p): status=%d size=%d\n",
-				tx, urb->status, urb->actual_length);
+	acxlog(L_USBRXTX, "RETURN TX (%d): status=%d size=%d\n",
+				txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
 	switch (urb->status) {
 	case 0:	/* No error */
+		break;
+	case -ESHUTDOWN:
+		goto end_unlock;
 		break;
 	case -ECONNRESET:
 		goto end_unlock;
@@ -1316,6 +1329,13 @@ acx100usb_e_close(struct net_device *dev)
 
 	del_timer_sync(&priv->mgmt_timer);
 
+	priv->tx_free = ACX100_USB_NUM_BULK_URBS;
+
+	for (i = 0; i< ACX100_USB_NUM_BULK_URBS; ++i) {
+		priv->usb_tx[i].busy = 0;
+		priv->usb_rx[i].busy = 0;
+	}
+
 	acx_unlock(priv, flags);
 
 	acx_sem_unlock(priv);
@@ -1343,13 +1363,14 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 
 	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
 		if (!priv->usb_tx[i].busy) {
+			acxlog(L_USBRXTX, "allocated tx %d\n", i);
 			tx = &priv->usb_tx[i];
 			tx->busy = 1;
 			break;
 		}
 	}
 	if (i >= ACX100_USB_NUM_BULK_URBS) {
-		printk("acx: tx buffers full\n");
+		printk_ratelimited("acx: tx buffers full\n");
 	}
 
 	FN_EXIT0;
@@ -1530,8 +1551,7 @@ acx100usb_i_tx_timeout(struct net_device *dev)
 	acx_lock(priv, flags);
 	/* unlink the URBs */
 	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-		if (priv->usb_tx[i].urb->status == -EINPROGRESS)
-			usb_unlink_urb(priv->usb_tx[i].urb);
+		acx_unlink_urb(priv->usb_tx[i].urb);
 	}
 	/* TODO: stats update */
 	acx_unlock(priv, flags);
