@@ -110,9 +110,6 @@ static void acx100usb_i_set_rx_mode(struct net_device *);
 static int acx100usb_e_init_network_device(struct net_device *);
 static int acx100usb_boot(struct usb_device *);
 
-static struct net_device_stats * acx_e_get_stats(struct net_device *);
-static struct iw_statistics *acx_e_get_wireless_stats(struct net_device *);
-
 static void acx100usb_l_poll_rx(wlandevice_t *, usb_rx_t* rx);
 
 static void acx100usb_i_tx_timeout(struct net_device *);
@@ -174,7 +171,7 @@ acx100usb_driver = {
 * something wrong with the urbs.
 */
 static void
-acx_unlink_urb(struct urb* urb)
+acxusb_unlink_urb(struct urb* urb)
 {
 	if (!urb)
 		return;
@@ -447,7 +444,7 @@ bad:
 **  a non-null pointer to a driver context and thereby claims the device.
 */
 static void
-acx_netdev_init(struct net_device *dev) {}
+dummy_netdev_init(struct net_device *dev) {}
 
 static int
 acx100usb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
@@ -492,7 +489,7 @@ acx100usb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* Ok, so it's our device and it is already booted */
 
 	/* Allocate memory for a network device */
-	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", acx_netdev_init);
+	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", dummy_netdev_init);
 	/* (NB: memsets to 0 entire area) */
 	if (!dev) {
 		msg = "acx: no memory for netdev\n";
@@ -884,6 +881,7 @@ acx100usb_e_init_network_device(struct net_device *dev)
 	dev->tx_timeout = &acx100usb_i_tx_timeout;
 	dev->watchdog_timeo = 4 * HZ;
 #endif
+	dev->change_mtu = &acx_e_change_mtu;
 	result = acx_s_init_mac(dev);
 	if (OK != result)
 		goto end;
@@ -1307,7 +1305,7 @@ acx100usb_e_close(struct net_device *dev)
 
 	/*
 	 * We must do FLUSH *without* holding sem to avoid a deadlock.
-	 * See pci.c:acx_s_down() for deails.
+	 * See pci.c:acxpci_s_down() for deails.
 	 */
 	acx_sem_unlock(priv);
 	FLUSH_SCHEDULED_WORK();
@@ -1323,8 +1321,8 @@ acx100usb_e_close(struct net_device *dev)
 	/* stop pending rx/tx urb transfers */
 	/* Make sure you don't free them! */
 	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-		acx_unlink_urb(priv->usb_rx[i].urb);
-		acx_unlink_urb(priv->usb_tx[i].urb);
+		acxusb_unlink_urb(priv->usb_rx[i].urb);
+		acxusb_unlink_urb(priv->usb_tx[i].urb);
 	}
 
 	del_timer_sync(&priv->mgmt_timer);
@@ -1508,28 +1506,6 @@ end:
 
 /***********************************************************************
 */
-static struct net_device_stats*
-acx_e_get_stats(netdevice_t *dev)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	return &priv->stats;
-}
-
-
-/***********************************************************************
-*/
-static struct iw_statistics*
-acx_e_get_wireless_stats(netdevice_t *dev)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	FN_ENTER;
-	FN_EXIT0;
-	return &priv->wstats;
-}
-
-
-/***********************************************************************
-*/
 static void
 acx100usb_i_set_rx_mode(struct net_device *dev)
 {
@@ -1551,7 +1527,7 @@ acx100usb_i_tx_timeout(struct net_device *dev)
 	acx_lock(priv, flags);
 	/* unlink the URBs */
 	for (i = 0; i < ACX100_USB_NUM_BULK_URBS; i++) {
-		acx_unlink_urb(priv->usb_tx[i].urb);
+		acxusb_unlink_urb(priv->usb_tx[i].urb);
 	}
 	/* TODO: stats update */
 	acx_unlock(priv, flags);

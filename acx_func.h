@@ -254,7 +254,10 @@ has_only_one_bit(u16 v)
 ** acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
 ** acx_l_xxxx - functions which expect lock to be already taken.
 ** rest       - non-sleeping functions which do not require locking
-**	but may be run inder lock
+**		but may be run inder lock
+**
+** A small number of local helpers do not have acx_[eisl]_ prefix.
+** They are always close to caller and are to be revieved locally.
 **
 ** Theory of operation:
 **
@@ -346,7 +349,7 @@ acx_up_helper(wlandevice_t *priv, const char* where)
 /* Can race with rx path (which is not protected by sem):
 ** rx -> process_[re]assocresp() -> set_status(ASSOCIATED) -> wake_queue()
 ** Can race with tx_complete IRQ:
-** IRQ -> acx_l_clean_tx_desc -> acx_wake_queue
+** IRQ -> acxpci_l_clean_txdesc -> acx_wake_queue
 ** Review carefully all callsites */
 static inline void
 acx_stop_queue(netdevice_t *dev, const char *msg)
@@ -517,17 +520,19 @@ int acx_s_init_mac(netdevice_t *dev);
 void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 void acx_set_timer(wlandevice_t *priv, int timeout_us);
 void acx_update_capabilities(wlandevice_t *priv);
-int acx_read_eeprom_offset(wlandevice_t *priv, u32 addr, u8 *charbuf);
+int acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf);
 void acx_s_start(wlandevice_t *priv);
+
 #if USE_FW_LOADER_26
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
 #else
 firmware_image_t *acx_s_read_fw(const char *file, u32 *size);
 #define acx_s_read_fw(dev, file, size) acx_s_read_fw(file, size)
 #endif
+int acxpci_s_upload_radio(wlandevice_t *priv);
+
 void acx_s_initialize_rx_config(wlandevice_t *priv);
 void acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all);
-int acx_s_upload_radio(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 void acx_l_update_ratevector(wlandevice_t *priv);
 
@@ -559,15 +564,14 @@ acx_get_wlan_hdr(wlandevice_t *priv, const rxbuffer_t *rxbuf)
 struct sk_buff *acx_rxbuf_to_ether(struct wlandevice *priv, rxbuffer_t *rxbuf);
 int acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
 
-void acx_l_power_led(wlandevice_t *priv, int enable);
+void acxpci_l_power_led(wlandevice_t *priv, int enable);
 
-unsigned int acx_l_clean_tx_desc(wlandevice_t *priv);
-void acx_l_clean_tx_desc_emergency(wlandevice_t *priv);
+unsigned int acxpci_l_clean_txdesc(wlandevice_t *priv);
+void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
 
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
 void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
-void acx_l_process_rx_desc(wlandevice_t *priv);
 
 tx_t* acxpci_l_alloc_tx(wlandevice_t *priv);
 tx_t* acxusb_l_alloc_tx(wlandevice_t *priv);
@@ -607,7 +611,7 @@ u8 acx_rate111to100(u16);
 
 void acx100usb_l_tx_data(wlandevice_t *priv, struct txdesc *desc);
 int acx_s_set_defaults(wlandevice_t *priv);
-void acx_init_mboxes(wlandevice_t *priv);
+void acxpci_init_mboxes(wlandevice_t *priv);
 
 
 #if !ACX_DEBUG
@@ -618,10 +622,10 @@ const char* acx_get_packet_type_string(u16 fc);
 const char* acx_cmd_status_str(unsigned int state);
 
 int acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev);
-void acx_free_desc_queues(wlandevice_t *priv);
+void acxpci_free_desc_queues(wlandevice_t *priv);
 
-int acx_s_create_hostdesc_queues(wlandevice_t *priv);
-void acx_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
+int acxpci_s_create_hostdesc_queues(wlandevice_t *priv);
+void acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
 
 int acx100_s_init_wep(wlandevice_t *priv);
 int acx100_s_init_packet_templates(wlandevice_t *priv);
@@ -630,9 +634,13 @@ int acx111_s_init_packet_templates(wlandevice_t *priv);
 void great_inquisitor(wlandevice_t *priv);
 
 char* acxpci_s_proc_diag_output(char *p, wlandevice_t *priv);
-int acx_proc_eeprom_output(char *p, wlandevice_t *priv);
-void acx_set_interrupt_mask(wlandevice_t *priv);
-int acx100_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
+int acxpci_proc_eeprom_output(char *p, wlandevice_t *priv);
+void acxpci_set_interrupt_mask(wlandevice_t *priv);
+int acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
+
+int acx_e_change_mtu(struct net_device *dev, int mtu);
+struct net_device_stats* acx_e_get_stats(netdevice_t *dev);
+struct iw_statistics* acx_e_get_wireless_stats(netdevice_t *dev);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);

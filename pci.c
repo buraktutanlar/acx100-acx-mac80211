@@ -56,8 +56,8 @@
 #include "acx.h"
 
 
-/*================================================================*/
-/* Local Constants */
+/***********************************************************************
+*/
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
 #define PCI_ACX100_REGION1		0x01
 #define PCI_ACX100_REGION1_SIZE		0x1000	/* Memory size - 4K bytes */
@@ -80,36 +80,21 @@
 #define PCI_DEVICE_ID_TI_TNETW1130	0x9066
 
 /* PCI Class & Sub-Class code, Network-'Other controller' */
-#define PCI_CLASS_NETWORK_OTHERS	0x280
+#define PCI_CLASS_NETWORK_OTHERS	0x0280
 
 #define CARD_EEPROM_ID_SIZE 6
-#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) /* a la orinoco.c */
 
 
 /***********************************************************************
 */
-static void acx_l_disable_irq(wlandevice_t *priv);
-static void acx_l_enable_irq(wlandevice_t *priv);
-static int acx_e_probe_pci(struct pci_dev *pdev,
-			    const struct pci_device_id *id);
-static void acx_e_remove_pci(struct pci_dev *pdev);
+static void acxpci_i_tx_timeout(netdevice_t *dev);
+static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static void acxpci_i_set_multicast_list(netdevice_t *dev);
 
-#ifdef CONFIG_PM
-static int acx_e_suspend(struct pci_dev *pdev, pm_message_t state);
-static int acx_e_resume(struct pci_dev *pdev);
-#endif
-
-static void acx_i_tx_timeout(netdevice_t *dev);
-static struct net_device_stats *acx_e_get_stats(netdevice_t *dev);
-static struct iw_statistics *acx_e_get_wireless_stats(netdevice_t *dev);
-
-static irqreturn_t acx_i_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-static void acx_i_set_multicast_list(netdevice_t *dev);
-
-static int acx_e_open(netdevice_t *dev);
-static int acx_e_close(netdevice_t *dev);
-static void acx_s_up(netdevice_t *dev);
-static void acx_s_down(netdevice_t *dev);
+static int acxpci_e_open(netdevice_t *dev);
+static int acxpci_e_close(netdevice_t *dev);
+static void acxpci_s_up(netdevice_t *dev);
+static void acxpci_s_down(netdevice_t *dev);
 
 
 /***********************************************************************
@@ -121,7 +106,7 @@ static void acx_s_down(netdevice_t *dev);
 #define INLINE_IO static inline
 
 INLINE_IO u32
-acx_read_reg32(wlandevice_t *priv, unsigned int offset)
+read_reg32(wlandevice_t *priv, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32
 	return readl((u8 *)priv->iobase + priv->io[offset]);
@@ -132,19 +117,19 @@ acx_read_reg32(wlandevice_t *priv, unsigned int offset)
 }
 
 INLINE_IO u16
-acx_read_reg16(wlandevice_t *priv, unsigned int offset)
+read_reg16(wlandevice_t *priv, unsigned int offset)
 {
 	return readw((u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO u8
-acx_read_reg8(wlandevice_t *priv, unsigned int offset)
+read_reg8(wlandevice_t *priv, unsigned int offset)
 {
 	return readb((u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO void
-acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
+write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
 {
 #if ACX_IO_WIDTH == 32
 	writel(val, (u8 *)priv->iobase + priv->io[offset]);
@@ -155,13 +140,13 @@ acx_write_reg32(wlandevice_t *priv, unsigned int offset, u32 val)
 }
 
 INLINE_IO void
-acx_write_reg16(wlandevice_t *priv, unsigned int offset, u16 val)
+write_reg16(wlandevice_t *priv, unsigned int offset, u16 val)
 {
 	writew(val, (u8 *)priv->iobase + priv->io[offset]);
 }
 
 INLINE_IO void
-acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
+write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
 {
 	writeb(val, (u8 *)priv->iobase + priv->io[offset]);
 }
@@ -172,7 +157,7 @@ acx_write_reg8(wlandevice_t *priv, unsigned int offset, u8 val)
  * This call has to be made if there is no read following (which would flush the data
  * to the adapter), yet the written data has to reach the adapter immediately. */
 INLINE_IO void
-acx_write_flush(wlandevice_t *priv)
+write_flush(wlandevice_t *priv)
 {
 	/* readb(priv->iobase + priv->io[IO_ACX_INFO_MAILBOX_OFFS]); */
 	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
@@ -183,72 +168,6 @@ acx_write_flush(wlandevice_t *priv)
 
 /***********************************************************************
 */
-static const char name_acx100[] = "ACX100";
-static const char name_tnetw1100a[] = "TNETW1100A";
-static const char name_tnetw1100b[] = "TNETW1100B";
-
-static const char name_acx111[] = "ACX111";
-static const char name_tnetw1130[] = "TNETW1130";
-
-static const struct pci_device_id
-acx_pci_id_tbl[] __devinitdata = {
-	{
-		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_TNETW1100A,
-		.subvendor = PCI_ANY_ID,
-		.subdevice = PCI_ANY_ID,
-		.driver_data = CHIPTYPE_ACX100,
-	},
-	{
-		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_TNETW1100B,
-		.subvendor = PCI_ANY_ID,
-		.subdevice = PCI_ANY_ID,
-		.driver_data = CHIPTYPE_ACX100,
-	},
-	{
-		.vendor = PCI_VENDOR_ID_TI,
-		.device = PCI_DEVICE_ID_TI_TNETW1130,
-		.subvendor = PCI_ANY_ID,
-		.subdevice = PCI_ANY_ID,
-		.driver_data = CHIPTYPE_ACX111,
-	},
-	{
-		.vendor = 0,
-		.device = 0,
-		.subvendor = 0,
-		.subdevice = 0,
-		.driver_data = 0,
-	}
-};
-
-MODULE_DEVICE_TABLE(pci, acx_pci_id_tbl);
-
-/* FIXME: checks should be removed once driver is included in the kernel */
-#ifndef __devexit_p
-#warning *** your kernel is EXTREMELY old since it does not even know about
-#warning __devexit_p - this driver could easily FAIL to work, so better
-#warning upgrade your kernel! ***
-#define __devexit_p(x) x
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 11)
-/* pci_name() got introduced at start of 2.6.x,
- * got mandatory (slot_name member removed) in 2.6.11-bk1 */
-#define pci_name(x) x->slot_name
-#endif
-
-static struct pci_driver acx_pci_drv_id = {
-	.name        = "acx_pci",
-	.id_table    = acx_pci_id_tbl,
-	.probe       = acx_e_probe_pci,
-	.remove      = __devexit_p(acx_e_remove_pci),
-#ifdef CONFIG_PM
-	.suspend     = acx_e_suspend,
-	.resume      = acx_e_resume
-#endif /* CONFIG_PM */
-};
-
 typedef struct acx_device {
 	netdevice_t *newest;
 } acx_device_t;
@@ -278,7 +197,7 @@ move_txdesc(wlandevice_t* priv, txdesc_t* txdesc, int inc)
 }
 
 static txhostdesc_t*
-acx_get_txhostdesc(wlandevice_t* priv, txdesc_t* txdesc)
+get_txhostdesc(wlandevice_t* priv, txdesc_t* txdesc)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
 	if (ACX_DEBUG && (index % priv->txdesc_size)) {
@@ -294,7 +213,7 @@ acx_get_txhostdesc(wlandevice_t* priv, txdesc_t* txdesc)
 }
 
 static client_t*
-acx_get_txc(wlandevice_t* priv, txdesc_t* txdesc)
+get_txc(wlandevice_t* priv, txdesc_t* txdesc)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
 	if (ACX_DEBUG && (index % priv->txdesc_size)) {
@@ -310,7 +229,7 @@ acx_get_txc(wlandevice_t* priv, txdesc_t* txdesc)
 }
 
 static void
-acx_put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
+put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
 	if (ACX_DEBUG && (index % priv->txdesc_size)) {
@@ -325,15 +244,16 @@ acx_put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
 	priv->txc[index] = c;
 }
 
+
 /***********************************************************************
 ** EEPROM and PHY read/write helpers
 */
 /***********************************************************************
-** acx_read_eeprom_offset
+** acxpci_read_eeprom_byte
 **
 ** Function called to read an octet in the EEPROM.
 **
-** This function is used by acx_probe_pci to check if the
+** This function is used by acxpci_e_probe to check if the
 ** connected card is a legal one or not.
 **
 ** Arguments:
@@ -341,26 +261,20 @@ acx_put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
 **	addr		address to read in the EEPROM
 **	charbuf		ptr to a char. This is where the read octet
 **			will be stored
-**
-** Returns:
-**	zero (0)	- failed
-**	one (1)		- success
-**
-** NOT ADAPTED FOR ACX111!!
 */
 int
-acx_read_eeprom_offset(wlandevice_t *priv, u32 addr, u8 *charbuf)
+acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf)
 {
-	int result = NOT_OK;
+	int result;
 	int count;
 
-	acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
-	acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr);
-	acx_write_flush(priv);
-	acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
+	write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
+	write_reg32(priv, IO_ACX_EEPROM_ADDR, addr);
+	write_flush(priv);
+	write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
 	count = 0xffff;
-	while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
+	while (read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -368,11 +282,12 @@ acx_read_eeprom_offset(wlandevice_t *priv, u32 addr, u8 *charbuf)
 		if (unlikely(!--count)) {
 			printk("%s: timeout waiting for EEPROM read\n",
 							priv->netdev->name);
+			result = NOT_OK;
 			goto fail;
 		}
 	}
 
-	*charbuf = acx_read_reg8(priv, IO_ACX_EEPROM_DATA);
+	*charbuf = read_reg8(priv, IO_ACX_EEPROM_DATA);
 	acxlog(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
 	result = OK;
 
@@ -385,13 +300,13 @@ fail:
 ** Dummy EEPROM read? why?!
 */
 static int
-acx_read_eeprom_area(wlandevice_t *priv)
+acxpci_read_eeprom_area(wlandevice_t *priv)
 {
 	int offs;
 	u8 tmp[0x3b];
 
 	for (offs = 0x8c; offs < 0xb9; offs++) {
-		acx_read_eeprom_offset(priv, offs, &tmp[offs - 0x8c]);
+		acxpci_read_eeprom_byte(priv, offs, &tmp[offs - 0x8c]);
 	}
 	return OK;
 }
@@ -403,7 +318,7 @@ acx_read_eeprom_area(wlandevice_t *priv)
 */
 #ifdef UNUSED
 int
-acx_s_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *charbuf)
+acxpci_s_write_eeprom(wlandevice_t *priv, u32 addr, u32 len, const u8 *charbuf)
 {
 	u8 *data_verify = NULL;
 	unsigned long flags;
@@ -435,19 +350,19 @@ acx_s_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *charb
 	 * but you probably have to modify GPIO_OUT, too,
 	 * and you probably need to activate a different GPIO
 	 * line instead! */
-	gpio_orig = acx_read_reg16(priv, IO_ACX_GPIO_OE);
-	acx_write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig & ~1);
-	acx_write_flush(priv);
+	gpio_orig = read_reg16(priv, IO_ACX_GPIO_OE);
+	write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig & ~1);
+	write_flush(priv);
 
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
-		acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
-		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
-		acx_write_reg32(priv, IO_ACX_EEPROM_DATA, *(charbuf + i));
-		acx_write_flush(priv);
-		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 1);
+		write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
+		write_reg32(priv, IO_ACX_EEPROM_DATA, *(charbuf + i));
+		write_flush(priv);
+		write_reg32(priv, IO_ACX_EEPROM_CTL, 1);
 
-		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
+		while (read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(++count > 0xffff)) {
 				printk("WARNING, DANGER!!! "
 					"Timeout waiting for EEPROM write\n");
@@ -457,25 +372,25 @@ acx_s_write_eeprom_offset(wlandevice_t *priv, u32 addr, u32 len, const u8 *charb
 	}
 
 	/* disable EEPROM writing */
-	acx_write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig);
-	acx_write_flush(priv);
+	write_reg16(priv, IO_ACX_GPIO_OE, gpio_orig);
+	write_flush(priv);
 
 	/* now start a verification run */
 	count = 0xffff;
 	for (i = 0; i < len; i++) {
-		acx_write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
-		acx_write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
-		acx_write_flush(priv);
-		acx_write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
+		write_reg32(priv, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(priv, IO_ACX_EEPROM_ADDR, addr + i);
+		write_flush(priv);
+		write_reg32(priv, IO_ACX_EEPROM_CTL, 2);
 
-		while (acx_read_reg16(priv, IO_ACX_EEPROM_CTL)) {
+		while (read_reg16(priv, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
 				printk("timeout waiting for EEPROM read\n");
 				goto end;
 			}
 		}
 
-		data_verify[i] = acx_read_reg16(priv, IO_ACX_EEPROM_DATA);
+		data_verify[i] = read_reg16(priv, IO_ACX_EEPROM_DATA);
 	}
 
 	if (0 == memcmp(charbuf, data_verify, len))
@@ -493,7 +408,7 @@ end:
 ** acxpci_s_read_phy_reg
 **
 ** Messing with rx/tx disabling and enabling here
-** (acx_write_reg32(priv, IO_ACX_ENABLE, 0b000000xx)) kills traffic
+** (write_reg32(priv, IO_ACX_ENABLE, 0b000000xx)) kills traffic
 */
 int
 acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
@@ -503,12 +418,12 @@ acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 
 	FN_ENTER;
 
-	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
-	acx_write_flush(priv);
-	acx_write_reg32(priv, IO_ACX_PHY_CTL, 2);
+	write_reg32(priv, IO_ACX_PHY_ADDR, reg);
+	write_flush(priv);
+	write_reg32(priv, IO_ACX_PHY_CTL, 2);
 
 	count = 0xffff;
-	while (acx_read_reg32(priv, IO_ACX_PHY_CTL)) {
+	while (read_reg32(priv, IO_ACX_PHY_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -522,7 +437,7 @@ acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	}
 
 	acxlog(L_DEBUG, "count was %u\n", count);
-	*charbuf = acx_read_reg8(priv, IO_ACX_PHY_DATA);
+	*charbuf = read_reg8(priv, IO_ACX_PHY_DATA);
 
 	acxlog(L_DEBUG, "radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
 	result = OK;
@@ -547,11 +462,11 @@ acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 	 * shouldn't happen any more...
 	 * FIXME: which radio is in the problematic card? My working one
 	 * is 0x11 */
-	acx_write_reg32(priv, IO_ACX_PHY_DATA, value);
-	acx_write_reg32(priv, IO_ACX_PHY_ADDR, reg);
-	acx_write_flush(priv);
-	acx_write_reg32(priv, IO_ACX_PHY_CTL, 1);
-	acx_write_flush(priv);
+	write_reg32(priv, IO_ACX_PHY_DATA, value);
+	write_reg32(priv, IO_ACX_PHY_ADDR, reg);
+	write_flush(priv);
+	write_reg32(priv, IO_ACX_PHY_CTL, 1);
+	write_flush(priv);
 	acxlog(L_DEBUG, "radio PHY write 0x%02X at 0x%04X\n", value, reg);
 
 	FN_EXIT1(OK);
@@ -562,7 +477,7 @@ acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 #define NO_AUTO_INCREMENT	1
 
 /***********************************************************************
-** acx_s_write_fw
+** acxpci_s_write_fw
 **
 ** Write the firmware image into the card.
 **
@@ -575,7 +490,7 @@ acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 **	0	success
 */
 static int
-acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
+acxpci_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offset)
 {
 	int len, size;
 	u32 sum, v32;
@@ -586,15 +501,14 @@ acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offse
 	sum = image[0]+image[1]+image[2]+image[3];
 	image += 4;
 
-	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
+	write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	acxlog(L_INIT, "not using auto increment for firmware loading\n");
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
-	acx_write_flush(priv);
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+	write_flush(priv);
 #endif
 
 	len = 0;
@@ -607,10 +521,10 @@ acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offse
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
-		acx_write_flush(priv);
+		write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		write_flush(priv);
 #endif
-		acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, v32);
+		write_reg32(priv, IO_ACX_SLV_MEM_DATA, v32);
 	}
 
 	acxlog(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
@@ -622,7 +536,7 @@ acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offse
 
 
 /***********************************************************************
-** acx_s_validate_fw
+** acxpci_s_validate_fw
 **
 ** Compare the firmware image given with
 ** the firmware image written into the card.
@@ -636,7 +550,7 @@ acx_s_write_fw(wlandevice_t *priv, const firmware_image_t *apfw_image, u32 offse
 **	OK	success
 */
 static int
-acx_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
+acxpci_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
 				u32 offset)
 {
 	u32 v32, w32, sum;
@@ -649,13 +563,13 @@ acx_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
 	sum = image[0]+image[1]+image[2]+image[3];
 	image += 4;
 
-	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
+	write_reg32(priv, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
 #endif
 
 	len = 0;
@@ -667,9 +581,9 @@ acx_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		write_reg32(priv, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 #endif
-		w32 = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+		w32 = read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 		if (unlikely(w32 != v32)) {
 			printk("acx: FATAL: firmware upload: "
@@ -698,18 +612,12 @@ acx_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
 
 
 /***********************************************************************
-** acx_s_upload_fw
+** acxpci_s_upload_fw
 **
-** Arguments:
-**	wlandevice: private device that contains card device
-** Returns:
-**	NOT_OK: failed
-**	OK: success
-** Call context:
-**	acx_reset_dev
+** Called from acx_reset_dev
 */
 static int
-acx_s_upload_fw(wlandevice_t *priv)
+acxpci_s_upload_fw(wlandevice_t *priv)
 {
 	firmware_image_t *apfw_image = NULL;
 	int res = NOT_OK;
@@ -736,10 +644,10 @@ acx_s_upload_fw(wlandevice_t *priv)
 	}
 
 	for (try = 1; try <= 5; try++) {
-		res = acx_s_write_fw(priv, apfw_image, 0);
+		res = acxpci_s_write_fw(priv, apfw_image, 0);
 		acxlog(L_DEBUG|L_INIT, "acx_write_fw (main/combined):%d\n", res);
 		if (OK == res) {
-			res = acx_s_validate_fw(priv, apfw_image, 0);
+			res = acxpci_s_validate_fw(priv, apfw_image, 0);
 			acxlog(L_DEBUG|L_INIT, "acx_validate_fw "
 					"(main/combined):%d\n", res);
 		}
@@ -761,13 +669,12 @@ acx_s_upload_fw(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_s_upload_radio
+** acxpci_s_upload_radio
 **
-** Uploads the appropriate radio module firmware
-** into the card.
+** Uploads the appropriate radio module firmware into the card.
 */
 int
-acx_s_upload_radio(wlandevice_t *priv)
+acxpci_s_upload_radio(wlandevice_t *priv)
 {
 	acx_ie_memmap_t mm;
 	firmware_image_t *radio_image = NULL;
@@ -797,10 +704,10 @@ acx_s_upload_radio(wlandevice_t *priv)
 	acx_s_issue_cmd(priv, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
-		res = acx_s_write_fw(priv, radio_image, offset);
+		res = acxpci_s_write_fw(priv, radio_image, offset);
 		acxlog(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
-			res = acx_s_validate_fw(priv, radio_image, offset);
+			res = acxpci_s_validate_fw(priv, radio_image, offset);
 			acxlog(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
 		}
 
@@ -833,7 +740,7 @@ fail:
 
 
 /***********************************************************************
-** acx_l_reset_mac
+** acxpci_l_reset_mac
 **
 ** Arguments:
 **	wlandevice: private device that contains card device
@@ -842,46 +749,44 @@ fail:
 ** Call context:
 **	acx_reset_dev
 ** Comment:
-**	resets onboard acx100 MAC
-**
-** Requires lock to be taken
+**	resets onboard acx MAC
 */
 static void
-acx_l_reset_mac(wlandevice_t *priv)
+acxpci_l_reset_mac(wlandevice_t *priv)
 {
 	u16 temp;
 
 	FN_ENTER;
 
 	/* halt eCPU */
-	temp = acx_read_reg16(priv, IO_ACX_ECPU_CTRL) | 0x1;
-	acx_write_reg16(priv, IO_ACX_ECPU_CTRL, temp);
+	temp = read_reg16(priv, IO_ACX_ECPU_CTRL) | 0x1;
+	write_reg16(priv, IO_ACX_ECPU_CTRL, temp);
 
 	/* now do soft reset of eCPU */
-	temp = acx_read_reg16(priv, IO_ACX_SOFT_RESET) | 0x1;
+	temp = read_reg16(priv, IO_ACX_SOFT_RESET) | 0x1;
 	acxlog(L_DEBUG, "%s: enable soft reset...\n", __func__);
-	acx_write_reg16(priv, IO_ACX_SOFT_RESET, temp);
-	acx_write_flush(priv);
+	write_reg16(priv, IO_ACX_SOFT_RESET, temp);
+	write_flush(priv);
 
 	/* now reset bit again */
 	acxlog(L_DEBUG, "%s: disable soft reset and go to init mode...\n", __func__);
 	/* deassert eCPU reset */
-	acx_write_reg16(priv, IO_ACX_SOFT_RESET, temp & ~0x1);
+	write_reg16(priv, IO_ACX_SOFT_RESET, temp & ~0x1);
 
 	/* now start a burst read from initial flash EEPROM */
-	temp = acx_read_reg16(priv, IO_ACX_EE_START) | 0x1;
-	acx_write_reg16(priv, IO_ACX_EE_START, temp);
-	acx_write_flush(priv);
+	temp = read_reg16(priv, IO_ACX_EE_START) | 0x1;
+	write_reg16(priv, IO_ACX_EE_START, temp);
+	write_flush(priv);
 
 	FN_EXIT0;
 }
 
 
 /***********************************************************************
-** acx_s_verify_init
+** acxpci_s_verify_init
 */
 static int
-acx_s_verify_init(wlandevice_t *priv)
+acxpci_s_verify_init(wlandevice_t *priv)
 {
 	int result = NOT_OK;
 	int timer;
@@ -889,15 +794,13 @@ acx_s_verify_init(wlandevice_t *priv)
 	FN_ENTER;
 
 	for (timer = 40; timer > 0; timer--) {
-		u16 irqstat = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
+		u16 irqstat = read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
 		if (irqstat & HOST_INT_FCS_THRESHOLD) {
 			result = OK;
-			acx_write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
+			write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
 			break;
 		}
-		/* HZ / 50 resulted in 24 schedules for ACX100 on my machine,
-		 * so better schedule away longer for greater efficiency,
-		 * decrease loop count */
+		/* Init may take up to ~0.5 sec total */
 		acx_s_msleep(50);
 	}
 
@@ -915,104 +818,51 @@ acx_s_verify_init(wlandevice_t *priv)
 */
 
 /***********************************************************************
-** acx_read_info_status
-*/
-/* Info mailbox format:
-2 bytes: type
-2 bytes: status
-more bytes may follow
-    docs say about status:
-	0x0000 info available (set by hw)
-	0x0001 information received (must be set by host)
-	0x1000 info available, mailbox overflowed (messages lost) (set by hw)
-    but in practice we've seen:
-	0x9000 when we did not set status to 0x0001 on prev message
-	0x1001 when we did set it
-	0x0000 was never seen
-    conclusion: this is really a bitfield:
-    0x1000 is 'info available' bit
-    'mailbox overflowed' bit is 0x8000, not 0x1000
-    value of 0x0000 probably means that there is no message at all
-    P.S. I dunno how in hell hw is supposed to notice that messages are lost -
-    it does NOT clear bit 0x0001, and this bit will probably stay forever set
-    after we set it once. Let's hope this will be fixed in firmware someday
+** acxpci_write_cmd_type_or_status
 */
 static void
-acx_read_info_status(wlandevice_t *priv)
+acxpci_write_cmd_type_or_status(wlandevice_t *priv, u32 val)
 {
-	u32 value;
+	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
-	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1);
-
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		acx_read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS));
-
-	/* make sure we only read the data once all cfg registers are written: */
-	acx_write_flush(priv);
-	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
-
-	priv->info_type = (u16)value;
-	priv->info_status = (value >> 16);
-
-	/* inform hw that we have read this info message */
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, priv->info_type | 0x00010000);
-	acx_write_flush(priv);
-	/* now bother hw to notice it: */
-	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
-	acx_write_flush(priv);
-
-	acxlog(L_CTL, "info_type 0x%04X, info_status 0x%04X\n",
-			priv->info_type, priv->info_status);
-}
-
-
-/***********************************************************************
-** acx_write_cmd_type_or_status
-*/
-static void
-acx_write_cmd_type_or_status(wlandevice_t *priv, u32 val)
-{
-	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
-
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
+	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
+		read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
 
 	/* make sure we only write the data once all config registers are written */
-	acx_write_flush(priv);
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
-	acx_write_flush(priv);
+	write_flush(priv);
+	write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
+	write_flush(priv);
 }
 static inline void
-acx_write_cmd_type(wlandevice_t *priv, u32 val)
+acxpci_write_cmd_type(wlandevice_t *priv, u32 val)
 {
-	acx_write_cmd_type_or_status(priv, val);
+	acxpci_write_cmd_type_or_status(priv, val);
 }
 static inline void
-acx_write_cmd_status(wlandevice_t *priv, u32 val)
+acxpci_write_cmd_status(wlandevice_t *priv, u32 val)
 {
-	acx_write_cmd_type_or_status(priv, val<<16);
+	acxpci_write_cmd_type_or_status(priv, val<<16);
 }
 
 
 /***********************************************************************
-** acx_read_cmd_status
+** acxpci_read_cmd_status
 */
 static void
-acx_read_cmd_status(wlandevice_t *priv)
+acxpci_read_cmd_status(wlandevice_t *priv)
 {
 	u32 value;
 
-	acx_write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
+	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
-	acx_write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
+	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
+		read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
 
 	/* make sure we only read the data once all config registers are written */
-	acx_write_flush(priv);
-	value = acx_read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+	write_flush(priv);
+	value = read_reg32(priv, IO_ACX_SLV_MEM_DATA);
 
 	priv->cmd_type = (u16)value;
 	priv->cmd_status = (value >> 16);
@@ -1024,7 +874,7 @@ acx_read_cmd_status(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_s_reset_dev
+** acxpci_s_reset_dev
 **
 ** Arguments:
 **	netdevice that contains the wlandevice priv variable
@@ -1034,13 +884,13 @@ acx_read_cmd_status(wlandevice_t *priv)
 ** Side effects:
 **	device is hard reset
 ** Call context:
-**	acx_probe_pci
+**	acxpci_e_probe
 ** Comment:
-**	This resets the acx100 device using low level hardware calls
+**	This resets the device using low level hardware calls
 **	as well as uploads and verifies the firmware to the card
 */
 static int
-acx_s_reset_dev(netdevice_t *dev)
+acxpci_s_reset_dev(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	const char* msg = "";
@@ -1058,23 +908,23 @@ acx_s_reset_dev(netdevice_t *dev)
 
 	acx_lock(priv, flags);
 
-	acx_l_reset_mac(priv);
+	acxpci_l_reset_mac(priv);
 
-	ecpu_ctrl = acx_read_reg16(priv, IO_ACX_ECPU_CTRL) & 1;
+	ecpu_ctrl = read_reg16(priv, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "eCPU is already running. ";
 		goto fail_unlock;
 	}
 
 #ifdef WE_DONT_NEED_THAT_DO_WE
-	if (acx_read_reg16(priv, IO_ACX_SOR_CFG) & 2) {
+	if (read_reg16(priv, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "eCPU did not start after boot from flash. ";
 		goto fail_unlock;
 	}
 
 	/* check sense on reset flags */
-	if (acx_read_reg16(priv, IO_ACX_SOR_CFG) & 0x10) {
+	if (read_reg16(priv, IO_ACX_SOR_CFG) & 0x10) {
 		printk("%s: eCPU did not start after boot (SOR), "
 			"is this fatal?\n", dev->name);
 	}
@@ -1089,22 +939,22 @@ acx_s_reset_dev(netdevice_t *dev)
 	acx_s_msleep(10);
 
 	/* Need to know radio type before fw load */
-	hardware_info = acx_read_reg16(priv, IO_ACX_EEPROM_INFORMATION);
+	hardware_info = read_reg16(priv, IO_ACX_EEPROM_INFORMATION);
 	priv->form_factor = hardware_info & 0xff;
 	priv->radio_type = hardware_info >> 8;
 
 	/* load the firmware */
-	if (OK != acx_s_upload_fw(priv))
+	if (OK != acxpci_s_upload_fw(priv))
 		goto fail;
 
 	acx_s_msleep(10);
 
 	/* now start eCPU by clearing bit */
 	acxlog(L_DEBUG, "booted eCPU up and waiting for completion...\n");
-	acx_write_reg16(priv, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+	write_reg16(priv, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
 
 	/* wait for eCPU bootup */
-	if (OK != acx_s_verify_init(priv)) {
+	if (OK != acxpci_s_verify_init(priv)) {
 		msg = "timeout waiting for eCPU. ";
 		goto fail;
 	}
@@ -1113,16 +963,16 @@ acx_s_reset_dev(netdevice_t *dev)
 
 	if (IS_ACX111(priv)) {
 		acxlog(L_DEBUG, "cleaning up cmd mailbox access area\n");
-		acx_write_cmd_status(priv, 0);
-		acx_read_cmd_status(priv);
+		acxpci_write_cmd_status(priv, 0);
+		acxpci_read_cmd_status(priv);
 		if (priv->cmd_status) {
 			msg = "error cleaning cmd mailbox area. ";
 			goto fail;
 		}
 	}
 
-	/* TODO what is this one doing ?? adapt for acx111 */
-	if ((OK != acx_read_eeprom_area(priv)) && IS_ACX100(priv)) {
+	/* Test that EEPROM is readable */
+	if ((OK != acxpci_read_eeprom_area(priv)) && IS_ACX100(priv)) {
 		/* does "CIS" mean "Card Information Structure"?
 		 * If so, then this would be a PCMCIA message...
 		 */
@@ -1145,17 +995,17 @@ fail:
 
 
 /***********************************************************************
-** acx_init_mboxes
+** acxpci_init_mboxes
 */
 void
-acx_init_mboxes(wlandevice_t *priv)
+acxpci_init_mboxes(wlandevice_t *priv)
 {
 	u32 cmd_offs, info_offs;
 
 	FN_ENTER;
 
-	cmd_offs = acx_read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
-	info_offs = acx_read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS);
+	cmd_offs = read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
+	info_offs = read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS);
 	priv->cmd_area = (u8 *)priv->iobase2 + cmd_offs + 0x4;
 	priv->info_area = (u8 *)priv->iobase2 + info_offs + 0x4;
 	acxlog(L_DEBUG, "iobase2=%p\n"
@@ -1170,7 +1020,7 @@ acx_init_mboxes(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_s_issue_cmd_timeo
+** acxpci_s_issue_cmd_timeo
 **
 ** Sends command to fw, extract result
 **
@@ -1234,7 +1084,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	/* wait for firmware to become idle for our command submission */
 	counter = 199; /* in ms */
 	do {
-		acx_read_cmd_status(priv);
+		acxpci_read_cmd_status(priv);
 		/* Test for IDLE state */
 		if (!priv->cmd_status)
 			break;
@@ -1267,10 +1117,10 @@ acxpci_s_issue_cmd_timeo_debug(
 	}
 	/* now write the actual command type */
 	priv->cmd_type = cmd;
-	acx_write_cmd_type(priv, cmd);
+	acxpci_write_cmd_type(priv, cmd);
 	/* execute command */
-	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
-	acx_write_flush(priv);
+	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
+	write_flush(priv);
 
 	/* wait for firmware to process command */
 
@@ -1287,9 +1137,9 @@ acxpci_s_issue_cmd_timeo_debug(
 	counter = timeout;
 	do {
 		if (!priv->irqs_active) { /* IRQ disabled: poll */
-			irqtype = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
+			irqtype = read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
 			if (irqtype & HOST_INT_CMD_COMPLETE) {
-				acx_write_reg16(priv, IO_ACX_IRQ_ACK,
+				write_reg16(priv, IO_ACX_IRQ_ACK,
 						HOST_INT_CMD_COMPLETE);
 				break;
 			}
@@ -1306,12 +1156,12 @@ acxpci_s_issue_cmd_timeo_debug(
 	} while (--counter);
 
 	/* save state for debugging */
-	acx_read_cmd_status(priv);
+	acxpci_read_cmd_status(priv);
 	cmd_status = priv->cmd_status;
 
 	/* put the card in IDLE state */
 	priv->cmd_status = 0;
-	acx_write_cmd_status(priv, 0);
+	acxpci_write_cmd_status(priv, 0);
 
 	if (!counter) {	/* timed out! */
 		printk("%s: "FUNC"(): timed out %s for CMD_COMPLETE. "
@@ -1369,6 +1219,8 @@ bad:
 
 /***********************************************************************
 ** acx_s_get_firmware_version
+**
+** TODO: not pci-specific, move to common.c and use from usb.c too
 */
 static void
 acx_s_get_firmware_version(wlandevice_t *priv)
@@ -1381,9 +1233,11 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 
 	FN_ENTER;
 
+	memset(fw.fw_id, 'E', FW_ID_SIZE);
 	acx_s_interrogate(priv, &fw, ACX1xx_IE_FWREV);
 	memcpy(priv->firmware_version, fw.fw_id, FW_ID_SIZE);
 	priv->firmware_version[FW_ID_SIZE] = '\0';
+
 	acxlog(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
 				priv->firmware_version, fw.hw_id);
 
@@ -1435,14 +1289,14 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 	switch (priv->firmware_id & 0xffff0000) {
 		case 0x01010000:
 		case 0x01020000:
-			priv->chip_name = name_tnetw1100a;
+			priv->chip_name = "TNETW1100A";
 			break;
 		case 0x01030000:
-			priv->chip_name = name_tnetw1100b;
+			priv->chip_name = "TNETW1100B";
 			break;
 		case 0x03000000:
 		case 0x03010000:
-			priv->chip_name = name_tnetw1130;
+			priv->chip_name = "TNETW1130";
 			break;
 		default:
 			printk("acx: unknown chip ID 0x%08X, "
@@ -1458,6 +1312,8 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 ** acx_display_hardware_details
 **
 ** Displays hw/fw version, radio type etc...
+**
+** TODO: not pci-specific, move to common.c and use from usb.c too
 */
 static void
 acx_display_hardware_details(wlandevice_t *priv)
@@ -1571,7 +1427,7 @@ acx_show_card_eeprom_id(wlandevice_t *priv)
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (OK != acx_read_eeprom_offset(priv,
+		if (OK != acxpci_read_eeprom_byte(priv,
 					 ACX100_EEPROM_ID_OFFSET + i,
 					 &buffer[i]))
 		{
@@ -1602,7 +1458,7 @@ acx_show_card_eeprom_id(wlandevice_t *priv)
 /***********************************************************************
 */
 static void
-acx_s_device_chain_add(struct net_device *dev)
+acxpci_s_device_chain_add(struct net_device *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 
@@ -1614,7 +1470,7 @@ acx_s_device_chain_add(struct net_device *dev)
 }
 
 static void
-acx_s_device_chain_remove(struct net_device *dev)
+acxpci_s_device_chain_remove(struct net_device *dev)
 {
 	struct net_device *querydev;
 	struct net_device *olderdev;
@@ -1657,14 +1513,15 @@ acx_s_device_chain_remove(struct net_device *dev)
 
 
 /***********************************************************************
-** acx_free_desc_queues
+** acxpci_free_desc_queues
 **
 ** Releases the queues that have been allocated, the
 ** others have been initialised to NULL so this
 ** function can be used if only part of the queues were allocated.
 */
+
 static inline void
-acx_free_coherent(struct pci_dev *hwdev, size_t size,
+free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
@@ -1676,11 +1533,11 @@ acx_free_coherent(struct pci_dev *hwdev, size_t size,
 }
 
 void
-acx_free_desc_queues(wlandevice_t *priv)
+acxpci_free_desc_queues(wlandevice_t *priv)
 {
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (ptr) { \
-		acx_free_coherent(0, size, ptr, phyaddr); \
+		free_coherent(0, size, ptr, phyaddr); \
 		ptr = NULL; \
 		size = 0; \
 	}
@@ -1702,10 +1559,10 @@ acx_free_desc_queues(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_s_delete_dma_regions
+** acxpci_s_delete_dma_regions
 */
 static void
-acx_s_delete_dma_regions(wlandevice_t *priv)
+acxpci_s_delete_dma_regions(wlandevice_t *priv)
 {
 	unsigned long flags;
 
@@ -1713,12 +1570,12 @@ acx_s_delete_dma_regions(wlandevice_t *priv)
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
 	 * here instead? Or are we that much down the road that it's no
 	 * longer possible here? */
-	acx_write_reg16(priv, IO_ACX_ENABLE, 0);
+	write_reg16(priv, IO_ACX_ENABLE, 0);
 
 	acx_s_msleep(100);
 
 	acx_lock(priv, flags);
-	acx_free_desc_queues(priv);
+	acxpci_free_desc_queues(priv);
 	acx_unlock(priv, flags);
 
 	FN_EXIT0;
@@ -1726,7 +1583,7 @@ acx_s_delete_dma_regions(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_e_probe_pci
+** acxpci_e_probe
 **
 ** Probe routine called when a PCI device w/ matching ID is found.
 ** Here's the sequence:
@@ -1827,26 +1684,10 @@ IO_ACX111[] =
 };
 
 static void
-acx_netdev_init(struct net_device *dev) {}
-
-//FIXME: do the same for USB
-static int
-acx_change_mtu(struct net_device *dev, int mtu)
-{
-	enum {
-		MIN_MTU = 256,
-		MAX_MTU = WLAN_DATA_MAXLEN - (ETH_HLEN)
-	};
-
-	if (mtu < MIN_MTU || mtu > MAX_MTU)
-		return -EINVAL;
-
-	dev->mtu = mtu;
-	return 0;
-}
+dummy_netdev_init(struct net_device *dev) {}
 
 static int __devinit
-acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
+acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	unsigned long mem_region1 = 0;
 	unsigned long mem_region2 = 0;
@@ -1906,14 +1747,14 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	chip_type = (u8)id->driver_data;
 	/* acx100 and acx111 have different PCI memory regions */
 	if (chip_type == CHIPTYPE_ACX100) {
-		chip_name = name_acx100;
+		chip_name = "ACX100";
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region1_size  = PCI_ACX100_REGION1_SIZE;
 
 		mem_region2 = PCI_ACX100_REGION2;
 		mem_region2_size  = PCI_ACX100_REGION2_SIZE;
 	} else if (chip_type == CHIPTYPE_ACX111) {
-		chip_name = name_acx111;
+		chip_name = "ACX111";
 		mem_region1 = PCI_ACX111_REGION1;
 		mem_region1_size  = PCI_ACX111_REGION1_SIZE;
 
@@ -1965,7 +1806,7 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_irq;
 	}
 
-	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", acx_netdev_init);
+	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", dummy_netdev_init);
 	/* (NB: memsets to 0 entire area) */
 	if (!dev) {
 		printk("acx: no memory for netdevice structure\n");
@@ -1973,8 +1814,8 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	ether_setup(dev);
-	dev->open = &acx_e_open;
-	dev->stop = &acx_e_close;
+	dev->open = &acxpci_e_open;
+	dev->stop = &acxpci_e_close;
 	dev->hard_start_xmit = &acx_i_start_xmit;
 	dev->get_stats = &acx_e_get_stats;
 	dev->get_wireless_stats = &acx_e_get_wireless_stats;
@@ -1983,9 +1824,9 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #else
 	dev->do_ioctl = &acx_e_ioctl_old;
 #endif
-	dev->set_multicast_list = &acx_i_set_multicast_list;
-	dev->tx_timeout = &acx_i_tx_timeout;
-	dev->change_mtu = &acx_change_mtu;
+	dev->set_multicast_list = &acxpci_i_set_multicast_list;
+	dev->tx_timeout = &acxpci_i_tx_timeout;
+	dev->change_mtu = &acx_e_change_mtu;
 	dev->watchdog_timeo = 4 * HZ;
 	dev->irq = pdev->irq;
 	dev->base_addr = pci_resource_start(pdev, 0);
@@ -2027,7 +1868,7 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 
 	/* register new dev in linked list */
-	acx_s_device_chain_add(dev);
+	acxpci_s_device_chain_add(dev);
 
 	acxlog(L_IRQ|L_INIT, "using IRQ %d\n", pdev->irq);
 
@@ -2040,15 +1881,15 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_save_state(pdev, priv->pci_state);
 #endif
 
-	/* NB: acx_read_reg() reads may return bogus data before reset_dev().
+	/* NB: read_reg() reads may return bogus data before reset_dev().
 	** acx100 seems to be more affected than acx111 */
-	if (OK != acx_s_reset_dev(dev)) {
+	if (OK != acxpci_s_reset_dev(dev)) {
 		goto fail_reset;
 	}
 
 	/* ok, basic setup is finished, now start initialising the card */
 
-	if (OK != acx_read_eeprom_offset(priv, 0x05, &priv->eeprom_version)) {
+	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version)) {
 		goto fail_read_eeprom_version;
 	}
 
@@ -2104,7 +1945,7 @@ acx_e_probe_pci(struct pci_dev *pdev, const struct pci_device_id *id)
 fail_proc_register_entries:
 
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
-		acx_s_down(dev);
+		acxpci_s_down(dev);
 
 	unregister_netdev(dev);
 
@@ -2116,7 +1957,7 @@ fail_proc_register_entries:
 
 fail_register_netdev:
 
-	acx_s_delete_dma_regions(priv);
+	acxpci_s_delete_dma_regions(priv);
 	pci_set_drvdata(pdev, NULL);
 
 fail_set_defaults:
@@ -2124,7 +1965,7 @@ fail_init_mac:
 fail_read_eeprom_version:
 fail_reset:
 
-	acx_s_device_chain_remove(dev);
+	acxpci_s_device_chain_remove(dev);
 	free_netdev(dev);
 fail_alloc_netdev:
 fail_irq:
@@ -2156,7 +1997,7 @@ done:
 
 
 /***********************************************************************
-** acx_e_remove_pci
+** acxpci_e_remove
 **
 ** Deallocate PCI resources for the acx chip.
 **
@@ -2167,7 +2008,7 @@ done:
 ** pdev - ptr to PCI device structure containing info about pci configuration
 */
 static void __devexit
-acx_e_remove_pci(struct pci_dev *pdev)
+acxpci_e_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev;
 	wlandevice_t *priv;
@@ -2186,7 +2027,7 @@ acx_e_remove_pci(struct pci_dev *pdev)
 
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device
-	 * NB: this will cause acx_e_close() to be called,
+	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem! */
 	acxlog(L_INIT, "removing device %s\n", dev->name);
 	unregister_netdev(dev);
@@ -2206,14 +2047,14 @@ acx_e_remove_pci(struct pci_dev *pdev)
 	acx_proc_unregister_entries(dev);
 
 	/* find our PCI device in the global acx list and remove it */
-	acx_s_device_chain_remove(dev);
+	acxpci_s_device_chain_remove(dev);
 
 	if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
-		acx_s_down(dev);
+		acxpci_s_down(dev);
 
 	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 
-	acx_s_delete_dma_regions(priv);
+	acxpci_s_delete_dma_regions(priv);
 
 	/* finally, clean up PCI bus state */
 	if (priv->iobase) iounmap(priv->iobase);
@@ -2245,11 +2086,12 @@ end:
 
 
 /***********************************************************************
+** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
 static int if_was_up = 0; /* FIXME: HACK, do it correctly sometime instead */
 static int
-acx_e_suspend(struct pci_dev *pdev, pm_message_t state)
+acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	wlandevice_t *priv = netdev_priv(dev);
@@ -2261,13 +2103,13 @@ acx_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	printk("acx: experimental suspend handler called for %p\n", priv);
 	if (netif_device_present(dev)) {
 		if_was_up = 1;
-		acx_s_down(dev);
+		acxpci_s_down(dev);
 	}
 	else
 		if_was_up = 0;
 
 	netif_device_detach(dev);	/* This one cannot sleep */
-	acx_s_delete_dma_regions(priv);
+	acxpci_s_delete_dma_regions(priv);
 
 	acx_sem_unlock(priv);
 
@@ -2276,7 +2118,7 @@ acx_e_suspend(struct pci_dev *pdev, pm_message_t state)
 }
 
 static int
-acx_e_resume(struct pci_dev *pdev)
+acxpci_e_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev;
 	wlandevice_t *priv;
@@ -2305,7 +2147,7 @@ acx_e_resume(struct pci_dev *pdev)
 	pci_restore_state(pdev, priv->pci_state);
 #endif
 	acxlog(L_DEBUG, "rsm: PCI state restored\n");
-	acx_s_reset_dev(dev);
+	acxpci_s_reset_dev(dev);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
 	if (OK != acx_s_init_mac(dev)) {
@@ -2315,7 +2157,7 @@ acx_e_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: init MAC done\n");
 
 	if (1 == if_was_up)
-		acx_s_up(dev);
+		acxpci_s_up(dev);
 	acxlog(L_DEBUG, "rsm: acx up\n");
 
 	/* now even reload all card parameters as they were before suspend,
@@ -2335,16 +2177,27 @@ fail: /* we need to return OK here anyway, right? */
 
 
 /***********************************************************************
-** acx_s_up
+** acxpci_s_up
 **
-** This function is called by acx_e_open (when ifconfig sets the device as up)
+** This function is called by acxpci_e_open (when ifconfig sets the device as up)
 **
 ** Side effects:
 ** - Enables on-card interrupt requests
-** - calls acx_start
+** - calls acx_s_start
 */
+
 static void
-acx_s_up(netdevice_t *dev)
+enable_acx_irq(wlandevice_t *priv)
+{
+	FN_ENTER;
+	write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask);
+	write_reg16(priv, IO_ACX_FEMR, 0x8000);
+	priv->irqs_active = 1;
+	FN_EXIT0;
+}
+
+static void
+acxpci_s_up(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	unsigned long flags;
@@ -2352,7 +2205,7 @@ acx_s_up(netdevice_t *dev)
 	FN_ENTER;
 
 	acx_lock(priv, flags);
-	acx_l_enable_irq(priv);
+	enable_acx_irq(priv);
 	acx_unlock(priv, flags);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
@@ -2382,15 +2235,26 @@ acx_s_up(netdevice_t *dev)
 
 
 /***********************************************************************
-** acx_s_down
+** acxpci_s_down
 **
 ** This disables the netdevice
 **
 ** Side effects:
 ** - disables on-card interrupt request
 */
+
 static void
-acx_s_down(netdevice_t *dev)
+disable_acx_irq(wlandevice_t *priv)
+{
+	FN_ENTER;
+	write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask_off);
+	write_reg16(priv, IO_ACX_FEMR, 0x0);
+	priv->irqs_active = 0;
+	FN_EXIT0;
+}
+
+static void
+acxpci_s_down(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	unsigned long flags;
@@ -2399,7 +2263,7 @@ acx_s_down(netdevice_t *dev)
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	acx_lock(priv, flags);
-	acx_l_disable_irq(priv);
+	disable_acx_irq(priv);
 	acx_unlock(priv, flags);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
@@ -2442,7 +2306,7 @@ acx_s_down(netdevice_t *dev)
 
 
 /***********************************************************************
-** acx_e_open
+** acxpci_e_open
 **
 ** Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
 ** from clear to set. In other words: ifconfig up.
@@ -2453,7 +2317,7 @@ acx_s_down(netdevice_t *dev)
 **	<0	driver reported error
 */
 static int
-acx_e_open(netdevice_t *dev)
+acxpci_e_open(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	int result = OK;
@@ -2468,7 +2332,7 @@ acx_e_open(netdevice_t *dev)
 	acx_init_task_scheduler(priv);
 
 	/* request shared IRQ handler */
-	if (request_irq(dev->irq, acx_i_interrupt, SA_SHIRQ, dev->name, dev)) {
+	if (request_irq(dev->irq, acxpci_i_interrupt, SA_SHIRQ, dev->name, dev)) {
 		printk("%s: request_irq FAILED\n", dev->name);
 		result = -EAGAIN;
 		goto done;
@@ -2476,7 +2340,7 @@ acx_e_open(netdevice_t *dev)
 	acxlog(L_DEBUG|L_IRQ, "request_irq %d successful\n", dev->irq);
 
 	/* ifup device */
-	acx_s_up(dev);
+	acxpci_s_up(dev);
 
 	/* We don't currently have to do anything else.
 	 * The setup of the MAC should be subsequently completed via
@@ -2494,7 +2358,7 @@ done:
 
 
 /***********************************************************************
-** acx_e_close
+** acxpci_e_close
 **
 ** Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
 ** from set to clear. I.e. called by "ifconfig DEV down"
@@ -2505,7 +2369,7 @@ done:
 **	<0	driver reported error
 */
 static int
-acx_e_close(netdevice_t *dev)
+acxpci_e_close(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 
@@ -2516,12 +2380,12 @@ acx_e_close(netdevice_t *dev)
 	/* ifdown device */
 	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 	if (netif_device_present(dev)) {
-		acx_s_down(dev);
+		acxpci_s_down(dev);
 	}
 
 	/* disable all IRQs, release shared IRQ handler */
-	acx_write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
-	acx_write_reg16(priv, IO_ACX_FEMR, 0x0);
+	write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	free_irq(dev->irq, dev);
 
 	/* We currently don't have to do anything else.
@@ -2541,12 +2405,12 @@ acx_e_close(netdevice_t *dev)
 
 
 /***********************************************************************
-** acx_i_tx_timeout
+** acxpci_i_tx_timeout
 **
 ** Called from network core. Must not sleep!
 */
 static void
-acx_i_tx_timeout(netdevice_t *dev)
+acxpci_i_tx_timeout(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	unsigned long flags;
@@ -2557,7 +2421,7 @@ acx_i_tx_timeout(netdevice_t *dev)
 	acx_lock(priv, flags);
 
 	/* clean processed tx descs, they may have been completely full */
-	tx_num_cleaned = acx_l_clean_tx_desc(priv);
+	tx_num_cleaned = acxpci_l_clean_txdesc(priv);
 
 	/* nothing cleaned, yet (almost) no free buffers available?
 	 * --> clean all tx descs, no matter which status!!
@@ -2571,7 +2435,7 @@ acx_i_tx_timeout(netdevice_t *dev)
 		printk("%s: FAILED to free any of the many full tx buffers. "
 			"Switching to emergency freeing. "
 			"Please report!\n", dev->name);
-		acx_l_clean_tx_desc_emergency(priv);
+		acxpci_l_clean_txdesc_emergency(priv);
 	}
 
 	if (acx_queue_stopped(dev) && (ACX_STATUS_4_ASSOCIATED == priv->status))
@@ -2591,33 +2455,11 @@ acx_i_tx_timeout(netdevice_t *dev)
 
 
 /***********************************************************************
-** acx_e_get_stats
-*/
-static struct net_device_stats*
-acx_e_get_stats(netdevice_t *dev)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	return &priv->stats;
-}
-
-
-/***********************************************************************
-** acx_e_get_wireless_stats
-*/
-static struct iw_statistics*
-acx_e_get_wireless_stats(netdevice_t *dev)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	return &priv->wstats;
-}
-
-
-/***********************************************************************
-** acx_i_set_multicast_list
+** acxpci_i_set_multicast_list
 ** FIXME: most likely needs refinement
 */
 static void
-acx_i_set_multicast_list(netdevice_t *dev)
+acxpci_i_set_multicast_list(netdevice_t *dev)
 {
 	wlandevice_t *priv = netdev_priv(dev);
 	unsigned long flags;
@@ -2649,50 +2491,98 @@ acx_i_set_multicast_list(netdevice_t *dev)
 	FN_EXIT0;
 }
 
+
+/***************************************************************
+** acxpci_l_process_rxdesc
+**
+** Called directly and only from the IRQ handler
+*/
+
+#if !ACX_DEBUG
+static inline void log_rxbuffer(const wlandevice_t *priv) {}
+#else
 static void
-acx_l_update_link_quality_led(wlandevice_t *priv)
+log_rxbuffer(const wlandevice_t *priv)
 {
-	int qual;
+	const struct rxhostdesc *rxhostdesc;
+	int i;
 
-	qual = acx_signal_determine_quality(priv->wstats.qual.level, priv->wstats.qual.noise);
-	if (qual > priv->brange_max_quality)
-		qual = priv->brange_max_quality;
+	/* no FN_ENTER here, we don't want that */
 
-	if (time_after(jiffies, priv->brange_time_last_state_change +
-				(HZ/2 - HZ/2 * (unsigned long) qual/priv->brange_max_quality ) )) {
-		acx_l_power_led(priv, (priv->brange_last_state == 0));
-		priv->brange_last_state ^= 1; /* toggle */
-		priv->brange_time_last_state_change = jiffies;
+	rxhostdesc = priv->rxhostdesc_start;
+	if (!rxhostdesc) return;
+	for (i = 0; i < RX_CNT; i++) {
+		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		 && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			printk("rx: buf %d full\n", i);
+		rxhostdesc++;
 	}
 }
+#endif
 
-
-/***********************************************************************
-** acx_l_enable_irq
-*/
 static void
-acx_l_enable_irq(wlandevice_t *priv)
+acxpci_l_process_rxdesc(wlandevice_t *priv)
 {
+	rxhostdesc_t *hostdesc;
+	int count,tail;
+
 	FN_ENTER;
-	acx_write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask);
-	acx_write_reg16(priv, IO_ACX_FEMR, 0x8000);
-	priv->irqs_active = 1;
+
+	if (unlikely(acx_debug & L_BUFR))
+		log_rxbuffer(priv);
+
+	/* First, have a loop to determine the first descriptor that's
+	 * full, just in case there's a mismatch between our current
+	 * rx_tail and the full descriptor we're supposed to handle. */
+	count = RX_CNT;
+	tail = priv->rx_tail;
+	while (1) {
+		hostdesc = &priv->rxhostdesc_start[tail];
+		/* advance tail regardless of outcome of the below test */
+		tail = (tail + 1) % RX_CNT;
+
+		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		 && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;		/* found it! */
+
+		if (--count)	/* hmm, no luck: all descs empty, bail out */
+			goto end;
+	}
+
+	/* now process descriptors, starting with the first we figured out */
+	while (1) {
+		acxlog(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
+			tail, hostdesc->Ctl_16, hostdesc->Status);
+
+		acx_l_process_rxbuf(priv, hostdesc->data);
+
+		hostdesc->Status = 0;
+		/* flush all writes before adapter sees CTL_HOSTOWN change */
+		wmb();
+		/* Host no longer owns this, needs to be LAST */
+		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+
+		/* ok, descriptor is handled, now check the next descriptor */
+		hostdesc = &priv->rxhostdesc_start[tail];
+
+		/* if next descriptor is empty, then bail out */
+		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		 || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;
+
+		tail = (tail + 1) % RX_CNT;
+	}
+end:
+	priv->rx_tail = tail;
 	FN_EXIT0;
 }
 
 
 /***********************************************************************
-** acx_l_disable_irq
+** acxpci_i_interrupt
+**
+** IRQ handler (atomic context, must not sleep, blah, blah)
 */
-static void
-acx_l_disable_irq(wlandevice_t *priv)
-{
-	FN_ENTER;
-	acx_write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask_off);
-	acx_write_reg16(priv, IO_ACX_FEMR, 0x0);
-	priv->irqs_active = 0;
-	FN_EXIT0;
-}
 
 /* scan is complete. all frames now on the receive queue are valid */
 #define INFO_SCAN_COMPLETE      0x0001
@@ -2705,8 +2595,58 @@ acx_l_disable_irq(wlandevice_t *priv)
 /* encryption/decryption process on a packet failed */
 #define INFO_IV_ICV_FAILURE     0x0005
 
+/* Info mailbox format:
+2 bytes: type
+2 bytes: status
+more bytes may follow
+    rumors say about status:
+	0x0000 info available (set by hw)
+	0x0001 information received (must be set by host)
+	0x1000 info available, mailbox overflowed (messages lost) (set by hw)
+    but in practice we've seen:
+	0x9000 when we did not set status to 0x0001 on prev message
+	0x1001 when we did set it
+	0x0000 was never seen
+    conclusion: this is really a bitfield:
+    0x1000 is 'info available' bit
+    'mailbox overflowed' bit is 0x8000, not 0x1000
+    value of 0x0000 probably means that there are no messages at all
+    P.S. I dunno how in hell hw is supposed to notice that messages are lost -
+    it does NOT clear bit 0x0001, and this bit will probably stay forever set
+    after we set it once. Let's hope this will be fixed in firmware someday
+*/
 static void
-acx_l_handle_info_irq(wlandevice_t *priv)
+read_info_status(wlandevice_t *priv)
+{
+	u32 value;
+
+	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1);
+
+	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
+		read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS));
+
+	/* make sure we only read the data once all cfg registers are written: */
+	write_flush(priv);
+	value = read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+
+	priv->info_type = (u16)value;
+	priv->info_status = (value >> 16);
+
+	/* inform hw that we have read this info message */
+	write_reg32(priv, IO_ACX_SLV_MEM_DATA, priv->info_type | 0x00010000);
+	write_flush(priv);
+	/* now bother hw to notice it: */
+	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
+	write_flush(priv);
+
+	acxlog(L_CTL, "info_type 0x%04X, info_status 0x%04X\n",
+			priv->info_type, priv->info_status);
+}
+
+
+static void
+handle_info_irq(wlandevice_t *priv)
 {
 #if ACX_DEBUG
 	static const char * const info_type_msg[] = {
@@ -2729,7 +2669,7 @@ acx_l_handle_info_irq(wlandevice_t *priv)
 		"TKIP IV value exceeds thresh"
 	};
 #endif
-	acx_read_info_status(priv);
+	read_info_status(priv);
 	acxlog(L_IRQ, "got Info IRQ: status 0x%04X type 0x%04X: %s\n",
 		priv->info_status, priv->info_type,
 		info_type_msg[(priv->info_type >= VEC_SIZE(info_type_msg)) ?
@@ -2738,13 +2678,8 @@ acx_l_handle_info_irq(wlandevice_t *priv)
 }
 
 
-/***********************************************************************
-** acx_i_interrupt
-**
-** IRQ handler (atomic context, must not sleep, blah, blah)
-*/
 static void
-acx_log_unusual_irq(u16 irqtype) {
+log_unusual_irq(u16 irqtype) {
 	/*
 	if (!printk_ratelimit())
 		return;
@@ -2792,8 +2727,29 @@ acx_log_unusual_irq(u16 irqtype) {
 	printk(" IRQ(s)\n");
 }
 
+
+static void
+update_link_quality_led(wlandevice_t *priv)
+{
+	int qual;
+
+	qual = acx_signal_determine_quality(priv->wstats.qual.level, priv->wstats.qual.noise);
+	if (qual > priv->brange_max_quality)
+		qual = priv->brange_max_quality;
+
+	if (time_after(jiffies, priv->brange_time_last_state_change +
+				(HZ/2 - HZ/2 * (unsigned long)qual / priv->brange_max_quality ) )) {
+		acxpci_l_power_led(priv, (priv->brange_last_state == 0));
+		priv->brange_last_state ^= 1; /* toggle */
+		priv->brange_time_last_state_change = jiffies;
+	}
+}
+
+
+#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) /* a la orinoco.c */
+
 static irqreturn_t
-acx_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	wlandevice_t *priv;
 	unsigned long flags;
@@ -2806,7 +2762,7 @@ acx_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * I am paranoid */
 	acx_lock(priv, flags);
 
-	unmasked = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR);
+	unmasked = read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR);
 	if (unlikely(0xffff == unmasked)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
@@ -2843,7 +2799,7 @@ if (jiffies != priv->irq_last_jiffies) {
 while (--irqcount) {
 #endif
 	/* ACK all IRQs asap */
-	acx_write_reg16(priv, IO_ACX_IRQ_ACK, 0xffff);
+	write_reg16(priv, IO_ACX_IRQ_ACK, 0xffff);
 
 	acxlog(L_IRQ, "IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
 				unmasked, priv->irq_mask, irqtype);
@@ -2851,7 +2807,7 @@ while (--irqcount) {
 	/* Handle most important IRQ types first */
 	if (irqtype & HOST_INT_RX_COMPLETE) {
 		acxlog(L_IRQ, "got Rx_Complete IRQ\n");
-		acx_l_process_rx_desc(priv);
+		acxpci_l_process_rxdesc(priv);
 	}
 	if (irqtype & HOST_INT_TX_COMPLETE) {
 		acxlog(L_IRQ, "got Tx_Complete IRQ\n");
@@ -2859,13 +2815,13 @@ while (--irqcount) {
 		 * unless we're going towards full, in which case
 		 * we do it immediately, too (otherwise we might lockup
 		 * with a full Tx buffer if we go into
-		 * acx_l_clean_tx_desc() at a time when we won't wakeup
+		 * acxpci_l_clean_txdesc() at a time when we won't wakeup
 		 * the net queue in there for some reason...) */
 		if (priv->tx_free <= TX_START_CLEAN) {
 #if TX_CLEANUP_IN_SOFTIRQ
 			acx_schedule_task(priv, ACX_AFTER_IRQ_TX_CLEANUP);
 #else
-			acx_l_clean_tx_desc(priv);
+			acxpci_l_clean_txdesc(priv);
 #endif
 		}
 	}
@@ -2882,7 +2838,7 @@ while (--irqcount) {
 			SET_BIT(priv->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 		if (irqtype & HOST_INT_INFO) {
-			acx_l_handle_info_irq(priv);
+			handle_info_irq(priv);
 		}
 		if (irqtype & HOST_INT_SCAN_COMPLETE) {
 			acxlog(L_IRQ, "got Scan_Complete IRQ\n");
@@ -2913,11 +2869,11 @@ while (--irqcount) {
 		| HOST_INT_FCS_THRESHOLD
 		| HOST_INT_UNKNOWN
 	)) {
-		acx_log_unusual_irq(irqtype);
+		log_unusual_irq(irqtype);
 	}
 
 #if IRQ_ITERATE
-	unmasked = acx_read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR);
+	unmasked = read_reg16(priv, IO_ACX_IRQ_STATUS_CLEAR);
 	irqtype = unmasked & ~priv->irq_mask;
 	/* Bail out if no new IRQ bits or if all are masked out */
 	if (!irqtype)
@@ -2926,7 +2882,7 @@ while (--irqcount) {
 	if (unlikely(++priv->irq_loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
 		printk(KERN_ERR "acx: too many interrupts per jiffy!\n");
 		/* Looks like card floods us with IRQs! Try to stop that */
-		acx_write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
+		write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
 		/* This will short-circuit all future attempts to handle IRQ.
 		 * We cant do much more... */
 		priv->irq_mask = 0;
@@ -2936,10 +2892,10 @@ while (--irqcount) {
 #endif
 	/* Routine to perform blink with range */
 	if (unlikely(priv->led_power == 2))
-		acx_l_update_link_quality_led(priv);
+		update_link_quality_led(priv);
 
 /* handled: */
-	/* acx_write_flush(priv); - not needed, last op was read anyway */
+	/* write_flush(priv); - not needed, last op was read anyway */
 	acx_unlock(priv, flags);
 	FN_EXIT0;
 	return IRQ_HANDLED;
@@ -2951,10 +2907,10 @@ none:
 
 
 /***********************************************************************
-** acx_l_power_led
+** acxpci_l_power_led
 */
 void
-acx_l_power_led(wlandevice_t *priv, int enable)
+acxpci_l_power_led(wlandevice_t *priv, int enable)
 {
 	u16 gpio_pled =	IS_ACX111(priv) ? 0x0040 : 0x0800;
 
@@ -2966,11 +2922,11 @@ acx_l_power_led(wlandevice_t *priv, int enable)
 		acxlog(L_IOCTL, "Please report in case toggling the power "
 				"LED doesn't work for your card!\n");
 	if (enable)
-		acx_write_reg16(priv, IO_ACX_GPIO_OUT,
-			acx_read_reg16(priv, IO_ACX_GPIO_OUT) & ~gpio_pled);
+		write_reg16(priv, IO_ACX_GPIO_OUT,
+			read_reg16(priv, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
-		acx_write_reg16(priv, IO_ACX_GPIO_OUT,
-			acx_read_reg16(priv, IO_ACX_GPIO_OUT) | gpio_pled);
+		write_reg16(priv, IO_ACX_GPIO_OUT,
+			read_reg16(priv, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 
 
@@ -3042,7 +2998,7 @@ acx111pci_ioctl_info(
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
-	acx_write_reg16(priv, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
+	write_reg16(priv, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
 
 	/* dump Acx111 Mem Configuration */
 	printk("dump mem config:\n"
@@ -3246,7 +3202,7 @@ acx111pci_ioctl_info(
 		txhostdesc++;
 	}
 
-	/* acx_write_reg16(priv, 0xb4, 0x4); */
+	/* write_reg16(priv, 0xb4, 0x4); */
 
 	acx_unlock(priv, flags);
 end_ok:
@@ -3291,8 +3247,8 @@ acx100pci_ioctl_set_phy_amp_bias(
 	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
 	 * IRQ handler uses it to update LED */
 	acx_lock(priv, flags);
-	gpio_old = acx_read_reg16(priv, IO_ACX_GPIO_OUT);
-	acx_write_reg16(priv, IO_ACX_GPIO_OUT, (gpio_old & 0xf8ff) | ((u16)*extra << 8));
+	gpio_old = read_reg16(priv, IO_ACX_GPIO_OUT);
+	write_reg16(priv, IO_ACX_GPIO_OUT, (gpio_old & 0xf8ff) | ((u16)*extra << 8));
 	acx_unlock(priv, flags);
 
 	acxlog(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
@@ -3361,7 +3317,7 @@ end:
 void*
 acxpci_l_get_txbuf(wlandevice_t *priv, tx_t* tx_opaque)
 {
-	return acx_get_txhostdesc(priv, (txdesc_t*)tx_opaque)->data;
+	return get_txhostdesc(priv, (txdesc_t*)tx_opaque)->data;
 }
 
 
@@ -3385,7 +3341,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	if (len < WLAN_HDR_A3_LEN)
 		goto end;
 
-	hostdesc1 = acx_get_txhostdesc(priv, txdesc);
+	hostdesc1 = get_txhostdesc(priv, txdesc);
 	hostdesc2 = hostdesc1 + 1;
 
 	/* modify flag status in separate variable to be able to write it back
@@ -3454,7 +3410,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	}
 
 	/* used in tx cleanup routine for auto rate and accounting: */
-	acx_put_txc(priv, txdesc, clt);
+	put_txc(priv, txdesc, clt);
 
 	txdesc->total_length = cpu_to_le16(len);
 	hostdesc2->length = cpu_to_le16(len - WLAN_HDR_A3_LEN);
@@ -3511,8 +3467,8 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 //TODO: should it be a mmiowb() instead? we are protecting against race with write[bwl]()
 	/* flush writes before we tell the adapter that it's its turn now */
 	wmb();
-	acx_write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
-	acx_write_flush(priv);
+	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+	write_flush(priv);
 
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
@@ -3544,9 +3500,41 @@ end:
 
 
 /***********************************************************************
+** acxpci_l_clean_txdesc
+**
+** This function resets the txdescs' status when the ACX100
+** signals the TX done IRQ (txdescs have been processed), starting with
+** the pool index of the descriptor which we would use next,
+** in order to make sure that we can be as fast as possible
+** in filling new txdescs.
+** Everytime we get called we know where the next packet to be cleaned is.
 */
+
+#if !ACX_DEBUG
+static inline void log_txbuffer(const wlandevice_t *priv) {}
+#else
 static void
-acx_l_handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
+log_txbuffer(wlandevice_t *priv)
+{
+	txdesc_t *txdesc;
+	int i;
+
+	/* no FN_ENTER here, we don't want that */
+	/* no locks here, since it's entirely non-critical code */
+	txdesc = priv->txdesc_start;
+	if (!txdesc) return;
+	printk("tx: desc->Ctl8's:");
+	for (i = 0; i < TX_CNT; i++) {
+		printk(" %02X", txdesc->Ctl_8);
+		txdesc = move_txdesc(priv, txdesc, 1);
+	}
+	printk("\n");
+}
+#endif
+
+
+static void
+handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 {
 	const char *err = "unknown error";
 
@@ -3639,8 +3627,26 @@ acx_l_handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 }
 
 
-/***********************************************************************
-*/
+/* maps acx100 tx descr rate field to acx111 one */
+static u16
+rate100to111(u8 r)
+{
+	switch (r) {
+	case RATE100_1:	return RATE111_1;
+	case RATE100_2:	return RATE111_2;
+	case RATE100_5:
+	case (RATE100_5 | RATE100_PBCC511):	return RATE111_5;
+	case RATE100_11:
+	case (RATE100_11 | RATE100_PBCC511):	return RATE111_11;
+	case RATE100_22:	return RATE111_22;
+	default:
+		printk("acx: unexpected acx100 txrate: %u! "
+			"Please report\n", r);
+		return RATE111_2;
+	}
+}
+
+
 /* Theory of operation:
 ** client->rate_cap is a bitmask of rates client is capable of.
 ** client->rate_cfg is a bitmask of allowed (configured) rates.
@@ -3664,28 +3670,8 @@ acx_l_handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 **
 ** 22Mbit, of course, is PBCC always. */
 
-/* maps acx100 tx descr rate field to acx111 one */
-static u16
-rate100to111(u8 r)
-{
-	switch (r) {
-	case RATE100_1:	return RATE111_1;
-	case RATE100_2:	return RATE111_2;
-	case RATE100_5:
-	case (RATE100_5 | RATE100_PBCC511):	return RATE111_5;
-	case RATE100_11:
-	case (RATE100_11 | RATE100_PBCC511):	return RATE111_11;
-	case RATE100_22:	return RATE111_22;
-	default:
-		printk("acx: unexpected acx100 txrate: %u! "
-			"Please report\n", r);
-		return RATE111_2;
-	}
-}
-
-
 static void
-acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
+handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 			unsigned int idx, u8 rate100, u16 rate111, u8 error)
 {
 	u16 sent_rate;
@@ -3792,54 +3778,8 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 }
 
 
-/***********************************************************************
-** acx_l_log_txbuffer
-*/
-#if !ACX_DEBUG
-static inline void acx_l_log_txbuffer(const wlandevice_t *priv) {}
-#else
-static void
-acx_l_log_txbuffer(wlandevice_t *priv)
-{
-	txdesc_t *txdesc;
-	int i;
-
-	/* no FN_ENTER here, we don't want that */
-	/* no locks here, since it's entirely non-critical code */
-	txdesc = priv->txdesc_start;
-	if (!txdesc) return;
-	printk("tx: desc->Ctl8's:");
-	for (i = 0; i < TX_CNT; i++) {
-		printk(" %02X", txdesc->Ctl_8);
-		txdesc = move_txdesc(priv, txdesc, 1);
-	}
-	printk("\n");
-}
-#endif
-
-
-/***********************************************************************
-** acx_l_clean_tx_desc
-**
-** This function resets the txdescs' status when the ACX100
-** signals the TX done IRQ (txdescs have been processed), starting with
-** the pool index of the descriptor which we would use next,
-** in order to make sure that we can be as fast as possible
-** in filling new txdescs.
-** Oops, now we have our own index, so everytime we get called we know
-** where the next packet to be cleaned is.
-** Hmm, still need to loop through the whole ring buffer now,
-** since we lost sync for some reason when ping flooding or so...
-** (somehow we don't get the IRQ for acx_l_clean_tx_desc any more when
-** too many packets are being sent!)
-** FIXME: currently we only process one packet, but this gets out of
-** sync for some reason when ping flooding, so we need to loop,
-** but the previous smart loop implementation causes the ping latency
-** to rise dramatically (~3000 ms), at least on CardBus PheeNet WL-0022.
-** Dunno what to do :-\
-*/
 unsigned int
-acx_l_clean_tx_desc(wlandevice_t *priv)
+acxpci_l_clean_txdesc(wlandevice_t *priv)
 {
 	txdesc_t *txdesc;
 	struct client *txc;
@@ -3851,7 +3791,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_DEBUG))
-		acx_l_log_txbuffer(priv);
+		log_txbuffer(priv);
 
 	acxlog(L_BUFT, "tx: cleaning up bufs from %u\n", priv->tx_tail);
 
@@ -3876,7 +3816,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 			/* Moan a lot if none was cleaned */
 			if (!num_cleaned) {
 				if (!(acx_debug & L_DEBUG))
-					acx_l_log_txbuffer(priv);
+					log_txbuffer(priv);
 				printk("%s: clean_tx_desc: tail is not free. "
 					"tail:%d head:%d. Please report\n",
 					priv->netdev->name,
@@ -3903,7 +3843,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 			wlan_hdr_t *hdr;
 			txhostdesc_t *hostdesc;
 
-			hostdesc = acx_get_txhostdesc(priv, txdesc);
+			hostdesc = get_txhostdesc(priv, txdesc);
 			hdr = (wlan_hdr_t *)hostdesc->data;
 			MAC_COPY(wrqu.addr.sa_data, hdr->a1);
 			wireless_send_event(priv->netdev, IWEVTXDROP, &wrqu, NULL);
@@ -3941,13 +3881,13 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 		 * AFTER having done the work, it's faster */
 
 		/* do rate handling */
-		txc = acx_get_txc(priv, txdesc);
+		txc = get_txc(priv, txdesc);
 		if (txc && priv->rate_auto) {
-			acx_l_handle_txrate_auto(priv, txc, finger, r100, r111, error);
+			handle_txrate_auto(priv, txc, finger, r100, r111, error);
 		}
 
 		if (unlikely(error))
-			acx_l_handle_tx_error(priv, error, finger);
+			handle_tx_error(priv, error, finger);
 
 		if (IS_ACX111(priv))
 			acxlog(L_BUFT, "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X\n",
@@ -3970,7 +3910,7 @@ acx_l_clean_tx_desc(wlandevice_t *priv)
 /* clean *all* Tx descriptors, and regardless of their previous state.
  * Used for brute-force reset handling. */
 void
-acx_l_clean_tx_desc_emergency(wlandevice_t *priv)
+acxpci_l_clean_txdesc_emergency(wlandevice_t *priv)
 {
 	txdesc_t *txdesc;
 	int i;
@@ -3995,118 +3935,23 @@ acx_l_clean_tx_desc_emergency(wlandevice_t *priv)
 
 
 /***********************************************************************
-** acx_l_log_rxbuffer
-**
-** Called from IRQ context only
+** acxpci_s_create_tx_host_desc_queue
 */
-#if !ACX_DEBUG
-static inline void acx_l_log_rxbuffer(const wlandevice_t *priv) {}
-#else
-static void
-acx_l_log_rxbuffer(const wlandevice_t *priv)
-{
-	const struct rxhostdesc *rxhostdesc;
-	int i;
-
-	/* no FN_ENTER here, we don't want that */
-
-	rxhostdesc = priv->rxhostdesc_start;
-	if (!rxhostdesc) return;
-	for (i = 0; i < RX_CNT; i++) {
-		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		 && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			printk("rx: buf %d full\n", i);
-		rxhostdesc++;
-	}
-}
-#endif
-
-
-/***************************************************************
-** acx_l_process_rx_desc
-**
-** Called directly and only from the IRQ handler
-*/
-void
-acx_l_process_rx_desc(wlandevice_t *priv)
-{
-	rxhostdesc_t *hostdesc;
-	int count,tail;
-
-	FN_ENTER;
-
-	if (unlikely(acx_debug & L_BUFR)) {
-		acx_l_log_rxbuffer(priv);
-	}
-
-	/* First, have a loop to determine the first descriptor that's
-	 * full, just in case there's a mismatch between our current
-	 * rx_tail and the full descriptor we're supposed to handle. */
-	count = RX_CNT;
-	tail = priv->rx_tail;
-	while (1) {
-		hostdesc = &priv->rxhostdesc_start[tail];
-		/* advance tail regardless of outcome of the below test */
-		tail = (tail + 1) % RX_CNT;
-
-		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		 && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			break;		/* found it! */
-
-		if (--count)	/* hmm, no luck: all descs empty, bail out */
-			goto end;
-	}
-
-	/* now process descriptors, starting with the first we figured out */
-	while (1) {
-		acxlog(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
-			tail, hostdesc->Ctl_16, hostdesc->Status);
-
-		acx_l_process_rxbuf(priv, hostdesc->data);
-
-		hostdesc->Status = 0;
-		/* flush all writes before adapter sees CTL_HOSTOWN change */
-		wmb();
-		/* Host no longer owns this, needs to be LAST */
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-
-		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &priv->rxhostdesc_start[tail];
-
-		/* if next descriptor is empty, then bail out */
-		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		 || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			break;
-
-		tail = (tail + 1) % RX_CNT;
-	}
-end:
-	priv->rx_tail = tail;
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acx_s_create_tx_host_desc_queue
-*/
-static inline void*
-acx_alloc_coherent(struct pci_dev *hwdev, size_t size,
-			dma_addr_t *dma_handle, int flag)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
-	return dma_alloc_coherent(hwdev == NULL ? NULL : &hwdev->dev,
-			size, dma_handle, flag);
-#else
-#warning Using old PCI-specific DMA allocation, may fail with out-of-mem!
-#warning Upgrade kernel if it does...
-	return pci_alloc_consistent(hwdev, size, dma_handle);
-#endif
-}
 
 static void*
 allocate(wlandevice_t *priv, size_t size, dma_addr_t *phy, const char *msg)
 {
-	void *ptr = acx_alloc_coherent(priv->pdev, size, phy, GFP_KERNEL);
+	void *ptr;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
+	ptr = dma_alloc_coherent(priv->pdev ? &priv->pdev->dev : NULL,
+			size, phy, GFP_KERNEL);
+#else
+#warning Using old PCI-specific DMA allocation, may fail with out-of-mem!
+#warning Upgrade kernel if it does...
+	ptr = pci_alloc_consistent(priv->pdev, size, phy);
+#endif
+
 	if (ptr) {
 		acxlog(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
 				msg, (int)size, ptr, (unsigned long long)*phy);
@@ -4118,8 +3963,9 @@ allocate(wlandevice_t *priv, size_t size, dma_addr_t *phy, const char *msg)
 	return NULL;
 }
 
+
 static int
-acx_s_create_tx_host_desc_queue(wlandevice_t *priv)
+acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 {
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
@@ -4242,14 +4088,14 @@ fail:
 
 
 /***************************************************************
-** acx_s_create_rx_host_desc_queue
+** acxpci_s_create_rx_host_desc_queue
 */
 /* the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end */
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 
 static int
-acx_s_create_rx_host_desc_queue(wlandevice_t *priv)
+acxpci_s_create_rx_host_desc_queue(wlandevice_t *priv)
 {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
@@ -4311,24 +4157,24 @@ fail:
 
 
 /***************************************************************
-** acx_s_create_hostdesc_queues
+** acxpci_s_create_hostdesc_queues
 */
 int
-acx_s_create_hostdesc_queues(wlandevice_t *priv)
+acxpci_s_create_hostdesc_queues(wlandevice_t *priv)
 {
 	int result;
-	result = acx_s_create_tx_host_desc_queue(priv);
+	result = acxpci_s_create_tx_host_desc_queue(priv);
 	if (OK != result) return result;
-	result = acx_s_create_rx_host_desc_queue(priv);
+	result = acxpci_s_create_rx_host_desc_queue(priv);
 	return result;
 }
 
 
 /***************************************************************
-** acx_create_tx_desc_queue
+** acxpci_create_tx_desc_queue
 */
 static void
-acx_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
+acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -4411,10 +4257,10 @@ acx_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 
 
 /***************************************************************
-** acx_create_rx_desc_queue
+** acxpci_create_rx_desc_queue
 */
 static void
-acx_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
+acxpci_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
@@ -4471,13 +4317,13 @@ acx_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
 
 
 /***************************************************************
-** acx_create_desc_queues
+** acxpci_create_desc_queues
 */
 void
-acx_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start)
+acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start)
 {
-	acx_create_tx_desc_queue(priv, tx_queue_start);
-	acx_create_rx_desc_queue(priv, rx_queue_start);
+	acxpci_create_tx_desc_queue(priv, tx_queue_start);
+	acxpci_create_rx_desc_queue(priv, rx_queue_start);
 }
 
 
@@ -4541,7 +4387,7 @@ acxpci_s_proc_diag_output(char *p, wlandevice_t *priv)
 /***********************************************************************
 */
 int
-acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
+acxpci_proc_eeprom_output(char *buf, wlandevice_t *priv)
 {
 	char *p = buf;
 	int i;
@@ -4549,7 +4395,7 @@ acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 	FN_ENTER;
 
 	for (i = 0; i < 0x400; i++) {
-		acx_read_eeprom_offset(priv, i, p++);
+		acxpci_read_eeprom_byte(priv, i, p++);
 	}
 
 	FN_EXIT1(p - buf);
@@ -4560,7 +4406,7 @@ acx_proc_eeprom_output(char *buf, wlandevice_t *priv)
 /***********************************************************************
 */
 void
-acx_set_interrupt_mask(wlandevice_t *priv)
+acxpci_set_interrupt_mask(wlandevice_t *priv)
 {
 	if (IS_ACX111(priv)) {
 		priv->irq_mask = (u16) ~(0
@@ -4609,7 +4455,7 @@ acx_set_interrupt_mask(wlandevice_t *priv)
 /***********************************************************************
 */
 int
-acx100_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
+acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 {
 	/* since it can be assumed that at least the Maxim radio has a
 	 * maximum power output of 20dBm and since it also can be
@@ -4667,7 +4513,71 @@ acx100_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 
 
 /***********************************************************************
-** acx_e_init_module
+** Data for init_module/cleanup_module
+*/
+static const struct pci_device_id
+acxpci_id_tbl[] __devinitdata = {
+	{
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_TNETW1100A,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+		.driver_data = CHIPTYPE_ACX100,
+	},
+	{
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_TNETW1100B,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+		.driver_data = CHIPTYPE_ACX100,
+	},
+	{
+		.vendor = PCI_VENDOR_ID_TI,
+		.device = PCI_DEVICE_ID_TI_TNETW1130,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+		.driver_data = CHIPTYPE_ACX111,
+	},
+	{
+		.vendor = 0,
+		.device = 0,
+		.subvendor = 0,
+		.subdevice = 0,
+		.driver_data = 0,
+	}
+};
+
+MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
+
+/* FIXME: checks should be removed once driver is included in the kernel */
+#ifndef __devexit_p
+#warning *** your kernel is EXTREMELY old since it does not even know about
+#warning __devexit_p - this driver could easily FAIL to work, so better
+#warning upgrade your kernel! ***
+#define __devexit_p(x) x
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 11)
+/* pci_name() got introduced at start of 2.6.x,
+ * got mandatory (slot_name member removed) in 2.6.11-bk1 */
+#define pci_name(x) x->slot_name
+#endif
+
+static struct pci_driver
+acxpci_drv_id = {
+	.name        = "acx_pci",
+	.id_table    = acxpci_id_tbl,
+	.probe       = acxpci_e_probe,
+	.remove      = __devexit_p(acxpci_e_remove),
+#ifdef CONFIG_PM
+	.suspend     = acxpci_e_suspend,
+	.resume      = acxpci_e_resume
+#endif /* CONFIG_PM */
+};
+
+
+/***********************************************************************
+** acxpci_e_init_module
 **
 ** Module initialization routine, called once at module load time
 */
@@ -4695,14 +4605,14 @@ acxpci_e_init_module(void)
 	acxlog(L_INIT, "PCI module " WLAN_RELEASE " initialized, "
 		"waiting for cards to probe...\n");
 
-	res = pci_module_init(&acx_pci_drv_id);
+	res = pci_module_init(&acxpci_drv_id);
 	FN_EXIT1(res);
 	return res;
 }
 
 
 /***********************************************************************
-** acx_e_cleanup_module
+** acxpci_e_cleanup_module
 **
 ** Called at module unload time. This is our last chance to
 ** clean up after ourselves.
@@ -4717,9 +4627,9 @@ acxpci_e_cleanup_module(void)
 
 	/* Since the whole module is about to be unloaded,
 	 * we recursively shutdown all cards we handled instead
-	 * of doing it in remove_pci() (which will be activated by us
+	 * of doing it in acxpci_e_remove() (which will be activated by us
 	 * via pci_unregister_driver at the end).
-	 * remove_pci() might just get called after a card eject,
+	 * acxpci_e_remove() might just get called after a card eject,
 	 * that's why hardware operations have to be done here instead
 	 * when the hardware is available. */
 
@@ -4746,21 +4656,21 @@ acxpci_e_cleanup_module(void)
 
 		/* disable power LED to save power :-) */
 		acxlog(L_INIT, "switching off power LED to save power :-)\n");
-		acx_l_power_led(priv, 0);
+		acxpci_l_power_led(priv, 0);
 
 		/* stop our eCPU */
 		if (IS_ACX111(priv)) {
 			/* FIXME: does this actually keep halting the eCPU?
 			 * I don't think so...
 			 */
-			acx_l_reset_mac(priv);
+			acxpci_l_reset_mac(priv);
 		} else {
 			u16 temp;
 
 			/* halt eCPU */
-			temp = acx_read_reg16(priv, IO_ACX_ECPU_CTRL) | 0x1;
-			acx_write_reg16(priv, IO_ACX_ECPU_CTRL, temp);
-			acx_write_flush(priv);
+			temp = read_reg16(priv, IO_ACX_ECPU_CTRL) | 0x1;
+			write_reg16(priv, IO_ACX_ECPU_CTRL, temp);
+			write_flush(priv);
 		}
 
 		acx_unlock(priv, flags);
@@ -4773,8 +4683,8 @@ acxpci_e_cleanup_module(void)
 	up(&root_acx_dev_sem);
 
 	/* now let the PCI layer recursively remove
-	 * all PCI related things (acx_e_remove_pci()) */
-	pci_unregister_driver(&acx_pci_drv_id);
+	 * all PCI related things (acxpci_e_remove()) */
+	pci_unregister_driver(&acxpci_drv_id);
 
 	FN_EXIT0;
 }

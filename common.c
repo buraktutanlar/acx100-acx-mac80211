@@ -568,6 +568,42 @@ acx_dump_bytes(const void *data, int num)
 
 
 /***********************************************************************
+*/
+int
+acx_e_change_mtu(struct net_device *dev, int mtu)
+{
+	enum {
+		MIN_MTU = 256,
+		MAX_MTU = WLAN_DATA_MAXLEN - (ETH_HLEN)
+	};
+
+	if (mtu < MIN_MTU || mtu > MAX_MTU)
+		return -EINVAL;
+
+	dev->mtu = mtu;
+	return 0;
+}
+
+
+/***********************************************************************
+** acx_e_get_stats, acx_e_get_wireless_stats
+*/
+struct net_device_stats*
+acx_e_get_stats(netdevice_t *dev)
+{
+	wlandevice_t *priv = netdev_priv(dev);
+	return &priv->stats;
+}
+
+struct iw_statistics*
+acx_e_get_wireless_stats(netdevice_t *dev)
+{
+	wlandevice_t *priv = netdev_priv(dev);
+	return &priv->wstats;
+}
+
+
+/***********************************************************************
 ** maps acx111 tx descr rate field to acx100 one
 */
 const u8
@@ -1068,7 +1104,7 @@ acx_e_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
 	length = 0;
 	if (IS_PCI(priv)) {
 		acx_sem_lock(priv);
-		length = acx_proc_eeprom_output(buf, priv);
+		length = acxpci_proc_eeprom_output(buf, priv);
 		acx_sem_unlock(priv);
 	}
 
@@ -1592,9 +1628,9 @@ acx100_s_create_dma_regions(wlandevice_t *priv)
 
 	if (IS_PCI(priv)) {
 	/* sets the beginning of the rx descriptor queue, after the tx descrs */
-		if (OK != acx_s_create_hostdesc_queues(priv))
+		if (OK != acxpci_s_create_hostdesc_queues(priv))
 			goto fail;
-		acx_create_desc_queues(priv, tx_queue_start, rx_queue_start);
+		acxpci_create_desc_queues(priv, tx_queue_start, rx_queue_start);
 	}
 
 	if (OK != acx_s_interrogate(priv, &memmap, ACX1xx_IE_MEMORY_MAP)) {
@@ -1626,7 +1662,7 @@ acx100_s_create_dma_regions(wlandevice_t *priv)
 fail:
 	acx_s_msleep(1000); /* ? */
 	if (IS_PCI(priv))
-		acx_free_desc_queues(priv);
+		acxpci_free_desc_queues(priv);
 end:
 	FN_EXIT1(res);
 	return res;
@@ -1654,7 +1690,7 @@ acx111_s_create_dma_regions(wlandevice_t *priv)
 
 	/* Set up our host descriptor pool + data pool */
 	if (IS_PCI(priv)) {
-		if (OK != acx_s_create_hostdesc_queues(priv))
+		if (OK != acxpci_s_create_hostdesc_queues(priv))
 			goto fail;
 	}
 
@@ -1717,13 +1753,13 @@ acx111_s_create_dma_regions(wlandevice_t *priv)
 		       rx_queue_start);
 
 	if (IS_PCI(priv))
-		acx_create_desc_queues(priv, tx_queue_start, rx_queue_start);
+		acxpci_create_desc_queues(priv, tx_queue_start, rx_queue_start);
 
 	FN_EXIT1(OK);
 	return OK;
 fail:
 	if (IS_PCI(priv))
-		acx_free_desc_queues(priv);
+		acxpci_free_desc_queues(priv);
 
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -1755,7 +1791,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 
 	/* set our global interrupt mask */
 	if (IS_PCI(priv))
-		acx_set_interrupt_mask(priv);
+		acxpci_set_interrupt_mask(priv);
 
 	priv->led_power = 1; /* LED is active on startup */
 	priv->brange_max_quality = 60; /* LED blink max quality is 60 */
@@ -1776,11 +1812,11 @@ acx_s_set_defaults(wlandevice_t *priv)
 	if (IS_PCI(priv)) {
 		if (IS_ACX111(priv)) {
 			/* Hope this is correct, only tested with domain 0x30 */
-			acx_read_eeprom_offset(priv, 0x16F, &priv->reg_dom_id);
+			acxpci_read_eeprom_byte(priv, 0x16F, &priv->reg_dom_id);
 		} else if (priv->eeprom_version < 5) {
-			acx_read_eeprom_offset(priv, 0x16F, &priv->reg_dom_id);
+			acxpci_read_eeprom_byte(priv, 0x16F, &priv->reg_dom_id);
 		} else {
-			acx_read_eeprom_offset(priv, 0x171, &priv->reg_dom_id);
+			acxpci_read_eeprom_byte(priv, 0x171, &priv->reg_dom_id);
 		}
 	}
 
@@ -1922,7 +1958,7 @@ acx_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 		return acx111_s_set_tx_level(priv, level_dbm);
 	}
 	if (IS_PCI(priv)) {
-		return acx100_s_set_tx_level(priv, level_dbm);
+		return acx100pci_s_set_tx_level(priv, level_dbm);
 	}
 	return OK;
 }
@@ -1957,11 +1993,11 @@ acx_s_init_mac(netdevice_t *dev)
 
 	if (IS_PCI(priv)) {
 		priv->memblocksize = 256; /* 256 is default */
-		acx_init_mboxes(priv);
+		acxpci_init_mboxes(priv);
 		/* try to load radio for both ACX100 and ACX111, since both
 		 * chips have at least some firmware versions making use of an
 		 * external radio module */
-		acx_s_upload_radio(priv);
+		acxpci_s_upload_radio(priv);
 	} else {
 		priv->memblocksize = 128;
 	}
@@ -5783,7 +5819,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 
 		acx_lock(priv, flags);
 		if (IS_PCI(priv))
-			acx_l_power_led(priv, priv->led_power);
+			acxpci_l_power_led(priv, priv->led_power);
 		CLEAR_BIT(priv->set_mask, GETSET_LED_POWER);
 		acx_unlock(priv, flags);
 	}
@@ -6288,9 +6324,10 @@ acx_e_after_interrupt_task(void *data)
 		goto end; /* no jobs to do */
 
 #if TX_CLEANUP_IN_SOFTIRQ
+	/* can happen only on PCI */
 	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_TX_CLEANUP) {
 		acx_lock(priv, flags);
-		acx_l_clean_tx_desc(priv);
+		acxpci_l_clean_txdesc(priv);
 		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_TX_CLEANUP);
 		acx_unlock(priv, flags);
 	}
