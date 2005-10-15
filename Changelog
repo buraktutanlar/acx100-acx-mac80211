@@ -105,6 +105,10 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 08!
 
 
+[20051016] 0.3.13
+# Revert 20051013 fix, we have one which actually works.
+  Thanks Toni Inger <toni_inger@yahoo.com> for testing!
+
 [20051013]
 * trying to fix "yet another similar bug"
 * usb fix by Carlos Martin

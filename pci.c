@@ -2524,7 +2524,7 @@ static void
 acxpci_l_process_rxdesc(wlandevice_t *priv)
 {
 	rxhostdesc_t *hostdesc;
-	int count,tail;
+	int count, tail;
 
 	FN_ENTER;
 
@@ -3281,15 +3281,17 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	/* 2005-10-11: there were several bug reports on this happening
 	** but now cause seems to be understood & fixed */
-	if (unlikely(DESC_CTL_DONE != ctl8)) {
-		/* whoops, descr at current index is not free, so
-		 * ring buffer completely full??! */
-		printk("acx: BUG: tx_head:%d Ctl8:0x%02X (expected "
-			"0x"DESC_CTL_DONE_STR"): failed to find "
-			"free tx descr\n", head, ctl8);
+	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_DONE))) {
+		/* whoops, descr at current index is not free, so probably
+		 * ring buffer already full */
+		printk("acx: BUG: tx_head:%d Ctl8:0x%02X - failed to find "
+			"free txdesc\n", head, ctl8);
 		txdesc = NULL;
 		goto end;
 	}
+
+	/* Needed in case txdesc won't be eventually submitted for tx */
+	txdesc->Ctl_8 = DESC_CTL_DONE;
 
 	priv->tx_free--;
 	acxlog(L_BUFT, "tx: got desc %u, %u remain\n",
@@ -3451,8 +3453,8 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* don't need to clean ack/rts statistics here, already
 	 * done on descr cleanup */
 
-	/* clears Ctl DESC_CTL_DONE bits, thus telling that the descriptors
-	 * are now owned by the acx; do this as LAST operation */
+	/* clears HOSTOWN and ACXDONE bits, thus telling that the descriptors
+	 * are now owned by the acx100; do this as LAST operation */
 	CLEAR_BIT(Ctl_8, DESC_CTL_DONE);
 	/* flush writes before we release hostdesc to the adapter here */
 	wmb();
@@ -3854,17 +3856,10 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		txdesc->ack_failures = 0;
 		txdesc->rts_failures = 0;
 		txdesc->rts_ok = 0;
+		/* signal host owning it LAST, since ACX already knows that this
+		** descriptor is finished since it set Ctl_8 accordingly. */
+		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 
-		/* Signal host owning it LAST, since ACX already knows that this
-		** descriptor is finished since it set Ctl_8 accordingly.
-		** NB: older code was setting it to HOSTOWN.
-		** This would cause problem if txdesc got allocated but not
-		** submitted for tx (left as a "bubble") */
-
-		/* TODO: we may avoid setting this at all (just slightly modify
-		** check in alloc_tx) since DESC_CTL_DONE bits are already set */
-
-		txdesc->Ctl_8 = DESC_CTL_DONE;
 		priv->tx_free++;
 		num_cleaned++;
 
@@ -3925,7 +3920,7 @@ acxpci_l_clean_txdesc_emergency(wlandevice_t *priv)
 		txdesc->rts_failures = 0;
 		txdesc->rts_ok = 0;
 		txdesc->error = 0;
-		txdesc->Ctl_8 = DESC_CTL_DONE;
+		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 	}
 
 	priv->tx_free = TX_CNT;
@@ -4214,7 +4209,7 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 		/* FIXME: do we have to do the hostmemptr stuff here?? */
 		for (i = 0; i < TX_CNT; i++) {
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
-			txdesc->Ctl_8 = DESC_CTL_DONE;
+			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(txhostdesc_t);
