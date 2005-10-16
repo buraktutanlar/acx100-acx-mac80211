@@ -3275,13 +3275,19 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	FN_ENTER;
 
+	if(!priv->tx_free) {
+		printk("acx: BUG: no free txdesc left\n");
+		txdesc = NULL;
+		goto end;
+	}
+
 	head = priv->tx_head;
 	txdesc = get_txdesc(priv, head);
 	ctl8 = txdesc->Ctl_8;
 
 	/* 2005-10-11: there were several bug reports on this happening
 	** but now cause seems to be understood & fixed */
-	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_DONE))) {
+	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
 		printk("acx: BUG: tx_head:%d Ctl8:0x%02X - failed to find "
@@ -3291,7 +3297,7 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 	}
 
 	/* Needed in case txdesc won't be eventually submitted for tx */
-	txdesc->Ctl_8 = DESC_CTL_DONE;
+	txdesc->Ctl_8 = DESC_CTL_ACXDONE_HOSTOWN;
 
 	priv->tx_free--;
 	acxlog(L_BUFT, "tx: got desc %u, %u remain\n",
@@ -3455,7 +3461,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 
 	/* clears HOSTOWN and ACXDONE bits, thus telling that the descriptors
 	 * are now owned by the acx100; do this as LAST operation */
-	CLEAR_BIT(Ctl_8, DESC_CTL_DONE);
+	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
 	/* flush writes before we release hostdesc to the adapter here */
 	wmb();
 	CLEAR_BIT(hostdesc1->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
@@ -3814,7 +3820,7 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		** We may meet it on the next ring pass here. */
 
 		/* stop if not marked as "tx finished" and "host owned" */
-		if ((txdesc->Ctl_8 & DESC_CTL_DONE) != DESC_CTL_DONE) {
+		if ((txdesc->Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
 			/* Moan a lot if none was cleaned */
 			if (!num_cleaned) {
 				if (!(acx_debug & L_DEBUG))

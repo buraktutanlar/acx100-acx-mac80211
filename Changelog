@@ -107,7 +107,7 @@ TODO: from Efthym <efthym@gmx.net>:
 
 [20051016] 0.3.13
 # Revert 20051013 fix, we have one which actually works.
-  Thanks Toni Inger <toni_inger@yahoo.com> for testing!
+  Thanks Jacek Jablonski <yacek87@gmail.com> for testing!
 
 [20051013]
 * trying to fix "yet another similar bug"

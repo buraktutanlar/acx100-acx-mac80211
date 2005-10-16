@@ -765,11 +765,9 @@ typedef struct {
 #define DESC_CTL_HOSTOWN	0x80
 
 #define	DESC_CTL_INIT		(DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM | \
-				 DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG)
-#define	DESC_CTL_DONE		(DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
+				DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG)
+#define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
 
-#define DESC_CTL_HOSTOWN_STR	"80"
-#define	DESC_CTL_DONE_STR	"C0"
 /* Descriptor Status field
  */
 #define	DESC_STATUS_FULL	(1 << 31)
@@ -1210,7 +1208,7 @@ struct wlandevice {
 	u16		rx_config_1;
 	u16		rx_config_2;
 	u16		memblocksize;
-	u32		tx_free;
+	int		tx_free;
 
 	/*** Unknown ***/
 	u8		dtim_interval;
@@ -1222,7 +1220,7 @@ struct wlandevice {
 	/*** PCI stuff ***/
 #ifdef ACX_PCI
 	/* pointers to tx buffers, tx host descriptors (in host memory)
-	** and tx descrs in device memory */
+	** and tx descs in device memory */
 	u8		*txbuf_start;
 	txhostdesc_t	*txhostdesc_start;
 	txdesc_t	*txdesc_start;	/* points to PCI-mapped memory */
