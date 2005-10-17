@@ -2,7 +2,7 @@
 #define CONFIG_ACX_PCI 1
 #define CONFIG_ACX_USB 1
 
-#define WLAN_RELEASE "v0.3.13"
+#define WLAN_RELEASE "v0.3.14"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
@@ -34,9 +34,9 @@
 
 /* Locking: */
 /* very talkative */
-#define PARANOID_LOCKING 1
+/* #define PARANOID_LOCKING 1 */
 /* normal (use when bug-free) */
-/* #define DO_LOCKING 1 */
+#define DO_LOCKING 1
 /* else locking is disabled! */
 
 /* 0 - normal mode */

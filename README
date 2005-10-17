@@ -18,7 +18,12 @@ for bug hunting. Try older versions of the driver.
 
 Firmware images:
 
-Driver will try to load the following images via hotplug:
+You should not supply firmware_dir= parameter anymore. Driver will try
+to load the following images via hotplug (not from /usr/share/acx
+directory as older driver did, hotplug firmware directory location
+varies for different distros, try /lib/firmware or
+/usr/lib/hotplug/firmware):
+
 PCI driver:
 'tiacxNNNcMM' (NNN=100/111, MM=radio module ID (in uppercase hex)):
 combined firmware for specified chipset and radio.

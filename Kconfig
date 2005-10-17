@@ -16,7 +16,7 @@ config ACX
 
 config ACX_PCI
 	bool "TI acx100/acx111 802.11b/g PCI"
-	depends on PCI && ACX
+	depends on ACX && PCI
 	---help---
 	Include PCI and CardBus support in acx.
 
@@ -45,7 +45,7 @@ config ACX_PCI
 
 config ACX_USB
 	bool "TI acx100/acx111 802.11b/g USB"
-	depends on USB && ACX && BROKEN
+	depends on ACX && (USB=y || USB=ACX)
 	---help---
 	Include USB support in acx.
 
@@ -54,7 +54,7 @@ config ACX_USB
 
 	acx chipsets need their firmware loaded at startup.
 	You will need to provide a firmware image via hotplug.
-	
+
 	Firmware for USB device is requested from hotplug
 	by the 'tiacx100usb' name.
 

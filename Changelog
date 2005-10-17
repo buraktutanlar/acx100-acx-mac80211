@@ -4,34 +4,34 @@ do we need to do something like above for rxhostdescs/rxbufs?
 
 TODO: from Efthym <efthym@gmx.net>:
 13:12:42 wlan0: rx: 31 DUPs in 551 packets received in 10 sec
-13:12:48 wlan0: tx error 0x20, buf 20! (excessive Tx retries 
-13:12:48 wlan0: tx error 0x20, buf 21! (excessive Tx retries 
+13:12:48 wlan0: tx error 0x20, buf 20! (excessive Tx retries
+13:12:48 wlan0: tx error 0x20, buf 21! (excessive Tx retries
 13:12:48 wlan0: several excessive Tx retry errors occurred, a
-13:12:48 wlan0: tx error 0x20, buf 22! (excessive Tx retries 
-13:12:48 wlan0: tx error 0x20, buf 23! (excessive Tx retries 
-13:12:48 wlan0: tx error 0x20, buf 24! (excessive Tx retries 
+13:12:48 wlan0: tx error 0x20, buf 22! (excessive Tx retries
+13:12:48 wlan0: tx error 0x20, buf 23! (excessive Tx retries
+13:12:48 wlan0: tx error 0x20, buf 24! (excessive Tx retries
 13:12:48 wlan0: recalibrating radio
 13:12:48 wlan0: successfully recalibrated radio
-13:12:52 wlan0: tx error 0x20, buf 25! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 25! (excessive Tx retries
 13:12:52 wlan0: several excessive Tx retry errors occurred, a
-13:12:52 wlan0: tx error 0x20, buf 26! (excessive Tx retries 
-13:12:52 wlan0: tx error 0x20, buf 27! (excessive Tx retries 
-13:12:52 wlan0: tx error 0x20, buf 28! (excessive Tx retries 
-13:12:52 wlan0: tx error 0x20, buf 29! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 26! (excessive Tx retries
+13:12:52 wlan0: tx error 0x20, buf 27! (excessive Tx retries
+13:12:52 wlan0: tx error 0x20, buf 28! (excessive Tx retries
+13:12:52 wlan0: tx error 0x20, buf 29! (excessive Tx retries
 13:12:52 wlan0: several excessive Tx retry errors occurred, a
-13:12:52 wlan0: tx error 0x20, buf 30! (excessive Tx retries 
-13:12:52 wlan0: tx error 0x20, buf 31! (excessive Tx retries 
-13:12:52 wlan0: tx error 0x20, buf 00! (excessive Tx retries 
+13:12:52 wlan0: tx error 0x20, buf 30! (excessive Tx retries
+13:12:52 wlan0: tx error 0x20, buf 31! (excessive Tx retries
+13:12:52 wlan0: tx error 0x20, buf 00! (excessive Tx retries
 13:12:52 wlan0: less than 5 minutes since last radio recalibr
-13:12:58 wlan0: tx error 0x20, buf 01! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 01! (excessive Tx retries
 13:12:58 wlan0: several excessive Tx retry errors occurred, a
-13:12:58 wlan0: tx error 0x20, buf 02! (excessive Tx retries 
-13:12:58 wlan0: tx error 0x20, buf 03! (excessive Tx retries 
-13:12:58 wlan0: tx error 0x20, buf 04! (excessive Tx retries 
-13:12:58 wlan0: tx error 0x20, buf 05! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 02! (excessive Tx retries
+13:12:58 wlan0: tx error 0x20, buf 03! (excessive Tx retries
+13:12:58 wlan0: tx error 0x20, buf 04! (excessive Tx retries
+13:12:58 wlan0: tx error 0x20, buf 05! (excessive Tx retries
 13:12:58 wlan0: several excessive Tx retry errors occurred, a
 13:12:58 disabling above notification message
-13:12:58 wlan0: tx error 0x20, buf 06! (excessive Tx retries 
+13:12:58 wlan0: tx error 0x20, buf 06! (excessive Tx retries
 13:12:58 wlan0: tx error 0x20, buf 07!
 13:12:58 wlan0: tx error 0x20, buf 08!
 13:12:58 wlan0: less than 5 minutes since last radio recalibr
@@ -105,8 +105,13 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 08!
 
 
+[20051018] 0.3.14
+* update for 2.6.14-rc4-mm1
+* Kconfig bug (error if ACX=y, ACX_USB=y, USB=m) fixed
+* PARANOID_LOCKING off by default
+
 [20051016] 0.3.13
-# Revert 20051013 fix, we have one which actually works.
+* Revert 20051013 fix, we have one which actually works.
   Thanks Jacek Jablonski <yacek87@gmail.com> for testing!
 
 [20051013]
