@@ -105,6 +105,9 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 08!
 
 
+[20051019]
+* first step in proper auto rate handling for USB
+
 [20051018] 0.3.14
 * update for 2.6.14-rc4-mm1
 * Kconfig bug (error if ACX=y, ACX_USB=y, USB=m) fixed

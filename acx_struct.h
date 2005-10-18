@@ -495,10 +495,13 @@ typedef struct phy_hdr {
 #define RXBUF_BYTES_RCVD(rxbuf) (le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff)
 #define RXBUF_BYTES_USED(rxbuf) \
 		((le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff) + RXBUF_HDRSIZE)
+/* USBism */
+#define RXBUF_IS_TXSTAT(rxbuf) (le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0x8000)
 /*
 mac_cnt_rcvd:
     12 bits: length of frame from control field to last byte of FCS
-    4 bits: reserved
+    3 bits: reserved
+    1 bit: 1 = it's a tx status info, not a rx packet (USB only)
 
 mac_cnt_mblks:
     6 bits: number of memory block used to store frame in adapter memory
@@ -976,7 +979,7 @@ struct rxhostdesc {
 
 /* Used for usb_txbuffer.desc field */
 #define USB_TXBUF_TXDESC	0xA
-/* Used for usb_txbuffer.hostData field */
+/* Used for usb_txbuffer.hostdata field */
 #define USB_TXBUF_HD_ISDATA     0x10000
 #define USB_TXBUF_HD_DIRECTED   0x20000
 #define USB_TXBUF_HD_BROADCAST  0x40000
@@ -984,16 +987,29 @@ struct rxhostdesc {
 #define USB_TXBUF_HDRSIZE	14
 typedef struct usb_txbuffer {
 	u16	desc ACX_PACKED;
-	u16	MPDUlen ACX_PACKED;
+	u16	mpdu_len ACX_PACKED;
 	u8	index ACX_PACKED;
-	u8	txRate ACX_PACKED;
-	u32	hostData ACX_PACKED;
+	u8	rate ACX_PACKED;
+	u32	hostdata ACX_PACKED;
 	u8	ctrl1 ACX_PACKED;
 	u8	ctrl2 ACX_PACKED;
-	u16	dataLength ACX_PACKED;
+	u16	data_len ACX_PACKED;
 	/* wlan packet content is placed here: */
 	u8	data[WLAN_A4FR_MAXLEN_WEP_FCS] ACX_PACKED;
 } usb_txbuffer_t;
+
+/* USB returns either rx packets (see rxbuffer) or
+** these "tx status" structs: */
+typedef struct usb_txstatus {
+	u16	mac_cnt_rcvd ACX_PACKED;	/* only 12 bits are len! (0xfff) */
+	u8	queue_index ACX_PACKED;
+	u8	mac_status ACX_PACKED;
+	u32	hostdata ACX_PACKED;
+	u8	rate ACX_PACKED;
+	u8	ack_failures ACX_PACKED;
+	u8	rts_failures ACX_PACKED;
+	u8	rts_ok ACX_PACKED;
+} usb_txstatus_t;
 
 typedef struct usb_tx {
 	unsigned	busy:1;

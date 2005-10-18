@@ -1130,30 +1130,53 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	*/
 	while (remsize) {
 		if (remsize < RXBUF_HDRSIZE) {
-			printk("acx: truncated rx header (%d bytes)!\n",
+			printk("acx: truncated rx header (%d bytes)! ",
 				remsize);
+			acx_dump_bytes(ptr, remsize);
 			break;
 		}
+
 		packetsize = RXBUF_BYTES_USED(ptr);
 		acxlog(L_USBRXTX, "packet with packetsize=%d\n", packetsize);
+
+		if (RXBUF_IS_TXSTAT(ptr)) {
+			/* do rate handling */
+			usb_txstatus_t *stat = (void*)ptr;
+			client_t *clt = NULL; /* TODO: pass it in hostdata */
+
+			acxlog(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
+			"queue_index:%02X mac_status:%02X hostdata:%08X "
+			"rate:%02X ack_failures:%02X rts_failures:%02X "
+			"rts_ok:%02X\n",
+			stat->mac_cnt_rcvd,
+			stat->queue_index, stat->mac_status, stat->hostdata,
+			stat->rate, stat->ack_failures, stat->rts_failures,
+			stat->rts_ok);
+
+			if (clt && priv->rate_auto) {
+				acx_l_handle_txrate_auto(priv, clt, stat->rate,
+					0 /*rate111*/, 0 /*error*/);
+            		}
+			goto next;
+		}
+
 		if (packetsize > sizeof(rxbuffer_t)) {
 			printk("acx: packet exceeds max wlan "
-				"frame size (%d > %d). size=%d\n",
+				"frame size (%d > %d). size=%d bytes:",
 				packetsize, (int) sizeof(rxbuffer_t), size);
+			acx_dump_bytes(ptr, 16);
 			/* FIXME: put some real error-handling in here! */
 			break;
 		}
 
 		/* skip null packets (does this really happen?!) */
 		if (packetsize == RXBUF_HDRSIZE) {
-			remsize -= RXBUF_HDRSIZE;
-			if (acx_debug & L_USBRXTX) {
-				printk("acx: null packet, new remsize=%d. "
-					"header follows:\n", remsize);
+			//Should never happen
+			//if (acx_debug & L_USBRXTX) {
+				printk("acx: null packet: ");
 				acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-			}
-			ptr = (rxbuffer_t *)(((char *)ptr) + RXBUF_HDRSIZE);
-			continue;
+			//}
+			goto next;
 		}
 
 		if (packetsize > remsize) {
@@ -1161,24 +1184,25 @@ acx100usb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 			if (acx_debug & L_USBRXTX) {
 				printk("need to truncate packet, "
 					"packetsize=%d remsize=%d "
-					"size=%d\n",
+					"size=%d bytes:",
 					packetsize, remsize, size);
 				acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 			}
 			memcpy(&priv->rxtruncbuf, ptr, remsize);
 			priv->rxtruncsize = remsize;
 			break;
-		} else { /* packetsize <= remsize */
-			/* now handle the received data */
-			acx_l_process_rxbuf(priv, ptr);
+		}
 
-			ptr = (rxbuffer_t *)(((char *)ptr) + packetsize);
-			remsize -= packetsize;
-			if ((acx_debug & L_USBRXTX) && remsize) {
-				printk("more than one packet in buffer, "
-						"second packet hdr follows\n");
-				acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-			}
+		/* packetsize <= remsize */
+		/* now handle the received data */
+		acx_l_process_rxbuf(priv, ptr);
+next:
+		ptr = (rxbuffer_t *)(((char *)ptr) + packetsize);
+		remsize -= packetsize;
+		if ((acx_debug & L_USBRXTX) && remsize) {
+			printk("more than one packet in buffer, "
+						"second packet hdr:");
+			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 		}
 	}
 
@@ -1444,23 +1468,24 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 
 	/* fill the USB transfer header */
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
-	txbuf->MPDUlen = cpu_to_le16(wlanpkt_len);
-	txbuf->ctrl1 = 0;
-	txbuf->ctrl2 = 0;
-	txbuf->hostData = cpu_to_le32(wlanpkt_len | (rate100 << 24));
+	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
+	txbuf->index = 1;
+	txbuf->rate = rate100;
+
+	/* TODO: now we know what hostdata is for, use it properly */
+	txbuf->hostdata = cpu_to_le32(wlanpkt_len | (rate100 << 24));
+	if ( (WF_FC_FTYPEi & whdr->fc) == WF_FTYPE_DATAi )
+		SET_BIT(txbuf->hostdata, cpu_to_le32(USB_TXBUF_HD_ISDATA));
+	if (mac_is_directed(whdr->a1))
+		SET_BIT(txbuf->hostdata, cpu_to_le32(USB_TXBUF_HD_DIRECTED));
+	else if (mac_is_bcast(whdr->a1))
+		SET_BIT(txbuf->hostdata, cpu_to_le32(USB_TXBUF_HD_BROADCAST));
+
+	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == priv->preamble_cur)
 		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
-	SET_BIT(txbuf->ctrl1, DESC_CTL_FIRSTFRAG);
-	txbuf->txRate = rate100;
-	txbuf->index = 1;
-	txbuf->dataLength = cpu_to_le16(wlanpkt_len);
-
-	if ( (WF_FC_FTYPEi & whdr->fc) == WF_FTYPE_DATAi )
-		SET_BIT(txbuf->hostData, cpu_to_le32(USB_TXBUF_HD_ISDATA));
-	if (mac_is_directed(whdr->a1))
-		SET_BIT(txbuf->hostData, cpu_to_le32(USB_TXBUF_HD_DIRECTED));
-	else if (mac_is_bcast(whdr->a1))
-		SET_BIT(txbuf->hostData, cpu_to_le32(USB_TXBUF_HD_BROADCAST));
+	txbuf->ctrl2 = 0;
+	txbuf->data_len = cpu_to_le16(wlanpkt_len);
 
 	if (acx_debug & L_DATA) {
 		printk("dump of bulk out urb:\n");

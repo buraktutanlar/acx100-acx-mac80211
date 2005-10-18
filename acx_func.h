@@ -572,6 +572,8 @@ void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
 void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
+void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
+				u8 rate100, u16 rate111, u8 error);
 
 tx_t* acxpci_l_alloc_tx(wlandevice_t *priv);
 tx_t* acxusb_l_alloc_tx(wlandevice_t *priv);
