@@ -354,7 +354,7 @@ acx_up_helper(wlandevice_t *priv, const char* where)
 static inline void
 acx_stop_queue(netdevice_t *dev, const char *msg)
 {
-	if(netif_queue_stopped(dev))
+	if (netif_queue_stopped(dev))
 		return;
 
 	netif_stop_queue(dev);
@@ -573,7 +573,8 @@ u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
 void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
 void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
-				u8 rate100, u16 rate111, u8 error);
+				u8 rate100, u16 rate111, u8 error,
+				int pkts_to_ignore);
 
 tx_t* acxpci_l_alloc_tx(wlandevice_t *priv);
 tx_t* acxusb_l_alloc_tx(wlandevice_t *priv);
@@ -611,7 +612,6 @@ void acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr);
 
 u8 acx_rate111to100(u16);
 
-void acx100usb_l_tx_data(wlandevice_t *priv, struct txdesc *desc);
 int acx_s_set_defaults(wlandevice_t *priv);
 void acxpci_init_mboxes(wlandevice_t *priv);
 

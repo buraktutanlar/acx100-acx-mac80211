@@ -455,13 +455,8 @@ acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 {
 	FN_ENTER;
 
-	/* FIXME: we didn't use 32bit access here since mprusko said that
-	 * it results in distorted sensitivity on his card (huh!?!?
-	 * doesn't happen with my setup...)
-	 * But with the access reordering and flushing it
-	 * shouldn't happen any more...
-	 * FIXME: which radio is in the problematic card? My working one
-	 * is 0x11 */
+	/* mprusko said that 32bit accesses result in distorted sensitivity
+	 * on his card. Unconfirmed, looks like it's not true. */
 	write_reg32(priv, IO_ACX_PHY_DATA, value);
 	write_reg32(priv, IO_ACX_PHY_ADDR, reg);
 	write_flush(priv);
@@ -824,6 +819,7 @@ static void
 acxpci_write_cmd_type_or_status(wlandevice_t *priv, u32 val)
 {
 	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+//TODO: this write and flush below are bogus. Test without
 	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
 	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
@@ -855,6 +851,7 @@ acxpci_read_cmd_status(wlandevice_t *priv)
 	u32 value;
 
 	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
+//TODO: this write and flush below are bogus. Test without
 	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
 	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
@@ -2161,15 +2158,16 @@ acxpci_e_resume(struct pci_dev *pdev)
 	acxlog(L_DEBUG, "rsm: acx up\n");
 
 	/* now even reload all card parameters as they were before suspend,
-	 * and possibly be back in the network again already :-)
-	 * FIXME: should this be done in that scheduled task instead?? */
+	 * and possibly be back in the network again already :-) */
 	if (ACX_STATE_IFACE_UP & priv->dev_state_mask)
 		acx_s_update_card_settings(priv, 0, 1);
 	acxlog(L_DEBUG, "rsm: settings updated\n");
 	netif_device_attach(dev);
 	acxlog(L_DEBUG, "rsm: device attached\n");
+
 fail: /* we need to return OK here anyway, right? */
 	acx_sem_unlock(priv);
+
 	FN_EXIT0;
 	return OK;
 }
@@ -2766,10 +2764,7 @@ acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (unlikely(0xffff == unmasked)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
-		 * FIXME: that's not very clean - maybe we are able to
-		 * establish a flag which definitely tells us that some
-		 * hardware is absent and which we could check here?
-		 * Hmm, but other drivers do the very same thing... */
+		 * Not very clean, but other drivers do the same... */
 		acxlog(L_IRQ, "IRQ type:FFFF - device removed? IRQ_NONE\n");
 		goto none;
 	}
@@ -3275,7 +3270,7 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	FN_ENTER;
 
-	if(!priv->tx_free) {
+	if (!priv->tx_free) {
 		printk("acx: BUG: no free txdesc left\n");
 		txdesc = NULL;
 		goto end;
@@ -3470,11 +3465,10 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	/* write back modified flags */
 	txdesc->Ctl2_8 = Ctl2_8;
 	txdesc->Ctl_8 = Ctl_8;
-
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
-//TODO: should it be a mmiowb() instead? we are protecting against race with write[bwl]()
+
 	/* flush writes before we tell the adapter that it's its turn now */
-	wmb();
+	mmiowb();
 	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 	write_flush(priv);
 
@@ -3669,14 +3663,11 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		** We may meet it on the next ring pass here. */
 
 		/* stop if not marked as "tx finished" and "host owned" */
-		if ((txdesc->Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
-			/* Moan a lot if none was cleaned */
-			if (!num_cleaned) {
-				if (!(acx_debug & L_DEBUG))
-					log_txbuffer(priv);
-				printk("%s: clean_tx_desc: tail is not free. "
-					"tail:%d head:%d. Please report\n",
-					priv->netdev->name,
+		if ((txdesc->Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN)
+					!= DESC_CTL_ACXDONE_HOSTOWN) {
+			if (!num_cleaned) { /* maybe remove completely */
+				acxlog(L_BUFT, "clean_txdesc: tail isnt free. "
+					"tail:%d head:%d\n",
 					priv->tx_tail, priv->tx_head);
 			}
 			break;
@@ -3733,7 +3724,8 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		/* do rate handling */
 		txc = get_txc(priv, txdesc);
 		if (txc && priv->rate_auto) {
-			acx_l_handle_txrate_auto(priv, txc, r100, r111, error);
+			acx_l_handle_txrate_auto(priv, txc, r100, r111, error,
+				TX_CNT + TX_CLEAN_BACKLOG - priv->tx_free);
 		}
 
 		if (unlikely(error))
@@ -4081,8 +4073,6 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 				"size: 0x%X\n", txdesc, priv->txdesc_size);
 
 			/* pointer to hostdesc memory */
-			/* FIXME: type-incorrect assignment, might cause trouble
-			 * in some cases */
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
 			/* initialise ctl */
 			txdesc->Ctl_8 = DESC_CTL_INIT;
@@ -4139,7 +4129,7 @@ acxpci_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
 		priv->rxdesc_start = (rxdesc_t *)
 			((u8 *) priv->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
 		/* NB: sizeof(txdesc_t) above is valid because we know
-		** we are in if(acx100) block. Beware of cut-n-pasting elsewhere!
+		** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
 		** acx111's txdesc is larger! */
 
 		memset(priv->rxdesc_start, 0, RX_CNT * sizeof(rxdesc_t));

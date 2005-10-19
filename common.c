@@ -1258,7 +1258,7 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 
 	tmp.beacon_interval = cpu_to_le16(priv->beacon_interval);
 
-	/* basic rate set. Control frame responses (such as ACK or CTS frames)
+	/* Basic rate set. Control frame responses (such as ACK or CTS frames)
 	** are sent with one of these rates */
 	if (IS_ACX111(priv)) {
 		/* It was experimentally determined that rates_basic
@@ -1267,15 +1267,14 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
 		tmp.u.acx111.rates_basic = cpu_to_le16(priv->rate_basic);
-		acxlog(L_ASSOC, "%s rates_basic %04X, rates_supported %04X\n",
-			__func__, priv->rate_basic, priv->rate_oper);
+		acxlog(L_ASSOC, "rates_basic:%04X, rates_supported:%04X\n",
+			priv->rate_basic, priv->rate_oper);
 	} else {
 		tmp.u.acx100.dtim_interval = dtim_interval;
 		tmp.u.acx100.rates_basic = rate111to5bits(priv->rate_basic);
 		tmp.u.acx100.rates_supported = rate111to5bits(priv->rate_oper);
-		acxlog(L_ASSOC, "%s rates_basic %04X->%02X, "
-			"rates_supported %04X->%02X\n",
-			__func__,
+		acxlog(L_ASSOC, "rates_basic:%04X->%02X, "
+			"rates_supported:%04X->%02X\n",
 			priv->rate_basic, tmp.u.acx100.rates_basic,
 			priv->rate_oper, tmp.u.acx100.rates_supported);
 	}
@@ -1636,13 +1635,6 @@ acx100_s_create_dma_regions(wlandevice_t *priv)
 	if (OK != acx_s_interrogate(priv, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
 	}
-
-/* [20050901] seems to be bogus. remove if no one complains */
-#if 0 /* #ifdef ACX_USB */
-	if (OK != acx_s_configure(priv, &memmap, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-#endif
 
 	memmap.PoolStart = cpu_to_le32(
 			(le32_to_cpu(memmap.QueueEnd) + 4 + 0x1f) & ~0x1f
@@ -2423,25 +2415,19 @@ rate100to111(u8 r)
 	default:
 		printk("acx: unexpected acx100 txrate: %u! "
 			"Please report\n", r);
-		return RATE111_2;
+		return RATE111_1;
 	}
 }
 
 
 void
 acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
-			u8 rate100, u16 rate111, u8 error)
+			u8 rate100, u16 rate111, u8 error,
+			int pkts_to_ignore)
 {
 	u16 sent_rate;
 	u16 cur = txc->rate_cur;
 	int slower_rate_was_used;
-
-	/* FIXME: need to implement some kind of rate success memory
-	 * which stores the success percentage per rate, to be taken
-	 * into account when considering allowing a new rate, since it
-	 * doesn't really help to stupidly count fallback/stepup,
-	 * since one invalid rate will spoil the party anyway
-	 * (such as 22M in case of 11M-only peers) */
 
 	/* vda: hmm. current code will do this:
 	** 1. send packets at 11 Mbit, stepup++
@@ -2452,6 +2438,11 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	**    11Mbit. go to step 1.
 	** If stepup_count is large (say, 16) and fallback_count
 	** is small (3), this wouldn't be too bad wrt throughput */
+
+	if (unlikely(!cur)) {
+		printk("acx: BUG! ratemask is empty\n");
+		return; /* or else we may lock up the box */
+	}
 
 	/* do some preparations, i.e. calculate the one rate that was
 	 * used to send this packet */
@@ -2475,7 +2466,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	/* we need to ignore old packets already in the tx queue since
 	 * they use older rate bytes configured before our last rate change,
 	 * otherwise our mechanism will get confused by interpreting old data.
-	 * Do it here only, in order to have the logging above */
+	 * Do it after logging above */
 	if (txc->ignore_count) {
 		txc->ignore_count--;
 		return;
@@ -2495,21 +2486,20 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 		sent_rate = RATE111_54;
 		while (!(cur & sent_rate)) sent_rate >>= 1;
 		CLEAR_BIT(cur, sent_rate);
-
-		if (cur) { /* we can't disable all rates! */
-			acxlog(L_XFER, "tx: falling back to ratemask %04X\n", cur);
-			txc->rate_cur = cur;
-			txc->ignore_count = TX_CNT - priv->tx_free;
-		}
-	} else if (!slower_rate_was_used) {
+		if (!cur) /* we can't disable all rates! */
+			cur = sent_rate;
+		acxlog(L_XFER, "tx: falling back to ratemask %04X\n", cur);
+		
+	} else { /* there was neither lower rate nor error */
 		txc->fallback_count = 0;
 		if (++txc->stepup_count <= priv->stepup_threshold)
 			return;
 		txc->stepup_count = 0;
 
-		/* sanitize. Sort of not needed, but I dont trust hw that much...
+		/* Sanitize. Sort of not needed, but I dont trust hw that much...
 		** what if it can report bogus tx rates sometimes? */
 		while (!(cur & sent_rate)) sent_rate >>= 1;
+
 		/* try to find a higher sent_rate that isn't yet in our
 		 * current set, but is an allowed cfg */
 		while (1) {
@@ -2524,11 +2514,10 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 		}
 		SET_BIT(cur, sent_rate);
 		acxlog(L_XFER, "tx: stepping up to ratemask %04X\n", cur);
-		txc->rate_cur = cur;
-		/* FIXME: totally bogus - we could be sending to many peers at once... */
-		txc->ignore_count = TX_CNT - priv->tx_free;
 	}
 
+	txc->rate_cur = cur;
+	txc->ignore_count = pkts_to_ignore;
 	/* calculate acx100 style rate byte if needed */
 	if (IS_ACX100(priv)) {
 		txc->rate_100 = bitpos2rate100[highest_bit(cur)];
@@ -2586,8 +2575,8 @@ acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 
 	tx = acx_l_alloc_tx(priv);
 	if (unlikely(!tx)) {
-		printk("%s: start_xmit: txdesc ring is full, dropping tx\n",
-			dev->name);
+		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
+			"dropping tx\n", dev->name);
 		txresult = NOT_OK;
 		goto end;
 	}
@@ -4006,11 +3995,13 @@ acx_l_process_assocresp(wlandevice_t *priv, const wlan_fr_assocresp_t *req)
 		u16 st = ieee2host16(*(req->status));
 		if (WLAN_MGMT_STATUS_SUCCESS == st) {
 			priv->aid = ieee2host16(*(req->aid));
-			/* tell the card we are associated when we are out of interrupt context */
+			/* tell the card we are associated when
+			** we are out of interrupt context */
 			acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_ASSOCIATE);
 		} else {
 
-			/* TODO: we shall delete peer from sta_list, and try other candidates... */
+			/* TODO: we shall delete peer from sta_list, and try
+			** other candidates... */
 
 			printk("%s: association FAILED: peer sent "
 				"response code %d (%s)\n",
@@ -5128,8 +5119,6 @@ acx_s_set_wepkey(wlandevice_t *priv)
 int
 acx100_s_init_wep(wlandevice_t *priv)
 {
-/*	int i;
-	acx100_cmd_wep_mgmt_t wep_mgmt;           size = 37 bytes */
 	acx100_ie_wep_options_t options;
 	ie_dot11WEPDefaultKeyID_t dk;
 	acx_ie_memmap_t pt;
@@ -5178,7 +5167,8 @@ acx100_s_init_wep(wlandevice_t *priv)
 				priv->wep_key_struct[i].index = i;
 			}
 		}
-	} */
+	}
+*/
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_s_interrogate(priv, &pt, ACX1xx_IE_MEMORY_MAP)) {
@@ -5612,10 +5602,10 @@ acx100_s_set_probe_request_template(wlandevice_t *priv)
 	acxlog(L_ASSOC, "SSID='%s' len=%d\n", priv->essid, priv->essid_len);
 	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
-	/* FIXME: should these be here or AFTER ds_parms? */
 	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
-	/* HUH?? who said it must be here? I've found nothing in 802.11! --vda*/
-	/* p = wlan_fill_ie_ds_parms(p, priv->channel); */
+//DELETE
+/* HUH?? who said it must be here? I've found nothing in 802.11! --vda*/
+/* p = wlan_fill_ie_ds_parms(p, priv->channel); */
 	frame_len = p - (char*)&probereq;
 	probereq.size = frame_len - 2;
 
@@ -5749,7 +5739,6 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 			acxlog(L_DEBUG, "resetting bssid\n");
 			MAC_ZERO(priv->bssid);
 			SET_BIT(priv->set_mask, SET_TEMPLATES|SET_STA_LIST);
-			/* FIXME: should start scanning */
 			start_scan = 1;
 		}
 	}
@@ -5865,7 +5854,6 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		switch (priv->mode) {
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_3_AP:
-			/* FIXME: why only for AP? STA need probe req templates... */
 			acx_s_set_beacon_template(priv);
 			acx_s_set_tim_template(priv);
 			/* BTW acx111 firmware would not send probe responses
@@ -6033,8 +6021,6 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 				priv->tx_disabled ? "disable" : "enable");
 		if (priv->tx_disabled)
 			acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			/*                                                 ^ */
-			/* FIXME: this used to be 1, but since we don't transfer a parameter... */
 		else
 			acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 1);
 		CLEAR_BIT(priv->set_mask, GETSET_TX);
@@ -6389,7 +6375,7 @@ acx_s_recalib_radio(wlandevice_t *priv)
 		/* automatic recalibration, choose all methods: */
 		cal.methods = cpu_to_le32(0x8000000f);
 		/* automatic recalibration every 60 seconds (value in TUs)
-		 * FIXME: what is the firmware default here?? */
+		 * I wonder what is the firmware default here? */
 		cal.interval = cpu_to_le32(58594);
 		return acx_s_issue_cmd_timeo(priv, ACX111_CMD_RADIOCALIB,
 			&cal, sizeof(cal), CMD_TIMEOUT_MS(100));

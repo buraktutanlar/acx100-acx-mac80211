@@ -221,7 +221,8 @@ enum { acx_debug = 0 };
 #define TX_CNT 16
 
 /* we clean up txdescs when we have N free txdesc: */
-#define TX_START_CLEAN (TX_CNT - (TX_CNT/4))
+#define TX_CLEAN_BACKLOG (TX_CNT/4)
+#define TX_START_CLEAN (TX_CNT - TX_CLEAN_BACKLOG)
 #define TX_EMERG_CLEAN 2
 /* we stop queue if we have less than N free txbufs: */
 #define TX_STOP_QUEUE 3
@@ -963,32 +964,14 @@ struct rxhostdesc {
 */
 #ifdef ACX_USB
 
-/* Buffer size for fw upload */
-#define ACX100_USB_RWMEM_MAXLEN	2048
-
-/* Should be sent to the ctrlout endpoint */
-#define ACX100_USB_ENBULKIN	6
-
-/* The number of bulk URBs to use */
-#define ACX100_USB_NUM_BULK_URBS 8
-
-/* Should be sent to the bulkout endpoint */
-#define ACX_USB_REQ_UPLOAD_FW	0x10
-#define ACX_USB_REQ_ACK_CS	0x11
-#define ACX_USB_REQ_CMD		0x12
-
 /* Used for usb_txbuffer.desc field */
 #define USB_TXBUF_TXDESC	0xA
-/* Used for usb_txbuffer.hostdata field */
-#define USB_TXBUF_HD_ISDATA     0x10000
-#define USB_TXBUF_HD_DIRECTED   0x20000
-#define USB_TXBUF_HD_BROADCAST  0x40000
 /* Size of header (everything up to data[]) */
 #define USB_TXBUF_HDRSIZE	14
 typedef struct usb_txbuffer {
 	u16	desc ACX_PACKED;
 	u16	mpdu_len ACX_PACKED;
-	u8	index ACX_PACKED;
+	u8	queue_index ACX_PACKED;
 	u8	rate ACX_PACKED;
 	u32	hostdata ACX_PACKED;
 	u8	ctrl1 ACX_PACKED;
@@ -1015,16 +998,24 @@ typedef struct usb_tx {
 	unsigned	busy:1;
 	struct urb	*urb;
 	wlandevice_t	*priv;
-	client_t	*txc;
 	/* actual USB bulk output data block is here: */
 	usb_txbuffer_t	bulkout;
 } usb_tx_t;
+
+struct usb_rx_plain {
+	unsigned	busy:1;
+	struct urb	*urb;
+	wlandevice_t	*priv;
+	rxbuffer_t	bulkin;
+};
 
 typedef struct usb_rx {
 	unsigned	busy:1;
 	struct urb	*urb;
 	wlandevice_t	*priv;
 	rxbuffer_t	bulkin;
+ /* Make entire structure 4k. Report if it breaks something. */
+	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
 } usb_rx_t;
 #endif /* ACX_USB */
 
@@ -1225,6 +1216,7 @@ struct wlandevice {
 	u16		rx_config_2;
 	u16		memblocksize;
 	int		tx_free;
+	int		tx_head;
 
 	/*** Unknown ***/
 	u8		dtim_interval;
@@ -1255,8 +1247,7 @@ struct wlandevice {
 	unsigned int	rxbuf_area_size;
 	unsigned int	rxhostdesc_area_size;
 
-	unsigned int	txdesc_size;	/* size per tx descr; ACX111 = ACX100 + 4 */
-	unsigned int	tx_head;	/* current ring buffer pool member index */
+	unsigned int	txdesc_size;	/* size of txdesc; ACX111 = ACX100 + 4 */
 	unsigned int	tx_tail;
 	unsigned int	rx_tail;
 

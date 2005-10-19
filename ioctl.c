@@ -1525,10 +1525,7 @@ acx_ioctl_get_nick(
 {
 	wlandevice_t *priv = netdev_priv(dev);
 
-	/* FIXME : consider spinlock here */
 	strcpy(extra, priv->nick);
-	/* FIXME : consider spinlock here */
-
 	dwrq->length = strlen(extra) + 1;
 
 	return OK;
@@ -2011,7 +2008,6 @@ end:
 
 /*----------------------------------------------------------------
 * acx_ioctl_set_tx_antenna
-*
 *
 * Arguments: 0 == antenna2; 1 == antenna1;
 * Comment: Could anybody test which antenna is the external one
@@ -2612,7 +2608,7 @@ static const iw_handler acx_ioctl_handler[] =
 #else /* IW_HANDLER_VERSION > 4 */
 #ifdef WIRELESS_SPY
 	(iw_handler) NULL /* acx_ioctl_set_spy FIXME */,	/* SIOCSIWSPY */
-	(iw_handler) NULL /* acx_ioctl_get_spy FIXME */,	/* SIOCGIWSPY */
+	(iw_handler) NULL /* acx_ioctl_get_spy */,		/* SIOCGIWSPY */
 #else /* WSPY */
 	(iw_handler) NULL,			/* SIOCSIWSPY */
 	(iw_handler) NULL,			/* SIOCGIWSPY */
@@ -2641,8 +2637,8 @@ static const iw_handler acx_ioctl_handler[] =
 	(iw_handler) acx_ioctl_get_rate,	/* SIOCGIWRATE */
 	(iw_handler) acx_ioctl_set_rts,		/* SIOCSIWRTS */
 	(iw_handler) acx_ioctl_get_rts,		/* SIOCGIWRTS */
-	(iw_handler) NULL /* acx_ioctl_set_frag FIXME */,	/* SIOCSIWFRAG */
-	(iw_handler) NULL /* acx_ioctl_get_frag FIXME */,	/* SIOCGIWFRAG */
+	(iw_handler) NULL /* acx_ioctl_set_frag FIXME*/,	/* SIOCSIWFRAG */
+	(iw_handler) NULL /* acx_ioctl_get_frag */,		/* SIOCGIWFRAG */
 	(iw_handler) acx_ioctl_set_txpow,	/* SIOCSIWTXPOW */
 	(iw_handler) acx_ioctl_get_txpow,	/* SIOCGIWTXPOW */
 	(iw_handler) acx_ioctl_set_retry,	/* SIOCSIWRETRY */
@@ -2789,7 +2785,6 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx_ioctl_get_iw_priv(iwr);
 		break;
 
-	/* FIXME: */
 	/* case SIOCSIWSPY: */
 	/* case SIOCGIWSPY: */
 	/* case SIOCSIWTHRSPY: */
@@ -2814,7 +2809,6 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 #if NOT_FINISHED_YET
-	/* FIXME: do proper interfacing to activate that! */
 	case SIOCSIWSCAN:
 		/* start a station scan */
 		result = acx_ioctl_set_scan(iwr, priv);
@@ -2915,7 +2909,6 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		result = acx_ioctl_get_rts(dev, NULL,  &(iwr->u.rts), NULL);
 		break;
 
-	/* FIXME: */
 	/* case  SIOCSIWFRAG: */
 	/* case  SIOCGIWFRAG: */
 

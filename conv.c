@@ -61,7 +61,7 @@ static inline int
 proto_is_stt(unsigned int proto)
 {
 	/* Always return found for now.  This is the behavior used by the */
-	/*  Zoom Win95 driver when 802.1h mode is selected */
+	/* Zoom Win95 driver when 802.1h mode is selected */
 	/* TODO: If necessary, add an actual search we'll probably
 		 need this to match the CMAC's way of doing things.
 		 Need to do some testing to confirm.

@@ -105,6 +105,9 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 08!
 
 
+[20051020] 0.3.15
+* Auto rate handling for USB is implemented. Untested.
+
 [20051019]
 * first step in proper auto rate handling for USB
 
