@@ -112,7 +112,6 @@ static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
 static int acxusb_e_open(struct net_device *);
 static int acxusb_e_close(struct net_device *);
 static void acxusb_i_set_rx_mode(struct net_device *);
-static int acxusb_e_init_network_device(struct net_device *);
 static int acxusb_boot(struct usb_device *);
 
 static void acxusb_l_poll_rx(wlandevice_t *, usb_rx_t* rx);
@@ -433,286 +432,6 @@ bad:
 
 
 /***********************************************************************
-** acxusb_e_probe()
-**
-** This function is invoked by the kernel's USB core whenever a new device is
-** attached to the system or the module is loaded. It is presented a usb_device
-** structure from which information regarding the device is obtained and evaluated.
-** In case this driver is able to handle one of the offered devices, it returns
-** a non-null pointer to a driver context and thereby claims the device.
-*/
-static void
-dummy_netdev_init(struct net_device *dev) {}
-
-static int
-acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
-{
-	struct usb_device *usbdev = interface_to_usbdev(intf);
-	wlandevice_t *priv = NULL;
-	struct net_device *dev = NULL;
-	struct usb_config_descriptor *config;
-	struct usb_endpoint_descriptor *epdesc;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
-	struct usb_host_endpoint *ep;
-#endif
-	struct usb_interface_descriptor *ifdesc;
-	const char* msg;
-	int numconfigs, numfaces, numep;
-	int result = OK;
-	int i;
-
-	FN_ENTER;
-
-	/* First check if this is the "unbooted" hardware */
-	if ((usbdev->descriptor.idVendor == ACX100_VENDOR_ID)
-	 && (usbdev->descriptor.idProduct == ACX100_PRODUCT_ID_UNBOOTED)) {
-		/* Boot the device (i.e. upload the firmware) */
-		acxusb_boot(usbdev);
-
-		/* OK, we are done with booting. Normally, the
-		** ID for the unbooted device should disappear
-		** and it will not need a driver anyway...so
-		** return a NULL
-		*/
-		acxlog(L_INIT, "finished booting, returning from probe()\n");
-		result = OK; /* success */
-		goto end;
-	}
-
-	if ((usbdev->descriptor.idVendor != ACX100_VENDOR_ID)
-	 || (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)) {
-		goto end_nodev;
-	}
-
-	/* Ok, so it's our device and it is already booted */
-
-	/* Allocate memory for a network device */
-	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", dummy_netdev_init);
-	/* (NB: memsets to 0 entire area) */
-	if (!dev) {
-		msg = "acx: no memory for netdev\n";
-		goto end_nomem;
-	}
-	dev->init = (void *)&acxusb_e_init_network_device;
-
-	/* Setup private driver context */
-	priv = netdev_priv(dev);
-	priv->netdev = dev;
-	priv->dev_type = DEVTYPE_USB;
-	priv->chip_type = CHIPTYPE_ACX100;
-	/* FIXME: should be read from register (via firmware) using standard ACX code */
-	priv->radio_type = RADIO_MAXIM_0D;
-	priv->usbdev = usbdev;
-
-	spin_lock_init(&priv->lock);    /* initial state: unlocked */
-	sema_init(&priv->sem, 1);       /* initial state: 1 (upped) */
-
-	/* Initialize the device context and also check
-	** if this is really the hardware we know about.
-	** If not sure, at least notify the user that he
-	** may be in trouble...
-	*/
-	numconfigs = (int)usbdev->descriptor.bNumConfigurations;
-	if (numconfigs != 1)
-		printk("acx: number of configurations is %d, "
-			"this driver only knows how to handle 1, "
-			"be prepared for surprises\n", numconfigs);
-
-	config = &usbdev->config->desc;
-	numfaces = config->bNumInterfaces;
-	if (numfaces != 1)
-		printk("acx: number of interfaces is %d, "
-			"this driver only knows how to handle 1, "
-			"be prepared for surprises\n", numfaces);
-
-	ifdesc = &intf->altsetting->desc;
-	numep = ifdesc->bNumEndpoints;
-	acxlog(L_DEBUG, "# of endpoints: %d\n", numep);
-
-	/* obtain information about the endpoint
-	** addresses, begin with some default values
-	*/
-	priv->bulkoutep = 1;
-	priv->bulkinep = 1;
-	for (i = 0; i < numep; i++) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
-		ep = usbdev->ep_in[i];
-		if (!ep)
-			continue;
-		epdesc = &ep->desc;
-#else
-		epdesc = usb_epnum_to_ep_desc(usbdev, i);
-		if (!epdesc)
-			continue;
-#endif
-		if (epdesc->bmAttributes & USB_ENDPOINT_XFER_BULK) {
-			if (epdesc->bEndpointAddress & 0x80)
-				priv->bulkinep = epdesc->bEndpointAddress & 0xF;
-			else
-				priv->bulkoutep = epdesc->bEndpointAddress & 0xF;
-		}
-	}
-	acxlog(L_DEBUG, "bulkout ep: 0x%X\n", priv->bulkoutep);
-	acxlog(L_DEBUG, "bulkin ep: 0x%X\n", priv->bulkinep);
-
-	/* already done by memset: priv->rxtruncsize = 0; */
-	acxlog(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
-				(int) TXBUFSIZE, (int) RXBUFSIZE);
-
-	priv->tx_free = ACX_URB_CNT;
-
-	/* Allocate the RX/TX containers. */
-	priv->usb_tx = kmalloc(sizeof(usb_tx_t) * ACX_URB_CNT, GFP_KERNEL);
-	if (!priv->usb_tx) {
-		msg = "acx: no memory for tx container";
-		goto end_nomem;
-	}
-	priv->usb_rx = kmalloc(sizeof(usb_rx_t) * ACX_URB_CNT, GFP_KERNEL);
-	if (!priv->usb_rx) {
-		msg = "acx: no memory for rx container";
-		goto end_nomem;
-	}
-
-	/* Setup URBs for bulk-in/out messages */
-	for (i = 0; i < ACX_URB_CNT; i++) {
-		priv->usb_rx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!priv->usb_rx[i].urb) {
-			msg = "acx: no memory for input URB\n";
-			goto end_nomem;
-		}
-		priv->usb_rx[i].urb->status = 0;
-		priv->usb_rx[i].priv = priv;
-		priv->usb_rx[i].busy = 0;
-
-		priv->usb_tx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
-		if (!priv->usb_tx[i].urb) {
-			msg = "acx: no memory for output URB\n";
-			goto end_nomem;
-		}
-		priv->usb_tx[i].urb->status = 0;
-		priv->usb_tx[i].priv = priv;
-		priv->usb_rx[i].busy = 0;
-	}
-
-	usb_set_intfdata(intf, priv);
-	SET_NETDEV_DEV(dev, &intf->dev);
-
-	/* Register the network device */
-	acxlog(L_INIT, "registering network device\n");
-	result = register_netdev(dev);
-	if (result != 0) {
-		msg = "acx: failed to register network device "
-			"for USB WLAN (errcode=%d)\n";
-		goto end_nomem;
-	}
-
-	if (OK != acx_proc_register_entries(dev)) {
-		printk("acx: /proc registration failed\n");
-	}
-
-	printk("acx: USB module " WLAN_RELEASE " loaded successfully\n");
-
-#if CMD_DISCOVERY
-	great_inquisitor(priv);
-#endif
-
-	/* Everything went OK, we are happy now	*/
-	result = OK;
-	goto end;
-
-end_nomem:
-	printk(msg, result);
-
-	if (dev) {
-		if (priv->usb_rx) {
-			for (i = 0; i < ACX_URB_CNT; i++)
-				usb_free_urb(priv->usb_rx[i].urb);
-			kfree(priv->usb_rx);
-		}
-		if (priv->usb_tx) {
-			for (i = 0; i < ACX_URB_CNT; i++)
-				usb_free_urb(priv->usb_tx[i].urb);
-			kfree(priv->usb_tx);
-		}
-		free_netdev(dev);
-	}
-
-	result = -ENOMEM;
-	goto end;
-
-end_nodev:
-
-	/* no device we could handle, return error. */
-	result = -EIO;
-
-end:
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-** acxusb_e_disconnect()
-**
-** This function is invoked whenever the user pulls the plug from the USB
-** device or the module is removed from the kernel. In these cases, the
-** network devices have to be taken down and all allocated memory has
-** to be freed.
-*/
-static void
-acxusb_e_disconnect(struct usb_interface *intf)
-{
-	wlandevice_t *priv = usb_get_intfdata(intf);
-	int i;
-	unsigned long flags;
-
-	FN_ENTER;
-
-	/* No WLAN device... no sense */
-	if (!priv)
-		goto end;
-
-	/* Unregister network device
-	 *
-	 * If the interface is up, unregister_netdev() will take
-	 * care of calling our close() function, which takes
-	 * care of unlinking the urbs, sending the device to
-	 * sleep, etc...
-	 * This can't be called with sem or lock held because
-	 * _close() will try to grab it as well if it's called,
-	 * deadlocking the machine.
-	 */
-	unregister_netdev(priv->netdev);
-
-	acx_sem_lock(priv);
-	acx_lock(priv, flags);
-	/* This device exists no more */
-	usb_set_intfdata(intf, NULL);
-	acx_proc_unregister_entries(priv->netdev);
-
-	/*
-	 * Here we only free them. _close() takes care of
-	 * unlinking them.
-	 */
-	for (i = 0; i < ACX_URB_CNT; ++i) {
-		usb_free_urb(priv->usb_rx[i].urb);
-		usb_free_urb(priv->usb_tx[i].urb);
-	}
-
-	/* The the containers. */
-	kfree(priv->usb_rx);
-	kfree(priv->usb_tx);
-
-	acx_unlock(priv, flags);
-	acx_sem_unlock(priv);
-
-	free_netdev(priv->netdev);
-end:
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
 ** acxusb_boot()
 ** Inputs:
 **    usbdev -> Pointer to kernel's usb_device structure
@@ -834,32 +553,72 @@ end:
 
 
 /***********************************************************************
-** acxusb_e_init_network_device()
-** Inputs:
-**    dev -> Pointer to network device
+** acxusb_e_probe()
 **
-** Basic setup of a network device for use with the WLAN device.
+** This function is invoked by the kernel's USB core whenever a new device is
+** attached to the system or the module is loaded. It is presented a usb_device
+** structure from which information regarding the device is obtained and evaluated.
+** In case this driver is able to handle one of the offered devices, it returns
+** a non-null pointer to a driver context and thereby claims the device.
 */
+
+static void
+dummy_netdev_init(struct net_device *dev) {}
+
 static int
-acxusb_e_init_network_device(struct net_device *dev)
+acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 {
-	wlandevice_t *priv;
-	int result = 0;
+	struct usb_device *usbdev = interface_to_usbdev(intf);
+	wlandevice_t *priv = NULL;
+	struct net_device *dev = NULL;
+	struct usb_config_descriptor *config;
+	struct usb_endpoint_descriptor *epdesc;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
+	struct usb_host_endpoint *ep;
+#endif
+	struct usb_interface_descriptor *ifdesc;
+	const char* msg;
+	int numconfigs, numfaces, numep;
+	int result = OK;
+	int i;
 
 	FN_ENTER;
 
-	/* Setup the device and stop the queue */
-	ether_setup(dev);
-	acx_stop_queue(dev, "on init");
+	/* First check if this is the "unbooted" hardware */
+	if ((usbdev->descriptor.idVendor == ACX100_VENDOR_ID)
+	 && (usbdev->descriptor.idProduct == ACX100_PRODUCT_ID_UNBOOTED)) {
+		/* Boot the device (i.e. upload the firmware) */
+		acxusb_boot(usbdev);
 
-	priv = netdev_priv(dev);
+		/* OK, we are done with booting. Normally, the
+		** ID for the unbooted device should disappear
+		** and it will not need a driver anyway...so
+		** return a NULL
+		*/
+		acxlog(L_INIT, "finished booting, returning from probe()\n");
+		result = OK; /* success */
+		goto end;
+	}
 
-	acx_sem_lock(priv);
+	if ((usbdev->descriptor.idVendor != ACX100_VENDOR_ID)
+	 || (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)) {
+		goto end_nodev;
+	}
 
-	/* put the ACX100 out of sleep mode */
-	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
+/* Ok, so it's our device and it has already booted */
+
+	/* Allocate memory for a network device */
+
+	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", dummy_netdev_init);
+	/* (NB: memsets to 0 entire area) */
+	if (!dev) {
+		msg = "acx: no memory for netdev\n";
+		goto end_nomem;
+	}
 
 	/* Register the callbacks for the network device functions */
+
+	ether_setup(dev);
 	dev->open = &acxusb_e_open;
 	dev->stop = &acxusb_e_close;
 	dev->hard_start_xmit = (void *)&acx_i_start_xmit;
@@ -876,21 +635,232 @@ acxusb_e_init_network_device(struct net_device *dev)
 	dev->watchdog_timeo = 4 * HZ;
 #endif
 	dev->change_mtu = &acx_e_change_mtu;
-	result = acx_s_init_mac(dev);
-	if (OK != result)
-		goto end;
-	result = acx_s_set_defaults(priv);
-	if (OK != result) {
-		printk("%s: acx_set_defaults FAILED\n", dev->name);
-		goto end;
+	SET_MODULE_OWNER(dev);
+
+	/* Setup private driver context */
+
+	priv = netdev_priv(dev);
+	priv->netdev = dev;
+	priv->dev_type = DEVTYPE_USB;
+	priv->chip_type = CHIPTYPE_ACX100;
+	/* FIXME: should be read from register (via firmware) using standard ACX code */
+	priv->radio_type = RADIO_MAXIM_0D;
+	priv->usbdev = usbdev;
+	spin_lock_init(&priv->lock);    /* initial state: unlocked */
+	sema_init(&priv->sem, 1);       /* initial state: 1 (upped) */
+
+	/* Check that this is really the hardware we know about.
+	** If not sure, at least notify the user that he
+	** may be in trouble...
+	*/
+	numconfigs = (int)usbdev->descriptor.bNumConfigurations;
+	if (numconfigs != 1)
+		printk("acx: number of configurations is %d, "
+			"this driver only knows how to handle 1, "
+			"be prepared for surprises\n", numconfigs);
+
+	config = &usbdev->config->desc;
+	numfaces = config->bNumInterfaces;
+	if (numfaces != 1)
+		printk("acx: number of interfaces is %d, "
+			"this driver only knows how to handle 1, "
+			"be prepared for surprises\n", numfaces);
+
+	ifdesc = &intf->altsetting->desc;
+	numep = ifdesc->bNumEndpoints;
+	acxlog(L_DEBUG, "# of endpoints: %d\n", numep);
+
+	/* obtain information about the endpoint
+	** addresses, begin with some default values
+	*/
+	priv->bulkoutep = 1;
+	priv->bulkinep = 1;
+	for (i = 0; i < numep; i++) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
+		ep = usbdev->ep_in[i];
+		if (!ep)
+			continue;
+		epdesc = &ep->desc;
+#else
+		epdesc = usb_epnum_to_ep_desc(usbdev, i);
+		if (!epdesc)
+			continue;
+#endif
+		if (epdesc->bmAttributes & USB_ENDPOINT_XFER_BULK) {
+			if (epdesc->bEndpointAddress & 0x80)
+				priv->bulkinep = epdesc->bEndpointAddress & 0xF;
+			else
+				priv->bulkoutep = epdesc->bEndpointAddress & 0xF;
+		}
+	}
+	acxlog(L_DEBUG, "bulkout ep: 0x%X\n", priv->bulkoutep);
+	acxlog(L_DEBUG, "bulkin ep: 0x%X\n", priv->bulkinep);
+
+	/* already done by memset: priv->rxtruncsize = 0; */
+	acxlog(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
+				(int) TXBUFSIZE, (int) RXBUFSIZE);
+
+	/* Allocate the RX/TX containers. */
+	priv->usb_tx = kmalloc(sizeof(usb_tx_t) * ACX_URB_CNT, GFP_KERNEL);
+	if (!priv->usb_tx) {
+		msg = "acx: no memory for tx container";
+		goto end_nomem;
+	}
+	priv->usb_rx = kmalloc(sizeof(usb_rx_t) * ACX_URB_CNT, GFP_KERNEL);
+	if (!priv->usb_rx) {
+		msg = "acx: no memory for rx container";
+		goto end_nomem;
 	}
 
-	SET_MODULE_OWNER(dev);
-end:
-	acx_sem_unlock(priv);
+	/* Setup URBs for bulk-in/out messages */
+	for (i = 0; i < ACX_URB_CNT; i++) {
+		priv->usb_rx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!priv->usb_rx[i].urb) {
+			msg = "acx: no memory for input URB\n";
+			goto end_nomem;
+		}
+		priv->usb_rx[i].urb->status = 0;
+		priv->usb_rx[i].priv = priv;
+		priv->usb_rx[i].busy = 0;
 
+		priv->usb_tx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!priv->usb_tx[i].urb) {
+			msg = "acx: no memory for output URB\n";
+			goto end_nomem;
+		}
+		priv->usb_tx[i].urb->status = 0;
+		priv->usb_tx[i].priv = priv;
+		priv->usb_tx[i].busy = 0;
+	}
+	priv->tx_free = ACX_URB_CNT;
+
+	usb_set_intfdata(intf, priv);
+	SET_NETDEV_DEV(dev, &intf->dev);
+
+//TODO: move all of fw cmds to open()? But then we won't know our MAC addr
+//until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)...
+
+	/* put acx out of sleep mode and initialize it */
+	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
+	result = acx_s_init_mac(dev);
+	if (result)
+		goto end;
+
+	acx_s_set_defaults(priv);
+        acx_s_get_firmware_version(priv);
+	acx_display_hardware_details(priv);
+	acx_proc_register_entries(dev);
+
+	/* Register the network device */
+	acxlog(L_INIT, "registering network device\n");
+	result = register_netdev(dev);
+	if (result) {
+		msg = "acx: failed to register USB network device "
+			"(error %d)\n";
+		goto end_nomem;
+	}
+	acx_stop_queue(dev, "on probe");
+	acx_carrier_off(dev, "on probe");
+
+	printk("acx: USB module " ACX_RELEASE " loaded successfully\n");
+
+#if CMD_DISCOVERY
+	great_inquisitor(priv);
+#endif
+
+	/* Everything went OK, we are happy now	*/
+	result = OK;
+	goto end;
+
+end_nomem:
+	printk(msg, result);
+
+	if (dev) {
+		if (priv->usb_rx) {
+			for (i = 0; i < ACX_URB_CNT; i++)
+				usb_free_urb(priv->usb_rx[i].urb);
+			kfree(priv->usb_rx);
+		}
+		if (priv->usb_tx) {
+			for (i = 0; i < ACX_URB_CNT; i++)
+				usb_free_urb(priv->usb_tx[i].urb);
+			kfree(priv->usb_tx);
+		}
+		free_netdev(dev);
+	}
+
+	result = -ENOMEM;
+	goto end;
+
+end_nodev:
+
+	/* no device we could handle, return error. */
+	result = -EIO;
+
+end:
 	FN_EXIT1(result);
 	return result;
+}
+
+
+/***********************************************************************
+** acxusb_e_disconnect()
+**
+** This function is invoked whenever the user pulls the plug from the USB
+** device or the module is removed from the kernel. In these cases, the
+** network devices have to be taken down and all allocated memory has
+** to be freed.
+*/
+static void
+acxusb_e_disconnect(struct usb_interface *intf)
+{
+	wlandevice_t *priv = usb_get_intfdata(intf);
+	unsigned long flags;
+	int i;
+
+	FN_ENTER;
+
+	/* No WLAN device... no sense */
+	if (!priv)
+		goto end;
+
+	/* Unregister network device
+	 *
+	 * If the interface is up, unregister_netdev() will take
+	 * care of calling our close() function, which takes
+	 * care of unlinking the urbs, sending the device to
+	 * sleep, etc...
+	 * This can't be called with sem or lock held because
+	 * _close() will try to grab it as well if it's called,
+	 * deadlocking the machine.
+	 */
+	unregister_netdev(priv->netdev);
+
+	acx_sem_lock(priv);
+	acx_lock(priv, flags);
+	/* This device exists no more */
+	usb_set_intfdata(intf, NULL);
+	acx_proc_unregister_entries(priv->netdev);
+
+	/*
+	 * Here we only free them. _close() took care of
+	 * unlinking them.
+	 */
+	for (i = 0; i < ACX_URB_CNT; ++i) {
+		usb_free_urb(priv->usb_rx[i].urb);
+		usb_free_urb(priv->usb_tx[i].urb);
+	}
+
+	/* The the containers. */
+	kfree(priv->usb_rx);
+	kfree(priv->usb_tx);
+
+	acx_unlock(priv, flags);
+	acx_sem_unlock(priv);
+
+	free_netdev(priv->netdev);
+end:
+	FN_EXIT0;
 }
 
 
@@ -926,7 +896,8 @@ acxusb_e_open(struct net_device *dev)
 	SET_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx_s_start(priv);
 
-	acx_start_queue(dev, "on open");
+/* seems to be bogus. We need to assoc first.
+	acx_start_queue(dev, "on open"); */
 
 	acx_lock(priv, flags);
 	for (i = 0; i < ACX_URB_CNT; i++) {
@@ -937,6 +908,80 @@ acxusb_e_open(struct net_device *dev)
 	WLAN_MOD_INC_USE_COUNT;
 
 	acx_sem_unlock(priv);
+
+	FN_EXIT0;
+	return 0;
+}
+
+
+/***********************************************************************
+** acxusb_e_close()
+**
+** This function stops the network functionality of the interface (invoked
+** when the user calls ifconfig <wlan> down). The tx queue is halted and
+** the device is marked as down. In case there were any pending USB bulk
+** transfers, these are unlinked (asynchronously). The module in-use count
+** is also decreased in this function.
+*/
+static int
+acxusb_e_close(struct net_device *dev)
+{
+	wlandevice_t *priv = netdev_priv(dev);
+	unsigned long flags;
+	int i;
+
+	FN_ENTER;
+
+#ifdef WE_STILL_DONT_CARE_ABOUT_IT
+	/* Transmit a disassociate frame */
+	lock
+	acx_l_transmit_disassoc(priv, &client);
+	unlock
+#endif
+
+	acx_sem_lock(priv);
+
+	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
+
+//Below code is remarkably similar to acxpci_s_down(). Maybe we can merge them?
+
+	/* Make sure we don't get any more rx requests */
+	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+
+	/*
+	 * We must do FLUSH *without* holding sem to avoid a deadlock.
+	 * See pci.c:acxpci_s_down() for deails.
+	 */
+	acx_sem_unlock(priv);
+	FLUSH_SCHEDULED_WORK();
+	acx_sem_lock(priv);
+
+	/* Power down the device */
+	acx_s_issue_cmd(priv, ACX1xx_CMD_SLEEP, NULL, 0);
+
+	/* Stop the transmit queue, mark the device as DOWN */
+	acx_lock(priv, flags);
+	acx_stop_queue(dev, "on ifdown");
+	acx_set_status(priv, ACX_STATUS_0_STOPPED);
+	/* stop pending rx/tx urb transfers */
+	for (i = 0; i < ACX_URB_CNT; i++) {
+		acxusb_unlink_urb(priv->usb_tx[i].urb);
+		acxusb_unlink_urb(priv->usb_rx[i].urb);
+		priv->usb_tx[i].busy = 0;
+		priv->usb_rx[i].busy = 0;
+	}
+	priv->tx_free = ACX_URB_CNT;
+	acx_unlock(priv, flags);
+
+	/* Must do this outside of lock */
+	del_timer_sync(&priv->mgmt_timer);
+
+	acx_sem_unlock(priv);
+
+	/* Decrease module-in-use count (if necessary) */
+
+	WLAN_MOD_DEC_USE_COUNT;
 
 	FN_EXIT0;
 	return 0;
@@ -1154,7 +1199,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 			 && stat->hostdata < VEC_SIZE(priv->sta_list)) {
 				client_t *clt = &priv->sta_list[stat->hostdata];
 				acx_l_handle_txrate_auto(priv, clt, stat->rate,
-					0 /*rate111*/, 0 /*error*/,
+					0 /*rate111*/, stat->mac_status /*error*/,
 					ACX_URB_CNT - priv->tx_free);
             		}
 			goto next;
@@ -1281,89 +1326,21 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* free the URB and check for more data	*/
-	priv->tx_free++;
-//if (++priv->tx_free > TX_START_QUEUE) netif_wake_queue(...)
 	tx->busy = 0;
+	priv->tx_free++;
+	if ((priv->tx_free >= TX_START_QUEUE)
+	 && (priv->status == ACX_STATUS_4_ASSOCIATED)
+	 && (acx_queue_stopped(priv->netdev))
+	) {
+		acxlog(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
+				priv->tx_free);
+		acx_wake_queue(priv->netdev, NULL);
+	}
 
 end_unlock:
 	acx_unlock(priv, flags);
 /* end: */
 	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acxusb_e_close()
-**
-** This function stops the network functionality of the interface (invoked
-** when the user calls ifconfig <wlan> down). The tx queue is halted and
-** the device is marked as down. In case there were any pending USB bulk
-** transfers, these are unlinked (asynchronously). The module in-use count
-** is also decreased in this function.
-*/
-static int
-acxusb_e_close(struct net_device *dev)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	unsigned long flags;
-	int i;
-
-	FN_ENTER;
-
-#ifdef WE_STILL_DONT_CARE_ABOUT_IT
-	/* Transmit a disassociate frame */
-	lock
-	acx_l_transmit_disassoc(priv, &client);
-	unlock
-#endif
-
-	acx_sem_lock(priv);
-
-	/* Make sure we don't get any more rx requests */
-	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-
-	/*
-	 * We must do FLUSH *without* holding sem to avoid a deadlock.
-	 * See pci.c:acxpci_s_down() for deails.
-	 */
-	acx_sem_unlock(priv);
-	FLUSH_SCHEDULED_WORK();
-	acx_sem_lock(priv);
-
-	/* Power down the device */
-	acx_s_issue_cmd(priv, ACX1xx_CMD_SLEEP, NULL, 0);
-
-	/* Stop the transmit queue, mark the device as DOWN */
-	acx_lock(priv, flags);
-	acx_stop_queue(dev, "on iface stop");
-	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
-	/* stop pending rx/tx urb transfers */
-	/* Make sure you don't free them! */
-	for (i = 0; i < ACX_URB_CNT; i++) {
-		acxusb_unlink_urb(priv->usb_rx[i].urb);
-		acxusb_unlink_urb(priv->usb_tx[i].urb);
-	}
-
-	del_timer_sync(&priv->mgmt_timer);
-
-	priv->tx_free = ACX_URB_CNT;
-
-	for (i = 0; i< ACX_URB_CNT; ++i) {
-		priv->usb_tx[i].busy = 0;
-		priv->usb_rx[i].busy = 0;
-	}
-
-	acx_unlock(priv, flags);
-
-	acx_sem_unlock(priv);
-
-	/* Decrease module-in-use count (if necessary) */
-
-	WLAN_MOD_DEC_USE_COUNT;
-
-	FN_EXIT0;
-	return 0;
 }
 
 
@@ -1386,6 +1363,14 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 			acxlog(L_USBRXTX, "allocated tx %d\n", head);
 			tx = &priv->usb_tx[head];
 			tx->busy = 1;
+			priv->tx_free--;
+			/* Keep a few free descs between head and tail of tx ring.
+			** It is not absolutely needed, just feels safer */
+			if (priv->tx_free < TX_STOP_QUEUE) {
+				acxlog(L_BUF, "stop queue (%u txbufs left)\n",
+				priv->tx_free);
+				acx_stop_queue(priv->netdev, NULL);
+			}
 			goto end;
 		}
 	} while (head!=priv->tx_head);
@@ -1434,10 +1419,6 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	txbuf = &tx->bulkout;
 	whdr = (wlan_hdr_t *)txbuf->data;
 	txnum = tx - priv->usb_tx;
-
-	priv->tx_free--;
-//if (--priv->tx_free < TX_STOP_QUEUE) netif_stop_queue(...)
-//also maybe move tx_free-- below in "if (ucode) {...} else { *HERE* }"
 
 	acxlog(L_DEBUG, "using buf#%d free=%d len=%d\n",
 			txnum, priv->tx_free, wlanpkt_len);
@@ -1510,6 +1491,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 		priv->stats.tx_errors++;
 		tx->busy = 0;
 		priv->tx_free++;
+		/* needed? if (priv->tx_free > TX_START_QUEUE) acx_wake_queue(...) */
 	}
 end:
 	FN_EXIT0;
@@ -1562,7 +1544,7 @@ acxusb_i_tx_timeout(struct net_device *dev)
 int __init
 acxusb_e_init_module(void)
 {
-	acxlog(L_INIT, "USB module " WLAN_RELEASE " initialized, "
+	acxlog(L_INIT, "USB module " ACX_RELEASE " initialized, "
 		"probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }

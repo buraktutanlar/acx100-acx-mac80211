@@ -568,6 +568,165 @@ acx_dump_bytes(const void *data, int num)
 
 
 /***********************************************************************
+** acx_s_get_firmware_version
+*/
+void
+acx_s_get_firmware_version(wlandevice_t *priv)
+{
+	fw_ver_t fw;
+	u8 hexarr[4] = { 0, 0, 0, 0 };
+	int hexidx = 0, val = 0;
+	const char *num;
+	char c;
+
+	FN_ENTER;
+
+	memset(fw.fw_id, 'E', FW_ID_SIZE);
+	acx_s_interrogate(priv, &fw, ACX1xx_IE_FWREV);
+	memcpy(priv->firmware_version, fw.fw_id, FW_ID_SIZE);
+	priv->firmware_version[FW_ID_SIZE] = '\0';
+
+	acxlog(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
+				priv->firmware_version, fw.hw_id);
+
+	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
+		printk("acx: strange firmware version string "
+			"'%s', please report\n", priv->firmware_version);
+		priv->firmware_numver = 0x01090407; /* assume 1.9.4.7 */
+	} else {
+		num = &fw.fw_id[4];
+		while (1) {
+			c = *num++;
+			if ((c == '.') || (c == '\0')) {
+				hexarr[hexidx++] = val;
+				if ((hexidx > 3) || (c == '\0')) /* end? */
+					break;
+				val = 0;
+				continue;
+			}
+			if ((c >= '0') && (c <= '9'))
+				c -= '0';
+			else
+				c = c - 'a' + (char)10;
+			val = val*16 + c;
+		}
+
+		priv->firmware_numver = (u32)(
+				(hexarr[0] << 24) + (hexarr[1] << 16)
+				+ (hexarr[2] << 8) + hexarr[3]);
+		acxlog(L_DEBUG, "firmware_numver 0x%08X\n", priv->firmware_numver);
+	}
+	if (IS_ACX111(priv)) {
+		if (priv->firmware_numver == 0x00010011) {
+			/* This one does not survive floodpinging */
+			printk("acx: firmware '%s' is known to be buggy, "
+				"please upgrade\n", priv->firmware_version);
+		}
+		if (priv->firmware_numver == 0x02030131) {
+			/* With this one, all rx packets look mangled
+			** Most probably we simply do not know how to use it
+			** properly */
+			printk("acx: firmware '%s' does not work well "
+				"with this driver\n", priv->firmware_version);
+		}
+	}
+
+	priv->firmware_id = le32_to_cpu(fw.hw_id);
+
+	/* we're able to find out more detailed chip names now */
+	switch (priv->firmware_id & 0xffff0000) {
+		case 0x01010000:
+		case 0x01020000:
+			priv->chip_name = "TNETW1100A";
+			break;
+		case 0x01030000:
+			priv->chip_name = "TNETW1100B";
+			break;
+		case 0x03000000:
+		case 0x03010000:
+			priv->chip_name = "TNETW1130";
+			break;
+		default:
+			printk("acx: unknown chip ID 0x%08X, "
+				"please report\n", priv->firmware_id);
+			break;
+	}
+
+	FN_EXIT0;
+}
+
+
+/***********************************************************************
+** acx_display_hardware_details
+**
+** Displays hw/fw version, radio type etc...
+*/
+void
+acx_display_hardware_details(wlandevice_t *priv)
+{
+	const char *radio_str, *form_str;
+
+	FN_ENTER;
+
+	switch (priv->radio_type) {
+	case RADIO_MAXIM_0D:
+		/* hmm, the DWL-650+ seems to have two variants,
+		 * according to a windows driver changelog comment:
+		 * RFMD and Maxim. */
+		radio_str = "Maxim";
+		break;
+	case RADIO_RFMD_11:
+		radio_str = "RFMD";
+		break;
+	case RADIO_RALINK_15:
+		radio_str = "Ralink";
+		break;
+	case RADIO_RADIA_16:
+		radio_str = "Radia";
+		break;
+	case RADIO_UNKNOWN_17:
+		/* TI seems to have a radio which is
+		 * additionally 802.11a capable, too */
+		radio_str = "802.11a/b/g radio?! Please report";
+		break;
+	case RADIO_UNKNOWN_19:
+		radio_str = "A radio used by Safecom cards?! Please report";
+		break;
+	default:
+		radio_str = "UNKNOWN, please report the radio type name!";
+		break;
+	}
+
+	switch (priv->form_factor) {
+	case 0x00:
+		form_str = "unspecified";
+		break;
+	case 0x01:
+		form_str = "(mini-)PCI / CardBus";
+		break;
+	case 0x02:
+		form_str = "USB";
+		break;
+	case 0x03:
+		form_str = "Compact Flash";
+		break;
+	default:
+		form_str = "UNKNOWN, please report";
+		break;
+	}
+
+	printk("acx: form factor 0x%02X (%s), "
+		"radio type 0x%02X (%s), EEPROM version 0x%02X, "
+		"uploaded firmware '%s' (0x%08X)\n",
+		priv->form_factor, form_str, priv->radio_type, radio_str,
+		priv->eeprom_version, priv->firmware_version,
+		priv->firmware_id);
+
+	FN_EXIT0;
+}
+
+
+/***********************************************************************
 */
 int
 acx_e_change_mtu(struct net_device *dev, int mtu)
@@ -840,7 +999,7 @@ acx_l_proc_output(char *buf, wlandevice_t *priv)
 	FN_ENTER;
 
 	p += sprintf(p,
-		"acx driver version:\t\t" WLAN_RELEASE "\n"
+		"acx driver version:\t\t" ACX_RELEASE "\n"
 		"Wireless extension version:\t" STRING(WIRELESS_EXT) "\n"
 		"chip name:\t\t\t%s (0x%08X)\n"
 		"radio type:\t\t\t0x%02X\n"
@@ -1156,7 +1315,7 @@ static const char * const
 proc_files[] = { "", "_diag", "_eeprom", "_phy" };
 
 static read_proc_t * const
-acx_proc_funcs[] = {
+proc_funcs[] = {
 	acx_e_read_proc,
 	acx_e_read_proc_diag,
 	acx_e_read_proc_eeprom,
@@ -1171,13 +1330,14 @@ manage_proc_entries(const struct net_device *dev, int remove)
 	char procbuf[80];
 	int i;
 
-	for (i = 0; i < 4; i++)	{
-		sprintf(procbuf, "driver/acx_%s", dev->name);
-		strcat(procbuf, proc_files[i]);
+	for (i = 0; i < VEC_SIZE(proc_files); i++)	{
+		sprintf(procbuf, "driver/acx_%s%s", dev->name, proc_files[i]);
 		if (!remove) {
 			acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
-			if (!create_proc_read_entry(procbuf, 0, 0, acx_proc_funcs[i], priv))
+			if (!create_proc_read_entry(procbuf, 0, 0, proc_funcs[i], priv)) {
+				printk("acx: cannot register /proc entry %s\n", procbuf);
 				return NOT_OK;
+			}
 		} else {
 			acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
 			remove_proc_entry(procbuf, NULL);
@@ -1760,9 +1920,8 @@ fail:
 
 /***********************************************************************
 ** acx_s_set_defaults
-** Called from acx_s_init_mac
 */
-int
+void
 acx_s_set_defaults(wlandevice_t *priv)
 {
 	unsigned long flags;
@@ -1799,7 +1958,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 
 	/* we have a nick field to waste, so why not abuse it
 	 * to announce the driver version? ;-) */
-	strncpy(priv->nick, "acx " WLAN_RELEASE, IW_ESSID_MAX_SIZE);
+	strncpy(priv->nick, "acx " ACX_RELEASE, IW_ESSID_MAX_SIZE);
 
 	if (IS_PCI(priv)) {
 		if (IS_ACX111(priv)) {
@@ -1904,8 +2063,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 
 	acx_s_initialize_rx_config(priv);
 
-	FN_EXIT1(OK);
-	return OK;
+	FN_EXIT0;
 }
 
 
@@ -2002,24 +2160,16 @@ acx_s_init_mac(netdevice_t *dev)
 		*/
 		if (OK != acx111_s_init_packet_templates(priv))
 			goto fail;
-
 		if (OK != acx111_s_create_dma_regions(priv)) {
 			printk("%s: acx111_create_dma_regions FAILED\n",
 							dev->name);
 			goto fail;
 		}
-#ifdef DEBUG_WEP
-		/* don't decrypt WEP in firmware */
-		if (OK != acx111_s_feature_on(priv, 0, FEATURE2_SNIFFER))
-			goto fail;
-#endif
 	} else {
 		if (OK != acx100_s_init_wep(priv))
 			goto fail;
-		acxlog(L_DEBUG, "between init_wep and init_packet_templates\n");
 		if (OK != acx100_s_init_packet_templates(priv))
 			goto fail;
-
 		if (OK != acx100_s_create_dma_regions(priv)) {
 			printk("%s: acx100_create_dma_regions FAILED\n",
 							dev->name);
@@ -2031,6 +2181,8 @@ acx_s_init_mac(netdevice_t *dev)
 	result = OK;
 
 fail:
+	if(result)
+		printk("acx: init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;
 }
@@ -3125,7 +3277,6 @@ acx_l_transmit_assocresp(wlandevice_t *priv, const wlan_fr_assocreq_t *req)
 	head->fc = WF_FSTYPE_ASSOCRESPi;
 	head->dur = req->hdr->dur;
 	MAC_COPY(head->da, da);
-	/* MAC_COPY(head->sa, sa); */
 	MAC_COPY(head->sa, priv->dev_addr);
 	MAC_COPY(head->bssid, bssid);
 	head->seq = req->hdr->seq;
@@ -3306,7 +3457,6 @@ acx_l_transmit_reassocresp(wlandevice_t *priv, const wlan_fr_reassocreq_t *req)
 	head->fc = WF_FSTYPE_REASSOCRESPi;
 	head->dur = req->hdr->dur;
 	MAC_COPY(head->da, da);
-	/* MAC_COPY(head->sa, sa); */
 	MAC_COPY(head->sa, priv->dev_addr);
 	MAC_COPY(head->bssid, bssid);
 	head->seq = req->hdr->seq;
@@ -4316,7 +4466,6 @@ acx_l_transmit_authen2(wlandevice_t *priv, const wlan_fr_authen_t *req,
 	head->fc = WF_FSTYPE_AUTHENi;
 	head->dur = req->hdr->dur;
 	MAC_COPY(head->da, req->hdr->a2);
-	/* MAC_COPY(head->sa, req->hdr->a1); */
 	MAC_COPY(head->sa, priv->dev_addr);
 	MAC_COPY(head->bssid, req->hdr->a3);
 	head->seq = req->hdr->seq;
@@ -4417,7 +4566,6 @@ acx_l_transmit_authen4(wlandevice_t *priv, const wlan_fr_authen_t *req)
 	head->fc = WF_FSTYPE_AUTHENi; /* 0xb0 */
 	head->dur = req->hdr->dur;
 	MAC_COPY(head->da, req->hdr->a2);
-	/* MAC_COPY(head->sa, req->hdr->a1); */
 	MAC_COPY(head->sa, priv->dev_addr);
 	MAC_COPY(head->bssid, req->hdr->a3);
 	head->seq = req->hdr->seq;
@@ -6348,11 +6496,7 @@ acx_s_initialize_rx_config(wlandevice_t *priv)
 			);
 		break;
 	}
-#ifdef DEBUG_WEP
-	if (IS_ACX100(priv))
-		/* only ACX100 supports that */
-#endif
-		priv->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
+	priv->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
 
 	acxlog(L_INIT, "setting RXconfig to %04X:%04X\n",
 			priv->rx_config_1, priv->rx_config_2);

@@ -139,7 +139,7 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		case WLAN_EID_UNKNOWN223:
 		/* was seen by Carlos Martin <carlosmn@gmail.com> from ???? */
 		/* DF 20 01 1E 04 00 00 00 06 63 09 02 FF 0F 30 30 */
-		/* 30 42 36 42 33 34 30 39 46 31 00 00 00 00 00 00 */
+		/* 30 42 36 42 33 34 30 39 46 31 00 00 00 00 00 00 00 00 */
 		case WLAN_EID_GENERIC:
 		/* WPA: hostap code:
 			if (pos[1] >= 4 &&

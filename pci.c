@@ -1215,168 +1215,6 @@ bad:
 
 
 /***********************************************************************
-** acx_s_get_firmware_version
-**
-** TODO: not pci-specific, move to common.c and use from usb.c too
-*/
-static void
-acx_s_get_firmware_version(wlandevice_t *priv)
-{
-	fw_ver_t fw;
-	u8 hexarr[4] = { 0, 0, 0, 0 };
-	int hexidx = 0, val = 0;
-	const char *num;
-	char c;
-
-	FN_ENTER;
-
-	memset(fw.fw_id, 'E', FW_ID_SIZE);
-	acx_s_interrogate(priv, &fw, ACX1xx_IE_FWREV);
-	memcpy(priv->firmware_version, fw.fw_id, FW_ID_SIZE);
-	priv->firmware_version[FW_ID_SIZE] = '\0';
-
-	acxlog(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
-				priv->firmware_version, fw.hw_id);
-
-	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
-		printk("acx: strange firmware version string "
-			"'%s', please report\n", priv->firmware_version);
-		priv->firmware_numver = 0x01090407; /* assume 1.9.4.7 */
-	} else {
-		num = &fw.fw_id[4];
-		while (1) {
-			c = *num++;
-			if ((c == '.') || (c == '\0')) {
-				hexarr[hexidx++] = val;
-				if ((hexidx > 3) || (c == '\0')) /* end? */
-					break;
-				val = 0;
-				continue;
-			}
-			if ((c >= '0') && (c <= '9'))
-				c -= '0';
-			else
-				c = c - 'a' + (char)10;
-			val = val*16 + c;
-		}
-
-		priv->firmware_numver = (u32)(
-				(hexarr[0] << 24) + (hexarr[1] << 16)
-				+ (hexarr[2] << 8) + hexarr[3]);
-		acxlog(L_DEBUG, "firmware_numver 0x%08X\n", priv->firmware_numver);
-	}
-	if (IS_ACX111(priv)) {
-		if (priv->firmware_numver == 0x00010011) {
-			/* This one does not survive floodpinging */
-			printk("acx: firmware '%s' is known to be buggy, "
-				"please upgrade\n", priv->firmware_version);
-		}
-		if (priv->firmware_numver == 0x02030131) {
-			/* With this one, all rx packets look mangled
-			** Most probably we simply do not know how to use it
-			** properly */
-			printk("acx: firmware '%s' does not work well "
-				"with this driver\n", priv->firmware_version);
-		}
-	}
-
-	priv->firmware_id = le32_to_cpu(fw.hw_id);
-
-	/* we're able to find out more detailed chip names now */
-	switch (priv->firmware_id & 0xffff0000) {
-		case 0x01010000:
-		case 0x01020000:
-			priv->chip_name = "TNETW1100A";
-			break;
-		case 0x01030000:
-			priv->chip_name = "TNETW1100B";
-			break;
-		case 0x03000000:
-		case 0x03010000:
-			priv->chip_name = "TNETW1130";
-			break;
-		default:
-			printk("acx: unknown chip ID 0x%08X, "
-				"please report\n", priv->firmware_id);
-			break;
-	}
-
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acx_display_hardware_details
-**
-** Displays hw/fw version, radio type etc...
-**
-** TODO: not pci-specific, move to common.c and use from usb.c too
-*/
-static void
-acx_display_hardware_details(wlandevice_t *priv)
-{
-	const char *radio_str, *form_str;
-
-	FN_ENTER;
-
-	switch (priv->radio_type) {
-	case RADIO_MAXIM_0D:
-		/* hmm, the DWL-650+ seems to have two variants,
-		 * according to a windows driver changelog comment:
-		 * RFMD and Maxim. */
-		radio_str = "Maxim";
-		break;
-	case RADIO_RFMD_11:
-		radio_str = "RFMD";
-		break;
-	case RADIO_RALINK_15:
-		radio_str = "Ralink";
-		break;
-	case RADIO_RADIA_16:
-		radio_str = "Radia";
-		break;
-	case RADIO_UNKNOWN_17:
-		/* TI seems to have a radio which is
-		 * additionally 802.11a capable, too */
-		radio_str = "802.11a/b/g radio?! Please report";
-		break;
-	case RADIO_UNKNOWN_19:
-		radio_str = "A radio used by Safecom cards?! Please report";
-		break;
-	default:
-		radio_str = "UNKNOWN, please report the radio type name!";
-		break;
-	}
-
-	switch (priv->form_factor) {
-	case 0x00:
-		form_str = "unspecified";
-		break;
-	case 0x01:
-		form_str = "(mini-)PCI / CardBus";
-		break;
-	case 0x02:
-		form_str = "USB";
-		break;
-	case 0x03:
-		form_str = "Compact Flash";
-		break;
-	default:
-		form_str = "UNKNOWN, Please report";
-		break;
-	}
-
-	printk("acx: form factor 0x%02X (%s), "
-		"radio type 0x%02X (%s), EEPROM version 0x%02X, "
-		"uploaded firmware '%s' (0x%08X)\n",
-		priv->form_factor, form_str, priv->radio_type, radio_str,
-		priv->eeprom_version, priv->firmware_version,
-		priv->firmware_id);
-
-	FN_EXIT0;
-}
-
-/***********************************************************************
 */
 #ifdef NONESSENTIAL_FEATURES
 typedef struct device_id {
@@ -1765,31 +1603,26 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Figure out our resources */
 	phymem1 = pci_resource_start(pdev, mem_region1);
 	phymem2 = pci_resource_start(pdev, mem_region2);
-
 	if (!request_mem_region(phymem1, pci_resource_len(pdev, mem_region1), "ACX1xx_1")) {
 		printk("acx: cannot reserve PCI memory region 1 (are you sure "
 			"you have CardBus support in kernel?)\n");
 		goto fail_request_mem_region1;
 	}
-
 	if (!request_mem_region(phymem2, pci_resource_len(pdev, mem_region2), "ACX1xx_2")) {
 		printk("acx: cannot reserve PCI memory region 2\n");
 		goto fail_request_mem_region2;
 	}
-
 	mem1 = ioremap(phymem1, mem_region1_size);
-	if (NULL == mem1) {
+	if (!mem1) {
 		printk("acx: ioremap() FAILED\n");
 		goto fail_ioremap1;
 	}
-
 	mem2 = ioremap(phymem2, mem_region2_size);
-	if (NULL == mem2) {
+	if (!mem2) {
 		printk("acx: ioremap() #2 FAILED\n");
 		goto fail_ioremap2;
 	}
 
-	/* Log the device */
 	printk("acx: found %s-based wireless network card at %s, irq:%d, "
 		"phymem1:0x%lX, phymem2:0x%lX, mem1:0x%p, mem1_size:%ld, "
 		"mem2:0x%p, mem2_size:%ld\n",
@@ -1852,10 +1685,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	acx_show_card_eeprom_id(priv);
 #endif /* NONESSENTIAL_FEATURES */
 
-	/* now we have our device, so make sure the kernel doesn't try
-	 * to send packets even though we're not associated to a network yet */
-	acx_stop_queue(dev, "after setup");
-
 #ifdef SET_MODULE_OWNER
 	SET_MODULE_OWNER(dev);
 #endif
@@ -1877,36 +1706,27 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #else
 	pci_save_state(pdev, priv->pci_state);
 #endif
+	pci_set_drvdata(pdev, dev);
+
+	/* ok, pci setup is finished, now start initialising the card */
 
 	/* NB: read_reg() reads may return bogus data before reset_dev().
 	** acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_s_reset_dev(dev)) {
+	if (OK != acxpci_s_reset_dev(dev))
 		goto fail_reset;
-	}
 
-	/* ok, basic setup is finished, now start initialising the card */
-
-	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version)) {
+	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version))
 		goto fail_read_eeprom_version;
-	}
 
-	if (OK != acx_s_init_mac(dev)) {
-		printk("acx: init_mac() FAILED\n");
+	if (OK != acx_s_init_mac(dev))
 		goto fail_init_mac;
-	}
-	if (OK != acx_s_set_defaults(priv)) {
-		printk("acx: set_defaults() FAILED\n");
-		goto fail_set_defaults;
-	}
 
-	/* needs to be after acx_s_init_mac() due to necessary init stuff */
-	acx_s_get_firmware_version(priv);
-
+	acx_s_set_defaults(priv);
+	acx_s_get_firmware_version(priv); /* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(priv);
+	acx_proc_register_entries(dev);
 
-	pci_set_drvdata(pdev, dev);
-
-	/* ...and register the card, AFTER everything else has been set up,
+	/* Register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 	err = register_netdev(dev);
@@ -1914,18 +1734,16 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("acx: register_netdev() FAILED: %d\n", err);
 		goto fail_register_netdev;
 	}
-
+	/* Now we have our device, so make sure the kernel doesn't try
+	 * to send packets even though we're not associated to a network yet */
+	acx_stop_queue(dev, "on probe");
 	acx_carrier_off(dev, "on probe");
-
-	if (OK != acx_proc_register_entries(dev)) {
-		goto fail_proc_register_entries;
-	}
 
 	/* after register_netdev() userspace may start working with dev
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(priv); */
 
-	printk("acx "WLAN_RELEASE": net device %s, driver compiled "
+	printk("acx "ACX_RELEASE": net device %s, driver compiled "
 		"against wireless extensions %d and Linux %s\n",
 		dev->name, WIRELESS_EXT, UTS_RELEASE);
 
@@ -1938,26 +1756,11 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* error paths: undo everything in reverse order... */
 
-#ifdef CONFIG_PROC_FS
-fail_proc_register_entries:
-
-	if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
-		acxpci_s_down(dev);
-
-	unregister_netdev(dev);
-
-	/* after unregister_netdev() userspace is guaranteed to finish
-	 * working with it. netdev does not exist anymore.
-	 * For paranoid reasons I am taking sem anyway */
-	acx_sem_lock(priv);
-#endif
-
 fail_register_netdev:
 
 	acxpci_s_delete_dma_regions(priv);
 	pci_set_drvdata(pdev, NULL);
 
-fail_set_defaults:
 fail_init_mac:
 fail_read_eeprom_version:
 fail_reset:
@@ -2147,10 +1950,8 @@ acxpci_e_resume(struct pci_dev *pdev)
 	acxpci_s_reset_dev(dev);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
-	if (OK != acx_s_init_mac(dev)) {
-		printk("rsm: init_mac FAILED\n");
+	if (OK != acx_s_init_mac(dev))
 		goto fail;
-	}
 	acxlog(L_DEBUG, "rsm: init MAC done\n");
 
 	if (1 == if_was_up)
@@ -2289,7 +2090,7 @@ acxpci_s_down(netdevice_t *dev)
 	** That's why we stop queue _after_ FLUSH_SCHEDULED_WORK
 	** lock/unlock is just paranoia, maybe not needed */
 	acx_lock(priv, flags);
-	acx_stop_queue(dev, "during close");
+	acx_stop_queue(dev, "on ifdown");
 	acx_set_status(priv, ACX_STATUS_0_STOPPED);
 	acx_unlock(priv, flags);
 
@@ -3297,7 +3098,6 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 	priv->tx_free--;
 	acxlog(L_BUFT, "tx: got desc %u, %u remain\n",
 			head, priv->tx_free);
-
 	/* Keep a few free descs between head and tail of tx ring.
 	** It is not absolutely needed, just feels safer */
 	if (priv->tx_free < TX_STOP_QUEUE) {
@@ -3365,13 +3165,6 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
-
-#ifdef DEBUG_WEP
-	if (priv->wep_enabled)
-		SET_BIT(Ctl2_8, DESC_CTL2_WEP);
-	else
-		CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
-#endif
 
 	switch (priv->mode) {
 	case ACX_MODE_0_ADHOC:
@@ -3706,8 +3499,8 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		** descriptor is finished since it set Ctl_8 accordingly. */
 		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 
-		priv->tx_free++;
 		num_cleaned++;
+		priv->tx_free++;
 
 		if ((priv->tx_free >= TX_START_QUEUE)
 		 && (priv->status == ACX_STATUS_4_ASSOCIATED)
@@ -4442,7 +4235,7 @@ acxpci_e_init_module(void)
 #else
 	acxlog(L_INIT, "running on a BIG-ENDIAN CPU\n");
 #endif
-	acxlog(L_INIT, "PCI module " WLAN_RELEASE " initialized, "
+	acxlog(L_INIT, "PCI module " ACX_RELEASE " initialized, "
 		"waiting for cards to probe...\n");
 
 	res = pci_module_init(&acxpci_drv_id);

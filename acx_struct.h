@@ -224,10 +224,10 @@ enum { acx_debug = 0 };
 #define TX_CLEAN_BACKLOG (TX_CNT/4)
 #define TX_START_CLEAN (TX_CNT - TX_CLEAN_BACKLOG)
 #define TX_EMERG_CLEAN 2
-/* we stop queue if we have less than N free txbufs: */
+/* we stop queue if we have < N free txbufs: */
 #define TX_STOP_QUEUE 3
-/* we start queue if we have more than N free txbufs: */
-#define TX_START_QUEUE 6
+/* we start queue if we have >= N free txbufs: */
+#define TX_START_QUEUE 5
 
 /***********************************************************************
 ** Interrogate/Configure cmd constants
@@ -986,7 +986,7 @@ typedef struct usb_txbuffer {
 typedef struct usb_txstatus {
 	u16	mac_cnt_rcvd ACX_PACKED;	/* only 12 bits are len! (0xfff) */
 	u8	queue_index ACX_PACKED;
-	u8	mac_status ACX_PACKED;
+	u8	mac_status ACX_PACKED;		/* seen 0x20 on tx failure */
 	u32	hostdata ACX_PACKED;
 	u8	rate ACX_PACKED;
 	u8	ack_failures ACX_PACKED;

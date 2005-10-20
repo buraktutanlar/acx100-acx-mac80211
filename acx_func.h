@@ -368,6 +368,7 @@ acx_queue_stopped(netdevice_t *dev)
 	return netif_queue_stopped(dev);
 }
 
+/*
 static inline void
 acx_start_queue(netdevice_t *dev, const char *msg)
 {
@@ -375,6 +376,7 @@ acx_start_queue(netdevice_t *dev, const char *msg)
 	if (msg)
 		acxlog(L_BUFT, "tx: start queue %s\n", msg);
 }
+*/
 
 static inline void
 acx_wake_queue(netdevice_t *dev, const char *msg)
@@ -493,6 +495,17 @@ acx_proc_unregister_entries(const struct net_device *dev) { return OK; }
 
 
 /***********************************************************************
+*/
+#if USE_FW_LOADER_26
+firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
+#else
+firmware_image_t *acx_s_read_fw(const char *file, u32 *size);
+#define acx_s_read_fw(dev, file, size) acx_s_read_fw(file, size)
+#endif
+int acxpci_s_upload_radio(wlandevice_t *priv);
+
+
+/***********************************************************************
 ** Unsorted yet :)
 */
 int acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf);
@@ -514,67 +527,6 @@ acx_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 		return acxpci_s_write_phy_reg(priv, reg, value);
 	return acxusb_s_write_phy_reg(priv, reg, value);
 }
-
-void acx_s_msleep(int ms);
-int acx_s_init_mac(netdevice_t *dev);
-void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
-void acx_set_timer(wlandevice_t *priv, int timeout_us);
-void acx_update_capabilities(wlandevice_t *priv);
-int acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf);
-void acx_s_start(wlandevice_t *priv);
-
-#if USE_FW_LOADER_26
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
-#else
-firmware_image_t *acx_s_read_fw(const char *file, u32 *size);
-#define acx_s_read_fw(dev, file, size) acx_s_read_fw(file, size)
-#endif
-int acxpci_s_upload_radio(wlandevice_t *priv);
-
-void acx_s_initialize_rx_config(wlandevice_t *priv);
-void acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all);
-void acx_read_configoption(wlandevice_t *priv);
-void acx_l_update_ratevector(wlandevice_t *priv);
-
-void acx_init_task_scheduler(wlandevice_t *priv);
-void acx_schedule_task(wlandevice_t *priv, unsigned int set_flag);
-
-int acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
-
-client_t *acx_l_sta_list_get(wlandevice_t *priv, const u8 *address);
-void acx_l_sta_list_del(wlandevice_t *priv, client_t *clt);
-
-int acx_l_transmit_disassoc(wlandevice_t *priv, client_t *clt);
-void acx_i_timer(unsigned long a);
-int acx_s_complete_scan(wlandevice_t *priv);
-
-static inline wlan_hdr_t*
-acx_get_wlan_hdr(wlandevice_t *priv, const rxbuffer_t *rxbuf)
-{
-	if (!(priv->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR))
-		return (wlan_hdr_t*)&rxbuf->hdr_a3;
-
-	/* take into account phy header in front of packet */
-	if (IS_ACX111(priv))
-		return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 8);
-
-	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 4);
-}
-
-struct sk_buff *acx_rxbuf_to_ether(struct wlandevice *priv, rxbuffer_t *rxbuf);
-int acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
-
-void acxpci_l_power_led(wlandevice_t *priv, int enable);
-
-unsigned int acxpci_l_clean_txdesc(wlandevice_t *priv);
-void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
-
-u8 acx_signal_determine_quality(u8 signal, u8 noise);
-
-void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
-void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
-				u8 rate100, u16 rate111, u8 error,
-				int pkts_to_ignore);
 
 tx_t* acxpci_l_alloc_tx(wlandevice_t *priv);
 tx_t* acxusb_l_alloc_tx(wlandevice_t *priv);
@@ -607,14 +559,72 @@ acx_l_tx_data(wlandevice_t *priv, tx_t *tx_opaque, int len)
 		acxusb_l_tx_data(priv, tx_opaque, len);
 }
 
+static inline wlan_hdr_t*
+acx_get_wlan_hdr(wlandevice_t *priv, const rxbuffer_t *rxbuf)
+{
+	if (!(priv->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR))
+		return (wlan_hdr_t*)&rxbuf->hdr_a3;
+
+	/* take into account phy header in front of packet */
+	if (IS_ACX111(priv))
+		return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 8);
+
+	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 4);
+}
+
+void acxpci_l_power_led(wlandevice_t *priv, int enable);
+int acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf);
+unsigned int acxpci_l_clean_txdesc(wlandevice_t *priv);
+void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
+void acxpci_init_mboxes(wlandevice_t *priv);
+int acxpci_s_create_hostdesc_queues(wlandevice_t *priv);
+void acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
+void acxpci_free_desc_queues(wlandevice_t *priv);
+char* acxpci_s_proc_diag_output(char *p, wlandevice_t *priv);
+int acxpci_proc_eeprom_output(char *p, wlandevice_t *priv);
+void acxpci_set_interrupt_mask(wlandevice_t *priv);
+int acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
+
+void acx_s_msleep(int ms);
+int acx_s_init_mac(netdevice_t *dev);
+void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
+void acx_set_timer(wlandevice_t *priv, int timeout_us);
+void acx_update_capabilities(wlandevice_t *priv);
+void acx_s_start(wlandevice_t *priv);
+
+void acx_s_initialize_rx_config(wlandevice_t *priv);
+void acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all);
+void acx_read_configoption(wlandevice_t *priv);
+void acx_l_update_ratevector(wlandevice_t *priv);
+
+void acx_init_task_scheduler(wlandevice_t *priv);
+void acx_schedule_task(wlandevice_t *priv, unsigned int set_flag);
+
+int acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
+
+client_t *acx_l_sta_list_get(wlandevice_t *priv, const u8 *address);
+void acx_l_sta_list_del(wlandevice_t *priv, client_t *clt);
+
+int acx_l_transmit_disassoc(wlandevice_t *priv, client_t *clt);
+void acx_i_timer(unsigned long a);
+int acx_s_complete_scan(wlandevice_t *priv);
+
+struct sk_buff *acx_rxbuf_to_ether(struct wlandevice *priv, rxbuffer_t *rxbuf);
+int acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
+
+u8 acx_signal_determine_quality(u8 signal, u8 noise);
+
+void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
+void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
+				u8 rate100, u16 rate111, u8 error,
+				int pkts_to_ignore);
+
 void acx_dump_bytes(const void *, int);
 void acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr);
 
 u8 acx_rate111to100(u16);
 
-int acx_s_set_defaults(wlandevice_t *priv);
-void acxpci_init_mboxes(wlandevice_t *priv);
-
+void acx_s_set_defaults(wlandevice_t *priv);
 
 #if !ACX_DEBUG
 static inline const char* acx_get_packet_type_string(u16 fc) { return ""; }
@@ -624,10 +634,6 @@ const char* acx_get_packet_type_string(u16 fc);
 const char* acx_cmd_status_str(unsigned int state);
 
 int acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev);
-void acxpci_free_desc_queues(wlandevice_t *priv);
-
-int acxpci_s_create_hostdesc_queues(wlandevice_t *priv);
-void acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
 
 int acx100_s_init_wep(wlandevice_t *priv);
 int acx100_s_init_packet_templates(wlandevice_t *priv);
@@ -635,10 +641,8 @@ int acx111_s_init_packet_templates(wlandevice_t *priv);
 
 void great_inquisitor(wlandevice_t *priv);
 
-char* acxpci_s_proc_diag_output(char *p, wlandevice_t *priv);
-int acxpci_proc_eeprom_output(char *p, wlandevice_t *priv);
-void acxpci_set_interrupt_mask(wlandevice_t *priv);
-int acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
+void acx_s_get_firmware_version(wlandevice_t *priv);
+void acx_display_hardware_details(wlandevice_t *priv);
 
 int acx_e_change_mtu(struct net_device *dev, int mtu);
 struct net_device_stats* acx_e_get_stats(netdevice_t *dev);
