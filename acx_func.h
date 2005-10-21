@@ -576,7 +576,6 @@ void acxpci_l_power_led(wlandevice_t *priv, int enable);
 int acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf);
 unsigned int acxpci_l_clean_txdesc(wlandevice_t *priv);
 void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
-void acxpci_init_mboxes(wlandevice_t *priv);
 int acxpci_s_create_hostdesc_queues(wlandevice_t *priv);
 void acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
 void acxpci_free_desc_queues(wlandevice_t *priv);

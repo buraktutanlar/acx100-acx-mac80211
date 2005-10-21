@@ -1262,8 +1262,8 @@ struct wlandevice {
 
 	unsigned long	membase;
 	unsigned long	membase2;
-	void		*iobase;
-	void		*iobase2;
+	void __iomem	*iobase;
+	void __iomem	*iobase2;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 10)
 	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced a shorter API version,
@@ -1276,8 +1276,8 @@ struct wlandevice {
 	unsigned long	irq_last_jiffies;
 
 	/* command interface */
-	void		*cmd_area;	/* points to PCI mapped memory */
-	void		*info_area;	/* points to PCI mapped memory */
+	u8 __iomem	*cmd_area;	/* points to PCI mapped memory */
+	u8 __iomem	*info_area;	/* points to PCI mapped memory */
 	u16		cmd_type;
 	u16		cmd_status;
 	u16		info_type;

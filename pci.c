@@ -672,7 +672,7 @@ int
 acxpci_s_upload_radio(wlandevice_t *priv)
 {
 	acx_ie_memmap_t mm;
-	firmware_image_t *radio_image = NULL;
+	firmware_image_t *radio_image;
 	acx_cmd_radioinit_t radioinit;
 	int res = NOT_OK;
 	int try;
@@ -813,53 +813,24 @@ acxpci_s_verify_init(wlandevice_t *priv)
 */
 
 /***********************************************************************
-** acxpci_write_cmd_type_or_status
+** acxpci_write_cmd_type_status
 */
-static void
-acxpci_write_cmd_type_or_status(wlandevice_t *priv, u32 val)
-{
-	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-//TODO: this write and flush below are bogus. Test without
-	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
 
-	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
-
-	/* make sure we only write the data once all config registers are written */
-	write_flush(priv);
-	write_reg32(priv, IO_ACX_SLV_MEM_DATA, val);
-	write_flush(priv);
-}
 static inline void
-acxpci_write_cmd_type(wlandevice_t *priv, u32 val)
+acxpci_write_cmd_type_status(wlandevice_t *priv, u16 type, u16 status)
 {
-	acxpci_write_cmd_type_or_status(priv, val);
-}
-static inline void
-acxpci_write_cmd_status(wlandevice_t *priv, u32 val)
-{
-	acxpci_write_cmd_type_or_status(priv, val<<16);
+	writel(type + (status << 16), priv->cmd_area);
+	write_flush(priv);
 }
 
 
 /***********************************************************************
-** acxpci_read_cmd_status
+** acxpci_read_cmd_type_status
 */
 static void
-acxpci_read_cmd_status(wlandevice_t *priv)
+acxpci_read_cmd_type_status(wlandevice_t *priv)
 {
-	u32 value;
-
-	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-//TODO: this write and flush below are bogus. Test without
-	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1); /* FIXME: why auto increment?? */
-
-	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS));
-
-	/* make sure we only read the data once all config registers are written */
-	write_flush(priv);
-	value = read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+	u32 value = readl(priv->cmd_area);
 
 	priv->cmd_type = (u16)value;
 	priv->cmd_status = (value >> 16);
@@ -886,6 +857,25 @@ acxpci_read_cmd_status(wlandevice_t *priv)
 **	This resets the device using low level hardware calls
 **	as well as uploads and verifies the firmware to the card
 */
+
+static inline void
+init_mboxes(wlandevice_t *priv)
+{
+	u32 cmd_offs, info_offs;
+
+ 	cmd_offs = read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
+	info_offs = read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS);
+ 	priv->cmd_area = (u8 *)priv->iobase2 + cmd_offs;
+ 	priv->info_area = (u8 *)priv->iobase2 + info_offs;
+	acxlog(L_DEBUG, "iobase2=%p\n"
+		"cmd_mbox_offset=%X cmd_area=%p\n"
+		"info_mbox_offset=%X info_area=%p\n",
+		priv->iobase2,
+		cmd_offs, priv->cmd_area,
+		info_offs, priv->info_area);
+}
+
+
 static int
 acxpci_s_reset_dev(netdevice_t *dev)
 {
@@ -910,14 +900,14 @@ acxpci_s_reset_dev(netdevice_t *dev)
 	ecpu_ctrl = read_reg16(priv, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "eCPU is already running. ";
-		goto fail_unlock;
+		goto end_unlock;
 	}
 
 #ifdef WE_DONT_NEED_THAT_DO_WE
 	if (read_reg16(priv, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "eCPU did not start after boot from flash. ";
-		goto fail_unlock;
+		goto end_unlock;
 	}
 
 	/* check sense on reset flags */
@@ -942,7 +932,7 @@ acxpci_s_reset_dev(netdevice_t *dev)
 
 	/* load the firmware */
 	if (OK != acxpci_s_upload_fw(priv))
-		goto fail;
+		goto end_fail;
 
 	acx_s_msleep(10);
 
@@ -953,18 +943,20 @@ acxpci_s_reset_dev(netdevice_t *dev)
 	/* wait for eCPU bootup */
 	if (OK != acxpci_s_verify_init(priv)) {
 		msg = "timeout waiting for eCPU. ";
-		goto fail;
+		goto end_fail;
 	}
-
 	acxlog(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 
+	init_mboxes(priv);
+
+//why?
 	if (IS_ACX111(priv)) {
 		acxlog(L_DEBUG, "cleaning up cmd mailbox access area\n");
-		acxpci_write_cmd_status(priv, 0);
-		acxpci_read_cmd_status(priv);
+		acxpci_write_cmd_type_status(priv, 0, 0);
+		acxpci_read_cmd_type_status(priv);
 		if (priv->cmd_status) {
 			msg = "error cleaning cmd mailbox area. ";
-			goto fail;
+			goto end_fail;
 		}
 	}
 
@@ -974,45 +966,20 @@ acxpci_s_reset_dev(netdevice_t *dev)
 		 * If so, then this would be a PCMCIA message...
 		 */
 		msg = "CIS error. ";
-		goto fail;
+		goto end_fail;
 	}
 
 	result = OK;
-	FN_EXIT1(result);
-	return result;
+	goto end;
 
 /* Finish error message. Indicate which function failed */
-fail_unlock:
+end_unlock:
 	acx_unlock(priv, flags);
-fail:
+end_fail:
 	printk("acx: %sreset_dev() FAILED\n", msg);
+end:
 	FN_EXIT1(result);
 	return result;
-}
-
-
-/***********************************************************************
-** acxpci_init_mboxes
-*/
-void
-acxpci_init_mboxes(wlandevice_t *priv)
-{
-	u32 cmd_offs, info_offs;
-
-	FN_ENTER;
-
-	cmd_offs = read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
-	info_offs = read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS);
-	priv->cmd_area = (u8 *)priv->iobase2 + cmd_offs + 0x4;
-	priv->info_area = (u8 *)priv->iobase2 + info_offs + 0x4;
-	acxlog(L_DEBUG, "iobase2=%p\n"
-		"cmd_mbox_offset=%X cmd_area=%p\n"
-		"info_mbox_offset=%X info_area=%p\n",
-		priv->iobase2,
-		cmd_offs, priv->cmd_area,
-		info_offs, priv->info_area);
-
-	FN_EXIT0;
 }
 
 
@@ -1081,7 +1048,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	/* wait for firmware to become idle for our command submission */
 	counter = 199; /* in ms */
 	do {
-		acxpci_read_cmd_status(priv);
+		acxpci_read_cmd_type_status(priv);
 		/* Test for IDLE state */
 		if (!priv->cmd_status)
 			break;
@@ -1107,14 +1074,15 @@ acxpci_s_issue_cmd_timeo_debug(
 		 * of parameters to read, as data */
 #if CMD_DISCOVERY
 		if (cmd == ACX1xx_CMD_INTERROGATE)
-			memset(priv->cmd_area, 0xAA, buflen);
+			memset_io(priv->cmd_area + 4, 0xAA, buflen);
 #endif
-		memcpy(priv->cmd_area, buffer,
+		/* priv->cmd_area points to PCI device's memory, not to RAM! */
+		memcpy_toio(priv->cmd_area + 4, buffer,
 			(cmd == ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
 	priv->cmd_type = cmd;
-	acxpci_write_cmd_type(priv, cmd);
+	acxpci_write_cmd_type_status(priv, cmd, 0);
 	/* execute command */
 	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
 	write_flush(priv);
@@ -1153,12 +1121,12 @@ acxpci_s_issue_cmd_timeo_debug(
 	} while (--counter);
 
 	/* save state for debugging */
-	acxpci_read_cmd_status(priv);
+	acxpci_read_cmd_type_status(priv);
 	cmd_status = priv->cmd_status;
 
 	/* put the card in IDLE state */
-	priv->cmd_status = 0;
-	acxpci_write_cmd_status(priv, 0);
+//	priv->cmd_status = 0;
+	acxpci_write_cmd_type_status(priv, 0, 0);
 
 	if (!counter) {	/* timed out! */
 		printk("%s: "FUNC"(): timed out %s for CMD_COMPLETE. "
@@ -1188,7 +1156,8 @@ acxpci_s_issue_cmd_timeo_debug(
 
 	/* read in result parameters if needed */
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
-		memcpy(buffer, priv->cmd_area, buflen);
+		/* priv->cmd_area points to PCI device's memory, not to RAM! */
+		memcpy_fromio(buffer, priv->cmd_area + 4, buflen);
 		if (acx_debug & L_DEBUG) {
 			printk("output buffer (len=%u): ", buflen);
 			acx_dump_bytes(buffer, buflen);
@@ -1488,7 +1457,7 @@ IO_ACX111[] =
 
 	0x00b4, /* IO_ACX_INT_TRIG */
 	0x00d4, /* IO_ACX_IRQ_MASK */
-	/* we need NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
+	/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
 	0x00f0, /* IO_ACX_IRQ_STATUS_NON_DES */
 	0x00e4, /* IO_ACX_IRQ_STATUS_CLEAR */
 	0x00e8, /* IO_ACX_IRQ_ACK */
@@ -2417,25 +2386,14 @@ more bytes may follow
 static void
 read_info_status(wlandevice_t *priv)
 {
-	u32 value;
-
-	write_reg32(priv, IO_ACX_SLV_END_CTL, 0x0);
-	write_reg32(priv, IO_ACX_SLV_MEM_CTL, 0x1);
-
-	write_reg32(priv, IO_ACX_SLV_MEM_ADDR,
-		read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS));
-
-	/* make sure we only read the data once all cfg registers are written: */
-	write_flush(priv);
-	value = read_reg32(priv, IO_ACX_SLV_MEM_DATA);
+	u32 value = readl(priv->info_area);
 
 	priv->info_type = (u16)value;
 	priv->info_status = (value >> 16);
 
-	/* inform hw that we have read this info message */
-	write_reg32(priv, IO_ACX_SLV_MEM_DATA, priv->info_type | 0x00010000);
-	write_flush(priv);
-	/* now bother hw to notice it: */
+	/* inform fw that we have read this info message */
+	writel(priv->info_type | 0x00010000, priv->info_area);
+	/* now let fw notice it */
 	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(priv);
 

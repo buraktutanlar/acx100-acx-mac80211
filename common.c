@@ -2143,7 +2143,6 @@ acx_s_init_mac(netdevice_t *dev)
 
 	if (IS_PCI(priv)) {
 		priv->memblocksize = 256; /* 256 is default */
-		acxpci_init_mboxes(priv);
 		/* try to load radio for both ACX100 and ACX111, since both
 		 * chips have at least some firmware versions making use of an
 		 * external radio module */
@@ -5751,9 +5750,6 @@ acx100_s_set_probe_request_template(wlandevice_t *priv)
 	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
 	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
 	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
-//DELETE
-/* HUH?? who said it must be here? I've found nothing in 802.11! --vda*/
-/* p = wlan_fill_ie_ds_parms(p, priv->channel); */
 	frame_len = p - (char*)&probereq;
 	probereq.size = frame_len - 2;
 
