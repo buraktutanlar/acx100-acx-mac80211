@@ -1188,7 +1188,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 
 			acxlog(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
 			"queue_index:%02X mac_status:%02X hostdata:%08X "
-			"rate:%02X ack_failures:%02X rts_failures:%02X "
+			"rate:%u ack_failures:%02X rts_failures:%02X "
 			"rts_ok:%02X\n",
 			stat->mac_cnt_rcvd,
 			stat->queue_index, stat->mac_status, stat->hostdata,
@@ -1478,8 +1478,8 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	txurb->transfer_flags = URB_ASYNC_UNLINK|URB_ZERO_PACKET;
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
 	acxlog(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
-		"errcode=%d\n", txnum, outpipe, txbuf,
-		wlanpkt_len + USB_TXBUF_HDRSIZE, ucode);
+		"rate=%X errcode=%d\n", txnum, outpipe, txbuf,
+		wlanpkt_len + USB_TXBUF_HDRSIZE, rate100, ucode);
 
 	if (ucode) {
 		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",

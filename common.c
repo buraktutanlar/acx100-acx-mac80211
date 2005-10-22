@@ -128,19 +128,6 @@ MODULE_PARM(card, "i");
 MODULE_PARM_DESC(card, "Associate only with card-th acx100 card from this driver instance");
 #endif
 
-/* Shoundn't be needed now, acx.firmware_dir= should work */
-#if 0 /* USE_FW_LOADER_LEGACY */
-static int __init
-acx_get_firmware_dir(const char *str)
-{
-	/* I've seen other drivers just pass the string pointer,
-	 * so hopefully that's safe */
-	firmware_dir = str;
-	return OK;
-}
-__setup("acx_firmware_dir=", acx_get_firmware_dir);
-#endif
-
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
 #endif
@@ -2459,8 +2446,8 @@ acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	  || (acx_debug & L_XFER_BEACON)
 	) {
 		acxlog(L_XFER|L_DATA, "rx: %s "
-			"time %u len %u signal %u SNR %u macstat %02X "
-			"phystat %02X phyrate %u status %u\n",
+			"time:%u len:%u signal:%u SNR:%u macstat:%02X "
+			"phystat:%02X phyrate:%u status:%u\n",
 			acx_get_packet_type_string(fc),
 			le32_to_cpu(rxbuf->time),
 			buf_len,
@@ -2606,7 +2593,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	 * which was used by hardware to tx this particular packet */
 
 	/* now do the actual auto rate management */
-	acxlog(L_DEBUG, "tx: %sclient=%p/"MACSTR" used=%04X cur=%04X cfg=%04X "
+	acxlog(L_XFER, "tx: %sclient=%p/"MACSTR" used=%04X cur=%04X cfg=%04X "
 		"__=%u/%u ^^=%u/%u\n",
 		(txc->ignore_count > 0) ? "[IGN] " : "",
 		txc, MAC(txc->address), sent_rate, cur, txc->rate_cfg,
@@ -6278,8 +6265,12 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
 			acx111_s_feature_off(priv, 0, FEATURE2_NO_TXCRYPT|FEATURE2_SNIFFER);
+
+			acx_lock(priv, flags);
 			priv->aid = 0;
 			priv->ap_client = NULL;
+			acx_unlock(priv, flags);
+
 			/* we want to start looking for peer or AP */
 			start_scan = 1;
 			break;

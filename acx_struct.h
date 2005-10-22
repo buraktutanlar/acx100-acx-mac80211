@@ -1264,6 +1264,9 @@ struct wlandevice {
 	unsigned long	membase2;
 	void __iomem	*iobase;
 	void __iomem	*iobase2;
+	/* command interface */
+	u8 __iomem	*cmd_area;
+	u8 __iomem	*info_area;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 10)
 	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced a shorter API version,
@@ -1274,14 +1277,6 @@ struct wlandevice {
 	u16		irq_mask_off;		/* interrupt types to mask out (not wanted) with IRQs off */
 	unsigned int	irq_loops_this_jiffy;
 	unsigned long	irq_last_jiffies;
-
-	/* command interface */
-	u8 __iomem	*cmd_area;	/* points to PCI mapped memory */
-	u8 __iomem	*info_area;	/* points to PCI mapped memory */
-	u16		cmd_type;
-	u16		cmd_status;
-	u16		info_type;
-	u16		info_status;
 #endif
 
 	/*** USB stuff ***/

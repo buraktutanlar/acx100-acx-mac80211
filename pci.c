@@ -297,22 +297,6 @@ fail:
 
 
 /***********************************************************************
-** Dummy EEPROM read? why?!
-*/
-static int
-acxpci_read_eeprom_area(wlandevice_t *priv)
-{
-	int offs;
-	u8 tmp[0x3b];
-
-	for (offs = 0x8c; offs < 0xb9; offs++) {
-		acxpci_read_eeprom_byte(priv, offs, &tmp[offs - 0x8c]);
-	}
-	return OK;
-}
-
-
-/***********************************************************************
 ** We don't lock hw accesses here since we never r/w eeprom in IRQ
 ** Note: this function sleeps only because of GFP_KERNEL alloc
 */
@@ -827,17 +811,20 @@ acxpci_write_cmd_type_status(wlandevice_t *priv, u16 type, u16 status)
 /***********************************************************************
 ** acxpci_read_cmd_type_status
 */
-static void
+static u32
 acxpci_read_cmd_type_status(wlandevice_t *priv)
 {
-	u32 value = readl(priv->cmd_area);
+	u32 cmd_type, cmd_status;
 
-	priv->cmd_type = (u16)value;
-	priv->cmd_status = (value >> 16);
+	cmd_type = readl(priv->cmd_area);
+	cmd_status = (cmd_type >> 16);
+	cmd_type = (u16)cmd_type;
 
-	acxlog(L_CTL, "cmd_type 0x%04X, cmd_status 0x%04X [%s]\n",
-		priv->cmd_type, priv->cmd_status,
-		acx_cmd_status_str(priv->cmd_status));
+	acxlog(L_CTL, "cmd_type:%04X cmd_status:%04X [%s]\n",
+		cmd_type, cmd_status,
+		acx_cmd_status_str(cmd_status));
+
+	return cmd_status;
 }
 
 
@@ -873,6 +860,19 @@ init_mboxes(wlandevice_t *priv)
 		priv->iobase2,
 		cmd_offs, priv->cmd_area,
 		info_offs, priv->info_area);
+}
+
+
+static inline void
+read_eeprom_area(wlandevice_t *priv)
+{
+#if ACX_DEBUG > 1
+	int offs;
+	u8 tmp;
+
+	for (offs = 0x8c; offs < 0xb9; offs++)
+		acxpci_read_eeprom_byte(priv, offs, &tmp);
+#endif
 }
 
 
@@ -948,26 +948,10 @@ acxpci_s_reset_dev(netdevice_t *dev)
 	acxlog(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 
 	init_mboxes(priv);
-
-//why?
-	if (IS_ACX111(priv)) {
-		acxlog(L_DEBUG, "cleaning up cmd mailbox access area\n");
-		acxpci_write_cmd_type_status(priv, 0, 0);
-		acxpci_read_cmd_type_status(priv);
-		if (priv->cmd_status) {
-			msg = "error cleaning cmd mailbox area. ";
-			goto end_fail;
-		}
-	}
+	acxpci_write_cmd_type_status(priv, 0, 0);
 
 	/* Test that EEPROM is readable */
-	if ((OK != acxpci_read_eeprom_area(priv)) && IS_ACX100(priv)) {
-		/* does "CIS" mean "Card Information Structure"?
-		 * If so, then this would be a PCMCIA message...
-		 */
-		msg = "CIS error. ";
-		goto end_fail;
-	}
+	read_eeprom_area(priv);
 
 	result = OK;
 	goto end;
@@ -1048,9 +1032,9 @@ acxpci_s_issue_cmd_timeo_debug(
 	/* wait for firmware to become idle for our command submission */
 	counter = 199; /* in ms */
 	do {
-		acxpci_read_cmd_type_status(priv);
+		cmd_status = acxpci_read_cmd_type_status(priv);
 		/* Test for IDLE state */
-		if (!priv->cmd_status)
+		if (!cmd_status)
 			break;
 		if (counter % 10 == 0) {
 			/* we waited 10 iterations, no luck. Sleep 10 ms */
@@ -1061,7 +1045,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	if (!counter) {
 		/* the card doesn't get idle, we're in trouble */
 		printk("%s: "FUNC"(): cmd_status is not IDLE: 0x%04X!=0\n",
-			devname, priv->cmd_status);
+			devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
 		acxlog(L_CTL|L_DEBUG, FUNC"(): waited for IDLE %dms. "
@@ -1081,7 +1065,6 @@ acxpci_s_issue_cmd_timeo_debug(
 			(cmd == ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
-	priv->cmd_type = cmd;
 	acxpci_write_cmd_type_status(priv, cmd, 0);
 	/* execute command */
 	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_CMD);
@@ -1121,11 +1104,9 @@ acxpci_s_issue_cmd_timeo_debug(
 	} while (--counter);
 
 	/* save state for debugging */
-	acxpci_read_cmd_type_status(priv);
-	cmd_status = priv->cmd_status;
+	cmd_status = acxpci_read_cmd_type_status(priv);
 
 	/* put the card in IDLE state */
-//	priv->cmd_status = 0;
 	acxpci_write_cmd_type_status(priv, 0, 0);
 
 	if (!counter) {	/* timed out! */
@@ -2383,24 +2364,6 @@ more bytes may follow
     it does NOT clear bit 0x0001, and this bit will probably stay forever set
     after we set it once. Let's hope this will be fixed in firmware someday
 */
-static void
-read_info_status(wlandevice_t *priv)
-{
-	u32 value = readl(priv->info_area);
-
-	priv->info_type = (u16)value;
-	priv->info_status = (value >> 16);
-
-	/* inform fw that we have read this info message */
-	writel(priv->info_type | 0x00010000, priv->info_area);
-	/* now let fw notice it */
-	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
-	write_flush(priv);
-
-	acxlog(L_CTL, "info_type 0x%04X, info_status 0x%04X\n",
-			priv->info_type, priv->info_status);
-}
-
 
 static void
 handle_info_irq(wlandevice_t *priv)
@@ -2426,11 +2389,24 @@ handle_info_irq(wlandevice_t *priv)
 		"TKIP IV value exceeds thresh"
 	};
 #endif
-	read_info_status(priv);
-	acxlog(L_IRQ, "got Info IRQ: status 0x%04X type 0x%04X: %s\n",
-		priv->info_status, priv->info_type,
-		info_type_msg[(priv->info_type >= VEC_SIZE(info_type_msg)) ?
-				0 : priv->info_type]
+	u32 info_type, info_status;
+
+	info_type = readl(priv->info_area);
+	info_status = (info_type >> 16);
+	info_type = (u16)info_type;
+
+	/* inform fw that we have read this info message */
+	writel(info_type | 0x00010000, priv->info_area);
+	write_reg16(priv, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
+	write_flush(priv);
+
+	acxlog(L_CTL, "info_type:%04X info_status:%04X\n",
+			info_type, info_status);
+
+	acxlog(L_IRQ, "got Info IRQ: status %04X type %04X: %s\n",
+		info_status, info_type,
+		info_type_msg[(info_type >= VEC_SIZE(info_type_msg)) ?
+				0 : info_type]
 	);
 }
 

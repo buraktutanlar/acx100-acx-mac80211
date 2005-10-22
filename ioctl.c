@@ -747,13 +747,6 @@ acx_ioctl_get_scan(
 		result = -EAGAIN;
 		goto end_unlock;
 	}
-#if 0 /* Why is this needed? If needed, add a comment */
-	if (priv->scan_start && time_before(jiffies, priv->scan_start + 3*HZ)) {
-		acxlog(L_IOCTL, "scan in progress, no results yet\n");
-		result = -EAGAIN;
-		goto end_unlock;
-	}
-#endif
 
 #ifdef ENODATA_TO_BE_USED_AFTER_SCAN_ERROR_ONLY
 	if (priv->bss_table_count == 0)	{
@@ -1018,11 +1011,19 @@ acx_ioctl_get_rate(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	/* TODO: remember rate of last tx, show it. think about multiple peers... */
 	wlandevice_t *priv = netdev_priv(dev);
-	vwrq->value = acx111_rate_tbl[highest_bit(priv->rate_oper)];
+	unsigned long flags;
+	u16 rate;
+
+	acx_lock(priv, flags);
+	rate = priv->rate_oper;
+	if (priv->ap_client)
+		rate = priv->ap_client->rate_cur;
+	vwrq->value = acx111_rate_tbl[highest_bit(rate)];
 	vwrq->fixed = !priv->rate_auto;
 	vwrq->disabled = 0;
+	acx_unlock(priv, flags);
+
 	return OK;
 }
 
