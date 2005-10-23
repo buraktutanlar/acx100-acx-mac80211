@@ -700,7 +700,7 @@ acx_s_scan_add_station(
 
 	{
 	u16 rate = bss->rate_cap;
-	const u8* p = bitpos2ratebyte;
+	const u8* p = acx_bitpos2ratebyte;
 	while (rate) {
 		if (rate & 1) {
 			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
@@ -876,6 +876,8 @@ acx_l_update_client_rates(wlandevice_t *priv, u16 rate)
 			/* current rate become invalid, choose a valid one */
 			clt->rate_cur = 1 << lowest_bit(clt->rate_cfg);
 		}
+		if (IS_ACX100(priv))
+			clt->rate_100 = acx_bitpos2rate100[highest_bit(clt->rate_cur)];
 		clt->fallback_count = clt->stepup_count = 0;
 		clt->ignore_count = 16;
 	}
@@ -1746,14 +1748,14 @@ acx_ioctl_set_reg_domain(
 
 	FN_ENTER;
 
-	if ((*extra < 1) || ((size_t)*extra > reg_domain_ids_len)) {
+	if ((*extra < 1) || ((size_t)*extra > acx_reg_domain_ids_len)) {
 		result = -EINVAL;
 		goto end;
 	}
 
 	acx_sem_lock(priv);
 
-	priv->reg_dom_id = reg_domain_ids[*extra - 1];
+	priv->reg_dom_id = acx_reg_domain_ids[*extra - 1];
 	SET_BIT(priv->set_mask, GETSET_REG_DOMAIN);
 
 	result = -EINPROGRESS;
@@ -1782,7 +1784,7 @@ acx_ioctl_get_reg_domain(
 	dom = priv->reg_dom_id;
 
 	for (i=1; i <= 7; i++) {
-		if (reg_domain_ids[i-1] == dom) {
+		if (acx_reg_domain_ids[i-1] == dom) {
 			acxlog(L_IOCTL, "regulatory domain is currently set "
 				"to %d (0x%X): %s\n", i, dom,
 				reg_domain_strings[i-1]);

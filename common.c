@@ -151,11 +151,11 @@ MODULE_DESCRIPTION("Driver for TI ACX1xx based wireless cards (CardBus/PCI/USB)"
 /* minutes to wait until next radio recalibration: */
 #define RECALIB_PAUSE	5
 
-const u8 reg_domain_ids[] =
+const u8 acx_reg_domain_ids[] =
 	{ 0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51 };
 /* stupid workaround for the fact that in C the size of an external array
  * cannot be determined from within a second file */
-const u8 reg_domain_ids_len = sizeof(reg_domain_ids);
+const u8 acx_reg_domain_ids_len = sizeof(acx_reg_domain_ids);
 static const u16 reg_domain_channel_masks[] =
 	{ 0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x01fc };
 
@@ -753,7 +753,7 @@ acx_e_get_wireless_stats(netdevice_t *dev)
 ** maps acx111 tx descr rate field to acx100 one
 */
 const u8
-bitpos2rate100[] = {
+acx_bitpos2rate100[] = {
 	RATE100_1	,/* 0 */
 	RATE100_2	,/* 1 */
 	RATE100_5	,/* 2 */
@@ -774,7 +774,7 @@ bitpos2rate100[] = {
 
 u8
 acx_rate111to100(u16 r) {
-	return bitpos2rate100[highest_bit(r)];
+	return acx_bitpos2rate100[highest_bit(r)];
 }
 
 
@@ -2658,7 +2658,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	txc->ignore_count = pkts_to_ignore;
 	/* calculate acx100 style rate byte if needed */
 	if (IS_ACX100(priv)) {
-		txc->rate_100 = bitpos2rate100[highest_bit(cur)];
+		txc->rate_100 = acx_bitpos2rate100[highest_bit(cur)];
 	}
 }
 
@@ -2756,7 +2756,7 @@ end_no_unlock:
 ** Updates priv->rate_supported[_len] according to rate_{basic,oper}
 */
 const u8
-bitpos2ratebyte[] = {
+acx_bitpos2ratebyte[] = {
 	DOT11RATEBYTE_1,
 	DOT11RATEBYTE_2,
 	DOT11RATEBYTE_5_5,
@@ -2778,7 +2778,7 @@ acx_l_update_ratevector(wlandevice_t *priv)
 	u16 bcfg = priv->rate_basic;
 	u16 ocfg = priv->rate_oper;
 	u8 *supp = priv->rate_supported;
-	const u8 *dot11 = bitpos2ratebyte;
+	const u8 *dot11 = acx_bitpos2ratebyte;
 
 	FN_ENTER;
 
@@ -3231,10 +3231,10 @@ acx_l_transmit_assocresp(wlandevice_t *priv, const wlan_fr_assocreq_t *req)
 
 	clt->used = CLIENT_ASSOCIATED_3;
 
-	if (clt->aid == 0) {
+	if (clt->aid == 0)
 		clt->aid = ++priv->aid;
-	}
 	clt->cap_info = ieee2host16(*(req->cap_info));
+
 	/* We cheat here a bit. We don't really care which rates are flagged
 	** as basic by the client, so we stuff them in single ratemask */
 	clt->rate_cap = 0;
@@ -3249,6 +3249,8 @@ acx_l_transmit_assocresp(wlandevice_t *priv, const wlan_fr_assocreq_t *req)
 	clt->rate_cfg = clt->rate_cap & priv->rate_oper;
 	if (!clt->rate_cfg) clt->rate_cfg = 1 << lowest_bit(priv->rate_oper);
 	clt->rate_cur = 1 << lowest_bit(clt->rate_cfg);
+	if (IS_ACX100(priv))
+		clt->rate_100 = acx_bitpos2rate100[lowest_bit(clt->rate_cfg)];
 	clt->fallback_count = clt->stepup_count = 0;
 	clt->ignore_count = 16;
 
@@ -3415,6 +3417,7 @@ acx_l_transmit_reassocresp(wlandevice_t *priv, const wlan_fr_reassocreq_t *req)
 	}
 	if (req->cap_info)
 		clt->cap_info = ieee2host16(*(req->cap_info));
+
 	/* We cheat here a bit. We don't really care which rates are flagged
 	** as basic by the client, so we stuff them in single ratemask */
 	clt->rate_cap = 0;
@@ -3429,6 +3432,9 @@ acx_l_transmit_reassocresp(wlandevice_t *priv, const wlan_fr_reassocreq_t *req)
 	clt->rate_cfg = clt->rate_cap & priv->rate_oper;
 	if (!clt->rate_cfg) clt->rate_cfg = 1 << lowest_bit(priv->rate_oper);
 	clt->rate_cur = 1 << lowest_bit(clt->rate_cfg);
+	if (IS_ACX100(priv))
+		clt->rate_100 = acx_bitpos2rate100[lowest_bit(clt->rate_cfg)];
+
 	clt->fallback_count = clt->stepup_count = 0;
 	clt->ignore_count = 16;
 
@@ -6195,17 +6201,17 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 
 		acxlog(L_INIT, "updating regulatory domain: 0x%02X\n",
 					priv->reg_dom_id);
-		for (i = 0; i < sizeof(reg_domain_ids); i++)
-			if (reg_domain_ids[i] == priv->reg_dom_id)
+		for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
+			if (acx_reg_domain_ids[i] == priv->reg_dom_id)
 				break;
 
-		if (sizeof(reg_domain_ids) == i) {
+		if (sizeof(acx_reg_domain_ids) == i) {
 			acxlog(L_INIT, "Invalid or unsupported regulatory "
 				"domain 0x%02X specified, falling back to "
 				"FCC (USA)! Please report if this sounds "
 				"fishy!\n", priv->reg_dom_id);
 			i = 0;
-			priv->reg_dom_id = reg_domain_ids[i];
+			priv->reg_dom_id = acx_reg_domain_ids[i];
 		}
 
 		priv->reg_dom_chanmask = reg_domain_channel_masks[i];

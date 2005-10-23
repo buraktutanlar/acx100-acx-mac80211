@@ -1930,10 +1930,10 @@ acx_struct_size_check(void)
 /*============================================================================*
  * Global data                                                                *
  *============================================================================*/
-extern const u8 bitpos2ratebyte[];
-extern const u8 bitpos2rate100[];
+extern const u8 acx_bitpos2ratebyte[];
+extern const u8 acx_bitpos2rate100[];
 
-extern const u8 reg_domain_ids[];
-extern const u8 reg_domain_ids_len;
+extern const u8 acx_reg_domain_ids[];
+extern const u8 acx_reg_domain_ids_len;
 
 extern const struct iw_handler_def acx_ioctl_handler_def;

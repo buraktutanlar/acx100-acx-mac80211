@@ -1674,7 +1674,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	acx_s_set_defaults(priv);
 	acx_s_get_firmware_version(priv); /* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(priv);
-	acx_proc_register_entries(dev);
 
 	/* Register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
@@ -1684,6 +1683,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("acx: register_netdev() FAILED: %d\n", err);
 		goto fail_register_netdev;
 	}
+
+	acx_proc_register_entries(dev);
+
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
 	acx_stop_queue(dev, "on probe");

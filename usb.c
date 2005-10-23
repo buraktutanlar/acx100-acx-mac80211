@@ -749,7 +749,6 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_s_set_defaults(priv);
         acx_s_get_firmware_version(priv);
 	acx_display_hardware_details(priv);
-	acx_proc_register_entries(dev);
 
 	/* Register the network device */
 	acxlog(L_INIT, "registering network device\n");
@@ -759,6 +758,9 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			"(error %d)\n";
 		goto end_nomem;
 	}
+
+	acx_proc_register_entries(dev);
+
 	acx_stop_queue(dev, "on probe");
 	acx_carrier_off(dev, "on probe");
 
@@ -1332,7 +1334,7 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	 && (priv->status == ACX_STATUS_4_ASSOCIATED)
 	 && (acx_queue_stopped(priv->netdev))
 	) {
-		acxlog(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
+		acxlog(L_BUF, "tx: wake queue (%u free txbufs)\n",
 				priv->tx_free);
 		acx_wake_queue(priv->netdev, NULL);
 	}
@@ -1367,8 +1369,8 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 			/* Keep a few free descs between head and tail of tx ring.
 			** It is not absolutely needed, just feels safer */
 			if (priv->tx_free < TX_STOP_QUEUE) {
-				acxlog(L_BUF, "stop queue (%u txbufs left)\n",
-				priv->tx_free);
+				acxlog(L_BUF, "tx: stop queue "
+					"(%u free txbufs)\n", priv->tx_free);
 				acx_stop_queue(priv->netdev, NULL);
 			}
 			goto end;
@@ -1478,7 +1480,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	txurb->transfer_flags = URB_ASYNC_UNLINK|URB_ZERO_PACKET;
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
 	acxlog(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
-		"rate=%X errcode=%d\n", txnum, outpipe, txbuf,
+		"rate=%u errcode=%d\n", txnum, outpipe, txbuf,
 		wlanpkt_len + USB_TXBUF_HDRSIZE, rate100, ucode);
 
 	if (ucode) {
