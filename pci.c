@@ -212,7 +212,7 @@ get_txhostdesc(wlandevice_t* priv, txdesc_t* txdesc)
 	return &priv->txhostdesc_start[index*2];
 }
 
-static client_t*
+static inline client_t*
 get_txc(wlandevice_t* priv, txdesc_t* txdesc)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
@@ -228,8 +228,16 @@ get_txc(wlandevice_t* priv, txdesc_t* txdesc)
 	return priv->txc[index];
 }
 
-static void
-put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
+static inline u16
+get_txr(wlandevice_t* priv, txdesc_t* txdesc)
+{
+	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
+	index /= priv->txdesc_size;
+	return priv->txr[index];
+}
+
+static inline void
+put_txcr(wlandevice_t* priv, txdesc_t* txdesc, client_t* c, u16 r111)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
 	if (ACX_DEBUG && (index % priv->txdesc_size)) {
@@ -242,6 +250,7 @@ put_txc(wlandevice_t* priv, txdesc_t* txdesc, client_t* c)
 		return;
 	}
 	priv->txc[index] = c;
+	priv->txr[index] = r111;
 }
 
 
@@ -1553,12 +1562,12 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Figure out our resources */
 	phymem1 = pci_resource_start(pdev, mem_region1);
 	phymem2 = pci_resource_start(pdev, mem_region2);
-	if (!request_mem_region(phymem1, pci_resource_len(pdev, mem_region1), "ACX1xx_1")) {
+	if (!request_mem_region(phymem1, pci_resource_len(pdev, mem_region1), "acx_1")) {
 		printk("acx: cannot reserve PCI memory region 1 (are you sure "
 			"you have CardBus support in kernel?)\n");
 		goto fail_request_mem_region1;
 	}
-	if (!request_mem_region(phymem2, pci_resource_len(pdev, mem_region2), "ACX1xx_2")) {
+	if (!request_mem_region(phymem2, pci_resource_len(pdev, mem_region2), "acx_2")) {
 		printk("acx: cannot reserve PCI memory region 2\n");
 		goto fail_request_mem_region2;
 	}
@@ -3072,6 +3081,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	txdesc_t *txdesc = (txdesc_t*)tx_opaque;
 	txhostdesc_t *hostdesc1, *hostdesc2;
 	client_t *clt;
+	u16 rate_cur;
 	u8 Ctl_8, Ctl2_8;
 
 	FN_ENTER;
@@ -3136,18 +3146,18 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 		break;
 	}
 
-	if (unlikely(clt && !clt->rate_cur)) {
+	rate_cur = clt ? clt->rate_cur : priv->rate_bcast;
+	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
 		goto end;
 	}
 
 	/* used in tx cleanup routine for auto rate and accounting: */
-	put_txc(priv, txdesc, clt);
+	put_txcr(priv, txdesc, clt, rate_cur);
 
 	txdesc->total_length = cpu_to_le16(len);
 	hostdesc2->length = cpu_to_le16(len - WLAN_HDR_A3_LEN);
 	if (IS_ACX111(priv)) {
-		u16 rate_cur = clt ? clt->rate_cur : priv->rate_bcast;
 		/* note that if !txdesc->do_auto, txrate->cur
 		** has only one nonzero bit */
 		txdesc->u.r2.rate111 = cpu_to_le16(
@@ -3362,7 +3372,6 @@ unsigned int
 acxpci_l_clean_txdesc(wlandevice_t *priv)
 {
 	txdesc_t *txdesc;
-	struct client *txc;
 	int finger;
 	int num_cleaned;
 	u16 r111;
@@ -3451,10 +3460,18 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		 * AFTER having done the work, it's faster */
 
 		/* do rate handling */
-		txc = get_txc(priv, txdesc);
-		if (txc && priv->rate_auto) {
-			acx_l_handle_txrate_auto(priv, txc, r100, r111, error,
-				TX_CNT + TX_CLEAN_BACKLOG - priv->tx_free);
+		if (priv->rate_auto) {
+			struct client *clt = get_txc(priv, txdesc);
+			if (clt) {
+				u16 cur = get_txr(priv, txdesc);
+				if (clt->rate_cur == cur) {
+					acx_l_handle_txrate_auto(priv, clt,
+						cur, /* intended rate */
+						r100, r111, /* actually used rate */
+						(error & 0x30), /* was there an error? */
+						TX_CNT + TX_CLEAN_BACKLOG - priv->tx_free);
+				}
+			}
 		}
 
 		if (unlikely(error))

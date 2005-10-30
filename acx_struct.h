@@ -1252,6 +1252,7 @@ struct wlandevice {
 	unsigned int	rx_tail;
 
 	client_t	*txc[TX_CNT];
+	u16		txr[TX_CNT];
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */

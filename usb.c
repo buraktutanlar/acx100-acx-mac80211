@@ -1187,6 +1187,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		if (RXBUF_IS_TXSTAT(ptr)) {
 			/* do rate handling */
 			usb_txstatus_t *stat = (void*)ptr;
+			u16 client_no = (u16)stat->hostdata;
 
 			acxlog(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
 			"queue_index:%02X mac_status:%02X hostdata:%08X "
@@ -1197,12 +1198,17 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 			stat->rate, stat->ack_failures, stat->rts_failures,
 			stat->rts_ok);
 			
-			if (priv->rate_auto
-			 && stat->hostdata < VEC_SIZE(priv->sta_list)) {
-				client_t *clt = &priv->sta_list[stat->hostdata];
-				acx_l_handle_txrate_auto(priv, clt, stat->rate,
-					0 /*rate111*/, stat->mac_status /*error*/,
-					ACX_URB_CNT - priv->tx_free);
+			if (priv->rate_auto && client_no < VEC_SIZE(priv->sta_list)) {
+				client_t *clt = &priv->sta_list[client_no];
+				u16 cur = stat->hostdata >> 16;
+
+				if (clt && clt->rate_cur == cur) {
+					acx_l_handle_txrate_auto(priv, clt,
+						cur, /* intended rate */
+						stat->rate, 0, /* actually used rate */
+						stat->mac_status, /* error? */
+						ACX_URB_CNT - priv->tx_free);
+				}
             		}
 			goto next;
 		}
@@ -1412,7 +1418,6 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	wlan_hdr_t* whdr;
 	unsigned int outpipe;
 	int ucode, txnum;
-	u8 rate100;
 
 	FN_ENTER;
 
@@ -1443,14 +1448,17 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 		goto end;
 	}
 
-	rate100 = clt ? clt->rate_100 : priv->rate_bcast100;
-
 	/* fill the USB transfer header */
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
 	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
 	txbuf->queue_index = 1;
-	txbuf->rate = rate100;
-	txbuf->hostdata = clt ? (clt - priv->sta_list) : (u32)-1;
+	if (clt) {
+		txbuf->rate = clt->rate_100;
+		txbuf->hostdata = (clt - priv->sta_list) | (clt->rate_cur << 16);
+	} else {
+		txbuf->rate = priv->rate_bcast100;
+		txbuf->hostdata = ((u16)-1) | (priv->rate_bcast << 16);
+	}
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == priv->preamble_cur)
 		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
@@ -1481,7 +1489,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
 	acxlog(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
 		"rate=%u errcode=%d\n", txnum, outpipe, txbuf,
-		wlanpkt_len + USB_TXBUF_HDRSIZE, rate100, ucode);
+		wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
 	if (ucode) {
 		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",

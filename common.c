@@ -2560,11 +2560,10 @@ rate100to111(u8 r)
 
 void
 acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
-			u8 rate100, u16 rate111, u8 error,
-			int pkts_to_ignore)
+			u16 cur, u8 rate100, u16 rate111,
+			u8 error, int pkts_to_ignore)
 {
 	u16 sent_rate;
-	u16 cur = txc->rate_cur;
 	int slower_rate_was_used;
 
 	/* vda: hmm. current code will do this:
@@ -2614,7 +2613,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	** less significant than highest nonzero bit in cur */
 	slower_rate_was_used = ( cur > ((sent_rate<<1)-1) );
 
-	if (slower_rate_was_used || (error & 0x30)) {
+	if (slower_rate_was_used || error) {
 		txc->stepup_count = 0;
 		if (++txc->fallback_count <= priv->fallback_threshold)
 			return;

@@ -615,8 +615,8 @@ u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
 void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
 void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
-				u8 rate100, u16 rate111, u8 error,
-				int pkts_to_ignore);
+			u16 intended_rate, u8 rate100, u16 rate111, u8 error,
+			int pkts_to_ignore);
 
 void acx_dump_bytes(const void *, int);
 void acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr);
