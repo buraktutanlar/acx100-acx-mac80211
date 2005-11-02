@@ -1074,7 +1074,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
 	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acxlog(L_USBRXTX, "not doing anything.\n");
+		acxlog(L_USBRXTX, "rx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
@@ -1310,7 +1310,7 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	 * to play with them. The urb may get unlinked.
 	 */
 	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acxlog(L_USBRXTX, "not doing anything\n");
+		acxlog(L_USBRXTX, "tx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
