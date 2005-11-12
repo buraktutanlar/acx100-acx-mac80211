@@ -52,6 +52,7 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/pm.h>
+#include <linux/vmalloc.h>
 
 #include "acx.h"
 

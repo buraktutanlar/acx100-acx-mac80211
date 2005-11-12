@@ -38,10 +38,6 @@
 **  Martin Wawro <martin.wawro AT uni-dortmund.de>
 **  Andreas Mohr <andi AT lisas.de>
 **
-** Issues:
-**  - Note that this driver relies on a native little-endian byteformat
-**    at some points
-**
 ** LOCKING
 ** callback functions called by USB core are running in interrupt context
 ** and thus have names with _i_.
@@ -64,6 +60,7 @@
 #if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
 #endif
+#include <linux/vmalloc.h>
 
 #include "acx.h"
 

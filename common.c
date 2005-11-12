@@ -45,6 +45,7 @@
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <linux/pm.h>
+#include <linux/vmalloc.h>
 #if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
 #endif /* WE >= 13 */
