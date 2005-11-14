@@ -1172,9 +1172,10 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	*/
 	while (remsize) {
 		if (remsize < RXBUF_HDRSIZE) {
-			printk("acx: truncated rx header (%d bytes)! ",
+			printk("acx: truncated rx header (%d bytes)!\n",
 				remsize);
-			acx_dump_bytes(ptr, remsize);
+			if (ACX_DEBUG)
+				acx_dump_bytes(ptr, remsize);
 			break;
 		}
 
@@ -1212,21 +1213,12 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 
 		if (packetsize > sizeof(rxbuffer_t)) {
 			printk("acx: packet exceeds max wlan "
-				"frame size (%d > %d). size=%d bytes:",
+				"frame size (%d > %d). size=%d\n",
 				packetsize, (int) sizeof(rxbuffer_t), size);
-			acx_dump_bytes(ptr, 16);
+			if (ACX_DEBUG)
+				acx_dump_bytes(ptr, 16);
 			/* FIXME: put some real error-handling in here! */
 			break;
-		}
-
-		/* skip null packets (does this really happen?!) */
-		if (packetsize == RXBUF_HDRSIZE) {
-			//Should never happen
-			//if (acx_debug & L_USBRXTX) {
-				printk("acx: null packet: ");
-				acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-			//}
-			goto next;
 		}
 
 		if (packetsize > remsize) {
