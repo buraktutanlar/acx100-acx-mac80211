@@ -1393,6 +1393,9 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 	int dtim_interval;
 	int i;
 
+	if (mac_is_zero(bssid))
+		return;
+
 	FN_ENTER;
 
 	dtim_interval =	(ACX_MODE_0_ADHOC == priv->mode) ?
@@ -2168,7 +2171,7 @@ acx_s_init_mac(netdevice_t *dev)
 	result = OK;
 
 fail:
-	if(result)
+	if (result)
 		printk("acx: init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;

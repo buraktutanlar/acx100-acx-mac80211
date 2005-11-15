@@ -1290,7 +1290,8 @@ acx_ioctl_get_power(
 	acxlog(L_IOCTL, "Get 802.11 Power Save flags = 0x%04X\n", vwrq->flags);
 	vwrq->disabled = ((priv->ps_wakeup_cfg & PS_CFG_ENABLE) == 0);
 	if (vwrq->disabled)
-		return OK;
+		goto end;
+
 	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {
 		vwrq->value = priv->ps_hangover_period * 1000 / 1024;
 		vwrq->flags = IW_POWER_TIMEOUT;
@@ -1302,7 +1303,7 @@ acx_ioctl_get_power(
 		SET_BIT(vwrq->flags, IW_POWER_ALL_R);
 	else
 		SET_BIT(vwrq->flags, IW_POWER_UNICAST_R);
-
+end:
 	FN_EXIT1(OK);
 	return OK;
 }
