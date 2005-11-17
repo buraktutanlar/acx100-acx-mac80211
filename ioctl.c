@@ -790,13 +790,13 @@ acx_ioctl_set_essid(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "Set ESSID '%*s', length %d, flags 0x%04X\n",
-					len, extra, len, dwrq->flags);
-
 	if (len < 0) {
 		result = -EINVAL;
 		goto end;
 	}
+
+	acxlog(L_IOCTL, "Set ESSID '%*s', length %d, flags 0x%04X\n",
+					len, extra, len, dwrq->flags);
 
 	acx_sem_lock(priv);
 
