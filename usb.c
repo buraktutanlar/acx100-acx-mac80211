@@ -143,7 +143,6 @@ acxusb_ids[] = {
 static struct usb_driver
 acxusb_driver = {
 	.name = "acx_usb",
-	.owner = THIS_MODULE,
 	.probe = acxusb_e_probe,
 	.disconnect = acxusb_e_disconnect,
 	.id_table = acxusb_ids
