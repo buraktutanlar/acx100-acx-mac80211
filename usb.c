@@ -92,7 +92,8 @@
 #define ACX_USB_RWMEM_MAXLEN	2048
 
 /* The number of bulk URBs to use */
-#define ACX_URB_CNT		8
+#define ACX_TX_URB_CNT		8
+#define ACX_RX_URB_CNT		2
 
 /* Should be sent to the bulkout endpoint */
 #define ACX_USB_REQ_UPLOAD_FW	0x10
@@ -697,19 +698,19 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 				(int) TXBUFSIZE, (int) RXBUFSIZE);
 
 	/* Allocate the RX/TX containers. */
-	priv->usb_tx = kmalloc(sizeof(usb_tx_t) * ACX_URB_CNT, GFP_KERNEL);
+	priv->usb_tx = kmalloc(sizeof(usb_tx_t) * ACX_TX_URB_CNT, GFP_KERNEL);
 	if (!priv->usb_tx) {
 		msg = "acx: no memory for tx container";
 		goto end_nomem;
 	}
-	priv->usb_rx = kmalloc(sizeof(usb_rx_t) * ACX_URB_CNT, GFP_KERNEL);
+	priv->usb_rx = kmalloc(sizeof(usb_rx_t) * ACX_RX_URB_CNT, GFP_KERNEL);
 	if (!priv->usb_rx) {
 		msg = "acx: no memory for rx container";
 		goto end_nomem;
 	}
 
 	/* Setup URBs for bulk-in/out messages */
-	for (i = 0; i < ACX_URB_CNT; i++) {
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		priv->usb_rx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!priv->usb_rx[i].urb) {
 			msg = "acx: no memory for input URB\n";
@@ -718,7 +719,9 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		priv->usb_rx[i].urb->status = 0;
 		priv->usb_rx[i].priv = priv;
 		priv->usb_rx[i].busy = 0;
+	}
 
+	for (i = 0; i< ACX_TX_URB_CNT; i++) {
 		priv->usb_tx[i].urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!priv->usb_tx[i].urb) {
 			msg = "acx: no memory for output URB\n";
@@ -728,7 +731,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		priv->usb_tx[i].priv = priv;
 		priv->usb_tx[i].busy = 0;
 	}
-	priv->tx_free = ACX_URB_CNT;
+	priv->tx_free = ACX_TX_URB_CNT;
 
 	usb_set_intfdata(intf, priv);
 	SET_NETDEV_DEV(dev, &intf->dev);
@@ -775,12 +778,12 @@ end_nomem:
 
 	if (dev) {
 		if (priv->usb_rx) {
-			for (i = 0; i < ACX_URB_CNT; i++)
+			for (i = 0; i < ACX_RX_URB_CNT; i++)
 				usb_free_urb(priv->usb_rx[i].urb);
 			kfree(priv->usb_rx);
 		}
 		if (priv->usb_tx) {
-			for (i = 0; i < ACX_URB_CNT; i++)
+			for (i = 0; i < ACX_TX_URB_CNT; i++)
 				usb_free_urb(priv->usb_tx[i].urb);
 			kfree(priv->usb_tx);
 		}
@@ -844,8 +847,10 @@ acxusb_e_disconnect(struct usb_interface *intf)
 	 * Here we only free them. _close() took care of
 	 * unlinking them.
 	 */
-	for (i = 0; i < ACX_URB_CNT; ++i) {
+	for (i = 0; i < ACX_RX_URB_CNT; ++i) {
 		usb_free_urb(priv->usb_rx[i].urb);
+	}
+	for (i = 0; i< ACX_TX_URB_CNT; ++i) {
 		usb_free_urb(priv->usb_tx[i].urb);
 	}
 
@@ -898,7 +903,7 @@ acxusb_e_open(struct net_device *dev)
 	acx_start_queue(dev, "on open"); */
 
 	acx_lock(priv, flags);
-	for (i = 0; i < ACX_URB_CNT; i++) {
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		acxusb_l_poll_rx(priv, &priv->usb_rx[i]);
 	}
 	acx_unlock(priv, flags);
@@ -963,13 +968,15 @@ acxusb_e_close(struct net_device *dev)
 	acx_stop_queue(dev, "on ifdown");
 	acx_set_status(priv, ACX_STATUS_0_STOPPED);
 	/* stop pending rx/tx urb transfers */
-	for (i = 0; i < ACX_URB_CNT; i++) {
+	for (i = 0; i < ACX_TX_URB_CNT; i++) {
 		acxusb_unlink_urb(priv->usb_tx[i].urb);
-		acxusb_unlink_urb(priv->usb_rx[i].urb);
 		priv->usb_tx[i].busy = 0;
+	}
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
+		acxusb_unlink_urb(priv->usb_rx[i].urb);
 		priv->usb_rx[i].busy = 0;
 	}
-	priv->tx_free = ACX_URB_CNT;
+	priv->tx_free = ACX_TX_URB_CNT;
 	acx_unlock(priv, flags);
 
 	/* Must do this outside of lock */
@@ -1090,7 +1097,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	case 0: /* No error */
 		break;
 	case -EOVERFLOW:
-		printk(KERN_ERR "acx: rx data overrun -> this is bad\n");
+		printk(KERN_ERR "acx: rx data overrun\n");
 		priv->rxtruncsize = 0; /* Not valid anymore. */
 		goto do_poll_rx;
 	case -ECONNRESET:
@@ -1204,7 +1211,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 						cur, /* intended rate */
 						stat->rate, 0, /* actually used rate */
 						stat->mac_status, /* error? */
-						ACX_URB_CNT - priv->tx_free);
+						ACX_TX_URB_CNT - priv->tx_free);
 				}
             		}
 			goto next;
@@ -1354,7 +1361,7 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 
 	head = priv->tx_head;
 	do {
-		head = (head + 1) % ACX_URB_CNT;
+		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!priv->usb_tx[head].busy) {
 			acxlog(L_USBRXTX, "allocated tx %d\n", head);
 			tx = &priv->usb_tx[head];
@@ -1518,11 +1525,11 @@ acxusb_i_tx_timeout(struct net_device *dev)
 
 	acx_lock(priv, flags);
 	/* unlink the URBs */
-	for (i = 0; i < ACX_URB_CNT; i++) {
+	for (i = 0; i < ACX_TX_URB_CNT; i++) {
 		acxusb_unlink_urb(priv->usb_tx[i].urb);
 		priv->usb_tx[i].busy = 0;
 	}
-	priv->tx_free = ACX_URB_CNT;
+	priv->tx_free = ACX_TX_URB_CNT;
 	/* TODO: stats update */
 	acx_unlock(priv, flags);
 
