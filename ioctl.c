@@ -470,7 +470,7 @@ acx_ioctl_set_ap(
 	}
 
 	ap = awrq->sa_data;
-	acxlog_mac(L_IOCTL, "Set AP=", ap, "\n");
+	acxlog_mac(L_IOCTL, "set AP=", ap, "\n");
 
 	MAC_COPY(priv->ap, ap);
 
@@ -795,7 +795,7 @@ acx_ioctl_set_essid(
 		goto end;
 	}
 
-	acxlog(L_IOCTL, "Set ESSID '%*s', length %d, flags 0x%04X\n",
+	acxlog(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
 					len, extra, len, dwrq->flags);
 
 	acx_sem_lock(priv);
@@ -1080,7 +1080,7 @@ acx_ioctl_set_encode(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "Set Encoding flags=0x%04X, size=%d, key: %s\n",
+	acxlog(L_IOCTL, "set encoding flags=0x%04X, size=%d, key: %s\n",
 			dwrq->flags, dwrq->length, extra ? "set" : "No key");
 
 	acx_sem_lock(priv);
@@ -1216,7 +1216,7 @@ acx_ioctl_set_power(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "Set 802.11 Power Save flags=0x%04X\n", vwrq->flags);
+	acxlog(L_IOCTL, "set 802.11 powersave flags=0x%04X\n", vwrq->flags);
 
 	acx_sem_lock(priv);
 

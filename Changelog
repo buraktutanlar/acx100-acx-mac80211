@@ -104,6 +104,12 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20051128] 0.3.20
+* we will use only 2 rx usb buffers now. No apparent speed loss,
+  eliminates usb packet reordering risk.
+* two USB fixes for real bugs and one fix for possible leak
+  of an urb on error path. Thanks Carlos Martin <carlosmn@gmail.com>.
+
 [20051116] 0.3.19
 * a few small fixes accumulated over time, nothing spectacular
 

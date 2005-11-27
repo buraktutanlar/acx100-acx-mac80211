@@ -2,7 +2,7 @@
 #define CONFIG_ACX_PCI 1
 #define CONFIG_ACX_USB 1
 
-#define ACX_RELEASE "v0.3.19"
+#define ACX_RELEASE "v0.3.20"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */

@@ -854,7 +854,7 @@ acxusb_e_disconnect(struct usb_interface *intf)
 		usb_free_urb(priv->usb_tx[i].urb);
 	}
 
-	/* The the containers. */
+	/* Freeing containers */
 	kfree(priv->usb_rx);
 	kfree(priv->usb_tx);
 
@@ -899,16 +899,19 @@ acxusb_e_open(struct net_device *dev)
 	SET_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx_s_start(priv);
 
-/* seems to be bogus. We need to assoc first.
-	acx_start_queue(dev, "on open"); */
+	/* don't acx_start_queue() here, we need to associate first */
 
 	acx_lock(priv, flags);
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
+		priv->usb_rx[i].urb->status = 0;
 		acxusb_l_poll_rx(priv, &priv->usb_rx[i]);
 	}
 	acx_unlock(priv, flags);
 
 	WLAN_MOD_INC_USE_COUNT;
+
+	/* Let things settle down a little in USB and/or firmware */
+	acx_s_msleep(20);
 
 	acx_sem_unlock(priv);
 
@@ -946,7 +949,7 @@ acxusb_e_close(struct net_device *dev)
 
 	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 
-//Below code is remarkably similar to acxpci_s_down(). Maybe we can merge them?
+//Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them?
 
 	/* Make sure we don't get any more rx requests */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -982,10 +985,12 @@ acxusb_e_close(struct net_device *dev)
 	/* Must do this outside of lock */
 	del_timer_sync(&priv->mgmt_timer);
 
+	/* Let things settle down a little in USB and/or firmware */
+	acx_s_msleep(20);
+
 	acx_sem_unlock(priv);
 
 	/* Decrease module-in-use count (if necessary) */
-
 	WLAN_MOD_DEC_USE_COUNT;
 
 	FN_EXIT0;
@@ -1045,8 +1050,8 @@ end:
 /***********************************************************************
 ** acxusb_i_complete_rx()
 ** Inputs:
-**     urb -> Pointer to USB request block
-**    regs -> Pointer to register-buffer for syscalls (see asm/ptrace.h)
+**     urb -> pointer to USB request block
+**    regs -> pointer to register-buffer for syscalls (see asm/ptrace.h)
 **
 ** This function is invoked by USB subsystem whenever a bulk receive
 ** request returns.
@@ -1267,19 +1272,10 @@ end_unlock:
 /***********************************************************************
 ** acxusb_i_complete_tx()
 ** Inputs:
-**     urb -> Pointer to USB request block
-**    regs -> Pointer to register-buffer for syscalls (see asm/ptrace.h)
+**     urb -> pointer to USB request block
+**    regs -> pointer to register-buffer for syscalls (see asm/ptrace.h)
 **
-** This function is invoked upon termination of a USB transfer. As the
-** USB device is only capable of sending a limited amount of bytes per
-** transfer to the bulk-out endpoint, this routine checks if there are
-** more bytes to send and triggers subsequent transfers. In case the
-** transfer size exactly matches the maximum bulk-out size, it triggers
-** a transfer of a null-frame, telling the card that this is it. Upon
-** completion of a frame, it checks whether the Tx ringbuffer contains
-** more data to send and invokes the Tx routines if this is the case.
-** If there are no more occupied Tx descriptors, the Tx Mutex is unlocked
-** and the network queue is switched back to life again.
+** This function is invoked upon termination of a USB transfer.
 */
 static void
 acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
@@ -1383,6 +1379,17 @@ end:
 	priv->tx_head = head;
 	FN_EXIT0;
 	return (tx_t*)tx;
+}
+
+
+/***************************************************************
+** Used if alloc_tx()'ed buffer needs to be cancelled without doing tx
+*/
+void
+acxusb_l_dealloc_tx(tx_t *tx_opaque)
+{
+	usb_tx_t* tx = (usb_tx_t*)tx_opaque;
+	tx->busy = 0;
 }
 
 

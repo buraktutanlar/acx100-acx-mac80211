@@ -2726,12 +2726,14 @@ acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	if (!txbuf) {
 		/* Card was removed */
 		txresult = NOT_OK;
+		acx_l_dealloc_tx(priv, tx);
 		goto end;
 	}
 	len = acx_ether_to_txbuf(priv, txbuf, skb);
 	if (len < 0) {
 		/* Error in packet conversion */
 		txresult = NOT_OK;
+		acx_l_dealloc_tx(priv, tx);
 		goto end;
 	}
 	acx_l_tx_data(priv, tx, len);
@@ -3261,8 +3263,10 @@ acx_l_transmit_assocresp(wlandevice_t *priv, const wlan_fr_assocreq_t *req)
 	if (!tx)
 		goto bad;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto bad;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_ASSOCRESPi;
@@ -3445,8 +3449,10 @@ acx_l_transmit_reassocresp(wlandevice_t *priv, const wlan_fr_reassocreq_t *req)
 	if (!tx)
 		goto ok;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto ok;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_REASSOCRESPi;
@@ -3684,6 +3690,8 @@ acx_l_process_data_frame_master(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		if (txbuf) {
 			memcpy(txbuf, &rxbuf->hdr_a3, len);
 			acx_l_tx_data(priv, tx, len);
+		} else {
+			acx_l_dealloc_tx(priv, tx);
 		}
 	}
 done:
@@ -4352,8 +4360,10 @@ acx_l_transmit_deauthen(wlandevice_t *priv, const u8 *addr, u16 reason)
 	if (!tx)
 		goto bad;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto bad;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = (WF_FTYPE_MGMTi | WF_FSTYPE_DEAUTHENi);
@@ -4393,15 +4403,17 @@ acx_l_transmit_authen1(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_ASSOC, "Sending authentication1 request, "
-		"awaiting response!\n");
+	acxlog(L_ASSOC, "sending authentication1 request, "
+		"awaiting response\n");
 
 	tx = acx_l_alloc_tx(priv);
 	if (!tx)
 		goto bad;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto bad;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi;
@@ -4454,8 +4466,10 @@ acx_l_transmit_authen2(wlandevice_t *priv, const wlan_fr_authen_t *req,
 	if (!tx)
 		goto bad;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto bad;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi;
@@ -4509,8 +4523,10 @@ acx_l_transmit_authen3(wlandevice_t *priv, const wlan_fr_authen_t *req)
 	if (!tx)
 		goto ok;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto ok;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FC_ISWEPi + WF_FSTYPE_AUTHENi;
@@ -4554,8 +4570,10 @@ acx_l_transmit_authen4(wlandevice_t *priv, const wlan_fr_authen_t *req)
 	if (!tx)
 		goto ok;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto ok;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi; /* 0xb0 */
@@ -4599,8 +4617,10 @@ acx_l_transmit_assoc_req(wlandevice_t *priv)
 	if (!tx)
 		goto bad;
 	head = acx_l_get_txbuf(priv, tx);
-	if (!head)
+	if (!head) {
+		acx_l_dealloc_tx(priv, tx);
 		goto bad;
+	}
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_ASSOCREQi;
@@ -4707,8 +4727,10 @@ acx_l_transmit_disassoc(wlandevice_t *priv, client_t *clt)
 		if (!tx)
 			goto bad;
 		head = acx_l_get_txbuf(priv, tx);
-		if (!head)
+		if (!head) {
+			acx_l_dealloc_tx(priv, tx);
 			goto bad;
+		}
 		body = (void*)(head + 1);
 
 /*		clt->used = CLIENT_AUTHENTICATED_2; - not (yet?) associated */
@@ -4789,7 +4811,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 		bss = &priv->sta_list[i];
 		if (!bss->used) continue;
 
-		acxlog(L_ASSOC, "Scan Table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
+		acxlog(L_ASSOC, "scan table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
 			bss->essid, bss->channel, bss->sir, bss->snr);
 
 		if (!mac_is_bcast(priv->ap))
@@ -6733,7 +6755,7 @@ acx_s_start(wlandevice_t *priv)
 		|GETSET_REG_DOMAIN|GETSET_MODE|GETSET_CHANNEL
 		|GETSET_TX|GETSET_RX);
 
-	acxlog(L_INIT, "updating initial settings on iface activation...\n");
+	acxlog(L_INIT, "updating initial settings on iface activation\n");
 	acx_s_update_card_settings(priv, 0, 0);
 
 	FN_EXIT0;

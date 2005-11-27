@@ -538,6 +538,14 @@ acx_l_alloc_tx(wlandevice_t *priv)
 	return acxusb_l_alloc_tx(priv);
 }
 
+void acxusb_l_dealloc_tx(tx_t *tx_opaque);
+static inline void
+acx_l_dealloc_tx(wlandevice_t *priv, tx_t *tx_opaque)
+{
+	if (IS_USB(priv))
+		acxusb_l_dealloc_tx(tx_opaque);
+}
+
 void* acxpci_l_get_txbuf(wlandevice_t *priv, tx_t *tx_opaque);
 void* acxusb_l_get_txbuf(wlandevice_t *priv, tx_t *tx_opaque);
 static inline void*
