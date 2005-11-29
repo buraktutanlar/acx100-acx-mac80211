@@ -886,8 +886,10 @@ acxusb_e_open(struct net_device *dev)
 
 	/* put the ACX100 out of sleep mode */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
+
+	/* 2005-11-28: Removal planned. These are done again by acx_s_start():
 	acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, NULL, 0);
-	acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, NULL, 0);
+	acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, NULL, 0); */
 
 	acx_init_task_scheduler(priv);
 
@@ -1000,7 +1002,7 @@ acxusb_e_close(struct net_device *dev)
 
 /***********************************************************************
 ** acxusb_l_poll_rx
-** This function (re)initiates a bulk-in USB transfer on given urb
+** This function (re)initiates a bulk-in USB transfer on a given urb
 */
 static void
 acxusb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)

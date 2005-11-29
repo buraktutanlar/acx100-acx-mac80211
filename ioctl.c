@@ -46,7 +46,8 @@
 #include "acx.h"
 
 
-/*================================================================*/
+/***********************************************************************
+*/
 
 /* if you plan to reorder something, make sure to reorder all other places
  * accordingly! */
@@ -198,9 +199,9 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 };
 
 
-/*------------------------------------------------------------------------------
- * acx_ioctl_commit
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_commit
+*/
 static int
 acx_ioctl_commit(struct net_device *dev,
 				      struct iw_request_info *info,
@@ -238,9 +239,9 @@ acx_ioctl_get_name(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_freq
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_freq
+*/
 static int
 acx_ioctl_set_freq(
 	struct net_device *dev,
@@ -308,9 +309,9 @@ acx_ioctl_get_freq(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_mode
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_mode
+*/
 static int
 acx_ioctl_set_mode(
 	struct net_device *dev,
@@ -443,11 +444,11 @@ acx_ioctl_get_sens(
 }
 
 
-/*------------------------------------------------------------------------------
- * acx_ioctl_set_ap
- *
- * Sets the MAC address of the AP to associate with
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_ap
+**
+** Sets the MAC address of the AP to associate with
+*/
 static int
 acx_ioctl_set_ap(
 	struct net_device *dev,
@@ -522,13 +523,13 @@ acx_ioctl_get_ap(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_aplist
-*
-* Comment: deprecated in favour of iwscan.
-* We simply return the list of currently available stations in range,
-* don't do a new scan.
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_aplist
+**
+** Deprecated in favor of iwscan.
+** We simply return the list of currently available stations in range,
+** don't do a new scan.
+*/
 static int
 acx_ioctl_get_aplist(
 	struct net_device *dev,
@@ -853,9 +854,9 @@ acx_ioctl_get_essid(
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_update_client_rates
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_update_client_rates
+*/
 static void
 acx_l_update_client_rates(wlandevice_t *priv, u16 rate)
 {
@@ -1003,9 +1004,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_rate
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_rate
+*/
 static int
 acx_ioctl_get_rate(
 	struct net_device *dev,
@@ -1064,9 +1065,9 @@ acx_ioctl_get_rts(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_encode
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_encode
+*/
 static int
 acx_ioctl_set_encode(
 	struct net_device *dev,
@@ -1161,9 +1162,9 @@ end_unlock:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_encode
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_encode
+*/
 static int
 acx_ioctl_get_encode(
 	struct net_device *dev,
@@ -1309,9 +1310,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_txpow
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_txpow
+*/
 static inline int
 acx_ioctl_get_txpow(
 	struct net_device *dev,
@@ -1335,9 +1336,9 @@ acx_ioctl_get_txpow(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_txpow
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_txpow
+*/
 static int
 acx_ioctl_set_txpow(
 	struct net_device *dev,
@@ -1384,9 +1385,9 @@ acx_ioctl_set_txpow(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_range
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_range
+*/
 static int
 acx_ioctl_get_range(
 	struct net_device *dev,
@@ -1484,17 +1485,17 @@ end:
 }
 
 
-/*================================================================*/
-/* Private functions						  */
-/*================================================================*/
+/***********************************************************************
+** Private functions
+*/
 
 #if WIRELESS_EXT < 13
-/*----------------------------------------------------------------
-* acx_ioctl_get_iw_priv
-*
-* Comment: I added the monitor mode and changed the stuff below
-* to look more like the orinoco driver
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_iw_priv
+**
+** I added the monitor mode and changed the stuff below
+** to look more like the orinoco driver
+*/
 static int
 acx_ioctl_get_iw_priv(struct iwreq *iwr)
 {
@@ -1517,9 +1518,9 @@ acx_ioctl_get_iw_priv(struct iwreq *iwr)
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_nick
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_nick
+*/
 static inline int
 acx_ioctl_get_nick(
 	struct net_device *dev,
@@ -1536,9 +1537,9 @@ acx_ioctl_get_nick(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_nick
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_nick
+*/
 static int
 acx_ioctl_set_nick(
 	struct net_device *dev,
@@ -1570,9 +1571,9 @@ end_unlock:
 }
 
 
-/*------------------------------------------------------------------------------
- * acx_ioctl_get_retry
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_retry
+*/
 static int
 acx_ioctl_get_retry(
 	struct net_device *dev,
@@ -1614,9 +1615,9 @@ acx_ioctl_get_retry(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_retry
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_retry
+*/
 static int
 acx_ioctl_set_retry(
 	struct net_device *dev,
@@ -1672,12 +1673,12 @@ end:
 }
 
 
-/******************************* private ioctls ******************************/
+/************************ private ioctls ******************************/
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_debug
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_debug
+*/
 #if ACX_DEBUG
 static int
 acx_ioctl_set_debug(
@@ -1698,9 +1699,10 @@ acx_ioctl_set_debug(
 }
 #endif
 
-/*----------------------------------------------------------------
-* acx_ioctl_list_reg_domain
-*----------------------------------------------------------------*/
+
+/***********************************************************************
+** acx_ioctl_list_reg_domain
+*/
 static const char * const
 reg_domain_strings[] = {
 	" 1-11 FCC (USA)",
@@ -1734,9 +1736,9 @@ acx_ioctl_list_reg_domain(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_reg_domain
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_reg_domain
+*/
 static int
 acx_ioctl_set_reg_domain(
 	struct net_device *dev,
@@ -1768,9 +1770,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_reg_domain
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_reg_domain
+*/
 static int
 acx_ioctl_get_reg_domain(
 	struct net_device *dev,
@@ -1798,9 +1800,9 @@ acx_ioctl_get_reg_domain(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_short_preamble
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_short_preamble
+*/
 static const char * const
 preamble_modes[] = {
 	"off",
@@ -1876,9 +1878,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_short_preamble
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_short_preamble
+*/
 static int
 acx_ioctl_get_short_preamble(
 	struct net_device *dev,
@@ -1902,12 +1904,12 @@ acx_ioctl_get_short_preamble(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_antenna
-*
-* Comment: TX and RX antenna can be set separately but this function good
-*          for testing 0-4 bits
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_antenna
+**
+** TX and RX antenna can be set separately but this function good
+** for testing 0-4 bits
+*/
 static int
 acx_ioctl_set_antenna(
 	struct net_device *dev,
@@ -1941,9 +1943,9 @@ acx_ioctl_set_antenna(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_antenna
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_antenna
+*/
 static int
 acx_ioctl_get_antenna(
 	struct net_device *dev,
@@ -1968,14 +1970,12 @@ acx_ioctl_get_antenna(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_rx_antenna
-*
-*
-* Arguments:
-*	0 = antenna1; 1 = antenna2; 2 = full diversity; 3 = partial diversity
-* Comment: Could anybody test which antenna is the external one
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_rx_antenna
+**
+** 0 = antenna1; 1 = antenna2; 2 = full diversity; 3 = partial diversity
+** Could anybody test which antenna is the external one?
+*/
 static int
 acx_ioctl_set_rx_antenna(
 	struct net_device *dev,
@@ -2010,12 +2010,12 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_tx_antenna
-*
-* Arguments: 0 == antenna2; 1 == antenna1;
-* Comment: Could anybody test which antenna is the external one
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_tx_antenna
+**
+** Arguments: 0 == antenna2; 1 == antenna1;
+** Could anybody test which antenna is the external one?
+*/
 static int
 acx_ioctl_set_tx_antenna(
 	struct net_device *dev,
@@ -2050,11 +2050,11 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_wlansniff
-*
-* can we just remove this in favor of monitor mode? --vda
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_wlansniff
+**
+** can we just remove this in favor of monitor mode? --vda
+*/
 static int
 acx_ioctl_wlansniff(
 	struct net_device *dev,
@@ -2105,10 +2105,10 @@ acx_ioctl_wlansniff(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_unknown11
-* FIXME: looks like some sort of "iwpriv kick_sta MAC" but it's broken
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_unknown11
+** FIXME: looks like some sort of "iwpriv kick_sta MAC" but it's broken
+*/
 static int
 acx_ioctl_unknown11(
 	struct net_device *dev,
@@ -2170,7 +2170,7 @@ acx_ioctl_dbg_set_masks(
 }
 
 
-/*----------------------------------------------------------------
+/***********************************************************************
 * acx_ioctl_set_rates
 *
 * This ioctl takes string parameter. Examples:
@@ -2199,7 +2199,7 @@ acx_ioctl_dbg_set_masks(
 *	(acx111 does not support CCK-OFDM, driver will reject this cmd)
 * iwpriv wlan0 SetRates "6,9,12 18,24,36,48,54"
 *	6,9,12 are basic, rest of 11g rates is enabled. Using OFDM
-*----------------------------------------------------------------*/
+*/
 #include "setrate.c"
 
 /* disallow: 33Mbit (unsupported by hw) */
@@ -2315,9 +2315,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_get_phy_chan_busy_percentage
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_get_phy_chan_busy_percentage
+*/
 static int
 acx_ioctl_get_phy_chan_busy_percentage(
 	struct net_device *dev,
@@ -2358,9 +2358,9 @@ end_unlock:
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_ed_threshold
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_ed_threshold
+*/
 static inline int
 acx_ioctl_set_ed_threshold(
 	struct net_device *dev,
@@ -2383,9 +2383,9 @@ acx_ioctl_set_ed_threshold(
 }
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_cca
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_cca
+*/
 static inline int
 acx_ioctl_set_cca(
 	struct net_device *dev,
@@ -2698,17 +2698,15 @@ const struct iw_handler_def acx_ioctl_handler_def =
 
 
 #if WIRELESS_EXT < 13
-/*================================================================*/
-/* Main function						  */
-/*================================================================*/
-/*----------------------------------------------------------------
-* acx_e_ioctl_old
-*
-* Comment:
-* This is the *OLD* ioctl handler.
-* Make sure to not only place your additions here, but instead mainly
-* in the new one (acx_ioctl_handler[])!
-*----------------------------------------------------------------*/
+/***********************************************************************
+** Main function
+**
+** acx_e_ioctl_old
+**
+** This is the *OLD* ioctl handler.
+** Make sure to not only place your additions here, but instead mainly
+** in the new one (acx_ioctl_handler[])!
+*/
 int
 acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 {

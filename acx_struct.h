@@ -71,14 +71,14 @@ enum { acx_debug = 0 };
 #endif
 
 
-/*============================================================================*
- * Random helpers                                                             *
- *============================================================================*/
+/***********************************************************************
+** Random helpers
+*/
 #define ACX_PACKED __WLAN_ATTRIB_PACK__
 
 #define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
-/* Use worker_queues for 2.5/2.6 Kernels and queue tasks for 2.4 Kernels
+/* Use worker_queues for 2.5/2.6 kernels and queue tasks for 2.4 kernels
    (used for the 'bottom half' of the interrupt routine) */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
@@ -104,9 +104,9 @@ enum { acx_debug = 0 };
 #endif
 
 
-/*============================================================================*
- * Constants                                                                  *
- *============================================================================*/
+/***********************************************************************
+** Constants
+*/
 #define OK	0
 #define NOT_OK	1
 
@@ -448,9 +448,9 @@ DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 #endif
 
 
-/*============================================================================*
- * Information Frames Structures                                              *
- *============================================================================*/
+/***********************************************************************
+**Information Frames Structures
+*/
 
 /* Used in beacon frames and the like */
 #define DOT11RATEBYTE_1		(1*2)
@@ -684,9 +684,9 @@ struct client {
 };
 
 
-/*============================================================================*
- * Hardware structures                                                        *
- *============================================================================*/
+/***********************************************************************
+** Hardware structures
+*/
 
 /* An opaque typesafe helper type
  *
@@ -786,7 +786,7 @@ typedef struct {
 #define DESC_CTL2_WEP		0x40	/* encrypt this frame */
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
-/***************************************************************
+/***********************************************************************
 ** PCI structures
 */
 /* IRQ Constants
@@ -959,7 +959,7 @@ struct rxhostdesc {
 
 #endif /* ACX_PCI */
 
-/***************************************************************
+/***********************************************************************
 ** USB structures and constants
 */
 #ifdef ACX_USB
@@ -1020,9 +1020,9 @@ typedef struct usb_rx {
 #endif /* ACX_USB */
 
 
-/*============================================================================*
- * Main acx per-device data structure (netdev_priv(dev))                      *
- *============================================================================*/
+/***********************************************************************
+** Main acx per-device data structure (netdev_priv(dev))
+*/
 #define ACX_STATE_FW_LOADED	0x01
 #define ACX_STATE_IFACE_UP	0x02
 
@@ -1388,9 +1388,9 @@ struct wlandevice {
 #define GETSET_ALL		0x80000000L
 
 
-/*============================================================================*
- * Firmware loading                                                           *
- *============================================================================*/
+/***********************************************************************
+** Firmware loading
+*/
 /* Doh, 2.4.x also has CONFIG_FW_LOADER_MODULE
  * (but doesn't have the new device model yet which we require!)
  * FIXME: exact version that introduced new device handling? */
@@ -1928,9 +1928,9 @@ acx_struct_size_check(void)
 }
 
 
-/*============================================================================*
- * Global data                                                                *
- *============================================================================*/
+/***********************************************************************
+** Global data
+*/
 extern const u8 acx_bitpos2ratebyte[];
 extern const u8 acx_bitpos2rate100[];
 
