@@ -887,10 +887,6 @@ acxusb_e_open(struct net_device *dev)
 	/* put the ACX100 out of sleep mode */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
 
-	/* 2005-11-28: Removal planned. These are done again by acx_s_start():
-	acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, NULL, 0);
-	acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, NULL, 0); */
-
 	acx_init_task_scheduler(priv);
 
 	init_timer(&priv->mgmt_timer);
@@ -906,14 +902,13 @@ acxusb_e_open(struct net_device *dev)
 	acx_lock(priv, flags);
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		priv->usb_rx[i].urb->status = 0;
-		acxusb_l_poll_rx(priv, &priv->usb_rx[i]);
 	}
+
+	acxusb_l_poll_rx(priv, &priv->usb_rx[0]);
+
 	acx_unlock(priv, flags);
 
 	WLAN_MOD_INC_USE_COUNT;
-
-	/* Let things settle down a little in USB and/or firmware */
-	acx_s_msleep(20);
 
 	acx_sem_unlock(priv);
 
@@ -986,9 +981,6 @@ acxusb_e_close(struct net_device *dev)
 
 	/* Must do this outside of lock */
 	del_timer_sync(&priv->mgmt_timer);
-
-	/* Let things settle down a little in USB and/or firmware */
-	acx_s_msleep(20);
 
 	acx_sem_unlock(priv);
 
@@ -1096,6 +1088,10 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	acxlog(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
 				rxnum, urb->status, size);
 
+	/* Send the URB that's waiting. */
+	acxlog(L_USBRXTX, "rxnum=%d, sending=%d", rxnum, rxnum^1);
+	acxusb_l_poll_rx(priv, &priv->usb_rx[rxnum^1]);
+
 	if (size > sizeof(rxbuffer_t))
 		printk("acx_usb: rx too large: %d, please report\n", size);
 
@@ -1106,7 +1102,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	case -EOVERFLOW:
 		printk(KERN_ERR "acx: rx data overrun\n");
 		priv->rxtruncsize = 0; /* Not valid anymore. */
-		goto do_poll_rx;
+		goto end_unlock;
 	case -ECONNRESET:
 		priv->rxtruncsize = 0;
 		goto end_unlock;
@@ -1117,14 +1113,14 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		priv->rxtruncsize = 0;
 		priv->stats.rx_errors++;
 		printk("acx: rx error (urb status=%d)\n", urb->status);
-		goto do_poll_rx;
+		goto end_unlock;
 	}
 
 	if (!size)
 		printk("acx: warning, encountered zerolength rx packet\n");
 
 	if (urb->transfer_buffer != inbuf)
-		goto do_poll_rx;
+		goto end_unlock;
 
 	/* check if previous frame was truncated
 	** FIXME: this code can only handle truncation
@@ -1261,9 +1257,6 @@ next:
 		}
 	}
 
-do_poll_rx:
-	/* receive of frame completed, now look for the next one */
-	acxusb_l_poll_rx(priv, rx);
 end_unlock:
 	acx_unlock(priv, flags);
 /* end: */
