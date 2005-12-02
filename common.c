@@ -1927,7 +1927,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 	if (IS_ACX100(priv))
 		priv->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
 
-	acx_s_update_card_settings(priv, 0, 0);
+	acx_s_update_card_settings(priv);
 
 	acx_lock(priv, flags);
 
@@ -4986,7 +4986,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 			/* need to update channel in beacon template */
 			SET_BIT(priv->set_mask, SET_TEMPLATES);
 			if (ACX_STATE_IFACE_UP & priv->dev_state_mask)
-				acx_s_update_card_settings(priv, 0, 0);
+				acx_s_update_card_settings(priv);
 		}
 		/* Inform firmware on our decision to start or join BSS */
 		acx_s_cmd_join_bssid(priv, priv->bssid);
@@ -5843,19 +5843,13 @@ acx111_s_sens_radio_16_17(wlandevice_t *priv)
 }
 
 void
-acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
+acx_s_update_card_settings(wlandevice_t *priv)
 {
 	unsigned long flags;
 	unsigned int start_scan = 0;
 	int i;
 
 	FN_ENTER;
-
-	if (get_all)
-		SET_BIT(priv->get_mask, GETSET_ALL);
-	if (set_all)
-		SET_BIT(priv->set_mask, GETSET_ALL);
-	/* Why not just set masks to 0xffffffff? We can get rid of GETSET_ALL */
 
 	acxlog(L_INIT, "get_mask 0x%08X, set_mask 0x%08X\n",
 			priv->get_mask, priv->set_mask);
@@ -5867,7 +5861,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 			"Need to update packet templates, too\n");
 		SET_BIT(priv->set_mask, SET_TEMPLATES);
 	}
-	if (priv->set_mask & (GETSET_CHANNEL|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_CHANNEL) {
 		/* This will actually tune RX/TX to the channel */
 		SET_BIT(priv->set_mask, GETSET_RX|GETSET_TX);
 		switch (priv->mode) {
@@ -5887,7 +5881,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 
 #ifdef WHY_SHOULD_WE_BOTHER /* imagine we were just powered off */
 	/* send a disassoc request in case it's required */
-	if (priv->set_mask & (GETSET_MODE|GETSET_RESCAN|GETSET_CHANNEL|GETSET_WEP|GETSET_ALL)) {
+	if (priv->set_mask & (GETSET_MODE|GETSET_RESCAN|GETSET_CHANNEL|GETSET_WEP)) {
 		if (ACX_MODE_2_STA == priv->mode) {
 			if (ACX_STATUS_4_ASSOCIATED == priv->status) {
 				acxlog(L_ASSOC, "we were ASSOCIATED - "
@@ -5906,7 +5900,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 	}
 #endif
 
-	if (priv->get_mask & (GETSET_STATION_ID|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_STATION_ID) {
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
 		const u8 *paddr;
 
@@ -5922,7 +5916,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_STATION_ID);
 	}
 
-	if (priv->get_mask & (GETSET_SENSITIVITY|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_SENSITIVITY) {
 		if ((RADIO_RFMD_11 == priv->radio_type)
 		|| (RADIO_MAXIM_0D == priv->radio_type)
 		|| (RADIO_RALINK_15 == priv->radio_type)) {
@@ -5937,7 +5931,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_SENSITIVITY);
 	}
 
-	if (priv->get_mask & (GETSET_ANTENNA|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_ANTENNA) {
 		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
 
 		memset(antenna, 0, sizeof(antenna));
@@ -5947,7 +5941,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_ANTENNA);
 	}
 
-	if (priv->get_mask & (GETSET_ED_THRESH|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_ED_THRESH) {
 		if (IS_ACX100(priv))	{
 			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
 
@@ -5962,7 +5956,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_ED_THRESH);
 	}
 
-	if (priv->get_mask & (GETSET_CCA|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_CCA) {
 		if (IS_ACX100(priv))	{
 			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
@@ -5977,7 +5971,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_CCA);
 	}
 
-	if (priv->get_mask & (GETSET_REG_DOMAIN|GETSET_ALL)) {
+	if (priv->get_mask & GETSET_REG_DOMAIN) {
 		acx_ie_generic_t dom;
 
 		acx_s_interrogate(priv, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
@@ -5987,7 +5981,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->get_mask, GETSET_REG_DOMAIN);
 	}
 
-	if (priv->set_mask & (GETSET_STATION_ID|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_STATION_ID) {
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
 		u8 *paddr;
 
@@ -6003,7 +5997,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_STATION_ID);
 	}
 
-	if (priv->set_mask & (SET_TEMPLATES|GETSET_ALL)) {
+	if (priv->set_mask & SET_TEMPLATES) {
 		acxlog(L_INIT, "updating packet templates\n");
 		/* Doesn't work for acx100, do it only for acx111 for now */
 		if (IS_ACX111(priv)) {
@@ -6031,13 +6025,13 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		acx_s_cmd_join_bssid(priv, priv->bssid);
 		CLEAR_BIT(priv->set_mask, SET_TEMPLATES);
 	}
-	if (priv->set_mask & (SET_STA_LIST|GETSET_ALL)) {
+	if (priv->set_mask & SET_STA_LIST) {
 		acx_lock(priv, flags);
 		acx_l_sta_list_init(priv);
 		CLEAR_BIT(priv->set_mask, SET_STA_LIST);
 		acx_unlock(priv, flags);
 	}
-	if (priv->set_mask & (SET_RATE_FALLBACK|GETSET_ALL)) {
+	if (priv->set_mask & SET_RATE_FALLBACK) {
 		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
 
 		/* configure to not do fallbacks when not in auto rate mode */
@@ -6046,14 +6040,14 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		acx_s_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
 	}
-	if (priv->set_mask & (GETSET_TXPOWER|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_TXPOWER) {
 		acxlog(L_INIT, "updating transmit power: %u dBm\n",
 					priv->tx_level_dbm);
 		acx_s_set_tx_level(priv, priv->tx_level_dbm);
 		CLEAR_BIT(priv->set_mask, GETSET_TXPOWER);
 	}
 
-	if (priv->set_mask & (GETSET_SENSITIVITY|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_SENSITIVITY) {
 		acxlog(L_INIT, "updating sensitivity value: %u\n",
 					priv->sensitivity);
 		switch (priv->radio_type) {
@@ -6073,7 +6067,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_SENSITIVITY);
 	}
 
-	if (priv->set_mask & (GETSET_ANTENNA|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_ANTENNA) {
 		/* antenna */
 		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
 
@@ -6085,7 +6079,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_ANTENNA);
 	}
 
-	if (priv->set_mask & (GETSET_ED_THRESH|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_ED_THRESH) {
 		/* ed_threshold */
 		acxlog(L_INIT, "updating Energy Detect (ED) threshold: %u\n",
 					priv->ed_threshold);
@@ -6101,7 +6095,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_ED_THRESH);
 	}
 
-	if (priv->set_mask & (GETSET_CCA|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_CCA) {
 		/* CCA value */
 		acxlog(L_INIT, "updating Channel Clear Assessment "
 				"(CCA) value: 0x%02X\n", priv->cca);
@@ -6117,7 +6111,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_CCA);
 	}
 
-	if (priv->set_mask & (GETSET_LED_POWER|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_LED_POWER) {
 		/* Enable Tx */
 		acxlog(L_INIT, "updating power LED status: %u\n", priv->led_power);
 
@@ -6128,11 +6122,11 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		acx_unlock(priv, flags);
 	}
 
+	if (priv->set_mask & GETSET_POWER_80211) {
 /* this seems to cause Tx lockup after some random time (Tx error 0x20),
  * so let's disable it for now until further investigation */
 /* Maybe fixed now after locking is fixed. Need to retest */
 #ifdef POWER_SAVE_80211
-	if (priv->set_mask & (GETSET_POWER_80211|GETSET_ALL)) {
 		acx100_ie_powermgmt_t pm;
 
 		/* change 802.11 power save mode settings */
@@ -6167,17 +6161,17 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		/* FIXME: we shouldn't trigger a scan immediately after
 		 * fiddling with power save mode (since the firmware is sending
 		 * a NULL frame then). Does this need locking?? */
+#endif
 		CLEAR_BIT(priv->set_mask, GETSET_POWER_80211);
 	}
-#endif
 
-	if (priv->set_mask & (GETSET_CHANNEL|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_CHANNEL) {
 		/* channel */
 		acxlog(L_INIT, "updating channel to: %u\n", priv->channel);
 		CLEAR_BIT(priv->set_mask, GETSET_CHANNEL);
 	}
 
-	if (priv->set_mask & (GETSET_TX|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_TX) {
 		/* set Tx */
 		acxlog(L_INIT, "updating: %s Tx\n",
 				priv->tx_disabled ? "disable" : "enable");
@@ -6188,7 +6182,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_TX);
 	}
 
-	if (priv->set_mask & (GETSET_RX|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_RX) {
 		/* Enable Rx */
 		acxlog(L_INIT, "updating: enable Rx on channel: %u\n",
 				priv->channel);
@@ -6196,7 +6190,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_RX);
 	}
 
-	if (priv->set_mask & (GETSET_RETRY|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_RETRY) {
 		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
 		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
 
@@ -6209,7 +6203,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_RETRY);
 	}
 
-	if (priv->set_mask & (SET_MSDU_LIFETIME|GETSET_ALL)) {
+	if (priv->set_mask & SET_MSDU_LIFETIME) {
 		u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
 		acxlog(L_INIT, "updating tx MSDU lifetime: %u\n",
@@ -6219,7 +6213,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, SET_MSDU_LIFETIME);
 	}
 
-	if (priv->set_mask & (GETSET_REG_DOMAIN|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_REG_DOMAIN) {
 		/* reg_domain */
 		acx_ie_generic_t dom;
 		unsigned mask;
@@ -6263,7 +6257,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_REG_DOMAIN);
 	}
 
-	if (priv->set_mask & (GETSET_MODE|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_MODE) {
 		priv->netdev->type = ARPHRD_ETHER;
 
 		switch (priv->mode) {
@@ -6318,12 +6312,12 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_MODE);
 	}
 
-	if (priv->set_mask & (SET_RXCONFIG|GETSET_ALL)) {
+	if (priv->set_mask & SET_RXCONFIG) {
 		acx_s_initialize_rx_config(priv);
 		CLEAR_BIT(priv->set_mask, SET_RXCONFIG);
 	}
 
-	if (priv->set_mask & (GETSET_RESCAN|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_RESCAN) {
 		switch (priv->mode) {
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
@@ -6333,7 +6327,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_RESCAN);
 	}
 
-	if (priv->set_mask & (GETSET_WEP|GETSET_ALL)) {
+	if (priv->set_mask & GETSET_WEP) {
 		/* encode */
 
 		ie_dot11WEPDefaultKeyID_t dkey;
@@ -6359,7 +6353,7 @@ acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all)
 		CLEAR_BIT(priv->set_mask, GETSET_WEP);
 	}
 
-	if (priv->set_mask & (SET_WEP_OPTIONS|GETSET_ALL)) {
+	if (priv->set_mask & SET_WEP_OPTIONS) {
 		acx100_ie_wep_options_t options;
 
 		if (IS_ACX111(priv)) {
@@ -6642,7 +6636,7 @@ acx_e_after_interrupt_task(void *data)
 	/* a poor interrupt code wanted to do update_card_settings() */
 	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
 		if (ACX_STATE_IFACE_UP & priv->dev_state_mask)
-			acx_s_update_card_settings(priv, 0, 0);
+			acx_s_update_card_settings(priv);
 		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
@@ -6756,7 +6750,7 @@ acx_s_start(wlandevice_t *priv)
 		|GETSET_TX|GETSET_RX);
 
 	acxlog(L_INIT, "updating initial settings on iface activation\n");
-	acx_s_update_card_settings(priv, 0, 0);
+	acx_s_update_card_settings(priv);
 
 	FN_EXIT0;
 }

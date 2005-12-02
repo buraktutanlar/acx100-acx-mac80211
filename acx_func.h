@@ -600,7 +600,7 @@ void acx_update_capabilities(wlandevice_t *priv);
 void acx_s_start(wlandevice_t *priv);
 
 void acx_s_initialize_rx_config(wlandevice_t *priv);
-void acx_s_update_card_settings(wlandevice_t *priv, int get_all, int set_all);
+void acx_s_update_card_settings(wlandevice_t *priv);
 void acx_read_configoption(wlandevice_t *priv);
 void acx_l_update_ratevector(wlandevice_t *priv);
 

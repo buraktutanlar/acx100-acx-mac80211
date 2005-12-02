@@ -1922,8 +1922,10 @@ acxpci_e_resume(struct pci_dev *pdev)
 
 	/* now even reload all card parameters as they were before suspend,
 	 * and possibly be back in the network again already :-) */
-	if (ACX_STATE_IFACE_UP & priv->dev_state_mask)
-		acx_s_update_card_settings(priv, 0, 1);
+	if (ACX_STATE_IFACE_UP & priv->dev_state_mask) {
+		priv->set_mask = GETSET_ALL;
+		acx_s_update_card_settings(priv);
+	}
 	acxlog(L_DEBUG, "rsm: settings updated\n");
 	netif_device_attach(dev);
 	acxlog(L_DEBUG, "rsm: device attached\n");

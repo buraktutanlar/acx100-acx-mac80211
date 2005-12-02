@@ -213,7 +213,7 @@ acx_ioctl_commit(struct net_device *dev,
 
 	acx_sem_lock(priv);
 	if (ACX_STATE_IFACE_UP & priv->dev_state_mask)
-		acx_s_update_card_settings(priv, 0, 0);
+		acx_s_update_card_settings(priv);
 	acx_sem_unlock(priv);
 
 	FN_EXIT0;
@@ -3071,7 +3071,7 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 
 	if ((priv->dev_state_mask & ACX_STATE_IFACE_UP) && priv->set_mask) {
 		acx_sem_lock(priv);
-		acx_s_update_card_settings(priv, 0, 0);
+		acx_s_update_card_settings(priv);
 		acx_sem_unlock(priv);
 	}
 
