@@ -433,6 +433,43 @@ acx_get_packet_type_string(u16 fc)
 
 
 /***********************************************************************
+** acx_wlan_reason_str
+*/
+static const char*
+acx_wlan_reason_str(u16 reason)
+{
+	static const char* const reason_str[] = {
+	/*  0 */	"?",
+	/*  1 */	"unspecified",
+	/*  2 */	"prev auth is not valid",
+	/*  3 */	"leaving BBS",
+	/*  4 */	"due to inactivity",
+	/*  5 */	"AP is busy",
+	/*  6 */	"got class 2 frame from non-auth'ed STA",
+	/*  7 */	"got class 3 frame from non-assoc'ed STA",
+	/*  8 */	"STA has left BSS",
+	/*  9 */	"assoc without auth is not allowed",
+	/* 10 */	"bad power setting (802.11h)",
+	/* 11 */	"bad channel (802.11i)",
+	/* 12 */	"?",
+	/* 13 */	"invalid IE",
+	/* 14 */	"MIC failure",
+	/* 15 */	"four-way handshake timeout",
+	/* 16 */	"group key handshake timeout",
+	/* 17 */	"IE is different",
+	/* 18 */	"invalid group cipher",
+	/* 19 */	"invalid pairwise cipher",
+	/* 20 */	"invalid AKMP",
+	/* 21 */	"unsupported RSN version",
+	/* 22 */	"invalid RSN IE cap",
+	/* 23 */	"802.1x failed",
+	/* 24 */	"cipher suite rejected"
+	};
+	return reason < VEC_SIZE(reason_str) ? reason_str[reason] : "?";
+}
+
+
+/***********************************************************************
 ** acx_cmd_status_str
 */
 const char*
@@ -458,7 +495,7 @@ acx_cmd_status_str(unsigned int state)
 		"Failed"
 	};
 	return state < VEC_SIZE(cmd_error_strings) ?
-			cmd_error_strings[state] : "UNKNOWN REASON";
+			cmd_error_strings[state] : "?";
 }
 
 
@@ -3568,10 +3605,14 @@ acx_l_process_disassoc_from_ap(wlandevice_t *priv, const wlan_fr_disassoc_t *req
 		/* Hrm, we aren't assoc'ed yet anyhow... */
 		goto end;
 	}
+
+	printk("%s: got disassoc frame with reason %d (%s)\n",
+		priv->netdev->name, *req->reason,
+		acx_wlan_reason_str(*req->reason));
+
 	if (mac_is_equal(priv->dev_addr, req->hdr->a1)) {
 		acx_l_transmit_deauthen(priv, priv->bssid,
 				WLAN_MGMT_REASON_DEAUTH_LEAVING);
-		/* Start scan anew */
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
 		acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
@@ -3592,10 +3633,14 @@ acx_l_process_deauth_from_ap(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 		/* Hrm, we aren't assoc'ed yet anyhow... */
 		goto end;
 	}
+
+	printk("%s: got deauth frame with reason %d (%s)\n",
+		priv->netdev->name, *req->reason,
+		acx_wlan_reason_str(*req->reason));
+
 	/* Chk: is ta is verified to be from our AP? */
 	if (mac_is_equal(priv->dev_addr, req->hdr->a1)) {
 		acxlog(L_DEBUG, "AP sent us deauth packet\n");
-		/* not needed: acx_set_status(priv, ACX_STATUS_1_SCANNING) */
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
 		acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
