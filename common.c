@@ -5685,7 +5685,7 @@ acx100_s_init_packet_templates(wlandevice_t *priv)
 	acxlog(L_DEBUG, "sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
 
 	/* acx100 still do not emit probe requests, thus this call
-	** is sourt of not needed. But we want it to work someday */
+	** is sort of not needed. But we want it to work someday */
 	if (OK != acx_s_init_max_probe_request_template(priv))
 		goto failed;
 
@@ -5724,7 +5724,7 @@ acx100_s_init_packet_templates(wlandevice_t *priv)
 failed:
 	acxlog(L_DEBUG|L_INIT,
 		/* "cb=0x%X\n" */
-		"pACXMemoryMap:\n"
+		"ACXMemoryMap:\n"
 		".CodeStart=0x%X\n"
 		".CodeEnd=0x%X\n"
 		".WEPCacheStart=0x%X\n"

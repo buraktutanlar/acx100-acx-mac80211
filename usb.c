@@ -1089,7 +1089,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 				rxnum, urb->status, size);
 
 	/* Send the URB that's waiting. */
-	acxlog(L_USBRXTX, "rxnum=%d, sending=%d", rxnum, rxnum^1);
+	acxlog(L_USBRXTX, "rxnum=%d, sending=%d\n", rxnum, rxnum^1);
 	acxusb_l_poll_rx(priv, &priv->usb_rx[rxnum^1]);
 
 	if (size > sizeof(rxbuffer_t))
