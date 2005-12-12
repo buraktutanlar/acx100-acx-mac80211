@@ -593,7 +593,7 @@ void acxpci_set_interrupt_mask(wlandevice_t *priv);
 int acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
 
 void acx_s_msleep(int ms);
-int acx_s_init_mac(netdevice_t *dev);
+int acx_s_init_mac(wlandevice_t *priv);
 void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
 void acx_set_timer(wlandevice_t *priv, int timeout_us);
 void acx_update_capabilities(wlandevice_t *priv);

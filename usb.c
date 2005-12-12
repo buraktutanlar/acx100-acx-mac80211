@@ -241,7 +241,7 @@ acxusb_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 
 
 /***********************************************************************
-** acx_s_issue_cmd_timeo
+** acxusb_s_issue_cmd_timeo
 ** Excecutes a command in the command mailbox
 **
 ** buffer = a pointer to the data.
@@ -291,7 +291,8 @@ acxusb_s_issue_cmd_timeo_debug(
 	FN_ENTER;
 
 	devname = priv->netdev->name;
-	if (!devname || !devname[0])
+	/* no "wlan%%d: ..." please */
+	if (!devname || !devname[0] || devname[4]=='%')
 		devname = "acx";
 
 	acxlog(L_CTL, FUNC"(cmd:%s,buflen:%u,type:0x%04X)\n",
@@ -741,7 +742,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
-	result = acx_s_init_mac(dev);
+	result = acx_s_init_mac(priv);
 	if (result)
 		goto end;
 

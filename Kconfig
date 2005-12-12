@@ -1,6 +1,7 @@
 config ACX
 	tristate "TI acx100/acx111 802.11b/g wireless chipsets"
-	depends on NET_RADIO && EXPERIMENTAL && FW_LOADER && (USB || PCI)
+	depends on NET_RADIO && EXPERIMENTAL && (USB || PCI)
+	select FW_LOADER
 	---help---
 	A driver for 802.11b/g wireless cards based on
 	Texas Instruments acx100 and acx111 chipsets.

@@ -2162,9 +2162,8 @@ acx111_s_get_tx_level(wlandevice_t *priv)
 ** acx_s_init_mac
 */
 int
-acx_s_init_mac(netdevice_t *dev)
+acx_s_init_mac(wlandevice_t *priv)
 {
-	wlandevice_t *priv = netdev_priv(dev);
 	int result = NOT_OK;
 
 	FN_ENTER;
@@ -2189,7 +2188,7 @@ acx_s_init_mac(netdevice_t *dev)
 			goto fail;
 		if (OK != acx111_s_create_dma_regions(priv)) {
 			printk("%s: acx111_create_dma_regions FAILED\n",
-							dev->name);
+						priv->netdev->name);
 			goto fail;
 		}
 	} else {
@@ -2199,12 +2198,12 @@ acx_s_init_mac(netdevice_t *dev)
 			goto fail;
 		if (OK != acx100_s_create_dma_regions(priv)) {
 			printk("%s: acx100_create_dma_regions FAILED\n",
-							dev->name);
+						priv->netdev->name);
 			goto fail;
 		}
 	}
 
-	MAC_COPY(dev->dev_addr, priv->dev_addr);
+	MAC_COPY(priv->netdev->dev_addr, priv->dev_addr);
 	result = OK;
 
 fail:

@@ -887,9 +887,8 @@ read_eeprom_area(wlandevice_t *priv)
 
 
 static int
-acxpci_s_reset_dev(netdevice_t *dev)
+acxpci_s_reset_dev(wlandevice_t *priv)
 {
-	wlandevice_t *priv = netdev_priv(dev);
 	const char* msg = "";
 	unsigned long flags;
 	int result = NOT_OK;
@@ -923,7 +922,7 @@ acxpci_s_reset_dev(netdevice_t *dev)
 	/* check sense on reset flags */
 	if (read_reg16(priv, IO_ACX_SOR_CFG) & 0x10) {
 		printk("%s: eCPU did not start after boot (SOR), "
-			"is this fatal?\n", dev->name);
+			"is this fatal?\n", priv->netdev->name);
 	}
 #endif
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
@@ -1672,13 +1671,13 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* NB: read_reg() reads may return bogus data before reset_dev().
 	** acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_s_reset_dev(dev))
+	if (OK != acxpci_s_reset_dev(priv))
 		goto fail_reset;
 
 	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version))
 		goto fail_read_eeprom_version;
 
-	if (OK != acx_s_init_mac(dev))
+	if (OK != acx_s_init_mac(priv))
 		goto fail_init_mac;
 
 	acx_s_set_defaults(priv);
@@ -1853,7 +1852,11 @@ end:
 #ifdef CONFIG_PM
 static int if_was_up = 0; /* FIXME: HACK, do it correctly sometime instead */
 static int
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
+#else
+acxpci_e_suspend(struct pci_dev *pdev, u32 state)
+#endif
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	wlandevice_t *priv = netdev_priv(dev);
@@ -1909,10 +1912,10 @@ acxpci_e_resume(struct pci_dev *pdev)
 	pci_restore_state(pdev, priv->pci_state);
 #endif
 	acxlog(L_DEBUG, "rsm: PCI state restored\n");
-	acxpci_s_reset_dev(dev);
+	acxpci_s_reset_dev(priv);
 	acxlog(L_DEBUG, "rsm: device reset done\n");
 
-	if (OK != acx_s_init_mac(dev))
+	if (OK != acx_s_init_mac(priv))
 		goto fail;
 	acxlog(L_DEBUG, "rsm: init MAC done\n");
 
