@@ -3827,8 +3827,9 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 			/* pointer to hostdesc memory */
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
 			/* initialise ctl */
-			txdesc->Ctl_8 = DESC_CTL_INIT;
-			txdesc->Ctl2_8 = 0;
+			txdesc->Ctl_8 = ( DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM
+					| DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG);
+			/* done by memset(0): txdesc->Ctl2_8 = 0; */
 			/* point to next txdesc */
 			txdesc->pNextDesc = cpu2acx(mem_offs + priv->txdesc_size);
 			/* reserve two (hdr desc and payload desc) */

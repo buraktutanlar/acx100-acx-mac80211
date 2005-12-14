@@ -767,9 +767,6 @@ typedef struct {
 #define DESC_CTL_ACXDONE	0x40	/* acx has finished processing */
 /* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
 #define DESC_CTL_HOSTOWN	0x80
-
-#define	DESC_CTL_INIT		(DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM | \
-				DESC_CTL_AUTODMA | DESC_CTL_FIRSTFRAG)
 #define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
 
 /* Descriptor Status field
@@ -1590,6 +1587,7 @@ typedef struct acx111_ie_powermgmt {
 #define ACX_SCAN_RATE_5		55
 #define ACX_SCAN_RATE_11	110
 #define ACX_SCAN_RATE_22	220
+#define ACX_SCAN_RATE_PBCC	0x80	/* OR with this if needed */
 #define ACX_SCAN_OPT_ACTIVE	0x00	/* a bit mask */
 #define ACX_SCAN_OPT_PASSIVE	0x01
 /* Background scan: we go into Power Save mode (by transmitting
