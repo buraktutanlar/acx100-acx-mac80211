@@ -1013,13 +1013,14 @@ acxusb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 	rxnum = rx - priv->usb_rx;
 
 	inpipe = usb_rcvbulkpipe(usbdev, priv->bulkinep);
-	if (rxurb->status == -EINPROGRESS) {
+	if (unlikely(rxurb->status == -EINPROGRESS)) {
 		printk(KERN_ERR "acx: error, rx triggered while rx urb in progress\n");
 		/* FIXME: this is nasty, receive is being cancelled by this code
 		 * on the other hand, this should not happen anyway...
 		 */
 		usb_unlink_urb(rxurb);
-	} else if (rxurb->status == -ECONNRESET) {
+	} else
+	if (unlikely(rxurb->status == -ECONNRESET)) {
 		acxlog(L_USBRXTX, "acx_usb: _poll_rx: connection reset\n");
 		goto end;
 	}
@@ -1076,7 +1077,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	 * Happens on disconnect or close. Don't play with the urb.
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
-	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
+	if (unlikely(!(priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		acxlog(L_USBRXTX, "rx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
@@ -1093,7 +1094,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	acxlog(L_USBRXTX, "rxnum=%d, sending=%d\n", rxnum, rxnum^1);
 	acxusb_l_poll_rx(priv, &priv->usb_rx[rxnum^1]);
 
-	if (size > sizeof(rxbuffer_t))
+	if (unlikely(size > sizeof(rxbuffer_t)))
 		printk("acx_usb: rx too large: %d, please report\n", size);
 
 	/* check if the transfer was aborted */
@@ -1117,7 +1118,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		goto end_unlock;
 	}
 
-	if (!size)
+	if (unlikely(!size))
 		printk("acx: warning, encountered zerolength rx packet\n");
 
 	if (urb->transfer_buffer != inbuf)
@@ -1296,7 +1297,7 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	 * If the iface isn't up, we don't have any right
 	 * to play with them. The urb may get unlinked.
 	 */
-	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
+	if (unlikely(!(priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		acxlog(L_USBRXTX, "tx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
@@ -1368,7 +1369,7 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 			}
 			goto end;
 		}
-	} while (head!=priv->tx_head);
+	} while (likely(head!=priv->tx_head));
 	tx = NULL;
 	printk_ratelimited("acx: tx buffers full\n");
 end:
@@ -1468,7 +1469,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
 	}
 
-	if (txurb->status == -EINPROGRESS) {
+	if (unlikely(txurb->status == -EINPROGRESS)) {
 		printk("acx: trying to submit tx urb while already in progress\n");
 	}
 
@@ -1489,7 +1490,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 		"rate=%u errcode=%d\n", txnum, outpipe, txbuf,
 		wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
-	if (ucode) {
+	if (unlikely(ucode)) {
 		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",
 			ucode, wlanpkt_len + USB_TXBUF_HDRSIZE);
 

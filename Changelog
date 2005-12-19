@@ -104,6 +104,10 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20051220] 0.3.23
+* timeout handling fixed for high load case
+  (patch by Andreas Mohr)
+
 [20051219] 0.3.22
 * acx100 active scanning must be working now, thanks to Carlos Martin
   <carlos@cmartin.tk>.

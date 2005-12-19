@@ -192,7 +192,7 @@ get_txdesc(wlandevice_t* priv, int index)
 }
 
 static inline txdesc_t*
-move_txdesc(wlandevice_t* priv, txdesc_t* txdesc, int inc)
+advance_txdesc(wlandevice_t* priv, txdesc_t* txdesc, int inc)
 {
 	return (txdesc_t*) (((u8*)txdesc) + inc * priv->txdesc_size);
 }
@@ -778,17 +778,20 @@ static int
 acxpci_s_verify_init(wlandevice_t *priv)
 {
 	int result = NOT_OK;
-	int timer;
+	unsigned long timeout;
 
 	FN_ENTER;
 
-	for (timer = 40; timer > 0; timer--) {
+	timeout = jiffies + 2*HZ;
+	for (;;) {
 		u16 irqstat = read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
 		if (irqstat & HOST_INT_FCS_THRESHOLD) {
 			result = OK;
 			write_reg16(priv, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
 			break;
 		}
+		if (time_after(jiffies, timeout))
+			break;
 		/* Init may take up to ~0.5 sec total */
 		acx_s_msleep(50);
 	}
@@ -813,7 +816,7 @@ acxpci_s_verify_init(wlandevice_t *priv)
 static inline void
 acxpci_write_cmd_type_status(wlandevice_t *priv, u16 type, u16 status)
 {
-	writel(type + (status << 16), priv->cmd_area);
+	writel(type | (status << 16), priv->cmd_area);
 	write_flush(priv);
 }
 
@@ -998,7 +1001,7 @@ acxpci_s_issue_cmd_timeo(
 	unsigned int cmd,
 	void *buffer,
 	unsigned buflen,
-	unsigned timeout)
+	unsigned cmd_timeout)
 {
 #else
 int
@@ -1007,7 +1010,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	unsigned cmd,
 	void *buffer,
 	unsigned buflen,
-	unsigned timeout,
+	unsigned cmd_timeout,
 	const char* cmdstr)
 {
 	unsigned long start = jiffies;
@@ -1016,6 +1019,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	unsigned counter;
 	u16 irqtype;
 	u16 cmd_status;
+	unsigned long timeout;
 
 	FN_ENTER;
 
@@ -1024,7 +1028,7 @@ acxpci_s_issue_cmd_timeo_debug(
 		devname = "acx";
 
 	acxlog(L_CTL, FUNC"(cmd:%s,buflen:%u,timeout:%ums,type:0x%04X)\n",
-		cmdstr, buflen, timeout,
+		cmdstr, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(priv->dev_state_mask & ACX_STATE_FW_LOADED)) {
@@ -1039,17 +1043,24 @@ acxpci_s_issue_cmd_timeo_debug(
 	}
 
 	/* wait for firmware to become idle for our command submission */
-	counter = 199; /* in ms */
+	timeout = HZ/5;
+	counter = (timeout * 1000 / HZ) - 1; /* in ms */
+	timeout += jiffies;
 	do {
 		cmd_status = acxpci_read_cmd_type_status(priv);
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
 		if (counter % 10 == 0) {
+			if (time_after(jiffies, timeout))
+			{
+				counter = 0;
+				break;
+			}
 			/* we waited 10 iterations, no luck. Sleep 10 ms */
 			acx_s_msleep(10);
 		}
-	} while (--counter);
+	} while (likely(--counter));
 
 	if (!counter) {
 		/* the card doesn't get idle, we're in trouble */
@@ -1084,14 +1095,15 @@ acxpci_s_issue_cmd_timeo_debug(
 	/* Ensure nonzero and not too large timeout.
 	** Also converts e.g. 100->99, 200->199
 	** which is nice but not essential */
-	timeout = (timeout-1) | 1;
-	if (unlikely(timeout > 1199))
-		timeout = 1199;
+	cmd_timeout = (cmd_timeout-1) | 1;
+	if (unlikely(cmd_timeout > 1199))
+		cmd_timeout = 1199;
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
 	priv->irq_status &= ~HOST_INT_CMD_COMPLETE;
 
 	/* we schedule away sometimes (timeout can be large) */
-	counter = timeout;
+	counter = cmd_timeout;
+	timeout = jiffies + cmd_timeout * HZ / 1000;
 	do {
 		if (!priv->irqs_active) { /* IRQ disabled: poll */
 			irqtype = read_reg16(priv, IO_ACX_IRQ_STATUS_NON_DES);
@@ -1107,10 +1119,15 @@ acxpci_s_issue_cmd_timeo_debug(
 		}
 
 		if (counter % 10 == 0) {
+			if (time_after(jiffies, timeout))
+			{
+				counter = 0;
+				break;
+			}
 			/* we waited 10 iterations, no luck. Sleep 10 ms */
 			acx_s_msleep(10);
 		}
-	} while (--counter);
+	} while (likely(--counter));
 
 	/* save state for debugging */
 	cmd_status = acxpci_read_cmd_type_status(priv);
@@ -1123,21 +1140,21 @@ acxpci_s_issue_cmd_timeo_debug(
 			"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 			"cmd_status:%d (%s)\n",
 			devname, (priv->irqs_active) ? "waiting" : "polling",
-			irqtype, priv->irq_status, timeout,
+			irqtype, priv->irq_status, cmd_timeout,
 			cmd_status, acx_cmd_status_str(cmd_status));
 		goto bad;
-	} else if (timeout - counter > 30) { /* if waited >30ms... */
+	} else if (cmd_timeout - counter > 30) { /* if waited >30ms... */
 		acxlog(L_CTL|L_DEBUG, FUNC"(): %s for CMD_COMPLETE %dms. "
 			"count:%d. Please report\n",
 			(priv->irqs_active) ? "waited" : "polled",
-			timeout - counter, counter);
+			cmd_timeout - counter, counter);
 	}
 
 	if (1 != cmd_status) { /* it is not a 'Success' */
 		printk("%s: "FUNC"(): cmd_status is not SUCCESS: %d (%s). "
 			"Took %dms of %d\n",
 			devname, cmd_status, acx_cmd_status_str(cmd_status),
-			timeout - counter, timeout);
+			cmd_timeout - counter, cmd_timeout);
 		/* zero out result buffer */
 		if (buffer && buflen)
 			memset(buffer, 0, buflen);
@@ -2270,13 +2287,12 @@ static inline void log_rxbuffer(const wlandevice_t *priv) {}
 static void
 log_rxbuffer(const wlandevice_t *priv)
 {
-	const struct rxhostdesc *rxhostdesc;
+	register const struct rxhostdesc *rxhostdesc;
 	int i;
-
 	/* no FN_ENTER here, we don't want that */
 
 	rxhostdesc = priv->rxhostdesc_start;
-	if (!rxhostdesc) return;
+	if (unlikely(!rxhostdesc)) return;
 	for (i = 0; i < RX_CNT; i++) {
 		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 		 && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
@@ -2289,7 +2305,7 @@ log_rxbuffer(const wlandevice_t *priv)
 static void
 acxpci_l_process_rxdesc(wlandevice_t *priv)
 {
-	rxhostdesc_t *hostdesc;
+	register rxhostdesc_t *hostdesc;
 	int count, tail;
 
 	FN_ENTER;
@@ -2300,8 +2316,8 @@ acxpci_l_process_rxdesc(wlandevice_t *priv)
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to handle. */
-	count = RX_CNT;
 	tail = priv->rx_tail;
+	count = RX_CNT;
 	while (1) {
 		hostdesc = &priv->rxhostdesc_start[tail];
 		/* advance tail regardless of outcome of the below test */
@@ -2311,7 +2327,7 @@ acxpci_l_process_rxdesc(wlandevice_t *priv)
 		 && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break;		/* found it! */
 
-		if (--count)	/* hmm, no luck: all descs empty, bail out */
+		if (unlikely(!--count))	/* hmm, no luck: all descs empty, bail out */
 			goto end;
 	}
 
@@ -2504,7 +2520,8 @@ acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	wlandevice_t *priv;
 	unsigned long flags;
 	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
-	u16 irqtype, unmasked;
+	register u16 irqtype;
+	u16 unmasked;
 
 	priv = (wlandevice_t *) (((netdevice_t *) dev_id)->priv);
 
@@ -2543,9 +2560,9 @@ if (jiffies != priv->irq_last_jiffies) {
 
 /* safety condition; we'll normally abort loop below
  * in case no IRQ type occurred */
-while (--irqcount) {
+while (likely(--irqcount)) {
 #endif
-	/* ACK all IRQs asap */
+	/* ACK all IRQs ASAP */
 	write_reg16(priv, IO_ACX_IRQ_ACK, 0xffff);
 
 	acxlog(L_IRQ, "IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
@@ -2921,7 +2938,7 @@ acx111pci_ioctl_info(
 			txdesc->Ctl_8,
 			txdesc->Ctl2_8, txdesc->error,
 			txdesc->u.r1.rate);
-		txdesc = move_txdesc(priv, txdesc, 1);
+		txdesc = advance_txdesc(priv, txdesc, 1);
 	}
 
 	/* dump host tx descriptor ring buffer */
@@ -3022,7 +3039,7 @@ acxpci_l_alloc_tx(wlandevice_t* priv)
 
 	FN_ENTER;
 
-	if (!priv->tx_free) {
+	if (unlikely(!priv->tx_free)) {
 		printk("acx: BUG: no free txdesc left\n");
 		txdesc = NULL;
 		goto end;
@@ -3097,13 +3114,13 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 		goto end;
 
 	hostdesc1 = get_txhostdesc(priv, txdesc);
-	hostdesc2 = hostdesc1 + 1;
-
 	/* modify flag status in separate variable to be able to write it back
 	 * in one big swoop later (also in order to have less device memory
 	 * accesses) */
 	Ctl_8 = txdesc->Ctl_8;
 	Ctl2_8 = txdesc->Ctl2_8;
+
+	hostdesc2 = hostdesc1 + 1;
 
 	/* DON'T simply set Ctl field to 0 here globally,
 	 * it needs to maintain a consistent flag status (those are state flags!!),
@@ -3269,11 +3286,11 @@ log_txbuffer(wlandevice_t *priv)
 	/* no FN_ENTER here, we don't want that */
 	/* no locks here, since it's entirely non-critical code */
 	txdesc = priv->txdesc_start;
-	if (!txdesc) return;
+	if (unlikely(!txdesc)) return;
 	printk("tx: desc->Ctl8's:");
 	for (i = 0; i < TX_CNT; i++) {
 		printk(" %02X", txdesc->Ctl_8);
-		txdesc = move_txdesc(priv, txdesc, 1);
+		txdesc = advance_txdesc(priv, txdesc, 1);
 	}
 	printk("\n");
 }
@@ -3398,7 +3415,7 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 
 	finger = priv->tx_tail;
 	num_cleaned = 0;
-	while (finger != priv->tx_head) {
+	while (likely(finger != priv->tx_head)) {
 		txdesc = get_txdesc(priv, finger);
 
 		/* If we allocated txdesc on tx path but then decided
@@ -3409,8 +3426,8 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		/* stop if not marked as "tx finished" and "host owned" */
 		if ((txdesc->Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN)
 					!= DESC_CTL_ACXDONE_HOSTOWN) {
-			if (!num_cleaned) { /* maybe remove completely */
-				acxlog(L_BUFT, "clean_txdesc: tail isnt free. "
+			if (unlikely(!num_cleaned)) { /* maybe remove completely */
+				acxlog(L_BUFT, "clean_txdesc: tail isn't free. "
 					"tail:%d head:%d\n",
 					priv->tx_tail, priv->tx_head);
 			}
@@ -3450,8 +3467,8 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		** descriptor is finished since it set Ctl_8 accordingly. */
 		txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 
-		num_cleaned++;
 		priv->tx_free++;
+		num_cleaned++;
 
 		if ((priv->tx_free >= TX_START_QUEUE)
 		 && (priv->status == ACX_STATUS_4_ASSOCIATED)
@@ -3812,7 +3829,7 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(txhostdesc_t);
-			txdesc = move_txdesc(priv, txdesc, 1);
+			txdesc = advance_txdesc(priv, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -3954,7 +3971,7 @@ acxpci_s_proc_diag_output(char *p, wlandevice_t *priv)
 			p += sprintf(p, "%02u free (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
 		else
 			p += sprintf(p, "%02u tx   (%02X)%s%s\n", i, txdesc->Ctl_8, thd, ttl);
-		txdesc = move_txdesc(priv, txdesc, 1);
+		txdesc = advance_txdesc(priv, txdesc, 1);
 	}
 	p += sprintf(p,
 		"\n"
@@ -4191,12 +4208,15 @@ acxpci_e_init_module(void)
 #endif
 
 #ifdef __LITTLE_ENDIAN
-	acxlog(L_INIT, "running on a little-endian CPU\n");
+#define ENDIANNESS_STRING "running on a little-endian CPU\n"
 #else
-	acxlog(L_INIT, "running on a BIG-ENDIAN CPU\n");
+#define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
 #endif
-	acxlog(L_INIT, "PCI module " ACX_RELEASE " initialized, "
-		"waiting for cards to probe...\n");
+	acxlog(L_INIT,
+		ENDIANNESS_STRING
+		"PCI module " ACX_RELEASE " initialized, "
+		"waiting for cards to probe...\n"
+	);
 
 	res = pci_module_init(&acxpci_drv_id);
 	FN_EXIT1(res);

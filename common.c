@@ -223,15 +223,18 @@ void
 acx_down_debug(wlandevice_t *priv, const char* where)
 {
 	int sem_count;
-	int count = 5000/5;
+	unsigned long timeout = jiffies + 5*HZ;
+
 	where = sanitize_str(where);
 
-	while (--count) {
+	for (;;) {
 		sem_count = atomic_read(&priv->sem.count);
 		if (sem_count) break;
+		if (time_after(jiffies, timeout))
+			break;
 		msleep(5);
 	}
-	if (!count) {
+	if (!sem_count) {
 		printk(KERN_EMERG "D STATE at %s! last sem at %s\n",
 			where, priv->last_sem);
 		dump_stack();
@@ -379,7 +382,10 @@ acx_get_status_name(u16 status)
 		"STOPPED", "SCANNING", "WAIT_AUTH",
 		"AUTHENTICATED", "ASSOCIATED", "INVALID??"
 	};
-	return str[(status < VEC_SIZE(str)) ? status : VEC_SIZE(str)-1];
+	if (status >= VEC_SIZE(str))
+		status = VEC_SIZE(str)-1;
+
+	return str[status];
 }
 
 
@@ -926,7 +932,7 @@ acx_s_configure_debug(wlandevice_t *priv, void *pdr, int type, const char* types
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(priv, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
-	if (OK != res) {
+	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		printk("%s: "FUNC"(type:%s) FAILED\n", priv->netdev->name, typestr);
 #else
@@ -961,7 +967,7 @@ acx_s_interrogate_debug(wlandevice_t *priv, void *pdr, int type,
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(priv, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
-	if (OK != res) {
+	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		printk("%s: "FUNC"(type:%s) FAILED\n", priv->netdev->name, typestr);
 #else
@@ -1414,7 +1420,7 @@ bitpos2genframe_txrate[] = {
 /* Looks scary, eh?
 ** Actually, each one compiled into one AND and one SHIFT,
 ** 31 bytes in x86 asm (more if uints are replaced by u16/u8) */
-static unsigned int
+static inline unsigned int
 rate111to5bits(unsigned int rate)
 {
 	return (rate & 0x7)
@@ -2233,7 +2239,7 @@ acx_l_rxmonitor(wlandevice_t *priv, const rxbuffer_t *rxbuf)
 	skb_len = RXBUF_BYTES_USED(rxbuf) - payload_offset;
 
 	/* sanity check */
-	if (skb_len > WLAN_A4FR_MAXLEN_WEP) {
+	if (unlikely(skb_len > WLAN_A4FR_MAXLEN_WEP)) {
 		printk("%s: monitor mode panic: oversized frame!\n",
 				priv->netdev->name);
 		goto end;
@@ -2244,7 +2250,7 @@ acx_l_rxmonitor(wlandevice_t *priv, const rxbuffer_t *rxbuf)
 
 	/* allocate skb */
 	skb = dev_alloc_skb(skb_len);
-	if (!skb) {
+	if (unlikely(!skb)) {
 		printk("%s: no memory for skb (%u bytes)\n",
 				priv->netdev->name, skb_len);
 		goto end;
@@ -2392,7 +2398,7 @@ acx_l_rx_ieee802_11_frame(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	hdr = acx_get_wlan_hdr(priv, rxbuf);
 
 	/* see IEEE 802.11-1999.pdf chapter 7 "MAC frame formats" */
-	if ((hdr->fc & WF_FC_PVERi) != 0) {
+	if (unlikely((hdr->fc & WF_FC_PVERi) != 0)) {
 		printk_ratelimited(KERN_INFO "rx: unsupported 802.11 protocol\n");
 		goto end;
 	}
@@ -2476,8 +2482,8 @@ acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 	hdr = acx_get_wlan_hdr(priv, rxbuf);
 	/* length of frame from control field to last byte of FCS */
-	buf_len = RXBUF_BYTES_RCVD(rxbuf);
 	fc = le16_to_cpu(hdr->fc);
+	buf_len = RXBUF_BYTES_RCVD(rxbuf);
 
 	if ( ((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON)
 	  || (acx_debug & L_XFER_BEACON)
@@ -2756,14 +2762,14 @@ acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 	}
 
 	txbuf = acx_l_get_txbuf(priv, tx);
-	if (!txbuf) {
+	if (unlikely(!txbuf)) {
 		/* Card was removed */
 		txresult = NOT_OK;
 		acx_l_dealloc_tx(priv, tx);
 		goto end;
 	}
 	len = acx_ether_to_txbuf(priv, txbuf, skb);
-	if (len < 0) {
+	if (unlikely(len < 0)) {
 		/* Error in packet conversion */
 		txresult = NOT_OK;
 		acx_l_dealloc_tx(priv, tx);
@@ -3212,7 +3218,7 @@ dot11ratebyte[] = {
 	DOT11RATEBYTE_54_G,
 };
 
-static int
+static inline int
 find_pos(const u8 *p, int size, u8 v)
 {
 	int i;
