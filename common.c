@@ -2003,11 +2003,8 @@ acx_s_set_defaults(wlandevice_t *priv)
 	/* 0xffff would be better, but then we won't get a "scan complete"
 	 * interrupt, so our current infrastructure will fail: */
 	priv->scan_count = 1;
-	priv->scan_mode = ACX_SCAN_OPT_PASSIVE;
-	/* Doesn't work for acx100, do it only for acx111 for now */
-	if (IS_ACX111(priv)) {
-		priv->scan_mode = ACX_SCAN_OPT_ACTIVE;
-	}
+	priv->scan_mode = ACX_SCAN_OPT_ACTIVE;
+
 	priv->scan_duration = 100;
 	priv->scan_probe_delay = 200;
 	priv->scan_rate = ACX_SCAN_RATE_1;
@@ -5472,15 +5469,12 @@ acx_s_init_max_probe_response_template(wlandevice_t *priv)
 static int
 acx_s_init_max_probe_request_template(wlandevice_t *priv)
 {
-	union {
-		acx100_template_probereq_t p100;
-		acx111_template_probereq_t p111;
-	} pr;
 	int res;
+	acx_template_probereq_t pr;
 
 	FN_ENTER;
 	memset(&pr, 0, sizeof(pr));
-	pr.p100.size = cpu_to_le16(sizeof(pr) - 2);
+	pr.size = cpu_to_le16(sizeof(pr) - 2);
 	res = acx_s_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &pr, sizeof(pr));
 	FN_EXIT1(res);
 	return res;
@@ -5683,18 +5677,11 @@ acx100_s_init_packet_templates(wlandevice_t *priv)
 
 	acxlog(L_DEBUG, "sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
 
-	/* acx100 still do not emit probe requests, thus this call
-	** is sort of not needed. But we want it to work someday */
 	if (OK != acx_s_init_max_probe_request_template(priv))
 		goto failed;
 
-#ifdef NOT_WORKING_YET
-	/* FIXME: creating the NULL data template breaks
-	 * communication right now, needs further testing.
-	 * Also, need to set the template once we're joining a network. */
 	if (OK != acx_s_init_max_null_data_template(priv))
 		goto failed;
-#endif
 
 	if (OK != acx_s_init_max_beacon_template(priv))
 		goto failed;
@@ -5787,78 +5774,33 @@ success:
 /***********************************************************************
 */
 static int
-acx100_s_set_probe_request_template(wlandevice_t *priv)
-{
-	struct acx100_template_probereq probereq;
-	char *p;
-	int res;
-	int frame_len;
-
-	FN_ENTER;
-
-	memset(&probereq, 0, sizeof(probereq));
-
-	probereq.fc = WF_FTYPE_MGMTi | WF_FSTYPE_PROBEREQi;
-	MAC_BCAST(probereq.da);
-	MAC_COPY(probereq.sa, priv->dev_addr);
-	MAC_BCAST(probereq.bssid);
-
-	probereq.beacon_interval = cpu_to_le16(priv->beacon_interval);
-	acx_update_capabilities(priv);
-	probereq.cap = cpu_to_le16(priv->capabilities);
-
-	p = probereq.variable;
-	acxlog(L_ASSOC, "SSID='%s' len=%d\n", priv->essid, priv->essid_len);
-	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
-	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
-	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
-	frame_len = p - (char*)&probereq;
-	probereq.size = frame_len - 2;
-
-	res = acx_s_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
-	FN_EXIT0;
-	return res;
-}
-
-static int
-acx111_s_set_probe_request_template(wlandevice_t *priv)
-{
-	struct acx111_template_probereq probereq;
-	char *p;
-	int res;
-	int frame_len;
-
-	FN_ENTER;
-
-	memset(&probereq, 0, sizeof(probereq));
-
-	probereq.fc = WF_FTYPE_MGMTi | WF_FSTYPE_PROBEREQi;
-	MAC_BCAST(probereq.da);
-	MAC_COPY(probereq.sa, priv->dev_addr);
-	MAC_BCAST(probereq.bssid);
-
-	p = probereq.variable;
-	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
-	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
-	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
-	frame_len = p - (char*)&probereq;
-	probereq.size = frame_len - 2;
-
-	res = acx_s_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
-	FN_EXIT0;
-	return res;
-}
-
-static int
 acx_s_set_probe_request_template(wlandevice_t *priv)
 {
-	if (IS_ACX111(priv)) {
-		return acx111_s_set_probe_request_template(priv);
-	} else {
-		return acx100_s_set_probe_request_template(priv);
-	}
-}
+	struct acx_template_probereq probereq;
+	char *p;
+	int res;
+	int frame_len;
 
+	FN_ENTER;
+
+	memset(&probereq, 0, sizeof(probereq));
+
+	probereq.fc = WF_FTYPE_MGMTi | WF_FSTYPE_PROBEREQi;
+	MAC_BCAST(probereq.da);
+	MAC_COPY(probereq.sa, priv->dev_addr);
+	MAC_BCAST(probereq.bssid);
+
+	p = probereq.variable;
+	p = wlan_fill_ie_ssid(p, priv->essid_len, priv->essid);
+	p = wlan_fill_ie_rates(p, priv->rate_supported_len, priv->rate_supported);
+	p = wlan_fill_ie_rates_ext(p, priv->rate_supported_len, priv->rate_supported);
+	frame_len = p - (char*)&probereq;
+	probereq.size = frame_len - 2;
+
+	res = acx_s_issue_cmd(priv, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
+	FN_EXIT0;
+	return res;
+}
 
 /***********************************************************************
 ** acx_s_update_card_settings
@@ -6043,16 +5985,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 	if (priv->set_mask & SET_TEMPLATES) {
 		acxlog(L_INIT, "updating packet templates\n");
-		/* Doesn't work for acx100, do it only for acx111 for now */
-		if (IS_ACX111(priv)) {
-			switch (priv->mode) {
-			case ACX_MODE_0_ADHOC:
-			case ACX_MODE_2_STA:
-				acx_s_set_probe_request_template(priv);
-			}
-		}
 		switch (priv->mode) {
+		case ACX_MODE_2_STA:
+			acx_s_set_probe_request_template(priv);
+			break;
 		case ACX_MODE_0_ADHOC:
+			acx_s_set_probe_request_template(priv);
+			/* fall through */
 		case ACX_MODE_3_AP:
 			acx_s_set_beacon_template(priv);
 			acx_s_set_tim_template(priv);

@@ -1679,23 +1679,7 @@ typedef struct acx_template_tim {
 	u8	variable[0x100 - 1-1-1-1-1] ACX_PACKED;
 } acx_template_tim_t;
 
-typedef struct acx100_template_probereq {
-	u16	size ACX_PACKED;
-	u16	fc ACX_PACKED;		/* 00 2 fc */
-	u16	dur ACX_PACKED;		/* 02 2 Duration */
-	u8	da[6] ACX_PACKED;	/* 04 6 Destination Address * */
-	u8	sa[6] ACX_PACKED;	/* 0A 6 Source Address * */
-	u8	bssid[6] ACX_PACKED;	/* 10 6 BSSID * */
-	u16	seq ACX_PACKED;		/* 16 2 Sequence Control */
-	u8	timestamp[8] ACX_PACKED;/* 18 8 Timestamp */
-	u16	beacon_interval ACX_PACKED; /* 20 2 Beacon Interval * */
-	u16	cap ACX_PACKED;		/* 22 2 Capability Information * */
-					/* 24 n SSID * */
-					/* nn n Supported Rates * */
-	u8	variable[0x44 - 2-2-6-6-6-2-8-2-2] ACX_PACKED;
-} acx100_template_probereq_t;
-
-typedef struct acx111_template_probereq {
+typedef struct acx_template_probereq {
 	u16	size ACX_PACKED;
 	u16	fc ACX_PACKED;		/* 00 2 fc * */
 	u16	dur ACX_PACKED;		/* 02 2 Duration */
@@ -1706,7 +1690,7 @@ typedef struct acx111_template_probereq {
 					/* 18 n SSID * */
 					/* nn n Supported Rates * */
 	u8	variable[0x44 - 2-2-6-6-6-2] ACX_PACKED;
-} acx111_template_probereq_t;
+} acx_template_probereq_t;
 
 typedef struct acx_template_proberesp {
 	u16	size ACX_PACKED;
