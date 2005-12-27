@@ -617,7 +617,7 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 	memcpy(priv->firmware_version, fw.fw_id, FW_ID_SIZE);
 	priv->firmware_version[FW_ID_SIZE] = '\0';
 
-	acxlog(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
+	log(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
 				priv->firmware_version, fw.hw_id);
 
 	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
@@ -645,7 +645,7 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 		priv->firmware_numver = (u32)(
 				(hexarr[0] << 24) + (hexarr[1] << 16)
 				+ (hexarr[2] << 8) + hexarr[3]);
-		acxlog(L_DEBUG, "firmware_numver 0x%08X\n", priv->firmware_numver);
+		log(L_DEBUG, "firmware_numver 0x%08X\n", priv->firmware_numver);
 	}
 	if (IS_ACX111(priv)) {
 		if (priv->firmware_numver == 0x00010011) {
@@ -924,9 +924,9 @@ acx_s_configure_debug(wlandevice_t *priv, void *pdr, int type, const char* types
 	else
 		len = CtlLengthDot11[type - 0x1000];
 
-	acxlog(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
 	if (unlikely(!len)) {
-		acxlog(L_DEBUG, "zero-length type %s?!\n", typestr);
+		log(L_DEBUG, "zero-length type %s?!\n", typestr);
 	}
 
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
@@ -962,7 +962,7 @@ acx_s_interrogate_debug(wlandevice_t *priv, void *pdr, int type,
 		len = CtlLength[type];
 	else
 		len = CtlLengthDot11[type-0x1000];
-	acxlog(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
 
 	((acx_ie_generic_t *)pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *)pdr)->len = cpu_to_le16(len);
@@ -1364,13 +1364,13 @@ manage_proc_entries(const struct net_device *dev, int remove)
 	for (i = 0; i < VEC_SIZE(proc_files); i++)	{
 		sprintf(procbuf, "driver/acx_%s%s", dev->name, proc_files[i]);
 		if (!remove) {
-			acxlog(L_INIT, "creating /proc entry %s\n", procbuf);
+			log(L_INIT, "creating /proc entry %s\n", procbuf);
 			if (!create_proc_read_entry(procbuf, 0, 0, proc_funcs[i], priv)) {
 				printk("acx: cannot register /proc entry %s\n", procbuf);
 				return NOT_OK;
 			}
 		} else {
-			acxlog(L_INIT, "removing /proc entry %s\n", procbuf);
+			log(L_INIT, "removing /proc entry %s\n", procbuf);
 			remove_proc_entry(procbuf, NULL);
 		}
 	}
@@ -1461,13 +1461,13 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 		** Just use RATE111_nnn constants... */
 		tmp.u.acx111.dtim_interval = dtim_interval;
 		tmp.u.acx111.rates_basic = cpu_to_le16(priv->rate_basic);
-		acxlog(L_ASSOC, "rates_basic:%04X, rates_supported:%04X\n",
+		log(L_ASSOC, "rates_basic:%04X, rates_supported:%04X\n",
 			priv->rate_basic, priv->rate_oper);
 	} else {
 		tmp.u.acx100.dtim_interval = dtim_interval;
 		tmp.u.acx100.rates_basic = rate111to5bits(priv->rate_basic);
 		tmp.u.acx100.rates_supported = rate111to5bits(priv->rate_oper);
-		acxlog(L_ASSOC, "rates_basic:%04X->%02X, "
+		log(L_ASSOC, "rates_basic:%04X->%02X, "
 			"rates_supported:%04X->%02X\n",
 			priv->rate_basic, tmp.u.acx100.rates_basic,
 			priv->rate_oper, tmp.u.acx100.rates_supported);
@@ -1492,7 +1492,7 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 	memcpy(tmp.essid, priv->essid, tmp.essid_len);
 	acx_s_issue_cmd(priv, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
 
-	acxlog(L_ASSOC|L_DEBUG, "BSS_Type = %u\n", tmp.macmode);
+	log(L_ASSOC|L_DEBUG, "BSS_Type = %u\n", tmp.macmode);
 	acxlog_mac(L_ASSOC|L_DEBUG, "JoinBSSID MAC:", priv->bssid, "\n");
 
 	acx_update_capabilities(priv);
@@ -1556,12 +1556,12 @@ acx_s_cmd_start_scan(wlandevice_t *priv)
 	if (!(priv->irq_status & HOST_INT_SCAN_COMPLETE)
 	 && time_before(jiffies, priv->scan_start + 10*HZ)
 	) {
-		acxlog(L_INIT, "start_scan: seems like previous scan "
+		log(L_INIT, "start_scan: seems like previous scan "
 		"is still running. Not starting anew. Please report\n");
 		return;
 	}
 
-	acxlog(L_INIT, "starting radio scan\n");
+	log(L_INIT, "starting radio scan\n");
 	/* remember that fw is commanded to do scan */
 	priv->scan_start = jiffies;
 	CLEAR_BIT(priv->irq_status, HOST_INT_SCAN_COMPLETE);
@@ -1592,7 +1592,7 @@ acx111_s_get_feature_config(wlandevice_t *priv,
 	if (OK != acx_s_interrogate(priv, &fc, ACX1xx_IE_FEATURE_CONFIG)) {
 		return NOT_OK;
 	}
-	acxlog(L_DEBUG,
+	log(L_DEBUG,
 		"got Feature option:0x%X, DataFlow option: 0x%X\n",
 		fc.feature_options,
 		fc.data_flow_options);
@@ -1636,7 +1636,7 @@ acx111_s_set_feature_config(wlandevice_t *priv,
 		SET_BIT(fc.data_flow_options, cpu_to_le32(data_flow_options));
 	}
 
-	acxlog(L_DEBUG,
+	log(L_DEBUG,
 		"old: feature 0x%08X dataflow 0x%08X. mode: %u\n"
 		"new: feature 0x%08X dataflow 0x%08X\n",
 		feature_options, data_flow_options, mode,
@@ -1698,7 +1698,7 @@ acx100_s_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *mmt)
 	   memory pointers, i.e.: end-start/size */
 	TotalMemoryBlocks = (le32_to_cpu(mmt->PoolEnd) - le32_to_cpu(mmt->PoolStart)) / priv->memblocksize;
 
-	acxlog(L_DEBUG, "TotalMemoryBlocks=%u (%u bytes)\n",
+	log(L_DEBUG, "TotalMemoryBlocks=%u (%u bytes)\n",
 		TotalMemoryBlocks, TotalMemoryBlocks*priv->memblocksize);
 
 	/* MemoryConfigOption.DMA_config bitmask:
@@ -1713,7 +1713,7 @@ acx100_s_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *mmt)
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc = cpu2acx(priv->rxhostdesc_startphy);
-		acxlog(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
+		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 				acx2cpu(MemoryConfigOption.pRxHostDesc),
 				(long)priv->rxhostdesc_startphy);
 	} else {
@@ -1731,7 +1731,7 @@ acx100_s_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *mmt)
 	/* size of the tx and rx descriptor queues */
 	TotalTxBlockSize = TxBlockNum * priv->memblocksize;
 	TotalRxBlockSize = RxBlockNum * priv->memblocksize;
-	acxlog(L_DEBUG, "TxBlockNum %u RxBlockNum %u TotalTxBlockSize %u "
+	log(L_DEBUG, "TxBlockNum %u RxBlockNum %u TotalTxBlockSize %u "
 		"TotalTxBlockSize %u\n", TxBlockNum, RxBlockNum,
 		TotalTxBlockSize, TotalRxBlockSize);
 
@@ -1744,7 +1744,7 @@ acx100_s_init_memory_pools(wlandevice_t *priv, const acx_ie_memmap_t *mmt)
 	 * and offset it by the tx descriptor queue */
 	MemoryConfigOption.tx_mem =
 		cpu_to_le32((le32_to_cpu(mmt->PoolStart) + TotalRxBlockSize + 0x1f) & ~0x1f);
-	acxlog(L_DEBUG, "rx_mem %08X rx_mem %08X\n",
+	log(L_DEBUG, "rx_mem %08X rx_mem %08X\n",
 		MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
@@ -1788,7 +1788,7 @@ acx100_s_create_dma_regions(wlandevice_t *priv)
 	tx_queue_start = le32_to_cpu(memmap.QueueStart);
 	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
 
-	acxlog(L_DEBUG, "initializing Queue Indicator\n");
+	log(L_DEBUG, "initializing Queue Indicator\n");
 
 	memset(&queueconf, 0, sizeof(queueconf));
 
@@ -1926,7 +1926,7 @@ acx111_s_create_dma_regions(wlandevice_t *priv)
 	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
 
-	acxlog(L_INIT, "dump queue head (from card):\n"
+	log(L_INIT, "dump queue head (from card):\n"
 		       "len: %u\n"
 		       "tx_memory_block_address: %X\n"
 		       "rx_memory_block_address: %X\n"
@@ -2125,7 +2125,7 @@ acx111_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 		priv->tx_level_dbm = 15;
 	}
 	if (level_dbm != priv->tx_level_dbm)
-		acxlog(L_INIT, "acx111 firmware has specific "
+		log(L_INIT, "acx111 firmware has specific "
 			"power levels only: adjusted %d dBm to %d dBm!\n",
 			level_dbm, priv->tx_level_dbm);
 
@@ -2488,7 +2488,7 @@ acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	if ( ((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON)
 	  || (acx_debug & L_XFER_BEACON)
 	) {
-		acxlog(L_XFER|L_DATA, "rx: %s "
+		log(L_XFER|L_DATA, "rx: %s "
 			"time:%u len:%u signal:%u SNR:%u macstat:%02X "
 			"phystat:%02X phyrate:%u status:%u\n",
 			acx_get_packet_type_string(fc),
@@ -2516,7 +2516,7 @@ acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	} else if (likely(buf_len >= WLAN_HDR_A3_LEN)) {
 		acx_l_rx_ieee802_11_frame(priv, rxbuf);
 	} else {
-		acxlog(L_DEBUG|L_XFER|L_DATA,
+		log(L_DEBUG|L_XFER|L_DATA,
 		       "rx: NOT receiving packet (%s): "
 		       "size too small (%u)\n",
 		       acx_get_packet_type_string(fc),
@@ -2635,7 +2635,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 	 * which was used by hardware to tx this particular packet */
 
 	/* now do the actual auto rate management */
-	acxlog(L_XFER, "tx: %sclient=%p/"MACSTR" used=%04X cur=%04X cfg=%04X "
+	log(L_XFER, "tx: %sclient=%p/"MACSTR" used=%04X cur=%04X cfg=%04X "
 		"__=%u/%u ^^=%u/%u\n",
 		(txc->ignore_count > 0) ? "[IGN] " : "",
 		txc, MAC(txc->address), sent_rate, cur, txc->rate_cfg,
@@ -2668,7 +2668,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 		CLEAR_BIT(cur, sent_rate);
 		if (!cur) /* we can't disable all rates! */
 			cur = sent_rate;
-		acxlog(L_XFER, "tx: falling back to ratemask %04X\n", cur);
+		log(L_XFER, "tx: falling back to ratemask %04X\n", cur);
 		
 	} else { /* there was neither lower rate nor error */
 		txc->fallback_count = 0;
@@ -2693,7 +2693,7 @@ acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
 			/* not found, try higher one */
 		}
 		SET_BIT(cur, sent_rate);
-		acxlog(L_XFER, "tx: stepping up to ratemask %04X\n", cur);
+		log(L_XFER, "tx: stepping up to ratemask %04X\n", cur);
 	}
 
 	txc->rate_cur = cur;
@@ -2740,11 +2740,11 @@ acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev)
 		goto end;
 	}
 	if (unlikely(acx_queue_stopped(dev))) {
-		acxlog(L_DEBUG, "%s: called when queue stopped\n", __func__);
+		log(L_DEBUG, "%s: called when queue stopped\n", __func__);
 		goto end;
 	}
 	if (unlikely(ACX_STATUS_4_ASSOCIATED != priv->status)) {
-		acxlog(L_XFER, "trying to xmit, but not associated yet: "
+		log(L_XFER, "trying to xmit, but not associated yet: "
 			"aborting...\n");
 		/* silently drop the packet, since we're not connected yet */
 		txresult = OK;
@@ -3028,7 +3028,7 @@ acx_set_status(wlandevice_t *priv, u16 new_status)
 
 	FN_ENTER;
 
-	acxlog(L_ASSOC, "%s(%d):%s\n",
+	log(L_ASSOC, "%s(%d):%s\n",
 	       __func__, new_status, acx_get_status_name(new_status));
 
 #if WIRELESS_EXT > 13 /* wireless_send_event() and SIOCGIWSCAN */
@@ -3105,7 +3105,7 @@ acx_i_timer(unsigned long address)
 
 	acx_lock(priv, flags);
 
-	acxlog(L_DEBUG|L_ASSOC, "%s: priv->status=%d (%s)\n",
+	log(L_DEBUG|L_ASSOC, "%s: priv->status=%d (%s)\n",
 		__func__, priv->status, acx_get_status_name(priv->status));
 
 	switch (priv->status) {
@@ -3115,10 +3115,10 @@ acx_i_timer(unsigned long address)
 			acx_set_timer(priv, 1000000);
 			/* used to interrogate for scan status.
 			** We rely on SCAN_COMPLETE IRQ instead */
-			acxlog(L_ASSOC, "continuing scan (%d sec)\n",
+			log(L_ASSOC, "continuing scan (%d sec)\n",
 					priv->scan_retries);
 		} else {
-			acxlog(L_ASSOC, "stopping scan\n");
+			log(L_ASSOC, "stopping scan\n");
 			/* send stop_scan cmd when we leave the interrupt context,
 			 * and make a decision what to do next (COMPLETE_SCAN) */
 			acx_schedule_task(priv,
@@ -3128,12 +3128,12 @@ acx_i_timer(unsigned long address)
 	case ACX_STATUS_2_WAIT_AUTH:
 		/* was set to 0 by set_status() */
 		if (++priv->auth_or_assoc_retries < 10) {
-			acxlog(L_ASSOC, "resend authen1 request (attempt %d)\n",
+			log(L_ASSOC, "resend authen1 request (attempt %d)\n",
 					priv->auth_or_assoc_retries + 1);
 			acx_l_transmit_authen1(priv);
 		} else {
 			/* time exceeded: fall back to scanning mode */
-			acxlog(L_ASSOC,
+			log(L_ASSOC,
 			       "authen1 request reply timeout, giving up\n");
 			/* we are a STA, need to find AP anyhow */
 			acx_set_status(priv, ACX_STATUS_1_SCANNING);
@@ -3145,12 +3145,12 @@ acx_i_timer(unsigned long address)
 	case ACX_STATUS_3_AUTHENTICATED:
 		/* was set to 0 by set_status() */
 		if (++priv->auth_or_assoc_retries < 10) {
-			acxlog(L_ASSOC,	"resend assoc request (attempt %d)\n",
+			log(L_ASSOC,	"resend assoc request (attempt %d)\n",
 					priv->auth_or_assoc_retries + 1);
 			acx_l_transmit_assoc_req(priv);
 		} else {
 			/* time exceeded: give up */
-			acxlog(L_ASSOC,
+			log(L_ASSOC,
 				"association request reply timeout, giving up\n");
 			/* we are a STA, need to find AP anyhow */
 			acx_set_status(priv, ACX_STATUS_1_SCANNING);
@@ -3179,7 +3179,7 @@ acx_set_timer(wlandevice_t *priv, int timeout_us)
 {
 	FN_ENTER;
 
-	acxlog(L_DEBUG|L_IRQ, "%s(%u ms)\n", __func__, timeout_us/1000);
+	log(L_DEBUG|L_IRQ, "%s(%u ms)\n", __func__, timeout_us/1000);
 	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		printk("attempt to set the timer "
 			"when the card interface is not up!\n");
@@ -3642,7 +3642,7 @@ acx_l_process_deauth_from_ap(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 
 	/* Chk: is ta is verified to be from our AP? */
 	if (mac_is_equal(priv->dev_addr, req->hdr->a1)) {
-		acxlog(L_DEBUG, "AP sent us deauth packet\n");
+		log(L_DEBUG, "AP sent us deauth packet\n");
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
 		acx_schedule_task(priv, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
@@ -3698,12 +3698,12 @@ acx_l_process_data_frame_master(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	switch (WF_FC_FROMTODSi & hdr->fc) {
 	case 0:
 	case WF_FC_FROMDSi:
-		acxlog(L_DEBUG, "ap->sta or adhoc->adhoc data frame ignored\n");
+		log(L_DEBUG, "ap->sta or adhoc->adhoc data frame ignored\n");
 		goto done;
 	case WF_FC_TODSi:
 		break;
 	default: /* WF_FC_FROMTODSi */
-		acxlog(L_DEBUG, "wds data frame ignored (todo)\n");
+		log(L_DEBUG, "wds data frame ignored (todo)\n");
 		goto done;
 	}
 
@@ -3770,23 +3770,23 @@ acx_l_process_data_frame_client(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	switch (WF_FC_FROMTODSi & hdr->fc) {
 	case 0:
 		if (priv->mode != ACX_MODE_0_ADHOC) {
-			acxlog(L_DEBUG, "adhoc->adhoc data frame ignored\n");
+			log(L_DEBUG, "adhoc->adhoc data frame ignored\n");
 			goto drop;
 		}
 		bssid = hdr->a3;
 		break;
 	case WF_FC_FROMDSi:
 		if (priv->mode != ACX_MODE_2_STA) {
-			acxlog(L_DEBUG, "ap->sta data frame ignored\n");
+			log(L_DEBUG, "ap->sta data frame ignored\n");
 			goto drop;
 		}
 		bssid = hdr->a2;
 		break;
 	case WF_FC_TODSi:
-		acxlog(L_DEBUG, "sta->ap data frame ignored\n");
+		log(L_DEBUG, "sta->ap data frame ignored\n");
 		goto drop;
 	default: /* WF_FC_FROMTODSi: wds->wds */
-		acxlog(L_DEBUG, "wds data frame ignored (todo)\n");
+		log(L_DEBUG, "wds data frame ignored (todo)\n");
 		goto drop;
 	}
 
@@ -3827,14 +3827,14 @@ acx_l_process_data_frame_client(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		/* FIXME: check against the list of
 		 * multicast addresses that are configured
 		 * for the interface (ifconfig) */
-		acxlog(L_XFER, "FIXME: multicast packet, need to check "
+		log(L_XFER, "FIXME: multicast packet, need to check "
 			"against a list of multicast addresses "
 			"(to be created!); accepting packet for now\n");
 		/* for now, just accept it here */
 		goto process;
 	}
 
-	acxlog(L_DEBUG, "rx: foreign packet, dropping\n");
+	log(L_DEBUG, "rx: foreign packet, dropping\n");
 	goto drop;
 process:
 	/* receive packet */
@@ -4078,11 +4078,11 @@ acx_l_process_NULL_frame(wlandevice_t *priv, rxbuffer_t *rxbuf, int vala)
 		result = NOT_OK;
 	else {
 #ifdef IS_IT_BROKEN
-		acxlog(L_DEBUG|L_XFER, "<transmit_deauth 7>\n");
+		log(L_DEBUG|L_XFER, "<transmit_deauth 7>\n");
 		acx_l_transmit_deauthen(priv, ebx,
 			WLAN_MGMT_REASON_CLASS2_NONAUTH);
 #else
-		acxlog(L_DEBUG, "received NULL frame from unknown client! "
+		log(L_DEBUG, "received NULL frame from unknown client! "
 			"We really shouldn't send deauthen here, right?\n");
 #endif
 		result = OK;
@@ -4108,7 +4108,7 @@ acx_l_process_probe_response(wlandevice_t *priv, wlan_fr_proberesp_t *req,
 	hdr = req->hdr;
 
 	if (mac_is_equal(hdr->a3, priv->dev_addr)) {
-		acxlog(L_ASSOC, "huh, scan found our own MAC!?\n");
+		log(L_ASSOC, "huh, scan found our own MAC!?\n");
 		goto ok; /* just skip this one silently */
 	}
 
@@ -4166,7 +4166,7 @@ acx_l_process_probe_response(wlandevice_t *priv, wlan_fr_proberesp_t *req,
 		bss->rate_cur = 1 << lowest_bit(bss->rate_bas);
 
 	/* People moan about this being too noisy at L_ASSOC */
-	acxlog(L_DEBUG,
+	log(L_DEBUG,
 		"found %s: ESSID='%s' ch=%d "
 		"BSSID="MACSTR" caps=0x%04X SIR=%d SNR=%d\n",
 		(bss->cap_info & WF_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "AP",
@@ -4286,18 +4286,18 @@ acx_l_process_authen(wlandevice_t *priv, const wlan_fr_authen_t *req)
 
 	if (priv->auth_alg <= 1) {
 		if (priv->auth_alg != alg) {
-			acxlog(L_ASSOC, "auth algorithm mismatch: "
+			log(L_ASSOC, "auth algorithm mismatch: "
 				"our:%d peer:%d\n", priv->auth_alg, alg);
 			result = NOT_OK;
 			goto end;
 		}
 	}
-	acxlog(L_ASSOC, "algorithm is ok\n");
+	log(L_ASSOC, "algorithm is ok\n");
 
 	if (ap) {
 		clt = acx_l_sta_list_get_or_add(priv, hdr->a2);
 		if (STA_LIST_ADD_CAN_FAIL && !clt) {
-			acxlog(L_ASSOC, "could not allocate room for client\n");
+			log(L_ASSOC, "could not allocate room for client\n");
 			result = NOT_OK;
 			goto end;
 		}
@@ -4313,7 +4313,7 @@ acx_l_process_authen(wlandevice_t *priv, const wlan_fr_authen_t *req)
 
 	/* now check which step in the authentication sequence we are
 	 * currently in, and act accordingly */
-	acxlog(L_ASSOC, "acx_process_authen auth seq step %d\n", seq);
+	log(L_ASSOC, "acx_process_authen auth seq step %d\n", seq);
 	switch (seq) {
 	case 1:
 		if (!ap)
@@ -4365,7 +4365,7 @@ acx_l_process_authen(wlandevice_t *priv, const wlan_fr_authen_t *req)
 			break;
 		/* ok, we're through: we're authenticated. Woohoo!! */
 		acx_set_status(priv, ACX_STATUS_3_AUTHENTICATED);
-		acxlog(L_ASSOC, "Authenticated!\n");
+		log(L_ASSOC, "Authenticated!\n");
 		/* now that we're authenticated, request association */
 		acx_l_transmit_assoc_req(priv);
 		break;
@@ -4420,7 +4420,7 @@ acx_l_transmit_deauthen(wlandevice_t *priv, const u8 *addr, u16 reason)
 	MAC_COPY(head->bssid, priv->bssid);
 	head->seq = 0;
 
-	acxlog(L_DEBUG|L_ASSOC|L_XFER,
+	log(L_DEBUG|L_ASSOC|L_XFER,
 		"sending deauthen to "MACSTR" for %d\n",
 		MAC(addr), reason);
 
@@ -4450,7 +4450,7 @@ acx_l_transmit_authen1(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_ASSOC, "sending authentication1 request, "
+	log(L_ASSOC, "sending authentication1 request, "
 		"awaiting response\n");
 
 	tx = acx_l_alloc_tx(priv);
@@ -4592,7 +4592,7 @@ acx_l_transmit_authen3(wlandevice_t *priv, const wlan_fr_authen_t *req)
 	memcpy(&body->challenge, req->challenge, req->challenge->len + 2);
 	packet_len = WLAN_HDR_A3_LEN + 8 + req->challenge->len;
 
-	acxlog(L_ASSOC|L_XFER, "transmit_authen3!\n");
+	log(L_ASSOC|L_XFER, "transmit_authen3!\n");
 
 	acx_l_tx_data(priv, tx, packet_len);
 ok:
@@ -4658,7 +4658,7 @@ acx_l_transmit_assoc_req(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_ASSOC, "sending association request, "
+	log(L_ASSOC, "sending association request, "
 			"awaiting response. NOT ASSOCIATED YET\n");
 	tx = acx_l_alloc_tx(priv);
 	if (!tx)
@@ -4741,7 +4741,7 @@ acx_l_transmit_assoc_req(wlandevice_t *priv)
 	/* calculate lengths */
 	packet_len = WLAN_HDR_A3_LEN + (p - body);
 
-	acxlog(L_ASSOC, "association: requesting caps 0x%04X, ESSID '%s'\n",
+	log(L_ASSOC, "association: requesting caps 0x%04X, ESSID '%s'\n",
 		cap, priv->essid_for_assoc);
 
 	acx_l_tx_data(priv, tx, packet_len);
@@ -4858,7 +4858,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 		bss = &priv->sta_list[i];
 		if (!bss->used) continue;
 
-		acxlog(L_ASSOC, "scan table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
+		log(L_ASSOC, "scan table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
 			bss->essid, bss->channel, bss->sir, bss->snr);
 
 		if (!mac_is_bcast(priv->ap))
@@ -4873,7 +4873,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 				priv->netdev->name, MAC(bss->address));
 			continue;
 		}
-		acxlog(L_ASSOC, "peer_cap 0x%04X, needed_cap 0x%04X\n",
+		log(L_ASSOC, "peer_cap 0x%04X, needed_cap 0x%04X\n",
 		       bss->cap_info, needed_cap);
 
 		/* does peer station support what we need? */
@@ -4920,7 +4920,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 		}
 
 		if (!priv->essid_active || !strcmp(bss->essid, priv->essid)) {
-			acxlog(L_ASSOC,
+			log(L_ASSOC,
 			       "found station with matching ESSID! ('%s' "
 			       "station, '%s' config)\n",
 			       bss->essid,
@@ -4948,12 +4948,12 @@ acx_s_complete_scan(wlandevice_t *priv)
 			bss->used = CLIENT_JOIN_CANDIDATE;
 			if (idx_found == -1)
 				idx_found = i;
-			acxlog(L_ASSOC, "found station with empty or "
+			log(L_ASSOC, "found station with empty or "
 				"single-space (hidden) SSID, considering "
 				"for assoc attempt\n");
 			/* ...and keep looking for better matches */
 		} else {
-			acxlog(L_ASSOC, "ESSID doesn't match! ('%s' "
+			log(L_ASSOC, "ESSID doesn't match! ('%s' "
 				"station, '%s' config)\n",
 				bss->essid,
 				(priv->essid_active) ? priv->essid : "[any]");
@@ -5019,7 +5019,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 		} else {
 			/* we shall scan again, AP can be
 			** just temporarily powered off */
-			acxlog(L_ASSOC,
+			log(L_ASSOC,
 				"no matching station found in range yet\n");
 			acx_set_status(priv, ACX_STATUS_1_SCANNING);
 			result = NOT_OK;
@@ -5079,7 +5079,7 @@ acx_s_read_fw(const char *file, u32 *size)
 	const struct firmware *fw_entry;
 
 	res = NULL;
-	acxlog(L_INIT, "requesting firmware image '%s'\n", file);
+	log(L_INIT, "requesting firmware image '%s'\n", file);
 	if (!request_firmware(&fw_entry, file, dev)) {
 		*size = 8;
 		if (fw_entry->size >= 8)
@@ -5128,12 +5128,12 @@ release_ret:
 	}
 	if (!firmware_dir) {
 		firmware_dir = "/usr/share/acx";
-		acxlog(L_DEBUG, "no firmware directory specified "
+		log(L_DEBUG, "no firmware directory specified "
 			"via module parameter firmware_dir, "
 			"using default %s\n", firmware_dir);
 	}
 	snprintf(filename, PATH_MAX, "%s/%s", firmware_dir, file);
-	acxlog(L_INIT, "reading firmware image '%s'\n", filename);
+	log(L_INIT, "reading firmware image '%s'\n", filename);
 
 	buffer = (char*)page;
 
@@ -5199,7 +5199,7 @@ release_ret:
 						*size);
 					goto fail_close;
 				}
-				acxlog(L_DEBUG, "allocated %u bytes "
+				log(L_DEBUG, "allocated %u bytes "
 					"for firmware module loading\n",
 					*size);
 			}
@@ -5275,7 +5275,7 @@ acx100_s_set_wepkey(wlandevice_t *priv)
 
 	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
 		if (priv->wep_keys[i].size != 0) {
-			acxlog(L_INIT, "setting WEP key: %d with "
+			log(L_INIT, "setting WEP key: %d with "
 				"total size: %d\n", i, (int) priv->wep_keys[i].size);
 			dk.action = 1;
 			dk.keySize = priv->wep_keys[i].size;
@@ -5294,7 +5294,7 @@ acx111_s_set_wepkey(wlandevice_t *priv)
 
 	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
 		if (priv->wep_keys[i].size != 0) {
-			acxlog(L_INIT, "setting WEP key: %d with "
+			log(L_INIT, "setting WEP key: %d with "
 				"total size: %d\n", i, (int) priv->wep_keys[i].size);
 			memset(&dk, 0, sizeof(dk));
 			dk.action = cpu_to_le16(1); /* "add key"; yes, that's a 16bit value */
@@ -5342,7 +5342,7 @@ acx100_s_init_wep(wlandevice_t *priv)
 		goto fail;
 	}
 
-	acxlog(L_DEBUG, "CodeEnd:%X\n", pt.CodeEnd);
+	log(L_DEBUG, "CodeEnd:%X\n", pt.CodeEnd);
 
 	pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 	pt.WEPCacheEnd   = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
@@ -5355,13 +5355,13 @@ acx100_s_init_wep(wlandevice_t *priv)
 	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
 	options.WEPOption = 0x00;
 
-	acxlog(L_ASSOC, "%s: writing WEP options\n", __func__);
+	log(L_ASSOC, "%s: writing WEP options\n", __func__);
 	acx_s_configure(priv, &options, ACX100_IE_WEP_OPTIONS);
 
 	acx100_s_set_wepkey(priv);
 
 	if (priv->wep_keys[priv->wep_current_index].size != 0) {
-		acxlog(L_ASSOC, "setting active default WEP key number: %d\n",
+		log(L_ASSOC, "setting active default WEP key number: %d\n",
 				priv->wep_current_index);
 		dk.KeyID = priv->wep_current_index;
 		acx_s_configure(priv, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET); /* 0x1010 */
@@ -5374,7 +5374,7 @@ acx100_s_init_wep(wlandevice_t *priv)
 			wep_mgmt.KeySize = cpu_to_le16(priv->wep_key_struct[i].len);
 			memcpy(&wep_mgmt.Key, priv->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
 			wep_mgmt.Action = cpu_to_le16(1);
-			acxlog(L_ASSOC, "writing WEP key %d (len %d)\n", i, le16_to_cpu(wep_mgmt.KeySize));
+			log(L_ASSOC, "writing WEP key %d (len %d)\n", i, le16_to_cpu(wep_mgmt.KeySize));
 			if (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt))) {
 				priv->wep_key_struct[i].index = i;
 			}
@@ -5681,7 +5681,7 @@ acx100_s_init_packet_templates(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_DEBUG, "sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
+	log(L_DEBUG, "sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
 
 	if (OK != acx_s_init_max_probe_request_template(priv))
 		goto failed;
@@ -5714,7 +5714,7 @@ acx100_s_init_packet_templates(wlandevice_t *priv)
 	goto success;
 
 failed:
-	acxlog(L_DEBUG|L_INIT,
+	log(L_DEBUG|L_INIT,
 		/* "cb=0x%X\n" */
 		"ACXMemoryMap:\n"
 		".CodeStart=0x%X\n"
@@ -5743,7 +5743,7 @@ acx111_s_init_packet_templates(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_DEBUG|L_INIT, "initializing max packet templates\n");
+	log(L_DEBUG|L_INIT, "initializing max packet templates\n");
 
 	if (OK != acx_s_init_max_probe_request_template(priv))
 		goto failed;
@@ -5843,13 +5843,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	acxlog(L_INIT, "get_mask 0x%08X, set_mask 0x%08X\n",
+	log(L_INIT, "get_mask 0x%08X, set_mask 0x%08X\n",
 			priv->get_mask, priv->set_mask);
 
 	/* Track dependencies betweed various settings */
 
 	if (priv->set_mask & (GETSET_MODE|GETSET_RESCAN|GETSET_WEP)) {
-		acxlog(L_INIT, "important setting has been changed. "
+		log(L_INIT, "important setting has been changed. "
 			"Need to update packet templates, too\n");
 		SET_BIT(priv->set_mask, SET_TEMPLATES);
 	}
@@ -5876,7 +5876,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	if (priv->set_mask & (GETSET_MODE|GETSET_RESCAN|GETSET_CHANNEL|GETSET_WEP)) {
 		if (ACX_MODE_2_STA == priv->mode) {
 			if (ACX_STATUS_4_ASSOCIATED == priv->status) {
-				acxlog(L_ASSOC, "we were ASSOCIATED - "
+				log(L_ASSOC, "we were ASSOCIATED - "
 					"sending disassoc request\n");
 				acx_lock(priv, flags);
 				acx_l_transmit_disassoc(priv, NULL);
@@ -5884,7 +5884,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 				acx_unlock(priv, flags);
 			}
 			/* need to reset some other stuff as well */
-			acxlog(L_DEBUG, "resetting bssid\n");
+			log(L_DEBUG, "resetting bssid\n");
 			MAC_ZERO(priv->bssid);
 			SET_BIT(priv->set_mask, SET_TEMPLATES|SET_STA_LIST);
 			start_scan = 1;
@@ -5914,11 +5914,11 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		|| (RADIO_RALINK_15 == priv->radio_type)) {
 			acx_s_read_phy_reg(priv, 0x30, &priv->sensitivity);
 		} else {
-			acxlog(L_INIT, "don't know how to get sensitivity "
+			log(L_INIT, "don't know how to get sensitivity "
 				"for radio type 0x%02X\n", priv->radio_type);
 			priv->sensitivity = 0;
 		}
-		acxlog(L_INIT, "got sensitivity value %u\n", priv->sensitivity);
+		log(L_INIT, "got sensitivity value %u\n", priv->sensitivity);
 
 		CLEAR_BIT(priv->get_mask, GETSET_SENSITIVITY);
 	}
@@ -5929,7 +5929,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		memset(antenna, 0, sizeof(antenna));
 		acx_s_interrogate(priv, antenna, ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 		priv->antenna = antenna[4];
-		acxlog(L_INIT, "got antenna value 0x%02X\n", priv->antenna);
+		log(L_INIT, "got antenna value 0x%02X\n", priv->antenna);
 		CLEAR_BIT(priv->get_mask, GETSET_ANTENNA);
 	}
 
@@ -5941,10 +5941,10 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx_s_interrogate(priv, ed_threshold, ACX100_IE_DOT11_ED_THRESHOLD);
 			priv->ed_threshold = ed_threshold[4];
 		} else {
-			acxlog(L_INIT, "acx111 doesn't support ED\n");
+			log(L_INIT, "acx111 doesn't support ED\n");
 			priv->ed_threshold = 0;
 		}
-		acxlog(L_INIT, "got Energy Detect (ED) threshold %u\n", priv->ed_threshold);
+		log(L_INIT, "got Energy Detect (ED) threshold %u\n", priv->ed_threshold);
 		CLEAR_BIT(priv->get_mask, GETSET_ED_THRESH);
 	}
 
@@ -5956,10 +5956,10 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx_s_interrogate(priv, cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 			priv->cca = cca[4];
 		} else {
-			acxlog(L_INIT, "acx111 doesn't support CCA\n");
+			log(L_INIT, "acx111 doesn't support CCA\n");
 			priv->cca = 0;
 		}
-		acxlog(L_INIT, "got Channel Clear Assessment (CCA) value %u\n", priv->cca);
+		log(L_INIT, "got Channel Clear Assessment (CCA) value %u\n", priv->cca);
 		CLEAR_BIT(priv->get_mask, GETSET_CCA);
 	}
 
@@ -5969,7 +5969,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		acx_s_interrogate(priv, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 		priv->reg_dom_id = dom.m.bytes[0];
 		/* FIXME: should also set chanmask somehow */
-		acxlog(L_INIT, "got regulatory domain 0x%02X\n", priv->reg_dom_id);
+		log(L_INIT, "got regulatory domain 0x%02X\n", priv->reg_dom_id);
 		CLEAR_BIT(priv->get_mask, GETSET_REG_DOMAIN);
 	}
 
@@ -5990,7 +5990,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	}
 
 	if (priv->set_mask & SET_TEMPLATES) {
-		acxlog(L_INIT, "updating packet templates\n");
+		log(L_INIT, "updating packet templates\n");
 		switch (priv->mode) {
 		case ACX_MODE_2_STA:
 			acx_s_set_probe_request_template(priv);
@@ -6010,7 +6010,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx_s_set_probe_response_template(priv);
 		}
 		/* Needed if generated frames are to be emitted at different tx rate now */
-		acxlog(L_IRQ, "redoing cmd_join_bssid() after template cfg\n");
+		log(L_IRQ, "redoing cmd_join_bssid() after template cfg\n");
 		acx_s_cmd_join_bssid(priv, priv->bssid);
 		CLEAR_BIT(priv->set_mask, SET_TEMPLATES);
 	}
@@ -6025,19 +6025,19 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 		/* configure to not do fallbacks when not in auto rate mode */
 		rate[4] = (priv->rate_auto) ? /* priv->txrate_fallback_retries */ 1 : 0;
-		acxlog(L_INIT, "updating Tx fallback to %u retries\n", rate[4]);
+		log(L_INIT, "updating Tx fallback to %u retries\n", rate[4]);
 		acx_s_configure(priv, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(priv->set_mask, SET_RATE_FALLBACK);
 	}
 	if (priv->set_mask & GETSET_TXPOWER) {
-		acxlog(L_INIT, "updating transmit power: %u dBm\n",
+		log(L_INIT, "updating transmit power: %u dBm\n",
 					priv->tx_level_dbm);
 		acx_s_set_tx_level(priv, priv->tx_level_dbm);
 		CLEAR_BIT(priv->set_mask, GETSET_TXPOWER);
 	}
 
 	if (priv->set_mask & GETSET_SENSITIVITY) {
-		acxlog(L_INIT, "updating sensitivity value: %u\n",
+		log(L_INIT, "updating sensitivity value: %u\n",
 					priv->sensitivity);
 		switch (priv->radio_type) {
 		case RADIO_RFMD_11:
@@ -6050,7 +6050,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx111_s_sens_radio_16_17(priv);
 			break;
 		default:
-			acxlog(L_INIT, "don't know how to modify sensitivity "
+			log(L_INIT, "don't know how to modify sensitivity "
 				"for radio type 0x%02X\n", priv->radio_type);
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_SENSITIVITY);
@@ -6062,7 +6062,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 		memset(antenna, 0, sizeof(antenna));
 		antenna[4] = priv->antenna;
-		acxlog(L_INIT, "updating antenna value: 0x%02X\n",
+		log(L_INIT, "updating antenna value: 0x%02X\n",
 					priv->antenna);
 		acx_s_configure(priv, &antenna, ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 		CLEAR_BIT(priv->set_mask, GETSET_ANTENNA);
@@ -6070,7 +6070,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 	if (priv->set_mask & GETSET_ED_THRESH) {
 		/* ed_threshold */
-		acxlog(L_INIT, "updating Energy Detect (ED) threshold: %u\n",
+		log(L_INIT, "updating Energy Detect (ED) threshold: %u\n",
 					priv->ed_threshold);
 		if (IS_ACX100(priv)) {
 			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
@@ -6080,13 +6080,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx_s_configure(priv, &ed_threshold, ACX100_IE_DOT11_ED_THRESHOLD);
 		}
 		else
-			acxlog(L_INIT, "acx111 doesn't support ED!\n");
+			log(L_INIT, "acx111 doesn't support ED!\n");
 		CLEAR_BIT(priv->set_mask, GETSET_ED_THRESH);
 	}
 
 	if (priv->set_mask & GETSET_CCA) {
 		/* CCA value */
-		acxlog(L_INIT, "updating Channel Clear Assessment "
+		log(L_INIT, "updating Channel Clear Assessment "
 				"(CCA) value: 0x%02X\n", priv->cca);
 		if (IS_ACX100(priv))	{
 			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
@@ -6096,13 +6096,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			acx_s_configure(priv, &cca, ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 		}
 		else
-			acxlog(L_INIT, "acx111 doesn't support CCA!\n");
+			log(L_INIT, "acx111 doesn't support CCA!\n");
 		CLEAR_BIT(priv->set_mask, GETSET_CCA);
 	}
 
 	if (priv->set_mask & GETSET_LED_POWER) {
 		/* Enable Tx */
-		acxlog(L_INIT, "updating power LED status: %u\n", priv->led_power);
+		log(L_INIT, "updating power LED status: %u\n", priv->led_power);
 
 		acx_lock(priv, flags);
 		if (IS_PCI(priv))
@@ -6119,7 +6119,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		acx100_ie_powermgmt_t pm;
 
 		/* change 802.11 power save mode settings */
-		acxlog(L_INIT, "updating 802.11 power save mode settings: "
+		log(L_INIT, "updating 802.11 power save mode settings: "
 			"wakeup_cfg 0x%02X, listen interval %u, "
 			"options 0x%02X, hangover period %u, "
 			"enhanced_ps_transition_time %d\n",
@@ -6127,7 +6127,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			priv->ps_options, priv->ps_hangover_period,
 			priv->ps_enhanced_transition_time);
 		acx_s_interrogate(priv, &pm, ACX100_IE_POWER_MGMT);
-		acxlog(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
+		log(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
 			"listen interval %u, options 0x%02X, "
 			"hangover period %u, "
 			"enhanced_ps_transition_time %d\n",
@@ -6140,10 +6140,10 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		pm.enhanced_ps_transition_time = cpu_to_le16(priv->ps_enhanced_transition_time);
 		acx_s_configure(priv, &pm, ACX100_IE_POWER_MGMT);
 		acx_s_interrogate(priv, &pm, ACX100_IE_POWER_MGMT);
-		acxlog(L_INIT, "wakeup_cfg: 0x%02X\n", pm.wakeup_cfg);
+		log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.wakeup_cfg);
 		acx_s_msleep(40);
 		acx_s_interrogate(priv, &pm, ACX100_IE_POWER_MGMT);
-		acxlog(L_INIT, "power save mode change %s\n",
+		log(L_INIT, "power save mode change %s\n",
 			(pm.wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
 		/* FIXME: maybe verify via PS_CFG_PENDING bit here
 		 * that power save mode change was successful. */
@@ -6156,13 +6156,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 	if (priv->set_mask & GETSET_CHANNEL) {
 		/* channel */
-		acxlog(L_INIT, "updating channel to: %u\n", priv->channel);
+		log(L_INIT, "updating channel to: %u\n", priv->channel);
 		CLEAR_BIT(priv->set_mask, GETSET_CHANNEL);
 	}
 
 	if (priv->set_mask & GETSET_TX) {
 		/* set Tx */
-		acxlog(L_INIT, "updating: %s Tx\n",
+		log(L_INIT, "updating: %s Tx\n",
 				priv->tx_disabled ? "disable" : "enable");
 		if (priv->tx_disabled)
 			acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0);
@@ -6173,7 +6173,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 
 	if (priv->set_mask & GETSET_RX) {
 		/* Enable Rx */
-		acxlog(L_INIT, "updating: enable Rx on channel: %u\n",
+		log(L_INIT, "updating: enable Rx on channel: %u\n",
 				priv->channel);
 		acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 1);
 		CLEAR_BIT(priv->set_mask, GETSET_RX);
@@ -6183,7 +6183,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
 		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
 
-		acxlog(L_INIT, "updating short retry limit: %u, long retry limit: %u\n",
+		log(L_INIT, "updating short retry limit: %u, long retry limit: %u\n",
 					priv->short_retry, priv->long_retry);
 		short_retry[0x4] = priv->short_retry;
 		long_retry[0x4] = priv->long_retry;
@@ -6195,7 +6195,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	if (priv->set_mask & SET_MSDU_LIFETIME) {
 		u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
-		acxlog(L_INIT, "updating tx MSDU lifetime: %u\n",
+		log(L_INIT, "updating tx MSDU lifetime: %u\n",
 					priv->msdu_lifetime);
 		*(u32 *)&xmt_msdu_lifetime[4] = cpu_to_le32((u32)priv->msdu_lifetime);
 		acx_s_configure(priv, &xmt_msdu_lifetime, ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
@@ -6207,14 +6207,14 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		acx_ie_generic_t dom;
 		unsigned mask;
 
-		acxlog(L_INIT, "updating regulatory domain: 0x%02X\n",
+		log(L_INIT, "updating regulatory domain: 0x%02X\n",
 					priv->reg_dom_id);
 		for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
 			if (acx_reg_domain_ids[i] == priv->reg_dom_id)
 				break;
 
 		if (sizeof(acx_reg_domain_ids) == i) {
-			acxlog(L_INIT, "Invalid or unsupported regulatory "
+			log(L_INIT, "Invalid or unsupported regulatory "
 				"domain 0x%02X specified, falling back to "
 				"FCC (USA)! Please report if this sounds "
 				"fishy!\n", priv->reg_dom_id);
@@ -6327,12 +6327,12 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			u8  val ACX_PACKED;
 		} keyindic;
 #endif
-		acxlog(L_INIT, "updating WEP key settings\n");
+		log(L_INIT, "updating WEP key settings\n");
 
 		acx_s_set_wepkey(priv);
 
 		dkey.KeyID = priv->wep_current_index;
-		acxlog(L_INIT, "setting WEP key %u as default\n", dkey.KeyID);
+		log(L_INIT, "setting WEP key %u as default\n", dkey.KeyID);
 		acx_s_configure(priv, &dkey, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
 #ifdef DEBUG_WEP
 		keyindic.val = 3;
@@ -6346,9 +6346,9 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		acx100_ie_wep_options_t options;
 
 		if (IS_ACX111(priv)) {
-			acxlog(L_DEBUG, "setting WEP Options for acx111 is not supported\n");
+			log(L_DEBUG, "setting WEP Options for acx111 is not supported\n");
 		} else {
-			acxlog(L_INIT, "setting WEP Options\n");
+			log(L_INIT, "setting WEP Options\n");
 
 			/* let's choose maximum setting: 4 default keys,
 			 * plus 10 other keys: */
@@ -6388,7 +6388,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	/* debug, rate, and nick don't need any handling */
 	/* what about sniffing mode?? */
 
-	acxlog(L_INIT, "get_mask 0x%08X, set_mask 0x%08X - after update\n",
+	log(L_INIT, "get_mask 0x%08X, set_mask 0x%08X - after update\n",
 			priv->get_mask, priv->set_mask);
 
 /* end: */
@@ -6499,7 +6499,7 @@ acx_s_initialize_rx_config(wlandevice_t *priv)
 	}
 	priv->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
 
-	acxlog(L_INIT, "setting RXconfig to %04X:%04X\n",
+	log(L_INIT, "setting RXconfig to %04X:%04X\n",
 			priv->rx_config_1, priv->rx_config_2);
 	cfg.rx_cfg1 = cpu_to_le16(priv->rx_config_1);
 	cfg.rx_cfg2 = cpu_to_le16(priv->rx_config_2);
@@ -6632,7 +6632,7 @@ acx_e_after_interrupt_task(void *data)
 	/* 1) we detected that no Scan_Complete IRQ came from fw, or
 	** 2) we found too many STAs */
 	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
-		acxlog(L_IRQ, "sending a stop scan cmd...\n");
+		log(L_IRQ, "sending a stop scan cmd...\n");
 		acx_s_issue_cmd(priv, ACX1xx_CMD_STOP_SCAN, NULL, 0);
 		/* HACK: set the IRQ bit, since we won't get a
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
@@ -6661,7 +6661,7 @@ acx_e_after_interrupt_task(void *data)
 			switch (priv->mode) {
 			case ACX_MODE_0_ADHOC:
 			case ACX_MODE_3_AP:
-				acxlog(L_IRQ, "redoing cmd_join_bssid() after scan\n");
+				log(L_IRQ, "redoing cmd_join_bssid() after scan\n");
 				acx_s_cmd_join_bssid(priv, priv->bssid);
 			}
 		}
@@ -6670,7 +6670,7 @@ acx_e_after_interrupt_task(void *data)
 
 	/* STA auth or assoc timed out, start over again */
 	if (priv->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
-		acxlog(L_IRQ, "sending a start_scan cmd...\n");
+		log(L_IRQ, "sending a start_scan cmd...\n");
 		acx_s_cmd_start_scan(priv);
 		CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_RESTART_SCAN);
 	}
@@ -6684,7 +6684,7 @@ acx_e_after_interrupt_task(void *data)
 			pdr.m.aid = cpu_to_le16(priv->aid);
 			acx_s_configure(priv, &pdr, ACX1xx_IE_ASSOC_ID);
 			acx_set_status(priv, ACX_STATUS_4_ASSOCIATED);
-			acxlog(L_ASSOC|L_DEBUG, "ASSOCIATED!\n");
+			log(L_ASSOC|L_DEBUG, "ASSOCIATED!\n");
 			CLEAR_BIT(priv->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_ASSOCIATE);
 		}
 	}
@@ -6738,7 +6738,7 @@ acx_s_start(wlandevice_t *priv)
 		|GETSET_REG_DOMAIN|GETSET_MODE|GETSET_CHANNEL
 		|GETSET_TX|GETSET_RX);
 
-	acxlog(L_INIT, "updating initial settings on iface activation\n");
+	log(L_INIT, "updating initial settings on iface activation\n");
 	acx_s_update_card_settings(priv);
 
 	FN_EXIT0;
@@ -6773,7 +6773,7 @@ acx_update_capabilities(wlandevice_t *priv)
 	if (priv->capab_agility) {
 		SET_BIT(cap, WF_MGMT_CAP_AGILITY);
 	}
-	acxlog(L_DEBUG, "caps updated from 0x%04X to 0x%04X\n",
+	log(L_DEBUG, "caps updated from 0x%04X to 0x%04X\n",
 				priv->capabilities, cap);
 	priv->capabilities = cap;
 }

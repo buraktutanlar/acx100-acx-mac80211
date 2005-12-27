@@ -212,7 +212,7 @@ acxusb_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 	mem.len = cpu_to_le32(4);
 	acx_s_issue_cmd(priv, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
 	*charbuf = mem.data;
-	acxlog(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
+	log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -233,7 +233,7 @@ acxusb_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
 	acx_s_issue_cmd(priv, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
-	acxlog(L_DEBUG, "write radio PHY[0x%04X]=0x%02X\n", reg, value);
+	log(L_DEBUG, "write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -295,7 +295,7 @@ acxusb_s_issue_cmd_timeo_debug(
 	if (!devname || !devname[0] || devname[4]=='%')
 		devname = "acx";
 
-	acxlog(L_CTL, FUNC"(cmd:%s,buflen:%u,type:0x%04X)\n",
+	log(L_CTL, FUNC"(cmd:%s,buflen:%u,type:0x%04X)\n",
 		cmdstr, buflen,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
@@ -339,8 +339,8 @@ acxusb_s_issue_cmd_timeo_debug(
 	/* obtain the I/O pipes */
 	outpipe = usb_sndctrlpipe(usbdev, 0);
 	inpipe = usb_rcvctrlpipe(usbdev, 0);
-	acxlog(L_CTL, "ctrl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
-	acxlog(L_CTL, "sending USB control msg (out) (blocklen=%d)\n", blocklen);
+	log(L_CTL, "ctrl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
+	log(L_CTL, "sending USB control msg (out) (blocklen=%d)\n", blocklen);
 	if (acx_debug & L_DATA)
 		acx_dump_bytes(loc, blocklen);
 
@@ -355,17 +355,17 @@ acxusb_s_issue_cmd_timeo_debug(
 	);
 
 	if (result == -ENODEV) {
-		acxlog(L_CTL, "no device present (unplug?)\n");
+		log(L_CTL, "no device present (unplug?)\n");
 		goto good;
 	}
 
-	acxlog(L_CTL, "wrote %d bytes\n", result);
+	log(L_CTL, "wrote %d bytes\n", result);
 	if (result < 0) {
 		goto bad;
 	}
 
 	/* check for device acknowledge */
-	acxlog(L_CTL, "sending USB control msg (in) (acklen=%d)\n", acklen);
+	log(L_CTL, "sending USB control msg (in) (acklen=%d)\n", acklen);
 	loc->status = 0; /* delete old status flag -> set to IDLE */
 //shall we zero out the rest?
 	result = usb_control_msg(usbdev, inpipe,
@@ -406,7 +406,7 @@ read 4 bytes <==== MUST BE 12!!
 	}
 	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
-		acxlog(L_CTL, "response frame: cmd=0x%04X status=%d\n",
+		log(L_CTL, "response frame: cmd=0x%04X status=%d\n",
 			le16_to_cpu(loc->cmd),
 			cmd_status);
 	}
@@ -469,7 +469,7 @@ acxusb_boot(struct usb_device *usbdev)
 		result = -EIO;
 		goto end;
 	}
-	acxlog(L_INIT, "firmware size: %d bytes\n", size);
+	log(L_INIT, "firmware size: %d bytes\n", size);
 
 	/* Obtain the I/O pipes */
 	outpipe = usb_sndctrlpipe(usbdev, 0);
@@ -482,7 +482,7 @@ acxusb_boot(struct usb_device *usbdev)
 		if (len >= ACX_USB_RWMEM_MAXLEN) {
 			len = ACX_USB_RWMEM_MAXLEN;
 		}
-		acxlog(L_INIT, "uploading firmware (%d bytes, offset=%d)\n",
+		log(L_INIT, "uploading firmware (%d bytes, offset=%d)\n",
 						len, offset);
 		result = 0;
 		memcpy(usbbuf, firmware + offset, len);
@@ -593,7 +593,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		** and it will not need a driver anyway...so
 		** return a NULL
 		*/
-		acxlog(L_INIT, "finished booting, returning from probe()\n");
+		log(L_INIT, "finished booting, returning from probe()\n");
 		result = OK; /* success */
 		goto end;
 	}
@@ -666,7 +666,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	ifdesc = &intf->altsetting->desc;
 	numep = ifdesc->bNumEndpoints;
-	acxlog(L_DEBUG, "# of endpoints: %d\n", numep);
+	log(L_DEBUG, "# of endpoints: %d\n", numep);
 
 	/* obtain information about the endpoint
 	** addresses, begin with some default values
@@ -691,11 +691,11 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 				priv->bulkoutep = epdesc->bEndpointAddress & 0xF;
 		}
 	}
-	acxlog(L_DEBUG, "bulkout ep: 0x%X\n", priv->bulkoutep);
-	acxlog(L_DEBUG, "bulkin ep: 0x%X\n", priv->bulkinep);
+	log(L_DEBUG, "bulkout ep: 0x%X\n", priv->bulkoutep);
+	log(L_DEBUG, "bulkin ep: 0x%X\n", priv->bulkinep);
 
 	/* already done by memset: priv->rxtruncsize = 0; */
-	acxlog(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
+	log(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
 				(int) TXBUFSIZE, (int) RXBUFSIZE);
 
 	/* Allocate the RX/TX containers. */
@@ -751,7 +751,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_display_hardware_details(priv);
 
 	/* Register the network device */
-	acxlog(L_INIT, "registering network device\n");
+	log(L_INIT, "registering network device\n");
 	result = register_netdev(dev);
 	if (result) {
 		msg = "acx: failed to register USB network device "
@@ -1021,7 +1021,7 @@ acxusb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 		usb_unlink_urb(rxurb);
 	} else
 	if (unlikely(rxurb->status == -ECONNRESET)) {
-		acxlog(L_USBRXTX, "acx_usb: _poll_rx: connection reset\n");
+		log(L_USBRXTX, "acx_usb: _poll_rx: connection reset\n");
 		goto end;
 	}
 	rxurb->actual_length = 0;
@@ -1036,7 +1036,7 @@ acxusb_l_poll_rx(wlandevice_t *priv, usb_rx_t* rx)
 	/* ATOMIC: we may be called from complete_rx() usb callback */
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
-	acxlog(L_USBRXTX, "SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
+	log(L_USBRXTX, "SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
 			rxnum, inpipe, (int) RXBUFSIZE, errcode);
 end:
 	FN_EXIT0;
@@ -1078,7 +1078,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
 	if (unlikely(!(priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		acxlog(L_USBRXTX, "rx: device is down, not doing anything\n");
+		log(L_USBRXTX, "rx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
@@ -1087,11 +1087,11 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 	remsize = size;
 	rxnum = rx - priv->usb_rx;
 
-	acxlog(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
+	log(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
 				rxnum, urb->status, size);
 
 	/* Send the URB that's waiting. */
-	acxlog(L_USBRXTX, "rxnum=%d, sending=%d\n", rxnum, rxnum^1);
+	log(L_USBRXTX, "rxnum=%d, sending=%d\n", rxnum, rxnum^1);
 	acxusb_l_poll_rx(priv, &priv->usb_rx[rxnum^1]);
 
 	if (unlikely(size > sizeof(rxbuffer_t)))
@@ -1173,7 +1173,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 			ptr = (rxbuffer_t *) (((char *)inbuf) + tail_size);
 			remsize -= tail_size;
 		}
-		acxlog(L_USBRXTX, "post-merge size=%d remsize=%d\n",
+		log(L_USBRXTX, "post-merge size=%d remsize=%d\n",
 						size, remsize);
 	}
 
@@ -1191,14 +1191,14 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		}
 
 		packetsize = RXBUF_BYTES_USED(ptr);
-		acxlog(L_USBRXTX, "packet with packetsize=%d\n", packetsize);
+		log(L_USBRXTX, "packet with packetsize=%d\n", packetsize);
 
 		if (RXBUF_IS_TXSTAT(ptr)) {
 			/* do rate handling */
 			usb_txstatus_t *stat = (void*)ptr;
 			u16 client_no = (u16)stat->hostdata;
 
-			acxlog(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
+			log(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
 			"queue_index:%02X mac_status:%02X hostdata:%08X "
 			"rate:%u ack_failures:%02X rts_failures:%02X "
 			"rts_ok:%02X\n",
@@ -1298,11 +1298,11 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	 * to play with them. The urb may get unlinked.
 	 */
 	if (unlikely(!(priv->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		acxlog(L_USBRXTX, "tx: device is down, not doing anything\n");
+		log(L_USBRXTX, "tx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
-	acxlog(L_USBRXTX, "RETURN TX (%d): status=%d size=%d\n",
+	log(L_USBRXTX, "RETURN TX (%d): status=%d size=%d\n",
 				txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
@@ -1328,7 +1328,7 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	 && (priv->status == ACX_STATUS_4_ASSOCIATED)
 	 && (acx_queue_stopped(priv->netdev))
 	) {
-		acxlog(L_BUF, "tx: wake queue (%u free txbufs)\n",
+		log(L_BUF, "tx: wake queue (%u free txbufs)\n",
 				priv->tx_free);
 		acx_wake_queue(priv->netdev, NULL);
 	}
@@ -1356,14 +1356,14 @@ acxusb_l_alloc_tx(wlandevice_t* priv)
 	do {
 		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!priv->usb_tx[head].busy) {
-			acxlog(L_USBRXTX, "allocated tx %d\n", head);
+			log(L_USBRXTX, "allocated tx %d\n", head);
 			tx = &priv->usb_tx[head];
 			tx->busy = 1;
 			priv->tx_free--;
 			/* Keep a few free descs between head and tail of tx ring.
 			** It is not absolutely needed, just feels safer */
 			if (priv->tx_free < TX_STOP_QUEUE) {
-				acxlog(L_BUF, "tx: stop queue "
+				log(L_BUF, "tx: stop queue "
 					"(%u free txbufs)\n", priv->tx_free);
 				acx_stop_queue(priv->netdev, NULL);
 			}
@@ -1426,7 +1426,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	whdr = (wlan_hdr_t *)txbuf->data;
 	txnum = tx - priv->usb_tx;
 
-	acxlog(L_DEBUG, "using buf#%d free=%d len=%d\n",
+	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
 			txnum, priv->tx_free, wlanpkt_len);
 
 	switch (priv->mode) {
@@ -1486,7 +1486,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 
 	txurb->transfer_flags = URB_ASYNC_UNLINK|URB_ZERO_PACKET;
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
-	acxlog(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
+	log(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
 		"rate=%u errcode=%d\n", txnum, outpipe, txbuf,
 		wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
@@ -1553,7 +1553,7 @@ acxusb_i_tx_timeout(struct net_device *dev)
 int __init
 acxusb_e_init_module(void)
 {
-	acxlog(L_INIT, "USB module " ACX_RELEASE " initialized, "
+	log(L_INIT, "USB module " ACX_RELEASE " initialized, "
 		"probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }

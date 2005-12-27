@@ -51,13 +51,13 @@
 ** - Use printk_ratelimited() for messages which may flood
 **   (e.g. "rx DUP pkt!").
 **
-** - Use acxlog() for messages which may be omitted (and they
+** - Use log() for messages which may be omitted (and they
 **   _will_ be omitted in non-debug builds). Note that
 **   message levels may be disabled at compile-time selectively,
 **   thus select them wisely. Example: L_DEBUG is the lowest
 **   (most likely to be compiled out) -> use for less important stuff.
 **
-** - Do not print important stuff with acxlog(), or else people
+** - Do not print important stuff with log(), or else people
 **   will never build non-debug driver.
 **
 ** Style:
@@ -101,7 +101,7 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #if ACX_DEBUG
 
-#define acxlog(chan, args...) \
+#define log(chan, args...) \
 	do { \
 		if (acx_debug & (chan)) \
 			printk(args); \
@@ -110,7 +110,7 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #else /* Non-debug build: */
 
-#define acxlog(chan, args...)
+#define log(chan, args...)
 /* Standard way of log flood prevention */
 #define printk_ratelimited(args...) \
 do { \
@@ -359,7 +359,7 @@ acx_stop_queue(netdevice_t *dev, const char *msg)
 
 	netif_stop_queue(dev);
 	if (msg)
-		acxlog(L_BUFT, "tx: stop queue %s\n", msg);
+		log(L_BUFT, "tx: stop queue %s\n", msg);
 }
 
 static inline int
@@ -374,7 +374,7 @@ acx_start_queue(netdevice_t *dev, const char *msg)
 {
 	netif_start_queue(dev);
 	if (msg)
-		acxlog(L_BUFT, "tx: start queue %s\n", msg);
+		log(L_BUFT, "tx: start queue %s\n", msg);
 }
 */
 
@@ -383,7 +383,7 @@ acx_wake_queue(netdevice_t *dev, const char *msg)
 {
 	netif_wake_queue(dev);
 	if (msg)
-		acxlog(L_BUFT, "tx: wake queue %s\n", msg);
+		log(L_BUFT, "tx: wake queue %s\n", msg);
 }
 
 static inline void
@@ -391,7 +391,7 @@ acx_carrier_off(netdevice_t *dev, const char *msg)
 {
 	netif_carrier_off(dev);
 	if (msg)
-		acxlog(L_BUFT, "tx: carrier off %s\n", msg);
+		log(L_BUFT, "tx: carrier off %s\n", msg);
 }
 
 static inline void
@@ -399,7 +399,7 @@ acx_carrier_on(netdevice_t *dev, const char *msg)
 {
 	netif_carrier_on(dev);
 	if (msg)
-		acxlog(L_BUFT, "tx: carrier on %s\n", msg);
+		log(L_BUFT, "tx: carrier on %s\n", msg);
 }
 
 /* This function does not need locking UNLESS you call it

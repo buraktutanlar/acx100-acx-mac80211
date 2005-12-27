@@ -281,7 +281,7 @@ acx_ioctl_set_freq(
 	priv->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
-	acxlog(L_IOCTL, "Changing to channel %d\n", channel);
+	log(L_IOCTL, "Changing to channel %d\n", channel);
 	SET_BIT(priv->set_mask, GETSET_CHANNEL);
 
 	result = -EINPROGRESS; /* need to call commit handler */
@@ -355,7 +355,7 @@ acx_ioctl_set_mode(
 		goto end_unlock;
 	}
 
-	acxlog(L_ASSOC, "new priv->mode=%d\n", priv->mode);
+	log(L_ASSOC, "new priv->mode=%d\n", priv->mode);
 	SET_BIT(priv->set_mask, GETSET_MODE);
 	result = -EINPROGRESS;
 
@@ -487,9 +487,9 @@ acx_ioctl_set_ap(
 		if (mac_is_zero(ap)) {
 			/* "off" == 00:00:00:00:00:00 */
 			MAC_BCAST(priv->ap);
-			acxlog(L_IOCTL, "Not reassociating\n");
+			log(L_IOCTL, "Not reassociating\n");
 		} else {
-			acxlog(L_IOCTL, "Forcing reassociation\n");
+			log(L_IOCTL, "Forcing reassociation\n");
 			SET_BIT(priv->set_mask, GETSET_RESCAN);
 		}
 		break;
@@ -645,7 +645,7 @@ acx_s_scan_add_station(
 	iwe.cmd = SIOCGIWESSID;
 	iwe.u.data.length = bss->essid_len;
 	iwe.u.data.flags = 1;
-	acxlog(L_IOCTL, "scan, essid: %s\n", bss->essid);
+	log(L_IOCTL, "scan, essid: %s\n", bss->essid);
 	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
 
 	/* Add mode */
@@ -655,7 +655,7 @@ acx_s_scan_add_station(
 			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
-		acxlog(L_IOCTL, "scan, mode: %d\n", iwe.u.mode);
+		log(L_IOCTL, "scan, mode: %d\n", iwe.u.mode);
 		ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_UINT_LEN);
 	}
 
@@ -663,7 +663,7 @@ acx_s_scan_add_station(
 	iwe.cmd = SIOCGIWFREQ;
 	iwe.u.freq.m = acx_channel_freq[bss->channel - 1] * 100000;
 	iwe.u.freq.e = 1;
-	acxlog(L_IOCTL, "scan, frequency: %d\n", iwe.u.freq.m);
+	log(L_IOCTL, "scan, frequency: %d\n", iwe.u.freq.m);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_FREQ_LEN);
 
 	/* Add link quality */
@@ -680,7 +680,7 @@ acx_s_scan_add_station(
 				100 - iwe.u.qual.noise : 0;
 #endif
 	iwe.u.qual.updated = 7;
-	acxlog(L_IOCTL, "scan, link quality: %d/%d/%d\n",
+	log(L_IOCTL, "scan, link quality: %d/%d/%d\n",
 			iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_QUAL_LEN);
 
@@ -691,7 +691,7 @@ acx_s_scan_add_station(
 	else
 		iwe.u.data.flags = IW_ENCODE_DISABLED;
 	iwe.u.data.length = 0;
-	acxlog(L_IOCTL, "scan, encryption flags: %X\n", iwe.u.data.flags);
+	log(L_IOCTL, "scan, encryption flags: %X\n", iwe.u.data.flags);
 	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
 
 	/* add rates */
@@ -705,7 +705,7 @@ acx_s_scan_add_station(
 	while (rate) {
 		if (rate & 1) {
 			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
-			acxlog(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
+			log(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
 			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf,
 						&iwe, IW_EV_PARAM_LEN);
 		}
@@ -744,7 +744,7 @@ acx_ioctl_get_scan(
 
 	/* no scan available if device is not up yet */
 	if (!(priv->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acxlog(L_IOCTL, "iface not up yet\n");
+		log(L_IOCTL, "iface not up yet\n");
 		result = -EAGAIN;
 		goto end_unlock;
 	}
@@ -796,7 +796,7 @@ acx_ioctl_set_essid(
 		goto end;
 	}
 
-	acxlog(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
+	log(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
 					len, extra, len, dwrq->flags);
 
 	acx_sem_lock(priv);
@@ -932,7 +932,7 @@ acx_ioctl_set_rate(
 	int result = -EINVAL;
 
 	FN_ENTER;
-	acxlog(L_IOCTL, "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
+	log(L_IOCTL, "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
 		vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
 
 	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
@@ -1081,7 +1081,7 @@ acx_ioctl_set_encode(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "set encoding flags=0x%04X, size=%d, key: %s\n",
+	log(L_IOCTL, "set encoding flags=0x%04X, size=%d, key: %s\n",
 			dwrq->flags, dwrq->length, extra ? "set" : "No key");
 
 	acx_sem_lock(priv);
@@ -1141,12 +1141,12 @@ acx_ioctl_set_encode(
 	/* set flag to make sure the card WEP settings get updated */
 	SET_BIT(priv->set_mask, GETSET_WEP);
 
-	acxlog(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
+	log(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
 		dwrq->length, extra, dwrq->flags);
 
 	for (index = 0; index <= 3; index++) {
 		if (priv->wep_keys[index].size) {
-			acxlog(L_IOCTL,	"index=%d, size=%d, key at 0x%p\n",
+			log(L_IOCTL,	"index=%d, size=%d, key at 0x%p\n",
 				priv->wep_keys[index].index,
 				(int) priv->wep_keys[index].size,
 				priv->wep_keys[index].key);
@@ -1194,7 +1194,7 @@ acx_ioctl_get_encode(
 	/* set the current index */
 	SET_BIT(dwrq->flags, index + 1);
 
-	acxlog(L_IOCTL, "len=%d, key=%p, flags=0x%X\n",
+	log(L_IOCTL, "len=%d, key=%p, flags=0x%X\n",
 	       dwrq->length, dwrq->pointer,
 	       dwrq->flags);
 
@@ -1217,7 +1217,7 @@ acx_ioctl_set_power(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "set 802.11 powersave flags=0x%04X\n", vwrq->flags);
+	log(L_IOCTL, "set 802.11 powersave flags=0x%04X\n", vwrq->flags);
 
 	acx_sem_lock(priv);
 
@@ -1231,7 +1231,7 @@ acx_ioctl_set_power(
 
 		if (ps_timeout > 255)
 			ps_timeout = 255;
-		acxlog(L_IOCTL, "setting PS timeout value to %d time units "
+		log(L_IOCTL, "setting PS timeout value to %d time units "
 				"due to %dus\n", ps_timeout, vwrq->value);
 		priv->ps_hangover_period = ps_timeout;
 	} else if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_PERIOD) {
@@ -1239,7 +1239,7 @@ acx_ioctl_set_power(
 
 		if (ps_periods > 255)
 			ps_periods = 255;
-		acxlog(L_IOCTL, "setting PS period value to %d periods "
+		log(L_IOCTL, "setting PS period value to %d periods "
 				"due to %dus\n", ps_periods, vwrq->value);
 		priv->ps_listen_interval = ps_periods;
 		CLEAR_BIT(priv->ps_wakeup_cfg, PS_CFG_WAKEUP_MODE_MASK);
@@ -1260,7 +1260,7 @@ acx_ioctl_set_power(
 		case IW_POWER_ON:
 			break;
 		default:
-			acxlog(L_IOCTL, "unknown PS mode\n");
+			log(L_IOCTL, "unknown PS mode\n");
 			result = -EINVAL;
 			goto end;
 	}
@@ -1288,7 +1288,7 @@ acx_ioctl_get_power(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "Get 802.11 Power Save flags = 0x%04X\n", vwrq->flags);
+	log(L_IOCTL, "Get 802.11 Power Save flags = 0x%04X\n", vwrq->flags);
 	vwrq->disabled = ((priv->ps_wakeup_cfg & PS_CFG_ENABLE) == 0);
 	if (vwrq->disabled)
 		goto end;
@@ -1329,7 +1329,7 @@ acx_ioctl_get_txpow(
 	vwrq->fixed = 1;
 	vwrq->value = priv->tx_level_dbm;
 
-	acxlog(L_IOCTL, "get txpower:%d dBm\n", priv->tx_level_dbm);
+	log(L_IOCTL, "get txpower:%d dBm\n", priv->tx_level_dbm);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -1351,7 +1351,7 @@ acx_ioctl_set_txpow(
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "set txpower:%d, disabled:%d, flags:0x%04X\n",
+	log(L_IOCTL, "set txpower:%d, disabled:%d, flags:0x%04X\n",
 			vwrq->value, vwrq->disabled, vwrq->flags);
 
 	acx_sem_lock(priv);
@@ -1364,15 +1364,15 @@ acx_ioctl_set_txpow(
 	if (vwrq->value == -1) {
 		if (vwrq->disabled) {
 			priv->tx_level_dbm = 0;
-			acxlog(L_IOCTL, "disable radio tx\n");
+			log(L_IOCTL, "disable radio tx\n");
 		} else {
 			/* priv->tx_level_auto = 1; */
-			acxlog(L_IOCTL, "set tx power auto (NIY)\n");
+			log(L_IOCTL, "set tx power auto (NIY)\n");
 		}
 	} else {
 		priv->tx_level_dbm = vwrq->value <= 20 ? vwrq->value : 20;
 		/* priv->tx_level_auto = 0; */
-		acxlog(L_IOCTL, "set txpower=%d dBm\n", priv->tx_level_dbm);
+		log(L_IOCTL, "set txpower=%d dBm\n", priv->tx_level_dbm);
 	}
 	SET_BIT(priv->set_mask, GETSET_TXPOWER);
 
@@ -1690,7 +1690,7 @@ acx_ioctl_set_debug(
 	unsigned int debug_new = *((unsigned int *)extra);
 	int result = -EINVAL;
 
-	acxlog(L_ANY, "setting debug from %04X to %04X\n", acx_debug, debug_new);
+	log(L_ANY, "setting debug from %04X to %04X\n", acx_debug, debug_new);
 	acx_debug = debug_new;
 
 	result = OK;
@@ -1788,7 +1788,7 @@ acx_ioctl_get_reg_domain(
 
 	for (i=1; i <= 7; i++) {
 		if (acx_reg_domain_ids[i-1] == dom) {
-			acxlog(L_IOCTL, "regulatory domain is currently set "
+			log(L_IOCTL, "regulatory domain is currently set "
 				"to %d (0x%X): %s\n", i, dom,
 				reg_domain_strings[i-1]);
 			*extra = i;
@@ -2073,7 +2073,7 @@ acx_ioctl_wlansniff(
 
 	/* not using printk() here, since it distorts kismet display
 	 * when printk messages activated */
-	acxlog(L_IOCTL, "setting monitor to: 0x%02X\n", params[0]);
+	log(L_IOCTL, "setting monitor to: 0x%02X\n", params[0]);
 
 	switch (params[0]) {
 	case 0:
@@ -2153,14 +2153,14 @@ acx_ioctl_dbg_set_masks(
 
 	acx_sem_lock(priv);
 
-	acxlog(L_IOCTL, "setting flags in settings mask: "
+	log(L_IOCTL, "setting flags in settings mask: "
 			"get_mask %08X set_mask %08X\n"
 			"before: get_mask %08X set_mask %08X\n",
 			params[0], params[1],
 			priv->get_mask, priv->set_mask);
 	SET_BIT(priv->get_mask, params[0]);
 	SET_BIT(priv->set_mask, params[1]);
-	acxlog(L_IOCTL, "after: get_mask %08X set_mask %08X\n",
+	log(L_IOCTL, "after: get_mask %08X set_mask %08X\n",
 			priv->get_mask, priv->set_mask);
 	result = -EINPROGRESS; /* immediately call commit handler */
 
@@ -2272,12 +2272,12 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 
 	FN_ENTER;
 
-	acxlog(L_IOCTL, "set_rates %s\n", extra);
+	log(L_IOCTL, "set_rates %s\n", extra);
 	result = fill_ratemasks(extra, &brate, &orate,
 				acx111_supported, acx111_gen_mask, 0);
 	if (result) goto end;
 	SET_BIT(orate, brate);
-	acxlog(L_IOCTL, "brate %08X orate %08X\n", brate, orate);
+	log(L_IOCTL, "brate %08X orate %08X\n", brate, orate);
 
 	result = verify_rate(brate, priv->chip_type);
 	if (result) goto end;
@@ -2714,7 +2714,7 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 	int result = 0;
 	struct iwreq *iwr = (struct iwreq *)ifr;
 
-	acxlog(L_IOCTL, "%s cmd = 0x%04X\n", __func__, cmd);
+	log(L_IOCTL, "%s cmd = 0x%04X\n", __func__, cmd);
 
 	/* This is the way it is done in the orinoco driver.
 	 * Check to see if device is present.
@@ -3044,7 +3044,7 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case ACX100_IOCTL_MONITOR:	/* set sniff (monitor) mode */
-		acxlog(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
+		log(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
 
 		/* can only be done by admin */
 		if (!capable(CAP_NET_ADMIN)) {
@@ -3063,7 +3063,7 @@ acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	default:
-		acxlog(L_IOCTL, "wireless ioctl 0x%04X queried "
+		log(L_IOCTL, "wireless ioctl 0x%04X queried "
 				"but not implemented yet\n", cmd);
 		result = -EOPNOTSUPP;
 		break;

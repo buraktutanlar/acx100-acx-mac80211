@@ -150,7 +150,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	FN_ENTER;
 
 	if (unlikely(!skb->len)) {
-		acxlog(L_DEBUG, "zero-length skb!\n");
+		log(L_DEBUG, "zero-length skb!\n");
 		goto end;
 	}
 
@@ -174,7 +174,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	e_hdr = (wlan_ethhdr_t *)skb->data;
 	proto = ntohs(e_hdr->type);
 	if (proto <= 1500) {
-		acxlog(L_DEBUG, "tx: 802.3 len: %d\n", skb->len);
+		log(L_DEBUG, "tx: 802.3 len: %d\n", skb->len);
 		/* codes <= 1500 reserved for 802.3 lengths */
 		/* it's 802.3, pass ether payload unchanged, */
 		/* trim off ethernet header and copy payload to txdesc */
@@ -183,7 +183,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 		/* it's DIXII, time for some conversion */
 		/* Create 802.11 packet. Header also contains llc and snap. */
 
-		acxlog(L_DEBUG, "tx: DIXII len: %d\n", skb->len);
+		log(L_DEBUG, "tx: DIXII len: %d\n", skb->len);
 
 		/* size of header is 802.11 header + llc + snap */
 		header_len = WLAN_HDR_A3_LEN + sizeof(wlan_llc_t) + sizeof(wlan_snap_t);
@@ -318,7 +318,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 	if ((WF_FC_ISWEPi & fc) && IS_ACX100(priv)) {
 		/* chop off the IV+ICV WEP header and footer */
-		acxlog(L_DATA|L_DEBUG, "rx: WEP packet, "
+		log(L_DATA|L_DEBUG, "rx: WEP packet, "
 			"chopping off IV and ICV\n");
 		payload_offset += WLAN_WEP_IV_LEN;
 		payload_length -= WLAN_WEP_IV_LEN + WLAN_WEP_ICV_LEN;
@@ -335,9 +335,9 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	e_payload = (u8*) (e_snap + 1);
 	mtu = priv->netdev->mtu;
 
-	acxlog(L_DATA, "rx: payload_offset %d, payload_length %d\n",
+	log(L_DATA, "rx: payload_offset %d, payload_length %d\n",
 		payload_offset, payload_length);
-	acxlog(L_XFER|L_DATA,
+	log(L_XFER|L_DATA,
 		"rx: frame info: llc=%02X%02X%02X "
 		"snap.oui=%02X%02X%02X snap.type=%04X\n",
 		e_llc->dsap, e_llc->ssap, e_llc->ctl,
@@ -353,7 +353,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	) {
 	/* 802.3 Encapsulated: */
 	/* wlan frame body contains complete eth frame (header+body) */
-		acxlog(L_DEBUG|L_DATA, "rx: 802.3 ENCAP len=%d\n", payload_length);
+		log(L_DEBUG|L_DATA, "rx: 802.3 ENCAP len=%d\n", payload_length);
 
 		if (unlikely(payload_length > (mtu + ETH_HLEN))) {
 			printk("%s: rx: ENCAP frame too large (%d > %d)\n",
@@ -380,7 +380,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 		if ( !oui_is_rfc1042(e_snap)
 		 || (proto_is_stt(ieee2host16(e_snap->type)) /* && (ethconv == WLAN_ETHCONV_8021h) */)) {
-			acxlog(L_DEBUG|L_DATA, "rx: SNAP+RFC1042 len=%d\n", payload_length);
+			log(L_DEBUG|L_DATA, "rx: SNAP+RFC1042 len=%d\n", payload_length);
 	/* wlan frame body contains: AA AA 03 !(00 00 00) ... -or- */
 	/* wlan frame body contains: AA AA 03 00 00 00 0x80f3 ... */
 	/* build eth hdr, type = len, copy AA AA 03... as eth body */
@@ -416,7 +416,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		} else {
 	/* wlan frame body contains: AA AA 03 00 00 00 [type] [tail] */
 	/* build eth hdr, type=[type], copy [tail] as eth body */
-			acxlog(L_DEBUG|L_DATA, "rx: 802.1h/RFC1042 len=%d\n",
+			log(L_DEBUG|L_DATA, "rx: 802.1h/RFC1042 len=%d\n",
 				payload_length);
 			/* it's an 802.1h frame (an RFC1042 && protocol is not in STT) */
 			/* build a DIXII + RFC894 */
@@ -451,7 +451,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		}
 
 	} else {
-		acxlog(L_DEBUG|L_DATA, "rx: NON-ENCAP len=%d\n", payload_length);
+		log(L_DEBUG|L_DATA, "rx: NON-ENCAP len=%d\n", payload_length);
 	/* build eth hdr, type=len, copy wlan body as eth body */
 		/* any NON-ENCAP */
 		/* it's a generic 80211+LLC or IPX 'Raw 802.3' */
