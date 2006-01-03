@@ -104,6 +104,38 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060104] 0.3.24
+* From Andreas Mohr <andim2@users.sourceforge.net>
+  - activated acx100 configoption readout, unified acx100/acx111 parsing
+  - init NULL data template, required for 802.11 power save mode
+  - return actual, valid txpower levels in range ioctl (from configoption!)
+  fix bugs:
+  - fatal bug in 802.11 powersave structs
+  - some missing endianness conversions
+  - check for sane regulatory domain related settings on both SETting and GETting
+  - random optimizations making this much enhanced code *smaller* than the
+    previous version!
+  - optimized struct layout
+  - merge acx100_s_init_packet_templates and acx111_s_init_packet_templates
+  - use kzalloc instead of kmalloc where useful (yes, this driver is Linux 2.6.x
+    only, with x rather large)
+  - avoid some sprintf() and strlen()
+  - add support for new get_wireless_stats handling (...silence deprecation
+    warning!)
+  - add some unlikely()
+  - lower msleep() value in issue_cmd() in order to speed up card initialization
+    time (almost less than 1 second now, on P3/700!). should this lower msleep()
+    value be made init-only??
+  - disable get sensitivity ioctl for USB (unfortunately not working yet)
+  - make sure to call synchronize_irq(), (semi-)required for SMP
+  - group together some closely related functions
+  - misc cleanups/code maintenance
+  So, configoptions are now working for acx100, too, and unified, and
+  802.11 power save mode actually worked for acx100 when I tested it (large
+  delays during ping which indicate that it must be active, but I guess these
+  delays should be much reduced with a properly tuned implementation), but it's
+  not finished and thus not enabled by default.
+
 [20051228]
 * Global s/acxlog/log/
 

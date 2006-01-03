@@ -432,6 +432,10 @@ acx_ioctl_get_sens(
 {
 	wlandevice_t *priv = netdev_priv(dev);
 
+	if (IS_USB(priv))
+		/* setting the PHY reg via fw cmd doesn't work yet */
+		return -EOPNOTSUPP;
+
 	/* acx_sem_lock(priv); */
 
 	vwrq->value = priv->sensitivity;
@@ -1438,10 +1442,22 @@ acx_ioctl_get_range(
 	range->pmt_flags = IW_POWER_TIMEOUT;
 	range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
 
-	for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
-		range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
-	range->num_txpower = IW_MAX_TXPOWER;
-	range->txpower_capa = IW_TXPOW_DBM;
+	if (IS_ACX100(priv))
+	{ /* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
+		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
+			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
+		range->num_txpower = IW_MAX_TXPOWER;
+		range->txpower_capa = IW_TXPOW_DBM;
+	}
+	else
+	{
+		int count = min(IW_MAX_TXPOWER, (int)priv->cfgopt.power_levels.len);
+		for (i = 0; i <= count; i++)
+			range->txpower[i] = priv->cfgopt.power_levels.list[i];
+		range->num_txpower = count;
+		/* this list is given in mW */
+		range->txpower_capa = IW_TXPOW_MWATT;
+	}
 
 	range->we_version_compiled = WIRELESS_EXT;
 	range->we_version_source = 0x9;
@@ -1703,21 +1719,6 @@ acx_ioctl_set_debug(
 /***********************************************************************
 ** acx_ioctl_list_reg_domain
 */
-static const char * const
-reg_domain_strings[] = {
-	" 1-11 FCC (USA)",
-	" 1-11 DOC/IC (Canada)",
-	/* BTW: WLAN use in ETSI is regulated by
-	 * ETSI standard EN 300 328-2 V1.1.2 */
-	" 1-13 ETSI (Europe)",
-	"10-11 Spain",
-	"10-13 France",
-	"   14 MKK (Japan)",
-	" 1-14 MKK1",
-	"  3-9 Israel (not all firmware versions)",
-	NULL /* needs to remain as last entry */
-};
-
 static int
 acx_ioctl_list_reg_domain(
 	struct net_device *dev,
@@ -1727,7 +1728,7 @@ acx_ioctl_list_reg_domain(
 {
 
 	int i = 1;
-	const char * const *entry = reg_domain_strings;
+	const char * const *entry = acx_reg_domain_strings;
 
 	printk("dom# chan# domain/country\n");
 	while (*entry)
@@ -1786,11 +1787,11 @@ acx_ioctl_get_reg_domain(
 	/* no locking */
 	dom = priv->reg_dom_id;
 
-	for (i=1; i <= 7; i++) {
+	for (i = 1; i <= acx_reg_domain_ids_len; i++) {
 		if (acx_reg_domain_ids[i-1] == dom) {
 			log(L_IOCTL, "regulatory domain is currently set "
 				"to %d (0x%X): %s\n", i, dom,
-				reg_domain_strings[i-1]);
+				acx_reg_domain_strings[i-1]);
 			*extra = i;
 			break;
 		}
@@ -2279,9 +2280,9 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 	SET_BIT(orate, brate);
 	log(L_IOCTL, "brate %08X orate %08X\n", brate, orate);
 
-	result = verify_rate(brate, priv->chip_type);
+	result = verify_rate(brate, priv->cfgopt.chip_type);
 	if (result) goto end;
-	result = verify_rate(orate, priv->chip_type);
+	result = verify_rate(orate, priv->cfgopt.chip_type);
 	if (result) goto end;
 
 	acx_sem_lock(priv);
@@ -2692,6 +2693,9 @@ const struct iw_handler_def acx_ioctl_handler_def =
 	.standard = (iw_handler *) acx_ioctl_handler,
 	.private = (iw_handler *) acx_ioctl_private_handler,
 	.private_args = (struct iw_priv_args *) acx_ioctl_private_args,
+#if IW_HANDLER_VERSION > 5
+	.get_wireless_stats = acx_e_get_wireless_stats
+#endif /* IW > 5 */
 };
 
 #endif /* WE >= 13 */

@@ -114,8 +114,8 @@ enum { acx_debug = 0 };
 #define CHIPTYPE_ACX100		1
 #define CHIPTYPE_ACX111		2
 
-#define IS_ACX100(priv)	((priv)->chip_type == CHIPTYPE_ACX100)
-#define IS_ACX111(priv)	((priv)->chip_type == CHIPTYPE_ACX111)
+#define IS_ACX100(priv)	((priv)->cfgopt.chip_type == CHIPTYPE_ACX100)
+#define IS_ACX111(priv)	((priv)->cfgopt.chip_type == CHIPTYPE_ACX111)
 
 /* Supported interfaces */
 #define DEVTYPE_PCI		0
@@ -125,7 +125,7 @@ enum { acx_debug = 0 };
  #if !defined(CONFIG_ACX_USB)
   #define IS_PCI(priv)	1
  #else
-  #define IS_PCI(priv)	((priv)->dev_type == DEVTYPE_PCI)
+  #define IS_PCI(priv)	((priv)->cfgopt.dev_type == DEVTYPE_PCI)
  #endif
 #else
  #define IS_PCI(priv)	0
@@ -135,7 +135,7 @@ enum { acx_debug = 0 };
  #if !defined(CONFIG_ACX_PCI)
   #define IS_USB(priv)	1
  #else
-  #define IS_USB(priv)	((priv)->dev_type == DEVTYPE_USB)
+  #define IS_USB(priv)	((priv)->cfgopt.dev_type == DEVTYPE_USB)
  #endif
 #else
  #define IS_USB(priv)	0
@@ -258,6 +258,9 @@ DEF_IE(1xx_IE_SCAN_STATUS		,0x0009, 0x04); /* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_ASSOC_ID			,0x000a, 0x02);
 DEF_IE(1xx_IE_UNKNOWN_0B		,0x000b, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(100_IE_UNKNOWN_0C		,0x000c, -1);	/* very small implementation in FW150! */
+/* ACX100 has an equivalent struct in the cmd mailbox directly after reset.
+ * 0x14c seems extremely large, will trash stack on failure (memset!)
+ * in case of small input struct --> OOPS! */
 DEF_IE(111_IE_CONFIG_OPTIONS		,0x000c, 0x14c);
 DEF_IE(1xx_IE_FWREV			,0x000d, 0x18);
 DEF_IE(1xx_IE_FCS_ERROR_COUNT		,0x000e, 0x04);
@@ -656,6 +659,8 @@ enum {
 	CLIENT_JOIN_CANDIDATE = 4
 };
 struct client {
+	/* most frequent access first */
+	u8	used;			/* misnamed, more like 'status' */
 	struct client*	next;
 	unsigned long	mtime;		/* last time we heard it, in jiffies */
 	size_t	essid_len;		/* length of ESSID (without '\0') */
@@ -670,7 +675,6 @@ struct client {
 	u16	rate_cfg;		/* what is allowed (by iwconfig etc) */
 	u16	rate_cur;		/* currently used rate mask */
 	u8	rate_100;		/* currently used rate byte (acx100 only) */
-	u8	used;			/* misnamed, more like 'status' */
 	u8	address[ETH_ALEN];
 	u8	bssid[ETH_ALEN];	/* ad-hoc hosts can have bssid != mac */
 	u8	channel;
@@ -1017,6 +1021,102 @@ typedef struct usb_rx {
 #endif /* ACX_USB */
 
 
+/* Config Option structs */
+
+typedef struct co_antennas {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u8	list[2] ACX_PACKED;
+} co_antennas_t;
+
+typedef struct co_powerlevels {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u16	list[8] ACX_PACKED;
+} co_powerlevels_t;
+
+typedef struct co_datarates {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u8	list[8] ACX_PACKED;
+} co_datarates_t;
+
+typedef struct co_domains {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u8	list[6] ACX_PACKED;
+} co_domains_t;
+
+typedef struct co_product_id {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u8	list[128] ACX_PACKED;
+} co_product_id_t;
+
+typedef struct co_manuf_id {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	u8	list[128] ACX_PACKED;
+} co_manuf_t;
+
+typedef struct acx111_co_fixed {
+	u8	type ACX_PACKED;
+	u8	len ACX_PACKED;
+	char	NVSv[8] ACX_PACKED;
+	u8	MAC[6] ACX_PACKED;
+	u16	probe_delay ACX_PACKED;
+	u32	eof_memory ACX_PACKED;
+	u8	dot11CCAModes ACX_PACKED;
+	u8	dot11Diversity ACX_PACKED;
+	u8	dot11ShortPreambleOption ACX_PACKED;
+	u8	dot11PBCCOption ACX_PACKED;
+	u8	dot11ChannelAgility ACX_PACKED;
+	u8	dot11PhyType ACX_PACKED; /* FIXME: does 802.11 call it "dot11PHYType"? */
+/*	u8	dot11TempType ACX_PACKED;
+	u8	num_var ACX_PACKED;           seems to be erased     */
+} acx111_co_fixed_t;
+
+
+typedef struct acx111_ie_configoption {
+	acx111_co_fixed_t	fixed ACX_PACKED;
+	co_antennas_t		antennas ACX_PACKED;
+	co_powerlevels_t	power_levels ACX_PACKED;
+	co_datarates_t		data_rates ACX_PACKED;
+	co_domains_t		domains ACX_PACKED;
+	co_product_id_t		product_id ACX_PACKED;
+	co_manuf_t		manufacturer ACX_PACKED;
+	u32			_padding[2];
+} acx111_ie_configoption_t;
+
+typedef struct acx_combined_configopt {
+	const char	*chip_name;
+	u8	dev_type;
+	u8	chip_type;
+	u8	form_factor;
+	u8	radio_type;
+	u8	eeprom_version;
+
+	char	NVSv[8] ACX_PACKED;
+	u16	NVS_vendor_offs ACX_PACKED; /* ACX111-only */
+	u8	MAC[6] ACX_PACKED; /* ACX100-only */
+	u16	probe_delay ACX_PACKED; /* ACX100-only */
+	u32	eof_memory ACX_PACKED;
+	u8	dot11CCAModes ACX_PACKED;
+	u8	dot11Diversity ACX_PACKED;
+	u8	dot11ShortPreambleOption ACX_PACKED;
+	u8	dot11PBCCOption ACX_PACKED;
+	u8	dot11ChannelAgility ACX_PACKED;
+	u8	dot11PhyType ACX_PACKED; /* FIXME: does 802.11 call it "dot11PHYType"? */
+	u8	dot11TempType ACX_PACKED;
+	co_antennas_t		antennas ACX_PACKED;
+	co_powerlevels_t	power_levels ACX_PACKED;
+	co_datarates_t		data_rates ACX_PACKED;
+	co_domains_t		domains ACX_PACKED;
+	co_product_id_t		product_id ACX_PACKED;
+	co_manuf_t		manufacturer ACX_PACKED;
+} acx_combined_configopt_t;
+
+
 /***********************************************************************
 ** Main acx per-device data structure (netdev_priv(dev))
 */
@@ -1047,6 +1147,18 @@ typedef struct usb_rx {
 
 /* non-firmware struct, no packing necessary */
 struct wlandevice {
+	/* most frequent accesses first (dereferencing and cache line!) */
+
+	/*** Locking ***/
+	struct semaphore	sem;
+	spinlock_t		lock;
+#if defined(PARANOID_LOCKING) /* Lock debugging */
+	const char		*last_sem;
+	const char		*last_lock;
+	unsigned long		sem_time;
+	unsigned long		lock_time;
+#endif
+
 	/*** Device chain ***/
 	struct wlandevice	*next;		/* link for list of devices */
 
@@ -1066,23 +1178,8 @@ struct wlandevice {
 	/*** Management timer ***/
 	struct timer_list	mgmt_timer;
 
-	/*** Locking ***/
-	struct semaphore	sem;
-	spinlock_t		lock;
-#if defined(PARANOID_LOCKING) /* Lock debugging */
-	const char		*last_sem;
-	const char		*last_lock;
-	unsigned long		sem_time;
-	unsigned long		lock_time;
-#endif
-
 	/*** Hardware identification ***/
-	const char	*chip_name;
-	u8		dev_type;
-	u8		chip_type;
-	u8		form_factor;
-	u8		radio_type;
-	u8		eeprom_version;
+	acx_combined_configopt_t cfgopt; /* R/O once retrieved - DON'T MODIFY! */
 
 	/*** Firmware identification ***/
 	char		firmware_version[FW_ID_SIZE+1];
@@ -1194,9 +1291,6 @@ struct wlandevice {
 	u32		beacon_interval;
 
 	u16		capabilities;
-	u8		capab_short;
-	u8		capab_pbcc;
-	u8		capab_agility;
 	u8		rate_supported_len;
 	u8		rate_supported[13];
 
@@ -1218,7 +1312,10 @@ struct wlandevice {
 	/*** Unknown ***/
 	u8		dtim_interval;
 
-/*** PCI/USB/... must be last or else hw agnostic code breaks horribly ***/
+/*************************************************************************
+ *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
+ *************************************************************************/
+
 	/* hack to let common code compile. FIXME */
 	dma_addr_t	rxhostdesc_startphy;
 
@@ -1254,7 +1351,7 @@ struct wlandevice {
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
 
-	const u16	*io;		/* points to ACX100 or ACX111 I/O register address set */
+	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */
 
 	struct pci_dev	*pdev;
 
@@ -1549,11 +1646,12 @@ typedef struct acx111_ie_tx_level {
 /* Enhanced PS mode: sleep until Rx Beacon w/ the STA's AID bit set
 ** in the TIM; newer firmwares only(?) */
 #define PS_OPT_ENA_ENHANCED_PS	0x04
+#define PS_OPT_TX_PSPOLL	0x02 /* send PSPoll frame to fetch waiting frames from AP (on frame with matching AID) */
 #define PS_OPT_STILL_RCV_BCASTS	0x01
 
 typedef struct acx100_ie_powermgmt {
-	u32	type ACX_PACKED;
-	u32	len ACX_PACKED;
+	u16	type ACX_PACKED;
+	u16	len ACX_PACKED;
 	u8	wakeup_cfg ACX_PACKED;
 	u8	listen_interval ACX_PACKED; /* for EACH_ITVL: wake up every "beacon units" interval */
 	u8	options ACX_PACKED;
@@ -1562,8 +1660,8 @@ typedef struct acx100_ie_powermgmt {
 } acx100_ie_powermgmt_t;
 
 typedef struct acx111_ie_powermgmt {
-	u32	type ACX_PACKED;
-	u32	len ACX_PACKED;
+	u16	type ACX_PACKED;
+	u16	len ACX_PACKED;
 	u8	wakeup_cfg ACX_PACKED;
 	u8	listen_interval ACX_PACKED; /* for EACH_ITVL: wake up every "beacon units" interval */
 	u8	options ACX_PACKED;
@@ -1806,12 +1904,12 @@ typedef struct ie_dot11WEPDefaultKey {
 	u8	action ACX_PACKED;
 	u8	keySize ACX_PACKED;
 	u8	defaultKeyNum ACX_PACKED;
-	u8	key[29] ACX_PACKED;	/* check this! was Key[19]. */
+	u8	key[29] ACX_PACKED;	/* check this! was Key[19] */
 } ie_dot11WEPDefaultKey_t;
 
 typedef struct acx111WEPDefaultKey {
 	u8	MacAddr[ETH_ALEN] ACX_PACKED;
-	u16	action ACX_PACKED; /* NOTE: this is a u16, NOT a u8!! */
+	u16	action ACX_PACKED;	/* NOTE: this is a u16, NOT a u8!! */
 	u16	reserved ACX_PACKED;
 	u8	keySize ACX_PACKED;
 	u8	type ACX_PACKED;
@@ -1834,9 +1932,11 @@ typedef struct acx100_cmd_wep_mgmt {
 	u8	Key[29] ACX_PACKED; /* 29*8 == 232bits == WEP256 */
 } acx100_cmd_wep_mgmt_t;
 
+/* UNUSED?
 typedef struct defaultkey {
 	u8	num;
 } defaultkey_t;
+*/
 
 typedef struct acx_ie_generic {
 	u16	type ACX_PACKED;
@@ -1850,73 +1950,6 @@ typedef struct acx_ie_generic {
 		u8	bytes[32] ACX_PACKED;
 	} m ACX_PACKED;
 } acx_ie_generic_t;
-
-/* Config Option structs */
-
-typedef struct co_antennas {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u8	list[2] ACX_PACKED;
-} co_antennas_t;
-
-typedef struct co_powerlevels {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u16	list[8] ACX_PACKED;
-} co_powerlevels_t;
-
-typedef struct co_datarates {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u8	list[8] ACX_PACKED;
-} co_datarates_t;
-
-typedef struct co_domains {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u8	list[6] ACX_PACKED;
-} co_domains_t;
-
-typedef struct co_product_id {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u8	list[128] ACX_PACKED;
-} co_product_id_t;
-
-typedef struct co_manuf_id {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	u8	list[128] ACX_PACKED;
-} co_manuf_t;
-
-typedef struct co_fixed {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
-	char	NVSv[8] ACX_PACKED;
-	u8	MAC[6] ACX_PACKED;
-	u16	probe_delay ACX_PACKED;
-	u32	eof_memory ACX_PACKED;
-	u8	dot11CCAModes ACX_PACKED;
-	u8	dot11Diversity ACX_PACKED;
-	u8	dot11ShortPreambleOption ACX_PACKED;
-	u8	dot11PBCCOption ACX_PACKED;
-	u8	dot11ChannelAgility ACX_PACKED;
-	u8	dot11PhyType ACX_PACKED;
-/*	u8	dot11TempType ACX_PACKED;
-	u8	num_var ACX_PACKED;           seems to be erased     */
-} co_fixed_t;
-
-
-typedef struct acx111_ie_configoption {
-	co_fixed_t		configoption_fixed ACX_PACKED;
-	co_antennas_t		antennas ACX_PACKED;
-	co_powerlevels_t	power_levels ACX_PACKED;
-	co_datarates_t		data_rates ACX_PACKED;
-	co_domains_t		domains ACX_PACKED;
-	co_product_id_t		product_id ACX_PACKED;
-	co_manuf_t		manufacturer ACX_PACKED;
-} acx111_ie_configoption_t;
-
 
 /***********************************************************************
 */
@@ -1932,6 +1965,8 @@ acx_struct_size_check(void)
 	CHECK_SIZEOF(acx100_ie_memconfigoption_t, 24);
 	CHECK_SIZEOF(acx100_ie_queueconfig_t, 0x20);
 	CHECK_SIZEOF(acx_joinbss_t, 0x30);
+	/* IEs need 4 bytes for (type,len) tuple */
+	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_IE_CONFIG_OPTIONS_LEN + 4);
 }
 
 
@@ -1942,6 +1977,9 @@ extern const u8 acx_bitpos2ratebyte[];
 extern const u8 acx_bitpos2rate100[];
 
 extern const u8 acx_reg_domain_ids[];
-extern const u8 acx_reg_domain_ids_len;
+static const char * const acx_reg_domain_strings[];
+enum {
+	acx_reg_domain_ids_len = 8
+};
 
 extern const struct iw_handler_def acx_ioctl_handler_def;

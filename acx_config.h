@@ -2,7 +2,7 @@
 #define CONFIG_ACX_PCI 1
 #define CONFIG_ACX_USB 1
 
-#define ACX_RELEASE "v0.3.23"
+#define ACX_RELEASE "v0.3.24"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
@@ -24,6 +24,9 @@
  * system load, so still do that stuff in the IRQ handler for now,
  * even if that probably means worse latency */
 #define TX_CLEANUP_IN_SOFTIRQ 0
+
+/* if you want very experimental 802.11 power save mode features */
+#define POWER_SAVE_80211 0
 
 /* set to 1 if you want to have 1 driver per card instead of 1 single driver
  * managing all cards (of a particular bus type) in your system

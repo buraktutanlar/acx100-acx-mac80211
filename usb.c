@@ -203,16 +203,20 @@ acxusb_unlink_urb(struct urb* urb)
 int
 acxusb_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 {
-	mem_read_write_t mem;
+	/* mem_read_write_t mem; */
 
 	FN_ENTER;
 
+	printk("%s doesn't seem to work yet, disabled.\n", __func__);
+
+	/*
 	mem.addr = cpu_to_le16(reg);
 	mem.type = cpu_to_le16(0x82);
 	mem.len = cpu_to_le32(4);
 	acx_s_issue_cmd(priv, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
 	*charbuf = mem.data;
 	log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
+	*/
 
 	FN_EXIT1(OK);
 	return OK;
@@ -367,7 +371,7 @@ acxusb_s_issue_cmd_timeo_debug(
 	/* check for device acknowledge */
 	log(L_CTL, "sending USB control msg (in) (acklen=%d)\n", acklen);
 	loc->status = 0; /* delete old status flag -> set to IDLE */
-//shall we zero out the rest?
+	/* shall we zero out the rest? */
 	result = usb_control_msg(usbdev, inpipe,
 		ACX_USB_REQ_CMD, /* request */
 		USB_TYPE_VENDOR|USB_DIR_IN, /* requesttype */
@@ -386,8 +390,9 @@ acxusb_s_issue_cmd_timeo_debug(
 		acx_dump_bytes(loc, result);
 	}
 
-//check for result==buflen+4? Was seen:
 /*
+   check for result==buflen+4? Was seen:
+
 interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
 issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
 ctrl inpipe=0x80000280 outpipe=0x80000200
@@ -550,6 +555,27 @@ end:
 }
 
 
+/*
+ * temporary helper function to at least fill important cfgopt members with
+ * useful replacement values until we figure out how one manages to fetch
+ * the configoption struct in the USB device case...
+ */
+int
+acxusb_s_fill_configoption(wlandevice_t *priv)
+{
+	printk("FIXME: haven't figured out how to fetch configoption struct "
+		"from USB device, passing hardcoded values instead\n");
+	priv->cfgopt.probe_delay = 200;
+	priv->cfgopt.dot11CCAModes = 4;
+	priv->cfgopt.dot11Diversity = 1;
+	priv->cfgopt.dot11ShortPreambleOption = 1;
+	priv->cfgopt.dot11PBCCOption = 1;
+	priv->cfgopt.dot11ChannelAgility = 0;
+	priv->cfgopt.dot11PhyType = 5;
+	priv->cfgopt.dot11TempType = 1;
+	return OK;
+}
+
 /***********************************************************************
 ** acxusb_e_probe()
 **
@@ -621,7 +647,9 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	dev->stop = &acxusb_e_close;
 	dev->hard_start_xmit = (void *)&acx_i_start_xmit;
 	dev->get_stats = (void *)&acx_e_get_stats;
+#if IW_HANDLER_VERSION <= 5
 	dev->get_wireless_stats = (void *)&acx_e_get_wireless_stats;
+#endif
 #if WIRELESS_EXT >= 13
 	dev->wireless_handlers = (struct iw_handler_def *)&acx_ioctl_handler_def;
 #else
@@ -639,10 +667,13 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	priv = netdev_priv(dev);
 	priv->netdev = dev;
-	priv->dev_type = DEVTYPE_USB;
-	priv->chip_type = CHIPTYPE_ACX100;
+
+	priv->cfgopt.dev_type = DEVTYPE_USB;
+	priv->cfgopt.chip_type = CHIPTYPE_ACX100;
+
 	/* FIXME: should be read from register (via firmware) using standard ACX code */
-	priv->radio_type = RADIO_MAXIM_0D;
+	priv->cfgopt.radio_type = RADIO_MAXIM_0D;
+
 	priv->usbdev = usbdev;
 	spin_lock_init(&priv->lock);    /* initial state: unlocked */
 	sema_init(&priv->sem, 1);       /* initial state: 1 (upped) */
@@ -737,17 +768,20 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	usb_set_intfdata(intf, priv);
 	SET_NETDEV_DEV(dev, &intf->dev);
 
-//TODO: move all of fw cmds to open()? But then we won't know our MAC addr
-//until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)...
+	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
+	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
 
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_WAKE, NULL, 0);
+
+	acxusb_s_fill_configoption(priv);
+
 	result = acx_s_init_mac(priv);
 	if (result)
 		goto end;
 
 	acx_s_set_defaults(priv);
-        acx_s_get_firmware_version(priv);
+	acx_s_get_firmware_version(priv);
 	acx_display_hardware_details(priv);
 
 	/* Register the network device */
@@ -795,7 +829,6 @@ end_nomem:
 	goto end;
 
 end_nodev:
-
 	/* no device we could handle, return error. */
 	result = -EIO;
 
@@ -947,7 +980,7 @@ acxusb_e_close(struct net_device *dev)
 
 	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
 
-//Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them?
+/* Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them? */
 
 	/* Make sure we don't get any more rx requests */
 	acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -1206,7 +1239,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 			stat->queue_index, stat->mac_status, stat->hostdata,
 			stat->rate, stat->ack_failures, stat->rts_failures,
 			stat->rts_ok);
-			
+
 			if (priv->rate_auto && client_no < VEC_SIZE(priv->sta_list)) {
 				client_t *clt = &priv->sta_list[client_no];
 				u16 cur = stat->hostdata >> 16;
@@ -1218,7 +1251,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 						stat->mac_status, /* error? */
 						ACX_TX_URB_CNT - priv->tx_free);
 				}
-            		}
+			}
 			goto next;
 		}
 
@@ -1464,7 +1497,7 @@ acxusb_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int wlanpkt_len)
 	txbuf->ctrl2 = 0;
 	txbuf->data_len = cpu_to_le16(wlanpkt_len);
 
-	if (acx_debug & L_DATA) {
+	if (unlikely(acx_debug & L_DATA)) {
 		printk("dump of bulk out urb:\n");
 		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
 	}

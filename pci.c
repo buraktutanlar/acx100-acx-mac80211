@@ -201,12 +201,12 @@ static txhostdesc_t*
 get_txhostdesc(wlandevice_t* priv, txdesc_t* txdesc)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
-	if (ACX_DEBUG && (index % priv->txdesc_size)) {
+	if (unlikely(ACX_DEBUG && (index % priv->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 	index /= priv->txdesc_size;
-	if (ACX_DEBUG && (index >= TX_CNT)) {
+	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
@@ -217,12 +217,12 @@ static inline client_t*
 get_txc(wlandevice_t* priv, txdesc_t* txdesc)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
-	if (ACX_DEBUG && (index % priv->txdesc_size)) {
+	if (unlikely(ACX_DEBUG && (index % priv->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 	index /= priv->txdesc_size;
-	if (ACX_DEBUG && (index >= TX_CNT)) {
+	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
@@ -241,12 +241,12 @@ static inline void
 put_txcr(wlandevice_t* priv, txdesc_t* txdesc, client_t* c, u16 r111)
 {
 	int index = (u8*)txdesc - (u8*)priv->txdesc_start;
-	if (ACX_DEBUG && (index % priv->txdesc_size)) {
+	if (unlikely(ACX_DEBUG && (index % priv->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return;
 	}
 	index /= priv->txdesc_size;
-	if (ACX_DEBUG && (index >= TX_CNT)) {
+	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return;
 	}
@@ -450,7 +450,8 @@ acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
 	FN_ENTER;
 
 	/* mprusko said that 32bit accesses result in distorted sensitivity
-	 * on his card. Unconfirmed, looks like it's not true. */
+	 * on his card. Unconfirmed, looks like it's not true (most likely since we
+	 * now properly flush writes). */
 	write_reg32(priv, IO_ACX_PHY_DATA, value);
 	write_reg32(priv, IO_ACX_PHY_ADDR, reg);
 	write_flush(priv);
@@ -542,7 +543,7 @@ static int
 acxpci_s_validate_fw(wlandevice_t *priv, const firmware_image_t *apfw_image,
 				u32 offset)
 {
-	u32 v32, w32, sum;
+	u32 sum, v32, w32;
 	int len, size;
 	int result = OK;
 	/* we skip the first four bytes which contain the control sum */
@@ -618,8 +619,8 @@ acxpci_s_upload_fw(wlandevice_t *priv)
 
 	/* Try combined, then main image */
 	priv->need_radio_fw = 0;
-	sprintf(filename, "tiacx1%02dc%02X",
-		IS_ACX111(priv)*11, priv->radio_type);
+	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
+		IS_ACX111(priv)*11, priv->cfgopt.radio_type);
 
 	apfw_image = acx_s_read_fw(&priv->pdev->dev, filename, &size);
 	if (!apfw_image) {
@@ -681,9 +682,9 @@ acxpci_s_upload_radio(wlandevice_t *priv)
 	acx_s_interrogate(priv, &mm, ACX1xx_IE_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
-	sprintf(filename, "tiacx1%02dr%02X",
+	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
 		IS_ACX111(priv)*11,
-		priv->radio_type);
+		priv->cfgopt.radio_type);
 	radio_image = acx_s_read_fw(&priv->pdev->dev, filename, &size);
 	if (!radio_image) {
 		printk("acx: can't load radio module '%s'\n", filename);
@@ -863,10 +864,10 @@ init_mboxes(wlandevice_t *priv)
 {
 	u32 cmd_offs, info_offs;
 
- 	cmd_offs = read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
+	cmd_offs = read_reg32(priv, IO_ACX_CMD_MAILBOX_OFFS);
 	info_offs = read_reg32(priv, IO_ACX_INFO_MAILBOX_OFFS);
- 	priv->cmd_area = (u8 *)priv->iobase2 + cmd_offs;
- 	priv->info_area = (u8 *)priv->iobase2 + info_offs;
+	priv->cmd_area = (u8 *)priv->iobase2 + cmd_offs;
+	priv->info_area = (u8 *)priv->iobase2 + info_offs;
 	log(L_DEBUG, "iobase2=%p\n"
 		"cmd_mbox_offset=%X cmd_area=%p\n"
 		"info_mbox_offset=%X info_area=%p\n",
@@ -939,8 +940,8 @@ acxpci_s_reset_dev(wlandevice_t *priv)
 
 	/* Need to know radio type before fw load */
 	hardware_info = read_reg16(priv, IO_ACX_EEPROM_INFORMATION);
-	priv->form_factor = hardware_info & 0xff;
-	priv->radio_type = hardware_info >> 8;
+	priv->cfgopt.form_factor = hardware_info & 0xff;
+	priv->cfgopt.radio_type = hardware_info >> 8;
 
 	/* load the firmware */
 	if (OK != acxpci_s_upload_fw(priv))
@@ -1051,14 +1052,13 @@ acxpci_s_issue_cmd_timeo_debug(
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
-		if (counter % 10 == 0) {
-			if (time_after(jiffies, timeout))
-			{
+		if (counter % 5 == 0) {
+			if (time_after(jiffies, timeout)) {
 				counter = 0;
 				break;
 			}
-			/* we waited 10 iterations, no luck. Sleep 10 ms */
-			acx_s_msleep(10);
+			/* we waited 5 iterations, no luck. Sleep 5 ms */
+			acx_s_msleep(5);
 		}
 	} while (likely(--counter));
 
@@ -1118,14 +1118,13 @@ acxpci_s_issue_cmd_timeo_debug(
 				break;
 		}
 
-		if (counter % 10 == 0) {
-			if (time_after(jiffies, timeout))
-			{
+		if (counter % 5 == 0) {
+			if (time_after(jiffies, timeout)) {
 				counter = 0;
 				break;
 			}
-			/* we waited 10 iterations, no luck. Sleep 10 ms */
-			acx_s_msleep(10);
+			/* we waited 5 iterations, no luck. Sleep 5 ms */
+			acx_s_msleep(5);
 		}
 	} while (likely(--counter));
 
@@ -1155,7 +1154,9 @@ acxpci_s_issue_cmd_timeo_debug(
 			"Took %dms of %d\n",
 			devname, cmd_status, acx_cmd_status_str(cmd_status),
 			cmd_timeout - counter, cmd_timeout);
-		/* zero out result buffer */
+		/* zero out result buffer
+		 * WARNING: this will trash stack in case of illegally large input
+		 * length! */
 		if (buffer && buflen)
 			memset(buffer, 0, buflen);
 		goto bad;
@@ -1240,8 +1241,7 @@ acx_show_card_eeprom_id(wlandevice_t *priv)
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
 		if (OK != acxpci_read_eeprom_byte(priv,
 					 ACX100_EEPROM_ID_OFFSET + i,
-					 &buffer[i]))
-		{
+					 &buffer[i])) {
 			printk("acx: reading EEPROM FAILED\n");
 			break;
 		}
@@ -1500,6 +1500,7 @@ dummy_netdev_init(struct net_device *dev) {}
 static int __devinit
 acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
+	acx111_ie_configoption_t co;
 	unsigned long mem_region1 = 0;
 	unsigned long mem_region2 = 0;
 	unsigned long mem_region1_size;
@@ -1552,6 +1553,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* enable busmastering (required for CardBus) */
 	pci_set_master(pdev);
+
+	/* FIXME: prism54 calls pci_set_mwi() here,
+	 * should we do/support the same? */
 
 	/* chiptype is u8 but id->driver_data is ulong
 	** Works for now (possible values are 1 and 2) */
@@ -1612,7 +1616,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_irq;
 	}
 
-	dev = alloc_netdev(sizeof(wlandevice_t), "wlan%d", dummy_netdev_init);
+	dev = alloc_netdev(sizeof(*priv), "wlan%d", dummy_netdev_init);
 	/* (NB: memsets to 0 entire area) */
 	if (!dev) {
 		printk("acx: no memory for netdevice structure\n");
@@ -1624,7 +1628,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->stop = &acxpci_e_close;
 	dev->hard_start_xmit = &acx_i_start_xmit;
 	dev->get_stats = &acx_e_get_stats;
+#if IW_HANDLER_VERSION <= 5
 	dev->get_wireless_stats = &acx_e_get_wireless_stats;
+#endif
 #if WIRELESS_EXT >= 13
 	dev->wireless_handlers = (struct iw_handler_def *)&acx_ioctl_handler_def;
 #else
@@ -1645,9 +1651,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	** just _presume_ that we're under sem (instead of actually taking it): */
 	/* acx_sem_lock(priv); */
 	priv->pdev = pdev;
-	priv->dev_type = DEVTYPE_PCI;
-	priv->chip_type = chip_type;
-	priv->chip_name = chip_name;
+	priv->cfgopt.dev_type = DEVTYPE_PCI;
+	priv->cfgopt.chip_type = chip_type;
+	priv->cfgopt.chip_name = chip_name;
 	priv->io = (CHIPTYPE_ACX100 == chip_type) ? IO_ACX100 : IO_ACX111;
 	priv->membase = phymem1;
 	priv->iobase = mem1;
@@ -1684,19 +1690,32 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 	pci_set_drvdata(pdev, dev);
 
-	/* ok, pci setup is finished, now start initialising the card */
+	/* ok, pci setup is finished, now start initializing the card */
 
-	/* NB: read_reg() reads may return bogus data before reset_dev().
-	** acx100 seems to be more affected than acx111 */
+	/* NB: read_reg() reads may return bogus data before reset_dev(),
+	 * since the firmware which directly controls large parts of the I/O
+	 * registers isn't initialized yet.
+	 * acx100 seems to be more affected than acx111 */
 	if (OK != acxpci_s_reset_dev(priv))
 		goto fail_reset;
 
-	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version))
+	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->cfgopt.eeprom_version))
 		goto fail_read_eeprom_version;
+
+	if (IS_ACX100(priv)) {
+		/* ACX100: configopt struct in cmd mailbox - directly after reset */
+		memcpy_fromio(&co, priv->cmd_area, sizeof(co));
+	}
 
 	if (OK != acx_s_init_mac(priv))
 		goto fail_init_mac;
 
+	if (IS_ACX111(priv)) {
+		/* ACX111: configopt struct needs to be queried after full init */
+		acx_s_interrogate(priv, &co, ACX111_IE_CONFIG_OPTIONS);
+	}
+
+	acx_s_parse_configoption(priv, &co);
 	acx_s_set_defaults(priv);
 	acx_s_get_firmware_version(priv); /* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(priv);
@@ -1929,7 +1948,8 @@ acxpci_e_resume(struct pci_dev *pdev)
 	pci_restore_state(pdev, priv->pci_state);
 #endif
 	log(L_DEBUG, "rsm: PCI state restored\n");
-	acxpci_s_reset_dev(priv);
+	if (OK != acxpci_s_reset_dev(priv))
+		goto fail;
 	log(L_DEBUG, "rsm: device reset done\n");
 
 	if (OK != acx_s_init_mac(priv))
@@ -2045,8 +2065,10 @@ acxpci_s_down(netdevice_t *dev)
 	FN_ENTER;
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
+	/* then wait until interrupts have finished executing on other CPUs */
 	acx_lock(priv, flags);
 	disable_acx_irq(priv);
+	synchronize_irq(priv->pdev->irq);
 	acx_unlock(priv, flags);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
@@ -3110,7 +3132,7 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	FN_ENTER;
 
 	/* fw doesn't tx such packets anyhow */
-	if (len < WLAN_HDR_A3_LEN)
+	if (unlikely(len < WLAN_HDR_A3_LEN))
 		goto end;
 
 	hostdesc1 = get_txhostdesc(priv, txdesc);
@@ -3334,29 +3356,22 @@ handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 			"try changing 'iwconfig txpower XXX' or "
 			"'sens'itivity or 'retry'";
 		priv->wstats.discard.retries++;
-		/* FIXME: set (GETSET_TX|GETSET_RX) here
-		 * (this seems to recalib radio on ACX100)
-		 * after some more jiffies passed??
-		 * But OTOH Tx error 0x20 also seems to occur on
+		/* Tx error 0x20 also seems to occur on
 		 * overheating, so I'm not sure whether we
-		 * actually want that, since people maybe won't notice
-		 * then that their hardware is slowly getting
-		 * cooked...
+		 * actually want to do aggressive radio recalibration,
+		 * since people maybe won't notice then that their hardware
+		 * is slowly getting cooked...
 		 * Or is it still a safe long distance from utter
-		 * radio non-functionality despite many radio
-		 * recalibs
+		 * radio non-functionality despite many radio recalibs
 		 * to final destructive overheating of the hardware?
 		 * In this case we really should do recalib here...
 		 * I guess the only way to find out is to do a
 		 * potentially fatal self-experiment :-\
 		 * Or maybe only recalib in case we're using Tx
 		 * rate auto (on errors switching to lower speed
-		 * --> less heat?) or 802.11 power save mode? */
-
-		/* ok, just do it.
-		 * ENABLE_TX|ENABLE_RX helps, so even do
-		 * DISABLE_TX and DISABLE_RX in order to perhaps
-		 * have more impact. */
+		 * --> less heat?) or 802.11 power save mode?
+		 *
+		 * ok, just do it. */
 		if (++priv->retry_errors_msg_ratelimit % 4 == 0) {
 			if (priv->retry_errors_msg_ratelimit <= 20)
 				printk("%s: several excessive Tx "
@@ -3440,7 +3455,7 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		rts_failures = txdesc->rts_failures;
 		rts_ok = txdesc->rts_ok;
 		r100 = txdesc->u.r1.rate;
-		r111 = txdesc->u.r2.rate111;
+		r111 = le16_to_cpu(txdesc->u.r2.rate111);
 
 #if WIRELESS_EXT > 13 /* wireless_send_event() and IWEVTXDROP are WE13 */
 		/* need to check for certain error conditions before we
@@ -3594,7 +3609,7 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
-	priv->txhostdesc_area_size = TX_CNT * 2*sizeof(txhostdesc_t);
+	priv->txhostdesc_area_size = TX_CNT * 2*sizeof(*hostdesc);
 	priv->txhostdesc_start = allocate(priv, priv->txhostdesc_area_size,
 			&priv->txhostdesc_startphy, "txhostdesc_start");
 	if (!priv->txhostdesc_start)
@@ -3613,7 +3628,7 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 ** txdesc->length == hostdesc->length and thus
 ** entire packet was placed into first txhostdesc.
 ** Due to this bug acx111 hangs unless second txhostdesc
-** has hostdesc.length = 3 (or larger)
+** has le16_to_cpu(hostdesc.length) = 3 (or larger)
 ** Storing NULL into hostdesc.desc_phy_next
 ** doesn't seem to help.
 **
@@ -3632,7 +3647,7 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 #if 0
 /* Works for xterasys xn2522g, does not for WG311v2 !!? */
 	for (i = 0; i < TX_CNT*2; i++) {
-		hostdesc_phy += sizeof(txhostdesc_t);
+		hostdesc_phy += sizeof(*hostdesc);
 		if (!(i & 1)) {
 			hostdesc->data_phy = cpu2acx(txbuf_phy);
 			/* hostdesc->data_offset = ... */
@@ -3652,7 +3667,7 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 			/* hostdesc->data_offset = ... */
 			/* hostdesc->reserved = ... */
 			/* hostdesc->Ctl_16 = ... */
-			hostdesc->length = 3; /* bug workaround */
+			hostdesc->length = cpu_to_le16(3); /* bug workaround */
 			/* hostdesc->desc_phy_next = ... */
 			/* hostdesc->pNext = ... */
 			/* hostdesc->Status = ... */
@@ -3663,7 +3678,7 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 	}
 #endif
 	for (i = 0; i < TX_CNT*2; i++) {
-		hostdesc_phy += sizeof(txhostdesc_t);
+		hostdesc_phy += sizeof(*hostdesc);
 
 		hostdesc->data_phy = cpu2acx(txbuf_phy);
 		/* done by memset(0): hostdesc->data_offset = 0; */
@@ -3717,7 +3732,7 @@ acxpci_s_create_rx_host_desc_queue(wlandevice_t *priv)
 	FN_ENTER;
 
 	/* allocate the RX host descriptor queue pool */
-	priv->rxhostdesc_area_size = RX_CNT * sizeof(rxhostdesc_t);
+	priv->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
 	priv->rxhostdesc_start = allocate(priv, priv->rxhostdesc_area_size,
 			&priv->rxhostdesc_startphy, "rxhostdesc_start");
 	if (!priv->rxhostdesc_start)
@@ -3750,8 +3765,8 @@ acxpci_s_create_rx_host_desc_queue(wlandevice_t *priv)
 		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
 		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 		rxbuf++;
-		rxbuf_phy += sizeof(rxbuffer_t);
-		hostdesc_phy += sizeof(rxhostdesc_t);
+		rxbuf_phy += sizeof(*rxbuf);
+		hostdesc_phy += sizeof(*hostdesc);
 		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
 		hostdesc++;
 	}
@@ -3795,12 +3810,11 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 
 	FN_ENTER;
 
-	priv->txdesc_size = sizeof(txdesc_t);
-
-	if (IS_ACX111(priv)) {
+	if (IS_ACX100(priv))
+		priv->txdesc_size = sizeof(*txdesc);
+	else
 		/* the acx111 txdesc is 4 bytes larger */
-		priv->txdesc_size = sizeof(txdesc_t) + 4;
-	}
+		priv->txdesc_size = sizeof(*txdesc) + 4;
 
 	priv->txdesc_start = (txdesc_t *) (priv->iobase2 + tx_queue_start);
 
@@ -3828,13 +3842,13 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
-			hostmemptr += 2 * sizeof(txhostdesc_t);
+			hostmemptr += 2 * sizeof(*hostdesc);
 			txdesc = advance_txdesc(priv, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
 		/* clear whole send pool. sizeof is safe here (we are acx100) */
-		memset(priv->txdesc_start, 0, TX_CNT * sizeof(txdesc_t));
+		memset(priv->txdesc_start, 0, TX_CNT * sizeof(*txdesc));
 
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
@@ -3851,7 +3865,7 @@ acxpci_create_tx_desc_queue(wlandevice_t *priv, u32 tx_queue_start)
 			txdesc->pNextDesc = cpu2acx(mem_offs + priv->txdesc_size);
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
-			hostmemptr += 2 * sizeof(txhostdesc_t);
+			hostmemptr += 2 * sizeof(*hostdesc);
 			/* go to the next one */
 			mem_offs += priv->txdesc_size;
 			/* ++ is safe here (we are acx100) */
@@ -3902,7 +3916,7 @@ acxpci_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
 		** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
 		** acx111's txdesc is larger! */
 
-		memset(priv->rxdesc_start, 0, RX_CNT * sizeof(rxdesc_t));
+		memset(priv->rxdesc_start, 0, RX_CNT * sizeof(*rxdesc));
 
 		/* loop over whole receive pool */
 		rxdesc = priv->rxdesc_start;
@@ -3911,9 +3925,9 @@ acxpci_create_rx_desc_queue(wlandevice_t *priv, u32 rx_queue_start)
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
 			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 			/* point to next rxdesc */
-			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(rxdesc_t));
+			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
 			/* go to the next one */
-			mem_offs += sizeof(rxdesc_t);
+			mem_offs += sizeof(*rxdesc);
 			rxdesc++;
 		}
 		/* go to the last one */
@@ -4101,7 +4115,7 @@ acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 	};
 	const u8 *table;
 
-	switch (priv->radio_type) {
+	switch (priv->cfgopt.radio_type) {
 	case RADIO_MAXIM_0D:
 		table = &dbm2val_maxim[0];
 		break;
@@ -4160,13 +4174,6 @@ acxpci_id_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
 
 /* FIXME: checks should be removed once driver is included in the kernel */
-#ifndef __devexit_p
-#warning *** your kernel is EXTREMELY old since it does not even know about
-#warning __devexit_p - this driver could easily FAIL to work, so better
-#warning upgrade your kernel! ***
-#define __devexit_p(x) x
-#endif
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 11)
 /* pci_name() got introduced at start of 2.6.x,
  * got mandatory (slot_name member removed) in 2.6.11-bk1 */

@@ -56,26 +56,26 @@
 /*-- values 11-15 reserved --*/
 #define WLAN_EID_CHALLENGE	16
 /*-- values 17-31 reserved for challenge text extension --*/
-#define WLAN_EID_ERP_INFO	42
+#define WLAN_EID_PWR_CONSTRAINT	32	/* 11h PowerConstraint */
+#define WLAN_EID_ERP_INFO	42	/* was seen from WRT54GS with OpenWrt */
 #define WLAN_EID_NONERP		47	/* was seen from WRT54GS with OpenWrt */
 #define WLAN_EID_RSN		48
 #define WLAN_EID_EXT_RATES	50
 #define WLAN_EID_UNKNOWN128	128
 #define WLAN_EID_UNKNOWN133	133
-#define WLAN_EID_GENERIC	221
+#define WLAN_EID_GENERIC	221	/* was seen from WRT54GS with OpenWrt */
 #define WLAN_EID_UNKNOWN223	223
 
 #if 0
-#define WLAN_EID_PWR_CONSTRAINT		32	/* 11H PowerConstraint */
-#define WLAN_EID_PWR_CAP		33	/* 11H PowerCapability */
-#define WLAN_EID_TPC_REQUEST		34	/* 11H TPC Request */
-#define WLAN_EID_TPC_REPORT		35	/* 11H TPC Report */
-#define WLAN_EID_SUPP_CHANNELS		36	/* 11H Supported Channels */
-#define WLAN_EID_CHANNEL_SWITCH		37	/* 11H ChannelSwitch */
-#define WLAN_EID_MEASURE_REQUEST	38	/* 11H MeasurementRequest */
-#define WLAN_EID_MEASURE_REPORT		39	/* 11H MeasurementReport */
-#define WLAN_EID_QUIET_ID		40	/* 11H Quiet */
-#define WLAN_EID_IBSS_DFS_ID		41	/* 11H IBSS_DFS */
+#define WLAN_EID_PWR_CAP		33	/* 11h PowerCapability */
+#define WLAN_EID_TPC_REQUEST		34	/* 11h TPC Request */
+#define WLAN_EID_TPC_REPORT		35	/* 11h TPC Report */
+#define WLAN_EID_SUPP_CHANNELS		36	/* 11h Supported Channels */
+#define WLAN_EID_CHANNEL_SWITCH		37	/* 11h ChannelSwitch */
+#define WLAN_EID_MEASURE_REQUEST	38	/* 11h MeasurementRequest */
+#define WLAN_EID_MEASURE_REPORT		39	/* 11h MeasurementReport */
+#define WLAN_EID_QUIET_ID		40	/* 11h Quiet */
+#define WLAN_EID_IBSS_DFS_ID		41	/* 11h IBSS_DFS */
 #endif
 
 /*-- Reason Codes -------------------------------*/

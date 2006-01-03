@@ -160,7 +160,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	case ACX_MODE_MONITOR:
 		/* NB: one day we might want to play with DESC_CTL2_FCS
 		** Will need to stop doing "- WLAN_FCS_LEN" here then */
-		if (skb->len >= WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_FCS_LEN) {
+		if (unlikely(skb->len >= WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_FCS_LEN)) {
 			printk("%s: can't tx oversized frame (%d bytes)\n",
 				priv->netdev->name, skb->len);
 			goto end;

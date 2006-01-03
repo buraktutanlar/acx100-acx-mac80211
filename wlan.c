@@ -124,8 +124,13 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		case WLAN_EID_ERP_INFO:
 			f->erp = (wlan_ie_erp_t *) ie_ptr;
 			break;
+
 		case WLAN_EID_COUNTRY:
 		/* was seen: 07 06 47 42 20 01 0D 14 */
+		case WLAN_EID_PWR_CONSTRAINT:
+		/* was seen by Ashwin Mansinghka <ashwin_man@yahoo.com> from
+		Atheros-based PCI card in AP mode using madwifi drivers: */
+		/* 20 01 00 */
 		case WLAN_EID_NONERP:
 		/* was seen from WRT54GS with OpenWrt: 2F 01 07 */
 		case WLAN_EID_UNKNOWN128:
@@ -135,7 +140,6 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 		/* was seen by David Bronaugh <dbronaugh@linuxboxen.org> from ???? */
 		/* 85 1E 00 00 84 12 07 00 FF 00 11 00 61 70 63 31 */
 		/* 63 73 72 30 34 32 00 00 00 00 00 00 00 00 00 25 */
-
 		case WLAN_EID_UNKNOWN223:
 		/* was seen by Carlos Martin <carlosmn@gmail.com> from ???? */
 		/* DF 20 01 1E 04 00 00 00 06 63 09 02 FF 0F 30 30 */
@@ -158,6 +162,7 @@ wlan_mgmt_decode_beacon(wlan_fr_beacon_t * f)
 			rsn_len = pos[1] + 2;
 		*/
 			break;
+
 		default:
 			LOG_BAD_EID(f->hdr, f->len, ie_ptr);
 			break;
@@ -239,6 +244,7 @@ wlan_mgmt_decode_assocresp(wlan_fr_assocresp_t * f)
 }
 
 
+#ifdef UNUSED
 void
 wlan_mgmt_decode_reassocreq(wlan_fr_reassocreq_t * f)
 {
@@ -320,6 +326,7 @@ wlan_mgmt_decode_probereq(wlan_fr_probereq_t * f)
 		ie_ptr = ie_ptr + 2 + IE_LEN(ie_ptr);
 	}
 }
+#endif /* UNUSED */
 
 
 /* TODO: decoding of beacon and proberesp can be merged (similar structure) */
@@ -365,6 +372,15 @@ wlan_mgmt_decode_proberesp(wlan_fr_proberesp_t * f)
 		case WLAN_EID_COUNTRY:
 			break;
 		...
+#endif
+#ifdef SENT_HERE_BY_OPENWRT
+		/* should those be trapped or handled?? */
+		case WLAN_EID_ERP_INFO:
+			break;
+		case WLAN_EID_NONERP:
+			break;
+		case WLAN_EID_GENERIC:
+			break;
 #endif
 		default:
 			LOG_BAD_EID(f->hdr, f->len, ie_ptr);

@@ -599,9 +599,8 @@ void acx_set_timer(wlandevice_t *priv, int timeout_us);
 void acx_update_capabilities(wlandevice_t *priv);
 void acx_s_start(wlandevice_t *priv);
 
-void acx_s_initialize_rx_config(wlandevice_t *priv);
 void acx_s_update_card_settings(wlandevice_t *priv);
-void acx_read_configoption(wlandevice_t *priv);
+void acx_s_parse_configoption(wlandevice_t *priv, acx111_ie_configoption_t *pcfg);
 void acx_l_update_ratevector(wlandevice_t *priv);
 
 void acx_init_task_scheduler(wlandevice_t *priv);
@@ -641,10 +640,6 @@ const char* acx_get_packet_type_string(u16 fc);
 const char* acx_cmd_status_str(unsigned int state);
 
 int acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev);
-
-int acx100_s_init_wep(wlandevice_t *priv);
-int acx100_s_init_packet_templates(wlandevice_t *priv);
-int acx111_s_init_packet_templates(wlandevice_t *priv);
 
 void great_inquisitor(wlandevice_t *priv);
 
