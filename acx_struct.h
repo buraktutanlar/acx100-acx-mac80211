@@ -1977,7 +1977,7 @@ extern const u8 acx_bitpos2ratebyte[];
 extern const u8 acx_bitpos2rate100[];
 
 extern const u8 acx_reg_domain_ids[];
-static const char * const acx_reg_domain_strings[];
+extern const char * const acx_reg_domain_strings[];
 enum {
 	acx_reg_domain_ids_len = 8
 };
