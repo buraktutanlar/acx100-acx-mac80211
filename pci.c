@@ -4225,7 +4225,7 @@ acxpci_e_init_module(void)
 		"waiting for cards to probe...\n"
 	);
 
-	res = pci_module_init(&acxpci_drv_id);
+	res = pci_register_driver(&acxpci_drv_id);
 	FN_EXIT1(res);
 	return res;
 }
