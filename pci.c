@@ -901,8 +901,6 @@ acxpci_s_reset_dev(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	/* we're doing a reset, so hardware is unavailable */
-
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 
@@ -938,7 +936,7 @@ acxpci_s_reset_dev(wlandevice_t *priv)
 	** (see below). Most probably eCPU runs some init code */
 	acx_s_msleep(10);
 
-	/* Need to know radio type before fw load */
+	/* need to know radio type before fw load */
 	hardware_info = read_reg16(priv, IO_ACX_EEPROM_INFORMATION);
 	priv->cfgopt.form_factor = hardware_info & 0xff;
 	priv->cfgopt.radio_type = hardware_info >> 8;
@@ -963,7 +961,7 @@ acxpci_s_reset_dev(wlandevice_t *priv)
 	init_mboxes(priv);
 	acxpci_write_cmd_type_status(priv, 0, 0);
 
-	/* Test that EEPROM is readable */
+	/* test that EEPROM is readable */
 	read_eeprom_area(priv);
 
 	result = OK;
@@ -1875,7 +1873,7 @@ acxpci_e_remove(struct pci_dev *pdev)
 	free_netdev(dev);
 
 	/* put device into ACPI D3 mode (shutdown) */
-	pci_set_power_state(pdev, 3);
+	pci_set_power_state(pdev, PCI_D3hot);
 
 end:
 	FN_EXIT0;
@@ -1886,7 +1884,6 @@ end:
 ** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
-static int if_was_up = 0; /* FIXME: HACK, do it correctly sometime instead */
 static int
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
@@ -1895,51 +1892,57 @@ acxpci_e_suspend(struct pci_dev *pdev, u32 state)
 #endif
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	wlandevice_t *priv = netdev_priv(dev);
+	wlandevice_t *priv;
 
 	FN_ENTER;
+	printk("acx: suspend handler is experimental!\n");
+	printk("sus: dev %p\n", dev);
+
+	if (!netif_running(dev))
+		goto end;
+
+	priv = netdev_priv(dev);
+	printk("sus: priv %p\n", priv);
 
 	acx_sem_lock(priv);
 
-	printk("acx: experimental suspend handler called for %p\n", priv);
-	if (netif_device_present(dev)) {
-		if_was_up = 1;
-		acxpci_s_down(dev);
-	}
-	else
-		if_was_up = 0;
-
 	netif_device_detach(dev);	/* This one cannot sleep */
+	acxpci_s_down(dev);
+//TODO: why down() does not set it to 0xffff?
+	write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	acxpci_s_delete_dma_regions(priv);
+	pci_save_state(pdev);
+	pci_set_power_state(pdev, PCI_D3hot);
 
 	acx_sem_unlock(priv);
-
+end:
 	FN_EXIT0;
 	return OK;
 }
 
+
 static int
 acxpci_e_resume(struct pci_dev *pdev)
 {
-	struct net_device *dev;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	wlandevice_t *priv;
 
-	printk(KERN_WARNING "rsm: resume\n");
-	dev = pci_get_drvdata(pdev);
-	printk(KERN_WARNING "rsm: got dev\n");
+	FN_ENTER;
+
+	printk("acx: resume handler is experimental!\n");
+	printk("rsm: got dev %p\n", dev);
 
 	if (!netif_running(dev))
-		return 0;
+		goto end;
 
 	priv = netdev_priv(dev);
+	printk("rsm: got priv %p\n", priv);
 
 	acx_sem_lock(priv);
 
-	printk(KERN_WARNING "rsm: got priv\n");
-	FN_ENTER;
-	printk("acx: experimental resume handler called for %p!\n", priv);
-	pci_set_power_state(pdev, 0);
-	log(L_DEBUG, "rsm: power state set\n");
+	pci_set_power_state(pdev, PCI_D0);
+	printk("rsm: power state PCI_D0 set\n");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
 	   then it made its way into 2.6.10 */
@@ -1947,32 +1950,32 @@ acxpci_e_resume(struct pci_dev *pdev)
 #else
 	pci_restore_state(pdev, priv->pci_state);
 #endif
-	log(L_DEBUG, "rsm: PCI state restored\n");
+	printk("rsm: PCI state restored\n");
+
 	if (OK != acxpci_s_reset_dev(priv))
-		goto fail;
-	log(L_DEBUG, "rsm: device reset done\n");
-
+		goto end_unlock;
+	printk("rsm: device reset done\n");
 	if (OK != acx_s_init_mac(priv))
-		goto fail;
-	log(L_DEBUG, "rsm: init MAC done\n");
+		goto end_unlock;
+	printk("rsm: init MAC done\n");
 
-	if (1 == if_was_up)
-		acxpci_s_up(dev);
-	log(L_DEBUG, "rsm: acx up\n");
+	acxpci_s_up(dev);
+	printk("rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before suspend,
 	 * and possibly be back in the network again already :-) */
 	if (ACX_STATE_IFACE_UP & priv->dev_state_mask) {
 		priv->set_mask = GETSET_ALL;
 		acx_s_update_card_settings(priv);
+		printk("rsm: settings updated\n");
 	}
-	log(L_DEBUG, "rsm: settings updated\n");
 	netif_device_attach(dev);
-	log(L_DEBUG, "rsm: device attached\n");
+	printk("rsm: device attached\n");
 
-fail: /* we need to return OK here anyway, right? */
+end_unlock: 
 	acx_sem_unlock(priv);
-
+end:
+	/* we need to return OK here anyway, right? */
 	FN_EXIT0;
 	return OK;
 }
@@ -2050,6 +2053,7 @@ static void
 disable_acx_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
+//TODO: try 0xffff mask
 	write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask_off);
 	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	priv->irqs_active = 0;
@@ -2136,6 +2140,8 @@ acxpci_e_open(netdevice_t *dev)
 
 	acx_init_task_scheduler(priv);
 
+//TODO: pci_set_power_state(pdev, PCI_D0); ?
+
 	/* request shared IRQ handler */
 	if (request_irq(dev->irq, acxpci_i_interrupt, SA_SHIRQ, dev->name, dev)) {
 		printk("%s: request_irq FAILED\n", dev->name);
@@ -2192,6 +2198,8 @@ acxpci_e_close(netdevice_t *dev)
 	write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	free_irq(dev->irq, dev);
+
+//TODO: pci_set_power_state(pdev, PCI_D3hot); ?
 
 	/* We currently don't have to do anything else.
 	 * Higher layers know we're not ready from dev->start==0 and

@@ -2137,7 +2137,8 @@ acx_s_set_defaults(wlandevice_t *priv)
 	priv->scan_mode = ACX_SCAN_OPT_ACTIVE;
 
 	priv->scan_duration = 100;
-	priv->scan_probe_delay = priv->cfgopt.probe_delay;
+	priv->scan_probe_delay = 200;
+	/* reported to break scanning: priv->scan_probe_delay = priv->cfgopt.probe_delay; */
 	priv->scan_rate = ACX_SCAN_RATE_1;
 
 	priv->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;

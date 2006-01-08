@@ -1442,15 +1442,13 @@ acx_ioctl_get_range(
 	range->pmt_flags = IW_POWER_TIMEOUT;
 	range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
 
-	if (IS_ACX100(priv))
-	{ /* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
+	if (IS_ACX100(priv)) {
+	/* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
 		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
 			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
 		range->num_txpower = IW_MAX_TXPOWER;
 		range->txpower_capa = IW_TXPOW_DBM;
-	}
-	else
-	{
+	} else {
 		int count = min(IW_MAX_TXPOWER, (int)priv->cfgopt.power_levels.len);
 		for (i = 0; i <= count; i++)
 			range->txpower[i] = priv->cfgopt.power_levels.list[i];
