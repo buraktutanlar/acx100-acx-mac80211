@@ -687,14 +687,14 @@ acx_s_get_firmware_version(wlandevice_t *priv)
 	switch (priv->firmware_id & 0xffff0000) {
 		case 0x01010000:
 		case 0x01020000:
-			priv->cfgopt.chip_name = "TNETW1100A";
+			priv->chip_name = "TNETW1100A";
 			break;
 		case 0x01030000:
-			priv->cfgopt.chip_name = "TNETW1100B";
+			priv->chip_name = "TNETW1100B";
 			break;
 		case 0x03000000:
 		case 0x03010000:
-			priv->cfgopt.chip_name = "TNETW1130";
+			priv->chip_name = "TNETW1130";
 			break;
 		default:
 			printk("acx: unknown chip ID 0x%08X, "
@@ -718,7 +718,7 @@ acx_display_hardware_details(wlandevice_t *priv)
 
 	FN_ENTER;
 
-	switch (priv->cfgopt.radio_type) {
+	switch (priv->radio_type) {
 	case RADIO_MAXIM_0D:
 		/* hmm, the DWL-650+ seems to have two variants,
 		 * according to a windows driver changelog comment:
@@ -747,7 +747,7 @@ acx_display_hardware_details(wlandevice_t *priv)
 		break;
 	}
 
-	switch (priv->cfgopt.form_factor) {
+	switch (priv->form_factor) {
 	case 0x00:
 		form_str = "unspecified";
 		break;
@@ -768,8 +768,8 @@ acx_display_hardware_details(wlandevice_t *priv)
 	printk("acx: form factor 0x%02X (%s), "
 		"radio type 0x%02X (%s), EEPROM version 0x%02X, "
 		"uploaded firmware '%s' (0x%08X)\n",
-		priv->cfgopt.form_factor, form_str, priv->cfgopt.radio_type, radio_str,
-		priv->cfgopt.eeprom_version, priv->firmware_version,
+		priv->form_factor, form_str, priv->radio_type, radio_str,
+		priv->eeprom_version, priv->firmware_version,
 		priv->firmware_id);
 
 	FN_EXIT0;
@@ -873,11 +873,15 @@ acx_signal_determine_quality(u8 signal, u8 noise)
 /***********************************************************************
 ** Interrogate/configure commands
 */
+
+/* FIXME: the lengths given here probably aren't always correct.
+ * They should be gradually replaced by proper "sizeof(acx1XX_ie_XXXX)-4",
+ * unless the firmware actually expects a different length than the struct length */
 static const u16
-CtlLength[] = {
+acx100_ie_len[] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
-	ACX1xx_IE_POWER_MGMT_LEN,
+	sizeof(acx100_ie_powermgmt_t)-4, /* is that 6 or 8??? */
 	ACX1xx_IE_QUEUE_CONFIG_LEN,
 	ACX100_IE_BLOCK_SIZE_LEN,
 	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
@@ -901,7 +905,7 @@ CtlLength[] = {
 };
 
 static const u16
-CtlLengthDot11[] = {
+acx100_ie_len_dot11[] = {
 	0,
 	ACX1xx_IE_DOT11_STATION_ID_LEN,
 	0,
@@ -924,6 +928,58 @@ CtlLengthDot11[] = {
 	0,
 };
 
+static const u16
+acx111_ie_len[] = {
+	0,
+	ACX100_IE_ACX_TIMER_LEN,
+	sizeof(acx111_ie_powermgmt_t)-4,
+	ACX1xx_IE_QUEUE_CONFIG_LEN,
+	ACX100_IE_BLOCK_SIZE_LEN,
+	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_RATE_FALLBACK_LEN,
+	ACX100_IE_WEP_OPTIONS_LEN,
+	ACX1xx_IE_MEMORY_MAP_LEN, /*	ACX1xx_IE_SSID_LEN, */
+	0,
+	ACX1xx_IE_ASSOC_ID_LEN,
+	0,
+	ACX111_IE_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_FWREV_LEN,
+	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
+	ACX1xx_IE_MEDIUM_USAGE_LEN,
+	ACX1xx_IE_RXCONFIG_LEN,
+	0,
+	0,
+	ACX1xx_IE_FIRMWARE_STATISTICS_LEN,
+	0,
+	ACX1xx_IE_FEATURE_CONFIG_LEN,
+	ACX111_IE_KEY_CHOOSE_LEN,
+};
+
+static const u16
+acx111_ie_len_dot11[] = {
+	0,
+	ACX1xx_IE_DOT11_STATION_ID_LEN,
+	0,
+	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
+	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
+	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
+	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
+	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
+	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
+	0,
+	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
+	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
+	0,
+	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
+	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
+	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
+	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
+	0,
+	0,
+	0,
+};
+
+
 #undef FUNC
 #define FUNC "configure"
 #if !ACX_DEBUG
@@ -939,9 +995,9 @@ acx_s_configure_debug(wlandevice_t *priv, void *pdr, int type, const char* types
 	int res;
 
 	if (type < 0x1000)
-		len = CtlLength[type];
+		len = priv->ie_len[type];
 	else
-		len = CtlLengthDot11[type - 0x1000];
+		len = priv->ie_len_dot11[type - 0x1000];
 
 	log(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
 	if (unlikely(!len)) {
@@ -978,9 +1034,9 @@ acx_s_interrogate_debug(wlandevice_t *priv, void *pdr, int type,
 	int res;
 
 	if (type < 0x1000)
-		len = CtlLength[type];
+		len = priv->ie_len[type];
 	else
-		len = CtlLengthDot11[type-0x1000];
+		len = priv->ie_len_dot11[type-0x1000];
 
 	log(L_CTL, FUNC"(type:%s,len:%u)\n", typestr, len);
 
@@ -1057,10 +1113,10 @@ acx_l_proc_output(char *buf, wlandevice_t *priv)
 		"form factor:\t\t\t0x%02X\n"
 		"EEPROM version:\t\t\t0x%02X\n"
 		"firmware version:\t\t%s (0x%08X)\n",
-		priv->cfgopt.chip_name, priv->firmware_id,
-		priv->cfgopt.radio_type,
-		priv->cfgopt.form_factor,
-		priv->cfgopt.eeprom_version,
+		priv->chip_name, priv->firmware_id,
+		priv->radio_type,
+		priv->form_factor,
+		priv->eeprom_version,
 		priv->firmware_version, priv->firmware_numver);
 
 	for (i = 0; i < VEC_SIZE(priv->sta_list); i++) {
@@ -1090,11 +1146,14 @@ acx_s_proc_diag_output(char *buf, wlandevice_t *priv)
 
 	FN_ENTER;
 
-	fw_stats = kzalloc(sizeof(*fw_stats), GFP_KERNEL);
+	/* TODO: may replace kmalloc/memset with kzalloc once
+	 * Linux 2.6.14 is widespread */
+	fw_stats = kmalloc(sizeof(*fw_stats), GFP_KERNEL);
 	if (!fw_stats) {
 		FN_EXIT1(0);
 		return 0;
 	}
+	memset(fw_stats, 0, sizeof(*fw_stats));
 
 	acx_lock(priv, flags);
 
@@ -1130,10 +1189,12 @@ acx_s_proc_diag_output(char *buf, wlandevice_t *priv)
 		"** PHY status **\n"
 		"tx_disabled %d, tx_level_dbm %d\n" /* "tx_level_val %d, tx_level_auto %d\n" */
 		"sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
-		"rts_threshold %d, short_retry %d, long_retry %d, msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
+		"rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
+		"msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
 		priv->tx_disabled, priv->tx_level_dbm, /* priv->tx_level_val, priv->tx_level_auto, */
 		priv->sensitivity, priv->antenna, priv->ed_threshold, priv->cca, priv->preamble_mode,
-		priv->rts_threshold, priv->short_retry, priv->long_retry, priv->msdu_lifetime, priv->listen_interval, priv->beacon_interval);
+		priv->rts_threshold, priv->frag_threshold, priv->short_retry, priv->long_retry,
+		priv->msdu_lifetime, priv->listen_interval, priv->beacon_interval);
 
 	acx_unlock(priv, flags);
 
@@ -1524,50 +1585,47 @@ acx_s_cmd_join_bssid(wlandevice_t *priv, const u8 *bssid)
 ** acx_s_cmd_start_scan
 **
 ** Issue scan command to the hardware
+**
+** unified function for both ACX111 and ACX100
 */
 static void
-acx100_s_scan_chan(wlandevice_t *priv)
+acx_s_scan_chan(wlandevice_t *priv)
 {
-	acx100_scan_t s;
+	union {
+		acx111_scan_t acx111;
+		acx100_scan_t acx100;
+	} s;
 
 	FN_ENTER;
 
 	memset(&s, 0, sizeof(s));
-	s.count = cpu_to_le16(priv->scan_count);
-	s.start_chan = cpu_to_le16(1);
-	s.flags = cpu_to_le16(0x8000);
-	s.max_rate = priv->scan_rate;
-	s.options = priv->scan_mode;
-	s.chan_duration = cpu_to_le16(priv->scan_duration);
-	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
+
+	/* first common positions... */
+
+	s.acx111.count = cpu_to_le16(priv->scan_count);
+	s.acx111.rate = priv->scan_rate;
+	s.acx111.options = priv->scan_mode;
+	s.acx111.chan_duration = cpu_to_le16(priv->scan_duration);
+	s.acx111.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
+
+	/* ...then differences */
+
+	if (IS_ACX111(priv)) {
+		s.acx111.channel_list_select = 0; /* scan every allowed channel */
+		/*s.acx111.channel_list_select = 1;*/ /* scan given channels */
+		/*s.acx111.modulation = 0x40;*/ /* long preamble? OFDM? -> only for active scan */
+		s.acx111.modulation = 0;
+		/*s.acx111.channel_list[0] = 6;
+		s.acx111.channel_list[1] = 4;*/
+	} else {
+		s.acx100.start_chan = cpu_to_le16(1);
+		s.acx100.flags = cpu_to_le16(0x8000);
+	}
 
 	acx_s_issue_cmd(priv, ACX1xx_CMD_SCAN, &s, sizeof(s));
 	FN_EXIT0;
 }
 
-static void
-acx111_s_scan_chan(wlandevice_t *priv)
-{
-	acx111_scan_t s;
-
-	FN_ENTER;
-
-	memset(&s, 0, sizeof(s));
-	s.count = cpu_to_le16(priv->scan_count);
-	s.channel_list_select = 0; /* scan every allowed channel */
-	/*s.channel_list_select = 1;*/ /* scan given channels */
-	s.rate = priv->scan_rate;
-	s.options = priv->scan_mode;
-	s.chan_duration = cpu_to_le16(priv->scan_duration);
-	s.max_probe_delay = cpu_to_le16(priv->scan_probe_delay);
-	/*s.modulation = 0x40;*/ /* long preamble? OFDM? -> only for active scan */
-	s.modulation = 0;
-	/*s.channel_list[0] = 6;
-	s.channel_list[1] = 4;*/
-
-	acx_s_issue_cmd(priv, ACX1xx_CMD_SCAN, &s, sizeof(s));
-	FN_EXIT0;
-}
 
 void
 acx_s_cmd_start_scan(wlandevice_t *priv)
@@ -1586,11 +1644,7 @@ acx_s_cmd_start_scan(wlandevice_t *priv)
 	priv->scan_start = jiffies;
 	CLEAR_BIT(priv->irq_status, HOST_INT_SCAN_COMPLETE);
 	/* issue it */
-	if (IS_ACX100(priv)) {
-		acx100_s_scan_chan(priv);
-	} else {
-		acx111_s_scan_chan(priv);
-	}
+	acx_s_scan_chan(priv);
 }
 
 
@@ -2127,7 +2181,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 
 	if (IS_PCI(priv)) { /* FIXME: this should be made to apply to USB, too! */
 		/* first regulatory domain entry in EEPROM == default reg. domain */
-		priv->reg_dom_id = priv->cfgopt.domains.list[0];
+		priv->reg_dom_id = priv->cfgopt_domains.list[0];
 	}
 
 	priv->channel = 1;
@@ -2138,7 +2192,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 
 	priv->scan_duration = 100;
 	priv->scan_probe_delay = 200;
-	/* reported to break scanning: priv->scan_probe_delay = priv->cfgopt.probe_delay; */
+	/* reported to break scanning: priv->scan_probe_delay = priv->cfgopt_probe_delay; */
 	priv->scan_rate = ACX_SCAN_RATE_1;
 
 	priv->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
@@ -2152,6 +2206,7 @@ acx_s_set_defaults(wlandevice_t *priv)
 	SET_BIT(priv->set_mask, SET_MSDU_LIFETIME);
 
 	priv->rts_threshold = DEFAULT_RTS_THRESHOLD;
+	priv->frag_threshold = 2346;
 
 	/* use standard default values for retry limits */
 	priv->short_retry = 7; /* max. retries for (short) non-RTS packets */
@@ -5853,6 +5908,14 @@ acx_s_init_mac(wlandevice_t *priv)
 
 	FN_ENTER;
 
+	if (IS_ACX111(priv)) {
+		priv->ie_len = acx111_ie_len;
+		priv->ie_len_dot11 = acx111_ie_len_dot11;
+	} else {
+		priv->ie_len = acx100_ie_len;
+		priv->ie_len_dot11 = acx100_ie_len_dot11;
+	}
+
 	if (IS_PCI(priv)) {
 		priv->memblocksize = 256; /* 256 is default */
 		/* try to load radio for both ACX100 and ACX111, since both
@@ -5945,6 +6008,67 @@ void acx_s_set_sane_reg_domain(wlandevice_t *priv, int do_set)
 		}
 	}
 }
+
+
+#if POWER_SAVE_80211
+static void
+acx_s_update_80211_powersave_mode(wlandevice_t *priv)
+{
+	/* merge both structs in a union to be able to have common code */
+	union {
+		acx111_ie_powermgmt_t acx111;
+		acx100_ie_powermgmt_t acx100;
+	} pm;
+
+	/* change 802.11 power save mode settings */
+	log(L_INIT, "updating 802.11 power save mode settings: "
+		"wakeup_cfg 0x%02X, listen interval %u, "
+		"options 0x%02X, hangover period %u, "
+		"enhanced_ps_transition_time %u\n",
+		priv->ps_wakeup_cfg, priv->ps_listen_interval,
+		priv->ps_options, priv->ps_hangover_period,
+		priv->ps_enhanced_transition_time);
+	acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
+		"listen interval %u, options 0x%02X, "
+		"hangover period %u, "
+		"enhanced_ps_transition_time %u, beacon_rx_time %u\n",
+		pm.acx111.wakeup_cfg,
+		pm.acx111.listen_interval,
+		pm.acx111.options,
+		pm.acx111.hangover_period,
+		IS_ACX111(priv) ?
+			pm.acx111.enhanced_ps_transition_time
+		      : pm.acx100.enhanced_ps_transition_time,
+		IS_ACX111(priv) ?
+			pm.acx111.beacon_rx_time
+		      : (u32)-1
+		);
+	pm.acx111.wakeup_cfg = priv->ps_wakeup_cfg;
+	pm.acx111.listen_interval = priv->ps_listen_interval;
+	pm.acx111.options = priv->ps_options;
+	pm.acx111.hangover_period = priv->ps_hangover_period;
+	if (IS_ACX111(priv)) {
+		pm.acx111.beacon_rx_time = cpu_to_le32(priv->ps_beacon_rx_time);
+		pm.acx111.enhanced_ps_transition_time = cpu_to_le32(priv->ps_enhanced_transition_time);
+	} else {
+		pm.acx100.enhanced_ps_transition_time = cpu_to_le16(priv->ps_enhanced_transition_time);
+	}
+	acx_s_configure(priv, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
+	acx_s_msleep(40);
+	acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
+	log(L_INIT, "power save mode change %s\n",
+		(pm.acx111.wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
+	/* FIXME: maybe verify via PS_CFG_PENDING bit here
+	 * that power save mode change was successful. */
+	/* FIXME: we shouldn't trigger a scan immediately after
+	 * fiddling with power save mode (since the firmware is sending
+	 * a NULL frame then). */
+}
+#endif
 
 
 /***********************************************************************
@@ -6049,13 +6173,13 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	}
 
 	if (priv->get_mask & GETSET_SENSITIVITY) {
-		if ((RADIO_RFMD_11 == priv->cfgopt.radio_type)
-		|| (RADIO_MAXIM_0D == priv->cfgopt.radio_type)
-		|| (RADIO_RALINK_15 == priv->cfgopt.radio_type)) {
+		if ((RADIO_RFMD_11 == priv->radio_type)
+		|| (RADIO_MAXIM_0D == priv->radio_type)
+		|| (RADIO_RALINK_15 == priv->radio_type)) {
 			acx_s_read_phy_reg(priv, 0x30, &priv->sensitivity);
 		} else {
 			log(L_INIT, "don't know how to get sensitivity "
-				"for radio type 0x%02X\n", priv->cfgopt.radio_type);
+				"for radio type 0x%02X\n", priv->radio_type);
 			priv->sensitivity = 0;
 		}
 		log(L_INIT, "got sensitivity value %u\n", priv->sensitivity);
@@ -6140,6 +6264,11 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			break;
 		case ACX_MODE_0_ADHOC:
 			acx_s_set_probe_request_template(priv);
+#if POWER_SAVE_80211
+			/* maybe power save functionality is somehow possible
+			 * for Ad-Hoc mode, too... FIXME: verify it somehow? firmware debug fields? */
+			acx_s_set_null_data_template(priv);
+#endif
 			/* fall through */
 		case ACX_MODE_3_AP:
 			acx_s_set_beacon_template(priv);
@@ -6182,7 +6311,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	if (priv->set_mask & GETSET_SENSITIVITY) {
 		log(L_INIT, "updating sensitivity value: %u\n",
 					priv->sensitivity);
-		switch (priv->cfgopt.radio_type) {
+		switch (priv->radio_type) {
 		case RADIO_RFMD_11:
 		case RADIO_MAXIM_0D:
 		case RADIO_RALINK_15:
@@ -6194,7 +6323,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 			break;
 		default:
 			log(L_INIT, "don't know how to modify sensitivity "
-				"for radio type 0x%02X\n", priv->cfgopt.radio_type);
+				"for radio type 0x%02X\n", priv->radio_type);
 		}
 		CLEAR_BIT(priv->set_mask, GETSET_SENSITIVITY);
 	}
@@ -6255,50 +6384,8 @@ acx_s_update_card_settings(wlandevice_t *priv)
 	}
 
 	if (priv->set_mask & GETSET_POWER_80211) {
-/* this seems to cause Tx lockup after some random time (Tx error 0x20),
- * so let's disable it for now until further investigation */
-/* Maybe fixed now after locking is fixed. Need to retest */
 #if POWER_SAVE_80211
-		/* FIXME: since a severe bug has been fixed, this now works for
-		 * acx100; however since acx111 has a different struct this needs
-		 * different handling, too, so it should best all be done in a
-		 * separate function... */
-
-		acx100_ie_powermgmt_t pm;
-
-		/* change 802.11 power save mode settings */
-		log(L_INIT, "updating 802.11 power save mode settings: "
-			"wakeup_cfg 0x%02X, listen interval %u, "
-			"options 0x%02X, hangover period %u, "
-			"enhanced_ps_transition_time %d\n",
-			priv->ps_wakeup_cfg, priv->ps_listen_interval,
-			priv->ps_options, priv->ps_hangover_period,
-			priv->ps_enhanced_transition_time);
-		acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
-		log(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
-			"listen interval %u, options 0x%02X, "
-			"hangover period %u, "
-			"enhanced_ps_transition_time %d\n",
-			pm.wakeup_cfg, pm.listen_interval, pm.options,
-			pm.hangover_period, pm.enhanced_ps_transition_time);
-		pm.wakeup_cfg = priv->ps_wakeup_cfg;
-		pm.listen_interval = priv->ps_listen_interval;
-		pm.options = priv->ps_options;
-		pm.hangover_period = priv->ps_hangover_period;
-		pm.enhanced_ps_transition_time = cpu_to_le16(priv->ps_enhanced_transition_time);
-		acx_s_configure(priv, &pm, ACX1xx_IE_POWER_MGMT);
-		acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
-		log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.wakeup_cfg);
-		acx_s_msleep(40);
-		acx_s_interrogate(priv, &pm, ACX1xx_IE_POWER_MGMT);
-		log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.wakeup_cfg);
-		log(L_INIT, "power save mode change %s\n",
-			(pm.wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
-		/* FIXME: maybe verify via PS_CFG_PENDING bit here
-		 * that power save mode change was successful. */
-		/* FIXME: we shouldn't trigger a scan immediately after
-		 * fiddling with power save mode (since the firmware is sending
-		 * a NULL frame then). Does this need locking?? */
+		acx_s_update_80211_powersave_mode(priv);
 #endif
 		CLEAR_BIT(priv->set_mask, GETSET_POWER_80211);
 	}
@@ -6557,14 +6644,15 @@ acx_s_after_interrupt_recalib(wlandevice_t *priv)
 	if (priv->recalib_time_last_success
 	 && time_before(jiffies, priv->recalib_time_last_success
 					+ RECALIB_PAUSE * 60 * HZ)) {
-		priv->recalib_msg_ratelimit++;
-		if (priv->recalib_msg_ratelimit <= 5)
+		if (priv->recalib_msg_ratelimit <= 4) {
 			printk("%s: less than " STRING(RECALIB_PAUSE)
 				" minutes since last radio recalibration, "
 				"not recalibrating (maybe card is too hot?)\n",
 				priv->netdev->name);
-		if (priv->recalib_msg_ratelimit == 5)
-			printk("disabling above message\n");
+			priv->recalib_msg_ratelimit++;
+			if (priv->recalib_msg_ratelimit == 5)
+				printk("disabling above message\n");
+		}
 		return;
 	}
 
@@ -6767,13 +6855,13 @@ acx_update_capabilities(wlandevice_t *priv)
 	if (priv->wep_restricted) {
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
 	}
-	if (priv->cfgopt.dot11ShortPreambleOption) {
+	if (priv->cfgopt_dot11ShortPreambleOption) {
 		SET_BIT(cap, WF_MGMT_CAP_SHORT);
 	}
-	if (priv->cfgopt.dot11PBCCOption) {
+	if (priv->cfgopt_dot11PBCCOption) {
 		SET_BIT(cap, WF_MGMT_CAP_PBCC);
 	}
-	if (priv->cfgopt.dot11ChannelAgility) {
+	if (priv->cfgopt_dot11ChannelAgility) {
 		SET_BIT(cap, WF_MGMT_CAP_AGILITY);
 	}
 	log(L_DEBUG, "caps updated from 0x%04X to 0x%04X\n",
@@ -6787,19 +6875,18 @@ acx_update_capabilities(wlandevice_t *priv)
 * FIXME: logging should be removed here and added to a /proc file instead
 */
 void
-acx_s_parse_configoption(wlandevice_t *priv, acx111_ie_configoption_t *pcfg)
+acx_s_parse_configoption(wlandevice_t *priv, const acx111_ie_configoption_t *pcfg)
 {
-	acx_combined_configopt_t *co = &priv->cfgopt;
-	int i;
 	const u8 *pEle;
-	u8 is_acx111 = IS_ACX111(priv);
+	int i;
+	int is_acx111 = IS_ACX111(priv);
 
-	if (( is_acx111 && (priv->cfgopt.eeprom_version != 5))
-	||  (!is_acx111 && (priv->cfgopt.eeprom_version != 4))) {
+	if (( is_acx111 && (priv->eeprom_version != 5))
+	||  (!is_acx111 && (priv->eeprom_version != 4))) {
 		printk("unknown chip and EEPROM version combination (%s, v%d), "
 			"don't know how to parse config options yet. "
 			"Please report\n", is_acx111 ? "ACX111" : "ACX100",
-			priv->cfgopt.eeprom_version);
+			priv->eeprom_version);
 		return;
 	}
 
@@ -6814,110 +6901,124 @@ acx_s_parse_configoption(wlandevice_t *priv, acx111_ie_configoption_t *pcfg)
 
 	pEle += 4; /* skip (type,len) header */
 
-	memcpy(co->NVSv, pEle, sizeof(co->NVSv));
-	pEle += sizeof(co->NVSv);
+	memcpy(priv->cfgopt_NVSv, pEle, sizeof(priv->cfgopt_NVSv));
+	pEle += sizeof(priv->cfgopt_NVSv);
 
 	if (is_acx111) {
-		co->NVS_vendor_offs = le16_to_cpu(*(u16 *)pEle);
-		pEle += sizeof(co->NVS_vendor_offs);
+		priv->cfgopt_NVS_vendor_offs = le16_to_cpu(*(u16 *)pEle);
+		pEle += sizeof(priv->cfgopt_NVS_vendor_offs);
 
-		co->probe_delay = 200; /* good default value? */
+		priv->cfgopt_probe_delay = 200; /* good default value? */
 		pEle += 2; /* FIXME: unknown, value 0x0001 */
 	} else {
-		memcpy(co->MAC, pEle, sizeof(co->MAC));
-		pEle += sizeof(co->MAC);
+		memcpy(priv->cfgopt_MAC, pEle, sizeof(priv->cfgopt_MAC));
+		pEle += sizeof(priv->cfgopt_MAC);
 
-		co->probe_delay = le16_to_cpu(*(u16 *)pEle);
-		pEle += sizeof(co->probe_delay);
+		priv->cfgopt_probe_delay = le16_to_cpu(*(u16 *)pEle);
+		pEle += sizeof(priv->cfgopt_probe_delay);
+		if ((priv->cfgopt_probe_delay < 100) || (priv->cfgopt_probe_delay > 500)) {
+			printk("strange probe_delay value %d, "
+				"tweaking to 200\n", priv->cfgopt_probe_delay);
+			priv->cfgopt_probe_delay = 200;
+		}
 	}
 
-	co->eof_memory = le32_to_cpu(*(u32 *)pEle);
-	pEle += sizeof(co->eof_memory);
+	priv->cfgopt_eof_memory = le32_to_cpu(*(u32 *)pEle);
+	pEle += sizeof(priv->cfgopt_eof_memory);
 
-	co->dot11CCAModes = *pEle++;
-	co->dot11Diversity = *pEle++;
-	co->dot11ShortPreambleOption = *pEle++;
-	co->dot11PBCCOption = *pEle++;
-	co->dot11ChannelAgility = *pEle++;
-	co->dot11PhyType = *pEle++;
-	co->dot11TempType = *pEle++;
+	printk("NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
+		priv->cfgopt_NVS_vendor_offs,
+		priv->cfgopt_probe_delay,
+		priv->cfgopt_eof_memory);
 
+	priv->cfgopt_dot11CCAModes = *pEle++;
+	priv->cfgopt_dot11Diversity = *pEle++;
+	priv->cfgopt_dot11ShortPreambleOption = *pEle++;
+	priv->cfgopt_dot11PBCCOption = *pEle++;
+	priv->cfgopt_dot11ChannelAgility = *pEle++;
+	priv->cfgopt_dot11PhyType = *pEle++;
+	priv->cfgopt_dot11TempType = *pEle++;
 	printk("CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
 		"PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
-		co->dot11CCAModes, co->dot11Diversity, co->dot11ShortPreambleOption,
-		co->dot11PBCCOption, co->dot11ChannelAgility, co->dot11PhyType, co->dot11TempType);
+		priv->cfgopt_dot11CCAModes,
+		priv->cfgopt_dot11Diversity,
+		priv->cfgopt_dot11ShortPreambleOption,
+		priv->cfgopt_dot11PBCCOption,
+		priv->cfgopt_dot11ChannelAgility,
+		priv->cfgopt_dot11PhyType,
+		priv->cfgopt_dot11TempType);
 
 	/* then use common parsing for next part which has common layout */
 
-	pEle++; /* skip No Of Tables (6) */
+	pEle++; /* skip table_count (6) */
 
-	co->antennas.type = pEle[0];
-	co->antennas.len = pEle[1];
+	priv->cfgopt_antennas.type = pEle[0];
+	priv->cfgopt_antennas.len = pEle[1];
 	printk("AntennaID:%02X Len:%02X Data:",
-			co->antennas.type, co->antennas.len);
+			priv->cfgopt_antennas.type, priv->cfgopt_antennas.len);
 	for (i = 0; i < pEle[1]; i++) {
-		co->antennas.list[i] = pEle[i+2];
+		priv->cfgopt_antennas.list[i] = pEle[i+2];
 		printk("%02X ", pEle[i+2]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] + 2;
-	co->power_levels.type = pEle[0];
-	co->power_levels.len = pEle[1];
+	priv->cfgopt_power_levels.type = pEle[0];
+	priv->cfgopt_power_levels.len = pEle[1];
 	printk("PowerLevelID:%02X Len:%02X Data:",
-			co->power_levels.type, co->power_levels.len);
+		priv->cfgopt_power_levels.type, priv->cfgopt_power_levels.len);
 	for (i = 0; i < pEle[1]; i++) {
-		co->power_levels.list[i] = le16_to_cpu(*(u16 *)&pEle[i*2+2]);
-		printk("%04X ", co->power_levels.list[i]);
+		priv->cfgopt_power_levels.list[i] = le16_to_cpu(*(u16 *)&pEle[i*2+2]);
+		printk("%04X ", priv->cfgopt_power_levels.list[i]);
 	}
 	printk("\n");
 
 	pEle += pEle[1]*2 + 2;
-	co->data_rates.type = pEle[0];
-	co->data_rates.len = pEle[1];
+	priv->cfgopt_data_rates.type = pEle[0];
+	priv->cfgopt_data_rates.len = pEle[1];
 	printk("DataRatesID:%02X Len:%02X Data:",
-			co->data_rates.type, co->data_rates.len);
+		priv->cfgopt_data_rates.type, priv->cfgopt_data_rates.len);
 	for (i = 0; i < pEle[1]; i++) {
-		co->data_rates.list[i] = pEle[i+2];
+		priv->cfgopt_data_rates.list[i] = pEle[i+2];
 		printk("%02X ", pEle[i+2]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] + 2;
-	co->domains.type = pEle[0];
-	co->domains.len = pEle[1];
+	priv->cfgopt_domains.type = pEle[0];
+	priv->cfgopt_domains.len = pEle[1];
 	printk("DomainID:%02X Len:%02X Data:",
-			co->domains.type, co->domains.len);
+			priv->cfgopt_domains.type, priv->cfgopt_domains.len);
 	for (i = 0; i < pEle[1]; i++) {
-		co->domains.list[i] = pEle[i+2];
+		priv->cfgopt_domains.list[i] = pEle[i+2];
 		printk("%02X ", pEle[i+2]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] + 2;
-	co->product_id.type = pEle[0];
-	co->product_id.len = pEle[1];
+	priv->cfgopt_product_id.type = pEle[0];
+	priv->cfgopt_product_id.len = pEle[1];
 	for (i = 0; i < pEle[1]; i++) {
-		co->product_id.list[i] = pEle[i+2];
+		priv->cfgopt_product_id.list[i] = pEle[i+2];
 	}
 	printk("ProductID:%02X Len:%02X Data:%.*s\n",
-			co->product_id.type, co->product_id.len,
-			co->product_id.len, (char *)co->product_id.list);
+		priv->cfgopt_product_id.type, priv->cfgopt_product_id.len,
+		priv->cfgopt_product_id.len, (char *)priv->cfgopt_product_id.list);
 
 	pEle += pEle[1] + 2;
-	co->manufacturer.type = pEle[0];
-	co->manufacturer.len = pEle[1];
+	priv->cfgopt_manufacturer.type = pEle[0];
+	priv->cfgopt_manufacturer.len = pEle[1];
 	for (i = 0; i < pEle[1]; i++) {
-		co->manufacturer.list[i] = pEle[i+2];
+		priv->cfgopt_manufacturer.list[i] = pEle[i+2];
 	}
 	printk("ManufacturerID:%02X Len:%02X Data:%.*s\n",
-			co->manufacturer.type, co->manufacturer.len,
-			co->manufacturer.len, (char *)co->manufacturer.list);
+		priv->cfgopt_manufacturer.type, priv->cfgopt_manufacturer.len,
+		priv->cfgopt_manufacturer.len, (char *)priv->cfgopt_manufacturer.list);
 /*
 	printk("EEPROM part:\n");
 	for (i=0; i<58; i++) {
 		printk("%02X =======>  0x%02X\n",
-			    i, (u8 *)co.cfgopt_fixed.NVSv[i-2]);
+			i, (u8 *)priv->cfgopt_NVSv[i-2]);
 	}
 */
 }

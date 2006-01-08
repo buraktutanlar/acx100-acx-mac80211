@@ -114,8 +114,8 @@ enum { acx_debug = 0 };
 #define CHIPTYPE_ACX100		1
 #define CHIPTYPE_ACX111		2
 
-#define IS_ACX100(priv)	((priv)->cfgopt.chip_type == CHIPTYPE_ACX100)
-#define IS_ACX111(priv)	((priv)->cfgopt.chip_type == CHIPTYPE_ACX111)
+#define IS_ACX100(priv)	((priv)->chip_type == CHIPTYPE_ACX100)
+#define IS_ACX111(priv)	((priv)->chip_type == CHIPTYPE_ACX111)
 
 /* Supported interfaces */
 #define DEVTYPE_PCI		0
@@ -125,7 +125,7 @@ enum { acx_debug = 0 };
  #if !defined(CONFIG_ACX_USB)
   #define IS_PCI(priv)	1
  #else
-  #define IS_PCI(priv)	((priv)->cfgopt.dev_type == DEVTYPE_PCI)
+  #define IS_PCI(priv)	((priv)->dev_type == DEVTYPE_PCI)
  #endif
 #else
  #define IS_PCI(priv)	0
@@ -135,7 +135,7 @@ enum { acx_debug = 0 };
  #if !defined(CONFIG_ACX_PCI)
   #define IS_USB(priv)	1
  #else
-  #define IS_USB(priv)	((priv)->cfgopt.dev_type == DEVTYPE_USB)
+  #define IS_USB(priv)	((priv)->dev_type == DEVTYPE_USB)
  #endif
 #else
  #define IS_USB(priv)	0
@@ -1059,47 +1059,12 @@ typedef struct co_manuf_id {
 	u8	list[128] ACX_PACKED;
 } co_manuf_t;
 
-typedef struct acx111_co_fixed {
-	u8	type ACX_PACKED;
-	u8	len ACX_PACKED;
+typedef struct co_fixed {
 	char	NVSv[8] ACX_PACKED;
-	u8	MAC[6] ACX_PACKED;
-	u16	probe_delay ACX_PACKED;
-	u32	eof_memory ACX_PACKED;
-	u8	dot11CCAModes ACX_PACKED;
-	u8	dot11Diversity ACX_PACKED;
-	u8	dot11ShortPreambleOption ACX_PACKED;
-	u8	dot11PBCCOption ACX_PACKED;
-	u8	dot11ChannelAgility ACX_PACKED;
-	u8	dot11PhyType ACX_PACKED; /* FIXME: does 802.11 call it "dot11PHYType"? */
-/*	u8	dot11TempType ACX_PACKED;
-	u8	num_var ACX_PACKED;           seems to be erased     */
-} acx111_co_fixed_t;
-
-
-typedef struct acx111_ie_configoption {
-	acx111_co_fixed_t	fixed ACX_PACKED;
-	co_antennas_t		antennas ACX_PACKED;
-	co_powerlevels_t	power_levels ACX_PACKED;
-	co_datarates_t		data_rates ACX_PACKED;
-	co_domains_t		domains ACX_PACKED;
-	co_product_id_t		product_id ACX_PACKED;
-	co_manuf_t		manufacturer ACX_PACKED;
-	u32			_padding[2];
-} acx111_ie_configoption_t;
-
-typedef struct acx_combined_configopt {
-	const char	*chip_name;
-	u8	dev_type;
-	u8	chip_type;
-	u8	form_factor;
-	u8	radio_type;
-	u8	eeprom_version;
-
-	char	NVSv[8] ACX_PACKED;
-	u16	NVS_vendor_offs ACX_PACKED; /* ACX111-only */
-	u8	MAC[6] ACX_PACKED; /* ACX100-only */
-	u16	probe_delay ACX_PACKED; /* ACX100-only */
+/*	u16	NVS_vendor_offs;	ACX111-only */
+/*	u16	unknown;		ACX111-only */
+	u8	MAC[6] ACX_PACKED;	/* ACX100-only */
+	u16	probe_delay ACX_PACKED;	/* ACX100-only */
 	u32	eof_memory ACX_PACKED;
 	u8	dot11CCAModes ACX_PACKED;
 	u8	dot11Diversity ACX_PACKED;
@@ -1108,13 +1073,22 @@ typedef struct acx_combined_configopt {
 	u8	dot11ChannelAgility ACX_PACKED;
 	u8	dot11PhyType ACX_PACKED; /* FIXME: does 802.11 call it "dot11PHYType"? */
 	u8	dot11TempType ACX_PACKED;
+	u8	table_count ACX_PACKED;
+} co_fixed_t;
+
+typedef struct acx111_ie_configoption {
+	u16			type ACX_PACKED;
+	u16			len ACX_PACKED;
+/* Do not access below members directly, they are in fact variable length */
+	co_fixed_t		fixed ACX_PACKED;
 	co_antennas_t		antennas ACX_PACKED;
 	co_powerlevels_t	power_levels ACX_PACKED;
 	co_datarates_t		data_rates ACX_PACKED;
 	co_domains_t		domains ACX_PACKED;
 	co_product_id_t		product_id ACX_PACKED;
 	co_manuf_t		manufacturer ACX_PACKED;
-} acx_combined_configopt_t;
+	u8			_padding[4];
+} acx111_ie_configoption_t;
 
 
 /***********************************************************************
@@ -1166,7 +1140,7 @@ struct wlandevice {
 	struct net_device	*netdev;	/* pointer to linux netdevice */
 	struct net_device	*prev_nd;	/* FIXME: We should not chain via our
 						 * private struct wlandevice _and_
-						 * the struct net_device. */
+						 * the struct net_device */
 	/*** Device statistics ***/
 	struct net_device_stats	stats;		/* net device statistics */
 #ifdef WIRELESS_EXT
@@ -1179,12 +1153,39 @@ struct wlandevice {
 	struct timer_list	mgmt_timer;
 
 	/*** Hardware identification ***/
-	acx_combined_configopt_t cfgopt; /* R/O once retrieved - DON'T MODIFY! */
+	const char		*chip_name;
+	u8			dev_type;
+	u8			chip_type;
+	u8			form_factor;
+	u8			radio_type;
+	u8			eeprom_version;
+
+	/*** Config retrieved from EEPROM ***/
+	char			cfgopt_NVSv[8];
+	u16			cfgopt_NVS_vendor_offs;
+	u8			cfgopt_MAC[6];
+	u16			cfgopt_probe_delay;
+	u32			cfgopt_eof_memory;
+	u8			cfgopt_dot11CCAModes;
+	u8			cfgopt_dot11Diversity;
+	u8			cfgopt_dot11ShortPreambleOption;
+	u8			cfgopt_dot11PBCCOption;
+	u8			cfgopt_dot11ChannelAgility;
+	u8			cfgopt_dot11PhyType;	/* FIXME: does 802.11 call it "dot11PHYType"? */
+	u8			cfgopt_dot11TempType;
+	co_antennas_t		cfgopt_antennas;
+	co_powerlevels_t	cfgopt_power_levels;
+	co_datarates_t		cfgopt_data_rates;
+	co_domains_t		cfgopt_domains;
+	co_product_id_t		cfgopt_product_id;
+	co_manuf_t		cfgopt_manufacturer;
 
 	/*** Firmware identification ***/
 	char		firmware_version[FW_ID_SIZE+1];
 	u32		firmware_numver;
 	u32		firmware_id;
+	const u16	*ie_len;
+	const u16	*ie_len_dot11;
 
 	/*** Device state ***/
 	u16		dev_state_mask;
@@ -1250,7 +1251,8 @@ struct wlandevice {
 	u8		ps_listen_interval;
 	u8		ps_options;
 	u8		ps_hangover_period;
-	u16		ps_enhanced_transition_time;
+	u32		ps_enhanced_transition_time;
+	u32		ps_beacon_rx_time;
 
 	/*** PHY settings ***/
 	u8		fallback_threshold;
@@ -1284,6 +1286,7 @@ struct wlandevice {
 	u8		cca;			/* clear channel assessment */
 
 	u16		rts_threshold;
+	u16		frag_threshold;
 	u32		short_retry;
 	u32		long_retry;
 	u16		msdu_lifetime;
@@ -1666,7 +1669,7 @@ typedef struct acx111_ie_powermgmt {
 	u8	listen_interval ACX_PACKED; /* for EACH_ITVL: wake up every "beacon units" interval */
 	u8	options ACX_PACKED;
 	u8	hangover_period ACX_PACKED; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
-	u32	beaconRxTime ACX_PACKED;
+	u32	beacon_rx_time ACX_PACKED;
 	u32	enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
 } acx111_ie_powermgmt_t;
 

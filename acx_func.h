@@ -600,7 +600,7 @@ void acx_update_capabilities(wlandevice_t *priv);
 void acx_s_start(wlandevice_t *priv);
 
 void acx_s_update_card_settings(wlandevice_t *priv);
-void acx_s_parse_configoption(wlandevice_t *priv, acx111_ie_configoption_t *pcfg);
+void acx_s_parse_configoption(wlandevice_t *priv, const acx111_ie_configoption_t *pcfg);
 void acx_l_update_ratevector(wlandevice_t *priv);
 
 void acx_init_task_scheduler(wlandevice_t *priv);

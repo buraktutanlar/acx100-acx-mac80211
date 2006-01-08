@@ -565,14 +565,14 @@ acxusb_s_fill_configoption(wlandevice_t *priv)
 {
 	printk("FIXME: haven't figured out how to fetch configoption struct "
 		"from USB device, passing hardcoded values instead\n");
-	priv->cfgopt.probe_delay = 200;
-	priv->cfgopt.dot11CCAModes = 4;
-	priv->cfgopt.dot11Diversity = 1;
-	priv->cfgopt.dot11ShortPreambleOption = 1;
-	priv->cfgopt.dot11PBCCOption = 1;
-	priv->cfgopt.dot11ChannelAgility = 0;
-	priv->cfgopt.dot11PhyType = 5;
-	priv->cfgopt.dot11TempType = 1;
+	priv->cfgopt_probe_delay = 200;
+	priv->cfgopt_dot11CCAModes = 4;
+	priv->cfgopt_dot11Diversity = 1;
+	priv->cfgopt_dot11ShortPreambleOption = 1;
+	priv->cfgopt_dot11PBCCOption = 1;
+	priv->cfgopt_dot11ChannelAgility = 0;
+	priv->cfgopt_dot11PhyType = 5;
+	priv->cfgopt_dot11TempType = 1;
 	return OK;
 }
 
@@ -668,11 +668,11 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	priv = netdev_priv(dev);
 	priv->netdev = dev;
 
-	priv->cfgopt.dev_type = DEVTYPE_USB;
-	priv->cfgopt.chip_type = CHIPTYPE_ACX100;
+	priv->dev_type = DEVTYPE_USB;
+	priv->chip_type = CHIPTYPE_ACX100;
 
 	/* FIXME: should be read from register (via firmware) using standard ACX code */
-	priv->cfgopt.radio_type = RADIO_MAXIM_0D;
+	priv->radio_type = RADIO_MAXIM_0D;
 
 	priv->usbdev = usbdev;
 	spin_lock_init(&priv->lock);    /* initial state: unlocked */

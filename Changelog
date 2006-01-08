@@ -104,6 +104,23 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060109] 0.3.26
+* From Andreas Mohr <andi@rhlx01.fht-esslingen.de>
+  - revert kzalloc change (too early, only Linux 2.6.14+ has support)
+  - add safe limit checks for probe_delay EEPROM values, log more
+    configopt values
+  - some early parts for packet fragmentation support
+    (I already know how to do it, I think, I just need some time
+    to implement it, and I *really* need this feature here with such
+    a BROKEN 3-wall connection here...)
+  - 802.11 power save mode improvements (not usable by mere mortals yet)
+  - switch fw cmd length structs depending on whether acx100 or acx111
+  - fix log message rate limiting (as a benefit code is now faster, too)
+  - unify acx100/acx111 scanning, saving a couple hundred bytes
+  - set Ctl2_8 to 0 which it most likely should be (please report if
+    this breaks anything - but it shouldn't since it's being initialized
+    to 0 on driver init anyway...)
+
 [20060108] 0.3.25
 * fix scanning breakage
 * fix cmd timeout breakage

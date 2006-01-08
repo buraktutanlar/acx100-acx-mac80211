@@ -620,7 +620,7 @@ acxpci_s_upload_fw(wlandevice_t *priv)
 	/* Try combined, then main image */
 	priv->need_radio_fw = 0;
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
-		IS_ACX111(priv)*11, priv->cfgopt.radio_type);
+		IS_ACX111(priv)*11, priv->radio_type);
 
 	apfw_image = acx_s_read_fw(&priv->pdev->dev, filename, &size);
 	if (!apfw_image) {
@@ -684,7 +684,7 @@ acxpci_s_upload_radio(wlandevice_t *priv)
 
 	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
 		IS_ACX111(priv)*11,
-		priv->cfgopt.radio_type);
+		priv->radio_type);
 	radio_image = acx_s_read_fw(&priv->pdev->dev, filename, &size);
 	if (!radio_image) {
 		printk("acx: can't load radio module '%s'\n", filename);
@@ -938,8 +938,8 @@ acxpci_s_reset_dev(wlandevice_t *priv)
 
 	/* need to know radio type before fw load */
 	hardware_info = read_reg16(priv, IO_ACX_EEPROM_INFORMATION);
-	priv->cfgopt.form_factor = hardware_info & 0xff;
-	priv->cfgopt.radio_type = hardware_info >> 8;
+	priv->form_factor = hardware_info & 0xff;
+	priv->radio_type = hardware_info >> 8;
 
 	/* load the firmware */
 	if (OK != acxpci_s_upload_fw(priv))
@@ -1023,7 +1023,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	FN_ENTER;
 
 	devname = priv->netdev->name;
-	if (!devname || !devname[0])
+	if (!devname || !devname[0] || devname[4]=='%')
 		devname = "acx";
 
 	log(L_CTL, FUNC"(cmd:%s,buflen:%u,timeout:%ums,type:0x%04X)\n",
@@ -1037,7 +1037,7 @@ acxpci_s_issue_cmd_timeo_debug(
 	}
 
 	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_INTERROGATE)) {
-		printk("input pdr (len=%u):\n", buflen);
+		printk("input buffer (len=%u):\n", buflen);
 		acx_dump_bytes(buffer, buflen);
 	}
 
@@ -1649,9 +1649,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	** just _presume_ that we're under sem (instead of actually taking it): */
 	/* acx_sem_lock(priv); */
 	priv->pdev = pdev;
-	priv->cfgopt.dev_type = DEVTYPE_PCI;
-	priv->cfgopt.chip_type = chip_type;
-	priv->cfgopt.chip_name = chip_name;
+	priv->dev_type = DEVTYPE_PCI;
+	priv->chip_type = chip_type;
+	priv->chip_name = chip_name;
 	priv->io = (CHIPTYPE_ACX100 == chip_type) ? IO_ACX100 : IO_ACX111;
 	priv->membase = phymem1;
 	priv->iobase = mem1;
@@ -1697,7 +1697,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (OK != acxpci_s_reset_dev(priv))
 		goto fail_reset;
 
-	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->cfgopt.eeprom_version))
+	if (OK != acxpci_read_eeprom_byte(priv, 0x05, &priv->eeprom_version))
 		goto fail_read_eeprom_version;
 
 	if (IS_ACX100(priv)) {
@@ -1906,9 +1906,9 @@ acxpci_e_suspend(struct pci_dev *pdev, u32 state)
 
 	acx_sem_lock(priv);
 
-	netif_device_detach(dev);	/* This one cannot sleep */
+	netif_device_detach(dev);	/* this one cannot sleep */
 	acxpci_s_down(dev);
-//TODO: why down() does not set it to 0xffff?
+	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(priv, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	acxpci_s_delete_dma_regions(priv);
@@ -1972,7 +1972,7 @@ acxpci_e_resume(struct pci_dev *pdev)
 	netif_device_attach(dev);
 	printk("rsm: device attached\n");
 
-end_unlock: 
+end_unlock:
 	acx_sem_unlock(priv);
 end:
 	/* we need to return OK here anyway, right? */
@@ -2053,7 +2053,10 @@ static void
 disable_acx_irq(wlandevice_t *priv)
 {
 	FN_ENTER;
-//TODO: try 0xffff mask
+
+	/* I guess mask is not 0xffff because acx100 won't signal
+	** cmd completion then (needed for ifup).
+	** Someone with acx100 please confirm */
 	write_reg16(priv, IO_ACX_IRQ_MASK, priv->irq_mask_off);
 	write_reg16(priv, IO_ACX_FEMR, 0x0);
 	priv->irqs_active = 0;
@@ -3059,6 +3062,10 @@ acx100pci_ioctl_set_phy_amp_bias(
 /***************************************************************
 ** acxpci_l_alloc_tx
 ** Actually returns a txdesc_t* ptr
+**
+** FIXME: in case of fragments, should allocate multiple descrs
+** after figuring out how many we need and whether we still have
+** sufficiently many.
 */
 tx_t*
 acxpci_l_alloc_tx(wlandevice_t* priv)
@@ -3127,6 +3134,10 @@ acxpci_l_get_txbuf(wlandevice_t *priv, tx_t* tx_opaque)
 **
 ** Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
 ** Can be called from acx_i_start_xmit (data frames from net core).
+**
+** FIXME: in case of fragments, should loop over the number of
+** pre-allocated tx descrs, properly setting up transfer data and
+** CTL_xxx flags according to fragment number.
 */
 void
 acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
@@ -3148,15 +3159,14 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 	 * in one big swoop later (also in order to have less device memory
 	 * accesses) */
 	Ctl_8 = txdesc->Ctl_8;
-	Ctl2_8 = txdesc->Ctl2_8;
+	Ctl2_8 = 0; /* really need to init it to 0, not txdesc->Ctl2_8, it seems */
 
 	hostdesc2 = hostdesc1 + 1;
 
 	/* DON'T simply set Ctl field to 0 here globally,
 	 * it needs to maintain a consistent flag status (those are state flags!!),
 	 * otherwise it may lead to severe disruption. Only set or reset particular
-	 * flags at the exact moment this is needed...
-	 * FIXME: what about Ctl2? Equally problematic? */
+	 * flags at the exact moment this is needed... */
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
@@ -3241,6 +3251,9 @@ acxpci_l_tx_data(wlandevice_t *priv, tx_t* tx_opaque, int len)
 #endif
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(Ctl_8, DESC_CTL_AUTODMA | DESC_CTL_RECLAIM | DESC_CTL_FIRSTFRAG);
+#if ACX_FRAGMENTATION
+		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
+#endif
 		hostdesc1->length = cpu_to_le16(WLAN_HDR_A3_LEN);
 	}
 	/* don't need to clean ack/rts statistics here, already
@@ -3381,7 +3394,7 @@ handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 		 *
 		 * ok, just do it. */
 		if (++priv->retry_errors_msg_ratelimit % 4 == 0) {
-			if (priv->retry_errors_msg_ratelimit <= 20)
+			if (priv->retry_errors_msg_ratelimit <= 20) {
 				printk("%s: several excessive Tx "
 					"retry errors occurred, attempting "
 					"to recalibrate radio. Radio "
@@ -3389,8 +3402,9 @@ handle_tx_error(wlandevice_t *priv, u8 error, unsigned int finger)
 					"card temperature, please check the card "
 					"before it's too late!\n",
 					priv->netdev->name);
-			if (priv->retry_errors_msg_ratelimit == 20)
-				printk("disabling above message\n");
+				if (priv->retry_errors_msg_ratelimit == 20)
+					printk("disabling above message\n");
+			}
 
 			acx_schedule_task(priv,	ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
@@ -4059,6 +4073,7 @@ acxpci_set_interrupt_mask(wlandevice_t *priv)
 				| HOST_INT_FCS_THRESHOLD
 				/* | HOST_INT_UNKNOWN        */
 				);
+		/* Or else acx100 won't signal cmd completion, right? */
 		priv->irq_mask_off = (u16)~( HOST_INT_CMD_COMPLETE ); /* 0xfdff */
 	} else {
 		priv->irq_mask = (u16) ~(0
@@ -4123,7 +4138,7 @@ acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm)
 	};
 	const u8 *table;
 
-	switch (priv->cfgopt.radio_type) {
+	switch (priv->radio_type) {
 	case RADIO_MAXIM_0D:
 		table = &dbm2val_maxim[0];
 		break;

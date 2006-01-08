@@ -1069,6 +1069,44 @@ acx_ioctl_get_rts(
 }
 
 
+#if ACX_FRAGMENTATION
+static int
+acx_ioctl_set_frag(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	struct iw_param *vwrq,
+	char *extra)
+{
+	wlandevice_t *priv = netdev_priv(dev);
+	int val = vwrq->value;
+
+	if (vwrq->disabled)
+		val = 32767;
+	else
+	if ((val < 256) || (val > 2347))
+		return -EINVAL;
+
+	priv->frag_threshold = val;
+	return OK;
+}
+
+static inline int
+acx_ioctl_get_frag(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	struct iw_param *vwrq,
+	char *extra)
+{
+	wlandevice_t *priv = netdev_priv(dev);
+
+	vwrq->value = priv->frag_threshold;
+	vwrq->disabled = (vwrq->value >= 2347);
+	vwrq->fixed = 1;
+	return OK;
+}
+#endif
+
+
 /***********************************************************************
 ** acx_ioctl_set_encode
 */
@@ -1424,9 +1462,11 @@ acx_ioctl_get_range(
 
 	range->min_rts = 0;
 	range->max_rts = 2312;
-	/* range->min_frag = 256;
-	 * range->max_frag = 2312;
-	 */
+
+#if ACX_FRAGMENTATION
+	range->min_frag = 256;
+	range->max_frag = 2312;
+#endif
 
 	range->encoding_size[0] = 5;
 	range->encoding_size[1] = 13;
@@ -1442,16 +1482,16 @@ acx_ioctl_get_range(
 	range->pmt_flags = IW_POWER_TIMEOUT;
 	range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
 
-	if (IS_ACX100(priv)) {
-	/* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
+	if (IS_ACX100(priv)) { /* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
 		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
 			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
 		range->num_txpower = IW_MAX_TXPOWER;
 		range->txpower_capa = IW_TXPOW_DBM;
-	} else {
-		int count = min(IW_MAX_TXPOWER, (int)priv->cfgopt.power_levels.len);
+	}
+	else {
+		int count = min(IW_MAX_TXPOWER, (int)priv->cfgopt_power_levels.len);
 		for (i = 0; i <= count; i++)
-			range->txpower[i] = priv->cfgopt.power_levels.list[i];
+			range->txpower[i] = priv->cfgopt_power_levels.list[i];
 		range->num_txpower = count;
 		/* this list is given in mW */
 		range->txpower_capa = IW_TXPOW_MWATT;
@@ -2278,9 +2318,9 @@ acx_ioctl_set_rates(struct net_device *dev, struct iw_request_info *info,
 	SET_BIT(orate, brate);
 	log(L_IOCTL, "brate %08X orate %08X\n", brate, orate);
 
-	result = verify_rate(brate, priv->cfgopt.chip_type);
+	result = verify_rate(brate, priv->chip_type);
 	if (result) goto end;
-	result = verify_rate(orate, priv->cfgopt.chip_type);
+	result = verify_rate(orate, priv->chip_type);
 	if (result) goto end;
 
 	acx_sem_lock(priv);
@@ -2640,8 +2680,13 @@ static const iw_handler acx_ioctl_handler[] =
 	(iw_handler) acx_ioctl_get_rate,	/* SIOCGIWRATE */
 	(iw_handler) acx_ioctl_set_rts,		/* SIOCSIWRTS */
 	(iw_handler) acx_ioctl_get_rts,		/* SIOCGIWRTS */
-	(iw_handler) NULL /* acx_ioctl_set_frag FIXME*/,	/* SIOCSIWFRAG */
-	(iw_handler) NULL /* acx_ioctl_get_frag */,		/* SIOCGIWFRAG */
+#if ACX_FRAGMENTATION
+	(iw_handler) acx_ioctl_set_frag,	/* SIOCSIWFRAG */
+	(iw_handler) acx_ioctl_get_frag,	/* SIOCGIWFRAG */
+#else
+	(iw_handler) NULL,			/* SIOCSIWFRAG */
+	(iw_handler) NULL,			/* SIOCGIWFRAG */
+#endif
 	(iw_handler) acx_ioctl_set_txpow,	/* SIOCSIWTXPOW */
 	(iw_handler) acx_ioctl_get_txpow,	/* SIOCGIWTXPOW */
 	(iw_handler) acx_ioctl_set_retry,	/* SIOCSIWRETRY */
