@@ -219,23 +219,8 @@
 #define __WLAN_PRAGMA_PACK1__
 #define __WLAN_PRAGMA_PACKDFLT__
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,38))
- typedef struct device netdevice_t;
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4))
- typedef struct net_device netdevice_t;
-#else
- #undef netdevice_t
- typedef struct net_device netdevice_t;
-#endif
-
-#ifdef WIRELESS_EXT
-#if (WIRELESS_EXT < 13)
-struct iw_request_info {
-	__u16 cmd;		/* Wireless Extension command */
-	__u16 flags;		/* More to come ;-) */
-};
-#endif
-#endif
+#undef netdevice_t
+typedef struct net_device netdevice_t;
 
 /* Interrupt handler backwards compatibility stuff */
 #ifndef IRQ_NONE
@@ -244,33 +229,16 @@ struct iw_request_info {
 typedef void irqreturn_t;
 #endif
 
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)  /* more or less */
-#define WLAN_MOD_INC_USE_COUNT	MOD_INC_USE_COUNT
-#define WLAN_MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT
-#else
-#define WLAN_MOD_INC_USE_COUNT
-#define WLAN_MOD_DEC_USE_COUNT
-#endif
-
 #ifndef ARPHRD_IEEE80211_PRISM
 #define ARPHRD_IEEE80211_PRISM 802
 #endif
 
-#define ETH_P_80211_RAW         (ETH_P_ECONET + 1)
+#define ETH_P_80211_RAW		(ETH_P_ECONET + 1)
 
 /*============================================================================*
  * Constants                                                                  *
  *============================================================================*/
-#define WLAN_IEEE_OUI_LEN     3
-/* unused
-#define WLAN_ETHHDR_LEN       14
-#define WLAN_ETHCONV_ENCAP    1
-#define WLAN_ETHCONV_RFC1042  2
-#define WLAN_ETHCONV_8021h    3
-#define WLAN_MIN_ETHFRM_LEN   60
-#define WLAN_MAX_ETHFRM_LEN   1514
-*/
+#define WLAN_IEEE_OUI_LEN	3
 
 /*============================================================================*
  * Types                                                                      *

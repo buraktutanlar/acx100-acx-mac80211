@@ -81,27 +81,11 @@ enum { acx_debug = 0 };
 /* Use worker_queues for 2.5/2.6 kernels and queue tasks for 2.4 kernels
    (used for the 'bottom half' of the interrupt routine) */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
 #include <linux/workqueue.h>
-/* #define NEWER_KERNELS_ONLY 1 */
 #define USE_WORKER_TASKS
 #define WORK_STRUCT struct work_struct
 #define SCHEDULE_WORK schedule_work
 #define FLUSH_SCHEDULED_WORK flush_scheduled_work
-
-#else
-#include <linux/tqueue.h>
-#define USE_QUEUE_TASKS
-#define WORK_STRUCT struct tq_struct
-#define SCHEDULE_WORK schedule_task
-#define INIT_WORK(work, func, ndev) \
-	do { \
-		(work)->routine = (func); \
-		(work)->data = (ndev); \
-	} while (0)
-#define FLUSH_SCHEDULED_WORK flush_scheduled_tasks
-
-#endif
 
 
 /***********************************************************************
@@ -1366,11 +1350,6 @@ struct wlandevice {
 	u8 __iomem	*cmd_area;
 	u8 __iomem	*info_area;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 10)
-	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced a shorter API version,
-	   then it made its way into 2.6.10 */
-	u32		pci_state[16];		/* saved PCI state for suspend/resume */
-#endif
 	u16		irq_mask;		/* interrupt types to mask out (not wanted) with many IRQs activated */
 	u16		irq_mask_off;		/* interrupt types to mask out (not wanted) with IRQs off */
 	unsigned int	irq_loops_this_jiffy;
@@ -1513,23 +1492,8 @@ struct wlandevice {
 /***********************************************************************
 ** Firmware loading
 */
-/* Doh, 2.4.x also has CONFIG_FW_LOADER_MODULE
- * (but doesn't have the new device model yet which we require!)
- * FIXME: exact version that introduced new device handling? */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
-#if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
-#define USE_FW_LOADER_26 1
-#define USE_FW_LOADER_LEGACY 0
-#else
-#define USE_FW_LOADER_26 0
-#define USE_FW_LOADER_LEGACY 1
-#endif
-#endif
-
-#if USE_FW_LOADER_26
 #include <linux/firmware.h>	/* request_firmware() */
 #include <linux/pci.h>		/* struct pci_device */
-#endif
 
 
 /***********************************************************************

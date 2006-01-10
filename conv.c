@@ -36,9 +36,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif
 
 #include "acx.h"
 

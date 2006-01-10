@@ -35,13 +35,10 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/io.h>
-#include <asm/uaccess.h> /* required for 2.4.x kernels; verify_write() */
-
+//#include <asm/uaccess.h> /* required for 2.4.x kernels; verify_write() */
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif /* WE >= 13 */
 
 #include "acx.h"
 
@@ -330,11 +327,9 @@ acx_ioctl_set_mode(
 	case IW_MODE_AUTO:
 		priv->mode = ACX_MODE_OFF;
 		break;
-#if WIRELESS_EXT > 14
 	case IW_MODE_MONITOR:
 		priv->mode = ACX_MODE_MONITOR;
 		break;
-#endif /* WIRELESS_EXT > 14 */
 	case IW_MODE_ADHOC:
 		priv->mode = ACX_MODE_0_ADHOC;
 		break;
@@ -382,10 +377,8 @@ acx_ioctl_get_mode(
 	switch (priv->mode) {
 	case ACX_MODE_OFF:
 		*uwrq = IW_MODE_AUTO; break;
-#if WIRELESS_EXT > 14
 	case ACX_MODE_MONITOR:
 		*uwrq = IW_MODE_MONITOR; break;
-#endif /* WIRELESS_EXT > 14 */
 	case ACX_MODE_0_ADHOC:
 		*uwrq = IW_MODE_ADHOC; break;
 	case ACX_MODE_2_STA:
@@ -621,7 +614,6 @@ end_unlock:
 }
 
 
-#if WIRELESS_EXT > 13
 /***********************************************************************
 ** acx_s_scan_add_station
 */
@@ -776,12 +768,11 @@ end_unlock:
 	FN_EXIT1(result);
 	return result;
 }
-#endif /* WIRELESS_EXT > 13 */
 
 
-/*----------------------------------------------------------------
-* acx_ioctl_set_essid
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_ioctl_set_essid
+*/
 static int
 acx_ioctl_set_essid(
 	struct net_device *dev,
@@ -1542,35 +1533,6 @@ end:
 /***********************************************************************
 ** Private functions
 */
-
-#if WIRELESS_EXT < 13
-/***********************************************************************
-** acx_ioctl_get_iw_priv
-**
-** I added the monitor mode and changed the stuff below
-** to look more like the orinoco driver
-*/
-static int
-acx_ioctl_get_iw_priv(struct iwreq *iwr)
-{
-	int result = -EINVAL;
-
-	if (!iwr->u.data.pointer)
-		return -EINVAL;
-	result = verify_area(VERIFY_WRITE, iwr->u.data.pointer,
-			sizeof(acx_ioctl_private_args));
-	if (result)
-		return result;
-
-	iwr->u.data.length = VEC_SIZE(acx_ioctl_private_args);
-	if (copy_to_user(iwr->u.data.pointer,
-	    acx_ioctl_private_args, sizeof(acx_ioctl_private_args)) != 0)
-		result = -EFAULT;
-
-	return result;
-}
-#endif
-
 
 /***********************************************************************
 ** acx_ioctl_get_nick
@@ -2624,7 +2586,6 @@ acx100_ioctl_set_phy_amp_bias(
 
 /***********************************************************************
 */
-#if WIRELESS_EXT >= 13
 static const iw_handler acx_ioctl_handler[] =
 {
 	(iw_handler) acx_ioctl_commit,		/* SIOCSIWCOMMIT */
@@ -2663,13 +2624,8 @@ static const iw_handler acx_ioctl_handler[] =
 	(iw_handler) acx_ioctl_get_ap,		/* SIOCGIWAP */
 	(iw_handler) NULL,			/* [nothing] */
 	(iw_handler) acx_ioctl_get_aplist,	/* SIOCGIWAPLIST */
-#if WIRELESS_EXT > 13
 	(iw_handler) acx_ioctl_set_scan,	/* SIOCSIWSCAN */
 	(iw_handler) acx_ioctl_get_scan,	/* SIOCGIWSCAN */
-#else /* WE > 13 */
-	(iw_handler) NULL,			/* SIOCSIWSCAN */
-	(iw_handler) NULL,			/* SIOCGIWSCAN */
-#endif /* WE > 13 */
 	(iw_handler) acx_ioctl_set_essid,	/* SIOCSIWESSID */
 	(iw_handler) acx_ioctl_get_essid,	/* SIOCGIWESSID */
 	(iw_handler) acx_ioctl_set_nick,	/* SIOCSIWNICKN */
@@ -2740,393 +2696,3 @@ const struct iw_handler_def acx_ioctl_handler_def =
 	.get_wireless_stats = acx_e_get_wireless_stats
 #endif /* IW > 5 */
 };
-
-#endif /* WE >= 13 */
-
-
-#if WIRELESS_EXT < 13
-/***********************************************************************
-** Main function
-**
-** acx_e_ioctl_old
-**
-** This is the *OLD* ioctl handler.
-** Make sure to not only place your additions here, but instead mainly
-** in the new one (acx_ioctl_handler[])!
-*/
-int
-acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd)
-{
-	wlandevice_t *priv = netdev_priv(dev);
-	int result = 0;
-	struct iwreq *iwr = (struct iwreq *)ifr;
-
-	log(L_IOCTL, "%s cmd = 0x%04X\n", __func__, cmd);
-
-	/* This is the way it is done in the orinoco driver.
-	 * Check to see if device is present.
-	 */
-	if (0 == netif_device_present(dev)) {
-		return -ENODEV;
-	}
-
-	switch (cmd) {
-/* WE 13 and higher will use acx_ioctl_handler_def */
-	case SIOCGIWNAME:
-		/* get name == wireless protocol */
-		result = acx_ioctl_get_name(dev, NULL,
-					       (char *)&(iwr->u.name), NULL);
-		break;
-
-	case SIOCSIWNWID: /* pre-802.11, */
-	case SIOCGIWNWID: /* not supported. */
-		result = -EOPNOTSUPP;
-		break;
-
-	case SIOCSIWFREQ:
-		/* set channel/frequency (Hz)
-		   data can be frequency or channel :
-		   0-1000 = channel
-		   > 1000 = frequency in Hz */
-		result = acx_ioctl_set_freq(dev, NULL, &(iwr->u.freq), NULL);
-		break;
-
-	case SIOCGIWFREQ:
-		/* get channel/frequency (Hz) */
-		result = acx_ioctl_get_freq(dev, NULL, &(iwr->u.freq), NULL);
-		break;
-
-	case SIOCSIWMODE:
-		/* set operation mode */
-		result = acx_ioctl_set_mode(dev, NULL, &(iwr->u.mode), NULL);
-		break;
-
-	case SIOCGIWMODE:
-		/* get operation mode */
-		result = acx_ioctl_get_mode(dev, NULL, &(iwr->u.mode), NULL);
-		break;
-
-	case SIOCSIWSENS:
-		/* Set sensitivity */
-		result = acx_ioctl_set_sens(dev, NULL, &(iwr->u.sens), NULL);
-		break;
-
-	case SIOCGIWSENS:
-		/* Get sensitivity */
-		result = acx_ioctl_get_sens(dev, NULL, &(iwr->u.sens), NULL);
-		break;
-
-#if WIRELESS_EXT > 10
-	case SIOCGIWRANGE:
-		/* Get range of parameters */
-		{
-			struct iw_range range;
-			result = acx_ioctl_get_range(dev, NULL,
-					&(iwr->u.data), (char *)&range);
-			if (copy_to_user(iwr->u.data.pointer, &range,
-					 sizeof(struct iw_range)))
-				result = -EFAULT;
-		}
-		break;
-#endif
-
-	case SIOCGIWPRIV:
-		result = acx_ioctl_get_iw_priv(iwr);
-		break;
-
-	/* case SIOCSIWSPY: */
-	/* case SIOCGIWSPY: */
-	/* case SIOCSIWTHRSPY: */
-	/* case SIOCGIWTHRSPY: */
-
-	case SIOCSIWAP:
-		/* set access point by MAC address */
-		result = acx_ioctl_set_ap(dev, NULL, &(iwr->u.ap_addr),
-					     NULL);
-		break;
-
-	case SIOCGIWAP:
-		/* get access point MAC address */
-		result = acx_ioctl_get_ap(dev, NULL, &(iwr->u.ap_addr),
-					     NULL);
-		break;
-
-	case SIOCGIWAPLIST:
-		/* get list of access points in range */
-		result = acx_ioctl_get_aplist(dev, NULL, &(iwr->u.data),
-						 NULL);
-		break;
-
-#if NOT_FINISHED_YET
-	case SIOCSIWSCAN:
-		/* start a station scan */
-		result = acx_ioctl_set_scan(iwr, priv);
-		break;
-
-	case SIOCGIWSCAN:
-		/* get list of stations found during scan */
-		result = acx_ioctl_get_scan(iwr, priv);
-		break;
-#endif
-
-	case SIOCSIWESSID:
-		/* set ESSID (network name) */
-		{
-			char essid[IW_ESSID_MAX_SIZE+1];
-
-			if (iwr->u.essid.length > IW_ESSID_MAX_SIZE)
-			{
-				result = -E2BIG;
-				break;
-			}
-			if (copy_from_user(essid, iwr->u.essid.pointer,
-						iwr->u.essid.length))
-			{
-				result = -EFAULT;
-				break;
-			}
-			result = acx_ioctl_set_essid(dev, NULL,
-					&(iwr->u.essid), essid);
-		}
-		break;
-
-	case SIOCGIWESSID:
-		/* get ESSID */
-		{
-			char essid[IW_ESSID_MAX_SIZE+1];
-			if (iwr->u.essid.pointer)
-				result = acx_ioctl_get_essid(dev, NULL,
-					&(iwr->u.essid), essid);
-			if (copy_to_user(iwr->u.essid.pointer, essid,
-						iwr->u.essid.length))
-				result = -EFAULT;
-		}
-		break;
-
-	case SIOCSIWNICKN:
-		/* set nick */
-		{
-			char nick[IW_ESSID_MAX_SIZE+1];
-
-			if (iwr->u.data.length > IW_ESSID_MAX_SIZE)
-			{
-				result = -E2BIG;
-				break;
-			}
-			if (copy_from_user(nick, iwr->u.data.pointer,
-						iwr->u.data.length))
-			{
-				result = -EFAULT;
-				break;
-			}
-			result = acx_ioctl_set_nick(dev, NULL,
-					&(iwr->u.data), nick);
-		}
-		break;
-
-	case SIOCGIWNICKN:
-		/* get nick */
-		{
-			char nick[IW_ESSID_MAX_SIZE+1];
-			if (iwr->u.data.pointer)
-				result = acx_ioctl_get_nick(dev, NULL,
-						&(iwr->u.data), nick);
-			if (copy_to_user(iwr->u.data.pointer, nick,
-						iwr->u.data.length))
-				result = -EFAULT;
-		}
-		break;
-
-	case SIOCSIWRATE:
-		/* set default bit rate (bps) */
-		result = acx_ioctl_set_rate(dev, NULL, &(iwr->u.bitrate),
-					       NULL);
-		break;
-
-	case SIOCGIWRATE:
-		/* get default bit rate (bps) */
-		result = acx_ioctl_get_rate(dev, NULL, &(iwr->u.bitrate),
-					       NULL);
-		break;
-
-	case  SIOCSIWRTS:
-		/* set RTS threshold value */
-		result = acx_ioctl_set_rts(dev, NULL, &(iwr->u.rts), NULL);
-		break;
-	case  SIOCGIWRTS:
-		/* get RTS threshold value */
-		result = acx_ioctl_get_rts(dev, NULL,  &(iwr->u.rts), NULL);
-		break;
-
-	/* case  SIOCSIWFRAG: */
-	/* case  SIOCGIWFRAG: */
-
-#if WIRELESS_EXT > 9
-	case SIOCGIWTXPOW:
-		/* get tx power */
-		result = acx_ioctl_get_txpow(dev, NULL, &(iwr->u.txpower),
-						NULL);
-		break;
-
-	case SIOCSIWTXPOW:
-		/* set tx power */
-		result = acx_ioctl_set_txpow(dev, NULL, &(iwr->u.txpower),
-						NULL);
-		break;
-#endif
-
-	case SIOCSIWRETRY:
-		result = acx_ioctl_set_retry(dev, NULL, &(iwr->u.retry), NULL);
-		break;
-
-	case SIOCGIWRETRY:
-		result = acx_ioctl_get_retry(dev, NULL, &(iwr->u.retry), NULL);
-		break;
-
-	case SIOCSIWENCODE:
-		{
-			/* set encoding token & mode */
-			u8 key[29];
-			if (iwr->u.encoding.pointer) {
-				if (iwr->u.encoding.length > 29) {
-					result = -E2BIG;
-					break;
-				}
-				if (copy_from_user(key, iwr->u.encoding.pointer,
-						iwr->u.encoding.length)) {
-					result = -EFAULT;
-					break;
-				}
-			}
-			else
-			if (iwr->u.encoding.length) {
-				result = -EINVAL;
-				break;
-			}
-			result = acx_ioctl_set_encode(dev, NULL,
-					&(iwr->u.encoding), key);
-		}
-		break;
-
-	case SIOCGIWENCODE:
-		{
-			/* get encoding token & mode */
-			u8 key[29];
-
-			result = acx_ioctl_get_encode(dev, NULL,
-					&(iwr->u.encoding), key);
-			if (iwr->u.encoding.pointer) {
-				if (copy_to_user(iwr->u.encoding.pointer,
-						key, iwr->u.encoding.length))
-					result = -EFAULT;
-			}
-		}
-		break;
-
-	/******************** iwpriv ioctls below ********************/
-#if ACX_DEBUG
-	case ACX100_IOCTL_DEBUG:
-		acx_ioctl_set_debug(dev, NULL, NULL, iwr->u.name);
-		break;
-#endif
-
-	case ACX100_IOCTL_SET_PLED:
-		acx100_ioctl_set_led_power(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_PLED:
-		acx100_ioctl_get_led_power(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_LIST_DOM:
-		acx_ioctl_list_reg_domain(dev, NULL, NULL, NULL);
-		break;
-
-	case ACX100_IOCTL_SET_DOM:
-		acx_ioctl_set_reg_domain(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_DOM:
-		acx_ioctl_get_reg_domain(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_SCAN_PARAMS:
-		acx_ioctl_set_scan_params(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_SCAN_PARAMS:
-		acx_ioctl_get_scan_params(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_PREAMB:
-		acx_ioctl_set_short_preamble(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_PREAMB:
-		acx_ioctl_get_short_preamble(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_ANT:
-		acx_ioctl_set_antenna(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_GET_ANT:
-		acx_ioctl_get_antenna(dev, NULL, NULL, NULL);
-		break;
-
-	case ACX100_IOCTL_RX_ANT:
-		acx_ioctl_set_rx_antenna(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_TX_ANT:
-		acx_ioctl_set_tx_antenna(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_ED:
-		acx_ioctl_set_ed_threshold(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_SET_CCA:
-		acx_ioctl_set_cca(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_MONITOR:	/* set sniff (monitor) mode */
-		log(L_IOCTL, "%s: IWPRIV monitor\n", dev->name);
-
-		/* can only be done by admin */
-		if (!capable(CAP_NET_ADMIN)) {
-			result = -EPERM;
-			break;
-		}
-		result = acx_ioctl_wlansniff(dev, NULL, NULL, iwr->u.name);
-		break;
-
-	case ACX100_IOCTL_TEST:
-		acx_ioctl_unknown11(dev, NULL, NULL, NULL);
-		break;
-
-	case ACX111_IOCTL_INFO:
-		acx111_ioctl_info(dev, NULL, NULL, NULL);
-		break;
-
-	default:
-		log(L_IOCTL, "wireless ioctl 0x%04X queried "
-				"but not implemented yet\n", cmd);
-		result = -EOPNOTSUPP;
-		break;
-	}
-
-	if ((priv->dev_state_mask & ACX_STATE_IFACE_UP) && priv->set_mask) {
-		acx_sem_lock(priv);
-		acx_s_update_card_settings(priv);
-		acx_sem_unlock(priv);
-	}
-
-	/* older WEs don't have a commit handler,
-	 * so we need to fix return code in this case */
-	if (-EINPROGRESS == result)
-		result = 0;
-
-	return result;
-}
-#endif /* WE < 13 */

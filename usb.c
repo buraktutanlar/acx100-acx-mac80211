@@ -48,18 +48,14 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 #include <linux/moduleparam.h>
-#endif
 #include <linux/kernel.h>
 #include <linux/usb.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif
 #include <linux/vmalloc.h>
 
 #include "acx.h"
@@ -650,11 +646,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 #if IW_HANDLER_VERSION <= 5
 	dev->get_wireless_stats = (void *)&acx_e_get_wireless_stats;
 #endif
-#if WIRELESS_EXT >= 13
 	dev->wireless_handlers = (struct iw_handler_def *)&acx_ioctl_handler_def;
-#else
-	dev->do_ioctl = (void *)&acx_e_ioctl_old;
-#endif
 	dev->set_multicast_list = (void *)&acxusb_i_set_rx_mode;
 #ifdef HAVE_TX_TIMEOUT
 	dev->tx_timeout = &acxusb_i_tx_timeout;
@@ -942,8 +934,6 @@ acxusb_e_open(struct net_device *dev)
 
 	acx_unlock(priv, flags);
 
-	WLAN_MOD_INC_USE_COUNT;
-
 	acx_sem_unlock(priv);
 
 	FN_EXIT0;
@@ -1017,9 +1007,6 @@ acxusb_e_close(struct net_device *dev)
 	del_timer_sync(&priv->mgmt_timer);
 
 	acx_sem_unlock(priv);
-
-	/* Decrease module-in-use count (if necessary) */
-	WLAN_MOD_DEC_USE_COUNT;
 
 	FN_EXIT0;
 	return 0;
@@ -1624,13 +1611,6 @@ dump_device(struct usb_device *usbdev)
 	printk("  tt: 0x%X\n", (unsigned int)(usbdev->tt));
 	printk("  ttport: %d\n", (unsigned int)(usbdev->ttport));
 	printk("  toggle[0]: 0x%X  toggle[1]: 0x%X\n", (unsigned int)(usbdev->toggle[0]), (unsigned int)(usbdev->toggle[1]));
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 8)
-	/* halted removed in 2.6.9-rc1 */
-	/* DOH, Canbreak... err... Mandrake decided to do their very own very
-	 * special version "2.6.8.1" which already includes this change, so we
-	 * need to blacklist that version already (i.e. 2.6.8) */
-	printk("  halted[0]: 0x%X  halted[1]: 0x%X\n", usbdev->halted[0], usbdev->halted[1]);
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 	/* This saw a change after 2.6.10 */
 	printk("  ep_in wMaxPacketSize: ");

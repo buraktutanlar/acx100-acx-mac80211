@@ -35,9 +35,7 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
 #include <linux/moduleparam.h>
-#endif
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
@@ -45,9 +43,7 @@
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif
 #include <linux/netdevice.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -84,6 +80,17 @@
 #define PCI_CLASS_NETWORK_OTHERS	0x0280
 
 #define CARD_EEPROM_ID_SIZE 6
+
+#ifndef PCI_D0
+/* From include/linux/pci.h */
+#define PCI_D0		0
+#define PCI_D1		1
+#define PCI_D2		2
+#define PCI_D3hot	3
+#define PCI_D3cold	4
+#define PCI_UNKNOWN	5
+#define PCI_POWER_ERROR	-1
+#endif
 
 
 /***********************************************************************
@@ -1333,12 +1340,8 @@ static inline void
 free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
 	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
 			size, vaddr, dma_handle);
-#else
-	pci_free_consistent(hwdev, size, vaddr, dma_handle);
-#endif
 }
 
 void
@@ -1629,11 +1632,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #if IW_HANDLER_VERSION <= 5
 	dev->get_wireless_stats = &acx_e_get_wireless_stats;
 #endif
-#if WIRELESS_EXT >= 13
 	dev->wireless_handlers = (struct iw_handler_def *)&acx_ioctl_handler_def;
-#else
-	dev->do_ioctl = &acx_e_ioctl_old;
-#endif
 	dev->set_multicast_list = &acxpci_i_set_multicast_list;
 	dev->tx_timeout = &acxpci_i_tx_timeout;
 	dev->change_mtu = &acx_e_change_mtu;
@@ -1668,10 +1667,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #ifdef SET_MODULE_OWNER
 	SET_MODULE_OWNER(dev);
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 70)
-	/* this define and its netdev member exist since 2.5.70 */
 	SET_NETDEV_DEV(dev, &pdev->dev);
-#endif
 
 	/* register new dev in linked list */
 	acxpci_s_device_chain_add(dev);
@@ -1679,13 +1675,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	log(L_IRQ|L_INIT, "using IRQ %d\n", pdev->irq);
 
 	/* need to be able to restore PCI state after a suspend */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
-	   then it made its way into 2.6.10 */
 	pci_save_state(pdev);
-#else
-	pci_save_state(pdev, priv->pci_state);
-#endif
 	pci_set_drvdata(pdev, dev);
 
 	/* ok, pci setup is finished, now start initializing the card */
@@ -1943,13 +1933,7 @@ acxpci_e_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, PCI_D0);
 	printk("rsm: power state PCI_D0 set\n");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-	/* 2.6.9-rc3-mm2 (2.6.9-bk4, too) introduced this shorter version,
-	   then it made its way into 2.6.10 */
 	pci_restore_state(pdev);
-#else
-	pci_restore_state(pdev, priv->pci_state);
-#endif
 	printk("rsm: PCI state restored\n");
 
 	if (OK != acxpci_s_reset_dev(priv))
@@ -2136,9 +2120,6 @@ acxpci_e_open(netdevice_t *dev)
 
 	FN_ENTER;
 
-	log(L_INIT, "module count++\n");
-	WLAN_MOD_INC_USE_COUNT;
-
 	acx_sem_lock(priv);
 
 	acx_init_task_scheduler(priv);
@@ -2209,9 +2190,6 @@ acxpci_e_close(netdevice_t *dev)
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
-	log(L_INIT, "module count--\n");
-	WLAN_MOD_DEC_USE_COUNT;
-
 	acx_sem_unlock(priv);
 
 	log(L_INIT, "closed device\n");
@@ -3479,7 +3457,6 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 		r100 = txdesc->u.r1.rate;
 		r111 = le16_to_cpu(txdesc->u.r2.rate111);
 
-#if WIRELESS_EXT > 13 /* wireless_send_event() and IWEVTXDROP are WE13 */
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
 		if (unlikely(0x30 & error)) {
@@ -3494,7 +3471,7 @@ acxpci_l_clean_txdesc(wlandevice_t *priv)
 			MAC_COPY(wrqu.addr.sa_data, hdr->a1);
 			wireless_send_event(priv->netdev, IWEVTXDROP, &wrqu, NULL);
 		}
-#endif
+
 		/* ...and free the desc */
 		txdesc->error = 0;
 		txdesc->ack_failures = 0;
@@ -3591,14 +3568,8 @@ allocate(wlandevice_t *priv, size_t size, dma_addr_t *phy, const char *msg)
 {
 	void *ptr;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 53)
 	ptr = dma_alloc_coherent(priv->pdev ? &priv->pdev->dev : NULL,
 			size, phy, GFP_KERNEL);
-#else
-#warning Using old PCI-specific DMA allocation, may fail with out-of-mem!
-#warning Upgrade kernel if it does...
-	ptr = pci_alloc_consistent(priv->pdev, size, phy);
-#endif
 
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",

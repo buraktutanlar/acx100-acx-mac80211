@@ -46,9 +46,7 @@
 #include <linux/wireless.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
-#if WIRELESS_EXT >= 13
 #include <net/iw_handler.h>
-#endif /* WE >= 13 */
 
 #include "acx.h"
 
@@ -84,49 +82,9 @@ static int acx_l_transmit_assoc_req(wlandevice_t *priv);
 */
 #if ACX_DEBUG
 unsigned int acx_debug = L_ASSOC|L_INIT;
-#endif
-#if USE_FW_LOADER_LEGACY
-static char *firmware_dir;
-#endif
-#if SEPARATE_DRIVER_INSTANCES
-static int card;
-#endif
-
-/* introduced earlier than 2.6.10, but takes more memory, so don't use it
- * if there's no compile warning by kernel */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 10)
-
-#if ACX_DEBUG
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0);
-#endif
-#if USE_FW_LOADER_LEGACY
-module_param(firmware_dir, charp, 0);
-#endif
-
-#else
-
-#if ACX_DEBUG
-/* doh, 2.6.x screwed up big time: here the define has its own ";"
- * ("double ; detected"), yet in 2.4.x it DOESN'T (the sane thing to do),
- * grrrrr! */
-MODULE_PARM(acx_debug, "i");
-#endif
-#if USE_FW_LOADER_LEGACY
-MODULE_PARM(firmware_dir, "s");
-#endif
-
-#endif
-
-#if ACX_DEBUG
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
-#endif
-#if USE_FW_LOADER_LEGACY
-MODULE_PARM_DESC(firmware_dir, "Directory to load acx100 firmware files from");
-#endif
-#if SEPARATE_DRIVER_INSTANCES
-MODULE_PARM(card, "i");
-MODULE_PARM_DESC(card, "Associate only with card-th acx100 card from this driver instance");
 #endif
 
 #ifdef MODULE_LICENSE
@@ -2350,10 +2308,10 @@ acx111_s_get_tx_level(wlandevice_t *priv)
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_l_rxmonitor
-* Called from IRQ context only
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_rxmonitor
+** Called from IRQ context only
+*/
 static void
 acx_l_rxmonitor(wlandevice_t *priv, const rxbuffer_t *rxbuf)
 {
@@ -2980,9 +2938,9 @@ acx_l_update_ratevector(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_init
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_init
+*/
 static void
 acx_l_sta_list_init(wlandevice_t *priv)
 {
@@ -2993,9 +2951,9 @@ acx_l_sta_list_init(wlandevice_t *priv)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_get_from_hash
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_get_from_hash
+*/
 static inline client_t*
 acx_l_sta_list_get_from_hash(wlandevice_t *priv, const u8 *address)
 {
@@ -3003,9 +2961,9 @@ acx_l_sta_list_get_from_hash(wlandevice_t *priv, const u8 *address)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_get
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_get
+*/
 client_t*
 acx_l_sta_list_get(wlandevice_t *priv, const u8 *address)
 {
@@ -3024,9 +2982,9 @@ acx_l_sta_list_get(wlandevice_t *priv, const u8 *address)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_del
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_del
+*/
 void
 acx_l_sta_list_del(wlandevice_t *priv, client_t *victim)
 {
@@ -3049,11 +3007,11 @@ acx_l_sta_list_del(wlandevice_t *priv, client_t *victim)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_alloc
-*
-* Never fails - will evict oldest client if needed
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_alloc
+**
+** Never fails - will evict oldest client if needed
+*/
 static client_t*
 acx_l_sta_list_alloc(wlandevice_t *priv)
 {
@@ -3087,11 +3045,11 @@ found:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_add
-*
-* Never fails - will evict oldest client if needed
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_add
+**
+** Never fails - will evict oldest client if needed
+*/
 /* In case we will reimplement it differently... */
 #define STA_LIST_ADD_CAN_FAIL 0
 
@@ -3129,11 +3087,11 @@ acx_l_sta_list_add(wlandevice_t *priv, const u8 *address)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_sta_list_get_or_add
-*
-* Never fails - will evict oldest client if needed
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_sta_list_get_or_add
+**
+** Never fails - will evict oldest client if needed
+*/
 static client_t*
 acx_l_sta_list_get_or_add(wlandevice_t *priv, const u8 *address)
 {
@@ -3164,7 +3122,6 @@ acx_set_status(wlandevice_t *priv, u16 new_status)
 	log(L_ASSOC, "%s(%d):%s\n",
 	       __func__, new_status, acx_get_status_name(new_status));
 
-#if WIRELESS_EXT > 13 /* wireless_send_event() and SIOCGIWSCAN */
 	/* wireless_send_event never sleeps */
 	if (ACX_STATUS_4_ASSOCIATED == new_status) {
 		union iwreq_data wrqu;
@@ -3186,7 +3143,6 @@ acx_set_status(wlandevice_t *priv, u16 new_status)
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(priv->netdev, SIOCGIWAP, &wrqu, NULL);
 	}
-#endif
 
 	priv->status = new_status;
 
@@ -3223,11 +3179,11 @@ acx_set_status(wlandevice_t *priv, u16 new_status)
 }
 
 
-/*------------------------------------------------------------------------------
- * acx_i_timer
- *
- * Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_i_timer
+**
+** Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
+*/
 void
 acx_i_timer(unsigned long address)
 {
@@ -3302,11 +3258,11 @@ acx_i_timer(unsigned long address)
 }
 
 
-/*------------------------------------------------------------------------------
- * acx_set_timer
- *
- * Sets the 802.11 state management timer's timeout.
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_set_timer
+**
+** Sets the 802.11 state management timer's timeout.
+*/
 void
 acx_set_timer(wlandevice_t *priv, int timeout_us)
 {
@@ -3329,11 +3285,11 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_assocresp
-*
-* We are an AP here
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_assocresp
+**
+** We are an AP here
+*/
 static const u8
 dot11ratebyte[] = {
 	DOT11RATEBYTE_1,
@@ -3466,7 +3422,7 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
+/***********************************************************************
 * acx_l_transmit_reassocresp
 
 You may be wondering, just like me, what the hell ReAuth is.
@@ -3558,7 +3514,7 @@ Order Information
 3 Association ID (AID)
 4 Supported rates
 
-*----------------------------------------------------------------*/
+*/
 static int
 acx_l_transmit_reassocresp(wlandevice_t *priv, const wlan_fr_reassocreq_t *req)
 {
@@ -3657,9 +3613,9 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_disassoc_from_sta
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_disassoc_from_sta
+*/
 static void
 acx_l_process_disassoc_from_sta(wlandevice_t *priv, const wlan_fr_disassoc_t *req)
 {
@@ -3691,9 +3647,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_deauthen_from_sta
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_deauthen_from_sta
+*/
 static void
 acx_l_process_deauth_from_sta(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 {
@@ -3728,9 +3684,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_disassoc_from_ap
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_disassoc_from_ap
+*/
 static void
 acx_l_process_disassoc_from_ap(wlandevice_t *priv, const wlan_fr_disassoc_t *req)
 {
@@ -3756,9 +3712,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_deauth_from_ap
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_deauth_from_ap
+*/
 static void
 acx_l_process_deauth_from_ap(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 {
@@ -3784,16 +3740,12 @@ end:
 }
 
 
-/*------------------------------------------------------------------------------
- * acx_l_rx
- *
- * The end of the Rx path. Pulls data from a rxhostdesc into a socket
- * buffer and feeds it to the network stack via netif_rx().
- *
- * Arguments:
- *	rxdesc:	the rxhostdesc to pull the data from
- *	priv:	the acx100 private struct of the interface
- *----------------------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_rx
+**
+** The end of the Rx path. Pulls data from a rxhostdesc into a socket
+** buffer and feeds it to the network stack via netif_rx().
+*/
 static void
 acx_l_rx(wlandevice_t *priv, rxbuffer_t *rxbuf)
 {
@@ -3812,9 +3764,9 @@ acx_l_rx(wlandevice_t *priv, rxbuffer_t *rxbuf)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_data_frame_master
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_data_frame_master
+*/
 static int
 acx_l_process_data_frame_master(wlandevice_t *priv, rxbuffer_t *rxbuf)
 {
@@ -3882,9 +3834,9 @@ fail:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_data_frame_client
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_data_frame_client
+*/
 static int
 acx_l_process_data_frame_client(wlandevice_t *priv, rxbuffer_t *rxbuf)
 {
@@ -3980,14 +3932,13 @@ drop:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_mgmt_frame
-*
-* Theory of operation: mgmt packet gets parsed (to make it easy
-* to access variable-sized IEs), results stored in 'parsed'.
-* Then we react to the packet.
-* NB: wlan_mgmt_decode_XXX are dev-independent (shoudnt have been named acx_XXX)
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_mgmt_frame
+**
+** Theory of operation: mgmt packet gets parsed (to make it easy
+** to access variable-sized IEs), results stored in 'parsed'.
+** Then we react to the packet.
+*/
 typedef union parsed_mgmt_req {
 	wlan_fr_mgmt_t mgmt;
 	wlan_fr_assocreq_t assocreq;
@@ -4155,11 +4106,11 @@ acx_l_process_mgmt_frame(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 
 #ifdef UNUSED
-/*----------------------------------------------------------------
-* acx_process_class_frame
-*
-* Called from IRQ context only
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_process_class_frame
+**
+** Called from IRQ context only
+*/
 static int
 acx_process_class_frame(wlandevice_t *priv, rxbuffer_t *rxbuf, int vala)
 {
@@ -4168,9 +4119,9 @@ acx_process_class_frame(wlandevice_t *priv, rxbuffer_t *rxbuf, int vala)
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_l_process_NULL_frame
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_NULL_frame
+*/
 #ifdef BOGUS_ITS_NOT_A_NULL_FRAME_HANDLER_AT_ALL
 static int
 acx_l_process_NULL_frame(wlandevice_t *priv, rxbuffer_t *rxbuf, int vala)
@@ -4226,9 +4177,9 @@ done:
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_l_process_probe_response
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_probe_response
+*/
 static int
 acx_l_process_probe_response(wlandevice_t *priv, wlan_fr_proberesp_t *req,
 			const rxbuffer_t *rxbuf)
@@ -4311,9 +4262,9 @@ ok:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_assocresp
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_assocresp
+*/
 static int
 acx_l_process_assocresp(wlandevice_t *priv, const wlan_fr_assocresp_t *req)
 {
@@ -4349,9 +4300,9 @@ acx_l_process_assocresp(wlandevice_t *priv, const wlan_fr_assocresp_t *req)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_reassocresp
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_reassocresp
+*/
 static int
 acx_l_process_reassocresp(wlandevice_t *priv, const wlan_fr_reassocresp_t *req)
 {
@@ -4381,11 +4332,11 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_process_authen
-*
-* Called only in STA_SCAN or AP mode
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_process_authen
+**
+** Called only in STA_SCAN or AP mode
+*/
 static int
 acx_l_process_authen(wlandevice_t *priv, const wlan_fr_authen_t *req)
 {
@@ -4512,9 +4463,9 @@ end:
 }
 
 
-/*----------------------------------------------------------------
-* acx_gen_challenge
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_gen_challenge
+*/
 static inline void
 acx_gen_challenge(wlan_ie_challenge_t* d)
 {
@@ -4526,9 +4477,9 @@ acx_gen_challenge(wlan_ie_challenge_t* d)
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_deauthen
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_deauthen
+*/
 static int
 acx_l_transmit_deauthen(wlandevice_t *priv, const u8 *addr, u16 reason)
 {
@@ -4573,9 +4524,9 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_authen1
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_authen1
+*/
 static int
 acx_l_transmit_authen1(wlandevice_t *priv)
 {
@@ -4619,9 +4570,9 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_authen2
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_authen2
+*/
 static int
 acx_l_transmit_authen2(wlandevice_t *priv, const wlan_fr_authen_t *req,
 		      client_t *clt)
@@ -4688,9 +4639,9 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_authen3
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_authen3
+*/
 static int
 acx_l_transmit_authen3(wlandevice_t *priv, const wlan_fr_authen_t *req)
 {
@@ -4736,9 +4687,9 @@ ok:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_authen4
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_authen4
+*/
 static int
 acx_l_transmit_authen4(wlandevice_t *priv, const wlan_fr_authen_t *req)
 {
@@ -4777,11 +4728,11 @@ ok:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_assoc_req
-*
-* priv->ap_client is a current candidate AP here
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_assoc_req
+**
+** priv->ap_client is a current candidate AP here
+*/
 static int
 acx_l_transmit_assoc_req(wlandevice_t *priv)
 {
@@ -4888,13 +4839,13 @@ bad:
 }
 
 
-/*----------------------------------------------------------------
-* acx_l_transmit_disassoc
-*
-* FIXME: looks like incomplete implementation of a helper:
-* acx_l_transmit_disassoc(priv, clt) - kick this client (we're an AP)
-* acx_l_transmit_disassoc(priv, NULL) - leave BSSID (we're a STA)
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_l_transmit_disassoc
+**
+** FIXME: looks like incomplete implementation of a helper:
+** acx_l_transmit_disassoc(priv, clt) - kick this client (we're an AP)
+** acx_l_transmit_disassoc(priv, NULL) - leave BSSID (we're a STA)
+*/
 #ifdef BROKEN
 int
 acx_l_transmit_disassoc(wlandevice_t *priv, client_t *clt)
@@ -4942,24 +4893,24 @@ bad:
 #endif
 
 
-/*----------------------------------------------------------------
-* acx_s_complete_scan
-*
-* Called either from after_interrupt_task() if:
-* 1) there was Scan_Complete IRQ, or
-* 2) scanning expired in timer()
-* We need to decide which ESS or IBSS to join.
-* Iterates thru priv->sta_list:
-*	if priv->ap is not bcast, will join only specified
-*	ESS or IBSS with this bssid
-*	checks peers' caps for ESS/IBSS bit
-*	checks peers' SSID, allows exact match or hidden SSID
-* If station to join is chosen:
-*	points priv->ap_client to the chosen struct client
-*	sets priv->essid_for_assoc for future assoc attempt
-* Auth/assoc is not yet performed
-* Returns OK if there is no need to restart scan
-*----------------------------------------------------------------*/
+/***********************************************************************
+** acx_s_complete_scan
+**
+** Called either from after_interrupt_task() if:
+** 1) there was Scan_Complete IRQ, or
+** 2) scanning expired in timer()
+** We need to decide which ESS or IBSS to join.
+** Iterates thru priv->sta_list:
+**	if priv->ap is not bcast, will join only specified
+**	ESS or IBSS with this bssid
+**	checks peers' caps for ESS/IBSS bit
+**	checks peers' SSID, allows exact match or hidden SSID
+** If station to join is chosen:
+**	points priv->ap_client to the chosen struct client
+**	sets priv->essid_for_assoc for future assoc attempt
+** Auth/assoc is not yet performed
+** Returns OK if there is no need to restart scan
+*/
 int
 acx_s_complete_scan(wlandevice_t *priv)
 {
@@ -5189,28 +5140,10 @@ end:
 **  0				unable to load file
 **  pointer to firmware		success
 */
-#if USE_FW_LOADER_26
 firmware_image_t*
 acx_s_read_fw(struct device *dev, const char *file, u32 *size)
-#else
-#undef acx_s_read_fw
-firmware_image_t*
-acx_s_read_fw(const char *file, u32 *size)
-#endif
 {
 	firmware_image_t *res;
-
-#if USE_FW_LOADER_LEGACY
-	mm_segment_t orgfs;
-	unsigned long page;
-	char *buffer;
-	struct file *inf;
-	int retval;
-	int offset;
-	char *filename;
-#endif
-
-#if USE_FW_LOADER_26
 	const struct firmware *fw_entry;
 
 	res = NULL;
@@ -5239,135 +5172,6 @@ release_ret:
 	}
 	printk("acx: firmware image '%s' was not provided. "
 		"Check your hotplug scripts\n", file);
-#endif
-
-#if USE_FW_LOADER_LEGACY
-	printk("acx: firmware upload via firmware_dir module parameter "
-		"is deprecated. Switch to using hotplug\n");
-
-	res = NULL;
-	orgfs = get_fs(); /* store original fs */
-	set_fs(KERNEL_DS);
-
-	/* Read in whole file then check the size */
-	page = __get_free_page(GFP_KERNEL);
-	if (unlikely(0 == page)) {
-		printk("acx: no memory for firmware upload\n");
-		goto fail;
-	}
-
-	filename = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (unlikely(!filename)) {
-		printk("acx: no memory for firmware upload\n");
-		goto fail;
-	}
-	if (!firmware_dir) {
-		firmware_dir = "/usr/share/acx";
-		log(L_DEBUG, "no firmware directory specified "
-			"via module parameter firmware_dir, "
-			"using default %s\n", firmware_dir);
-	}
-	snprintf(filename, PATH_MAX, "%s/%s", firmware_dir, file);
-	log(L_INIT, "reading firmware image '%s'\n", filename);
-
-	buffer = (char*)page;
-
-	/* Note that file must be given as absolute path:
-	 * a relative path works on first loading,
-	 * but any subsequent firmware loading during card
-	 * eject/insert will fail, most likely since the first
-	 * module loading happens in user space (and thus
-	 * filp_open can figure out the absolute path from a
-	 * relative path) whereas the card reinsert processing
-	 * probably happens in kernel space where you don't have
-	 * a current directory to be able to figure out an
-	 * absolute path from a relative path... */
-	inf = filp_open(filename, O_RDONLY, 0);
-	kfree(filename);
-	if (OK != IS_ERR(inf)) {
-		const char *err;
-
-		switch (-PTR_ERR(inf)) {
-			case 2: err = "file not found";
-				break;
-			default:
-				err = "unknown error";
-				break;
-		}
-		printk("acx: error %ld trying to open file '%s': %s\n",
-					-PTR_ERR(inf), file, err);
-		goto fail;
-	}
-
-	if (unlikely((NULL == inf->f_op) || (NULL == inf->f_op->read))) {
-		printk("acx: %s does not have a read method?!\n", file);
-		goto fail_close;
-	}
-
-	offset = 0;
-	do {
-		retval = inf->f_op->read(inf, buffer, PAGE_SIZE, &inf->f_pos);
-
-		if (unlikely(0 > retval)) {
-			printk("acx: error %d reading file '%s'\n",
-							-retval, file);
-			vfree(res);
-			res = NULL;
-		} else if (0 == retval) {
-			if (0 == offset) {
-				printk("acx: firmware image file "
-					"'%s' is empty?!\n", file);
-			}
-		} else if (0 < retval) {
-			/* allocate result buffer here if needed,
-			 * since we don't want to waste resources/time
-			 * (in case file opening/reading fails)
-			 * by doing allocation in front of the loop instead. */
-			if (NULL == res) {
-				*size = 8 + le32_to_cpu(*(u32 *)(4 + buffer));
-
-				res = vmalloc(*size);
-				if (NULL == res) {
-					printk("acx: unable to "
-						"allocate %u bytes for "
-						"firmware module upload\n",
-						*size);
-					goto fail_close;
-				}
-				log(L_DEBUG, "allocated %u bytes "
-					"for firmware module loading\n",
-					*size);
-			}
-			if ((unlikely(offset + retval > *size))) {
-				printk("acx: ERROR: allocation "
-					"was less than firmware image size?!\n");
-				goto fail_close;
-			}
-			memcpy((u8*)res + offset, buffer, retval);
-			offset += retval;
-		}
-	} while (0 < retval);
-
-fail_close:
-	retval = filp_close(inf, NULL);
-
-	if (unlikely(retval)) {
-		printk("acx: error %d closing file '%s'\n", -retval, file);
-	}
-
-	if (unlikely((NULL != res) && (offset != le32_to_cpu(res->size) + 8))) {
-		printk("acx: firmware is reporting a different size "
-			"(0x%08X; 0x%08X was read)\n",
-			le32_to_cpu(res->size) + 8, offset);
-		vfree(res);
-		res = NULL;
-	}
-
-fail:
-	if (page)
-		free_page(page);
-	set_fs(orgfs);
-#endif
 
 	/* checksum will be verified in write_fw, so don't bother here */
 	return res;
@@ -6870,9 +6674,9 @@ acx_update_capabilities(wlandevice_t *priv)
 }
 
 /***********************************************************************
-* Common function to parse ALL configoption struct formats
-* (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
-* FIXME: logging should be removed here and added to a /proc file instead
+** Common function to parse ALL configoption struct formats
+** (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
+** FIXME: logging should be removed here and added to a /proc file instead
 */
 void
 acx_s_parse_configoption(wlandevice_t *priv, const acx111_ie_configoption_t *pcfg)

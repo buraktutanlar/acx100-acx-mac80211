@@ -496,12 +496,7 @@ acx_proc_unregister_entries(const struct net_device *dev) { return OK; }
 
 /***********************************************************************
 */
-#if USE_FW_LOADER_26
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
-#else
-firmware_image_t *acx_s_read_fw(const char *file, u32 *size);
-#define acx_s_read_fw(dev, file, size) acx_s_read_fw(file, size)
-#endif
 int acxpci_s_upload_radio(wlandevice_t *priv);
 
 
