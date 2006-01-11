@@ -1155,7 +1155,7 @@ struct wlandevice {
 	u8			cfgopt_dot11ShortPreambleOption;
 	u8			cfgopt_dot11PBCCOption;
 	u8			cfgopt_dot11ChannelAgility;
-	u8			cfgopt_dot11PhyType;	/* FIXME: does 802.11 call it "dot11PHYType"? */
+	u8			cfgopt_dot11PhyType;
 	u8			cfgopt_dot11TempType;
 	co_antennas_t		cfgopt_antennas;
 	co_powerlevels_t	cfgopt_power_levels;

@@ -81,7 +81,7 @@ static int acx_l_transmit_assoc_req(wlandevice_t *priv);
 /***********************************************************************
 */
 #if ACX_DEBUG
-unsigned int acx_debug = L_ASSOC|L_INIT;
+unsigned int acx_debug /* will add __read_mostly later */ = L_ASSOC|L_INIT;
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
@@ -6480,10 +6480,12 @@ acx_s_after_interrupt_recalib(wlandevice_t *priv)
 		/* if some time passed between last
 		 * attempts, then reset failure retry counter
 		 * to be able to do next recalib attempt */
-		if (time_after(jiffies, priv->recalib_time_last_attempt + HZ))
+		if (time_after(jiffies, priv->recalib_time_last_attempt + 5*HZ))
 			priv->recalib_failure_count = 0;
 
-		if (++priv->recalib_failure_count <= 5) {
+		if (priv->recalib_failure_count < 5) {
+			/* increment inside only, for speedup of outside path */
+			priv->recalib_failure_count++;
 			priv->recalib_time_last_attempt = jiffies;
 			acx_schedule_task(priv, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
@@ -6685,18 +6687,21 @@ acx_s_parse_configoption(wlandevice_t *priv, const acx111_ie_configoption_t *pcf
 	int i;
 	int is_acx111 = IS_ACX111(priv);
 
-	if (( is_acx111 && (priv->eeprom_version != 5))
-	||  (!is_acx111 && (priv->eeprom_version != 4))) {
+	if (acx_debug & L_DEBUG) {
+		printk("configoption struct content:\n");
+		acx_dump_bytes(pcfg, sizeof(*pcfg));
+	}
+
+	if (( is_acx111 && (priv->eeprom_version == 5))
+	||  (!is_acx111 && (priv->eeprom_version == 4))
+	||  (!is_acx111 && (priv->eeprom_version == 5))) {
+		/* these versions are known to be supported */
+	} else {
 		printk("unknown chip and EEPROM version combination (%s, v%d), "
 			"don't know how to parse config options yet. "
 			"Please report\n", is_acx111 ? "ACX111" : "ACX100",
 			priv->eeprom_version);
 		return;
-	}
-
-	if (acx_debug & L_DEBUG) {
-		printk("configoption struct content:\n");
-		acx_dump_bytes(pcfg, sizeof(*pcfg));
 	}
 
 	/* first custom-parse the first part which has chip-specific layout */

@@ -104,6 +104,12 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060112] 0.3.27
+* Andreas Mohr <andim2@users.sourceforge.net>:
+  - add support for configopt parsing for ACX100 EEPROM version v5
+  - only start another radio recalibration interval every 5 seconds
+    on ACX111 instead of every second
+
 [20060111]
 * drop compatibility cruft for kernels < 2.6.10
 

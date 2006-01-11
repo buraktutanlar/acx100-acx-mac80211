@@ -1773,7 +1773,7 @@ fail_unknown_chiptype:
 	pci_disable_device(pdev);
 fail_pci_enable_device:
 
-	pci_set_power_state(pdev, 3);
+	pci_set_power_state(pdev, PCI_D3hot);
 
 done:
 	FN_EXIT1(result);

@@ -2,6 +2,7 @@ This tarball is targeted at 2.6 inclusion only.
 Not designed to work or even compile with 2.4.
 
 Contact:
+netdev@vger.kernel.org
 acx100-devel@lists.sourceforge.net
 acx100-users@lists.sourceforge.net
 
