@@ -1812,10 +1812,10 @@ acxpci_e_remove(struct pci_dev *pdev)
 	/* find our PCI device in the global acx list and remove it */
 	acxpci_s_device_chain_remove(dev);
 
-	if (priv->dev_state_mask & ACX_STATE_IFACE_UP)
+	if (priv->dev_state_mask & ACX_STATE_IFACE_UP) {
 		acxpci_s_down(dev);
-
-	CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
+		CLEAR_BIT(priv->dev_state_mask, ACX_STATE_IFACE_UP);
+	}
 
 	acxpci_s_delete_dma_regions(priv);
 
@@ -3591,8 +3591,14 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 		goto fail;
 	}
 
-/* Each tx frame buffer is accessed by hardware via
-** txdesc -> txhostdesc(s) -> framebuffer(s)
+	hostdesc = priv->txhostdesc_start;
+	hostdesc_phy = priv->txhostdesc_startphy;
+	txbuf = priv->txbuf_start;
+	txbuf_phy = priv->txbuf_startphy;
+
+#if 0
+/* Each tx buffer is accessed by hardware via
+** txdesc -> txhostdesc(s) -> txbuffer(s).
 ** We use only one txhostdesc per txdesc, but it looks like
 ** acx111 is buggy: it accesses second txhostdesc
 ** (via hostdesc.desc_phy_next field) even if
@@ -3603,20 +3609,10 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 ** Storing NULL into hostdesc.desc_phy_next
 ** doesn't seem to help.
 **
-** It is not known whether we need to have 'extra' second
-** txhostdescs for acx100. Maybe it is acx111-only bug.
-**
-** Update: acx111 WG311v2 is even more bogus than this.
-** We will initialize two hostdesc so that they point
-** to adjacent memory areas.
+** Update: although it worked on Xterasys XN-2522g
+** with len=3 trick, WG311v2 is even more bogus, doesn't work.
+** Keeping this code (#ifdef'ed out) for documentational purposes.
 */
-	hostdesc = priv->txhostdesc_start;
-	hostdesc_phy = priv->txhostdesc_startphy;
-	txbuf = priv->txbuf_start;
-	txbuf_phy = priv->txbuf_startphy;
-
-#if 0
-/* Works for xterasys xn2522g, does not for WG311v2 !!? */
 	for (i = 0; i < TX_CNT*2; i++) {
 		hostdesc_phy += sizeof(*hostdesc);
 		if (!(i & 1)) {
@@ -3648,6 +3644,8 @@ acxpci_s_create_tx_host_desc_queue(wlandevice_t *priv)
 		hostdesc++;
 	}
 #endif
+/* We initialize two hostdescs so that they point to adjacent
+** memory areas. Thus txbuf is really just a contiguous memory area */
 	for (i = 0; i < TX_CNT*2; i++) {
 		hostdesc_phy += sizeof(*hostdesc);
 
@@ -4247,7 +4245,7 @@ acxpci_e_cleanup_module(void)
 		acx_lock(priv, flags);
 
 		/* disable power LED to save power :-) */
-		log(L_INIT, "switching off power LED to save power :-)\n");
+		log(L_INIT, "switching off power LED to save power\n");
 		acxpci_l_power_led(priv, 0);
 
 		/* stop our eCPU */
