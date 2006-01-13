@@ -104,6 +104,14 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060113]
+* Andreas Mohr <andim2@users.sourceforge.net>:
+  - add recommended cpu_relax() to busy-wait loops
+  - reorder struct wlandevice_t for better(??) cache use
+  - kill superfluous result variable in conv.c
+  - misc. small cleanup
+* SEPARATE_DRIVER_INSTANCES is a 2.4ism, removed
+
 [20060112] 0.3.27
 * Andreas Mohr <andim2@users.sourceforge.net>:
   - add support for configopt parsing for ACX100 EEPROM version v5

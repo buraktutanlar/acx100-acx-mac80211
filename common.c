@@ -81,7 +81,7 @@ static int acx_l_transmit_assoc_req(wlandevice_t *priv);
 /***********************************************************************
 */
 #if ACX_DEBUG
-unsigned int acx_debug /* will add __read_mostly later */ = L_ASSOC|L_INIT;
+unsigned int acx_debug /* will add __read_mostly later */ = ACX_DEFAULT_MSG;
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
@@ -119,8 +119,7 @@ const char * const
 acx_reg_domain_strings[] = {
 	/* 0 */	" 1-11 FCC (USA)",
 	/* 1 */	" 1-11 DOC/IC (Canada)",
-	/* BTW: WLAN use in ETSI is regulated by
-	 * ETSI standard EN 300 328-2 V1.1.2 */
+/* BTW: WLAN use in ETSI is regulated by ETSI standard EN 300 328-2 V1.1.2 */
 	/* 2 */	" 1-13 ETSI (Europe)",
 	/* 3 */	"10-11 Spain",
 	/* 4 */	"10-13 France",
@@ -155,7 +154,7 @@ sanitize_str(const char *s)
 void
 acx_lock_debug(wlandevice_t *priv, const char* where)
 {
-	int count = 100*1000*1000;
+	unsigned int count = 100*1000*1000;
 	where = sanitize_str(where);
 	while (--count) {
 		if (!spin_is_locked(&priv->lock)) break;
@@ -179,7 +178,7 @@ acx_unlock_debug(wlandevice_t *priv, const char* where)
 	}
 #endif
 	if (acx_debug & L_LOCK) {
-		unsigned diff;
+		unsigned long diff;
 		rdtscl(diff);
 		diff -= priv->lock_time;
 		if (diff > max_lock_time) {
@@ -228,7 +227,7 @@ acx_up_debug(wlandevice_t *priv, const char* where)
 		dump_stack();
 	}
 	if (acx_debug & L_LOCK) {
-		unsigned diff = jiffies - priv->sem_time;
+		unsigned long diff = jiffies - priv->sem_time;
 		if (diff > max_sem_time) {
 			where = sanitize_str(where);
 			printk("max sem hold time %d jiffies from %s "
@@ -353,7 +352,7 @@ acx_get_status_name(u16 status)
 		"STOPPED", "SCANNING", "WAIT_AUTH",
 		"AUTHENTICATED", "ASSOCIATED", "INVALID??"
 	};
-	if (status >= VEC_SIZE(str))
+	if (status > VEC_SIZE(str)-1)
 		status = VEC_SIZE(str)-1;
 
 	return str[status];
@@ -3661,18 +3660,16 @@ acx_l_process_deauth_from_sta(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 	hdr = req->hdr;
 
 	if (acx_debug & L_ASSOC) {
-		acx_print_mac("DEAUTHEN priv->addr=", priv->dev_addr, " ");
-		acx_print_mac("a1", hdr->a1, " ");
-		acx_print_mac("a2", hdr->a2, " ");
-		acx_print_mac("a3", hdr->a3, " ");
-		acx_print_mac("priv->bssid", priv->bssid, "\n");
+		acx_print_mac("got deauth from sta:", hdr->a2, " ");
+		acx_print_mac("a1:", hdr->a1, " ");
+		acx_print_mac("a3:", hdr->a3, " ");
+		acx_print_mac("priv->addr:", priv->dev_addr, " ");
+		acx_print_mac("priv->bssid:", priv->bssid, "\n");
 	}
 
 	if (!mac_is_equal(priv->dev_addr, hdr->a1)) {
 		goto end;
 	}
-
-	acxlog_mac(L_DEBUG, "STA ", hdr->a2, " sent us deauthen packet\n");
 
 	client = acx_l_sta_list_get(priv, hdr->a2);
 	if (!client) {
@@ -3729,7 +3726,7 @@ acx_l_process_deauth_from_ap(wlandevice_t *priv, const wlan_fr_deauthen_t *req)
 		priv->netdev->name, *req->reason,
 		acx_wlan_reason_str(*req->reason));
 
-	/* Chk: is ta is verified to be from our AP? */
+	/* Chk: is ta verified to be from our AP? */
 	if (mac_is_equal(priv->dev_addr, req->hdr->a1)) {
 		log(L_DEBUG, "AP sent us deauth packet\n");
 		SET_BIT(priv->set_mask, GETSET_RESCAN);
@@ -5094,7 +5091,7 @@ acx_s_complete_scan(wlandevice_t *priv)
 			printk("%s: no matching station found in range, "
 				"generating our own IBSS instead\n",
 				priv->netdev->name);
-			/* we do it hostap way: */
+			/* we do it the HostAP way: */
 			MAC_COPY(priv->bssid, priv->dev_addr);
 			priv->bssid[0] |= 0x02; /* 'local assigned addr' bit */
 			/* add IBSS bit to our caps... */
@@ -6207,7 +6204,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		if (priv->tx_disabled)
 			acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 		else
-			acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 1);
+			acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &priv->channel, 1);
 		CLEAR_BIT(priv->set_mask, GETSET_TX);
 	}
 
@@ -6215,7 +6212,7 @@ acx_s_update_card_settings(wlandevice_t *priv)
 		/* Enable Rx */
 		log(L_INIT, "updating: enable Rx on channel: %u\n",
 				priv->channel);
-		acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 1);
+		acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &priv->channel, 1);
 		CLEAR_BIT(priv->set_mask, GETSET_RX);
 	}
 
@@ -6421,8 +6418,8 @@ acx_s_recalib_radio(wlandevice_t *priv)
 		 * by issuing a GETSET_TX|GETSET_RX */
 		if (/* (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
 		    (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
-		    (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &(priv->channel), 1)) &&
-		    (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &(priv->channel), 1)) )
+		    (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_TX, &priv->channel, 1)) &&
+		    (OK == acx_s_issue_cmd(priv, ACX1xx_CMD_ENABLE_RX, &priv->channel, 1)) )
 			return OK;
 		return NOT_OK;
 	}

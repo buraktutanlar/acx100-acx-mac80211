@@ -138,8 +138,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	struct wlan_llc *e_llc;
 	struct wlan_snap *e_snap;
 	const u8 *a1, *a3;
-	int header_len, payload_len;
-	int result = -1;
+	int header_len, payload_len = -1;
 	/* protocol type or data length, depending on whether
 	 * DIX or 802.3 ethernet format */
 	u16 proto;
@@ -164,7 +163,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 			goto end;
 		}
 		memcpy(w_hdr, skb->data, skb->len);
-		result = skb->len;
+		payload_len = skb->len;
 		goto end;
 	}
 
@@ -206,7 +205,6 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	/* TODO: can we just let acx DMA payload from skb instead? */
 	memcpy((u8*)txbuf + header_len, skb->data + sizeof(wlan_ethhdr_t), payload_len);
 	payload_len += header_len;
-	result = payload_len;
 
 	/* Set up the 802.11 header */
 	switch (priv->mode) {
@@ -228,7 +226,7 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	default:
 		printk("%s: error - converting eth to wlan in unknown mode\n",
 				priv->netdev->name);
-		result = -1;
+		payload_len = -1;
 		goto end;
 	}
 	if (priv->wep_enabled)
@@ -251,8 +249,8 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 #endif
 
 end:
-	FN_EXIT1(result);
-	return result;
+	FN_EXIT1(payload_len);
+	return payload_len;
 }
 
 
@@ -330,8 +328,8 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	e_hdr = (wlan_ethhdr_t*) ((u8*) w_hdr + payload_offset);
 	e_llc = (wlan_llc_t*) e_hdr;
 	e_snap = (wlan_snap_t*) (e_llc + 1);
-	e_payload = (u8*) (e_snap + 1);
 	mtu = priv->netdev->mtu;
+	e_payload = (u8*) (e_snap + 1);
 
 	log(L_DATA, "rx: payload_offset %d, payload_length %d\n",
 		payload_offset, payload_length);

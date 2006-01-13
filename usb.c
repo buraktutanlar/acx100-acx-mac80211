@@ -1618,7 +1618,7 @@ dump_device(struct usb_device *usbdev)
 		printk("%d ", usbdev->ep_in[i]->desc.wMaxPacketSize);
 	printk("\n");
 	printk("  ep_out wMaxPacketSize: ");
-	for (i = 0; i < 15; ++i)
+	for (i = 0; i < VEC_SIZE(usbdev->ep_out); ++i)
 		printk("%d ", usbdev->ep_out[i]->desc.wMaxPacketSize);
 	printk("\n");
 #else
@@ -1633,7 +1633,7 @@ dump_device(struct usb_device *usbdev)
 #endif
 	printk("  parent: 0x%X\n", (unsigned int)usbdev->parent);
 	printk("  bus: 0x%X\n", (unsigned int)usbdev->bus);
-#if NO_DATATYPE
+#ifdef NO_DATATYPE
 	printk("  configs: ");
 	for (i = 0; i < usbdev->descriptor.bNumConfigurations; i++)
 		printk("0x%X ", usbdev->config[i]);

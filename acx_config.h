@@ -8,6 +8,7 @@
 /* set to 1 if you want some debugging */
 /* set to 2 if you want extensive debug log */
 #define ACX_DEBUG 2
+#define ACX_DEFAULT_MSG (L_ASSOC|L_INIT)
 
 /* assume 32bit I/O width
  * (16bit is also compatible with Compact Flash) */
@@ -30,13 +31,6 @@
 
 /* if you want very early packet fragmentation bits and pieces */
 #define ACX_FRAGMENTATION 0
-
-/* set to 1 if you want to have 1 driver per card instead of 1 single driver
- * managing all cards (of a particular bus type) in your system
- * Useful e.g. if you need to reinitialize single cards from time to time
- * LINUX 2.4.X ONLY!! (pci_for_each_dev()) Feel free to implement 2.6.x
- * compatibility... */
-#define SEPARATE_DRIVER_INSTANCES 0
 
 /* Locking: */
 /* very talkative */

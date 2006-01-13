@@ -1225,9 +1225,9 @@ struct wlandevice {
 	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
 	client_t	*ap_client;		/* this one is our AP (STA mode only) */
 
-	unsigned long	dup_msg_expiry;
 	int		dup_count;
 	int		nondup_count;
+	unsigned long	dup_msg_expiry;
 	u16		last_seq_ctrl;		/* duplicate packet detection */
 
 	/* 802.11 power save mode */
@@ -1289,15 +1289,15 @@ struct wlandevice {
 	wep_key_t	wep_keys[DOT11_MAX_DEFAULT_WEP_KEYS];	/* the default WEP keys */
 	key_struct_t	wep_key_struct[10];
 
+	/*** Unknown ***/
+	u8		dtim_interval;
+
 	/*** Card Rx/Tx management ***/
 	u16		rx_config_1;
 	u16		rx_config_2;
 	u16		memblocksize;
-	int		tx_free;
-	int		tx_head;
-
-	/*** Unknown ***/
-	u8		dtim_interval;
+	unsigned int	tx_free;
+	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
@@ -1310,30 +1310,30 @@ struct wlandevice {
 #ifdef ACX_PCI
 	/* pointers to tx buffers, tx host descriptors (in host memory)
 	** and tx descs in device memory */
+	unsigned int	tx_tail;
 	u8		*txbuf_start;
 	txhostdesc_t	*txhostdesc_start;
 	txdesc_t	*txdesc_start;	/* points to PCI-mapped memory */
+	dma_addr_t	txbuf_startphy;
+	dma_addr_t	txhostdesc_startphy;
+	/* sizes of above host memory areas */
+	unsigned int	txbuf_area_size;
+	unsigned int	txhostdesc_area_size;
+
+	unsigned int	txdesc_size;	/* size of txdesc; ACX111 = ACX100 + 4 */
+	client_t	*txc[TX_CNT];
+	u16		txr[TX_CNT];
+
 	/* same for rx */
+	unsigned int	rx_tail;
 	rxbuffer_t	*rxbuf_start;
 	rxhostdesc_t	*rxhostdesc_start;
 	rxdesc_t	*rxdesc_start;
 	/* physical addresses of above host memory areas */
 	dma_addr_t	rxbuf_startphy;
 	/* dma_addr_t	rxhostdesc_startphy; */
-	dma_addr_t	txbuf_startphy;
-	dma_addr_t	txhostdesc_startphy;
-	/* sizes of above host memory areas */
-	unsigned int	txbuf_area_size;
-	unsigned int	txhostdesc_area_size;
 	unsigned int	rxbuf_area_size;
 	unsigned int	rxhostdesc_area_size;
-
-	unsigned int	txdesc_size;	/* size of txdesc; ACX111 = ACX100 + 4 */
-	unsigned int	tx_tail;
-	unsigned int	rx_tail;
-
-	client_t	*txc[TX_CNT];
-	u16		txr[TX_CNT];
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */

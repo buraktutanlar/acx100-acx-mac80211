@@ -302,6 +302,7 @@ acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf)
 			result = NOT_OK;
 			goto fail;
 		}
+		cpu_relax();
 	}
 
 	*charbuf = read_reg8(priv, IO_ACX_EEPROM_DATA);
@@ -369,6 +370,7 @@ acxpci_s_write_eeprom(wlandevice_t *priv, u32 addr, u32 len, const u8 *charbuf)
 					"Timeout waiting for EEPROM write\n");
 				goto end;
 			}
+			cpu_relax();
 		}
 	}
 
@@ -389,6 +391,7 @@ acxpci_s_write_eeprom(wlandevice_t *priv, u32 addr, u32 len, const u8 *charbuf)
 				printk("timeout waiting for EEPROM read\n");
 				goto end;
 			}
+			cpu_relax();
 		}
 
 		data_verify[i] = read_reg16(priv, IO_ACX_EEPROM_DATA);
@@ -435,6 +438,7 @@ acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
 			*charbuf = 0;
 			goto fail;
 		}
+		cpu_relax();
 	}
 
 	log(L_DEBUG, "count was %u\n", count);
@@ -1517,33 +1521,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int err;
 	u8 chip_type;
 
-#if SEPARATE_DRIVER_INSTANCES
-	struct pci_dev *tdev;
-	unsigned int inited;
-	static int turn = 0;
-#endif /* SEPARATE_DRIVER_INSTANCES */
-
 	FN_ENTER;
-
-#if SEPARATE_DRIVER_INSTANCES
-	if (card) {
-		turn++;
-		inited = 0;
-		pci_for_each_dev(tdev) {
-			if (tdev->vendor != PCI_VENDOR_ID_TI)
-				continue;
-
-			if (tdev == pdev)
-				break;
-			if (pci_get_drvdata(tdev))
-				inited++;
-		}
-		if (inited + turn != card) {
-			result = -ENODEV;
-			goto done;
-		}
-	}
-#endif /* SEPARATE_DRIVER_INSTANCES */
 
 	/* Enable the PCI device */
 	if (pci_enable_device(pdev)) {

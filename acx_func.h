@@ -171,7 +171,7 @@ mac_is_equal(const u8 *a, const u8 *b)
 static inline int
 mac_is_bcast(const u8 *mac)
 {
-	/* AND together 4 first bytes with sign-entended 2 last bytes
+	/* AND together 4 first bytes with sign-extended 2 last bytes
 	** Only bcast address gives 0xffffffff. +1 gives 0 */
 	return ( *(s32*)mac & ((s16*)mac)[2] ) + 1 == 0;
 }
@@ -254,7 +254,7 @@ has_only_one_bit(u16 v)
 ** acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
 ** acx_l_xxxx - functions which expect lock to be already taken.
 ** rest       - non-sleeping functions which do not require locking
-**		but may be run inder lock
+**		but may be run under lock
 **
 ** A small number of local helpers do not have acx_[eisl]_ prefix.
 ** They are always close to caller and are to be revieved locally.
