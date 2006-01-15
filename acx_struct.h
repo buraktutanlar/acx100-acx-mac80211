@@ -34,7 +34,7 @@
 ** Forward declarations of types
 */
 typedef struct tx tx_t;
-typedef struct wlandevice wlandevice_t;
+typedef struct acx_device acx_device_t;
 typedef struct client client_t;
 typedef struct rxdesc rxdesc_t;
 typedef struct txdesc txdesc_t;
@@ -98,8 +98,8 @@ enum { acx_debug = 0 };
 #define CHIPTYPE_ACX100		1
 #define CHIPTYPE_ACX111		2
 
-#define IS_ACX100(priv)	((priv)->chip_type == CHIPTYPE_ACX100)
-#define IS_ACX111(priv)	((priv)->chip_type == CHIPTYPE_ACX111)
+#define IS_ACX100(adev)	((adev)->chip_type == CHIPTYPE_ACX100)
+#define IS_ACX111(adev)	((adev)->chip_type == CHIPTYPE_ACX111)
 
 /* Supported interfaces */
 #define DEVTYPE_PCI		0
@@ -107,22 +107,22 @@ enum { acx_debug = 0 };
 
 #if defined(CONFIG_ACX_PCI)
  #if !defined(CONFIG_ACX_USB)
-  #define IS_PCI(priv)	1
+  #define IS_PCI(adev)	1
  #else
-  #define IS_PCI(priv)	((priv)->dev_type == DEVTYPE_PCI)
+  #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
  #endif
 #else
- #define IS_PCI(priv)	0
+ #define IS_PCI(adev)	0
 #endif
 
 #if defined(CONFIG_ACX_USB)
  #if !defined(CONFIG_ACX_PCI)
-  #define IS_USB(priv)	1
+  #define IS_USB(adev)	1
  #else
-  #define IS_USB(priv)	((priv)->dev_type == DEVTYPE_USB)
+  #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
  #endif
 #else
- #define IS_USB(priv)	0
+ #define IS_USB(adev)	0
 #endif
 
 /* Driver defaults */
@@ -629,7 +629,7 @@ typedef struct key_struct {
 
 
 /*--- Client (peer) info -----------------------------------------------------*/
-/* priv->sta_list[] is used for:
+/* adev->sta_list[] is used for:
 ** accumulating and processing of scan results
 ** keeping client info in AP mode
 ** keeping AP info in STA mode (AP is the only one 'client')
@@ -982,7 +982,7 @@ typedef struct usb_txstatus {
 typedef struct usb_tx {
 	unsigned	busy:1;
 	struct urb	*urb;
-	wlandevice_t	*priv;
+	acx_device_t	*adev;
 	/* actual USB bulk output data block is here: */
 	usb_txbuffer_t	bulkout;
 } usb_tx_t;
@@ -990,14 +990,14 @@ typedef struct usb_tx {
 struct usb_rx_plain {
 	unsigned	busy:1;
 	struct urb	*urb;
-	wlandevice_t	*priv;
+	acx_device_t	*adev;
 	rxbuffer_t	bulkin;
 };
 
 typedef struct usb_rx {
 	unsigned	busy:1;
 	struct urb	*urb;
-	wlandevice_t	*priv;
+	acx_device_t	*adev;
 	rxbuffer_t	bulkin;
  /* Make entire structure 4k. Report if it breaks something. */
 	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
@@ -1076,7 +1076,7 @@ typedef struct acx111_ie_configoption {
 
 
 /***********************************************************************
-** Main acx per-device data structure (netdev_priv(dev))
+** Main acx per-device data structure (netdev_priv(ndev))
 */
 #define ACX_STATE_FW_LOADED	0x01
 #define ACX_STATE_IFACE_UP	0x02
@@ -1104,7 +1104,7 @@ typedef struct acx111_ie_configoption {
  * acx_priv_t) */
 
 /* non-firmware struct, no packing necessary */
-struct wlandevice {
+struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
 	/*** Locking ***/
@@ -1118,12 +1118,12 @@ struct wlandevice {
 #endif
 
 	/*** Device chain ***/
-	struct wlandevice	*next;		/* link for list of devices */
+	struct acx_device	*next;		/* link for list of devices */
 
 	/*** Linux network device ***/
-	struct net_device	*netdev;	/* pointer to linux netdevice */
+	struct net_device	*ndev;		/* pointer to linux netdevice */
 	struct net_device	*prev_nd;	/* FIXME: We should not chain via our
-						 * private struct wlandevice _and_
+						 * private struct acx_device _and_
 						 * the struct net_device */
 	/*** Device statistics ***/
 	struct net_device_stats	stats;		/* net device statistics */

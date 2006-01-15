@@ -219,9 +219,6 @@
 #define __WLAN_PRAGMA_PACK1__
 #define __WLAN_PRAGMA_PACKDFLT__
 
-#undef netdevice_t
-typedef struct net_device netdevice_t;
-
 /* Interrupt handler backwards compatibility stuff */
 #ifndef IRQ_NONE
 #define IRQ_NONE

@@ -131,7 +131,7 @@ oui_is_8021h(const struct wlan_snap *snap)
 ** Based largely on p80211conv.c of the linux-wlan-ng project
 */
 int
-acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
+acx_ether_to_txbuf(acx_device_t *adev, void *txbuf, const struct sk_buff *skb)
 {
 	struct wlan_hdr_a3 *w_hdr;
 	struct wlan_ethhdr *e_hdr;
@@ -153,13 +153,13 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 
 	w_hdr = (struct wlan_hdr_a3*)txbuf;
 
-	switch (priv->mode) {
+	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
 		/* NB: one day we might want to play with DESC_CTL2_FCS
 		** Will need to stop doing "- WLAN_FCS_LEN" here then */
 		if (unlikely(skb->len >= WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_FCS_LEN)) {
 			printk("%s: can't tx oversized frame (%d bytes)\n",
-				priv->netdev->name, skb->len);
+				adev->ndev->name, skb->len);
 			goto end;
 		}
 		memcpy(w_hdr, skb->data, skb->len);
@@ -207,15 +207,15 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 	payload_len += header_len;
 
 	/* Set up the 802.11 header */
-	switch (priv->mode) {
+	switch (adev->mode) {
 	case ACX_MODE_0_ADHOC:
 		fc = (WF_FTYPE_DATAi | WF_FSTYPE_DATAONLYi);
 		a1 = e_hdr->daddr;
-		a3 = priv->bssid;
+		a3 = adev->bssid;
 		break;
 	case ACX_MODE_2_STA:
 		fc = (WF_FTYPE_DATAi | WF_FSTYPE_DATAONLYi | WF_FC_TODSi);
-		a1 = priv->bssid;
+		a1 = adev->bssid;
 		a3 = e_hdr->daddr;
 		break;
 	case ACX_MODE_3_AP:
@@ -225,17 +225,17 @@ acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb)
 		break;
 	default:
 		printk("%s: error - converting eth to wlan in unknown mode\n",
-				priv->netdev->name);
+				adev->ndev->name);
 		payload_len = -1;
 		goto end;
 	}
-	if (priv->wep_enabled)
+	if (adev->wep_enabled)
 		SET_BIT(fc, WF_FC_ISWEPi);
 
 	w_hdr->fc = fc;
 	w_hdr->dur = 0;
 	MAC_COPY(w_hdr->a1, a1);
-	MAC_COPY(w_hdr->a2, priv->dev_addr);
+	MAC_COPY(w_hdr->a2, adev->dev_addr);
 	MAC_COPY(w_hdr->a3, a3);
 	w_hdr->seq = 0;
 
@@ -266,7 +266,7 @@ end:
 ** Based largely on p80211conv.c of the linux-wlan-ng project
 */
 struct sk_buff*
-acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
+acx_rxbuf_to_ether(acx_device_t *adev, rxbuffer_t *rxbuf)
 {
 	struct wlan_hdr *w_hdr;
 	struct wlan_ethhdr *e_hdr;
@@ -284,7 +284,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 	/* This looks complex because it must handle possible
 	** phy header in rxbuff */
-	w_hdr = acx_get_wlan_hdr(priv, rxbuf);
+	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
 	payload_offset = WLAN_HDR_A3_LEN; /* it is relative to w_hdr */
 	payload_length = RXBUF_BYTES_USED(rxbuf) /* entire rxbuff... */
 		- ((u8*)w_hdr - (u8*)rxbuf) /* minus space before 802.11 frame */
@@ -312,7 +312,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		saddr = w_hdr->a4;
 	}
 
-	if ((WF_FC_ISWEPi & fc) && IS_ACX100(priv)) {
+	if ((WF_FC_ISWEPi & fc) && IS_ACX100(adev)) {
 		/* chop off the IV+ICV WEP header and footer */
 		log(L_DATA|L_DEBUG, "rx: WEP packet, "
 			"chopping off IV and ICV\n");
@@ -321,14 +321,14 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 	}
 
 	if (unlikely(payload_length < 0)) {
-		printk("%s: rx frame too short, ignored\n", priv->netdev->name);
+		printk("%s: rx frame too short, ignored\n", adev->ndev->name);
 		goto ret_null;
 	}
 
 	e_hdr = (wlan_ethhdr_t*) ((u8*) w_hdr + payload_offset);
 	e_llc = (wlan_llc_t*) e_hdr;
 	e_snap = (wlan_snap_t*) (e_llc + 1);
-	mtu = priv->netdev->mtu;
+	mtu = adev->ndev->mtu;
 	e_payload = (u8*) (e_snap + 1);
 
 	log(L_DATA, "rx: payload_offset %d, payload_length %d\n",
@@ -353,7 +353,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 		if (unlikely(payload_length > (mtu + ETH_HLEN))) {
 			printk("%s: rx: ENCAP frame too large (%d > %d)\n",
-				priv->netdev->name,
+				adev->ndev->name,
 				payload_length, mtu + ETH_HLEN);
 			goto ret_null;
 		}
@@ -384,7 +384,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 			if (unlikely(payload_length > mtu)) {
 				printk("%s: rx: SNAP frame too large (%d > %d)\n",
-					priv->netdev->name,
+					adev->ndev->name,
 					payload_length, mtu);
 				goto ret_null;
 			}
@@ -420,7 +420,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 			payload_length -= sizeof(wlan_llc_t) + sizeof(wlan_snap_t);
 			if (unlikely(payload_length > mtu)) {
 				printk("%s: rx: DIXII frame too large (%d > %d)\n",
-					priv->netdev->name,
+					adev->ndev->name,
 					payload_length,	mtu);
 				goto ret_null;
 			}
@@ -455,7 +455,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 		if (unlikely(payload_length > mtu)) {
 			printk("%s: rx: OTHER frame too large (%d > %d)\n",
-				priv->netdev->name, payload_length, mtu);
+				adev->ndev->name, payload_length, mtu);
 			goto ret_null;
 		}
 
@@ -477,8 +477,8 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 		memcpy(skb->data + ETH_HLEN, e_llc, payload_length);
 	}
 
-	skb->dev = priv->netdev;
-	skb->protocol = eth_type_trans(skb, priv->netdev);
+	skb->dev = adev->ndev;
+	skb->protocol = eth_type_trans(skb, adev->ndev);
 
 #ifdef DEBUG_CONVERT
 	if (acx_debug & L_DATA) {
@@ -494,7 +494,7 @@ acx_rxbuf_to_ether(wlandevice_t *priv, rxbuffer_t *rxbuf)
 
 no_skb:
 	printk("%s: rx: no memory for skb (%d bytes)\n",
-			priv->netdev->name, buflen + 2);
+			adev->ndev->name, buflen + 2);
 ret_null:
 	FN_EXIT1((int)NULL);
 	return NULL;

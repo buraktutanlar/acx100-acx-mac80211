@@ -243,12 +243,12 @@ has_only_one_bit(u16 v)
 
 /***********************************************************************
 ** LOCKING
-** We have priv->sem and priv->lock.
+** We have adev->sem and adev->lock.
 **
 ** We employ following naming convention in order to get locking right:
 **
 ** acx_e_xxxx - external entry points called from process context.
-**	It is okay to sleep. priv->sem is to be taken on entry.
+**	It is okay to sleep. adev->sem is to be taken on entry.
 ** acx_i_xxxx - external entry points possibly called from atomic context.
 **	Sleeping is not allowed (and thus down(sem) is not legal!)
 ** acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
@@ -288,55 +288,55 @@ has_only_one_bit(u16 v)
 
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 
-void acx_lock_debug(wlandevice_t *priv, const char* where);
-void acx_unlock_debug(wlandevice_t *priv, const char* where);
-void acx_down_debug(wlandevice_t *priv, const char* where);
-void acx_up_debug(wlandevice_t *priv, const char* where);
+void acx_lock_debug(acx_device_t *adev, const char* where);
+void acx_unlock_debug(acx_device_t *adev, const char* where);
+void acx_down_debug(acx_device_t *adev, const char* where);
+void acx_up_debug(acx_device_t *adev, const char* where);
 void acx_lock_unhold(void);
 void acx_sem_unhold(void);
 
 static inline void
-acx_lock_helper(wlandevice_t *priv, unsigned long *fp, const char* where)
+acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
-	acx_lock_debug(priv, where);
-	spin_lock_irqsave(&priv->lock, *fp);
+	acx_lock_debug(adev, where);
+	spin_lock_irqsave(&adev->lock, *fp);
 }
 static inline void
-acx_unlock_helper(wlandevice_t *priv, unsigned long *fp, const char* where)
+acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
-	acx_unlock_debug(priv, where);
-	spin_unlock_irqrestore(&priv->lock, *fp);
+	acx_unlock_debug(adev, where);
+	spin_unlock_irqrestore(&adev->lock, *fp);
 }
 static inline void
-acx_down_helper(wlandevice_t *priv, const char* where)
+acx_down_helper(acx_device_t *adev, const char* where)
 {
-	acx_down_debug(priv, where);
+	acx_down_debug(adev, where);
 }
 static inline void
-acx_up_helper(wlandevice_t *priv, const char* where)
+acx_up_helper(acx_device_t *adev, const char* where)
 {
-	acx_up_debug(priv, where);
+	acx_up_debug(adev, where);
 }
-#define acx_lock(priv, flags)	acx_lock_helper(priv, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_unlock(priv, flags)	acx_unlock_helper(priv, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_sem_lock(priv)	acx_down_helper(priv, __FILE__ ":" STRING(__LINE__))
-#define acx_sem_unlock(priv)	acx_up_helper(priv, __FILE__ ":" STRING(__LINE__))
+#define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
+#define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
+#define acx_sem_lock(adev)	acx_down_helper(adev, __FILE__ ":" STRING(__LINE__))
+#define acx_sem_unlock(adev)	acx_up_helper(adev, __FILE__ ":" STRING(__LINE__))
 
 #elif defined(DO_LOCKING)
 
-#define acx_lock(priv, flags)	spin_lock_irqsave(&priv->lock, flags)
-#define acx_unlock(priv, flags)	spin_unlock_irqrestore(&priv->lock, flags)
-#define acx_sem_lock(priv)	down(&priv->sem)
-#define acx_sem_unlock(priv)	up(&priv->sem)
+#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->lock, flags)
+#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->lock, flags)
+#define acx_sem_lock(adev)	down(&adev->sem)
+#define acx_sem_unlock(adev)	up(&adev->sem)
 #define acx_lock_unhold()	((void)0)
 #define acx_sem_unhold()	((void)0)
 
 #else /* no locking! :( */
 
-#define acx_lock(priv, flags)	((void)0)
-#define acx_unlock(priv, flags)	((void)0)
-#define acx_sem_lock(priv)	((void)0)
-#define acx_sem_unlock(priv)	((void)0)
+#define acx_lock(adev, flags)	((void)0)
+#define acx_unlock(adev, flags)	((void)0)
+#define acx_sem_lock(adev)	((void)0)
+#define acx_sem_unlock(adev)	((void)0)
 #define acx_lock_unhold()	((void)0)
 #define acx_sem_unhold()	((void)0)
 
@@ -352,52 +352,52 @@ acx_up_helper(wlandevice_t *priv, const char* where)
 ** IRQ -> acxpci_l_clean_txdesc -> acx_wake_queue
 ** Review carefully all callsites */
 static inline void
-acx_stop_queue(netdevice_t *dev, const char *msg)
+acx_stop_queue(struct net_device *ndev, const char *msg)
 {
-	if (netif_queue_stopped(dev))
+	if (netif_queue_stopped(ndev))
 		return;
 
-	netif_stop_queue(dev);
+	netif_stop_queue(ndev);
 	if (msg)
 		log(L_BUFT, "tx: stop queue %s\n", msg);
 }
 
 static inline int
-acx_queue_stopped(netdevice_t *dev)
+acx_queue_stopped(struct net_device *ndev)
 {
-	return netif_queue_stopped(dev);
+	return netif_queue_stopped(ndev);
 }
 
 /*
 static inline void
-acx_start_queue(netdevice_t *dev, const char *msg)
+acx_start_queue(struct net_device *ndev, const char *msg)
 {
-	netif_start_queue(dev);
+	netif_start_queue(ndev);
 	if (msg)
 		log(L_BUFT, "tx: start queue %s\n", msg);
 }
 */
 
 static inline void
-acx_wake_queue(netdevice_t *dev, const char *msg)
+acx_wake_queue(struct net_device *ndev, const char *msg)
 {
-	netif_wake_queue(dev);
+	netif_wake_queue(ndev);
 	if (msg)
 		log(L_BUFT, "tx: wake queue %s\n", msg);
 }
 
 static inline void
-acx_carrier_off(netdevice_t *dev, const char *msg)
+acx_carrier_off(struct net_device *ndev, const char *msg)
 {
-	netif_carrier_off(dev);
+	netif_carrier_off(ndev);
 	if (msg)
 		log(L_BUFT, "tx: carrier off %s\n", msg);
 }
 
 static inline void
-acx_carrier_on(netdevice_t *dev, const char *msg)
+acx_carrier_on(struct net_device *ndev, const char *msg)
 {
-	netif_carrier_on(dev);
+	netif_carrier_on(ndev);
 	if (msg)
 		log(L_BUFT, "tx: carrier on %s\n", msg);
 }
@@ -405,7 +405,7 @@ acx_carrier_on(netdevice_t *dev, const char *msg)
 /* This function does not need locking UNLESS you call it
 ** as acx_set_status(ACX_STATUS_4_ASSOCIATED), bacause this can
 ** wake queue. This can race with stop_queue elsewhere. */
-void acx_set_status(wlandevice_t *priv, u16 status);
+void acx_set_status(acx_device_t *adev, u16 status);
 
 
 /***********************************************************************
@@ -417,50 +417,50 @@ void acx_set_status(wlandevice_t *priv, u16 status);
 #if ACX_DEBUG
 
 /* We want to log cmd names */
-int acxpci_s_issue_cmd_timeo_debug(wlandevice_t *priv, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-int acxusb_s_issue_cmd_timeo_debug(wlandevice_t *priv, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 static inline int
-acx_s_issue_cmd_timeo_debug(wlandevice_t *priv, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr)
+acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr)
 {
-	if (IS_PCI(priv))
-		return acxpci_s_issue_cmd_timeo_debug(priv, cmd, param, len, timeout, cmdstr);
-	return acxusb_s_issue_cmd_timeo_debug(priv, cmd, param, len, timeout, cmdstr);
+	if (IS_PCI(adev))
+		return acxpci_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+	return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
 }
-#define acx_s_issue_cmd(priv,cmd,param,len) \
-	acx_s_issue_cmd_timeo_debug(priv,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
-#define acx_s_issue_cmd_timeo(priv,cmd,param,len,timeo) \
-	acx_s_issue_cmd_timeo_debug(priv,cmd,param,len,timeo,#cmd)
-int acx_s_configure_debug(wlandevice_t *priv, void *pdr, int type, const char* str);
-#define acx_s_configure(priv,pdr,type) \
-	acx_s_configure_debug(priv,pdr,type,#type)
-int acx_s_interrogate_debug(wlandevice_t *priv, void *pdr, int type, const char* str);
-#define acx_s_interrogate(priv,pdr,type) \
-	acx_s_interrogate_debug(priv,pdr,type,#type)
+#define acx_s_issue_cmd(adev,cmd,param,len) \
+	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
+#define acx_s_issue_cmd_timeo(adev,cmd,param,len,timeo) \
+	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
+int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_configure(adev,pdr,type) \
+	acx_s_configure_debug(adev,pdr,type,#type)
+int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_interrogate(adev,pdr,type) \
+	acx_s_interrogate_debug(adev,pdr,type,#type)
 
 #else
 
-int acxpci_s_issue_cmd_timeo(wlandevice_t *priv, unsigned cmd, void *param, unsigned len, unsigned timeout);
-int acxusb_s_issue_cmd_timeo(wlandevice_t *priv, unsigned cmd, void *param, unsigned len, unsigned timeout);
+int acxpci_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
+int acxusb_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
 static inline int
-acx_s_issue_cmd_timeo(wlandevice_t *priv, unsigned cmd,	void *param, unsigned len, unsigned timeout)
+acx_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd,	void *param, unsigned len, unsigned timeout)
 {
-	if (IS_PCI(priv))
-		return acxpci_s_issue_cmd_timeo(priv, cmd, param, len, timeout);
-	return acxusb_s_issue_cmd_timeo(priv, cmd, param, len, timeout);
+	if (IS_PCI(adev))
+		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
+	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
 }
 static inline int
-acx_s_issue_cmd(wlandevice_t *priv, unsigned cmd, void *param, unsigned len)
+acx_s_issue_cmd(acx_device_t *adev, unsigned cmd, void *param, unsigned len)
 {
-	if (IS_PCI(priv))
-		return acxpci_s_issue_cmd_timeo(priv, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
-	return acxusb_s_issue_cmd_timeo(priv, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
+	if (IS_PCI(adev))
+		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
+	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
 }
-int acx_s_configure(wlandevice_t *priv, void *pdr, int type);
-int acx_s_interrogate(wlandevice_t *priv, void *pdr, int type);
+int acx_s_configure(acx_device_t *adev, void *pdr, int type);
+int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
 
 #endif
 
-void acx_s_cmd_start_scan(wlandevice_t *priv);
+void acx_s_cmd_start_scan(acx_device_t *adev);
 
 
 /***********************************************************************
@@ -468,13 +468,13 @@ void acx_s_cmd_start_scan(wlandevice_t *priv);
 */
 int
 acx111pci_ioctl_info(
-	struct net_device *dev,
+	struct net_device *ndev,
 	struct iw_request_info *info,
 	struct iw_param *vwrq,
 	char *extra);
 int
 acx100pci_ioctl_set_phy_amp_bias(
-	struct net_device *dev,
+	struct net_device *ndev,
 	struct iw_request_info *info,
 	struct iw_param *vwrq,
 	char *extra);
@@ -484,139 +484,139 @@ acx100pci_ioctl_set_phy_amp_bias(
 ** /proc
 */
 #ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(const struct net_device *dev);
-int acx_proc_unregister_entries(const struct net_device *dev);
+int acx_proc_register_entries(const struct net_device *ndev);
+int acx_proc_unregister_entries(const struct net_device *ndev);
 #else
 static inline int
-acx_proc_register_entries(const struct net_device *dev) { return OK; }
+acx_proc_register_entries(const struct net_device *ndev) { return OK; }
 static inline int
-acx_proc_unregister_entries(const struct net_device *dev) { return OK; }
+acx_proc_unregister_entries(const struct net_device *ndev) { return OK; }
 #endif
 
 
 /***********************************************************************
 */
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
-int acxpci_s_upload_radio(wlandevice_t *priv);
+int acxpci_s_upload_radio(acx_device_t *adev);
 
 
 /***********************************************************************
 ** Unsorted yet :)
 */
-int acxpci_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf);
-int acxusb_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf);
+int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 static inline int
-acx_s_read_phy_reg(wlandevice_t *priv, u32 reg, u8 *charbuf)
+acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
-	if (IS_PCI(priv))
-		return acxpci_s_read_phy_reg(priv, reg, charbuf);
-	return acxusb_s_read_phy_reg(priv, reg, charbuf);
+	if (IS_PCI(adev))
+		return acxpci_s_read_phy_reg(adev, reg, charbuf);
+	return acxusb_s_read_phy_reg(adev, reg, charbuf);
 }
 
-int acxpci_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value);
-int acxusb_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value);
+int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static inline int
-acx_s_write_phy_reg(wlandevice_t *priv, u32 reg, u8 value)
+acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 {
-	if (IS_PCI(priv))
-		return acxpci_s_write_phy_reg(priv, reg, value);
-	return acxusb_s_write_phy_reg(priv, reg, value);
+	if (IS_PCI(adev))
+		return acxpci_s_write_phy_reg(adev, reg, value);
+	return acxusb_s_write_phy_reg(adev, reg, value);
 }
 
-tx_t* acxpci_l_alloc_tx(wlandevice_t *priv);
-tx_t* acxusb_l_alloc_tx(wlandevice_t *priv);
+tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
+tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
 static inline tx_t*
-acx_l_alloc_tx(wlandevice_t *priv)
+acx_l_alloc_tx(acx_device_t *adev)
 {
-	if (IS_PCI(priv))
-		return acxpci_l_alloc_tx(priv);
-	return acxusb_l_alloc_tx(priv);
+	if (IS_PCI(adev))
+		return acxpci_l_alloc_tx(adev);
+	return acxusb_l_alloc_tx(adev);
 }
 
 void acxusb_l_dealloc_tx(tx_t *tx_opaque);
 static inline void
-acx_l_dealloc_tx(wlandevice_t *priv, tx_t *tx_opaque)
+acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 {
-	if (IS_USB(priv))
+	if (IS_USB(adev))
 		acxusb_l_dealloc_tx(tx_opaque);
 }
 
-void* acxpci_l_get_txbuf(wlandevice_t *priv, tx_t *tx_opaque);
-void* acxusb_l_get_txbuf(wlandevice_t *priv, tx_t *tx_opaque);
+void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static inline void*
-acx_l_get_txbuf(wlandevice_t *priv, tx_t *tx_opaque)
+acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
-	if (IS_PCI(priv))
-		return acxpci_l_get_txbuf(priv, tx_opaque);
-	return acxusb_l_get_txbuf(priv, tx_opaque);
+	if (IS_PCI(adev))
+		return acxpci_l_get_txbuf(adev, tx_opaque);
+	return acxusb_l_get_txbuf(adev, tx_opaque);
 }
 
-void acxpci_l_tx_data(wlandevice_t *priv, tx_t *tx_opaque, int len);
-void acxusb_l_tx_data(wlandevice_t *priv, tx_t *tx_opaque, int len);
+void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len);
 static inline void
-acx_l_tx_data(wlandevice_t *priv, tx_t *tx_opaque, int len)
+acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len)
 {
-	if (IS_PCI(priv))
-		acxpci_l_tx_data(priv, tx_opaque, len);
+	if (IS_PCI(adev))
+		acxpci_l_tx_data(adev, tx_opaque, len);
 	else
-		acxusb_l_tx_data(priv, tx_opaque, len);
+		acxusb_l_tx_data(adev, tx_opaque, len);
 }
 
 static inline wlan_hdr_t*
-acx_get_wlan_hdr(wlandevice_t *priv, const rxbuffer_t *rxbuf)
+acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
-	if (!(priv->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR))
+	if (!(adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR))
 		return (wlan_hdr_t*)&rxbuf->hdr_a3;
 
 	/* take into account phy header in front of packet */
-	if (IS_ACX111(priv))
+	if (IS_ACX111(adev))
 		return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 8);
 
 	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 4);
 }
 
-void acxpci_l_power_led(wlandevice_t *priv, int enable);
-int acxpci_read_eeprom_byte(wlandevice_t *priv, u32 addr, u8 *charbuf);
-unsigned int acxpci_l_clean_txdesc(wlandevice_t *priv);
-void acxpci_l_clean_txdesc_emergency(wlandevice_t *priv);
-int acxpci_s_create_hostdesc_queues(wlandevice_t *priv);
-void acxpci_create_desc_queues(wlandevice_t *priv, u32 tx_queue_start, u32 rx_queue_start);
-void acxpci_free_desc_queues(wlandevice_t *priv);
-char* acxpci_s_proc_diag_output(char *p, wlandevice_t *priv);
-int acxpci_proc_eeprom_output(char *p, wlandevice_t *priv);
-void acxpci_set_interrupt_mask(wlandevice_t *priv);
-int acx100pci_s_set_tx_level(wlandevice_t *priv, u8 level_dbm);
+void acxpci_l_power_led(acx_device_t *adev, int enable);
+int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
+void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
+int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
+void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxpci_free_desc_queues(acx_device_t *adev);
+char* acxpci_s_proc_diag_output(char *p, acx_device_t *adev);
+int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
+void acxpci_set_interrupt_mask(acx_device_t *adev);
+int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 void acx_s_msleep(int ms);
-int acx_s_init_mac(wlandevice_t *priv);
-void acx_set_reg_domain(wlandevice_t *priv, unsigned char reg_dom_id);
-void acx_set_timer(wlandevice_t *priv, int timeout_us);
-void acx_update_capabilities(wlandevice_t *priv);
-void acx_s_start(wlandevice_t *priv);
+int acx_s_init_mac(acx_device_t *adev);
+void acx_set_reg_domain(acx_device_t *adev, unsigned char reg_dom_id);
+void acx_set_timer(acx_device_t *adev, int timeout_us);
+void acx_update_capabilities(acx_device_t *adev);
+void acx_s_start(acx_device_t *adev);
 
-void acx_s_update_card_settings(wlandevice_t *priv);
-void acx_s_parse_configoption(wlandevice_t *priv, const acx111_ie_configoption_t *pcfg);
-void acx_l_update_ratevector(wlandevice_t *priv);
+void acx_s_update_card_settings(acx_device_t *adev);
+void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
+void acx_l_update_ratevector(acx_device_t *adev);
 
-void acx_init_task_scheduler(wlandevice_t *priv);
-void acx_schedule_task(wlandevice_t *priv, unsigned int set_flag);
+void acx_init_task_scheduler(acx_device_t *adev);
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 
-int acx_e_ioctl_old(netdevice_t *dev, struct ifreq *ifr, int cmd);
+int acx_e_ioctl_old(struct net_device *ndev, struct ifreq *ifr, int cmd);
 
-client_t *acx_l_sta_list_get(wlandevice_t *priv, const u8 *address);
-void acx_l_sta_list_del(wlandevice_t *priv, client_t *clt);
+client_t *acx_l_sta_list_get(acx_device_t *adev, const u8 *address);
+void acx_l_sta_list_del(acx_device_t *adev, client_t *clt);
 
-int acx_l_transmit_disassoc(wlandevice_t *priv, client_t *clt);
+int acx_l_transmit_disassoc(acx_device_t *adev, client_t *clt);
 void acx_i_timer(unsigned long a);
-int acx_s_complete_scan(wlandevice_t *priv);
+int acx_s_complete_scan(acx_device_t *adev);
 
-struct sk_buff *acx_rxbuf_to_ether(struct wlandevice *priv, rxbuffer_t *rxbuf);
-int acx_ether_to_txbuf(wlandevice_t *priv, void *txbuf, const struct sk_buff *skb);
+struct sk_buff *acx_rxbuf_to_ether(acx_device_t *adev, rxbuffer_t *rxbuf);
+int acx_ether_to_txbuf(acx_device_t *adev, void *txbuf, const struct sk_buff *skb);
 
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
-void acx_l_process_rxbuf(wlandevice_t *priv, rxbuffer_t *rxbuf);
-void acx_l_handle_txrate_auto(wlandevice_t *priv, struct client *txc,
+void acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
+void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
 			u16 intended_rate, u8 rate100, u16 rate111, u8 error,
 			int pkts_to_ignore);
 
@@ -625,7 +625,7 @@ void acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr);
 
 u8 acx_rate111to100(u16);
 
-void acx_s_set_defaults(wlandevice_t *priv);
+void acx_s_set_defaults(acx_device_t *adev);
 
 #if !ACX_DEBUG
 static inline const char* acx_get_packet_type_string(u16 fc) { return ""; }
@@ -634,16 +634,16 @@ const char* acx_get_packet_type_string(u16 fc);
 #endif
 const char* acx_cmd_status_str(unsigned int state);
 
-int acx_i_start_xmit(struct sk_buff *skb, netdevice_t *dev);
+int acx_i_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 
-void great_inquisitor(wlandevice_t *priv);
+void great_inquisitor(acx_device_t *adev);
 
-void acx_s_get_firmware_version(wlandevice_t *priv);
-void acx_display_hardware_details(wlandevice_t *priv);
+void acx_s_get_firmware_version(acx_device_t *adev);
+void acx_display_hardware_details(acx_device_t *adev);
 
-int acx_e_change_mtu(struct net_device *dev, int mtu);
-struct net_device_stats* acx_e_get_stats(netdevice_t *dev);
-struct iw_statistics* acx_e_get_wireless_stats(netdevice_t *dev);
+int acx_e_change_mtu(struct net_device *ndev, int mtu);
+struct net_device_stats* acx_e_get_stats(struct net_device *ndev);
+struct iw_statistics* acx_e_get_wireless_stats(struct net_device *ndev);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);
