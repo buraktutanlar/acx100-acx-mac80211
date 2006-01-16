@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/version.h>
+#include <linux/compiler.h> /* required for Lx 2.6.8 ?? */
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -354,8 +355,9 @@ acxpci_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf)
 		write_flush(adev);
 		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
 
+		count = 0xffff;
 		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-			if (unlikely(++count > 0xffff)) {
+			if (unlikely(!--count)) {
 				printk("WARNING, DANGER!!! "
 					"Timeout waiting for EEPROM write\n");
 				goto end;
@@ -369,13 +371,13 @@ acxpci_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf)
 	write_flush(adev);
 
 	/* now start a verification run */
-	count = 0xffff;
 	for (i = 0; i < len; i++) {
 		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
 		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
 		write_flush(adev);
 		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
 
+		count = 0xffff;
 		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
 				printk("timeout waiting for EEPROM read\n");
@@ -747,18 +749,17 @@ acxpci_l_reset_mac(acx_device_t *adev)
 	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
 	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 
-	/* now do soft reset of eCPU */
+	/* now do soft reset of eCPU, set bit */
 	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
 	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
 	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
 	write_flush(adev);
 
-	/* now reset bit again */
+	/* now clear bit again: deassert eCPU reset */
 	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n", __func__);
-	/* deassert eCPU reset */
 	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
 
-	/* now start a burst read from initial flash EEPROM */
+	/* now start a burst read from initial EEPROM */
 	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
 	write_reg16(adev, IO_ACX_EE_START, temp);
 	write_flush(adev);
@@ -893,6 +894,7 @@ acxpci_s_reset_dev(acx_device_t *adev)
 	int result = NOT_OK;
 	u16 hardware_info;
 	u16 ecpu_ctrl;
+	int count;
 
 	FN_ENTER;
 
@@ -927,12 +929,23 @@ acxpci_s_reset_dev(acx_device_t *adev)
 
 	acx_unlock(adev, flags);
 
-	/* without this delay acx100 may fail to report hardware_info
-	** (see below). Most probably eCPU runs some init code */
-	acx_s_msleep(10);
-
 	/* need to know radio type before fw load */
-	hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+ 	/* Need to wait for arrival of this information in a loop,
+ 	 * most probably since eCPU runs some init code from EEPROM
+ 	 * (started burst read in reset_mac()) which also
+ 	 * sets the radio type ID */
+ 
+ 	count = 0xffff;
+ 	do {
+ 		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+ 		if (!--count) {
+ 			msg = "eCPU didn't indicate radio type";
+ 			goto end_fail;
+ 		}
+ 		cpu_relax();
+ 	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
+ 
+ 	/* printk("DEBUG: count %d\n", count); */
 	adev->form_factor = hardware_info & 0xff;
 	adev->radio_type = hardware_info >> 8;
 
@@ -940,11 +953,11 @@ acxpci_s_reset_dev(acx_device_t *adev)
 	if (OK != acxpci_s_upload_fw(adev))
 		goto end_fail;
 
-	acx_s_msleep(10);
+	/* acx_s_msleep(10);	this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
-	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
 	/* wait for eCPU bootup */
 	if (OK != acxpci_s_verify_init(adev)) {

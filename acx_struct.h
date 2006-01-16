@@ -1202,6 +1202,7 @@ struct acx_device {
 	u8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
 	u16		aid;			/* The Association ID sent from the AP / last used AID if we're an AP */
 	u16		mode;			/* mode from iwconfig */
+	int		monitor_type;		/* ARPHRD_IEEE80211 or ARPHRD_IEEE80211_PRISM */
 	u16		status;			/* 802.11 association status */
 	u8		essid_active;		/* specific ESSID active, or select any? */
 	u8		essid_len;		/* to avoid dozens of strlen() */
@@ -1623,7 +1624,7 @@ typedef struct acx111_ie_tx_level {
 #define PS_OPT_TX_PSPOLL	0x02 /* send PSPoll frame to fetch waiting frames from AP (on frame with matching AID) */
 #define PS_OPT_STILL_RCV_BCASTS	0x01
 
-typedef struct acx100_ie_powermgmt {
+typedef struct acx100_ie_powersave {
 	u16	type ACX_PACKED;
 	u16	len ACX_PACKED;
 	u8	wakeup_cfg ACX_PACKED;
@@ -1631,9 +1632,9 @@ typedef struct acx100_ie_powermgmt {
 	u8	options ACX_PACKED;
 	u8	hangover_period ACX_PACKED; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u16	enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
-} acx100_ie_powermgmt_t;
+} acx100_ie_powersave_t;
 
-typedef struct acx111_ie_powermgmt {
+typedef struct acx111_ie_powersave {
 	u16	type ACX_PACKED;
 	u16	len ACX_PACKED;
 	u8	wakeup_cfg ACX_PACKED;
@@ -1642,7 +1643,7 @@ typedef struct acx111_ie_powermgmt {
 	u8	hangover_period ACX_PACKED; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u32	beacon_rx_time ACX_PACKED;
 	u32	enhanced_ps_transition_time ACX_PACKED; /* rem. wake time for Enh. PS */
-} acx111_ie_powermgmt_t;
+} acx111_ie_powersave_t;
 
 
 /***********************************************************************

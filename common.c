@@ -183,7 +183,7 @@ acx_unlock_debug(acx_device_t *adev, const char* where)
 		diff -= adev->lock_time;
 		if (diff > max_lock_time) {
 			where = sanitize_str(where);
-			printk("max lock hold time %d CPU ticks from %s "
+			printk("max lock hold time %ld CPU ticks from %s "
 				"to %s\n", diff, adev->last_lock, where);
 			max_lock_time = diff;
 		}
@@ -230,7 +230,7 @@ acx_up_debug(acx_device_t *adev, const char* where)
 		unsigned long diff = jiffies - adev->sem_time;
 		if (diff > max_sem_time) {
 			where = sanitize_str(where);
-			printk("max sem hold time %d jiffies from %s "
+			printk("max sem hold time %ld jiffies from %s "
 				"to %s\n", diff, adev->last_sem, where);
 			max_sem_time = diff;
 		}
@@ -838,7 +838,7 @@ static const u16
 acx100_ie_len[] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx100_ie_powermgmt_t)-4, /* is that 6 or 8??? */
+	sizeof(acx100_ie_powersave_t)-4, /* is that 6 or 8??? */
 	ACX1xx_IE_QUEUE_CONFIG_LEN,
 	ACX100_IE_BLOCK_SIZE_LEN,
 	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
@@ -889,7 +889,7 @@ static const u16
 acx111_ie_len[] = {
 	0,
 	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx111_ie_powermgmt_t)-4,
+	sizeof(acx111_ie_powersave_t)-4,
 	ACX1xx_IE_QUEUE_CONFIG_LEN,
 	ACX100_IE_BLOCK_SIZE_LEN,
 	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
@@ -2103,16 +2103,6 @@ acx_s_set_defaults(acx_device_t *adev)
 
 	FN_ENTER;
 
-	/* query some settings from the card.
-	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
-	 * query is REQUIRED, otherwise the card won't work correctly!! */
-	adev->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
-	/* Only ACX100 supports ED and CCA */
-	if (IS_ACX100(adev))
-		adev->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
-
-	acx_s_update_card_settings(adev);
-
 	acx_lock(adev, flags);
 
 	/* set our global interrupt mask */
@@ -2123,9 +2113,8 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->brange_max_quality = 60; /* LED blink max quality is 60 */
 	adev->brange_time_last_state_change = jiffies;
 
-	/* copy the MAC address we just got from the card
-	 * into our MAC address used during current 802.11 session */
 	MAC_COPY(adev->dev_addr, adev->ndev->dev_addr);
+	MAC_BCAST(adev->ap);
 	adev->essid_len =
 		snprintf(adev->essid, sizeof(adev->essid), "STA%02X%02X%02X",
 			adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
@@ -2156,10 +2145,10 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->listen_interval = 100;
 	adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
 	adev->mode = ACX_MODE_2_STA;
+	adev->monitor_type = ARPHRD_IEEE80211_PRISM;
 	adev->dtim_interval = DEFAULT_DTIM_INTERVAL;
 
 	adev->msdu_lifetime = DEFAULT_MSDU_LIFETIME;
-	SET_BIT(adev->set_mask, SET_MSDU_LIFETIME);
 
 	adev->rts_threshold = DEFAULT_RTS_THRESHOLD;
 	adev->frag_threshold = 2346;
@@ -2167,7 +2156,6 @@ acx_s_set_defaults(acx_device_t *adev)
 	/* use standard default values for retry limits */
 	adev->short_retry = 7; /* max. retries for (short) non-RTS packets */
 	adev->long_retry = 4; /* max. retries for long (RTS) packets */
-	SET_BIT(adev->set_mask, GETSET_RETRY);
 
 	adev->fallback_threshold = 3;
 	adev->stepup_threshold = 10;
@@ -2180,17 +2168,9 @@ acx_s_set_defaults(acx_device_t *adev)
 	} else {
 		adev->rate_oper = RATE111_ACX100_COMPAT;
 	}
-
-	/* configure card to do rate fallback when in auto rate mode. */
-	SET_BIT(adev->set_mask, SET_RATE_FALLBACK);
-
-	/* Supported Rates element - the rates here are given in units of
-	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
+	/* build 802.11 style ratevector (802.11 7.3.2.2) */
 	acx_l_update_ratevector(adev);
 
-	SET_BIT(adev->set_mask, SET_RXCONFIG);
-
-	/* set some more defaults */
 	if (IS_ACX111(adev)) {
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
@@ -2201,15 +2181,11 @@ acx_s_set_defaults(acx_device_t *adev)
 		adev->tx_level_dbm = 18;
 	}
 	/* adev->tx_level_auto = 1; */
-	SET_BIT(adev->set_mask, GETSET_TXPOWER);
 
 	if (IS_ACX111(adev)) {
 		/* start with sensitivity level 1 out of 3: */
 		adev->sensitivity = 1;
 	}
-
-	/* better re-init the antenna value we got above */
-	SET_BIT(adev->set_mask, GETSET_ANTENNA);
 
 /* #define ENABLE_POWER_SAVE */
 #ifdef ENABLE_POWER_SAVE
@@ -2226,15 +2202,31 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->ps_enhanced_transition_time = 0;
 #endif
 
+	adev->set_mask = 0
+		/* better re-init the antenna value we got */
+		| GETSET_ANTENNA
+		| GETSET_TXPOWER
+		| SET_RXCONFIG
+		/* configure card to do rate fallback when in auto rate mode. */
+		| GETSET_RETRY
+		| SET_MSDU_LIFETIME
+		| SET_RATE_FALLBACK
 #if POWER_SAVE_80211
-	SET_BIT(adev->set_mask, GETSET_POWER_80211);
+		| GETSET_POWER_80211
 #endif
-
-	MAC_BCAST(adev->ap);
+		;
+	/* query some settings from the card.
+	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
+	 * query is REQUIRED, otherwise the card won't work correctly!! */
+	adev->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
+	/* Only ACX100 supports ED and CCA */
+	if (IS_ACX100(adev))
+		adev->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
 
 	acx_unlock(adev, flags);
 	acx_lock_unhold(); /* hold time 844814 CPU ticks @2GHz */
 
+	acx_s_update_card_settings(adev);
 	acx_s_initialize_rx_config(adev);
 
 	FN_EXIT0;
@@ -2347,10 +2339,11 @@ acx_l_rxmonitor(acx_device_t *adev, const rxbuffer_t *rxbuf)
 
 	skb_put(skb, skb_len);
 
+	if (adev->ndev->type == ARPHRD_IEEE80211) {
 		/* when in raw 802.11 mode, just copy frame as-is */
-	if (adev->ndev->type == ARPHRD_IEEE80211)
 		datap = skb->data;
-	else { /* otherwise, emulate prism header */
+	} else if (adev->ndev->type == ARPHRD_IEEE80211_PRISM) {
+		/* emulate prism header */
 		msg = (wlansniffrm_t*)skb->data;
 		datap = msg + 1;
 
@@ -2410,8 +2403,18 @@ acx_l_rxmonitor(acx_device_t *adev, const rxbuffer_t *rxbuf)
 		msg->frmlen.status = WLANITEM_STATUS_data_ok;
 		msg->frmlen.len = 4;
 		msg->frmlen.data = skb_len;
+	} else {
+		printk("acx: unsupported netdev type %d!\n", adev->ndev->type);
+		dev_kfree_skb(skb);
+		return;
 	}
 
+	/* sanity check (keep it here) */
+	if (unlikely((int)skb_len < 0)) {
+		printk("acx: skb_len=%d. Driver bug, please report\n", (int)skb_len);
+		dev_kfree_skb(skb);
+		return;
+	}
 	memcpy(datap, ((unsigned char*)rxbuf)+payload_offset, skb_len);
 
 	skb->dev = adev->ndev;
@@ -2425,6 +2428,7 @@ acx_l_rxmonitor(acx_device_t *adev, const rxbuffer_t *rxbuf)
 
 	adev->stats.rx_packets++;
 	adev->stats.rx_bytes += skb->len;
+
 end:
 	FN_EXIT0;
 }
@@ -5762,7 +5766,8 @@ fail:
 }
 
 
-void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
+void
+acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
 	unsigned mask;
 
@@ -5816,8 +5821,8 @@ acx_s_update_80211_powersave_mode(acx_device_t *adev)
 {
 	/* merge both structs in a union to be able to have common code */
 	union {
-		acx111_ie_powermgmt_t acx111;
-		acx100_ie_powermgmt_t acx100;
+		acx111_ie_powersave_t acx111;
+		acx100_ie_powersave_t acx100;
 	} pm;
 
 	/* change 802.11 power save mode settings */
@@ -6246,7 +6251,8 @@ acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_MODE) {
-		adev->ndev->type = ARPHRD_ETHER;
+		adev->ndev->type = (adev->mode == ACX_MODE_MONITOR) ?
+			adev->monitor_type : ARPHRD_ETHER;
 
 		switch (adev->mode) {
 		case ACX_MODE_3_AP:
@@ -6265,9 +6271,6 @@ acx_s_update_card_settings(acx_device_t *adev)
 			acx_s_cmd_join_bssid(adev, adev->bssid);
 			break;
 		case ACX_MODE_MONITOR:
-			/* adev->ndev->type = ARPHRD_ETHER; */
-			/* adev->ndev->type = ARPHRD_IEEE80211; */
-			adev->ndev->type = ARPHRD_IEEE80211_PRISM;
 			acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT|FEATURE2_SNIFFER);
 			/* this stops beacons */
 			acx_s_cmd_join_bssid(adev, adev->bssid);
