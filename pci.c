@@ -1264,7 +1264,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 static void
 acxpci_s_device_chain_add(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	down(&root_adev_sem);
 	adev->prev_nd = root_adev_newest;
@@ -1284,7 +1284,7 @@ acxpci_s_device_chain_remove(struct net_device *ndev)
 	querydev = root_adev_newest;
 	newerdev = NULL;
 	while (querydev) {
-		olderdev = ((acx_device_t*)netdev_priv(querydev))->prev_nd;
+		olderdev = ndev2adev(querydev)->prev_nd;
 		if (0 == strcmp(querydev->name, ndev->name)) {
 			if (!newerdev) {
 				/* if we were at the beginning of the
@@ -1296,8 +1296,7 @@ acxpci_s_device_chain_remove(struct net_device *ndev)
 				/* it's the device that is newer than us
 				 * that we need to update to point at
 				 * the device older than us */
-				((acx_device_t*)netdev_priv(newerdev))->
-					prev_nd = olderdev;
+				ndev2adev(newerdev)->prev_nd = olderdev;
 			}
 			break;
 		}
@@ -1602,7 +1601,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ndev->irq = pdev->irq;
 	ndev->base_addr = pci_resource_start(pdev, 0);
 
-	adev = netdev_priv(ndev);
+	adev = ndev2adev(ndev);
 	spin_lock_init(&adev->lock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	sema_init(&adev->sem, 1);	/* initial state: 1 (upped) */
@@ -1770,7 +1769,7 @@ acxpci_e_remove(struct pci_dev *pdev)
 		goto end;
 	}
 
-	adev = netdev_priv(ndev);
+	adev = ndev2adev(ndev);
 
 	/* unregister the device to not let the kernel
 	 * (e.g. ioctls) access a half-deconfigured device
@@ -1853,7 +1852,7 @@ acxpci_e_suspend(struct pci_dev *pdev, u32 state)
 	if (!netif_running(ndev))
 		goto end;
 
-	adev = netdev_priv(ndev);
+	adev = ndev2adev(ndev);
 	printk("sus: adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -1888,7 +1887,7 @@ acxpci_e_resume(struct pci_dev *pdev)
 	if (!netif_running(ndev))
 		goto end;
 
-	adev = netdev_priv(ndev);
+	adev = ndev2adev(ndev);
 	printk("rsm: got adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -1951,7 +1950,7 @@ enable_acx_irq(acx_device_t *adev)
 static void
 acxpci_s_up(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
 	FN_ENTER;
@@ -2012,7 +2011,7 @@ disable_acx_irq(acx_device_t *adev)
 static void
 acxpci_s_down(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
 	FN_ENTER;
@@ -2077,7 +2076,7 @@ acxpci_s_down(struct net_device *ndev)
 static int
 acxpci_e_open(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result = OK;
 
 	FN_ENTER;
@@ -2128,7 +2127,7 @@ done:
 static int
 acxpci_e_close(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
 
@@ -2168,7 +2167,7 @@ acxpci_e_close(struct net_device *ndev)
 static void
 acxpci_i_tx_timeout(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	unsigned int tx_num_cleaned;
 
@@ -2217,7 +2216,7 @@ acxpci_i_tx_timeout(struct net_device *ndev)
 static void
 acxpci_i_set_multicast_list(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
 	FN_ENTER;
@@ -2496,7 +2495,7 @@ acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	register u16 irqtype;
 	u16 unmasked;
 
-	adev = netdev_priv((struct net_device*)dev_id);
+	adev = ndev2adev((struct net_device*)dev_id);
 
 	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
 	 * I am paranoid */
@@ -2681,7 +2680,7 @@ acx111pci_ioctl_info(
 	char *extra)
 {
 #if ACX_DEBUG > 1
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	rxdesc_t *rxdesc;
 	txdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
@@ -2959,7 +2958,7 @@ acx100pci_ioctl_set_phy_amp_bias(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	u16 gpio_old;
 
@@ -4211,8 +4210,7 @@ acxpci_e_cleanup_module(void)
 
 	ndev = root_adev_newest;
 	while (ndev) {
-		/* doh, netdev_priv() doesn't have const! */
-		acx_device_t *adev = netdev_priv(ndev);
+		acx_device_t *adev = ndev2adev(ndev);
 
 		acx_sem_lock(adev);
 

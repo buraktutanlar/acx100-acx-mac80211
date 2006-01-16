@@ -204,7 +204,7 @@ acx_ioctl_commit(struct net_device *ndev,
 				      struct iw_request_info *info,
 				      void *zwrq, char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
 
@@ -227,7 +227,7 @@ acx_ioctl_get_name(
 	char *cwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	static const char * const names[] = { "IEEE 802.11b+/g+", "IEEE 802.11b+" };
 
 	strcpy(cwrq, names[IS_ACX111(adev) ? 0 : 1]);
@@ -246,7 +246,7 @@ acx_ioctl_set_freq(
 	struct iw_freq *fwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int channel = -1;
 	unsigned int mult = 1;
 	int result;
@@ -299,7 +299,7 @@ acx_ioctl_get_freq(
 	struct iw_freq *fwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	fwrq->e = 0;
 	fwrq->m = adev->channel;
 	return OK;
@@ -316,7 +316,7 @@ acx_ioctl_set_mode(
 	u32 *uwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -371,7 +371,7 @@ acx_ioctl_get_mode(
 	u32 *uwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result = 0;
 
 	switch (adev->mode) {
@@ -401,7 +401,7 @@ acx_ioctl_set_sens(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
@@ -423,7 +423,7 @@ acx_ioctl_get_sens(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	if (IS_USB(adev))
 		/* setting the PHY reg via fw cmd doesn't work yet */
@@ -453,7 +453,7 @@ acx_ioctl_set_ap(
 	struct sockaddr *awrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result = 0;
 	const u8 *ap;
 
@@ -507,7 +507,7 @@ acx_ioctl_get_ap(
 	struct sockaddr *awrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	if (ACX_STATUS_4_ASSOCIATED == adev->status) {
 		/* as seen in Aironet driver, airo.c */
@@ -534,7 +534,7 @@ acx_ioctl_get_aplist(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	struct sockaddr *address = (struct sockaddr *) extra;
 	struct iw_quality qual[IW_MAX_AP];
 	int i, cur;
@@ -588,7 +588,7 @@ acx_ioctl_set_scan(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -729,7 +729,7 @@ acx_ioctl_get_scan(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	char *ptr = extra;
 	int i;
 	int result = OK;
@@ -780,7 +780,7 @@ acx_ioctl_set_essid(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int len = dwrq->length;
 	int result;
 
@@ -836,7 +836,7 @@ acx_ioctl_get_essid(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	dwrq->flags = adev->essid_active;
 	if (adev->essid_active)	{
@@ -920,7 +920,7 @@ acx_ioctl_set_rate(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	u16 txrate_cfg = 1;
 	unsigned long flags;
 	int autorate;
@@ -1009,7 +1009,7 @@ acx_ioctl_get_rate(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	u16 rate;
 
@@ -1032,7 +1032,7 @@ acx_ioctl_set_rts(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int val = vwrq->value;
 
 	if (vwrq->disabled)
@@ -1051,7 +1051,7 @@ acx_ioctl_get_rts(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	vwrq->value = adev->rts_threshold;
 	vwrq->disabled = (vwrq->value >= 2312);
@@ -1068,7 +1068,7 @@ acx_ioctl_set_frag(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int val = vwrq->value;
 
 	if (vwrq->disabled)
@@ -1088,7 +1088,7 @@ acx_ioctl_get_frag(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	vwrq->value = adev->frag_threshold;
 	vwrq->disabled = (vwrq->value >= 2347);
@@ -1108,7 +1108,7 @@ acx_ioctl_set_encode(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int index;
 	int result;
 
@@ -1205,7 +1205,7 @@ acx_ioctl_get_encode(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 
 	FN_ENTER;
@@ -1245,7 +1245,7 @@ acx_ioctl_set_power(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result = -EINPROGRESS;
 
 	FN_ENTER;
@@ -1317,7 +1317,7 @@ acx_ioctl_get_power(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
 
@@ -1353,7 +1353,7 @@ acx_ioctl_get_txpow(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
 
@@ -1379,7 +1379,7 @@ acx_ioctl_set_txpow(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -1429,7 +1429,7 @@ acx_ioctl_get_range(
 	char *extra)
 {
 	struct iw_range *range = (struct iw_range *)extra;
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int i,n;
 
 	FN_ENTER;
@@ -1544,7 +1544,7 @@ acx_ioctl_get_nick(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	strcpy(extra, adev->nick);
 	dwrq->length = strlen(extra) + 1;
@@ -1563,7 +1563,7 @@ acx_ioctl_set_nick(
 	struct iw_point *dwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -1597,7 +1597,7 @@ acx_ioctl_get_retry(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned int type = vwrq->flags & IW_RETRY_TYPE;
 	unsigned int modifier = vwrq->flags & IW_RETRY_MODIFIER;
 	int result;
@@ -1641,7 +1641,7 @@ acx_ioctl_set_retry(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -1747,7 +1747,7 @@ acx_ioctl_set_reg_domain(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -1781,7 +1781,7 @@ acx_ioctl_get_reg_domain(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int dom,i;
 
 	/* no locking */
@@ -1819,7 +1819,7 @@ acx_ioctl_set_short_preamble(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int i;
 	int result;
 
@@ -1889,7 +1889,7 @@ acx_ioctl_get_short_preamble(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
@@ -1918,7 +1918,7 @@ acx_ioctl_set_antenna(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
@@ -1954,7 +1954,7 @@ acx_ioctl_get_antenna(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	/* no locking. it's pointless to lock a single load */
 	printk("current antenna value: 0x%02X (COMBINED bit mask)\n"
@@ -1984,7 +1984,7 @@ acx_ioctl_set_rx_antenna(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -2024,7 +2024,7 @@ acx_ioctl_set_tx_antenna(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
@@ -2063,7 +2063,7 @@ acx_ioctl_wlansniff(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned int *params = (unsigned int*)extra;
 	unsigned int enable = (unsigned int)(params[0] > 0);
 	int result;
@@ -2118,7 +2118,7 @@ acx_ioctl_unknown11(
 	char *extra)
 {
 #ifdef BROKEN
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	client_t client;
 	int result;
@@ -2148,7 +2148,7 @@ acx_ioctl_dbg_set_masks(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	const unsigned int *params = (unsigned int*)extra;
 	int result;
 
@@ -2266,7 +2266,7 @@ static int
 acx_ioctl_set_rates(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_param *vwrq, char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	int result;
 	u32 brate = 0, orate = 0; /* basic, operational rate set */
@@ -2326,7 +2326,7 @@ acx_ioctl_get_phy_chan_busy_percentage(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	struct { /* added ACX_PACKED, not tested --vda */
 		u16 type ACX_PACKED;
 		u16 len ACX_PACKED;
@@ -2369,7 +2369,7 @@ acx_ioctl_set_ed_threshold(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
@@ -2394,7 +2394,7 @@ acx_ioctl_set_cca(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	acx_sem_lock(adev);
@@ -2433,7 +2433,7 @@ acx_ioctl_set_scan_params(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 	const int *params = (int *)extra;
 
@@ -2464,7 +2464,7 @@ acx_ioctl_get_scan_params(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 	int *params = (int *)extra;
 
@@ -2494,7 +2494,7 @@ acx100_ioctl_set_led_power(
 {
 	static const char * const led_modes[] = { "off", "on", "LinkQuality" };
 
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	acx_sem_lock(adev);
@@ -2536,7 +2536,7 @@ acx100_ioctl_get_led_power(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
@@ -2561,7 +2561,7 @@ acx111_ioctl_info(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	if (!IS_PCI((acx_device_t*)netdev_priv(ndev)))
+	if (!IS_PCI(ndev2adev(ndev)))
 		return OK;
 	return acx111pci_ioctl_info(ndev, info, vwrq, extra);
 }
@@ -2576,7 +2576,7 @@ acx100_ioctl_set_phy_amp_bias(
 	struct iw_param *vwrq,
 	char *extra)
 {
-	if (!IS_PCI((acx_device_t*)netdev_priv(ndev))) {
+	if (!IS_PCI(ndev2adev(ndev))) {
 		printk("acx: set_phy_amp_bias() is not supported on USB\n");
 		return OK;
 	}

@@ -1076,7 +1076,7 @@ typedef struct acx111_ie_configoption {
 
 
 /***********************************************************************
-** Main acx per-device data structure (netdev_priv(ndev))
+** Main acx per-device data structure
 */
 #define ACX_STATE_FW_LOADED	0x01
 #define ACX_STATE_IFACE_UP	0x02
@@ -1371,6 +1371,13 @@ struct acx_device {
 #endif
 
 };
+
+static inline acx_device_t*
+ndev2adev(struct net_device *ndev)
+{
+        return netdev_priv(ndev);
+}
+
 
 /* For use with ACX1xx_IE_RXCONFIG */
 /*  bit     description

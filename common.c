@@ -757,14 +757,14 @@ acx_e_change_mtu(struct net_device *ndev, int mtu)
 struct net_device_stats*
 acx_e_get_stats(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	return &adev->stats;
 }
 
 struct iw_statistics*
 acx_e_get_wireless_stats(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	return &adev->wstats;
 }
 
@@ -1393,8 +1393,7 @@ proc_funcs[] = {
 static int
 manage_proc_entries(const struct net_device *ndev, int remove)
 {
-	/* doh, netdev_priv() doesn't have const! */
-	acx_device_t *adev = netdev_priv((struct net_device *)ndev);
+	acx_device_t *adev = ndev2adev((struct net_device *)ndev);
 	char procbuf[80];
 	int i;
 
@@ -2803,7 +2802,7 @@ acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
 int
 acx_i_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	tx_t *tx;
 	void *txbuf;
 	unsigned long flags;
@@ -6493,7 +6492,7 @@ static void
 acx_e_after_interrupt_task(void *data)
 {
 	struct net_device *ndev = (struct net_device*)data;
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
 

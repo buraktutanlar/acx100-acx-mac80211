@@ -657,7 +657,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* Setup private driver context */
 
-	adev = netdev_priv(ndev);
+	adev = ndev2adev(ndev);
 	adev->ndev = ndev;
 
 	adev->dev_type = DEVTYPE_USB;
@@ -902,7 +902,7 @@ end:
 static int
 acxusb_e_open(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	int i;
 
@@ -953,7 +953,7 @@ acxusb_e_open(struct net_device *ndev)
 static int
 acxusb_e_close(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	int i;
 
@@ -1541,7 +1541,7 @@ acxusb_i_set_rx_mode(struct net_device *ndev)
 static void
 acxusb_i_tx_timeout(struct net_device *ndev)
 {
-	acx_device_t *adev = netdev_priv(ndev);
+	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	int i;
 
