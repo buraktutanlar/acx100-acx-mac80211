@@ -1677,6 +1677,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
 
+//TODO: merge them into one function, they are called just once and are the same for pci & usb
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev);
 	acx_s_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
