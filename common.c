@@ -2103,6 +2103,19 @@ acx_s_set_defaults(acx_device_t *adev)
 
 	FN_ENTER;
 
+	/* do it before getting settings, prevent bogus channel 0 warning */
+	adev->channel = 1;
+
+	/* query some settings from the card.
+	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
+	 * query is REQUIRED, otherwise the card won't work correctly! */
+	adev->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
+	/* Only ACX100 supports ED and CCA */
+	if (IS_ACX100(adev))
+		adev->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
+
+	acx_s_update_card_settings(adev);
+
 	acx_lock(adev, flags);
 
 	/* set our global interrupt mask */
@@ -2113,8 +2126,11 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->brange_max_quality = 60; /* LED blink max quality is 60 */
 	adev->brange_time_last_state_change = jiffies;
 
+	/* copy the MAC address we just got from the card
+	 * into our MAC address used during current 802.11 session */
 	MAC_COPY(adev->dev_addr, adev->ndev->dev_addr);
 	MAC_BCAST(adev->ap);
+
 	adev->essid_len =
 		snprintf(adev->essid, sizeof(adev->essid), "STA%02X%02X%02X",
 			adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
@@ -2129,23 +2145,19 @@ acx_s_set_defaults(acx_device_t *adev)
 		adev->reg_dom_id = adev->cfgopt_domains.list[0];
 	}
 
-	adev->channel = 1;
 	/* 0xffff would be better, but then we won't get a "scan complete"
 	 * interrupt, so our current infrastructure will fail: */
 	adev->scan_count = 1;
 	adev->scan_mode = ACX_SCAN_OPT_ACTIVE;
-
 	adev->scan_duration = 100;
 	adev->scan_probe_delay = 200;
 	/* reported to break scanning: adev->scan_probe_delay = adev->cfgopt_probe_delay; */
 	adev->scan_rate = ACX_SCAN_RATE_1;
 
+	adev->mode = ACX_MODE_2_STA;
 	adev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
-	adev->preamble_mode = 2; /* auto */
 	adev->listen_interval = 100;
 	adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
-	adev->mode = ACX_MODE_2_STA;
-	adev->monitor_type = ARPHRD_IEEE80211_PRISM;
 	adev->dtim_interval = DEFAULT_DTIM_INTERVAL;
 
 	adev->msdu_lifetime = DEFAULT_MSDU_LIFETIME;
@@ -2157,6 +2169,7 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->short_retry = 7; /* max. retries for (short) non-RTS packets */
 	adev->long_retry = 4; /* max. retries for long (RTS) packets */
 
+	adev->preamble_mode = 2; /* auto */
 	adev->fallback_threshold = 3;
 	adev->stepup_threshold = 10;
 	adev->rate_bcast = RATE111_1;
@@ -2168,9 +2181,12 @@ acx_s_set_defaults(acx_device_t *adev)
 	} else {
 		adev->rate_oper = RATE111_ACX100_COMPAT;
 	}
-	/* build 802.11 style ratevector (802.11 7.3.2.2) */
+
+	/* Supported Rates element - the rates here are given in units of
+	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
 	acx_l_update_ratevector(adev);
 
+	/* set some more defaults */
 	if (IS_ACX111(adev)) {
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
@@ -2181,7 +2197,6 @@ acx_s_set_defaults(acx_device_t *adev)
 		adev->tx_level_dbm = 18;
 	}
 	/* adev->tx_level_auto = 1; */
-
 	if (IS_ACX111(adev)) {
 		/* start with sensitivity level 1 out of 3: */
 		adev->sensitivity = 1;
@@ -2202,31 +2217,24 @@ acx_s_set_defaults(acx_device_t *adev)
 	adev->ps_enhanced_transition_time = 0;
 #endif
 
+	/* These settings will be set in fw on ifup */
 	adev->set_mask = 0
-		/* better re-init the antenna value we got */
-		| GETSET_ANTENNA
-		| GETSET_TXPOWER
-		| SET_RXCONFIG
-		/* configure card to do rate fallback when in auto rate mode. */
 		| GETSET_RETRY
 		| SET_MSDU_LIFETIME
+	/* configure card to do rate fallback when in auto rate mode */
 		| SET_RATE_FALLBACK
+		| SET_RXCONFIG
+		| GETSET_TXPOWER
+	/* better re-init the antenna value we got above */
+		| GETSET_ANTENNA
 #if POWER_SAVE_80211
 		| GETSET_POWER_80211
 #endif
 		;
-	/* query some settings from the card.
-	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
-	 * query is REQUIRED, otherwise the card won't work correctly!! */
-	adev->get_mask = GETSET_ANTENNA|GETSET_SENSITIVITY|GETSET_STATION_ID|GETSET_REG_DOMAIN;
-	/* Only ACX100 supports ED and CCA */
-	if (IS_ACX100(adev))
-		adev->get_mask |= GETSET_CCA|GETSET_ED_THRESH;
 
 	acx_unlock(adev, flags);
 	acx_lock_unhold(); /* hold time 844814 CPU ticks @2GHz */
 
-	acx_s_update_card_settings(adev);
 	acx_s_initialize_rx_config(adev);
 
 	FN_EXIT0;
