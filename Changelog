@@ -104,6 +104,11 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060124] 0.3.30
+* fix breakage introduced by vda
+* Bas Vermeulen <bvermeul@blackstar.xs4all.nl>:
+  support for firmware 2.3.1.31
+
 [20060117] 0.3.29
 * Andreas Mohr <andim2@users.sourceforge.net>:
   - fix OOPS in acx_l_rxmonitor() (wrong ndev->type setting leading to memcpy

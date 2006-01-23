@@ -930,22 +930,22 @@ acxpci_s_reset_dev(acx_device_t *adev)
 	acx_unlock(adev, flags);
 
 	/* need to know radio type before fw load */
- 	/* Need to wait for arrival of this information in a loop,
- 	 * most probably since eCPU runs some init code from EEPROM
- 	 * (started burst read in reset_mac()) which also
- 	 * sets the radio type ID */
- 
- 	count = 0xffff;
- 	do {
- 		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
- 		if (!--count) {
- 			msg = "eCPU didn't indicate radio type";
- 			goto end_fail;
- 		}
- 		cpu_relax();
- 	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
- 
- 	/* printk("DEBUG: count %d\n", count); */
+	/* Need to wait for arrival of this information in a loop,
+	 * most probably since eCPU runs some init code from EEPROM
+	 * (started burst read in reset_mac()) which also
+	 * sets the radio type ID */
+
+	count = 0xffff;
+	do {
+		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+		if (!--count) {
+			msg = "eCPU didn't indicate radio type";
+			goto end_fail;
+		}
+		cpu_relax();
+	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
+
+	/* printk("DEBUG: count %d\n", count); */
 	adev->form_factor = hardware_info & 0xff;
 	adev->radio_type = hardware_info >> 8;
 

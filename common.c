@@ -629,13 +629,6 @@ acx_s_get_firmware_version(acx_device_t *adev)
 			printk("acx: firmware '%s' is known to be buggy, "
 				"please upgrade\n", adev->firmware_version);
 		}
-		if (adev->firmware_numver == 0x02030131) {
-			/* With this one, all rx packets look mangled
-			** Most probably we simply do not know how to use it
-			** properly */
-			printk("acx: firmware '%s' does not work well "
-				"with this driver\n", adev->firmware_version);
-		}
 	}
 
 	adev->firmware_id = le32_to_cpu(fw.hw_id);
@@ -2084,6 +2077,12 @@ acx_s_initialize_rx_config(acx_device_t *adev)
 		break;
 	}
 	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
+
+	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR) ||
+		(adev->firmware_numver >= 0x02000000))
+		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
+	else
+		adev->phy_header_len = 0;
 
 	log(L_INIT, "setting RXconfig to %04X:%04X\n",
 			adev->rx_config_1, adev->rx_config_2);

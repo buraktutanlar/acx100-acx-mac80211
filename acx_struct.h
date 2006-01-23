@@ -1299,6 +1299,7 @@ struct acx_device {
 	u16		memblocksize;
 	unsigned int	tx_free;
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
+	u16		phy_header_len;
 
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
@@ -1376,7 +1377,7 @@ struct acx_device {
 static inline acx_device_t*
 ndev2adev(struct net_device *ndev)
 {
-        return netdev_priv(ndev);
+	return netdev_priv(ndev);
 }
 
 

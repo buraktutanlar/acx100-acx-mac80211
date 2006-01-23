@@ -565,14 +565,7 @@ acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len)
 static inline wlan_hdr_t*
 acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
-	if (!(adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR))
-		return (wlan_hdr_t*)&rxbuf->hdr_a3;
-
-	/* take into account phy header in front of packet */
-	if (IS_ACX111(adev))
-		return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 8);
-
-	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + 4);
+	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
 
 void acxpci_l_power_led(acx_device_t *adev, int enable);
