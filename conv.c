@@ -482,8 +482,9 @@ acx_rxbuf_to_ether(acx_device_t *adev, rxbuffer_t *rxbuf)
 
 #ifdef DEBUG_CONVERT
 	if (acx_debug & L_DATA) {
-		printk("p802.11 frame [%d]: ", RXBUF_BYTES_RCVD(rxbuf));
-		acx_dump_bytes(w_hdr, RXBUF_BYTES_RCVD(rxbuf));
+		int len = RXBUF_BYTES_RCVD(adev, rxbuf);
+		printk("p802.11 frame [%d]: ", len);
+		acx_dump_bytes(w_hdr, len);
 		printk("eth frame [%d]: ", skb->len);
 		acx_dump_bytes(skb->data, skb->len);
 	}

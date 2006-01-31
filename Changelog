@@ -104,6 +104,9 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060126] 0.3.31
+* fix bug uncovered by code added in support for firmware 2.3.1.31
+
 [20060124] 0.3.30
 * fix breakage introduced by vda
 * Bas Vermeulen <bvermeul@blackstar.xs4all.nl>:

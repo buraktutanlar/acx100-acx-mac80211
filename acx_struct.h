@@ -105,6 +105,10 @@ enum { acx_debug = 0 };
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
 
+#if !defined(CONFIG_ACX_PCI) && !defined(CONFIG_ACX_USB)
+#error Driver must include PCI and/or USB support. You selected neither.
+#endif
+
 #if defined(CONFIG_ACX_PCI)
  #if !defined(CONFIG_ACX_USB)
   #define IS_PCI(adev)	1
@@ -479,15 +483,15 @@ typedef struct phy_hdr {
  * Some seem to have different meanings... */
 
 #define RXBUF_HDRSIZE 12
-#define PHY_HDR(rxbuf) ((phy_hdr_t*)&rxbuf->hdr_a3)
-#define RXBUF_BYTES_RCVD(rxbuf) (le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff)
+#define RXBUF_BYTES_RCVD(adev, rxbuf) \
+		((le16_to_cpu((rxbuf)->mac_cnt_rcvd) & 0xfff) - (adev)->phy_header_len)
 #define RXBUF_BYTES_USED(rxbuf) \
-		((le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0xfff) + RXBUF_HDRSIZE)
+		((le16_to_cpu((rxbuf)->mac_cnt_rcvd) & 0xfff) + RXBUF_HDRSIZE)
 /* USBism */
-#define RXBUF_IS_TXSTAT(rxbuf) (le16_to_cpu(rxbuf->mac_cnt_rcvd) & 0x8000)
+#define RXBUF_IS_TXSTAT(rxbuf) (le16_to_cpu((rxbuf)->mac_cnt_rcvd) & 0x8000)
 /*
 mac_cnt_rcvd:
-    12 bits: length of frame from control field to last byte of FCS
+    12 bits: length of frame from control field to first byte of FCS
     3 bits: reserved
     1 bit: 1 = it's a tx status info, not a rx packet (USB only)
 

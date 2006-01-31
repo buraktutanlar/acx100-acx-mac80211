@@ -2078,8 +2078,8 @@ acx_s_initialize_rx_config(acx_device_t *adev)
 	}
 	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
 
-	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR) ||
-		(adev->firmware_numver >= 0x02000000))
+	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR)
+	 || (adev->firmware_numver >= 0x02000000))
 		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
 	else
 		adev->phy_header_len = 0;
@@ -2576,14 +2576,14 @@ void
 acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf)
 {
 	struct wlan_hdr *hdr;
-	unsigned int buf_len;
 	unsigned int qual;
+	int buf_len;
 	u16 fc;
 
 	hdr = acx_get_wlan_hdr(adev, rxbuf);
-	/* length of frame from control field to last byte of FCS */
 	fc = le16_to_cpu(hdr->fc);
-	buf_len = RXBUF_BYTES_RCVD(rxbuf);
+	/* length of frame from control field to first byte of FCS */
+	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	if ( ((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON)
 	  || (acx_debug & L_XFER_BEACON)
@@ -3824,10 +3824,10 @@ acx_l_process_data_frame_master(acx_device_t *adev, rxbuffer_t *rxbuf)
 		/* To_DS = 0, From_DS = 1 */
 		hdr->fc = WF_FC_FROMDSi + WF_FTYPE_DATAi;
 
-		len = RXBUF_BYTES_RCVD(rxbuf);
 		txbuf = acx_l_get_txbuf(adev, tx);
 		if (txbuf) {
-			memcpy(txbuf, &rxbuf->hdr_a3, len);
+			len = RXBUF_BYTES_RCVD(adev, rxbuf);
+			memcpy(txbuf, hdr, len);
 			acx_l_tx_data(adev, tx, len);
 		} else {
 			acx_l_dealloc_tx(adev, tx);
@@ -3982,7 +3982,7 @@ acx_l_process_mgmt_frame(acx_device_t *adev, rxbuffer_t *rxbuf)
 		return NOT_OK;
 	}
 
-	len = RXBUF_BYTES_RCVD(rxbuf);
+	len = RXBUF_BYTES_RCVD(adev, rxbuf);
 	if (WF_FC_ISWEPi & hdr->fc)
 		len -= 0x10;
 
