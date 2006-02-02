@@ -646,6 +646,9 @@ acx_s_get_firmware_version(acx_device_t *adev)
 		case 0x03010000:
 			adev->chip_name = "TNETW1130";
 			break;
+		case 0x04030000: /* 0x04030101 is TNETW1450 */
+			adev->chip_name = "TNETW1450";
+			break;
 		default:
 			printk("acx: unknown chip ID 0x%08X, "
 				"please report\n", adev->firmware_id);
@@ -670,9 +673,6 @@ acx_display_hardware_details(acx_device_t *adev)
 
 	switch (adev->radio_type) {
 	case RADIO_MAXIM_0D:
-		/* hmm, the DWL-650+ seems to have two variants,
-		 * according to a windows driver changelog comment:
-		 * RFMD and Maxim. */
 		radio_str = "Maxim";
 		break;
 	case RADIO_RFMD_11:
@@ -692,8 +692,11 @@ acx_display_hardware_details(acx_device_t *adev)
 	case RADIO_UNKNOWN_19:
 		radio_str = "A radio used by Safecom cards?! Please report";
 		break;
+	case RADIO_UNKNOWN_1B:
+		radio_str = "An unknown radio used by TNETW1450 USB adapters";
+		break;
 	default:
-		radio_str = "UNKNOWN, please report the radio type name!";
+		radio_str = "UNKNOWN, please report radio type name!";
 		break;
 	}
 
@@ -852,6 +855,32 @@ acx100_ie_len[] = {
 	0,
 	ACX1xx_IE_FEATURE_CONFIG_LEN,
 	ACX111_IE_KEY_CHOOSE_LEN,
+	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
+	ACX1FF_IE_WONE_CONFIG_LEN,
+	0,
+	ACX1FF_IE_TID_CONFIG_LEN,
+	0,
+	0,
+	0,
+	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
+	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
+	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
+	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
+	0,
+	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
+	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
+	ACX1FF_IE_CCA_THRESHOLD_LEN,
+	ACX1FF_IE_EVENT_MASK_LEN,
+	ACX1FF_IE_DTIM_PERIOD_LEN,
+	0,
+	ACX1FF_IE_ACI_CONFIG_SET_LEN,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	ACX1FF_IE_EEPROM_VER_LEN,
 };
 
 static const u16
@@ -903,6 +932,32 @@ acx111_ie_len[] = {
 	0,
 	ACX1xx_IE_FEATURE_CONFIG_LEN,
 	ACX111_IE_KEY_CHOOSE_LEN,
+	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
+	ACX1FF_IE_WONE_CONFIG_LEN,
+	0,
+	ACX1FF_IE_TID_CONFIG_LEN,
+	0,
+	0,
+	0,
+	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
+	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
+	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
+	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
+	0,
+	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
+	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
+	ACX1FF_IE_CCA_THRESHOLD_LEN,
+	ACX1FF_IE_EVENT_MASK_LEN,
+	ACX1FF_IE_DTIM_PERIOD_LEN,
+	0,
+	ACX1FF_IE_ACI_CONFIG_SET_LEN,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	ACX1FF_IE_EEPROM_VER_LEN,
 };
 
 static const u16
@@ -983,6 +1038,8 @@ acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type,
 	u16 len;
 	int res;
 
+	/* FIXME: no check whether this exceeds the array yet.
+	 * We should probably remember the number of entries... */
 	if (type < 0x1000)
 		len = adev->ie_len[type];
 	else

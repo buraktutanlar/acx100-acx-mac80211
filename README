@@ -51,6 +51,15 @@ Remove "acx-obj-y += usb.o" line in Makefile
 and "#define CONFIG_ACX_USB 1" line in acx_config.h
 if you want PCI-only driver. Ditto for USB-only one.
 
+USB snooping:
+
+If you are an USB driver developer and need to see USB traffic,
+http://benoit.papillault.free.fr/usbsnoop/ may be useful.
+Another very good way to snoop the USB frames is under Linux if your
+driver happens to run under ndiswrapper (which is often the case),
+either by savage printk's, or by using the USB snooping facilities from
+Pete Zaitcev.
+
 
 From: Per Bjornsson <perbj@stanford.edu>
 To: ACX100 user mailing list <acx100-users@lists.sourceforge.net>

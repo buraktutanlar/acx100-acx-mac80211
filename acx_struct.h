@@ -152,6 +152,7 @@ enum { acx_debug = 0 };
 #define RADIO_UNKNOWN_17	0x17
 /* FwRad19.bin was found in a Safecom driver; must be an ACX111 radio: */
 #define RADIO_UNKNOWN_19	0x19
+#define RADIO_UNKNOWN_1B	0x1b    /* radio in SafeCom SWLUT-54125 USB adapter; entirely unknown!! */
 
 /* Controller Commands */
 /* can be found in table cmdTable in firmware "Rev. 1.5.0" (FW150) */
@@ -178,13 +179,18 @@ enum { acx_debug = 0 };
 #define ACX1xx_CMD_WAKE			0x10
 #define ACX1xx_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */
 #define ACX100_CMD_INIT_MEMORY		0x12
+#define ACX1FF_CMD_DISABLE_RADIO	0x12	/* new firmware? TNETW1450? */
 #define ACX1xx_CMD_CONFIG_BEACON	0x13
 #define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x14
 #define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
 #define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x16
-#define ACX1xx_CMD_TEST			0x17
+#define ACX1xx_CMD_FCC_TEST		0x17
 #define ACX1xx_CMD_RADIOINIT		0x18
 #define ACX111_CMD_RADIOCALIB		0x19
+#define ACX1FF_CMD_NOISE_HISTOGRAM	0x1c /* new firmware? TNETW1450? */
+#define ACX1FF_CMD_RX_RESET		0x1d /* new firmware? TNETW1450? */
+#define ACX1FF_CMD_LNA_CONTROL		0x20 /* new firmware? TNETW1450? */
+#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21 /* new firmware? TNETW1450? */
 
 /* 'After Interrupt' Commands */
 #define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
@@ -233,18 +239,22 @@ enum { acx_debug = 0 };
 /* these are handled by real_cfgtable in firmware "Rev 1.5.0" (FW150) */
 DEF_IE(1xx_IE_UNKNOWN_00		,0x0000, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(100_IE_ACX_TIMER			,0x0001, 0x10);
-DEF_IE(1xx_IE_POWER_MGMT		,0x0002, 0x06);
+DEF_IE(1xx_IE_POWER_MGMT		,0x0002, 0x06); /* TNETW1450: length 0x18!! */
 DEF_IE(1xx_IE_QUEUE_CONFIG		,0x0003, 0x1c);
 DEF_IE(100_IE_BLOCK_SIZE		,0x0004, 0x02);
+DEF_IE(1FF_IE_SLOT_TIME			,0x0004, 0x08); /* later firmware versions only? */
 DEF_IE(1xx_IE_MEMORY_CONFIG_OPTIONS	,0x0005, 0x14);
-DEF_IE(1xx_IE_RATE_FALLBACK		,0x0006, 0x01);
+DEF_IE(1FF_IE_QUEUE_HEAD		,0x0005, 0x14 /* FIXME: length? */);
+DEF_IE(1xx_IE_RATE_FALLBACK		,0x0006, 0x01); /* TNETW1450: length 2 */
 DEF_IE(100_IE_WEP_OPTIONS		,0x0007, 0x03);
 DEF_IE(111_IE_RADIO_BAND		,0x0007, -1);
-DEF_IE(1xx_IE_MEMORY_MAP		,0x0008, 0x28); /* huh? */
+DEF_IE(1FF_IE_TIMING_CFG		,0x0007, -1);	/* later firmware versions; TNETW1450 only? */
 DEF_IE(100_IE_SSID			,0x0008, 0x20); /* huh? */
+DEF_IE(1xx_IE_MEMORY_MAP		,0x0008, 0x28); /* huh? TNETW1450 has length 0x40!! */
 DEF_IE(1xx_IE_SCAN_STATUS		,0x0009, 0x04); /* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_ASSOC_ID			,0x000a, 0x02);
 DEF_IE(1xx_IE_UNKNOWN_0B		,0x000b, -1);	/* mapped to cfgInvalid in FW150 */
+DEF_IE(1FF_IE_TX_POWER_LEVEL_TABLE	,0x000b, 0x18); /* later firmware versions; TNETW1450 only? */
 DEF_IE(100_IE_UNKNOWN_0C		,0x000c, -1);	/* very small implementation in FW150! */
 /* ACX100 has an equivalent struct in the cmd mailbox directly after reset.
  * 0x14c seems extremely large, will trash stack on failure (memset!)
@@ -257,30 +267,47 @@ DEF_IE(1xx_IE_RXCONFIG			,0x0010, 0x04);
 DEF_IE(100_IE_UNKNOWN_11		,0x0011, -1);	/* NONBINARY: large implementation in FW150! link quality readings or so? */
 DEF_IE(111_IE_QUEUE_THRESH		,0x0011, -1);
 DEF_IE(100_IE_UNKNOWN_12		,0x0012, -1);	/* NONBINARY: VERY large implementation in FW150!! */
-DEF_IE(111_IE_BSS_POWER_SAVE		,0x0012, -1);
-DEF_IE(1xx_IE_FIRMWARE_STATISTICS	,0x0013, 0x9c);
+DEF_IE(111_IE_BSS_POWER_SAVE		,0x0012, /* -1 */ 2);
+DEF_IE(1xx_IE_FIRMWARE_STATISTICS	,0x0013, 0x9c); /* TNETW1450: length 0x134!! */
+DEF_IE(1FF_IE_RX_INTR_CONFIG		,0x0014, 0x14); /* later firmware versions, TNETW1450 only? */
 DEF_IE(1xx_IE_FEATURE_CONFIG		,0x0015, 0x08);
 DEF_IE(111_IE_KEY_CHOOSE		,0x0016, 0x04);	/* for rekeying. really len=4?? */
+DEF_IE(1FF_IE_MISC_CONFIG_TABLE		,0x0017, 0x04); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_WONE_CONFIG		,0x0018, -1);	/* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_TID_CONFIG		,0x001a, 0x2c); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_CALIB_ASSESSMENT		,0x001e, 0x04); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_BEACON_FILTER_OPTIONS	,0x001f, 0x02); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_LOW_RSSI_THRESH_OPT	,0x0020, 0x04); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_NOISE_HISTOGRAM_RESULTS	,0x0021, 0x30); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_PACKET_DETECT_THRESH	,0x0023, 0x04); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_TX_CONFIG_OPTIONS		,0x0024, 0x04); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_CCA_THRESHOLD		,0x0025, 0x02); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_EVENT_MASK		,0x0026, 0x08); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_DTIM_PERIOD		,0x0027, 0x02); /* later firmware versions, TNETW1450 only? */
+DEF_IE(1FF_IE_ACI_CONFIG_SET		,0x0029, 0x06); /* later firmware versions; maybe TNETW1450 only? */
+DEF_IE(1FF_IE_EEPROM_VER		,0x0030, 0x04); /* later firmware versions; maybe TNETW1450 only? */
 DEF_IE(1xx_IE_DOT11_STATION_ID		,0x1001, 0x06);
 DEF_IE(100_IE_DOT11_UNKNOWN_1002	,0x1002, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(111_IE_DOT11_FRAG_THRESH		,0x1002, -1);	/* mapped to cfgInvalid in FW150 */
+DEF_IE(111_IE_DOT11_FRAG_THRESH		,0x1002, -1);	/* mapped to cfgInvalid in FW150; TNETW1450 has length 2!! */
 DEF_IE(100_IE_DOT11_BEACON_PERIOD	,0x1003, 0x02);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_DOT11_DTIM_PERIOD		,0x1004, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1xx_IE_DOT11_SHORT_RETRY_LIMIT	,0x1005, 0x01);
-DEF_IE(1xx_IE_DOT11_LONG_RETRY_LIMIT	,0x1006, 0x01);
-DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	,0x1007, 0x20);	/* configure default keys */
+DEF_IE(1FF_IE_DOT11_MAX_RX_LIFETIME	,0x1004, -1);	/* later firmware versions; maybe TNETW1450 only? */
+DEF_IE(1xx_IE_DOT11_SHORT_RETRY_LIMIT	,0x1005, 0x01); /* TNETW1450: length 2 */
+DEF_IE(1xx_IE_DOT11_LONG_RETRY_LIMIT	,0x1006, 0x01); /* TNETW1450: length 2 */
+DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	,0x1007, 0x20);	/* configure default keys; TNETW1450 has length 0x24!! */
 DEF_IE(1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	,0x1008, 0x04);
 DEF_IE(1xx_IE_DOT11_GROUP_ADDR		,0x1009, -1);
 DEF_IE(1xx_IE_DOT11_CURRENT_REG_DOMAIN	,0x100a, 0x02);
 //It's harmless to have larger struct. Use USB case always.
 DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);	/* in fact len=1 for PCI */
 DEF_IE(1xx_IE_DOT11_UNKNOWN_100C	,0x100c, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01);
+DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01); /* TNETW1450 has length 2!! */
 DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);	/* in fact len=1 for PCI */
 //USB doesn't return anything - len==0?!
 DEF_IE(100_IE_DOT11_ED_THRESHOLD	,0x100f, 0x04);
-DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID */
+DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID; TNETW1450: length 2 */
 DEF_IE(100_IE_DOT11_UNKNOWN_1011	,0x1011, -1);	/* mapped to cfgInvalid in FW150 */
+DEF_IE(1FF_IE_DOT11_CURR_5GHZ_REGDOM	,0x1011, -1);	/* later firmware versions; maybe TNETW1450 only? */
 DEF_IE(100_IE_DOT11_UNKNOWN_1012	,0x1012, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(100_IE_DOT11_UNKNOWN_1013	,0x1013, -1);	/* mapped to cfgInvalid in FW150 */
 
@@ -1112,6 +1139,9 @@ struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
 	/*** Locking ***/
+	/* FIXME: try to convert semaphore to more efficient mutex according
+	   to Ingo Molnar's docs (but not before driver is in mainline or
+		 pre-mutex Linux 2.6.10 is very outdated). */
 	struct semaphore	sem;
 	spinlock_t		lock;
 #if defined(PARANOID_LOCKING) /* Lock debugging */
@@ -1854,7 +1884,7 @@ typedef struct acx_joinbss {
 */
 typedef struct mem_read_write {
 	u16	addr ACX_PACKED;
-	u16	type ACX_PACKED; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg. */
+	u16	type ACX_PACKED; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg.; or maybe it's actually 0x30 for MAC? Better verify it by writing and reading back and checking whether the value holds! */
 	u32	len ACX_PACKED;
 	u32	data ACX_PACKED;
 } mem_read_write_t;

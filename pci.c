@@ -476,23 +476,23 @@ acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 **
 ** Arguments:
 **	adev		wlan device structure
-**	apfw_image	firmware image.
+**	fw_image	firmware image.
 **
 ** Returns:
 **	1	firmware image corrupted
 **	0	success
 */
 static int
-acxpci_s_write_fw(acx_device_t *adev, const firmware_image_t *apfw_image, u32 offset)
+acxpci_s_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset)
 {
 	int len, size;
 	u32 sum, v32;
 	/* we skip the first four bytes which contain the control sum */
-	const u8 *image = (u8*)apfw_image + 4;
+	const u8 *p = (u8*)fw_image + 4;
 
 	/* start the image checksum by adding the image size value */
-	sum = image[0]+image[1]+image[2]+image[3];
-	image += 4;
+	sum = p[0]+p[1]+p[2]+p[3];
+	p += 4;
 
 	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
 
@@ -505,12 +505,12 @@ acxpci_s_write_fw(acx_device_t *adev, const firmware_image_t *apfw_image, u32 of
 #endif
 
 	len = 0;
-	size = le32_to_cpu(apfw_image->size) & (~3);
+	size = le32_to_cpu(fw_image->size) & (~3);
 
 	while (likely(len < size)) {
-		v32 = be32_to_cpu(*(u32*)image);
-		sum += image[0]+image[1]+image[2]+image[3];
-		image += 4;
+		v32 = be32_to_cpu(*(u32*)p);
+		sum += p[0]+p[1]+p[2]+p[3];
+		p += 4;
 		len += 4;
 
 #if NO_AUTO_INCREMENT
@@ -521,10 +521,10 @@ acxpci_s_write_fw(acx_device_t *adev, const firmware_image_t *apfw_image, u32 of
 	}
 
 	log(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
-			size, sum, le32_to_cpu(apfw_image->chksum));
+			size, sum, le32_to_cpu(fw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
-	return (sum != le32_to_cpu(apfw_image->chksum));
+	return (sum != le32_to_cpu(fw_image->chksum));
 }
 
 
@@ -536,25 +536,25 @@ acxpci_s_write_fw(acx_device_t *adev, const firmware_image_t *apfw_image, u32 of
 **
 ** Arguments:
 **	adev		wlan device structure
-**   apfw_image  firmware image.
+**   fw_image  firmware image.
 **
 ** Returns:
 **	NOT_OK	firmware image corrupted or not correctly written
 **	OK	success
 */
 static int
-acxpci_s_validate_fw(acx_device_t *adev, const firmware_image_t *apfw_image,
+acxpci_s_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 				u32 offset)
 {
 	u32 sum, v32, w32;
 	int len, size;
 	int result = OK;
 	/* we skip the first four bytes which contain the control sum */
-	const u8 *image = (u8*)apfw_image + 4;
+	const u8 *p = (u8*)fw_image + 4;
 
 	/* start the image checksum by adding the image size value */
-	sum = image[0]+image[1]+image[2]+image[3];
-	image += 4;
+	sum = p[0]+p[1]+p[2]+p[3];
+	p += 4;
 
 	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
 
@@ -566,11 +566,11 @@ acxpci_s_validate_fw(acx_device_t *adev, const firmware_image_t *apfw_image,
 #endif
 
 	len = 0;
-	size = le32_to_cpu(apfw_image->size) & (~3);
+	size = le32_to_cpu(fw_image->size) & (~3);
 
 	while (likely(len < size)) {
-		v32 = be32_to_cpu(*(u32*)image);
-		image += 4;
+		v32 = be32_to_cpu(*(u32*)p);
+		p += 4;
 		len += 4;
 
 #if NO_AUTO_INCREMENT
@@ -593,7 +593,7 @@ acxpci_s_validate_fw(acx_device_t *adev, const firmware_image_t *apfw_image,
 
 	/* sum control verification */
 	if (result != NOT_OK) {
-		if (sum != le32_to_cpu(apfw_image->chksum)) {
+		if (sum != le32_to_cpu(fw_image->chksum)) {
 			printk("acx: FATAL: firmware upload: "
 				"checksums don't match!\n");
 			result = NOT_OK;
@@ -612,10 +612,10 @@ acxpci_s_validate_fw(acx_device_t *adev, const firmware_image_t *apfw_image,
 static int
 acxpci_s_upload_fw(acx_device_t *adev)
 {
-	firmware_image_t *apfw_image = NULL;
+	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
 	int try;
-	u32 size;
+	u32 file_size;
 	char filename[sizeof("tiacx1NNcNN")];
 
 	FN_ENTER;
@@ -625,22 +625,22 @@ acxpci_s_upload_fw(acx_device_t *adev)
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
 		IS_ACX111(adev)*11, adev->radio_type);
 
-	apfw_image = acx_s_read_fw(&adev->pdev->dev, filename, &size);
-	if (!apfw_image) {
+	fw_image = acx_s_read_fw(&adev->pdev->dev, filename, &file_size);
+	if (!fw_image) {
 		adev->need_radio_fw = 1;
 		filename[sizeof("tiacx1NN")-1] = '\0';
-		apfw_image = acx_s_read_fw(&adev->pdev->dev, filename, &size);
-		if (!apfw_image) {
+		fw_image = acx_s_read_fw(&adev->pdev->dev, filename, &file_size);
+		if (!fw_image) {
 			FN_EXIT1(NOT_OK);
 			return NOT_OK;
 		}
 	}
 
 	for (try = 1; try <= 5; try++) {
-		res = acxpci_s_write_fw(adev, apfw_image, 0);
+		res = acxpci_s_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx_write_fw (main/combined):%d\n", res);
 		if (OK == res) {
-			res = acxpci_s_validate_fw(adev, apfw_image, 0);
+			res = acxpci_s_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG|L_INIT, "acx_validate_fw "
 					"(main/combined):%d\n", res);
 		}
@@ -654,7 +654,7 @@ acxpci_s_upload_fw(acx_device_t *adev)
 		acx_s_msleep(1000); /* better wait for a while... */
 	}
 
-	vfree(apfw_image);
+	vfree(fw_image);
 
 	FN_EXIT1(res);
 	return res;
@@ -1661,9 +1661,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (OK != acxpci_s_reset_dev(adev))
 		goto fail_reset;
 
-	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		goto fail_read_eeprom_version;
-
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly after reset */
 		memcpy_fromio(&co, adev->cmd_area, sizeof(co));
@@ -1678,6 +1675,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 //TODO: merge them into one function, they are called just once and are the same for pci & usb
+	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+		goto fail_read_eeprom_version;
+
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev);
 	acx_s_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */

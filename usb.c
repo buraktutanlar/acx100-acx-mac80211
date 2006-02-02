@@ -78,14 +78,25 @@
 
 /***********************************************************************
 */
+/* ACX100 (TNETW1100) USB device: D-Link DWL-120+ */
 #define ACX100_VENDOR_ID 0x2001
 #define ACX100_PRODUCT_ID_UNBOOTED 0x3B01
 #define ACX100_PRODUCT_ID_BOOTED 0x3B00
 
+/* TNETW1450 USB devices */
+#define VENDOR_ID_DLINK		0x07b8 /* D-Link Corp. */
+#define PRODUCT_ID_WUG2400	0xb21a /* AboCom WUG2400 or SafeCom SWLUT-54125 */
+#define VENDOR_ID_AVM_GMBH	0x057c
+#define PRODUCT_ID_AVM_WLAN_USB	0x5601
+#define VENDOR_ID_ZCOM		0x0cde
+#define PRODUCT_ID_ZCOM_XG750	0x0017 /* not tested yet */
+#define VENDOR_ID_TI		0x0451
+#define PRODUCT_ID_TI_UNKNOWN	0x60c5 /* not tested yet */
+
 #define ACX_USB_CTRL_TIMEOUT	5500   /* steps in ms */
 
-/* Buffer size for fw upload */
-#define ACX_USB_RWMEM_MAXLEN	2048
+/* Buffer size for fw upload, same for both ACX100 USB and TNETW1450 */
+#define USB_RWMEM_MAXLEN	2048
 
 /* The number of bulk URBs to use */
 #define ACX_TX_URB_CNT		8
@@ -106,7 +117,7 @@ static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
 static int acxusb_e_open(struct net_device *);
 static int acxusb_e_close(struct net_device *);
 static void acxusb_i_set_rx_mode(struct net_device *);
-static int acxusb_boot(struct usb_device *);
+static int acxusb_boot(struct usb_device *, int is_tnetw1450, int *radio_type);
 
 static void acxusb_l_poll_rx(acx_device_t *adev, usb_rx_t* rx);
 
@@ -132,6 +143,10 @@ static const struct usb_device_id
 acxusb_ids[] = {
 	{ USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED) },
 	{ USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_UNBOOTED) },
+	{ USB_DEVICE(VENDOR_ID_DLINK, PRODUCT_ID_WUG2400) },
+	{ USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB) },
+	{ USB_DEVICE(VENDOR_ID_ZCOM, PRODUCT_ID_ZCOM_XG750) },
+	{ USB_DEVICE(VENDOR_ID_TI, PRODUCT_ID_TI_UNKNOWN) },
 	{}
 };
 
@@ -429,6 +444,12 @@ bad:
 	return NOT_OK;
 }
 
+static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
+{
+	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
+
+	return ((num_xfers % 2) == 0);
+}
 
 /***********************************************************************
 ** acxusb_boot()
@@ -444,112 +465,271 @@ bad:
 ** as a new device on the USB bus (the device we can finally deal with)
 */
 static int
-acxusb_boot(struct usb_device *usbdev)
+acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 {
-	static const char filename[] = "tiacx100usb";
+	char filename[sizeof("tiacx1NNusbcRR")];
 
-	char *firmware = NULL;
+	firmware_image_t *fw_image = NULL;
 	char *usbbuf;
 	unsigned int offset;
-	unsigned int len, inpipe, outpipe;
-	u32 checksum;
-	u32 size;
-	int result;
+	unsigned int blk_len, inpipe, outpipe;
+	u32 num_processed;
+	u32 img_checksum, sum;
+	u32 file_size;
+	int result = -EIO;
+	int i;
 
 	FN_ENTER;
 
-	usbbuf = kmalloc(ACX_USB_RWMEM_MAXLEN, GFP_KERNEL);
+	/* dump_device(usbdev); */
+
+	usbbuf = kmalloc(USB_RWMEM_MAXLEN, GFP_KERNEL);
 	if (!usbbuf) {
-		printk(KERN_ERR "acx: no memory for USB transfer buffer ("
-			STRING(ACX_USB_RWMEM_MAXLEN)" bytes)\n");
+		printk(KERN_ERR "acx: no memory for USB transfer buffer (%d bytes)\n", USB_RWMEM_MAXLEN);
 		result = -ENOMEM;
 		goto end;
 	}
-	firmware = (char *)acx_s_read_fw(&usbdev->dev, filename, &size);
-	if (!firmware) {
+	if (is_tnetw1450) {
+		/* Obtain the I/O pipes */
+		outpipe = usb_sndbulkpipe(usbdev, 1);
+		inpipe = usb_rcvbulkpipe(usbdev, 2);
+
+		printk(KERN_DEBUG "wait for device ready\n");
+		for (i = 0; i <= 2; i++) {
+			result = usb_bulk_msg(usbdev, inpipe,
+				usbbuf,
+				USB_RWMEM_MAXLEN,
+				&num_processed,
+				2000
+				);
+
+			if ((*(u32 *)&usbbuf[4] == 0x40000001)
+			&& (*(u16 *)&usbbuf[2] == 0x1)
+			&& ((*(u16 *)usbbuf & 0x3fff) == 0)
+			&& ((*(u16 *)usbbuf & 0xc000) == 0xc000))
+				break;
+			msleep(10);
+		}
+		if (i == 2)
+			goto fw_end;
+
+		*radio_type = usbbuf[8];
+	} else {
+		/* Obtain the I/O pipes */
+		outpipe = usb_sndctrlpipe(usbdev, 0);
+		inpipe = usb_rcvctrlpipe(usbdev, 0);
+
+		/* FIXME: shouldn't be hardcoded */
+		*radio_type = RADIO_MAXIM_0D;
+	}
+
+	snprintf(filename, sizeof(filename), "tiacx1%02dusbc%02X",
+				is_tnetw1450 * 11, *radio_type);
+
+	fw_image = acx_s_read_fw(&usbdev->dev, filename, &file_size);
+	if (!fw_image) {
 		result = -EIO;
 		goto end;
 	}
-	log(L_INIT, "firmware size: %d bytes\n", size);
+	log(L_INIT, "firmware size: %d bytes\n", file_size);
 
-	/* Obtain the I/O pipes */
-	outpipe = usb_sndctrlpipe(usbdev, 0);
-	inpipe = usb_rcvctrlpipe(usbdev, 0);
+	img_checksum = le32_to_cpu(fw_image->chksum);
 
-	/* now upload the firmware, slice the data into blocks */
-	offset = 8;
-	while (offset < size) {
-		len = size - offset;
-		if (len >= ACX_USB_RWMEM_MAXLEN) {
-			len = ACX_USB_RWMEM_MAXLEN;
+	if (is_tnetw1450) {
+		u8 cmdbuf[20];
+		const u8 *p;
+		u8 need_padding;
+		u32 tmplen, val;
+
+		memset(cmdbuf, 0, 16);
+
+		need_padding = acxusb_fw_needs_padding(fw_image, USB_RWMEM_MAXLEN);
+		tmplen = need_padding ? file_size-4 : file_size-8;
+		*(u16 *)&cmdbuf[0] = 0xc000;
+		*(u16 *)&cmdbuf[2] = 0x000b;
+		*(u32 *)&cmdbuf[4] = tmplen;
+		*(u32 *)&cmdbuf[8] = file_size-8;
+		*(u32 *)&cmdbuf[12] = img_checksum;
+
+		result = usb_bulk_msg(usbdev, outpipe, cmdbuf, 16, &num_processed, HZ);
+		if (result < 0)
+			goto fw_end;
+
+		p = (const u8 *)&fw_image->size;
+
+		/* first calculate checksum for image size part */
+		sum = p[0]+p[1]+p[2]+p[3];
+		p += 4;
+
+		/* now continue checksum for firmware data part */
+		tmplen = le32_to_cpu(fw_image->size);
+		for (i = 0; i < tmplen /* image size */; i++) {
+			sum += *p++;
 		}
-		log(L_INIT, "uploading firmware (%d bytes, offset=%d)\n",
-						len, offset);
+
+		if (sum != le32_to_cpu(fw_image->chksum)) {
+			printk("acx: FATAL: firmware upload: "
+				"checksums don't match! "
+				"(0x%08x vs. 0x%08x)\n",
+					sum, fw_image->chksum);
+			goto fw_end;
+		}
+
+		offset = 8;
+		while (offset < file_size) {
+			blk_len = file_size - offset;
+			if (blk_len > USB_RWMEM_MAXLEN) {
+				blk_len = USB_RWMEM_MAXLEN;
+			}
+
+			log(L_INIT, "uploading firmware (%d bytes, offset=%d)\n",
+							blk_len, offset);
+			memcpy(usbbuf, ((u8 *)fw_image) + offset, blk_len);
+
+			p = usbbuf;
+			for (i = 0; i < blk_len; i += 4) {
+				*(u32 *)p = be32_to_cpu(*(u32 *)p);
+				p += 4;
+			}
+
+			result = usb_bulk_msg(usbdev, outpipe, usbbuf, blk_len, &num_processed, HZ);
+			if ((result < 0) || (num_processed != blk_len))
+				goto fw_end;
+			offset += blk_len;
+		}
+		if (need_padding) {
+			printk(KERN_DEBUG "send padding\n");
+			memset(usbbuf, 0, 4);
+			result = usb_bulk_msg(usbdev, outpipe, usbbuf, 4, &num_processed, HZ);
+			if ((result < 0) || (num_processed != 4))
+				goto fw_end;
+		}
+		printk(KERN_DEBUG "read firmware upload result\n");
+		memset(cmdbuf, 0, 20); /* additional memset */
+		result = usb_bulk_msg(usbdev, inpipe, cmdbuf, 20, &num_processed, 2000);
+		if (result < 0)
+			goto fw_end;
+		if (*(u32 *)&cmdbuf[4] == 0x40000003)
+			goto fw_end;
+		if (*(u32 *)&cmdbuf[4])
+			goto fw_end;
+		if (*(u16 *)&cmdbuf[16] != 1)
+			goto fw_end;
+
+		val = *(u32 *)&cmdbuf[0];
+		if ((val & 0x3fff)
+		||  ((val & 0xc000) != 0xc000))
+			goto fw_end;
+
+		val = *(u32 *)&cmdbuf[8];
+		if (val & 2) {
+			result = usb_bulk_msg(usbdev, inpipe, cmdbuf, 20, &num_processed, 2000);
+			if (result < 0)
+				goto fw_end;
+			val = *(u32 *)&cmdbuf[8];
+		}
+		/* yup, no "else" here! */
+		if (val & 1) {
+			memset(usbbuf, 0, 4);
+			result = usb_bulk_msg(usbdev, outpipe, usbbuf, 4, &num_processed, HZ);
+			if ((result < 0) || (!num_processed))
+				goto fw_end;
+		}
+
+		printk("TNETW1450 firmware upload successful!\n");
 		result = 0;
-		memcpy(usbbuf, firmware + offset, len);
+		goto end;
+fw_end:
+		result = -EIO;
+		goto end;
+	} else {
+		/* ACX100 USB */
+
+		/* now upload the firmware, slice the data into blocks */
+		offset = 8;
+		while (offset < file_size) {
+			blk_len = file_size - offset;
+			if (blk_len > USB_RWMEM_MAXLEN) {
+				blk_len = USB_RWMEM_MAXLEN;
+			}
+			log(L_INIT, "uploading firmware (%d bytes, offset=%d)\n",
+							blk_len, offset);
+			memcpy(usbbuf, ((u8 *)fw_image) + offset, blk_len);
+			result = usb_control_msg(usbdev, outpipe,
+				ACX_USB_REQ_UPLOAD_FW,
+				USB_TYPE_VENDOR|USB_DIR_OUT,
+				(file_size - 8) & 0xffff, /* value */
+				(file_size - 8) >> 16, /* index */
+				usbbuf, /* dataptr */
+				blk_len, /* size */
+				3000 /* timeout in ms */
+			);
+			offset += blk_len;
+			if (result < 0) {
+				printk(KERN_ERR "acx: error %d during upload "
+					"of firmware, aborting\n", result);
+				goto end;
+			}
+		}
+
+		/* finally, send the checksum and reboot the device */
+		/* does this trigger the reboot? */
 		result = usb_control_msg(usbdev, outpipe,
 			ACX_USB_REQ_UPLOAD_FW,
 			USB_TYPE_VENDOR|USB_DIR_OUT,
-			size - 8, /* value */
-			0, /* index */
-			usbbuf, /* dataptr */
-			len, /* size */
+			img_checksum & 0xffff, /* value */
+			img_checksum >> 16, /* index */
+			NULL, /* dataptr */
+			0, /* size */
 			3000 /* timeout in ms */
 		);
-		offset += len;
 		if (result < 0) {
-			printk(KERN_ERR "acx: error %d during upload "
-				"of firmware, aborting\n", result);
+			printk(KERN_ERR "acx: error %d during tx of checksum, "
+					"aborting\n", result);
 			goto end;
 		}
+		result = usb_control_msg(usbdev, inpipe,
+			ACX_USB_REQ_ACK_CS,
+			USB_TYPE_VENDOR|USB_DIR_IN,
+			img_checksum & 0xffff, /* value */
+			img_checksum >> 16, /* index */
+			usbbuf, /* dataptr */
+			8, /* size */
+			3000 /* timeout in ms */
+		);
+		if (result < 0) {
+			printk(KERN_ERR "acx: error %d during ACK of checksum, "
+					"aborting\n", result);
+			goto end;
+		}
+		if (*usbbuf != 0x10) {
+			printk(KERN_ERR "acx: invalid checksum?\n");
+			result = -EINVAL;
+			goto end;
+		}
+		result = 0;
 	}
 
-	/* finally, send the checksum and reboot the device */
-	checksum = le32_to_cpu(*(u32 *)firmware);
-	/* is this triggers the reboot? */
-	result = usb_control_msg(usbdev, outpipe,
-		ACX_USB_REQ_UPLOAD_FW,
-		USB_TYPE_VENDOR|USB_DIR_OUT,
-		checksum & 0xffff, /* value */
-		checksum >> 16, /* index */
-		NULL, /* dataptr */
-		0, /* size */
-		3000 /* timeout in ms */
-	);
-	if (result < 0) {
-		printk(KERN_ERR "acx: error %d during tx of checksum, "
-				"aborting\n", result);
-		goto end;
-	}
-	result = usb_control_msg(usbdev, inpipe,
-		ACX_USB_REQ_ACK_CS,
-		USB_TYPE_VENDOR|USB_DIR_IN,
-		checksum & 0xffff, /* value */
-		checksum >> 16, /* index */
-		usbbuf, /* dataptr */
-		8, /* size */
-		3000 /* timeout in ms */
-	);
-	if (result < 0) {
-		printk(KERN_ERR "acx: error %d during ACK of checksum, "
-				"aborting\n", result);
-		goto end;
-	}
-	if (*usbbuf != 0x10) {
-		kfree(usbbuf);
-		printk(KERN_ERR "acx: invalid checksum?\n");
-		result = -EINVAL;
-		goto end;
-	}
-	result = 0;
 end:
-	vfree(firmware);
+	vfree(fw_image);
 	kfree(usbbuf);
 
 	FN_EXIT1(result);
 	return result;
 }
 
+
+/* FIXME: maybe merge it with usual eeprom reading, into common code? */
+static void acxusb_s_read_eeprom_version(acx_device_t *adev)
+{
+	u8 eeprom_ver[0x8];
+
+	memset(eeprom_ver, 0, sizeof(eeprom_ver));
+	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
+
+	/* FIXME: which one of those values to take? */
+	adev->eeprom_version = eeprom_ver[5];
+}
 
 /*
  * temporary helper function to at least fill important cfgopt members with
@@ -559,8 +739,6 @@ end:
 int
 acxusb_s_fill_configoption(acx_device_t *adev)
 {
-	printk("FIXME: haven't figured out how to fetch configoption struct "
-		"from USB device, passing hardcoded values instead\n");
 	adev->cfgopt_probe_delay = 200;
 	adev->cfgopt_dot11CCAModes = 4;
 	adev->cfgopt_dot11Diversity = 1;
@@ -601,28 +779,41 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int numconfigs, numfaces, numep;
 	int result = OK;
 	int i;
+	int radio_type;
+	/* this one needs to be more precise in case there appears a TNETW1450 from the same vendor */
+	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
 
 	FN_ENTER;
 
-	/* First check if this is the "unbooted" hardware */
-	if ((usbdev->descriptor.idVendor == ACX100_VENDOR_ID)
-	 && (usbdev->descriptor.idProduct == ACX100_PRODUCT_ID_UNBOOTED)) {
+	if (is_tnetw1450) {
 		/* Boot the device (i.e. upload the firmware) */
-		acxusb_boot(usbdev);
+		acxusb_boot(usbdev, is_tnetw1450, &radio_type);
 
-		/* OK, we are done with booting. Normally, the
-		** ID for the unbooted device should disappear
-		** and it will not need a driver anyway...so
-		** return a NULL
-		*/
-		log(L_INIT, "finished booting, returning from probe()\n");
-		result = OK; /* success */
-		goto end;
-	}
+		/* TNETW1450-based cards will continue right away with
+		 * the same USB ID after booting */
+	} else {
+		/* First check if this is the "unbooted" hardware */
+		if (usbdev->descriptor.idProduct == ACX100_PRODUCT_ID_UNBOOTED) {
 
-	if ((usbdev->descriptor.idVendor != ACX100_VENDOR_ID)
-	 || (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)) {
-		goto end_nodev;
+			/* Boot the device (i.e. upload the firmware) */
+			acxusb_boot(usbdev, is_tnetw1450, &radio_type);
+
+			/* DWL-120+ will first boot the firmware,
+			 * then later have a *separate* probe() run
+			 * since its USB ID will have changed after
+			 * firmware boot!
+			 * Since the first probe() run has no
+			 * other purpose than booting the firmware,
+			 * simply return immediately.
+			*/
+			log(L_INIT, "finished booting, returning from probe()\n");
+			result = OK; /* success */
+			goto end;
+		}
+		else
+		/* device not unbooted, but invalid USB ID!? */
+		if (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)
+			goto end_nodev;
 	}
 
 /* Ok, so it's our device and it has already booted */
@@ -661,10 +852,15 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev->ndev = ndev;
 
 	adev->dev_type = DEVTYPE_USB;
-	adev->chip_type = CHIPTYPE_ACX100;
-
-	/* FIXME: should be read from register (via firmware) using standard ACX code */
-	adev->radio_type = RADIO_MAXIM_0D;
+	adev->radio_type = radio_type;
+	if (is_tnetw1450) {
+		/* well, actually it's a TNETW1450, but since it
+		 * seems to be sufficiently similar to TNETW1130,
+		 * I don't want to change large amounts of code now */
+		adev->chip_type = CHIPTYPE_ACX111;
+	} else {
+		adev->chip_type = CHIPTYPE_ACX100;
+	}
 
 	adev->usbdev = usbdev;
 	spin_lock_init(&adev->lock);    /* initial state: unlocked */
@@ -691,27 +887,32 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	numep = ifdesc->bNumEndpoints;
 	log(L_DEBUG, "# of endpoints: %d\n", numep);
 
-	/* obtain information about the endpoint
-	** addresses, begin with some default values
-	*/
-	adev->bulkoutep = 1;
-	adev->bulkinep = 1;
-	for (i = 0; i < numep; i++) {
+	if (is_tnetw1450) {
+		adev->bulkoutep = 1;
+		adev->bulkinep = 2;
+	} else {
+		/* obtain information about the endpoint
+		** addresses, begin with some default values
+		*/
+		adev->bulkoutep = 1;
+		adev->bulkinep = 1;
+		for (i = 0; i < numep; i++) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
-		ep = usbdev->ep_in[i];
-		if (!ep)
-			continue;
-		epdesc = &ep->desc;
+			ep = usbdev->ep_in[i];
+			if (!ep)
+				continue;
+			epdesc = &ep->desc;
 #else
-		epdesc = usb_epnum_to_ep_desc(usbdev, i);
-		if (!epdesc)
-			continue;
+			epdesc = usb_epnum_to_ep_desc(usbdev, i);
+			if (!epdesc)
+				continue;
 #endif
-		if (epdesc->bmAttributes & USB_ENDPOINT_XFER_BULK) {
-			if (epdesc->bEndpointAddress & 0x80)
-				adev->bulkinep = epdesc->bEndpointAddress & 0xF;
-			else
-				adev->bulkoutep = epdesc->bEndpointAddress & 0xF;
+			if (epdesc->bmAttributes & USB_ENDPOINT_XFER_BULK) {
+				if (epdesc->bEndpointAddress & 0x80)
+					adev->bulkinep = epdesc->bEndpointAddress & 0xF;
+				else
+					adev->bulkoutep = epdesc->bEndpointAddress & 0xF;
+			}
 		}
 	}
 	log(L_DEBUG, "bulkout ep: 0x%X\n", adev->bulkoutep);
@@ -766,12 +967,13 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
-	acxusb_s_fill_configoption(adev);
-
 	result = acx_s_init_mac(adev);
 	if (result)
 		goto end;
 
+	/* TODO: see similar code in pci.c */
+	acxusb_s_read_eeprom_version(adev);
+	acxusb_s_fill_configoption(adev);
 	acx_s_set_defaults(adev);
 	acx_s_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
@@ -1615,11 +1817,13 @@ dump_device(struct usb_device *usbdev)
 	/* This saw a change after 2.6.10 */
 	printk("  ep_in wMaxPacketSize: ");
 	for (i = 0; i < 16; ++i)
-		printk("%d ", usbdev->ep_in[i]->desc.wMaxPacketSize);
+		if (usbdev->ep_in[i] != NULL)
+			printk("%d:%d ", i, usbdev->ep_in[i]->desc.wMaxPacketSize);
 	printk("\n");
 	printk("  ep_out wMaxPacketSize: ");
 	for (i = 0; i < VEC_SIZE(usbdev->ep_out); ++i)
-		printk("%d ", usbdev->ep_out[i]->desc.wMaxPacketSize);
+		if (usbdev->ep_out[i] != NULL)
+			printk("%d:%d ", i, usbdev->ep_out[i]->desc.wMaxPacketSize);
 	printk("\n");
 #else
 	printk("  epmaxpacketin: ");

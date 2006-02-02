@@ -104,6 +104,22 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060202] 0.3.32
+* Andreas Mohr <andim2@users.sourceforge.net>
+  - add initial support for new TNETW1450 USB chip (available on the market since
+    June or so): successful firmware booting, driver initialization working up to
+    a working iwconfig. Any network traffic whatsoever NOT working yet.
+    VERY EXPERIMENTAL! (especially since TNETW1450 sometimes uses enhanced,
+    longer structs for some IEs)
+  - add a ton of different TNETW1450 USB device VID/PID combinations; it's
+    highly likely that there will be many more TNETW1450 devices in the future...
+  - add many more firmware command IEs
+  - firmware upload cleanup (rename variables to better names, unify the various
+    firmware upload implementations, ...)
+  - add FIXME comment to remind about semaphore -> mutex conversion
+  The TNETW1450 firmware image is currently called tiacx111usbcRR, with RR being
+  the currently used radio ID 0x1D ("1D"): tiacx111usbc1D.
+
 [20060126] 0.3.31
 * fix bug uncovered by code added in support for firmware 2.3.1.31
 
