@@ -444,12 +444,6 @@ bad:
 	return NOT_OK;
 }
 
-static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
-{
-	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
-
-	return ((num_xfers % 2) == 0);
-}
 
 /***********************************************************************
 ** acxusb_boot()
@@ -464,6 +458,14 @@ static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned i
 ** firmware and transmitting the checksum, the device resets and appears
 ** as a new device on the USB bus (the device we can finally deal with)
 */
+static inline int
+acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
+{
+	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
+
+	return ((num_xfers % 2) == 0);
+}
+
 static int
 acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 {
@@ -720,7 +722,8 @@ end:
 
 
 /* FIXME: maybe merge it with usual eeprom reading, into common code? */
-static void acxusb_s_read_eeprom_version(acx_device_t *adev)
+static void
+acxusb_s_read_eeprom_version(acx_device_t *adev)
 {
 	u8 eeprom_ver[0x8];
 
@@ -731,12 +734,13 @@ static void acxusb_s_read_eeprom_version(acx_device_t *adev)
 	adev->eeprom_version = eeprom_ver[5];
 }
 
+
 /*
  * temporary helper function to at least fill important cfgopt members with
  * useful replacement values until we figure out how one manages to fetch
  * the configoption struct in the USB device case...
  */
-int
+static int
 acxusb_s_fill_configoption(acx_device_t *adev)
 {
 	adev->cfgopt_probe_delay = 200;
@@ -749,6 +753,7 @@ acxusb_s_fill_configoption(acx_device_t *adev)
 	adev->cfgopt_dot11TempType = 1;
 	return OK;
 }
+
 
 /***********************************************************************
 ** acxusb_e_probe()

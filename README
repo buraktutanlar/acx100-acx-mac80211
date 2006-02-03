@@ -34,7 +34,7 @@ radio module). For example, my firmware is in file named 'tiacx111c16'.
 Alternatively, I may remove it and use pair of files 'tiacx111' and
 'tiacx111r16' instead.
 USB driver:
-image is named 'tiacx100usb'
+image is named 'tiacxNNNusbcMM'
 
 Build instructions:
 

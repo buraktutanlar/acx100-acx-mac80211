@@ -3300,7 +3300,7 @@ acx_i_timer(unsigned long address)
 	case ACX_STATUS_3_AUTHENTICATED:
 		/* was set to 0 by set_status() */
 		if (++adev->auth_or_assoc_retries < 10) {
-			log(L_ASSOC,	"resend assoc request (attempt %d)\n",
+			log(L_ASSOC, "resend assoc request (attempt %d)\n",
 					adev->auth_or_assoc_retries + 1);
 			acx_l_transmit_assoc_req(adev);
 		} else {
