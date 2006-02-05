@@ -257,7 +257,7 @@ has_only_one_bit(u16 v)
 **		but may be run under lock
 **
 ** A small number of local helpers do not have acx_[eisl]_ prefix.
-** They are always close to caller and are to be revieved locally.
+** They are always close to caller and are to be reviewed locally.
 **
 ** Theory of operation:
 **

@@ -104,6 +104,17 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060205] 0.3.33
+* Andreas Mohr <andi@rhlx01.fht-esslingen.de>
+  - implement much more flexible firmware statistics parsing
+    (for /proc/driver/acx_wlanX_diag)
+    This has the nice effect that we now get output for both the older
+    TNETW1100 USB and TNETW1450.
+    Since firmware statistics information has non-stable layout depending on
+    firmware version, please report if you suspect any parsing mismatch!
+    This improved version now uses 2kB more driver space, unfortunately.
+  - use "% 8" modulo instead of more complicated "% 5" calculation
+
 [20060202] 0.3.32
 * Andreas Mohr <andim2@users.sourceforge.net>
   - add initial support for new TNETW1450 USB chip (available on the market since

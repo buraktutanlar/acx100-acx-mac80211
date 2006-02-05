@@ -1058,13 +1058,13 @@ acxpci_s_issue_cmd_timeo_debug(
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
-		if (counter % 5 == 0) {
+		if (counter % 8 == 0) {
 			if (time_after(jiffies, timeout)) {
 				counter = 0;
 				break;
 			}
-			/* we waited 5 iterations, no luck. Sleep 5 ms */
-			acx_s_msleep(5);
+			/* we waited 8 iterations, no luck. Sleep 8 ms */
+			acx_s_msleep(8);
 		}
 	} while (likely(--counter));
 
@@ -1124,13 +1124,13 @@ acxpci_s_issue_cmd_timeo_debug(
 				break;
 		}
 
-		if (counter % 5 == 0) {
+		if (counter % 8 == 0) {
 			if (time_after(jiffies, timeout)) {
 				counter = 0;
 				break;
 			}
-			/* we waited 5 iterations, no luck. Sleep 5 ms */
-			acx_s_msleep(5);
+			/* we waited 8 iterations, no luck. Sleep 8 ms */
+			acx_s_msleep(8);
 		}
 	} while (likely(--counter));
 
@@ -2292,7 +2292,7 @@ static void
 acxpci_l_process_rxdesc(acx_device_t *adev)
 {
 	register rxhostdesc_t *hostdesc;
-	int count, tail;
+	unsigned count, tail;
 
 	FN_ENTER;
 
@@ -3024,7 +3024,7 @@ tx_t*
 acxpci_l_alloc_tx(acx_device_t *adev)
 {
 	struct txdesc *txdesc;
-	int head;
+	unsigned head;
 	u8 ctl8;
 
 	FN_ENTER;
@@ -3385,7 +3385,7 @@ unsigned int
 acxpci_l_clean_txdesc(acx_device_t *adev)
 {
 	txdesc_t *txdesc;
-	int finger;
+	unsigned finger;
 	int num_cleaned;
 	u16 r111;
 	u8 error, ack_failures, rts_failures, rts_ok, r100;

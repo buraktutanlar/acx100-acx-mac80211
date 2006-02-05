@@ -1575,7 +1575,7 @@ tx_t*
 acxusb_l_alloc_tx(acx_device_t *adev)
 {
 	usb_tx_t *tx;
-	int head;
+	unsigned head;
 
 	FN_ENTER;
 

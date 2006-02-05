@@ -582,21 +582,34 @@ typedef struct rxbuffer {
 
 
 /*--- Firmware statistics ----------------------------------------------------*/
-typedef struct fw_stats {
-	u32	val0x0 ACX_PACKED;		/* hdr; */
+
+/* define a random 100 bytes more to catch firmware versions which
+ * provide a bigger struct */
+#define FW_STATS_FUTURE_EXTENSION	100
+
+typedef struct fw_stats_tx {
 	u32	tx_desc_of ACX_PACKED;
+} fw_stats_tx_t;
+
+typedef struct fw_stats_rx {
 	u32	rx_oom ACX_PACKED;
 	u32	rx_hdr_of ACX_PACKED;
-	u32	rx_hdr_use_next ACX_PACKED;
+	u32	rx_hw_stuck ACX_PACKED; /* old: u32	rx_hdr_use_next */
 	u32	rx_dropped_frame ACX_PACKED;
 	u32	rx_frame_ptr_err ACX_PACKED;
 	u32	rx_xfr_hint_trig ACX_PACKED;
+	u32	rx_aci_events ACX_PACKED; /* later versions only */
+	u32	rx_aci_resets ACX_PACKED; /* later versions only */
+} fw_stats_rx_t;
 
+typedef struct fw_stats_dma {
 	u32	rx_dma_req ACX_PACKED;
 	u32	rx_dma_err ACX_PACKED;
 	u32	tx_dma_req ACX_PACKED;
 	u32	tx_dma_err ACX_PACKED;
+} fw_stats_dma_t;
 
+typedef struct fw_stats_irq {
 	u32	cmd_cplt ACX_PACKED;
 	u32	fiq ACX_PACKED;
 	u32	rx_hdrs ACX_PACKED;
@@ -604,23 +617,79 @@ typedef struct fw_stats {
 	u32	rx_mem_of ACX_PACKED;
 	u32	rx_rdys ACX_PACKED;
 	u32	irqs ACX_PACKED;
-	u32	acx_trans_procs ACX_PACKED;
+	u32	tx_procs ACX_PACKED;
 	u32	decrypt_done ACX_PACKED;
 	u32	dma_0_done ACX_PACKED;
 	u32	dma_1_done ACX_PACKED;
 	u32	tx_exch_complet ACX_PACKED;
 	u32	commands ACX_PACKED;
-	u32	acx_rx_procs ACX_PACKED;
+	u32	rx_procs ACX_PACKED;
 	u32	hw_pm_mode_changes ACX_PACKED;
 	u32	host_acks ACX_PACKED;
 	u32	pci_pm ACX_PACKED;
 	u32	acm_wakeups ACX_PACKED;
+} fw_stats_irq_t;
 
+typedef struct fw_stats_wep {
 	u32	wep_key_count ACX_PACKED;
 	u32	wep_default_key_count ACX_PACKED;
 	u32	dot11_def_key_mib ACX_PACKED;
 	u32	wep_key_not_found ACX_PACKED;
 	u32	wep_decrypt_fail ACX_PACKED;
+	u32	wep_pkt_decrypt ACX_PACKED;
+	u32	wep_decrypt_irqs ACX_PACKED;
+} fw_stats_wep_t;
+
+typedef struct fw_stats_pwr {
+	u32	tx_start_ctr ACX_PACKED;
+	u32	no_ps_tx_too_short ACX_PACKED;
+	u32	rx_start_ctr ACX_PACKED;
+	u32	no_ps_rx_too_short ACX_PACKED;
+	u32	lppd_started ACX_PACKED;
+	u32	no_lppd_too_noisy ACX_PACKED;
+	u32	no_lppd_too_short ACX_PACKED;
+	u32	no_lppd_matching_frame ACX_PACKED;
+} fw_stats_pwr_t;
+
+typedef struct fw_stats_mic {
+	u32 mic_rx_pkts ACX_PACKED;
+	u32 mic_calc_fail ACX_PACKED;
+} fw_stats_mic_t;
+
+typedef struct fw_stats_aes {
+	u32 aes_enc_fail ACX_PACKED;
+	u32 aes_dec_fail ACX_PACKED;
+	u32 aes_enc_pkts ACX_PACKED;
+	u32 aes_dec_pkts ACX_PACKED;
+	u32 aes_enc_irq ACX_PACKED;
+	u32 aes_dec_irq ACX_PACKED;
+} fw_stats_aes_t;
+
+typedef struct fw_stats_event {
+	u32 heartbeat ACX_PACKED;
+	u32 calibration ACX_PACKED;
+	u32 rx_mismatch ACX_PACKED;
+	u32 rx_mem_empty ACX_PACKED;
+	u32 rx_pool ACX_PACKED;
+	u32 oom_late ACX_PACKED;
+	u32 phy_tx_err ACX_PACKED;
+	u32 tx_stuck ACX_PACKED;
+} fw_stats_event_t;
+
+/* mainly for size calculation only */
+typedef struct fw_stats {
+	u16			type;
+	u16			len;
+	fw_stats_tx_t		tx;
+	fw_stats_rx_t		rx;
+	fw_stats_dma_t		dma;
+	fw_stats_irq_t		irq;
+	fw_stats_wep_t		wep;
+	fw_stats_pwr_t		pwr;
+	fw_stats_mic_t		mic;
+	fw_stats_aes_t		aes;
+	fw_stats_event_t	evt;
+	u8			_padding[FW_STATS_FUTURE_EXTENSION];
 } fw_stats_t;
 
 /* Firmware version struct */
