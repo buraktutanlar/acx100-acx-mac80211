@@ -1220,14 +1220,9 @@ struct acx_device {
 	unsigned long		lock_time;
 #endif
 
-	/*** Device chain ***/
-	struct acx_device	*next;		/* link for list of devices */
-
 	/*** Linux network device ***/
 	struct net_device	*ndev;		/* pointer to linux netdevice */
-	struct net_device	*prev_nd;	/* FIXME: We should not chain via our
-						 * private struct acx_device _and_
-						 * the struct net_device */
+
 	/*** Device statistics ***/
 	struct net_device_stats	stats;		/* net device statistics */
 #ifdef WIRELESS_EXT
