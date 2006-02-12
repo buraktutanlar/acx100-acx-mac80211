@@ -155,7 +155,6 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
 /* USB driver data structure as required by the kernel's USB core */
 static struct usb_driver
 acxusb_driver = {
-	.owner = THIS_MODULE,
 	.name = "acx_usb",
 	.probe = acxusb_e_probe,
 	.disconnect = acxusb_e_disconnect,

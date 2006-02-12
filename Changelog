@@ -104,6 +104,11 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060212] 0.3.35
+* Carlos Martin <carlos@cmartin.tk>
+  - Fix breakage of "Get rid of circular list of adev's"
+  - Remove .owner = THIS_MODULE 
+
 [20060209] 0.3.34
 * Get rid of circular list of adev's
 

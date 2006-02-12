@@ -1568,6 +1568,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	** just _presume_ that we're under sem (instead of actually taking it): */
 	/* acx_sem_lock(adev); */
 	adev->pdev = pdev;
+	adev->ndev = ndev;
 	adev->dev_type = DEVTYPE_PCI;
 	adev->chip_type = chip_type;
 	adev->chip_name = chip_name;
