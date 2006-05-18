@@ -2215,12 +2215,12 @@ acx_ioctl_get_phy_chan_busy_percentage(
 	char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
-	struct { /* added ACX_PACKED, not tested --vda */
-		u16 type ACX_PACKED;
-		u16 len ACX_PACKED;
-		u32 busytime ACX_PACKED;
-		u32 totaltime ACX_PACKED;
-	} usage;
+	struct {
+		u16 type;
+		u16 len;
+		u32 busytime;
+		u32 totaltime;
+	} ACX_PACKED usage;
 	int result;
 
 	acx_sem_lock(adev);

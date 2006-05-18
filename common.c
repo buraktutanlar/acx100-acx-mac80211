@@ -1066,11 +1066,11 @@ void
 great_inquisitor(acx_device_t *adev)
 {
 	static struct {
-		u16	type ACX_PACKED;
-		u16	len ACX_PACKED;
+		u16	type;
+		u16	len;
 		/* 0x200 was too large here: */
-		u8	data[0x100 - 4] ACX_PACKED;
-	} ie;
+		u8	data[0x100 - 4];
+	} ACX_PACKED ie;
 	u16 type;
 
 	FN_ENTER;
@@ -2304,11 +2304,11 @@ static void
 acx_s_initialize_rx_config(acx_device_t *adev)
 {
 	struct {
-		u16	id ACX_PACKED;
-		u16	len ACX_PACKED;
-		u16	rx_cfg1 ACX_PACKED;
-		u16	rx_cfg2 ACX_PACKED;
-	} cfg;
+		u16	id;
+		u16	len;
+		u16	rx_cfg1;
+		u16	rx_cfg2;
+	} ACX_PACKED cfg;
 
 	switch (adev->mode) {
 	case ACX_MODE_OFF:
@@ -6654,10 +6654,10 @@ acx_s_update_card_settings(acx_device_t *adev)
 		ie_dot11WEPDefaultKeyID_t dkey;
 #ifdef DEBUG_WEP
 		struct {
-			u16 type ACX_PACKED;
-			u16 len ACX_PACKED;
-			u8  val ACX_PACKED;
-		} keyindic;
+			u16 type;
+			u16 len;
+			u8  val;
+		} ACX_PACKED keyindic;
 #endif
 		log(L_INIT, "updating WEP key settings\n");
 

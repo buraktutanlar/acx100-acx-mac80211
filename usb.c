@@ -295,10 +295,10 @@ acxusb_s_issue_cmd_timeo_debug(
 
 	struct usb_device *usbdev;
 	struct {
-		u16	cmd ACX_PACKED;
-		u16	status ACX_PACKED;
-		u8	data[1] ACX_PACKED;
-	} *loc;
+		u16	cmd;
+		u16	status;
+		u8	data[1];
+	} ACX_PACKED *loc;
 	const char *devname;
 	int acklen, blocklen, inpipe, outpipe;
 	int cmd_status;

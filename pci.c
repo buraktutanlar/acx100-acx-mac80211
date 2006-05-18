@@ -50,6 +50,7 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
+#include <asm/dma-mapping.h>
 
 #include "acx.h"
 
@@ -3935,12 +3936,16 @@ acxpci_s_proc_diag_output(char *p, acx_device_t *adev)
 		"rxdesc_start %p\n"
 		"rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
 		"rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		adev->txbuf_start, adev->txbuf_area_size, (u64)adev->txbuf_startphy,
+		adev->txbuf_start, adev->txbuf_area_size,
+				(unsigned long long)adev->txbuf_startphy,
 		adev->txdesc_size, adev->txdesc_start,
-		adev->txhostdesc_start, adev->txhostdesc_area_size, (u64)adev->txhostdesc_startphy,
+		adev->txhostdesc_start, adev->txhostdesc_area_size,
+				(unsigned long long)adev->txhostdesc_startphy,
 		adev->rxdesc_start,
-		adev->rxhostdesc_start, adev->rxhostdesc_area_size, (u64)adev->rxhostdesc_startphy,
-		adev->rxbuf_start, adev->rxbuf_area_size, (u64)adev->rxbuf_startphy);
+		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
+				(unsigned long long)adev->rxhostdesc_startphy,
+		adev->rxbuf_start, adev->rxbuf_area_size,
+				(unsigned long long)adev->rxbuf_startphy);
 
 	FN_EXIT0;
 	return p;
