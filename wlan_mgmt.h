@@ -199,85 +199,85 @@ IEEE16(WF_MGMT_CAP_CCKOFDM,	0x2000)
 
 /* prototype structure, all IEs start with these members */
 typedef struct wlan_ie {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-} wlan_ie_t;
+	u8 eid;
+	u8 len;
+} WLAN_PACKED wlan_ie_t;
 
 /*-- Service Set Identity (SSID)  -----------------*/
 typedef struct wlan_ie_ssid {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 ssid[1] __WLAN_ATTRIB_PACK__;	/* may be zero */
-} wlan_ie_ssid_t;
+	u8 eid;
+	u8 len;
+	u8 ssid[1];	/* may be zero */
+} WLAN_PACKED wlan_ie_ssid_t;
 
 /*-- Supported Rates  -----------------------------*/
 typedef struct wlan_ie_supp_rates {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 rates[1] __WLAN_ATTRIB_PACK__;	/* had better be at LEAST one! */
-} wlan_ie_supp_rates_t;
+	u8 eid;
+	u8 len;
+	u8 rates[1];	/* had better be at LEAST one! */
+} WLAN_PACKED wlan_ie_supp_rates_t;
 
 /*-- FH Parameter Set  ----------------------------*/
 typedef struct wlan_ie_fh_parms {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u16 dwell __WLAN_ATTRIB_PACK__;
-	u8 hopset __WLAN_ATTRIB_PACK__;
-	u8 hoppattern __WLAN_ATTRIB_PACK__;
-	u8 hopindex __WLAN_ATTRIB_PACK__;
-} wlan_ie_fh_parms_t;
+	u8 eid;
+	u8 len;
+	u16 dwell;
+	u8 hopset;
+	u8 hoppattern;
+	u8 hopindex;
+} WLAN_PACKED wlan_ie_fh_parms_t;
 
 /*-- DS Parameter Set  ----------------------------*/
 typedef struct wlan_ie_ds_parms {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 curr_ch __WLAN_ATTRIB_PACK__;
-} wlan_ie_ds_parms_t;
+	u8 eid;
+	u8 len;
+	u8 curr_ch;
+} WLAN_PACKED wlan_ie_ds_parms_t;
 
 /*-- CF Parameter Set  ----------------------------*/
 typedef struct wlan_ie_cf_parms {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 cfp_cnt __WLAN_ATTRIB_PACK__;
-	u8 cfp_period __WLAN_ATTRIB_PACK__;
-	u16 cfp_maxdur __WLAN_ATTRIB_PACK__;
-	u16 cfp_durremaining __WLAN_ATTRIB_PACK__;
-} wlan_ie_cf_parms_t;
+	u8 eid;
+	u8 len;
+	u8 cfp_cnt;
+	u8 cfp_period;
+	u16 cfp_maxdur;
+	u16 cfp_durremaining;
+} WLAN_PACKED wlan_ie_cf_parms_t;
 
 /*-- TIM ------------------------------------------*/
 typedef struct wlan_ie_tim {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 dtim_cnt __WLAN_ATTRIB_PACK__;
-	u8 dtim_period __WLAN_ATTRIB_PACK__;
-	u8 bitmap_ctl __WLAN_ATTRIB_PACK__;
-	u8 virt_bm[1] __WLAN_ATTRIB_PACK__;
-} wlan_ie_tim_t;
+	u8 eid;
+	u8 len;
+	u8 dtim_cnt;
+	u8 dtim_period;
+	u8 bitmap_ctl;
+	u8 virt_bm[1];
+} WLAN_PACKED wlan_ie_tim_t;
 
 /*-- IBSS Parameter Set ---------------------------*/
 typedef struct wlan_ie_ibss_parms {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u16 atim_win __WLAN_ATTRIB_PACK__;
-} wlan_ie_ibss_parms_t;
+	u8 eid;
+	u8 len;
+	u16 atim_win;
+} WLAN_PACKED wlan_ie_ibss_parms_t;
 
 /*-- Challenge Text  ------------------------------*/
 typedef struct wlan_ie_challenge {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
-	u8 challenge[1] __WLAN_ATTRIB_PACK__;
-} wlan_ie_challenge_t;
+	u8 eid;
+	u8 len;
+	u8 challenge[1];
+} WLAN_PACKED wlan_ie_challenge_t;
 
 /*-- ERP (42) -------------------------------------*/
 typedef struct wlan_ie_erp {
-	u8 eid __WLAN_ATTRIB_PACK__;
-	u8 len __WLAN_ATTRIB_PACK__;
+	u8 eid;
+	u8 len;
 	/* bit 0:Non ERP present
 	**     1:Use Protection
 	**     2:Barker Preamble mode
 	**     3-7:reserved */
-	u8 erp __WLAN_ATTRIB_PACK__;
-} wlan_ie_erp_t;
+	u8 erp;
+} WLAN_PACKED wlan_ie_erp_t;
 
 /* Types for parsing mgmt frames */
 
@@ -289,7 +289,7 @@ typedef struct wlan_fr_mgmt {
 	/* used for target specific data, skb in Linux */
 	/*-- fixed fields -----------*/
 	/*-- info elements ----------*/
-} wlan_fr_mgmt_t;
+} WLAN_PACKED wlan_fr_mgmt_t;
 
 /*-- Beacon ---------------------------------------*/
 typedef struct wlan_fr_beacon {
@@ -431,59 +431,59 @@ typedef struct wlan_fr_deauthen {
 /* Warning. Several types used in below structs are
 ** in fact variable length. Use structs with such fields with caution */
 typedef struct auth_frame_body {
-	u16	auth_alg __WLAN_ATTRIB_PACK__;
-	u16	auth_seq __WLAN_ATTRIB_PACK__;
-	u16	status __WLAN_ATTRIB_PACK__;
-	wlan_ie_challenge_t challenge __WLAN_ATTRIB_PACK__;
-} auth_frame_body_t;
+	u16	auth_alg;
+	u16	auth_seq;
+	u16	status;
+	wlan_ie_challenge_t challenge;
+} WLAN_PACKED auth_frame_body_t;
 
 typedef struct assocresp_frame_body {
-	u16	cap_info __WLAN_ATTRIB_PACK__;
-	u16	status __WLAN_ATTRIB_PACK__;
-	u16	aid __WLAN_ATTRIB_PACK__;
-	wlan_ie_supp_rates_t rates __WLAN_ATTRIB_PACK__;
-} assocresp_frame_body_t;
+	u16	cap_info;
+	u16	status;
+	u16	aid;
+	wlan_ie_supp_rates_t rates;
+} WLAN_PACKED assocresp_frame_body_t;
 
 typedef struct reassocreq_frame_body {
-	u16	cap_info __WLAN_ATTRIB_PACK__;
-	u16	listen_int __WLAN_ATTRIB_PACK__;
-	u8	current_ap[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	wlan_ie_ssid_t ssid __WLAN_ATTRIB_PACK__;
+	u16	cap_info;
+	u16	listen_int;
+	u8	current_ap[ETH_ALEN];
+	wlan_ie_ssid_t ssid;
 /* access to this one is disabled since ssid_t is variable length: */
-     /* wlan_ie_supp_rates_t rates __WLAN_ATTRIB_PACK__; */
-} reassocreq_frame_body_t;
+     /* wlan_ie_supp_rates_t rates; */
+} WLAN_PACKED reassocreq_frame_body_t;
 
 typedef struct reassocresp_frame_body {
-	u16	cap_info __WLAN_ATTRIB_PACK__;
-	u16	status __WLAN_ATTRIB_PACK__;
-	u16	aid __WLAN_ATTRIB_PACK__;
-	wlan_ie_supp_rates_t rates __WLAN_ATTRIB_PACK__;
-} reassocresp_frame_body_t;
+	u16	cap_info;
+	u16	status;
+	u16	aid;
+	wlan_ie_supp_rates_t rates;
+} WLAN_PACKED reassocresp_frame_body_t;
 
 typedef struct deauthen_frame_body {
-	u16	reason __WLAN_ATTRIB_PACK__;
-} deauthen_frame_body_t;
+	u16	reason;
+} WLAN_PACKED deauthen_frame_body_t;
 
 typedef struct disassoc_frame_body {
-	u16	reason __WLAN_ATTRIB_PACK__;
-} disassoc_frame_body_t;
+	u16	reason;
+} WLAN_PACKED disassoc_frame_body_t;
 
 typedef struct probereq_frame_body {
-	wlan_ie_ssid_t ssid __WLAN_ATTRIB_PACK__;
-	wlan_ie_supp_rates_t rates __WLAN_ATTRIB_PACK__;
-} probereq_frame_body_t;
+	wlan_ie_ssid_t ssid;
+	wlan_ie_supp_rates_t rates;
+} WLAN_PACKED probereq_frame_body_t;
 
 typedef struct proberesp_frame_body {
-	u8	timestamp[8] __WLAN_ATTRIB_PACK__;
-	u16	beacon_int __WLAN_ATTRIB_PACK__;
-	u16	cap_info __WLAN_ATTRIB_PACK__;
-	wlan_ie_ssid_t ssid __WLAN_ATTRIB_PACK__;
+	u8	timestamp[8];
+	u16	beacon_int;
+	u16	cap_info;
+	wlan_ie_ssid_t ssid;
 /* access to these is disabled since ssid_t is variable length: */
-     /* wlan_ie_supp_rates_t rates __WLAN_ATTRIB_PACK__; */
-     /* fhps_t	fhps __WLAN_ATTRIB_PACK__; */
-     /* dsps_t	dsps __WLAN_ATTRIB_PACK__; */
-     /* cfps_t	cfps __WLAN_ATTRIB_PACK__; */
-} proberesp_frame_body_t;
+     /* wlan_ie_supp_rates_t rates; */
+     /* fhps_t	fhps; */
+     /* dsps_t	dsps; */
+     /* cfps_t	cfps; */
+} WLAN_PACKED proberesp_frame_body_t;
 
 
 /***********************************************************************
@@ -539,7 +539,7 @@ wlan_fill_ie_rates_ext(u8 *p, int len, const u8 *rates)
 	return p;
 #endif
 	len -= 8;
-	if (len < 0) return p;
+	if (len <= 0) return p;
 	/* ext supported rates */
 	ie->eid = WLAN_EID_EXT_RATES;
 	ie->len = len;

@@ -40,7 +40,10 @@ Build instructions:
 
 * Create drivers/net/wireless/acx subdirectory inside
   your kernel tree.
-* Unpack tarball into this directory.
+* BTW, if your kernel has drivers/net/wireless/tiacx directory,
+  you already may have acx driver (some different version).
+  Decide which one do you want.
+* Unpack tarball into drivers/net/wireless/acx directory.
 * Add a line to drivers/net/wireless/Makefile:
 	obj-m += acx/
 * Build your modules as usual (perhaps "make modules modules_install").

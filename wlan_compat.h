@@ -215,9 +215,7 @@
 /*=============================================================*/
 /*------ Compiler Portability Macros --------------------------*/
 /*=============================================================*/
-#define __WLAN_ATTRIB_PACK__		__attribute__ ((packed))
-#define __WLAN_PRAGMA_PACK1__
-#define __WLAN_PRAGMA_PACKDFLT__
+#define WLAN_PACKED	__attribute__ ((packed))
 
 /* Interrupt handler backwards compatibility stuff */
 #ifndef IRQ_NONE
@@ -243,20 +241,20 @@ typedef void irqreturn_t;
 
 /* local ether header type */
 typedef struct wlan_ethhdr {
-	u8	daddr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	saddr[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	type __WLAN_ATTRIB_PACK__;
-} wlan_ethhdr_t;
+	u8	daddr[ETH_ALEN];
+	u8	saddr[ETH_ALEN];
+	u16	type;
+} WLAN_PACKED wlan_ethhdr_t;
 
 /* local llc header type */
 typedef struct wlan_llc {
-	u8	dsap __WLAN_ATTRIB_PACK__;
-	u8	ssap __WLAN_ATTRIB_PACK__;
-	u8	ctl __WLAN_ATTRIB_PACK__;
-} wlan_llc_t;
+	u8	dsap;
+	u8	ssap;
+	u8	ctl;
+} WLAN_PACKED wlan_llc_t;
 
 /* local snap header type */
 typedef struct wlan_snap {
-	u8	oui[WLAN_IEEE_OUI_LEN] __WLAN_ATTRIB_PACK__;
-	u16	type __WLAN_ATTRIB_PACK__;
-} wlan_snap_t;
+	u8	oui[WLAN_IEEE_OUI_LEN];
+	u16	type;
+} WLAN_PACKED wlan_snap_t;

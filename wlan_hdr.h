@@ -337,120 +337,120 @@ IEEE16(WF_FSTYPE_CFACK_CFPOLL,		0x70)
 ** seq: [0:3] frag#, [4:15] seq# - used for dup detection
 ** (dups from retries have same seq#) */
 typedef struct wlan_hdr {
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-	u8	a4[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} wlan_hdr_t;
+	u16	fc;
+	u16	dur;
+	u8	a1[ETH_ALEN];
+	u8	a2[ETH_ALEN];
+	u8	a3[ETH_ALEN];
+	u16	seq;
+	u8	a4[ETH_ALEN];
+} WLAN_PACKED wlan_hdr_t;
 
 /* Separate structs for use if frame type is known */
 typedef struct wlan_hdr_a3 {
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	a1[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	a2[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	a3[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} wlan_hdr_a3_t;
+	u16	fc;
+	u16	dur;
+	u8	a1[ETH_ALEN];
+	u8	a2[ETH_ALEN];
+	u8	a3[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED wlan_hdr_a3_t;
 
 typedef struct wlan_hdr_mgmt {
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} wlan_hdr_mgmt_t;
+	u16	fc;
+	u16	dur;
+	u8	da[ETH_ALEN];
+	u8	sa[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED wlan_hdr_mgmt_t;
 
 #ifdef NOT_NEEDED_YET
 typedef struct { /* ad-hoc peer->peer (to/from DS = 0/0) */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} ibss;
+	u16	fc;
+	u16	dur;
+	u8	da[ETH_ALEN];
+	u8	sa[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED ibss;
 typedef struct { /* ap->sta (to/from DS = 0/1) */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} fromap;
+	u16	fc;
+	u16	dur;
+	u8	da[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+	u8	sa[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED fromap;
 typedef struct { /* sta->ap (to/from DS = 1/0) */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} toap;
+	u16	fc;
+	u16	dur;
+	u8	bssid[ETH_ALEN];
+	u8	sa[ETH_ALEN];
+	u8	da[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED toap;
 typedef struct { /* wds->wds (to/from DS = 1/1), the only 4addr pkt */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} wds;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+	u8	ta[ETH_ALEN];
+	u8	da[ETH_ALEN];
+	u16	seq;
+	u8	sa[ETH_ALEN];
+} WLAN_PACKED wds;
 typedef struct { /* all management packets */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	da[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	sa[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u16	seq __WLAN_ATTRIB_PACK__;
-} mgmt;
+	u16	fc;
+	u16	dur;
+	u8	da[ETH_ALEN];
+	u8	sa[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+	u16	seq;
+} WLAN_PACKED mgmt;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} rts;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+	u8	ta[ETH_ALEN];
+} WLAN_PACKED rts;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} cts;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+} WLAN_PACKED cts;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} ack;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+} WLAN_PACKED ack;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
+	u16	fc;
 	/* NB: this one holds Assoc ID in dur field: */
-	u16	aid __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	ta[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} pspoll;
+	u16	aid;
+	u8	bssid[ETH_ALEN];
+	u8	ta[ETH_ALEN];
+} WLAN_PACKED pspoll;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} cfend;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+} WLAN_PACKED cfend;
 typedef struct { /* has no body, just a FCS */
-	u16	fc __WLAN_ATTRIB_PACK__;
-	u16	dur __WLAN_ATTRIB_PACK__;
-	u8	ra[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-	u8	bssid[ETH_ALEN] __WLAN_ATTRIB_PACK__;
-} cfendcfack;
+	u16	fc;
+	u16	dur;
+	u8	ra[ETH_ALEN];
+	u8	bssid[ETH_ALEN];
+} WLAN_PACKED cfendcfack;
 #endif
 
 /* Prism header emulation (monitor mode) */
 typedef struct wlanitem_u32 {
-	u32	did __WLAN_ATTRIB_PACK__;
-	u16	status __WLAN_ATTRIB_PACK__;
-	u16	len __WLAN_ATTRIB_PACK__;
-	u32	data __WLAN_ATTRIB_PACK__;
-} wlanitem_u32_t;
+	u32	did;
+	u16	status;
+	u16	len;
+	u32	data;
+} WLAN_PACKED wlanitem_u32_t;
 #define WLANITEM_STATUS_data_ok			0
 #define WLANITEM_STATUS_no_value		1
 #define WLANITEM_STATUS_invalid_itemname	2
@@ -470,20 +470,20 @@ typedef struct wlanitem_u32 {
 
 #define WLAN_DEVNAMELEN_MAX	16
 typedef struct wlansniffrm {
-	u32		msgcode __WLAN_ATTRIB_PACK__;
-	u32		msglen __WLAN_ATTRIB_PACK__;
-	u8		devname[WLAN_DEVNAMELEN_MAX] __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	hosttime __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	mactime __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	channel __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	rssi __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	sq __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	signal __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	noise __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	rate __WLAN_ATTRIB_PACK__;
-	wlanitem_u32_t	istx __WLAN_ATTRIB_PACK__;	/* tx? 0:no 1:yes */
-	wlanitem_u32_t	frmlen __WLAN_ATTRIB_PACK__;
-} wlansniffrm_t;
+	u32		msgcode;
+	u32		msglen;
+	u8		devname[WLAN_DEVNAMELEN_MAX];
+	wlanitem_u32_t	hosttime;
+	wlanitem_u32_t	mactime;
+	wlanitem_u32_t	channel;
+	wlanitem_u32_t	rssi;
+	wlanitem_u32_t	sq;
+	wlanitem_u32_t	signal;
+	wlanitem_u32_t	noise;
+	wlanitem_u32_t	rate;
+	wlanitem_u32_t	istx;	/* tx? 0:no 1:yes */
+	wlanitem_u32_t	frmlen;
+} WLAN_PACKED wlansniffrm_t;
 #define WLANSNIFFFRM		0x0041
 #define WLANSNIFFFRM_hosttime	0x1041
 #define WLANSNIFFFRM_mactime	0x2041

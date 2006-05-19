@@ -74,7 +74,7 @@ enum { acx_debug = 0 };
 /***********************************************************************
 ** Random helpers
 */
-#define ACX_PACKED __WLAN_ATTRIB_PACK__
+#define ACX_PACKED __attribute__ ((packed))
 
 #define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
