@@ -1280,7 +1280,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		st -= 2*sizeof(u32);
 
 		/* our parsing doesn't quite match this firmware yet,
-	 	 * log failure */
+		 * log failure */
 		if (st > st_end)
 			goto fw_stats_fail;
 		temp1 = temp2 = 999999999;
@@ -1337,7 +1337,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 	irq = (fw_stats_irq_t *)st;
 	partlen = sizeof(fw_stats_irq_t);
 	st += partlen;
-	
+
 	if (st > st_end)
 		goto fw_stats_fail;
 
@@ -1377,7 +1377,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 	wep = (fw_stats_wep_t *)st;
 	partlen = sizeof(fw_stats_wep_t);
 	st += partlen;
-	
+
 	if (
 	    (IS_PCI(adev) && IS_ACX100(adev))
 	||  (IS_USB(adev) && IS_ACX100(adev))
@@ -1411,7 +1411,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		temp2);
 
 	part_str = "power";
-	
+
 	if (st == st_end)
 		goto fw_stats_end;
 
@@ -1439,7 +1439,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		pwr->no_lppd_matching_frame);
 
 	part_str = "MIC";
-	
+
 	if (st == st_end)
 		goto fw_stats_end;
 
@@ -1456,9 +1456,9 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		part_str,
 		mic->mic_rx_pkts,
 		mic->mic_calc_fail);
-	
+
 	part_str = "AES";
-	
+
 	if (st == st_end)
 		goto fw_stats_end;
 
@@ -1483,7 +1483,7 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		aes->aes_dec_irq);
 
 	part_str = "event";
-	
+
 	if (st == st_end)
 		goto fw_stats_end;
 
@@ -1526,7 +1526,7 @@ fw_stats_bigger:
 	for (; st < st_end; st += 4)
 		p += sprintf(p,
 			"UNKN%3d: %u\n", (int)st - (int)fw_stats, *(u32 *)st);
-	
+
 fw_stats_end:
 	kfree(fw_stats);
 

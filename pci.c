@@ -50,7 +50,7 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 
 #include "acx.h"
 

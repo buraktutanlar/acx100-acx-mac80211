@@ -563,14 +563,14 @@ time: 4 bytes:
 */
 
 typedef struct rxbuffer {
-	u16	mac_cnt_rcvdD;	/* only 12 bits are len! (0xfff) */
+	u16	mac_cnt_rcvd;		/* only 12 bits are len! (0xfff) */
 	u8	mac_cnt_mblks;
 	u8	mac_status;
 	u8	phy_stat_baseband;	/* bit 0x80: used LNA (Low-Noise Amplifier) */
 	u8	phy_plcp_signal;
 	u8	phy_level;		/* PHY stat */
 	u8	phy_snr;		/* PHY stat */
-	u32	time;		/* timestamp upon MAC rcv first byte */
+	u32	time;			/* timestamp upon MAC rcv first byte */
 /* 4-byte (acx100) or 8-byte (acx111) phy header will be here
 ** if RX_CFG1_INCLUDE_PHY_HDR is in effect:
 **	phy_hdr_t phy			*/
@@ -1069,7 +1069,7 @@ typedef struct usb_txbuffer {
 /* USB returns either rx packets (see rxbuffer) or
 ** these "tx status" structs: */
 typedef struct usb_txstatus {
-	u16	mac_cnt_rcvd;	/* only 12 bits are len! (0xfff) */
+	u16	mac_cnt_rcvd;		/* only 12 bits are len! (0xfff) */
 	u8	queue_index;
 	u8	mac_status;		/* seen 0x20 on tx failure */
 	u32	hostdata;

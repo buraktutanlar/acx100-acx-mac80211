@@ -111,7 +111,7 @@ TODO: from Efthym <efthym@gmx.net>:
 [20060212] 0.3.35
 * Carlos Martin <carlos@cmartin.tk>
   - Fix breakage of "Get rid of circular list of adev's"
-  - Remove .owner = THIS_MODULE 
+  - Remove .owner = THIS_MODULE
 
 [20060209] 0.3.34
 * Get rid of circular list of adev's
