@@ -104,6 +104,20 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
 
+[20060707]
+* Jeff Williams
+  Fixed Kconfig CONFIG_ACX_D80211_* in common.c and acx_struct.h
+
+[20060707]
+* Matthias Meyer
+  Moved GPL license to README
+
+[20060605-20060706]
+* Jeff Williams <jeff@wdwconsulting.net>
+  Added DeviceScape 80211 stack support to PCI
+  Works with wpa_supplicant and hostapd
+  Removed excess homegrown/linux-wlan 80211 stack
+
 [20060518]
 * Fix warnings about packed structs and printf format mismatches.
   Fix "implicit declaration of function dma_free_coherent" warning.

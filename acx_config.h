@@ -1,6 +1,6 @@
 /* temporary hack until proper Kconfig integration */
-#define CONFIG_ACX_PCI 1
-#define CONFIG_ACX_USB 1
+#define CONFIG_ACX_D80211_PCI 1
+#define CONFIG_ACX_D80211_USB 1
 
 #define ACX_RELEASE "v0.3.35"
 

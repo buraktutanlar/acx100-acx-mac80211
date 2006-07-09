@@ -1,4 +1,4 @@
-config ACX
+config ACX_D80211
 	tristate "TI acx100/acx111 802.11b/g wireless chipsets"
 	depends on NET_RADIO && EXPERIMENTAL && (USB || PCI)
 	select FW_LOADER
@@ -15,9 +15,9 @@ config ACX
 
 	The driver can be compiled as a module and will be named "acx".
 
-config ACX_PCI
+config ACX_D80211_PCI
 	bool "TI acx100/acx111 802.11b/g PCI"
-	depends on ACX && PCI
+	depends on ACX_D80211 && PCI
 	---help---
 	Include PCI and CardBus support in acx.
 
@@ -44,9 +44,9 @@ config ACX_PCI
 	Firmware files are not covered by GPL and are not distributed
 	with this driver for legal reasons.
 
-config ACX_USB
+config ACX_D80211_USB
 	bool "TI acx100/acx111 802.11b/g USB"
-	depends on ACX && (USB=y || USB=ACX)
+	depends on ACX_D80211 && (USB=y || USB=ACX_D80211)
 	---help---
 	Include USB support in acx.
 

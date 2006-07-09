@@ -1,33 +1,5 @@
-/***********************************************************************
+/**** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
-**
-** The contents of this file are subject to the Mozilla Public
-** License Version 1.1 (the "License"); you may not use this file
-** except in compliance with the License. You may obtain a copy of
-** the License at http://www.mozilla.org/MPL/
-**
-** Software distributed under the License is distributed on an "AS
-** IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-** implied. See the License for the specific language governing
-** rights and limitations under the License.
-**
-** Alternatively, the contents of this file may be used under the
-** terms of the GNU Public License version 2 (the "GPL"), in which
-** case the provisions of the GPL are applicable instead of the
-** above.  If you wish to allow the use of your version of this file
-** only under the terms of the GPL and not to allow others to use
-** your version of this file under the MPL, indicate your decision
-** by deleting the provisions above and replace them with the notice
-** and other provisions required by the GPL.  If you do not delete
-** the provisions above, a recipient may use your version of this
-** file under either the MPL or the GPL.
-** ---------------------------------------------------------------------
-** Inquiries regarding the ACX100 Open Source Project can be
-** made directly to:
-**
-** acx100-users@lists.sf.net
-** http://acx100.sf.net
-** ---------------------------------------------------------------------
 */
 
 /***********************************************************************
@@ -105,12 +77,12 @@ enum { acx_debug = 0 };
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
 
-#if !defined(CONFIG_ACX_PCI) && !defined(CONFIG_ACX_USB)
+#if !defined(CONFIG_ACX_D80211_PCI) && !defined(CONFIG_ACX_D80211_USB)
 #error Driver must include PCI and/or USB support. You selected neither.
 #endif
 
-#if defined(CONFIG_ACX_PCI)
- #if !defined(CONFIG_ACX_USB)
+#if defined(CONFIG_ACX_D80211_PCI)
+ #if !defined(CONFIG_ACX_D80211_USB)
   #define IS_PCI(adev)	1
  #else
   #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
@@ -119,8 +91,8 @@ enum { acx_debug = 0 };
  #define IS_PCI(adev)	0
 #endif
 
-#if defined(CONFIG_ACX_USB)
- #if !defined(CONFIG_ACX_PCI)
+#if defined(CONFIG_ACX_D80211_USB)
+ #if !defined(CONFIG_ACX_D80211_PCI)
   #define IS_USB(adev)	1
  #else
   #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
@@ -1027,6 +999,9 @@ struct txhostdesc {
 	u32	Status;			/* 0x14, unused on Tx */
 /* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
+	struct ieee80211_tx_status txstatus;
+	struct sk_buff *skb;	
+
 } ACX_PACKED;
 
 struct rxhostdesc {
@@ -1077,6 +1052,8 @@ typedef struct usb_txstatus {
 	u8	ack_failures;
 	u8	rts_failures;
 	u8	rts_ok;
+//	struct ieee80211_tx_status txstatus;
+//	struct sk_buff *skb;	
 } ACX_PACKED usb_txstatus_t;
 
 typedef struct usb_tx {
@@ -1224,10 +1201,16 @@ struct acx_device {
 	struct net_device	*ndev;		/* pointer to linux netdevice */
 
 	/*** Device statistics ***/
+	struct ieee80211_low_level_stats	ieee_stats;		/* wireless device statistics */
+
+	/*** Device statistics ***/
 	struct net_device_stats	stats;		/* net device statistics */
+
 #ifdef WIRELESS_EXT
 	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
+	struct acx_stats	acx_stats;
+	struct ieee80211_hw	*ieee;
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
 
@@ -1274,12 +1257,15 @@ struct acx_device {
 	u8		led_power;		/* power LED status */
 	u32		get_mask;		/* mask of settings to fetch from the card */
 	u32		set_mask;		/* mask of settings to write to the card */
-
+	u32		initialized:1;
 	/* Barely used in USB case */
 	u16		irq_status;
-
+	int		irq_savedstate;
+	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
 	WORK_STRUCT	after_interrupt_task;	/* our task for after interrupt actions */
+
+	unsigned int	irq;
 
 	/*** scanning ***/
 	u16		scan_count;		/* number of times to do channel scan */
@@ -1290,6 +1276,9 @@ struct acx_device {
 #if WIRELESS_EXT > 15
 	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
 #endif
+
+	/*** Virtual interface struct ***/
+	struct acx_interface interface;
 
 	/*** Wireless network settings ***/
 	/* copy of the device address (ifconfig hw ether) that we actually use
@@ -1320,9 +1309,9 @@ struct acx_device {
 	unsigned long	scan_start;		/* YES, jiffies is defined as "unsigned long" */
 
 	/* stations known to us (if we're an ap) */
-	client_t	sta_list[32];		/* tab is larger than list, so that */
-	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
-	client_t	*ap_client;		/* this one is our AP (STA mode only) */
+//	client_t	sta_list[32];		/* tab is larger than list, so that */
+//	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
+//	client_t	*ap_client;		/* this one is our AP (STA mode only) */
 
 	int		dup_count;
 	int		nondup_count;
@@ -1386,7 +1375,14 @@ struct acx_device {
 	u8		wep_restricted;
 	u8		wep_current_index;
 	wep_key_t	wep_keys[DOT11_MAX_DEFAULT_WEP_KEYS];	/* the default WEP keys */
+
 	key_struct_t	wep_key_struct[10];
+
+	/*** Encryption Replacement for d80211 ***/
+	struct acx_key	key[54];
+	u16 security_offset;
+	u8 default_key_idx;
+
 
 	/*** Unknown ***/
 	u8		dtim_interval;
@@ -1475,7 +1471,7 @@ struct acx_device {
 static inline acx_device_t*
 ndev2adev(struct net_device *ndev)
 {
-	return netdev_priv(ndev);
+	return ieee80211_dev_hw_data(ndev);
 }
 
 
@@ -2017,6 +2013,17 @@ typedef struct acx_ie_generic {
 	} ACX_PACKED m;
 } ACX_PACKED acx_ie_generic_t;
 
+#define ACX_SEC_KEYSIZE                     16
+/* Security algorithms. */                
+enum {
+        ACX_SEC_ALG,
+        ACX_SEC_ALGO_NONE = 0, /* unencrypted, as of TX header. */
+        ACX_SEC_ALGO_WEP,
+        ACX_SEC_ALGO_UNKNOWN,
+        ACX_SEC_ALGO_AES,
+        ACX_SEC_ALGO_WEP104,
+        ACX_SEC_ALGO_TKIP,
+};
 /***********************************************************************
 */
 #define CHECK_SIZEOF(type,size) { \
@@ -2048,4 +2055,4 @@ enum {
 	acx_reg_domain_ids_len = 8
 };
 
-extern const struct iw_handler_def acx_ioctl_handler_def;
+//extern const struct iw_handler_def acx_ioctl_handler_def;

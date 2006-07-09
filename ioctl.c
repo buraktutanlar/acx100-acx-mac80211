@@ -1,33 +1,5 @@
-/***********************************************************************
+/**** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
-**
-** The contents of this file are subject to the Mozilla Public
-** License Version 1.1 (the "License"); you may not use this file
-** except in compliance with the License. You may obtain a copy of
-** the License at http://www.mozilla.org/MPL/
-**
-** Software distributed under the License is distributed on an "AS
-** IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-** implied. See the License for the specific language governing
-** rights and limitations under the License.
-**
-** Alternatively, the contents of this file may be used under the
-** terms of the GNU Public License version 2 (the "GPL"), in which
-** case the provisions of the GPL are applicable instead of the
-** above.  If you wish to allow the use of your version of this file
-** only under the terms of the GPL and not to allow others to use
-** your version of this file under the MPL, indicate your decision
-** by deleting the provisions above and replace them with the notice
-** and other provisions required by the GPL.  If you do not delete
-** the provisions above, a recipient may use your version of this
-** file under either the MPL or the GPL.
-** ---------------------------------------------------------------------
-** Inquiries regarding the ACX100 Open Source Project can be
-** made directly to:
-**
-** acx100-users@lists.sf.net
-** http://acx100.sf.net
-** ---------------------------------------------------------------------
 */
 
 #include <linux/config.h>
@@ -61,9 +33,8 @@ static const u16 acx_channel_freq[] = {
 */
 static int
 acx_ioctl_commit(struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+		 struct iw_request_info *info,
+		 union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
@@ -82,14 +53,13 @@ acx_ioctl_commit(struct net_device *ndev,
 /***********************************************************************
 */
 static int
-acx_ioctl_get_name(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_name(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
-	static const char * const names[] = { "IEEE 802.11b+/g+", "IEEE 802.11b+" };
+	static const char *const names[] =
+	    { "IEEE 802.11b+/g+", "IEEE 802.11b+" };
 
 	strcpy(wrqu->name, names[IS_ACX111(adev) ? 0 : 1]);
 
@@ -101,11 +71,9 @@ acx_ioctl_get_name(
 ** acx_ioctl_set_freq
 */
 static int
-acx_ioctl_set_freq(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_freq(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int channel = -1;
@@ -142,10 +110,10 @@ acx_ioctl_set_freq(
 	log(L_IOCTL, "Changing to channel %d\n", channel);
 	SET_BIT(adev->set_mask, GETSET_CHANNEL);
 
-	result = -EINPROGRESS; /* need to call commit handler */
+	result = -EINPROGRESS;	/* need to call commit handler */
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -154,11 +122,9 @@ end:
 /***********************************************************************
 */
 static inline int
-acx_ioctl_get_freq(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_freq(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	wrqu->freq.e = 0;
@@ -171,11 +137,9 @@ acx_ioctl_get_freq(
 ** acx_ioctl_set_mode
 */
 static int
-acx_ioctl_set_mode(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_mode(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -199,9 +163,9 @@ acx_ioctl_set_mode(
 		break;
 	case IW_MODE_MASTER:
 		printk("acx: master mode (HostAP) is very, very "
-			"experimental! It might work partially, but "
-			"better get prepared for nasty surprises "
-			"at any time\n");
+		       "experimental! It might work partially, but "
+		       "better get prepared for nasty surprises "
+		       "at any time\n");
 		adev->mode = ACX_MODE_3_AP;
 		break;
 	case IW_MODE_REPEAT:
@@ -215,7 +179,7 @@ acx_ioctl_set_mode(
 	SET_BIT(adev->set_mask, GETSET_MODE);
 	result = -EINPROGRESS;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -226,26 +190,29 @@ end_unlock:
 /***********************************************************************
 */
 static int
-acx_ioctl_get_mode(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_mode(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result = 0;
 
 	switch (adev->mode) {
 	case ACX_MODE_OFF:
-		wrqu->mode = IW_MODE_AUTO; break;
+		wrqu->mode = IW_MODE_AUTO;
+		break;
 	case ACX_MODE_MONITOR:
-		wrqu->mode = IW_MODE_MONITOR; break;
+		wrqu->mode = IW_MODE_MONITOR;
+		break;
 	case ACX_MODE_0_ADHOC:
-		wrqu->mode = IW_MODE_ADHOC; break;
+		wrqu->mode = IW_MODE_ADHOC;
+		break;
 	case ACX_MODE_2_STA:
-		wrqu->mode = IW_MODE_INFRA; break;
+		wrqu->mode = IW_MODE_INFRA;
+		break;
 	case ACX_MODE_3_AP:
-		wrqu->mode = IW_MODE_MASTER; break;
+		wrqu->mode = IW_MODE_MASTER;
+		break;
 	default:
 		result = -EOPNOTSUPP;
 	}
@@ -256,11 +223,9 @@ acx_ioctl_get_mode(
 /***********************************************************************
 */
 static int
-acx_ioctl_set_sens(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_sens(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->sens;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -279,11 +244,9 @@ acx_ioctl_set_sens(
 /***********************************************************************
 */
 static int
-acx_ioctl_get_sens(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_sens(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->sens;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -310,11 +273,9 @@ acx_ioctl_get_sens(
 ** Sets the MAC address of the AP to associate with
 */
 static int
-acx_ioctl_set_ap(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_ap(struct net_device *ndev,
+		 struct iw_request_info *info,
+		 union iwreq_data *wrqu, char *extra)
 {
 	struct sockaddr *awrq = &wrqu->ap_addr;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -337,14 +298,14 @@ acx_ioctl_set_ap(
 	MAC_COPY(adev->ap, ap);
 
 	/* We want to start rescan in managed or ad-hoc mode,
-	** otherwise just set adev->ap.
-	** "iwconfig <if> ap <mac> mode managed": we must be able
-	** to set ap _first_ and _then_ set mode */
+	 ** otherwise just set adev->ap.
+	 ** "iwconfig <if> ap <mac> mode managed": we must be able
+	 ** to set ap _first_ and _then_ set mode */
 	switch (adev->mode) {
 	case ACX_MODE_0_ADHOC:
 	case ACX_MODE_2_STA:
 		/* FIXME: if there is a convention on what zero AP means,
-		** please add a comment about that. I don't know of any --vda */
+		 ** please add a comment about that. I don't know of any --vda */
 		if (mac_is_zero(ap)) {
 			/* "off" == 00:00:00:00:00:00 */
 			MAC_BCAST(adev->ap);
@@ -356,7 +317,7 @@ acx_ioctl_set_ap(
 		break;
 	}
 	result = -EINPROGRESS;
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -365,11 +326,9 @@ end:
 /***********************************************************************
 */
 static int
-acx_ioctl_get_ap(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_ap(struct net_device *ndev,
+		 struct iw_request_info *info,
+		 union iwreq_data *wrqu, char *extra)
 {
 	struct sockaddr *awrq = &wrqu->ap_addr;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -393,15 +352,13 @@ acx_ioctl_get_ap(
 ** don't do a new scan.
 */
 static int
-acx_ioctl_get_aplist(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_aplist(struct net_device *ndev,
+		     struct iw_request_info *info,
+		     union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->data;
 	acx_device_t *adev = ndev2adev(ndev);
-	struct sockaddr *address = (struct sockaddr *) extra;
+	struct sockaddr *address = (struct sockaddr *)extra;
 	struct iw_quality qual[IW_MAX_AP];
 	int i, cur;
 	int result = OK;
@@ -417,17 +374,18 @@ acx_ioctl_get_aplist(
 	cur = 0;
 	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
 		struct client *bss = &adev->sta_list[i];
-		if (!bss->used) continue;
+		if (!bss->used)
+			continue;
 		MAC_COPY(address[cur].sa_data, bss->bssid);
 		address[cur].sa_family = ARPHRD_ETHER;
 		qual[cur].level = bss->sir;
 		qual[cur].noise = bss->snr;
 #ifndef OLD_QUALITY
 		qual[cur].qual = acx_signal_determine_quality(qual[cur].level,
-						    qual[cur].noise);
+							      qual[cur].noise);
 #else
 		qual[cur].qual = (qual[cur].noise <= 100) ?
-			       100 - qual[cur].noise : 0;
+		    100 - qual[cur].noise : 0;
 #endif
 		/* no scan: level/noise/qual not updated: */
 		qual[cur].updated = 0;
@@ -435,11 +393,11 @@ acx_ioctl_get_aplist(
 	}
 	if (cur) {
 		dwrq->flags = 1;
-		memcpy(extra + sizeof(struct sockaddr)*cur, &qual,
-				sizeof(struct iw_quality)*cur);
+		memcpy(extra + sizeof(struct sockaddr) * cur, &qual,
+		       sizeof(struct iw_quality) * cur);
 	}
 	dwrq->length = cur;
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -448,11 +406,9 @@ end:
 /***********************************************************************
 */
 static int
-acx_ioctl_set_scan(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_scan(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -468,11 +424,11 @@ acx_ioctl_set_scan(
 	}
 
 	/* This is NOT a rescan for new AP!
-	** Do not use SET_BIT(GETSET_RESCAN); */
+	 ** Do not use SET_BIT(GETSET_RESCAN); */
 	acx_s_cmd_start_scan(adev);
 	result = OK;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 /* end: */
 	FN_EXIT1(result);
@@ -484,12 +440,9 @@ end_unlock:
 ** acx_s_scan_add_station
 */
 /* helper. not sure whether it's really a _s_leeping fn */
-static char*
-acx_s_scan_add_station(
-	acx_device_t *adev,
-	char *ptr,
-	char *end_buf,
-	struct client *bss)
+static char *acx_s_scan_add_station(acx_device_t * adev,
+				    char *ptr,
+				    char *end_buf, struct client *bss)
 {
 	struct iw_event iwe;
 	char *ptr_rate;
@@ -536,14 +489,14 @@ acx_s_scan_add_station(
 	iwe.u.qual.noise = bss->snr;
 #ifndef OLD_QUALITY
 	iwe.u.qual.qual = acx_signal_determine_quality(iwe.u.qual.level,
-							iwe.u.qual.noise);
+						       iwe.u.qual.noise);
 #else
 	iwe.u.qual.qual = (iwe.u.qual.noise <= 100) ?
-				100 - iwe.u.qual.noise : 0;
+	    100 - iwe.u.qual.noise : 0;
 #endif
 	iwe.u.qual.updated = 7;
 	log(L_IOCTL, "scan, link quality: %d/%d/%d\n",
-			iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
+	    iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
 	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_QUAL_LEN);
 
 	/* Add encryption */
@@ -562,20 +515,23 @@ acx_s_scan_add_station(
 	ptr_rate = ptr + IW_EV_LCP_LEN;
 
 	{
-	u16 rate = bss->rate_cap;
-	const u8* p = acx_bitpos2ratebyte;
-	while (rate) {
-		if (rate & 1) {
-			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
-			log(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
-			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf,
-						&iwe, IW_EV_PARAM_LEN);
+		u16 rate = bss->rate_cap;
+		const u8 *p = acx_bitpos2ratebyte;
+		while (rate) {
+			if (rate & 1) {
+				iwe.u.bitrate.value = *p * 500000;	/* units of 500kb/s */
+				log(L_IOCTL, "scan, rate: %d\n",
+				    iwe.u.bitrate.value);
+				ptr =
+				    iwe_stream_add_value(ptr, ptr_rate, end_buf,
+							 &iwe, IW_EV_PARAM_LEN);
+			}
+			rate >>= 1;
+			p++;
 		}
-		rate >>= 1;
-		p++;
-	}}
+	}
 
-	if ((ptr_rate - ptr) > (ptrdiff_t)IW_EV_LCP_LEN)
+	if ((ptr_rate - ptr) > (ptrdiff_t) IW_EV_LCP_LEN)
 		ptr = ptr_rate;
 
 	/* drop remaining station data items for now */
@@ -589,11 +545,9 @@ acx_s_scan_add_station(
  * acx_ioctl_get_scan
  */
 static int
-acx_ioctl_get_scan(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_scan(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->data;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -611,9 +565,8 @@ acx_ioctl_get_scan(
 		result = -EAGAIN;
 		goto end_unlock;
 	}
-
 #ifdef ENODATA_TO_BE_USED_AFTER_SCAN_ERROR_ONLY
-	if (adev->bss_table_count == 0)	{
+	if (adev->bss_table_count == 0) {
 		/* no stations found */
 		result = -ENODATA;
 		goto end_unlock;
@@ -622,14 +575,15 @@ acx_ioctl_get_scan(
 
 	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
 		struct client *bss = &adev->sta_list[i];
-		if (!bss->used) continue;
+		if (!bss->used)
+			continue;
 		ptr = acx_s_scan_add_station(adev, ptr,
-			extra + IW_SCAN_MAX_DATA, bss);
+					     extra + IW_SCAN_MAX_DATA, bss);
 	}
 	dwrq->length = ptr - extra;
 	dwrq->flags = 0;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 /* end: */
 	FN_EXIT1(result);
@@ -641,11 +595,9 @@ end_unlock:
 ** acx_ioctl_set_essid
 */
 static int
-acx_ioctl_set_essid(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_essid(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->essid;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -660,7 +612,7 @@ acx_ioctl_set_essid(
 	}
 
 	log(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
-					len, extra, len, dwrq->flags);
+	    len, extra, len, dwrq->flags);
 
 	acx_sem_lock(adev);
 
@@ -669,15 +621,15 @@ acx_ioctl_set_essid(
 		adev->essid_active = 0;
 
 	} else {
-		if (dwrq->length > IW_ESSID_MAX_SIZE+1)	{
+		if (dwrq->length > IW_ESSID_MAX_SIZE + 1) {
 			result = -E2BIG;
 			goto end_unlock;
 		}
 
 		if (len > sizeof(adev->essid))
 			len = sizeof(adev->essid);
-		memcpy(adev->essid, extra, len-1);
-		adev->essid[len-1] = '\0';
+		memcpy(adev->essid, extra, len - 1);
+		adev->essid[len - 1] = '\0';
 		/* Paranoia: just in case there is a '\0'... */
 		adev->essid_len = strlen(adev->essid);
 		adev->essid_active = 1;
@@ -687,9 +639,9 @@ acx_ioctl_set_essid(
 
 	result = -EINPROGRESS;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -698,17 +650,15 @@ end:
 /***********************************************************************
 */
 static int
-acx_ioctl_get_essid(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_essid(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->essid;
 	acx_device_t *adev = ndev2adev(ndev);
 
 	dwrq->flags = adev->essid_active;
-	if (adev->essid_active)	{
+	if (adev->essid_active) {
 		memcpy(extra, adev->essid, adev->essid_len);
 		extra[adev->essid_len] = '\0';
 		dwrq->length = adev->essid_len + 1;
@@ -721,18 +671,18 @@ acx_ioctl_get_essid(
 /***********************************************************************
 ** acx_l_update_client_rates
 */
-static void
-acx_l_update_client_rates(acx_device_t *adev, u16 rate)
+static void acx_l_update_client_rates(acx_device_t * adev, u16 rate)
 {
 	int i;
 	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
 		client_t *clt = &adev->sta_list[i];
-		if (!clt->used)	continue;
+		if (!clt->used)
+			continue;
 		clt->rate_cfg = (clt->rate_cap & rate);
 		if (!clt->rate_cfg) {
 			/* no compatible rates left: kick client */
-			acxlog_mac(L_ASSOC, "client ",clt->address," kicked: "
-				"rates are not compatible anymore\n");
+			acxlog_mac(L_ASSOC, "client ", clt->address, " kicked: "
+				   "rates are not compatible anymore\n");
 			acx_l_sta_list_del(adev, clt);
 			continue;
 		}
@@ -742,7 +692,8 @@ acx_l_update_client_rates(acx_device_t *adev, u16 rate)
 			clt->rate_cur = 1 << lowest_bit(clt->rate_cfg);
 		}
 		if (IS_ACX100(adev))
-			clt->rate_100 = acx_bitpos2rate100[highest_bit(clt->rate_cur)];
+			clt->rate_100 =
+			    acx_bitpos2rate100[highest_bit(clt->rate_cur)];
 		clt->fallback_count = clt->stepup_count = 0;
 		clt->ignore_count = 16;
 	}
@@ -759,35 +710,32 @@ acx_l_update_client_rates(acx_device_t *adev, u16 rate)
 /***********************************************************************
 */
 /* maps bits from acx111 rate to rate in Mbits */
-static const unsigned int
-acx111_rate_tbl[] = {
-     1000000, /* 0 */
-     2000000, /* 1 */
-     5500000, /* 2 */
-     6000000, /* 3 */
-     9000000, /* 4 */
-    11000000, /* 5 */
-    12000000, /* 6 */
-    18000000, /* 7 */
-    22000000, /* 8 */
-    24000000, /* 9 */
-    36000000, /* 10 */
-    48000000, /* 11 */
-    54000000, /* 12 */
-      500000, /* 13, should not happen */
-      500000, /* 14, should not happen */
-      500000, /* 15, should not happen */
+static const unsigned int acx111_rate_tbl[] = {
+	1000000,		/* 0 */
+	2000000,		/* 1 */
+	5500000,		/* 2 */
+	6000000,		/* 3 */
+	9000000,		/* 4 */
+	11000000,		/* 5 */
+	12000000,		/* 6 */
+	18000000,		/* 7 */
+	22000000,		/* 8 */
+	24000000,		/* 9 */
+	36000000,		/* 10 */
+	48000000,		/* 11 */
+	54000000,		/* 12 */
+	500000,			/* 13, should not happen */
+	500000,			/* 14, should not happen */
+	500000,			/* 15, should not happen */
 };
 
 /***********************************************************************
  * acx_ioctl_set_rate
  */
 static int
-acx_ioctl_set_rate(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_rate(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->param;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -798,13 +746,13 @@ acx_ioctl_set_rate(
 
 	FN_ENTER;
 	log(L_IOCTL, "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
-		vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
+	    vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
 
 	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
-		int i = VEC_SIZE(acx111_rate_tbl)-1;
+		int i = VEC_SIZE(acx111_rate_tbl) - 1;
 		if (vwrq->value == -1)
 			/* "iwconfig rate auto" --> choose highest */
-			vwrq->value = IS_ACX100(adev) ?	22000000 : 54000000;
+			vwrq->value = IS_ACX100(adev) ? 22000000 : 54000000;
 		while (i >= 0) {
 			if (vwrq->value == acx111_rate_tbl[i]) {
 				txrate_cfg <<= i;
@@ -813,27 +761,27 @@ acx_ioctl_set_rate(
 			}
 			i--;
 		}
-		if (i == -1) { /* no matching rate */
+		if (i == -1) {	/* no matching rate */
 			result = -EINVAL;
 			goto end;
 		}
-	} else {	/* rate N, N<1000 (driver specific): we don't use this */
+	} else {		/* rate N, N<1000 (driver specific): we don't use this */
 		result = -EOPNOTSUPP;
 		goto end;
 	}
 	/* now: only one bit is set in txrate_cfg, corresponding to
-	** indicated rate */
+	 ** indicated rate */
 
 	autorate = (vwrq->fixed == 0) && (RATE111_1 != txrate_cfg);
 	if (autorate) {
 		/* convert 00100000 -> 00111111 */
-		txrate_cfg = (txrate_cfg<<1)-1;
+		txrate_cfg = (txrate_cfg << 1) - 1;
 	}
 
 	if (IS_ACX100(adev)) {
 		txrate_cfg &= RATE111_ACX100_COMPAT;
 		if (!txrate_cfg) {
-			result = -ENOTSUPP; /* rate is not supported by acx100 */
+			result = -ENOTSUPP;	/* rate is not supported by acx100 */
 			goto end;
 		}
 	}
@@ -858,12 +806,12 @@ acx_ioctl_set_rate(
 	acx_l_update_client_rates(adev, txrate_cfg);
 
 	/* Do/don't do tx rate fallback; beacon contents and rate */
-	SET_BIT(adev->set_mask, SET_RATE_FALLBACK|SET_TEMPLATES);
+	SET_BIT(adev->set_mask, SET_RATE_FALLBACK | SET_TEMPLATES);
 	result = -EINPROGRESS;
 
 	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -873,11 +821,9 @@ end:
 ** acx_ioctl_get_rate
 */
 static int
-acx_ioctl_get_rate(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_rate(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->param;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -897,11 +843,9 @@ acx_ioctl_get_rate(
 }
 
 static int
-acx_ioctl_set_rts(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_rts(struct net_device *ndev,
+		  struct iw_request_info *info,
+		  union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->rts;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -917,11 +861,9 @@ acx_ioctl_set_rts(
 }
 
 static inline int
-acx_ioctl_get_rts(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_rts(struct net_device *ndev,
+		  struct iw_request_info *info,
+		  union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->rts;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -935,19 +877,16 @@ acx_ioctl_get_rts(
 
 #if ACX_FRAGMENTATION
 static int
-acx_ioctl_set_frag(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	struct iw_param *vwrq,
-	char *extra)
+acx_ioctl_set_frag(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   struct iw_param *vwrq, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int val = vwrq->value;
 
 	if (vwrq->disabled)
 		val = 32767;
-	else
-	if ((val < 256) || (val > 2347))
+	else if ((val < 256) || (val > 2347))
 		return -EINVAL;
 
 	adev->frag_threshold = val;
@@ -955,11 +894,9 @@ acx_ioctl_set_frag(
 }
 
 static inline int
-acx_ioctl_get_frag(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_frag(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->frag;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -976,11 +913,9 @@ acx_ioctl_get_frag(
 ** acx_ioctl_set_encode
 */
 static int
-acx_ioctl_set_encode(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_encode(struct net_device *ndev,
+		     struct iw_request_info *info,
+		     union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->encoding;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -990,7 +925,7 @@ acx_ioctl_set_encode(
 	FN_ENTER;
 
 	log(L_IOCTL, "set encoding flags=0x%04X, size=%d, key: %s\n",
-			dwrq->flags, dwrq->length, extra ? "set" : "No key");
+	    dwrq->flags, dwrq->length, extra ? "set" : "No key");
 
 	acx_sem_lock(adev);
 
@@ -1003,7 +938,7 @@ acx_ioctl_set_encode(
 
 		if (0 == (dwrq->flags & IW_ENCODE_NOKEY)) {
 			if (dwrq->length > 29)
-				dwrq->length = 29; /* restrict it */
+				dwrq->length = 29;	/* restrict it */
 
 			if (dwrq->length > 13) {
 				/* 29*8 == 232, WEP256 */
@@ -1020,7 +955,7 @@ acx_ioctl_set_encode(
 			}
 
 			memset(adev->wep_keys[index].key, 0,
-				sizeof(adev->wep_keys[index].key));
+			       sizeof(adev->wep_keys[index].key));
 			memcpy(adev->wep_keys[index].key, extra, dwrq->length);
 		}
 	} else {
@@ -1050,19 +985,19 @@ acx_ioctl_set_encode(
 	SET_BIT(adev->set_mask, GETSET_WEP);
 
 	log(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
-		dwrq->length, extra, dwrq->flags);
+	    dwrq->length, extra, dwrq->flags);
 
 	for (index = 0; index <= 3; index++) {
 		if (adev->wep_keys[index].size) {
-			log(L_IOCTL,	"index=%d, size=%d, key at 0x%p\n",
-				adev->wep_keys[index].index,
-				(int) adev->wep_keys[index].size,
-				adev->wep_keys[index].key);
+			log(L_IOCTL, "index=%d, size=%d, key at 0x%p\n",
+			    adev->wep_keys[index].index,
+			    (int)adev->wep_keys[index].size,
+			    adev->wep_keys[index].key);
 		}
 	}
 	result = -EINPROGRESS;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -1074,11 +1009,9 @@ end_unlock:
 ** acx_ioctl_get_encode
 */
 static int
-acx_ioctl_get_encode(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_encode(struct net_device *ndev,
+		     struct iw_request_info *info,
+		     union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->encoding;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1093,19 +1026,18 @@ acx_ioctl_get_encode(
 			index = (int)adev->wep_current_index;
 
 		dwrq->flags = (adev->wep_restricted == 1) ?
-				IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
+		    IW_ENCODE_RESTRICTED : IW_ENCODE_OPEN;
 		dwrq->length = adev->wep_keys[index].size;
 
 		memcpy(extra, adev->wep_keys[index].key,
-			      adev->wep_keys[index].size);
+		       adev->wep_keys[index].size);
 	}
 
 	/* set the current index */
 	SET_BIT(dwrq->flags, index + 1);
 
 	log(L_IOCTL, "len=%d, key=%p, flags=0x%X\n",
-	       dwrq->length, dwrq->pointer,
-	       dwrq->flags);
+	    dwrq->length, dwrq->pointer, dwrq->flags);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -1115,11 +1047,9 @@ acx_ioctl_get_encode(
 /***********************************************************************
 */
 static int
-acx_ioctl_set_power(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_power(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->power;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1142,7 +1072,7 @@ acx_ioctl_set_power(
 		if (ps_timeout > 255)
 			ps_timeout = 255;
 		log(L_IOCTL, "setting PS timeout value to %d time units "
-				"due to %dus\n", ps_timeout, vwrq->value);
+		    "due to %dus\n", ps_timeout, vwrq->value);
 		adev->ps_hangover_period = ps_timeout;
 	} else if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_PERIOD) {
 		u16 ps_periods = vwrq->value / 1000000;
@@ -1150,7 +1080,7 @@ acx_ioctl_set_power(
 		if (ps_periods > 255)
 			ps_periods = 255;
 		log(L_IOCTL, "setting PS period value to %d periods "
-				"due to %dus\n", ps_periods, vwrq->value);
+		    "due to %dus\n", ps_periods, vwrq->value);
 		adev->ps_listen_interval = ps_periods;
 		CLEAR_BIT(adev->ps_wakeup_cfg, PS_CFG_WAKEUP_MODE_MASK);
 		SET_BIT(adev->ps_wakeup_cfg, PS_CFG_WAKEUP_EACH_ITVL);
@@ -1158,26 +1088,26 @@ acx_ioctl_set_power(
 
 	switch (vwrq->flags & IW_POWER_MODE) {
 		/* FIXME: are we doing the right thing here? */
-		case IW_POWER_UNICAST_R:
-			CLEAR_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
-			break;
-		case IW_POWER_MULTICAST_R:
-			SET_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
-			break;
-		case IW_POWER_ALL_R:
-			SET_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
-			break;
-		case IW_POWER_ON:
-			break;
-		default:
-			log(L_IOCTL, "unknown PS mode\n");
-			result = -EINVAL;
-			goto end;
+	case IW_POWER_UNICAST_R:
+		CLEAR_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
+		break;
+	case IW_POWER_MULTICAST_R:
+		SET_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
+		break;
+	case IW_POWER_ALL_R:
+		SET_BIT(adev->ps_options, PS_OPT_STILL_RCV_BCASTS);
+		break;
+	case IW_POWER_ON:
+		break;
+	default:
+		log(L_IOCTL, "unknown PS mode\n");
+		result = -EINVAL;
+		goto end;
 	}
 
 	SET_BIT(adev->ps_wakeup_cfg, PS_CFG_ENABLE);
 	SET_BIT(adev->set_mask, GETSET_POWER_80211);
-end:
+      end:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -1188,11 +1118,9 @@ end:
 /***********************************************************************
 */
 static int
-acx_ioctl_get_power(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_power(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->power;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1209,13 +1137,13 @@ acx_ioctl_get_power(
 		vwrq->flags = IW_POWER_TIMEOUT;
 	} else {
 		vwrq->value = adev->ps_listen_interval * 1000000;
-		vwrq->flags = IW_POWER_PERIOD|IW_POWER_RELATIVE;
+		vwrq->flags = IW_POWER_PERIOD | IW_POWER_RELATIVE;
 	}
 	if (adev->ps_options & PS_OPT_STILL_RCV_BCASTS)
 		SET_BIT(vwrq->flags, IW_POWER_ALL_R);
 	else
 		SET_BIT(vwrq->flags, IW_POWER_UNICAST_R);
-end:
+      end:
 	FN_EXIT1(OK);
 	return OK;
 }
@@ -1225,11 +1153,9 @@ end:
 ** acx_ioctl_get_txpow
 */
 static inline int
-acx_ioctl_get_txpow(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_txpow(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->power;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1252,11 +1178,9 @@ acx_ioctl_get_txpow(
 ** acx_ioctl_set_txpow
 */
 static int
-acx_ioctl_set_txpow(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_txpow(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->power;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1265,7 +1189,7 @@ acx_ioctl_set_txpow(
 	FN_ENTER;
 
 	log(L_IOCTL, "set txpower:%d, disabled:%d, flags:0x%04X\n",
-			vwrq->value, vwrq->disabled, vwrq->flags);
+	    vwrq->value, vwrq->disabled, vwrq->flags);
 
 	acx_sem_lock(adev);
 
@@ -1302,16 +1226,14 @@ acx_ioctl_set_txpow(
 ** acx_ioctl_get_range
 */
 static int
-acx_ioctl_get_range(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_range(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->data;
 	struct iw_range *range = (struct iw_range *)extra;
 	acx_device_t *adev = ndev2adev(ndev);
-	int i,n;
+	int i, n;
 
 	FN_ENTER;
 
@@ -1325,7 +1247,7 @@ acx_ioctl_get_range(
 		if (adev->reg_dom_chanmask & (1 << (i - 1))) {
 			range->freq[n].i = i;
 			range->freq[n].m = acx_channel_freq[i - 1] * 100000;
-			range->freq[n].e = 1; /* units are MHz */
+			range->freq[n].e = 1;	/* units are MHz */
 			n++;
 		}
 	}
@@ -1354,14 +1276,14 @@ acx_ioctl_get_range(
 	range->pmt_flags = IW_POWER_TIMEOUT;
 	range->pm_capa = IW_POWER_PERIOD | IW_POWER_TIMEOUT | IW_POWER_ALL_R;
 
-	if (IS_ACX100(adev)) { /* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
+	if (IS_ACX100(adev)) {	/* ACX100 has direct radio programming - arbitrary levels, so offer a lot */
 		for (i = 0; i <= IW_MAX_TXPOWER - 1; i++)
 			range->txpower[i] = 20 * i / (IW_MAX_TXPOWER - 1);
 		range->num_txpower = IW_MAX_TXPOWER;
 		range->txpower_capa = IW_TXPOW_DBM;
-	}
-	else {
-		int count = min(IW_MAX_TXPOWER, (int)adev->cfgopt_power_levels.len);
+	} else {
+		int count =
+		    min(IW_MAX_TXPOWER, (int)adev->cfgopt_power_levels.len);
 		for (i = 0; i <= count; i++)
 			range->txpower[i] = adev->cfgopt_power_levels.list[i];
 		range->num_txpower = count;
@@ -1389,7 +1311,7 @@ acx_ioctl_get_range(
 	else
 		range->sensitivity = 255;
 
-	for (i=0; i < adev->rate_supported_len; i++) {
+	for (i = 0; i < adev->rate_supported_len; i++) {
 		range->bitrate[i] = (adev->rate_supported[i] & ~0x80) * 500000;
 		/* never happens, but keep it, to be safe: */
 		if (range->bitrate[i] == 0)
@@ -1405,7 +1327,7 @@ acx_ioctl_get_range(
 	range->avg_qual.level = 80;
 	range->avg_qual.noise = 2;
 
-end:
+      end:
 	FN_EXIT1(OK);
 	return OK;
 }
@@ -1419,11 +1341,9 @@ end:
 ** acx_ioctl_get_nick
 */
 static inline int
-acx_ioctl_get_nick(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_nick(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->data;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1439,11 +1359,9 @@ acx_ioctl_get_nick(
 ** acx_ioctl_set_nick
 */
 static int
-acx_ioctl_set_nick(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_nick(struct net_device *ndev,
+		   struct iw_request_info *info,
+		   union iwreq_data *wrqu, char *extra)
 {
 	struct iw_point *dwrq = &wrqu->data;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1462,7 +1380,7 @@ acx_ioctl_set_nick(
 	strcpy(adev->nick, extra);
 	result = OK;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -1474,11 +1392,9 @@ end_unlock:
 ** acx_ioctl_get_retry
 */
 static int
-acx_ioctl_get_retry(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_retry(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->retry;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1505,7 +1421,7 @@ acx_ioctl_get_retry(
 	}
 
 	/* can't be disabled */
-	vwrq->disabled = (u8)0;
+	vwrq->disabled = (u8) 0;
 	result = OK;
 
 	acx_sem_unlock(adev);
@@ -1519,11 +1435,9 @@ acx_ioctl_get_retry(
 ** acx_ioctl_set_retry
 */
 static int
-acx_ioctl_set_retry(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_retry(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->retry;
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1545,7 +1459,7 @@ acx_ioctl_set_retry(
 	result = -EINVAL;
 	if (IW_RETRY_LIMIT == (vwrq->flags & IW_RETRY_TYPE)) {
 		printk("old retry limits: short %d long %d\n",
-				adev->short_retry, adev->long_retry);
+		       adev->short_retry, adev->long_retry);
 		if (vwrq->flags & IW_RETRY_MAX) {
 			adev->long_retry = vwrq->value;
 		} else if (vwrq->flags & IW_RETRY_MIN) {
@@ -1556,11 +1470,10 @@ acx_ioctl_set_retry(
 			adev->short_retry = vwrq->value;
 		}
 		printk("new retry limits: short %d long %d\n",
-				adev->short_retry, adev->long_retry);
+		       adev->short_retry, adev->long_retry);
 		SET_BIT(adev->set_mask, GETSET_RETRY);
 		result = -EINPROGRESS;
-	}
-	else if (vwrq->flags & IW_RETRY_LIFETIME) {
+	} else if (vwrq->flags & IW_RETRY_LIFETIME) {
 		adev->msdu_lifetime = vwrq->value;
 		printk("new MSDU lifetime: %d\n", adev->msdu_lifetime);
 		SET_BIT(adev->set_mask, SET_MSDU_LIFETIME);
@@ -1568,7 +1481,7 @@ acx_ioctl_set_retry(
 	}
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1582,11 +1495,9 @@ end:
 */
 #if ACX_DEBUG
 static int
-acx_ioctl_set_debug(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_debug(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	unsigned int debug_new = *((unsigned int *)extra);
 	int result = -EINVAL;
@@ -1605,14 +1516,12 @@ acx_ioctl_set_debug(
 ** acx_ioctl_list_reg_domain
 */
 static int
-acx_ioctl_list_reg_domain(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_list_reg_domain(struct net_device *ndev,
+			  struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra)
 {
 	int i = 1;
-	const char * const *entry = acx_reg_domain_strings;
+	const char *const *entry = acx_reg_domain_strings;
 
 	printk("dom# chan# domain/country\n");
 	while (*entry)
@@ -1625,18 +1534,16 @@ acx_ioctl_list_reg_domain(
 ** acx_ioctl_set_reg_domain
 */
 static int
-acx_ioctl_set_reg_domain(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_reg_domain(struct net_device *ndev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
 
 	FN_ENTER;
 
-	if ((*extra < 1) || ((size_t)*extra > acx_reg_domain_ids_len)) {
+	if ((*extra < 1) || ((size_t) * extra > acx_reg_domain_ids_len)) {
 		result = -EINVAL;
 		goto end;
 	}
@@ -1649,7 +1556,7 @@ acx_ioctl_set_reg_domain(
 	result = -EINPROGRESS;
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1659,23 +1566,21 @@ end:
 ** acx_ioctl_get_reg_domain
 */
 static int
-acx_ioctl_get_reg_domain(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_reg_domain(struct net_device *ndev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
-	int dom,i;
+	int dom, i;
 
 	/* no locking */
 	dom = adev->reg_dom_id;
 
 	for (i = 1; i <= acx_reg_domain_ids_len; i++) {
-		if (acx_reg_domain_ids[i-1] == dom) {
+		if (acx_reg_domain_ids[i - 1] == dom) {
 			log(L_IOCTL, "regulatory domain is currently set "
-				"to %d (0x%X): %s\n", i, dom,
-				acx_reg_domain_strings[i-1]);
+			    "to %d (0x%X): %s\n", i, dom,
+			    acx_reg_domain_strings[i - 1]);
 			*extra = i;
 			break;
 		}
@@ -1688,8 +1593,8 @@ acx_ioctl_get_reg_domain(
 /***********************************************************************
 ** acx_ioctl_set_short_preamble
 */
-static const char * const
-preamble_modes[] = {
+static const char *const
+ preamble_modes[] = {
 	"off",
 	"on",
 	"auto (peer capability dependent)",
@@ -1697,11 +1602,9 @@ preamble_modes[] = {
 };
 
 static int
-acx_ioctl_set_short_preamble(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_short_preamble(struct net_device *ndev,
+			     struct iw_request_info *info,
+			     union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int i;
@@ -1716,9 +1619,9 @@ acx_ioctl_set_short_preamble(
 
 	acx_sem_lock(adev);
 
-	adev->preamble_mode = (u8)*extra;
+	adev->preamble_mode = (u8) * extra;
 	switch (adev->preamble_mode) {
-	case 0: /* long */
+	case 0:		/* long */
 		adev->preamble_cur = 0;
 		break;
 	case 1:
@@ -1726,7 +1629,8 @@ acx_ioctl_set_short_preamble(
 		adev->preamble_cur = 1;
 		for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
 			client_t *clt = &adev->sta_list[i];
-			if (!clt->used) continue;
+			if (!clt->used)
+				continue;
 			if (!(clt->cap_info & WF_MGMT_CAP_SHORT)) {
 				clt->used = CLIENT_EMPTY_SLOT_0;
 			}
@@ -1739,11 +1643,12 @@ acx_ioctl_set_short_preamble(
 			}
 		}
 		break;
-	case 2: /* auto. short only if all peers are short-capable */
+	case 2:		/* auto. short only if all peers are short-capable */
 		adev->preamble_cur = 1;
 		for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
 			client_t *clt = &adev->sta_list[i];
-			if (!clt->used) continue;
+			if (!clt->used)
+				continue;
 			if (!(clt->cap_info & WF_MGMT_CAP_SHORT)) {
 				adev->preamble_cur = 0;
 				break;
@@ -1752,12 +1657,12 @@ acx_ioctl_set_short_preamble(
 		break;
 	}
 	printk("new short preamble setting: configured %s, active %s\n",
-			preamble_modes[adev->preamble_mode],
-			preamble_modes[adev->preamble_cur]);
+	       preamble_modes[adev->preamble_mode],
+	       preamble_modes[adev->preamble_cur]);
 	result = OK;
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1767,19 +1672,17 @@ end:
 ** acx_ioctl_get_short_preamble
 */
 static int
-acx_ioctl_get_short_preamble(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_short_preamble(struct net_device *ndev,
+			     struct iw_request_info *info,
+			     union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
 	printk("current short preamble setting: configured %s, active %s\n",
-			preamble_modes[adev->preamble_mode],
-			preamble_modes[adev->preamble_cur]);
+	       preamble_modes[adev->preamble_mode],
+	       preamble_modes[adev->preamble_cur]);
 
 	*extra = (char)adev->preamble_mode;
 
@@ -1796,30 +1699,19 @@ acx_ioctl_get_short_preamble(
 ** for testing 0-4 bits
 */
 static int
-acx_ioctl_set_antenna(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_antenna(struct net_device *ndev,
+		      struct iw_request_info *info,
+		      union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
 	acx_sem_lock(adev);
 
-	printk("old antenna value: 0x%02X (COMBINED bit mask)\n"
-		     "Rx antenna selection:\n"
-		     "0x00 ant. 1\n"
-		     "0x40 ant. 2\n"
-		     "0x80 full diversity\n"
-		     "0xc0 partial diversity\n"
-		     "0x0f dwell time mask (in units of us)\n"
-		     "Tx antenna selection:\n"
-		     "0x00 ant. 2\n" /* yep, those ARE reversed! */
-		     "0x20 ant. 1\n"
-		     "new antenna value: 0x%02X\n",
-		     adev->antenna, (u8)*extra);
+	printk("old antenna value: 0x%02X (COMBINED bit mask)\n" "Rx antenna selection:\n" "0x00 ant. 1\n" "0x40 ant. 2\n" "0x80 full diversity\n" "0xc0 partial diversity\n" "0x0f dwell time mask (in units of us)\n" "Tx antenna selection:\n" "0x00 ant. 2\n"	/* yep, those ARE reversed! */
+	       "0x20 ant. 1\n"
+	       "new antenna value: 0x%02X\n", adev->antenna, (u8) * extra);
 
-	adev->antenna = (u8)*extra;
+	adev->antenna = (u8) * extra;
 	SET_BIT(adev->set_mask, GETSET_ANTENNA);
 
 	acx_sem_unlock(adev);
@@ -1832,24 +1724,15 @@ acx_ioctl_set_antenna(
 ** acx_ioctl_get_antenna
 */
 static int
-acx_ioctl_get_antenna(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_antenna(struct net_device *ndev,
+		      struct iw_request_info *info,
+		      union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
 	/* no locking. it's pointless to lock a single load */
-	printk("current antenna value: 0x%02X (COMBINED bit mask)\n"
-		     "Rx antenna selection:\n"
-		     "0x00 ant. 1\n"
-		     "0x40 ant. 2\n"
-		     "0x80 full diversity\n"
-		     "0xc0 partial diversity\n"
-		     "Tx antenna selection:\n"
-		     "0x00 ant. 2\n" /* yep, those ARE reversed! */
-		     "0x20 ant. 1\n", adev->antenna);
+	printk("current antenna value: 0x%02X (COMBINED bit mask)\n" "Rx antenna selection:\n" "0x00 ant. 1\n" "0x40 ant. 2\n" "0x80 full diversity\n" "0xc0 partial diversity\n" "Tx antenna selection:\n" "0x00 ant. 2\n"	/* yep, those ARE reversed! */
+	       "0x20 ant. 1\n", adev->antenna);
 
 	return 0;
 }
@@ -1862,11 +1745,9 @@ acx_ioctl_get_antenna(
 ** Could anybody test which antenna is the external one?
 */
 static int
-acx_ioctl_set_rx_antenna(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_rx_antenna(struct net_device *ndev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -1889,7 +1770,7 @@ acx_ioctl_set_rx_antenna(
 	result = -EINPROGRESS;
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1902,11 +1783,9 @@ end:
 ** Could anybody test which antenna is the external one?
 */
 static int
-acx_ioctl_set_tx_antenna(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_tx_antenna(struct net_device *ndev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -1929,7 +1808,7 @@ acx_ioctl_set_tx_antenna(
 	result = -EINPROGRESS;
 
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1941,14 +1820,12 @@ end:
 ** can we just remove this in favor of monitor mode? --vda
 */
 static int
-acx_ioctl_wlansniff(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_wlansniff(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
-	unsigned int *params = (unsigned int*)extra;
+	unsigned int *params = (unsigned int *)extra;
 	unsigned int enable = (unsigned int)(params[0] > 0);
 	int result;
 
@@ -1996,11 +1873,9 @@ acx_ioctl_wlansniff(
 ** FIXME: looks like some sort of "iwpriv kick_sta MAC" but it's broken
 */
 static int
-acx_ioctl_unknown11(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_unknown11(struct net_device *ndev,
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 #ifdef BROKEN
 	struct iw_param *vwrq = &wrqu->param;
@@ -2028,28 +1903,25 @@ acx_ioctl_unknown11(
 ** debug helper function to be able to debug various issues relatively easily
 */
 static int
-acx_ioctl_dbg_set_masks(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_dbg_set_masks(struct net_device *ndev,
+			struct iw_request_info *info,
+			union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
-	const unsigned int *params = (unsigned int*)extra;
+	const unsigned int *params = (unsigned int *)extra;
 	int result;
 
 	acx_sem_lock(adev);
 
 	log(L_IOCTL, "setting flags in settings mask: "
-			"get_mask %08X set_mask %08X\n"
-			"before: get_mask %08X set_mask %08X\n",
-			params[0], params[1],
-			adev->get_mask, adev->set_mask);
+	    "get_mask %08X set_mask %08X\n"
+	    "before: get_mask %08X set_mask %08X\n",
+	    params[0], params[1], adev->get_mask, adev->set_mask);
 	SET_BIT(adev->get_mask, params[0]);
 	SET_BIT(adev->set_mask, params[1]);
 	log(L_IOCTL, "after: get_mask %08X set_mask %08X\n",
-			adev->get_mask, adev->set_mask);
-	result = -EINPROGRESS; /* immediately call commit handler */
+	    adev->get_mask, adev->set_mask);
+	result = -EINPROGRESS;	/* immediately call commit handler */
 
 	acx_sem_unlock(adev);
 
@@ -2091,24 +1963,24 @@ acx_ioctl_dbg_set_masks(
 
 /* disallow: 33Mbit (unsupported by hw) */
 /* disallow: CCKOFDM (unsupported by hw) */
-static int
-acx111_supported(int mbit, int modulation, void *opaque)
+static int acx111_supported(int mbit, int modulation, void *opaque)
 {
-	if (mbit==33) return -ENOTSUPP;
-	if (modulation==DOT11_MOD_CCKOFDM) return -ENOTSUPP;
+	if (mbit == 33)
+		return -ENOTSUPP;
+	if (modulation == DOT11_MOD_CCKOFDM)
+		return -ENOTSUPP;
 	return OK;
 }
 
-static const u16
-acx111mask[] = {
-	[DOT11_RATE_1 ] = RATE111_1 ,
-	[DOT11_RATE_2 ] = RATE111_2 ,
-	[DOT11_RATE_5 ] = RATE111_5 ,
+static const u16 acx111mask[] = {
+	[DOT11_RATE_1] = RATE111_1,
+	[DOT11_RATE_2] = RATE111_2,
+	[DOT11_RATE_5] = RATE111_5,
 	[DOT11_RATE_11] = RATE111_11,
 	[DOT11_RATE_22] = RATE111_22,
 	/* [DOT11_RATE_33] = */
-	[DOT11_RATE_6 ] = RATE111_6 ,
-	[DOT11_RATE_9 ] = RATE111_9 ,
+	[DOT11_RATE_6] = RATE111_6,
+	[DOT11_RATE_9] = RATE111_9,
 	[DOT11_RATE_12] = RATE111_12,
 	[DOT11_RATE_18] = RATE111_18,
 	[DOT11_RATE_24] = RATE111_24,
@@ -2117,32 +1989,32 @@ acx111mask[] = {
 	[DOT11_RATE_54] = RATE111_54,
 };
 
-static u32
-acx111_gen_mask(int mbit, int modulation, void *opaque)
+static u32 acx111_gen_mask(int mbit, int modulation, void *opaque)
 {
 	/* lower 16 bits show selected 1, 2, CCK and OFDM rates */
 	/* upper 16 bits show selected PBCC rates */
 	u32 m = acx111mask[rate_mbit2enum(mbit)];
-	if (modulation==DOT11_MOD_PBCC)
-		return m<<16;
+	if (modulation == DOT11_MOD_PBCC)
+		return m << 16;
 	return m;
 }
 
-static int
-verify_rate(u32 rate, int chip_type)
+static int verify_rate(u32 rate, int chip_type)
 {
 	/* never happens. be paranoid */
-	if (!rate) return -EINVAL;
+	if (!rate)
+		return -EINVAL;
 
 	/* disallow: mixing PBCC and CCK at 5 and 11Mbit
-	** (can be supported, but needs complicated handling in tx code) */
-	if (( rate & ((RATE111_11+RATE111_5)<<16) )
-	&&  ( rate & (RATE111_11+RATE111_5) )
-	) {
+	 ** (can be supported, but needs complicated handling in tx code) */
+	if ((rate & ((RATE111_11 + RATE111_5) << 16))
+	    && (rate & (RATE111_11 + RATE111_5))
+	    ) {
 		return -ENOTSUPP;
 	}
 	if (CHIPTYPE_ACX100 == chip_type) {
-		if ( rate & ~(RATE111_ACX100_COMPAT+(RATE111_ACX100_COMPAT<<16)) )
+		if (rate &
+		    ~(RATE111_ACX100_COMPAT + (RATE111_ACX100_COMPAT << 16)))
 			return -ENOTSUPP;
 	}
 	return 0;
@@ -2150,28 +2022,30 @@ verify_rate(u32 rate, int chip_type)
 
 static int
 acx_ioctl_set_rates(struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+		    struct iw_request_info *info,
+		    union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	int result;
-	u32 brate = 0, orate = 0; /* basic, operational rate set */
+	u32 brate = 0, orate = 0;	/* basic, operational rate set */
 
 	FN_ENTER;
 
 	log(L_IOCTL, "set_rates %s\n", extra);
 	result = fill_ratemasks(extra, &brate, &orate,
 				acx111_supported, acx111_gen_mask, 0);
-	if (result) goto end;
+	if (result)
+		goto end;
 	SET_BIT(orate, brate);
 	log(L_IOCTL, "brate %08X orate %08X\n", brate, orate);
 
 	result = verify_rate(brate, adev->chip_type);
-	if (result) goto end;
+	if (result)
+		goto end;
 	result = verify_rate(orate, adev->chip_type);
-	if (result) goto end;
+	if (result)
+		goto end;
 
 	acx_sem_lock(adev);
 	acx_lock(adev, flags);
@@ -2179,11 +2053,11 @@ acx_ioctl_set_rates(struct net_device *ndev,
 	adev->rate_basic = brate;
 	adev->rate_oper = orate;
 	/* TODO: ideally, we shall monitor highest basic rate
-	** which was successfully sent to every peer
-	** (say, last we checked, everybody could hear 5.5 Mbits)
-	** and use that for bcasts when we want to reach all peers.
-	** For beacons, we probably shall use lowest basic rate
-	** because we want to reach all *potential* new peers too */
+	 ** which was successfully sent to every peer
+	 ** (say, last we checked, everybody could hear 5.5 Mbits)
+	 ** and use that for bcasts when we want to reach all peers.
+	 ** For beacons, we probably shall use lowest basic rate
+	 ** because we want to reach all *potential* new peers too */
 	adev->rate_bcast = 1 << lowest_bit(brate);
 	if (IS_ACX100(adev))
 		adev->rate_bcast100 = acx_rate111to100(adev->rate_bcast);
@@ -2193,12 +2067,12 @@ acx_ioctl_set_rates(struct net_device *ndev,
 	acx_l_update_ratevector(adev);
 
 	/* Do/don't do tx rate fallback; beacon contents and rate */
-	SET_BIT(adev->set_mask, SET_RATE_FALLBACK|SET_TEMPLATES);
+	SET_BIT(adev->set_mask, SET_RATE_FALLBACK | SET_TEMPLATES);
 	result = -EINPROGRESS;
 
 	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
-end:
+      end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -2208,11 +2082,9 @@ end:
 ** acx_ioctl_get_phy_chan_busy_percentage
 */
 static int
-acx_ioctl_get_phy_chan_busy_percentage(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_phy_chan_busy_percentage(struct net_device *ndev,
+				       struct iw_request_info *info,
+				       union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	struct {
@@ -2233,14 +2105,14 @@ acx_ioctl_get_phy_chan_busy_percentage(
 	usage.busytime = le32_to_cpu(usage.busytime);
 	usage.totaltime = le32_to_cpu(usage.totaltime);
 	printk("%s: average busy percentage since last invocation: %d%% "
-		"(%u of %u microseconds)\n",
-		ndev->name,
-		usage.busytime / ((usage.totaltime / 100) + 1),
-		usage.busytime, usage.totaltime);
+	       "(%u of %u microseconds)\n",
+	       ndev->name,
+	       usage.busytime / ((usage.totaltime / 100) + 1),
+	       usage.busytime, usage.totaltime);
 
 	result = OK;
 
-end_unlock:
+      end_unlock:
 	acx_sem_unlock(adev);
 
 	return result;
@@ -2251,11 +2123,9 @@ end_unlock:
 ** acx_ioctl_set_ed_threshold
 */
 static inline int
-acx_ioctl_set_ed_threshold(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_ed_threshold(struct net_device *ndev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
@@ -2276,11 +2146,9 @@ acx_ioctl_set_ed_threshold(
 ** acx_ioctl_set_cca
 */
 static inline int
-acx_ioctl_set_cca(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_cca(struct net_device *ndev,
+		  struct iw_request_info *info,
+		  union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -2301,25 +2169,22 @@ acx_ioctl_set_cca(
 
 /***********************************************************************
 */
-static const char * const
-scan_modes[] = { "active", "passive", "background" };
+static const char *const
+ scan_modes[] = { "active", "passive", "background" };
 
-static void
-acx_print_scan_params(acx_device_t *adev, const char* head)
+static void acx_print_scan_params(acx_device_t * adev, const char *head)
 {
 	printk("%s: %smode %d (%s), min chan time %dTU, "
-		"max chan time %dTU, max scan rate byte: %d\n",
-		adev->ndev->name, head,
-		adev->scan_mode, scan_modes[adev->scan_mode],
-		adev->scan_probe_delay, adev->scan_duration, adev->scan_rate);
+	       "max chan time %dTU, max scan rate byte: %d\n",
+	       adev->ndev->name, head,
+	       adev->scan_mode, scan_modes[adev->scan_mode],
+	       adev->scan_probe_delay, adev->scan_duration, adev->scan_rate);
 }
 
 static int
-acx_ioctl_set_scan_params(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_set_scan_params(struct net_device *ndev,
+			  struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -2346,11 +2211,9 @@ acx_ioctl_set_scan_params(
 }
 
 static int
-acx_ioctl_get_scan_params(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx_ioctl_get_scan_params(struct net_device *ndev,
+			  struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -2374,13 +2237,11 @@ acx_ioctl_get_scan_params(
 /***********************************************************************
 */
 static int
-acx100_ioctl_set_led_power(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx100_ioctl_set_led_power(struct net_device *ndev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
 {
-	static const char * const led_modes[] = { "off", "on", "LinkQuality" };
+	static const char *const led_modes[] = { "off", "on", "LinkQuality" };
 
 	acx_device_t *adev = ndev2adev(ndev);
 	int result;
@@ -2388,18 +2249,15 @@ acx100_ioctl_set_led_power(
 	acx_sem_lock(adev);
 
 	printk("%s: power LED status: old %d (%s), ",
-			ndev->name,
-			adev->led_power,
-			led_modes[adev->led_power]);
+	       ndev->name, adev->led_power, led_modes[adev->led_power]);
 	adev->led_power = extra[0];
-	if (adev->led_power > 2) adev->led_power = 2;
-	printk("new %d (%s)\n",
-			adev->led_power,
-			led_modes[adev->led_power]);
+	if (adev->led_power > 2)
+		adev->led_power = 2;
+	printk("new %d (%s)\n", adev->led_power, led_modes[adev->led_power]);
 
 	if (adev->led_power == 2) {
 		printk("%s: max link quality setting: old %d, ",
-			ndev->name, adev->brange_max_quality);
+		       ndev->name, adev->brange_max_quality);
 		if (extra[1])
 			adev->brange_max_quality = extra[1];
 		printk("new %d\n", adev->brange_max_quality);
@@ -2418,11 +2276,9 @@ acx100_ioctl_set_led_power(
 /***********************************************************************
 */
 static inline int
-acx100_ioctl_get_led_power(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx100_ioctl_get_led_power(struct net_device *ndev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 
@@ -2443,11 +2299,9 @@ acx100_ioctl_get_led_power(
 /***********************************************************************
 */
 static int
-acx111_ioctl_info(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx111_ioctl_info(struct net_device *ndev,
+		  struct iw_request_info *info,
+		  union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->param;
 	if (!IS_PCI(ndev2adev(ndev)))
@@ -2459,11 +2313,9 @@ acx111_ioctl_info(
 /***********************************************************************
 */
 static int
-acx100_ioctl_set_phy_amp_bias(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	union iwreq_data *wrqu,
-	char *extra)
+acx100_ioctl_set_phy_amp_bias(struct net_device *ndev,
+			      struct iw_request_info *info,
+			      union iwreq_data *wrqu, char *extra)
 {
 	struct iw_param *vwrq = &wrqu->param;
 	if (!IS_PCI(ndev2adev(ndev))) {
@@ -2476,71 +2328,70 @@ acx100_ioctl_set_phy_amp_bias(
 
 /***********************************************************************
 */
-static const iw_handler acx_ioctl_handler[] =
-{
-	acx_ioctl_commit,		/* SIOCSIWCOMMIT */
-	acx_ioctl_get_name,		/* SIOCGIWNAME */
-	NULL,				/* SIOCSIWNWID */
-	NULL,				/* SIOCGIWNWID */
-	acx_ioctl_set_freq,		/* SIOCSIWFREQ */
-	acx_ioctl_get_freq,		/* SIOCGIWFREQ */
-	acx_ioctl_set_mode,		/* SIOCSIWMODE */
-	acx_ioctl_get_mode,		/* SIOCGIWMODE */
-	acx_ioctl_set_sens,		/* SIOCSIWSENS */
-	acx_ioctl_get_sens,		/* SIOCGIWSENS */
-	NULL,				/* SIOCSIWRANGE */
-	acx_ioctl_get_range,		/* SIOCGIWRANGE */
-	NULL,				/* SIOCSIWPRIV */
-	NULL,				/* SIOCGIWPRIV */
-	NULL,				/* SIOCSIWSTATS */
-	NULL,				/* SIOCGIWSTATS */
+static const iw_handler acx_ioctl_handler[] = {
+	acx_ioctl_commit,	/* SIOCSIWCOMMIT */
+	acx_ioctl_get_name,	/* SIOCGIWNAME */
+	NULL,			/* SIOCSIWNWID */
+	NULL,			/* SIOCGIWNWID */
+	acx_ioctl_set_freq,	/* SIOCSIWFREQ */
+	acx_ioctl_get_freq,	/* SIOCGIWFREQ */
+	acx_ioctl_set_mode,	/* SIOCSIWMODE */
+	acx_ioctl_get_mode,	/* SIOCGIWMODE */
+	acx_ioctl_set_sens,	/* SIOCSIWSENS */
+	acx_ioctl_get_sens,	/* SIOCGIWSENS */
+	NULL,			/* SIOCSIWRANGE */
+	acx_ioctl_get_range,	/* SIOCGIWRANGE */
+	NULL,			/* SIOCSIWPRIV */
+	NULL,			/* SIOCGIWPRIV */
+	NULL,			/* SIOCSIWSTATS */
+	NULL,			/* SIOCGIWSTATS */
 #if IW_HANDLER_VERSION > 4
-	iw_handler_set_spy,		/* SIOCSIWSPY */
-	iw_handler_get_spy,		/* SIOCGIWSPY */
-	iw_handler_set_thrspy,		/* SIOCSIWTHRSPY */
-	iw_handler_get_thrspy,		/* SIOCGIWTHRSPY */
+	iw_handler_set_spy,	/* SIOCSIWSPY */
+	iw_handler_get_spy,	/* SIOCGIWSPY */
+	iw_handler_set_thrspy,	/* SIOCSIWTHRSPY */
+	iw_handler_get_thrspy,	/* SIOCGIWTHRSPY */
 #else /* IW_HANDLER_VERSION > 4 */
 #ifdef WIRELESS_SPY
-	NULL /* acx_ioctl_set_spy FIXME */,	/* SIOCSIWSPY */
-	NULL /* acx_ioctl_get_spy */,	/* SIOCGIWSPY */
+	NULL /* acx_ioctl_set_spy FIXME */ ,	/* SIOCSIWSPY */
+	NULL /* acx_ioctl_get_spy */ ,	/* SIOCGIWSPY */
 #else /* WSPY */
-	NULL,				/* SIOCSIWSPY */
-	NULL,				/* SIOCGIWSPY */
+	NULL,			/* SIOCSIWSPY */
+	NULL,			/* SIOCGIWSPY */
 #endif /* WSPY */
-	NULL,				/* [nothing] */
-	NULL,				/* [nothing] */
+	NULL,			/* [nothing] */
+	NULL,			/* [nothing] */
 #endif /* IW_HANDLER_VERSION > 4 */
-	acx_ioctl_set_ap,		/* SIOCSIWAP */
-	acx_ioctl_get_ap,		/* SIOCGIWAP */
-	NULL,				/* [nothing] */
-	acx_ioctl_get_aplist,		/* SIOCGIWAPLIST */
-	acx_ioctl_set_scan,		/* SIOCSIWSCAN */
-	acx_ioctl_get_scan,		/* SIOCGIWSCAN */
-	acx_ioctl_set_essid,		/* SIOCSIWESSID */
-	acx_ioctl_get_essid,		/* SIOCGIWESSID */
-	acx_ioctl_set_nick,		/* SIOCSIWNICKN */
-	acx_ioctl_get_nick,		/* SIOCGIWNICKN */
-	NULL,				/* [nothing] */
-	NULL,				/* [nothing] */
-	acx_ioctl_set_rate,		/* SIOCSIWRATE */
-	acx_ioctl_get_rate,		/* SIOCGIWRATE */
-	acx_ioctl_set_rts,		/* SIOCSIWRTS */
-	acx_ioctl_get_rts,		/* SIOCGIWRTS */
+	acx_ioctl_set_ap,	/* SIOCSIWAP */
+	acx_ioctl_get_ap,	/* SIOCGIWAP */
+	NULL,			/* [nothing] */
+	acx_ioctl_get_aplist,	/* SIOCGIWAPLIST */
+	acx_ioctl_set_scan,	/* SIOCSIWSCAN */
+	acx_ioctl_get_scan,	/* SIOCGIWSCAN */
+	acx_ioctl_set_essid,	/* SIOCSIWESSID */
+	acx_ioctl_get_essid,	/* SIOCGIWESSID */
+	acx_ioctl_set_nick,	/* SIOCSIWNICKN */
+	acx_ioctl_get_nick,	/* SIOCGIWNICKN */
+	NULL,			/* [nothing] */
+	NULL,			/* [nothing] */
+	acx_ioctl_set_rate,	/* SIOCSIWRATE */
+	acx_ioctl_get_rate,	/* SIOCGIWRATE */
+	acx_ioctl_set_rts,	/* SIOCSIWRTS */
+	acx_ioctl_get_rts,	/* SIOCGIWRTS */
 #if ACX_FRAGMENTATION
-	acx_ioctl_set_frag,		/* SIOCSIWFRAG */
-	acx_ioctl_get_frag,		/* SIOCGIWFRAG */
+	acx_ioctl_set_frag,	/* SIOCSIWFRAG */
+	acx_ioctl_get_frag,	/* SIOCGIWFRAG */
 #else
-	NULL,				/* SIOCSIWFRAG */
-	NULL,				/* SIOCGIWFRAG */
+	NULL,			/* SIOCSIWFRAG */
+	NULL,			/* SIOCGIWFRAG */
 #endif
-	acx_ioctl_set_txpow,		/* SIOCSIWTXPOW */
-	acx_ioctl_get_txpow,		/* SIOCGIWTXPOW */
-	acx_ioctl_set_retry,		/* SIOCSIWRETRY */
-	acx_ioctl_get_retry,		/* SIOCGIWRETRY */
-	acx_ioctl_set_encode,		/* SIOCSIWENCODE */
-	acx_ioctl_get_encode,		/* SIOCGIWENCODE */
-	acx_ioctl_set_power,		/* SIOCSIWPOWER */
-	acx_ioctl_get_power,		/* SIOCGIWPOWER */
+	acx_ioctl_set_txpow,	/* SIOCSIWTXPOW */
+	acx_ioctl_get_txpow,	/* SIOCGIWTXPOW */
+	acx_ioctl_set_retry,	/* SIOCSIWRETRY */
+	acx_ioctl_get_retry,	/* SIOCGIWRETRY */
+	acx_ioctl_set_encode,	/* SIOCSIWENCODE */
+	acx_ioctl_get_encode,	/* SIOCGIWENCODE */
+	acx_ioctl_set_power,	/* SIOCSIWPOWER */
+	acx_ioctl_get_power,	/* SIOCGIWPOWER */
 };
 
 
@@ -2583,150 +2434,152 @@ enum {
 };
 
 
-static const iw_handler acx_ioctl_private_handler[] =
-{
+static const iw_handler acx_ioctl_private_handler[] = {
 #if ACX_DEBUG
-[ACX100_IOCTL_DEBUG		- ACX100_IOCTL] = acx_ioctl_set_debug,
+	[ACX100_IOCTL_DEBUG - ACX100_IOCTL] = acx_ioctl_set_debug,
 #endif
-[ACX100_IOCTL_SET_PLED		- ACX100_IOCTL] = acx100_ioctl_set_led_power,
-[ACX100_IOCTL_GET_PLED		- ACX100_IOCTL] = acx100_ioctl_get_led_power,
-[ACX100_IOCTL_SET_RATES		- ACX100_IOCTL] = acx_ioctl_set_rates,
-[ACX100_IOCTL_LIST_DOM		- ACX100_IOCTL] = acx_ioctl_list_reg_domain,
-[ACX100_IOCTL_SET_DOM		- ACX100_IOCTL] = acx_ioctl_set_reg_domain,
-[ACX100_IOCTL_GET_DOM		- ACX100_IOCTL] = acx_ioctl_get_reg_domain,
-[ACX100_IOCTL_SET_SCAN_PARAMS	- ACX100_IOCTL] = acx_ioctl_set_scan_params,
-[ACX100_IOCTL_GET_SCAN_PARAMS	- ACX100_IOCTL] = acx_ioctl_get_scan_params,
-[ACX100_IOCTL_SET_PREAMB	- ACX100_IOCTL] = acx_ioctl_set_short_preamble,
-[ACX100_IOCTL_GET_PREAMB	- ACX100_IOCTL] = acx_ioctl_get_short_preamble,
-[ACX100_IOCTL_SET_ANT		- ACX100_IOCTL] = acx_ioctl_set_antenna,
-[ACX100_IOCTL_GET_ANT		- ACX100_IOCTL] = acx_ioctl_get_antenna,
-[ACX100_IOCTL_RX_ANT		- ACX100_IOCTL] = acx_ioctl_set_rx_antenna,
-[ACX100_IOCTL_TX_ANT		- ACX100_IOCTL] = acx_ioctl_set_tx_antenna,
-[ACX100_IOCTL_SET_PHY_AMP_BIAS	- ACX100_IOCTL] = acx100_ioctl_set_phy_amp_bias,
-[ACX100_IOCTL_GET_PHY_CHAN_BUSY	- ACX100_IOCTL] = acx_ioctl_get_phy_chan_busy_percentage,
-[ACX100_IOCTL_SET_ED		- ACX100_IOCTL] = acx_ioctl_set_ed_threshold,
-[ACX100_IOCTL_SET_CCA		- ACX100_IOCTL] = acx_ioctl_set_cca,
-[ACX100_IOCTL_MONITOR		- ACX100_IOCTL] = acx_ioctl_wlansniff,
-[ACX100_IOCTL_TEST		- ACX100_IOCTL] = acx_ioctl_unknown11,
-[ACX100_IOCTL_DBG_SET_MASKS	- ACX100_IOCTL] = acx_ioctl_dbg_set_masks,
-[ACX111_IOCTL_INFO		- ACX100_IOCTL] = acx111_ioctl_info,
+	[ACX100_IOCTL_SET_PLED - ACX100_IOCTL] = acx100_ioctl_set_led_power,
+	[ACX100_IOCTL_GET_PLED - ACX100_IOCTL] = acx100_ioctl_get_led_power,
+	[ACX100_IOCTL_SET_RATES - ACX100_IOCTL] = acx_ioctl_set_rates,
+	[ACX100_IOCTL_LIST_DOM - ACX100_IOCTL] = acx_ioctl_list_reg_domain,
+	[ACX100_IOCTL_SET_DOM - ACX100_IOCTL] = acx_ioctl_set_reg_domain,
+	[ACX100_IOCTL_GET_DOM - ACX100_IOCTL] = acx_ioctl_get_reg_domain,
+	[ACX100_IOCTL_SET_SCAN_PARAMS - ACX100_IOCTL] =
+	    acx_ioctl_set_scan_params,
+	[ACX100_IOCTL_GET_SCAN_PARAMS - ACX100_IOCTL] =
+	    acx_ioctl_get_scan_params,
+	[ACX100_IOCTL_SET_PREAMB - ACX100_IOCTL] = acx_ioctl_set_short_preamble,
+	[ACX100_IOCTL_GET_PREAMB - ACX100_IOCTL] = acx_ioctl_get_short_preamble,
+	[ACX100_IOCTL_SET_ANT - ACX100_IOCTL] = acx_ioctl_set_antenna,
+	[ACX100_IOCTL_GET_ANT - ACX100_IOCTL] = acx_ioctl_get_antenna,
+	[ACX100_IOCTL_RX_ANT - ACX100_IOCTL] = acx_ioctl_set_rx_antenna,
+	[ACX100_IOCTL_TX_ANT - ACX100_IOCTL] = acx_ioctl_set_tx_antenna,
+	[ACX100_IOCTL_SET_PHY_AMP_BIAS - ACX100_IOCTL] =
+	    acx100_ioctl_set_phy_amp_bias,
+	[ACX100_IOCTL_GET_PHY_CHAN_BUSY - ACX100_IOCTL] =
+	    acx_ioctl_get_phy_chan_busy_percentage,
+	[ACX100_IOCTL_SET_ED - ACX100_IOCTL] = acx_ioctl_set_ed_threshold,
+	[ACX100_IOCTL_SET_CCA - ACX100_IOCTL] = acx_ioctl_set_cca,
+	[ACX100_IOCTL_MONITOR - ACX100_IOCTL] = acx_ioctl_wlansniff,
+	[ACX100_IOCTL_TEST - ACX100_IOCTL] = acx_ioctl_unknown11,
+	[ACX100_IOCTL_DBG_SET_MASKS - ACX100_IOCTL] = acx_ioctl_dbg_set_masks,
+	[ACX111_IOCTL_INFO - ACX100_IOCTL] = acx111_ioctl_info,
 };
 
 
 static const struct iw_priv_args acx_ioctl_private_args[] = {
 #if ACX_DEBUG
-{ cmd : ACX100_IOCTL_DEBUG,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetDebug" },
+      {cmd:ACX100_IOCTL_DEBUG,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetDebug"},
 #endif
-{ cmd : ACX100_IOCTL_SET_PLED,
-	set_args : IW_PRIV_TYPE_BYTE | 2,
-	get_args : 0,
-	name : "SetLEDPower" },
-{ cmd : ACX100_IOCTL_GET_PLED,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 2,
-	name : "GetLEDPower" },
-{ cmd : ACX100_IOCTL_SET_RATES,
-	set_args : IW_PRIV_TYPE_CHAR | 256,
-	get_args : 0,
-	name : "SetRates" },
-{ cmd : ACX100_IOCTL_LIST_DOM,
-	set_args : 0,
-	get_args : 0,
-	name : "ListRegDomain" },
-{ cmd : ACX100_IOCTL_SET_DOM,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetRegDomain" },
-{ cmd : ACX100_IOCTL_GET_DOM,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "GetRegDomain" },
-{ cmd : ACX100_IOCTL_SET_SCAN_PARAMS,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
-	get_args : 0,
-	name : "SetScanParams" },
-{ cmd : ACX100_IOCTL_GET_SCAN_PARAMS,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
-	name : "GetScanParams" },
-{ cmd : ACX100_IOCTL_SET_PREAMB,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetSPreamble" },
-{ cmd : ACX100_IOCTL_GET_PREAMB,
-	set_args : 0,
-	get_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	name : "GetSPreamble" },
-{ cmd : ACX100_IOCTL_SET_ANT,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetAntenna" },
-{ cmd : ACX100_IOCTL_GET_ANT,
-	set_args : 0,
-	get_args : 0,
-	name : "GetAntenna" },
-{ cmd : ACX100_IOCTL_RX_ANT,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetRxAnt" },
-{ cmd : ACX100_IOCTL_TX_ANT,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetTxAnt" },
-{ cmd : ACX100_IOCTL_SET_PHY_AMP_BIAS,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetPhyAmpBias"},
-{ cmd : ACX100_IOCTL_GET_PHY_CHAN_BUSY,
-	set_args : 0,
-	get_args : 0,
-	name : "GetPhyChanBusy" },
-{ cmd : ACX100_IOCTL_SET_ED,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetED" },
-{ cmd : ACX100_IOCTL_SET_CCA,
-	set_args : IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
-	get_args : 0,
-	name : "SetCCA" },
-{ cmd : ACX100_IOCTL_MONITOR,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
-	get_args : 0,
-	name : "monitor" },
-{ cmd : ACX100_IOCTL_TEST,
-	set_args : 0,
-	get_args : 0,
-	name : "Test" },
-{ cmd : ACX100_IOCTL_DBG_SET_MASKS,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
-	get_args : 0,
-	name : "DbgSetMasks" },
-{ cmd : ACX111_IOCTL_INFO,
-	set_args : 0,
-	get_args : 0,
-	name : "GetAcx111Info" },
-{ cmd : ACX100_IOCTL_DBG_SET_IO,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
-	get_args : 0,
-	name : "DbgSetIO" },
-{ cmd : ACX100_IOCTL_DBG_GET_IO,
-	set_args : IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
-	get_args : 0,
-	name : "DbgGetIO" },
+      {cmd:ACX100_IOCTL_SET_PLED,
+	      set_args:IW_PRIV_TYPE_BYTE | 2,
+	      get_args:0,
+      name:"SetLEDPower"},
+      {cmd:ACX100_IOCTL_GET_PLED,
+	      set_args:0,
+	      get_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 2,
+      name:"GetLEDPower"},
+      {cmd:ACX100_IOCTL_SET_RATES,
+	      set_args:IW_PRIV_TYPE_CHAR | 256,
+	      get_args:0,
+      name:"SetRates"},
+      {cmd:ACX100_IOCTL_LIST_DOM,
+	      set_args:0,
+	      get_args:0,
+      name:"ListRegDomain"},
+      {cmd:ACX100_IOCTL_SET_DOM,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetRegDomain"},
+      {cmd:ACX100_IOCTL_GET_DOM,
+	      set_args:0,
+	      get_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+      name:"GetRegDomain"},
+      {cmd:ACX100_IOCTL_SET_SCAN_PARAMS,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
+	      get_args:0,
+      name:"SetScanParams"},
+      {cmd:ACX100_IOCTL_GET_SCAN_PARAMS,
+	      set_args:0,
+	      get_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
+      name:"GetScanParams"},
+      {cmd:ACX100_IOCTL_SET_PREAMB,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetSPreamble"},
+      {cmd:ACX100_IOCTL_GET_PREAMB,
+	      set_args:0,
+	      get_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+      name:"GetSPreamble"},
+      {cmd:ACX100_IOCTL_SET_ANT,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetAntenna"},
+      {cmd:ACX100_IOCTL_GET_ANT,
+	      set_args:0,
+	      get_args:0,
+      name:"GetAntenna"},
+      {cmd:ACX100_IOCTL_RX_ANT,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetRxAnt"},
+      {cmd:ACX100_IOCTL_TX_ANT,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetTxAnt"},
+      {cmd:ACX100_IOCTL_SET_PHY_AMP_BIAS,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetPhyAmpBias"},
+      {cmd:ACX100_IOCTL_GET_PHY_CHAN_BUSY,
+	      set_args:0,
+	      get_args:0,
+      name:"GetPhyChanBusy"},
+      {cmd:ACX100_IOCTL_SET_ED,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetED"},
+      {cmd:ACX100_IOCTL_SET_CCA,
+	      set_args:IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 1,
+	      get_args:0,
+      name:"SetCCA"},
+      {cmd:ACX100_IOCTL_MONITOR,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+	      get_args:0,
+      name:"monitor"},
+      {cmd:ACX100_IOCTL_TEST,
+	      set_args:0,
+	      get_args:0,
+      name:"Test"},
+      {cmd:ACX100_IOCTL_DBG_SET_MASKS,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
+	      get_args:0,
+      name:"DbgSetMasks"},
+      {cmd:ACX111_IOCTL_INFO,
+	      set_args:0,
+	      get_args:0,
+      name:"GetAcx111Info"},
+      {cmd:ACX100_IOCTL_DBG_SET_IO,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4,
+	      get_args:0,
+      name:"DbgSetIO"},
+      {cmd:ACX100_IOCTL_DBG_GET_IO,
+	      set_args:IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
+	      get_args:0,
+      name:"DbgGetIO"},
 };
 
 
-const struct iw_handler_def acx_ioctl_handler_def =
-{
+const struct iw_handler_def acx_ioctl_handler_def = {
 	.num_standard = VEC_SIZE(acx_ioctl_handler),
 	.num_private = VEC_SIZE(acx_ioctl_private_handler),
 	.num_private_args = VEC_SIZE(acx_ioctl_private_args),
 	.standard = (iw_handler *) acx_ioctl_handler,
 	.private = (iw_handler *) acx_ioctl_private_handler,
-	.private_args = (struct iw_priv_args *) acx_ioctl_private_args,
+	.private_args = (struct iw_priv_args *)acx_ioctl_private_args,
 #if IW_HANDLER_VERSION > 5
 	.get_wireless_stats = acx_e_get_wireless_stats
 #endif /* IW > 5 */
