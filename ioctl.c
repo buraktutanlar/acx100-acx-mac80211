@@ -2,12 +2,10 @@
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/io.h>
-//#include <asm/uaccess.h> /* required for 2.4.x kernels; verify_write() */
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
@@ -26,29 +24,6 @@ static const u16 acx_channel_freq[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484,
 };
-
-
-/***********************************************************************
-** acx_ioctl_commit
-*/
-static int
-acx_ioctl_commit(struct net_device *ndev,
-		 struct iw_request_info *info,
-		 union iwreq_data *wrqu, char *extra)
-{
-	acx_device_t *adev = ndev2adev(ndev);
-
-	FN_ENTER;
-
-	acx_sem_lock(adev);
-	if (ACX_STATE_IFACE_UP & adev->dev_state_mask)
-		acx_s_update_card_settings(adev);
-	acx_sem_unlock(adev);
-
-	FN_EXIT0;
-	return OK;
-}
-
 
 /***********************************************************************
 */
@@ -219,494 +194,6 @@ acx_ioctl_get_mode(struct net_device *ndev,
 	return result;
 }
 
-
-/***********************************************************************
-*/
-static int
-acx_ioctl_set_sens(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	struct iw_param *vwrq = &wrqu->sens;
-	acx_device_t *adev = ndev2adev(ndev);
-
-	acx_sem_lock(adev);
-
-	adev->sensitivity = (1 == vwrq->disabled) ? 0 : vwrq->value;
-	SET_BIT(adev->set_mask, GETSET_SENSITIVITY);
-
-	acx_sem_unlock(adev);
-
-	return -EINPROGRESS;
-}
-
-
-/***********************************************************************
-*/
-static int
-acx_ioctl_get_sens(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	struct iw_param *vwrq = &wrqu->sens;
-	acx_device_t *adev = ndev2adev(ndev);
-
-	if (IS_USB(adev))
-		/* setting the PHY reg via fw cmd doesn't work yet */
-		return -EOPNOTSUPP;
-
-	/* acx_sem_lock(adev); */
-
-	vwrq->value = adev->sensitivity;
-	vwrq->disabled = (vwrq->value == 0);
-	vwrq->fixed = 1;
-
-	/* acx_sem_unlock(adev); */
-
-	return OK;
-}
-
-
-/***********************************************************************
-** acx_ioctl_set_ap
-**
-** Sets the MAC address of the AP to associate with
-*/
-static int
-acx_ioctl_set_ap(struct net_device *ndev,
-		 struct iw_request_info *info,
-		 union iwreq_data *wrqu, char *extra)
-{
-	struct sockaddr *awrq = &wrqu->ap_addr;
-	acx_device_t *adev = ndev2adev(ndev);
-	int result = 0;
-	const u8 *ap;
-
-	FN_ENTER;
-	if (NULL == awrq) {
-		result = -EFAULT;
-		goto end;
-	}
-	if (ARPHRD_ETHER != awrq->sa_family) {
-		result = -EINVAL;
-		goto end;
-	}
-
-	ap = awrq->sa_data;
-	acxlog_mac(L_IOCTL, "set AP=", ap, "\n");
-
-	MAC_COPY(adev->ap, ap);
-
-	/* We want to start rescan in managed or ad-hoc mode,
-	 ** otherwise just set adev->ap.
-	 ** "iwconfig <if> ap <mac> mode managed": we must be able
-	 ** to set ap _first_ and _then_ set mode */
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-	case ACX_MODE_2_STA:
-		/* FIXME: if there is a convention on what zero AP means,
-		 ** please add a comment about that. I don't know of any --vda */
-		if (mac_is_zero(ap)) {
-			/* "off" == 00:00:00:00:00:00 */
-			MAC_BCAST(adev->ap);
-			log(L_IOCTL, "Not reassociating\n");
-		} else {
-			log(L_IOCTL, "Forcing reassociation\n");
-			SET_BIT(adev->set_mask, GETSET_RESCAN);
-		}
-		break;
-	}
-	result = -EINPROGRESS;
-      end:
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-*/
-static int
-acx_ioctl_get_ap(struct net_device *ndev,
-		 struct iw_request_info *info,
-		 union iwreq_data *wrqu, char *extra)
-{
-	struct sockaddr *awrq = &wrqu->ap_addr;
-	acx_device_t *adev = ndev2adev(ndev);
-
-	if (ACX_STATUS_4_ASSOCIATED == adev->status) {
-		/* as seen in Aironet driver, airo.c */
-		MAC_COPY(awrq->sa_data, adev->bssid);
-	} else {
-		MAC_ZERO(awrq->sa_data);
-	}
-	awrq->sa_family = ARPHRD_ETHER;
-	return OK;
-}
-
-
-/***********************************************************************
-** acx_ioctl_get_aplist
-**
-** Deprecated in favor of iwscan.
-** We simply return the list of currently available stations in range,
-** don't do a new scan.
-*/
-static int
-acx_ioctl_get_aplist(struct net_device *ndev,
-		     struct iw_request_info *info,
-		     union iwreq_data *wrqu, char *extra)
-{
-	struct iw_point *dwrq = &wrqu->data;
-	acx_device_t *adev = ndev2adev(ndev);
-	struct sockaddr *address = (struct sockaddr *)extra;
-	struct iw_quality qual[IW_MAX_AP];
-	int i, cur;
-	int result = OK;
-
-	FN_ENTER;
-
-	/* we have AP list only in STA mode */
-	if (ACX_MODE_2_STA != adev->mode) {
-		result = -EOPNOTSUPP;
-		goto end;
-	}
-
-	cur = 0;
-	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
-		struct client *bss = &adev->sta_list[i];
-		if (!bss->used)
-			continue;
-		MAC_COPY(address[cur].sa_data, bss->bssid);
-		address[cur].sa_family = ARPHRD_ETHER;
-		qual[cur].level = bss->sir;
-		qual[cur].noise = bss->snr;
-#ifndef OLD_QUALITY
-		qual[cur].qual = acx_signal_determine_quality(qual[cur].level,
-							      qual[cur].noise);
-#else
-		qual[cur].qual = (qual[cur].noise <= 100) ?
-		    100 - qual[cur].noise : 0;
-#endif
-		/* no scan: level/noise/qual not updated: */
-		qual[cur].updated = 0;
-		cur++;
-	}
-	if (cur) {
-		dwrq->flags = 1;
-		memcpy(extra + sizeof(struct sockaddr) * cur, &qual,
-		       sizeof(struct iw_quality) * cur);
-	}
-	dwrq->length = cur;
-      end:
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-*/
-static int
-acx_ioctl_set_scan(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	acx_device_t *adev = ndev2adev(ndev);
-	int result;
-
-	FN_ENTER;
-
-	acx_sem_lock(adev);
-
-	/* don't start scan if device is not up yet */
-	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		result = -EAGAIN;
-		goto end_unlock;
-	}
-
-	/* This is NOT a rescan for new AP!
-	 ** Do not use SET_BIT(GETSET_RESCAN); */
-	acx_s_cmd_start_scan(adev);
-	result = OK;
-
-      end_unlock:
-	acx_sem_unlock(adev);
-/* end: */
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-** acx_s_scan_add_station
-*/
-/* helper. not sure whether it's really a _s_leeping fn */
-static char *acx_s_scan_add_station(acx_device_t * adev,
-				    char *ptr,
-				    char *end_buf, struct client *bss)
-{
-	struct iw_event iwe;
-	char *ptr_rate;
-
-	FN_ENTER;
-
-	/* MAC address has to be added first */
-	iwe.cmd = SIOCGIWAP;
-	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
-	MAC_COPY(iwe.u.ap_addr.sa_data, bss->bssid);
-	acxlog_mac(L_IOCTL, "scan, station address: ", bss->bssid, "\n");
-	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_ADDR_LEN);
-
-	/* Add ESSID */
-	iwe.cmd = SIOCGIWESSID;
-	iwe.u.data.length = bss->essid_len;
-	iwe.u.data.flags = 1;
-	log(L_IOCTL, "scan, essid: %s\n", bss->essid);
-	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
-
-	/* Add mode */
-	iwe.cmd = SIOCGIWMODE;
-	if (bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)) {
-		if (bss->cap_info & WF_MGMT_CAP_ESS)
-			iwe.u.mode = IW_MODE_MASTER;
-		else
-			iwe.u.mode = IW_MODE_ADHOC;
-		log(L_IOCTL, "scan, mode: %d\n", iwe.u.mode);
-		ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_UINT_LEN);
-	}
-
-	/* Add frequency */
-	iwe.cmd = SIOCGIWFREQ;
-	iwe.u.freq.m = acx_channel_freq[bss->channel - 1] * 100000;
-	iwe.u.freq.e = 1;
-	log(L_IOCTL, "scan, frequency: %d\n", iwe.u.freq.m);
-	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_FREQ_LEN);
-
-	/* Add link quality */
-	iwe.cmd = IWEVQUAL;
-	/* FIXME: these values should be expressed in dBm, but we don't know
-	 * how to calibrate it yet */
-	iwe.u.qual.level = bss->sir;
-	iwe.u.qual.noise = bss->snr;
-#ifndef OLD_QUALITY
-	iwe.u.qual.qual = acx_signal_determine_quality(iwe.u.qual.level,
-						       iwe.u.qual.noise);
-#else
-	iwe.u.qual.qual = (iwe.u.qual.noise <= 100) ?
-	    100 - iwe.u.qual.noise : 0;
-#endif
-	iwe.u.qual.updated = 7;
-	log(L_IOCTL, "scan, link quality: %d/%d/%d\n",
-	    iwe.u.qual.level, iwe.u.qual.noise, iwe.u.qual.qual);
-	ptr = iwe_stream_add_event(ptr, end_buf, &iwe, IW_EV_QUAL_LEN);
-
-	/* Add encryption */
-	iwe.cmd = SIOCGIWENCODE;
-	if (bss->cap_info & WF_MGMT_CAP_PRIVACY)
-		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
-	else
-		iwe.u.data.flags = IW_ENCODE_DISABLED;
-	iwe.u.data.length = 0;
-	log(L_IOCTL, "scan, encryption flags: %X\n", iwe.u.data.flags);
-	ptr = iwe_stream_add_point(ptr, end_buf, &iwe, bss->essid);
-
-	/* add rates */
-	iwe.cmd = SIOCGIWRATE;
-	iwe.u.bitrate.fixed = iwe.u.bitrate.disabled = 0;
-	ptr_rate = ptr + IW_EV_LCP_LEN;
-
-	{
-		u16 rate = bss->rate_cap;
-		const u8 *p = acx_bitpos2ratebyte;
-		while (rate) {
-			if (rate & 1) {
-				iwe.u.bitrate.value = *p * 500000;	/* units of 500kb/s */
-				log(L_IOCTL, "scan, rate: %d\n",
-				    iwe.u.bitrate.value);
-				ptr =
-				    iwe_stream_add_value(ptr, ptr_rate, end_buf,
-							 &iwe, IW_EV_PARAM_LEN);
-			}
-			rate >>= 1;
-			p++;
-		}
-	}
-
-	if ((ptr_rate - ptr) > (ptrdiff_t) IW_EV_LCP_LEN)
-		ptr = ptr_rate;
-
-	/* drop remaining station data items for now */
-
-	FN_EXIT0;
-	return ptr;
-}
-
-
-/***********************************************************************
- * acx_ioctl_get_scan
- */
-static int
-acx_ioctl_get_scan(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	struct iw_point *dwrq = &wrqu->data;
-	acx_device_t *adev = ndev2adev(ndev);
-	char *ptr = extra;
-	int i;
-	int result = OK;
-
-	FN_ENTER;
-
-	acx_sem_lock(adev);
-
-	/* no scan available if device is not up yet */
-	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		log(L_IOCTL, "iface not up yet\n");
-		result = -EAGAIN;
-		goto end_unlock;
-	}
-#ifdef ENODATA_TO_BE_USED_AFTER_SCAN_ERROR_ONLY
-	if (adev->bss_table_count == 0) {
-		/* no stations found */
-		result = -ENODATA;
-		goto end_unlock;
-	}
-#endif
-
-	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
-		struct client *bss = &adev->sta_list[i];
-		if (!bss->used)
-			continue;
-		ptr = acx_s_scan_add_station(adev, ptr,
-					     extra + IW_SCAN_MAX_DATA, bss);
-	}
-	dwrq->length = ptr - extra;
-	dwrq->flags = 0;
-
-      end_unlock:
-	acx_sem_unlock(adev);
-/* end: */
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-** acx_ioctl_set_essid
-*/
-static int
-acx_ioctl_set_essid(struct net_device *ndev,
-		    struct iw_request_info *info,
-		    union iwreq_data *wrqu, char *extra)
-{
-	struct iw_point *dwrq = &wrqu->essid;
-	acx_device_t *adev = ndev2adev(ndev);
-	int len = dwrq->length;
-	int result;
-
-	FN_ENTER;
-
-	if (len < 0) {
-		result = -EINVAL;
-		goto end;
-	}
-
-	log(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
-	    len, extra, len, dwrq->flags);
-
-	acx_sem_lock(adev);
-
-	/* ESSID disabled? */
-	if (0 == dwrq->flags) {
-		adev->essid_active = 0;
-
-	} else {
-		if (dwrq->length > IW_ESSID_MAX_SIZE + 1) {
-			result = -E2BIG;
-			goto end_unlock;
-		}
-
-		if (len > sizeof(adev->essid))
-			len = sizeof(adev->essid);
-		memcpy(adev->essid, extra, len - 1);
-		adev->essid[len - 1] = '\0';
-		/* Paranoia: just in case there is a '\0'... */
-		adev->essid_len = strlen(adev->essid);
-		adev->essid_active = 1;
-	}
-
-	SET_BIT(adev->set_mask, GETSET_RESCAN);
-
-	result = -EINPROGRESS;
-
-      end_unlock:
-	acx_sem_unlock(adev);
-      end:
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-*/
-static int
-acx_ioctl_get_essid(struct net_device *ndev,
-		    struct iw_request_info *info,
-		    union iwreq_data *wrqu, char *extra)
-{
-	struct iw_point *dwrq = &wrqu->essid;
-	acx_device_t *adev = ndev2adev(ndev);
-
-	dwrq->flags = adev->essid_active;
-	if (adev->essid_active) {
-		memcpy(extra, adev->essid, adev->essid_len);
-		extra[adev->essid_len] = '\0';
-		dwrq->length = adev->essid_len + 1;
-		dwrq->flags = 1;
-	}
-	return OK;
-}
-
-
-/***********************************************************************
-** acx_l_update_client_rates
-*/
-static void acx_l_update_client_rates(acx_device_t * adev, u16 rate)
-{
-	int i;
-	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
-		client_t *clt = &adev->sta_list[i];
-		if (!clt->used)
-			continue;
-		clt->rate_cfg = (clt->rate_cap & rate);
-		if (!clt->rate_cfg) {
-			/* no compatible rates left: kick client */
-			acxlog_mac(L_ASSOC, "client ", clt->address, " kicked: "
-				   "rates are not compatible anymore\n");
-			acx_l_sta_list_del(adev, clt);
-			continue;
-		}
-		clt->rate_cur &= clt->rate_cfg;
-		if (!clt->rate_cur) {
-			/* current rate become invalid, choose a valid one */
-			clt->rate_cur = 1 << lowest_bit(clt->rate_cfg);
-		}
-		if (IS_ACX100(adev))
-			clt->rate_100 =
-			    acx_bitpos2rate100[highest_bit(clt->rate_cur)];
-		clt->fallback_count = clt->stepup_count = 0;
-		clt->ignore_count = 16;
-	}
-	switch (adev->mode) {
-	case ACX_MODE_2_STA:
-		if (adev->ap_client && !adev->ap_client->used) {
-			/* Owwww... we kicked our AP!! :) */
-			SET_BIT(adev->set_mask, GETSET_RESCAN);
-		}
-	}
-}
-
-
 /***********************************************************************
 */
 /* maps bits from acx111 rate to rate in Mbits */
@@ -728,119 +215,6 @@ static const unsigned int acx111_rate_tbl[] = {
 	500000,			/* 14, should not happen */
 	500000,			/* 15, should not happen */
 };
-
-/***********************************************************************
- * acx_ioctl_set_rate
- */
-static int
-acx_ioctl_set_rate(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	struct iw_param *vwrq = &wrqu->param;
-	acx_device_t *adev = ndev2adev(ndev);
-	u16 txrate_cfg = 1;
-	unsigned long flags;
-	int autorate;
-	int result = -EINVAL;
-
-	FN_ENTER;
-	log(L_IOCTL, "rate %d fixed 0x%X disabled 0x%X flags 0x%X\n",
-	    vwrq->value, vwrq->fixed, vwrq->disabled, vwrq->flags);
-
-	if ((0 == vwrq->fixed) || (1 == vwrq->fixed)) {
-		int i = VEC_SIZE(acx111_rate_tbl) - 1;
-		if (vwrq->value == -1)
-			/* "iwconfig rate auto" --> choose highest */
-			vwrq->value = IS_ACX100(adev) ? 22000000 : 54000000;
-		while (i >= 0) {
-			if (vwrq->value == acx111_rate_tbl[i]) {
-				txrate_cfg <<= i;
-				i = 0;
-				break;
-			}
-			i--;
-		}
-		if (i == -1) {	/* no matching rate */
-			result = -EINVAL;
-			goto end;
-		}
-	} else {		/* rate N, N<1000 (driver specific): we don't use this */
-		result = -EOPNOTSUPP;
-		goto end;
-	}
-	/* now: only one bit is set in txrate_cfg, corresponding to
-	 ** indicated rate */
-
-	autorate = (vwrq->fixed == 0) && (RATE111_1 != txrate_cfg);
-	if (autorate) {
-		/* convert 00100000 -> 00111111 */
-		txrate_cfg = (txrate_cfg << 1) - 1;
-	}
-
-	if (IS_ACX100(adev)) {
-		txrate_cfg &= RATE111_ACX100_COMPAT;
-		if (!txrate_cfg) {
-			result = -ENOTSUPP;	/* rate is not supported by acx100 */
-			goto end;
-		}
-	}
-
-	acx_sem_lock(adev);
-	acx_lock(adev, flags);
-
-	adev->rate_auto = autorate;
-	adev->rate_oper = txrate_cfg;
-	adev->rate_basic = txrate_cfg;
-	/* only do that in auto mode, non-auto will be able to use
-	 * one specific Tx rate only anyway */
-	if (autorate) {
-		/* only use 802.11b base rates, for standard 802.11b H/W
-		 * compatibility */
-		adev->rate_basic &= RATE111_80211B_COMPAT;
-	}
-	adev->rate_bcast = 1 << lowest_bit(txrate_cfg);
-	if (IS_ACX100(adev))
-		adev->rate_bcast100 = acx_rate111to100(adev->rate_bcast);
-	acx_l_update_ratevector(adev);
-	acx_l_update_client_rates(adev, txrate_cfg);
-
-	/* Do/don't do tx rate fallback; beacon contents and rate */
-	SET_BIT(adev->set_mask, SET_RATE_FALLBACK | SET_TEMPLATES);
-	result = -EINPROGRESS;
-
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
-      end:
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-** acx_ioctl_get_rate
-*/
-static int
-acx_ioctl_get_rate(struct net_device *ndev,
-		   struct iw_request_info *info,
-		   union iwreq_data *wrqu, char *extra)
-{
-	struct iw_param *vwrq = &wrqu->param;
-	acx_device_t *adev = ndev2adev(ndev);
-	unsigned long flags;
-	u16 rate;
-
-	acx_lock(adev, flags);
-	rate = adev->rate_oper;
-	if (adev->ap_client)
-		rate = adev->ap_client->rate_cur;
-	vwrq->value = acx111_rate_tbl[highest_bit(rate)];
-	vwrq->fixed = !adev->rate_auto;
-	vwrq->disabled = 0;
-	acx_unlock(adev, flags);
-
-	return OK;
-}
 
 static int
 acx_ioctl_set_rts(struct net_device *ndev,
@@ -1627,7 +1001,7 @@ acx_ioctl_set_short_preamble(struct net_device *ndev,
 	case 1:
 		/* short, kick incapable peers */
 		adev->preamble_cur = 1;
-		for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
+		for (i = 0; i < ARRAY_SIZE(adev->sta_list); i++) {
 			client_t *clt = &adev->sta_list[i];
 			if (!clt->used)
 				continue;
@@ -1645,7 +1019,7 @@ acx_ioctl_set_short_preamble(struct net_device *ndev,
 		break;
 	case 2:		/* auto. short only if all peers are short-capable */
 		adev->preamble_cur = 1;
-		for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
+		for (i = 0; i < ARRAY_SIZE(adev->sta_list); i++) {
 			client_t *clt = &adev->sta_list[i];
 			if (!clt->used)
 				continue;
@@ -2034,7 +1408,7 @@ acx_ioctl_set_rates(struct net_device *ndev,
 
 	log(L_IOCTL, "set_rates %s\n", extra);
 	result = fill_ratemasks(extra, &brate, &orate,
-				acx111_supported, acx111_gen_mask, 0);
+				acx111_supported, acx111_gen_mask, NULL);
 	if (result)
 		goto end;
 	SET_BIT(orate, brate);
@@ -2104,7 +1478,7 @@ acx_ioctl_get_phy_chan_busy_percentage(struct net_device *ndev,
 
 	usage.busytime = le32_to_cpu(usage.busytime);
 	usage.totaltime = le32_to_cpu(usage.totaltime);
-	printk("%s: average busy percentage since last invocation: %d%% "
+	printk("%s: busy percentage of medium since last invocation: %d%% "
 	       "(%u of %u microseconds)\n",
 	       ndev->name,
 	       usage.busytime / ((usage.totaltime / 100) + 1),
@@ -2325,76 +1699,6 @@ acx100_ioctl_set_phy_amp_bias(struct net_device *ndev,
 	return acx100pci_ioctl_set_phy_amp_bias(ndev, info, vwrq, extra);
 }
 
-
-/***********************************************************************
-*/
-static const iw_handler acx_ioctl_handler[] = {
-	acx_ioctl_commit,	/* SIOCSIWCOMMIT */
-	acx_ioctl_get_name,	/* SIOCGIWNAME */
-	NULL,			/* SIOCSIWNWID */
-	NULL,			/* SIOCGIWNWID */
-	acx_ioctl_set_freq,	/* SIOCSIWFREQ */
-	acx_ioctl_get_freq,	/* SIOCGIWFREQ */
-	acx_ioctl_set_mode,	/* SIOCSIWMODE */
-	acx_ioctl_get_mode,	/* SIOCGIWMODE */
-	acx_ioctl_set_sens,	/* SIOCSIWSENS */
-	acx_ioctl_get_sens,	/* SIOCGIWSENS */
-	NULL,			/* SIOCSIWRANGE */
-	acx_ioctl_get_range,	/* SIOCGIWRANGE */
-	NULL,			/* SIOCSIWPRIV */
-	NULL,			/* SIOCGIWPRIV */
-	NULL,			/* SIOCSIWSTATS */
-	NULL,			/* SIOCGIWSTATS */
-#if IW_HANDLER_VERSION > 4
-	iw_handler_set_spy,	/* SIOCSIWSPY */
-	iw_handler_get_spy,	/* SIOCGIWSPY */
-	iw_handler_set_thrspy,	/* SIOCSIWTHRSPY */
-	iw_handler_get_thrspy,	/* SIOCGIWTHRSPY */
-#else /* IW_HANDLER_VERSION > 4 */
-#ifdef WIRELESS_SPY
-	NULL /* acx_ioctl_set_spy FIXME */ ,	/* SIOCSIWSPY */
-	NULL /* acx_ioctl_get_spy */ ,	/* SIOCGIWSPY */
-#else /* WSPY */
-	NULL,			/* SIOCSIWSPY */
-	NULL,			/* SIOCGIWSPY */
-#endif /* WSPY */
-	NULL,			/* [nothing] */
-	NULL,			/* [nothing] */
-#endif /* IW_HANDLER_VERSION > 4 */
-	acx_ioctl_set_ap,	/* SIOCSIWAP */
-	acx_ioctl_get_ap,	/* SIOCGIWAP */
-	NULL,			/* [nothing] */
-	acx_ioctl_get_aplist,	/* SIOCGIWAPLIST */
-	acx_ioctl_set_scan,	/* SIOCSIWSCAN */
-	acx_ioctl_get_scan,	/* SIOCGIWSCAN */
-	acx_ioctl_set_essid,	/* SIOCSIWESSID */
-	acx_ioctl_get_essid,	/* SIOCGIWESSID */
-	acx_ioctl_set_nick,	/* SIOCSIWNICKN */
-	acx_ioctl_get_nick,	/* SIOCGIWNICKN */
-	NULL,			/* [nothing] */
-	NULL,			/* [nothing] */
-	acx_ioctl_set_rate,	/* SIOCSIWRATE */
-	acx_ioctl_get_rate,	/* SIOCGIWRATE */
-	acx_ioctl_set_rts,	/* SIOCSIWRTS */
-	acx_ioctl_get_rts,	/* SIOCGIWRTS */
-#if ACX_FRAGMENTATION
-	acx_ioctl_set_frag,	/* SIOCSIWFRAG */
-	acx_ioctl_get_frag,	/* SIOCGIWFRAG */
-#else
-	NULL,			/* SIOCSIWFRAG */
-	NULL,			/* SIOCGIWFRAG */
-#endif
-	acx_ioctl_set_txpow,	/* SIOCSIWTXPOW */
-	acx_ioctl_get_txpow,	/* SIOCGIWTXPOW */
-	acx_ioctl_set_retry,	/* SIOCSIWRETRY */
-	acx_ioctl_get_retry,	/* SIOCGIWRETRY */
-	acx_ioctl_set_encode,	/* SIOCSIWENCODE */
-	acx_ioctl_get_encode,	/* SIOCGIWENCODE */
-	acx_ioctl_set_power,	/* SIOCSIWPOWER */
-	acx_ioctl_get_power,	/* SIOCGIWPOWER */
-};
-
-
 /***********************************************************************
 */
 
@@ -2574,9 +1878,9 @@ static const struct iw_priv_args acx_ioctl_private_args[] = {
 
 
 const struct iw_handler_def acx_ioctl_handler_def = {
-	.num_standard = VEC_SIZE(acx_ioctl_handler),
-	.num_private = VEC_SIZE(acx_ioctl_private_handler),
-	.num_private_args = VEC_SIZE(acx_ioctl_private_args),
+	.num_standard = ARRAY_SIZE(acx_ioctl_handler),
+	.num_private = ARRAY_SIZE(acx_ioctl_private_handler),
+	.num_private_args = ARRAY_SIZE(acx_ioctl_private_args),
 	.standard = (iw_handler *) acx_ioctl_handler,
 	.private = (iw_handler *) acx_ioctl_private_handler,
 	.private_args = (struct iw_priv_args *)acx_ioctl_private_args,

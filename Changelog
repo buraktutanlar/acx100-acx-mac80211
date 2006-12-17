@@ -103,7 +103,12 @@ TODO: from Efthym <efthym@gmx.net>:
 13:14:13 wlan0: tx error 0x20, buf 06!
 13:14:13 wlan0: tx error 0x20, buf 07!
 13:14:13 wlan0: tx error 0x20, buf 08!
-
+[20061217]
+* Sync with acxsm 0.4.9
+ - Moved some #includes (were sitting in the middle of the file)
+ - from Andreas Mohr: ioremap -> ioremap_nocache,
+   more desriptive error message on firmware upload failure
+	
 [20060707]
 * Jeff Williams
   Fixed Kconfig CONFIG_ACX_D80211_* in common.c and acx_struct.h

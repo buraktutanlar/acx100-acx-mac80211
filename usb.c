@@ -17,7 +17,6 @@
 #define ACX_USB 1
 
 #include <linux/version.h>
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -30,6 +29,7 @@
 #include <net/iw_handler.h>
 #include <linux/vmalloc.h>
 #include <linux/ethtool.h>
+#include <linux/workqueue.h>
 
 #include "acx.h"
 
@@ -162,8 +162,8 @@ void acxusb_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
 **
 ** In light of this, timeout is just for paranoid reasons...
 *
-* Actually, it's useful for debugging. If we reach timeout, we're doing
-* something wrong with the urbs.
+** Actually, it's useful for debugging. If we reach timeout, we're doing
+** something wrong with the urbs.
 */
 static void acxusb_unlink_urb(struct urb *urb)
 {
@@ -178,7 +178,7 @@ static void acxusb_unlink_urb(struct urb *urb)
 			mdelay(1);
 		}
 		if (!timeout) {
-			printk("acx_usb: urb unlink timeout!\n");
+			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
 		}
 	}
 }
@@ -755,7 +755,8 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int result = OK;
 	int i;
 	int radio_type;
-	/* this one needs to be more precise in case there appears a TNETW1450 from the same vendor */
+	/* this one needs to be more precise in case there appears
+	 * a TNETW1450 from the same vendor */
 	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
 	struct ieee80211_hw *ieee;
 
@@ -786,10 +787,10 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			    "finished booting, returning from probe()\n");
 			result = OK;	/* success */
 			goto end;
-		} else
-			/* device not unbooted, but invalid USB ID!? */
-		if (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)
-			goto end_nodev;
+		} else {
+			if (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)
+				/* device not unbooted, but invalid USB ID!? */
+				goto end_nodev;
 	}
 
 /* Ok, so it's our device and it has already booted */
@@ -855,7 +856,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	adev->usbdev = usbdev;
 	spin_lock_init(&adev->lock);	/* initial state: unlocked */
-	sema_init(&adev->sem, 1);	/* initial state: 1 (upped) */
+	mutex_init(&adev->mutex);
 
 	/* Check that this is really the hardware we know about.
 	 ** If not sure, at least notify the user that he
@@ -971,7 +972,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_s_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
 
-	memcpy(ndev->dev_addr, adev->dev_addr, 6);
+	MAC_COPY(ndev->dev_addr, adev->dev_addr);
 
 	/* Register the network device */
 	log(L_INIT, "registering network device\n");
@@ -1203,7 +1204,7 @@ static int acxusb_e_close(struct net_device *ndev)
 	 * See pci.c:acxpci_s_down() for deails.
 	 */
 	acx_sem_unlock(adev);
-	FLUSH_SCHEDULED_WORK();
+	flush_scheduled_work();
 	acx_sem_lock(adev);
 
 	/* Power down the device */
@@ -1650,7 +1651,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	usb_tx_t *tx;
 	usb_txbuffer_t *txbuf;
 //	client_t *clt;
-	wlan_hdr_t *whdr;
+	struct ieee80211_hdr *whdr;
 	unsigned int outpipe;
 	int ucode, txnum;
 
@@ -1659,7 +1660,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	tx = ((usb_tx_t *) tx_opaque);
 	txurb = tx->urb;
 	txbuf = &tx->bulkout;
-	whdr = (wlan_hdr_t *) txbuf->data;
+	whdr = (struct ieee80211_hdr *) txbuf->data;
 	txnum = tx - adev->usb_tx;
 
 	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
@@ -1794,7 +1795,7 @@ int __init acxusb_e_init_module(void)
 ** This function is invoked as last step of the module unloading. It simply
 ** deregisters this module at the kernel's USB subsystem.
 */
-void __exit acxusb_e_cleanup_module()
+void __exit acxusb_e_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
 }
@@ -1828,7 +1829,7 @@ static void dump_device(struct usb_device *usbdev)
 			       usbdev->ep_in[i]->desc.wMaxPacketSize);
 	printk("\n");
 	printk("  ep_out wMaxPacketSize: ");
-	for (i = 0; i < VEC_SIZE(usbdev->ep_out); ++i)
+	for (i = 0; i < ARRAY_SIZE(usbdev->ep_out); ++i)
 		if (usbdev->ep_out[i] != NULL)
 			printk("%d:%d ", i,
 			       usbdev->ep_out[i]->desc.wMaxPacketSize);

@@ -3,7 +3,6 @@
 */
 #define ACX_PCI 1
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/compiler.h>	/* required for Lx 2.6.8 ?? */
 #include <linux/kernel.h>
@@ -24,6 +23,7 @@
 #include <linux/vmalloc.h>
 #include <linux/ethtool.h>
 #include <linux/dma-mapping.h>
+#include <linux/workqueue.h>
 
 #include "acx.h"
 
@@ -591,6 +591,21 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 
 	FN_ENTER;
 
+	/* print exact chipset and radio ID to make sure people
+	 * really get a clue on which files exactly they need to provide.
+	 * Firmware loading is a frequent end-user PITA with these chipsets.
+	 */
+	printk( "acx: need firmware for acx1%02d chipset with radio ID %02X\n"
+		"Please provide via firmware hotplug:\n"
+		"either combined firmware (single file named 'tiacx1%02dc%02X')\n"
+		"or two files (base firmware file 'tiacx1%02d' "
+		"+ radio fw 'tiacx1%02dr%02X')\n",
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11,
+		IS_ACX111(adev)*11, adev->radio_type
+		);
+
 	/* Try combined, then main image */
 	adev->need_radio_fw = 0;
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
@@ -610,11 +625,11 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 
 	for (try = 1; try <= 5; try++) {
 		res = acxpci_s_write_fw(adev, fw_image, 0);
-		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined):%d\n", res);
+		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG | L_INIT, "acx_validate_fw "
-			    "(main/combined):%d\n", res);
+			    "(main/combined): %d\n", res);
 		}
 
 		if (OK == res) {
@@ -723,13 +738,12 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 
 	/* now do soft reset of eCPU, set bit */
 	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
-	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
+	log(L_DEBUG, "enable soft reset\n");
 	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
 	write_flush(adev);
 
 	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n",
-	    __func__);
+	log(L_DEBUG, "disable soft reset and go to init mode");
 	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
 
 	/* now start a burst read from initial EEPROM */
@@ -1210,7 +1224,7 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 		}
 	}
 
-	for (i = 0; i < VEC_SIZE(device_ids); i++) {
+	for (i = 0; i < ARRAY_SIZE(device_ids); i++) {
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
 			if (device_ids[i].descr) {
 				printk("acx: EEPROM card ID string check "
@@ -1220,7 +1234,7 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 			break;
 		}
 	}
-	if (i == VEC_SIZE(device_ids)) {
+	if (i == ARRAY_SIZE(device_ids)) {
 		printk("acx: EEPROM card ID string check found "
 		       "unknown card: expected 'Global', got '%.*s\'. "
 		       "Please report\n", CARD_EEPROM_ID_SIZE, buffer);
@@ -1249,7 +1263,7 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 {
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (ptr) { \
-		free_coherent(0, size, ptr, phyaddr); \
+		free_coherent(NULL, size, ptr, phyaddr); \
 		ptr = NULL; \
 		size = 0; \
 	}
@@ -1460,7 +1474,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 /** Set up our private interface **/
 	spin_lock_init(&adev->lock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	sema_init(&adev->sem, 1);	/* initial state: 1 (upped) */
+	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well
 	 ** just _presume_ that we're under sem (instead of actually taking it): */
 	/* acx_sem_lock(adev); */
@@ -1527,12 +1541,21 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("acx: cannot reserve PCI memory region 2\n");
 		goto fail_request_mem_region2;
 	}
-	mem1 = ioremap(phymem1, mem_region1_size);
+	/* this used to be ioremap(), but ioremap_nocache()
+	 * is much less risky, right? (and slower?)
+	 * FIXME: we may want to go back to cached variant if it's
+	 * certain that our code really properly handles
+	 * cached operation (memory barriers, volatile?, ...)
+	 * (but always keep this comment here regardless!)
+	 * Possibly make this a driver config setting?
+	 */
+	
+	mem1 = ioremap_nocache(phymem1, mem_region1_size);
 	if (!mem1) {
 		printk("acx: ioremap() FAILED\n");
 		goto fail_ioremap1;
 	}
-	mem2 = ioremap(phymem2, mem_region2_size);
+	mem2 = ioremap_nocache(phymem2, mem_region2_size);
 	if (!mem2) {
 		printk("acx: ioremap() #2 FAILED\n");
 		goto fail_ioremap2;
@@ -1627,7 +1650,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	       "against wireless extensions %d and Linux %s\n",
 	       ndev->name, WIRELESS_EXT, UTS_RELEASE);
 
-	memcpy(ndev->dev_addr, adev->dev_addr, 6);
+	MAC_COPY(ndev->dev_addr, adev->dev_addr);
 
 	log(L_IRQ | L_INIT, "using IRQ %d\n", pdev->irq);
 
@@ -2017,10 +2040,10 @@ static void acxpci_s_down(struct net_device *ndev)
 	 ** end all remaining work now.
 	 **
 	 ** NB: carrier_off (done by set_status below) would lead to
-	 ** not yet fully understood deadlock in FLUSH_SCHEDULED_WORK().
+	 ** not yet fully understood deadlock in flush_scheduled_work().
 	 ** That's why we do FLUSH first.
 	 **
-	 ** NB2: we have a bad locking bug here: FLUSH_SCHEDULED_WORK()
+	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
 	 ** waits for acx_e_after_interrupt_task to complete if it is running
 	 ** on another CPU, but acx_e_after_interrupt_task
 	 ** will sleep on sem forever, because it is taken by us!
@@ -2028,13 +2051,13 @@ static void acxpci_s_down(struct net_device *ndev)
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
 //	acx_sem_unlock(adev);
-	FLUSH_SCHEDULED_WORK();
+	flush_scheduled_work();
 //	acx_sem_lock(adev);
 
 	/* This is possible:
-	 ** FLUSH_SCHEDULED_WORK -> acx_e_after_interrupt_task ->
+	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
 	 ** -> set_status(ASSOCIATED) -> wake_queue()
-	 ** That's why we stop queue _after_ FLUSH_SCHEDULED_WORK
+	 ** That's why we stop queue _after_ flush_scheduled_work
 	 ** lock/unlock is just paranoia, maybe not needed */
 //	acx_lock(adev, flags);
 //	acx_stop_queue(ndev, "on ifdown");
@@ -2379,7 +2402,7 @@ static void handle_info_irq(acx_device_t * adev)
 
 	log(L_IRQ, "got Info IRQ: status %04X type %04X: %s\n",
 	    info_status, info_type,
-	    info_type_msg[(info_type >= VEC_SIZE(info_type_msg)) ?
+	    info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
 			  0 : info_type]
 	    );
 }
@@ -2414,7 +2437,7 @@ static void log_unusual_irq(u16 irqtype)
 		printk(" Key_Not_Found");
 	}
 	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
-		printk(" IV_ICV_Failure");
+		printk(" IV_ICV_Failure (WEP?)");
 	}
 	/* HOST_INT_CMD_COMPLETE  */
 	/* HOST_INT_INFO          */
@@ -2458,7 +2481,7 @@ static void update_link_quality_led(acx_device_t * adev)
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)	/* a la orinoco.c */
 
 /* Interrupt handler bottom-half */
-void acx_interrupt_tasklet(struct acx_device *adev)
+void acx_interrupt_tasklet(void *data)
 {
 //        u32 reason;
 //        u32 dma_reason[4];
@@ -2470,7 +2493,7 @@ void acx_interrupt_tasklet(struct acx_device *adev)
 #else
 # define acxirq_handled(irq)    do { /* nothing */ } while (0)
 #endif /* CONFIG_ACX_D80211_DEBUG */
-//      acx_device_t *adev;
+	acx_device_t *adev = data;
 	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	register u16 irqtype;
 	u16 unmasked;
@@ -3260,7 +3283,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
         memcpy(&(hostdesc1->txstatus.control),ieeectl,sizeof(struct ieee80211_tx_control));
         hostdesc1->skb = skb;
 	if (unlikely(acx_debug & (L_XFER | L_DATA))) {
-		u16 fc = ((wlan_hdr_t *) hostdesc1->data)->fc;
+		u16 fc = ((struct ieee80211_hdr_3addr *) hostdesc1->data)->fc;
 		if (IS_ACX111(adev))
 			printk("tx: pkt (%s): len %d "
 			       "rate %04X%s status %u\n",
@@ -3469,9 +3492,9 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 			 * all other errors mean we screwed up locally */
 			union iwreq_data wrqu;
-			wlan_hdr_t *hdr;
-			hdr = (wlan_hdr_t *) hostdesc->data;
-			MAC_COPY(wrqu.addr.sa_data, hdr->a1);
+			struct ieee80211_hdr_3addr *hdr;
+			hdr = (struct ieee80211_hdr_3addr *) hostdesc->data;
+			MAC_COPY(wrqu.addr.sa_data, hdr->addr1);
 //			wireless_send_event(adev->ndev, IWEVTXDROP, &wrqu,
 //					    NULL);
 //			printk("Failed to send packet\n");

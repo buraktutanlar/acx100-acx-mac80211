@@ -162,7 +162,6 @@ IEEE16(WF_MGMT_CAP_SHORTSLOT,	0x0400)
 IEEE16(WF_MGMT_CAP_CCKOFDM,	0x2000)
 };
 
-
 /***********************************************************************
 ** Types
 */
@@ -251,153 +250,6 @@ typedef struct wlan_ie_erp {
 	u8 erp;
 } WLAN_PACKED wlan_ie_erp_t;
 
-/* Types for parsing mgmt frames */
-
-/* prototype structure, all mgmt frame types will start with these members */
-typedef struct wlan_fr_mgmt {
-	u16 type;
-	u16 len;		/* DOES NOT include FCS */
-	wlan_hdr_t *hdr;
-	/* used for target specific data, skb in Linux */
-	/*-- fixed fields -----------*/
-	/*-- info elements ----------*/
-} WLAN_PACKED wlan_fr_mgmt_t;
-
-/*-- Beacon ---------------------------------------*/
-typedef struct wlan_fr_beacon {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u64 *ts;
-	u16 *bcn_int;
-	u16 *cap_info;
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-	wlan_ie_fh_parms_t *fh_parms;
-	wlan_ie_ds_parms_t *ds_parms;
-	wlan_ie_cf_parms_t *cf_parms;
-	wlan_ie_ibss_parms_t *ibss_parms;
-	wlan_ie_tim_t *tim;	/* in beacon only, not proberesp */
-	wlan_ie_erp_t *erp;	/* in beacon only, not proberesp */
-} wlan_fr_beacon_t;
-#define wlan_fr_proberesp wlan_fr_beacon
-#define wlan_fr_proberesp_t wlan_fr_beacon_t
-
-/*-- IBSS ATIM ------------------------------------*/
-typedef struct wlan_fr_ibssatim {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	/*-- info elements ----------*/
-	/* this frame type has a null body */
-} wlan_fr_ibssatim_t;
-
-/*-- Disassociation -------------------------------*/
-typedef struct wlan_fr_disassoc {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *reason;
-	/*-- info elements ----------*/
-} wlan_fr_disassoc_t;
-
-/*-- Association Request --------------------------*/
-typedef struct wlan_fr_assocreq {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *cap_info;
-	u16 *listen_int;
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-} wlan_fr_assocreq_t;
-
-/*-- Association Response -------------------------*/
-typedef struct wlan_fr_assocresp {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *cap_info;
-	u16 *status;
-	u16 *aid;
-	/*-- info elements ----------*/
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-} wlan_fr_assocresp_t;
-
-/*-- Reassociation Request ------------------------*/
-typedef struct wlan_fr_reassocreq {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *cap_info;
-	u16 *listen_int;
-	u8 *curr_ap;
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-} wlan_fr_reassocreq_t;
-
-/*-- Reassociation Response -----------------------*/
-typedef struct wlan_fr_reassocresp {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *cap_info;
-	u16 *status;
-	u16 *aid;
-	/*-- info elements ----------*/
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-} wlan_fr_reassocresp_t;
-
-/*-- Probe Request --------------------------------*/
-typedef struct wlan_fr_probereq {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	/*-- info elements ----------*/
-	wlan_ie_ssid_t *ssid;
-	wlan_ie_supp_rates_t *supp_rates;
-	wlan_ie_supp_rates_t *ext_rates;
-} wlan_fr_probereq_t;
-
-/*-- Authentication -------------------------------*/
-typedef struct wlan_fr_authen {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *auth_alg;
-	u16 *auth_seq;
-	u16 *status;
-	/*-- info elements ----------*/
-	wlan_ie_challenge_t *challenge;
-} wlan_fr_authen_t;
-
-/*-- Deauthenication -----------------------------*/
-typedef struct wlan_fr_deauthen {
-	u16 type;
-	u16 len;
-	wlan_hdr_t *hdr;
-	/*-- fixed fields -----------*/
-	u16 *reason;
-	/*-- info elements ----------*/
-} wlan_fr_deauthen_t;
-
 /* Types for building mgmt frames */
 
 /* Warning. Several types used in below structs are
@@ -461,19 +313,6 @@ typedef struct proberesp_frame_body {
 /***********************************************************************
 ** Functions
 */
-
-/* Helpers for parsing mgmt frames */
-void wlan_mgmt_decode_ibssatim(wlan_fr_ibssatim_t *f);
-void wlan_mgmt_decode_assocreq(wlan_fr_assocreq_t *f);
-void wlan_mgmt_decode_assocresp(wlan_fr_assocresp_t *f);
-void wlan_mgmt_decode_authen(wlan_fr_authen_t *f);
-void wlan_mgmt_decode_beacon(wlan_fr_beacon_t *f);
-void wlan_mgmt_decode_deauthen(wlan_fr_deauthen_t *f);
-void wlan_mgmt_decode_disassoc(wlan_fr_disassoc_t *f);
-void wlan_mgmt_decode_probereq(wlan_fr_probereq_t *f);
-void wlan_mgmt_decode_proberesp(wlan_fr_proberesp_t *f);
-void wlan_mgmt_decode_reassocreq(wlan_fr_reassocreq_t *f);
-void wlan_mgmt_decode_reassocresp(wlan_fr_reassocresp_t *f);
 
 /* Helpers for building mgmt frames */
 static inline u8*

@@ -57,7 +57,7 @@ config ACX_D80211_USB
 	You will need to provide a firmware image via hotplug.
 
 	Firmware for USB device is requested from hotplug
-	by the 'tiacx100usb' name.
+	by the 'tiacx1NNusbcNN' name.
 
 	Firmware files are not covered by GPL and are not distributed
 	with this driver for legal reasons.

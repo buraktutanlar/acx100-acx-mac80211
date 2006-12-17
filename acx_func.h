@@ -110,9 +110,7 @@ acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
 static inline void
 MAC_COPY(u8 *mac, const u8 *src)
 {
-	*(u32*)mac = *(u32*)src;
-	((u16*)mac)[2] = ((u16*)src)[2];
-	/* kernel's memcpy will do the same: memcpy(dst, src, ETH_ALEN); */
+	memcpy(mac, src, ETH_ALEN);
 }
 
 static inline void
@@ -184,6 +182,7 @@ mac_is_mcast(const u8 *mac)
 
 #define CLEAR_BIT(val, mask) ((val) &= ~(mask))
 #define SET_BIT(val, mask) ((val) |= (mask))
+#define CHECK_BIT(val, mask) ((val) & (mask))
 
 /* undefined if v==0 */
 static inline unsigned int
@@ -279,27 +278,17 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 	acx_unlock_debug(adev, where);
 	spin_unlock_irqrestore(&adev->lock, *fp);
 }
-static inline void
-acx_down_helper(acx_device_t *adev, const char* where)
-{
-	acx_down_debug(adev, where);
-}
-static inline void
-acx_up_helper(acx_device_t *adev, const char* where)
-{
-	acx_up_debug(adev, where);
-}
 #define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
 #define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_sem_lock(adev)	acx_down_helper(adev, __FILE__ ":" STRING(__LINE__))
-#define acx_sem_unlock(adev)	acx_up_helper(adev, __FILE__ ":" STRING(__LINE__))
+#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
+#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 
 #elif defined(DO_LOCKING)
 
 #define acx_lock(adev, flags)	spin_lock_irqsave(&adev->lock, flags)
 #define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->lock, flags)
-#define acx_sem_lock(adev)	down(&adev->sem)
-#define acx_sem_unlock(adev)	up(&adev->sem)
+#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
+#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 #define acx_lock_unhold()	((void)0)
 #define acx_sem_unhold()	((void)0)
 
@@ -533,10 +522,10 @@ acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		acxusb_l_tx_data(adev, tx_opaque, len, ieeectl,skb);
 }
 
-static inline wlan_hdr_t*
+static inline struct ieee80211_hdr *
 acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
-	return (wlan_hdr_t*)((u8*)&rxbuf->hdr_a3 + adev->phy_header_len);
+	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
 void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
 void acxusb_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
@@ -590,7 +579,6 @@ void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
 			int pkts_to_ignore);
 
 void acx_dump_bytes(const void *, int);
-void acx_log_bad_eid(wlan_hdr_t* hdr, int len, wlan_ie_t* ie_ptr);
 
 u8 acx_rate111to100(u16);
 
@@ -639,7 +627,7 @@ void acx_display_hardware_details(acx_device_t *adev);
 int acx_e_change_mtu(struct net_device *ndev, int mtu);
 int acx_e_get_stats(struct net_device *ndev, struct ieee80211_low_level_stats *stats);
 struct iw_statistics* acx_e_get_wireless_stats(struct net_device *ndev);
-void acx_interrupt_tasklet(struct acx_device *adev);
+void acx_interrupt_tasklet(void *data);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);

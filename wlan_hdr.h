@@ -117,6 +117,17 @@ modulation from the start and thus easily identifiable.
 Not shown here.
 */
 
+/***********************************************************************
+*/
+#define WLAN_PACKED __attribute__ ((packed))
+
+#ifdef __LITTLE_ENDIAN
+ #define IEEE16(a,n) a = n, a##i = n,
+#else
+ #ifdef __BIG_ENDIAN
+  #define IEEE16(a,n) a = n a##i = ((n&0xff)*256 + ((n&0xff00/256)),
+ #endif
+#endif
 
 /***********************************************************************
 ** Constants
@@ -270,151 +281,9 @@ IEEE16(WF_FSTYPE_CFPOLL,		0x60)
 IEEE16(WF_FSTYPE_CFACK_CFPOLL,		0x70)
 };
 
-
-/***********************************************************************
-** Macros
-*/
-
-/*--- Duration Macros ----------------------------------------*/
-/* Macros to get/set the bitfields of the Duration Field      */
-/*  - the duration value is only valid when bit15 is zero     */
-/*  - the firmware handles these values, so I'm not going     */
-/*    these macros right now.                                 */
-/*------------------------------------------------------------*/
-
-/*--- Sequence Control  Macros -------------------------------*/
-/* Macros to get/set the bitfields of the Sequence Control    */
-/* Field.                                                     */
-/*------------------------------------------------------------*/
-#define WLAN_GET_SEQ_FRGNUM(n) ((u16)(n) & 0x000f)
-#define WLAN_GET_SEQ_SEQNUM(n) (((u16)(n) & 0xfff0) >> 4)
-
-/*--- Data ptr macro -----------------------------------------*/
-/* Creates a u8* to the data portion of a frame               */
-/* Assumes you're passing in a ptr to the beginning of the hdr*/
-/*------------------------------------------------------------*/
-#define WLAN_HDR_A3_DATAP(p) (((u8*)(p)) + WLAN_HDR_A3_LEN)
-#define WLAN_HDR_A4_DATAP(p) (((u8*)(p)) + WLAN_HDR_A4_LEN)
-
-
 /***********************************************************************
 ** Types
 */
-
-/* 802.11 header type
-**
-** Note the following:
-** a1 *always* is receiver's mac or bcast/mcast
-** a2 *always* is transmitter's mac, if a2 exists
-** seq: [0:3] frag#, [4:15] seq# - used for dup detection
-** (dups from retries have same seq#) */
-typedef struct wlan_hdr {
-	u16	fc;
-	u16	dur;
-	u8	a1[ETH_ALEN];
-	u8	a2[ETH_ALEN];
-	u8	a3[ETH_ALEN];
-	u16	seq;
-	u8	a4[ETH_ALEN];
-} WLAN_PACKED wlan_hdr_t;
-
-/* Separate structs for use if frame type is known */
-typedef struct wlan_hdr_a3 {
-	u16	fc;
-	u16	dur;
-	u8	a1[ETH_ALEN];
-	u8	a2[ETH_ALEN];
-	u8	a3[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED wlan_hdr_a3_t;
-
-typedef struct wlan_hdr_mgmt {
-	u16	fc;
-	u16	dur;
-	u8	da[ETH_ALEN];
-	u8	sa[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED wlan_hdr_mgmt_t;
-
-#ifdef NOT_NEEDED_YET
-typedef struct { /* ad-hoc peer->peer (to/from DS = 0/0) */
-	u16	fc;
-	u16	dur;
-	u8	da[ETH_ALEN];
-	u8	sa[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED ibss;
-typedef struct { /* ap->sta (to/from DS = 0/1) */
-	u16	fc;
-	u16	dur;
-	u8	da[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-	u8	sa[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED fromap;
-typedef struct { /* sta->ap (to/from DS = 1/0) */
-	u16	fc;
-	u16	dur;
-	u8	bssid[ETH_ALEN];
-	u8	sa[ETH_ALEN];
-	u8	da[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED toap;
-typedef struct { /* wds->wds (to/from DS = 1/1), the only 4addr pkt */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-	u8	ta[ETH_ALEN];
-	u8	da[ETH_ALEN];
-	u16	seq;
-	u8	sa[ETH_ALEN];
-} WLAN_PACKED wds;
-typedef struct { /* all management packets */
-	u16	fc;
-	u16	dur;
-	u8	da[ETH_ALEN];
-	u8	sa[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-	u16	seq;
-} WLAN_PACKED mgmt;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-	u8	ta[ETH_ALEN];
-} WLAN_PACKED rts;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-} WLAN_PACKED cts;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-} WLAN_PACKED ack;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	/* NB: this one holds Assoc ID in dur field: */
-	u16	aid;
-	u8	bssid[ETH_ALEN];
-	u8	ta[ETH_ALEN];
-} WLAN_PACKED pspoll;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-} WLAN_PACKED cfend;
-typedef struct { /* has no body, just a FCS */
-	u16	fc;
-	u16	dur;
-	u8	ra[ETH_ALEN];
-	u8	bssid[ETH_ALEN];
-} WLAN_PACKED cfendcfack;
-#endif
 
 /* Prism header emulation (monitor mode) */
 typedef struct wlanitem_u32 {

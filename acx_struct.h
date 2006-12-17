@@ -48,18 +48,6 @@ enum { acx_debug = 0 };
 */
 #define ACX_PACKED __attribute__ ((packed))
 
-#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
-
-/* Use worker_queues for 2.5/2.6 kernels and queue tasks for 2.4 kernels
-   (used for the 'bottom half' of the interrupt routine) */
-
-#include <linux/workqueue.h>
-#define USE_WORKER_TASKS
-#define WORK_STRUCT struct work_struct
-#define SCHEDULE_WORK schedule_work
-#define FLUSH_SCHEDULED_WORK flush_scheduled_work
-
-
 /***********************************************************************
 ** Constants
 */
@@ -546,7 +534,7 @@ typedef struct rxbuffer {
 /* 4-byte (acx100) or 8-byte (acx111) phy header will be here
 ** if RX_CFG1_INCLUDE_PHY_HDR is in effect:
 **	phy_hdr_t phy			*/
-	wlan_hdr_a3_t hdr_a3;
+	struct ieee80211_hdr hdr_a3;
 	/* maximally sized data part of wlan packet */
 	u8	data_a3[WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN];
 	/* can add hdr/data_a4 if needed */
@@ -624,28 +612,28 @@ typedef struct fw_stats_pwr {
 } ACX_PACKED fw_stats_pwr_t;
 
 typedef struct fw_stats_mic {
-	u32 mic_rx_pkts;
-	u32 mic_calc_fail;
+	u32	mic_rx_pkts;
+	u32	mic_calc_fail;
 } ACX_PACKED fw_stats_mic_t;
 
 typedef struct fw_stats_aes {
-	u32 aes_enc_fail;
-	u32 aes_dec_fail;
-	u32 aes_enc_pkts;
-	u32 aes_dec_pkts;
-	u32 aes_enc_irq;
-	u32 aes_dec_irq;
+	u32	aes_enc_fail;
+	u32	aes_dec_fail;
+	u32	aes_enc_pkts;
+	u32	aes_dec_pkts;
+	u32	aes_enc_irq;
+	u32	aes_dec_irq;
 } ACX_PACKED fw_stats_aes_t;
 
 typedef struct fw_stats_event {
-	u32 heartbeat;
-	u32 calibration;
-	u32 rx_mismatch;
-	u32 rx_mem_empty;
-	u32 rx_pool;
-	u32 oom_late;
-	u32 phy_tx_err;
-	u32 tx_stuck;
+	u32	heartbeat;
+	u32	calibration;
+	u32	rx_mismatch;
+	u32	rx_mem_empty;
+	u32	rx_pool;
+	u32	oom_late;
+	u32	phy_tx_err;
+	u32	tx_stuck;
 } ACX_PACKED fw_stats_event_t;
 
 /* mainly for size calculation only */
@@ -872,7 +860,7 @@ struct txdesc {
 	acx_ptr	HostMemPtr;			/* 0x04 */
 	acx_ptr	AcxMemPtr;			/* 0x08 */
 	u32	tx_time;			/* 0x0c */
-	u16	total_length;		/* 0x10 */
+	u16	total_length;			/* 0x10 */
 	u16	Reserved;			/* 0x12 */
 
 /* The following 16 bytes do not change when acx100 owns the descriptor */
@@ -888,7 +876,7 @@ struct txdesc {
 	u8	rts_ok;			/* 0x29 */
 	union {
 		struct {
-			u8	rate;	/* 0x2a */
+			u8	rate;		/* 0x2a */
 			u8	queue_ctrl;	/* 0x2b */
 		} ACX_PACKED r1;
 		struct {
@@ -905,7 +893,7 @@ struct rxdesc {
 	acx_ptr	HostMemPtr;			/* 0x04 */
 	acx_ptr	ACXMemPtr;			/* 0x08 */
 	u32	rx_time;			/* 0x0c */
-	u16	total_length;		/* 0x10 */
+	u16	total_length;			/* 0x10 */
 	u16	WEP_length;			/* 0x12 */
 	u32	WEP_ofs;			/* 0x14 */
 
@@ -1076,7 +1064,7 @@ typedef struct usb_rx {
 	struct urb	*urb;
 	acx_device_t	*adev;
 	rxbuffer_t	bulkin;
- /* Make entire structure 4k. Report if it breaks something. */
+	/* Make entire structure 4k */
 	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
 } usb_rx_t;
 #endif /* ACX_USB */
@@ -1151,7 +1139,6 @@ typedef struct acx111_ie_configoption {
 	u8			_padding[4];
 } ACX_PACKED acx111_ie_configoption_t;
 
-
 /***********************************************************************
 ** Main acx per-device data structure
 */
@@ -1185,10 +1172,7 @@ struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
 	/*** Locking ***/
-	/* FIXME: try to convert semaphore to more efficient mutex according
-	   to Ingo Molnar's docs (but not before driver is in mainline or
-		 pre-mutex Linux 2.6.10 is very outdated). */
-	struct semaphore	sem;
+	struct mutex		mutex;
 	spinlock_t		lock;
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
@@ -1263,7 +1247,7 @@ struct acx_device {
 	int		irq_savedstate;
 	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
-	WORK_STRUCT	after_interrupt_task;	/* our task for after interrupt actions */
+	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
 
 	unsigned int	irq;
 
@@ -1468,6 +1452,8 @@ struct acx_device {
 
 };
 
+void *ieee80211_dev_hw_data(struct net_device *);
+
 static inline acx_device_t*
 ndev2adev(struct net_device *ndev)
 {
@@ -1590,14 +1576,6 @@ ndev2adev(struct net_device *ndev)
 /* SET_MSDU_LIFETIME */	| 0x00100000L \
 /* SET_RATE_FALLBACK */	| 0x00200000L \
 			)
-
-
-/***********************************************************************
-** Firmware loading
-*/
-#include <linux/firmware.h>	/* request_firmware() */
-#include <linux/pci.h>		/* struct pci_device */
-
 
 /***********************************************************************
 */
@@ -1803,7 +1781,6 @@ typedef struct acx111_scan {
 						/* 26 bytes is enough to cover 802.11a */
 } ACX_PACKED acx111_scan_t;
 
-
 /*
 ** Radio calibration command structure
 */
@@ -1814,7 +1791,6 @@ typedef struct acx111_cmd_radiocalib {
 	u32	methods;
 	u32	interval;
 } ACX_PACKED acx111_cmd_radiocalib_t;
-
 
 /*
 ** Packet template structures
@@ -1851,12 +1827,12 @@ typedef struct acx_template_probereq {
 	u16	size;
 	u16	fc;		/* 00 2 fc * */
 	u16	dur;		/* 02 2 Duration */
-	u8	da[6];	/* 04 6 Destination Address * */
-	u8	sa[6];	/* 0A 6 Source Address * */
+	u8	da[6];  	/* 04 6 Destination Address * */
+	u8	sa[6];   	/* 0A 6 Source Address * */
 	u8	bssid[6];	/* 10 6 BSSID * */
 	u16	seq;		/* 16 2 Sequence Control */
-					/* 18 n SSID * */
-					/* nn n Supported Rates * */
+				/* 18 n SSID * */
+				/* nn n Supported Rates * */
 	u8	variable[0x44 - 2-2-6-6-6-2];
 } ACX_PACKED acx_template_probereq_t;
 
@@ -1881,7 +1857,7 @@ typedef struct acx_template_proberesp {
 
 typedef struct acx_template_nullframe {
 	u16	size;
-	struct wlan_hdr_a3 hdr;
+	struct ieee80211_hdr hdr;
 } ACX_PACKED acx_template_nullframe_t;
 
 

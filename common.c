@@ -2,7 +2,6 @@
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -18,17 +17,16 @@
 #include <linux/wireless.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
+#include <linux/firmware.h>
 #include <net/iw_handler.h>
 #include <linux/ethtool.h>
+#include <linux/utsrelease.h>
 
 #include "acx.h"
 
 
 /***********************************************************************
 */
-
-static client_t *acx_l_sta_list_get_from_hash(acx_device_t * adev,
-					      const u8 * address);
 
 static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf);
 
@@ -151,59 +149,6 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 		}
 	}
 }
-void acx_down_debug(acx_device_t * adev, const char *where)
-{
-	int sem_count;
-	unsigned long timeout = jiffies + 5 * HZ;
-
-	where = sanitize_str(where);
-
-	for (;;) {
-		sem_count = atomic_read(&adev->sem.count);
-		if (sem_count)
-			break;
-		if (time_after(jiffies, timeout))
-			break;
-		msleep(5);
-	}
-	if (!sem_count) {
-		printk(KERN_EMERG "D STATE at %s! last sem at %s\n",
-		       where, adev->last_sem);
-		dump_stack();
-	}
-	adev->last_sem = where;
-	adev->sem_time = jiffies;
-	down(&adev->sem);
-	if (acx_debug & L_LOCK) {
-		printk("%s: sem_down %d -> %d\n",
-		       where, sem_count, atomic_read(&adev->sem.count));
-	}
-}
-void acx_up_debug(acx_device_t * adev, const char *where)
-{
-	int sem_count = atomic_read(&adev->sem.count);
-	if (sem_count) {
-		where = sanitize_str(where);
-		printk(KERN_EMERG "STRAY UP at %s! sem.count=%d\n", where,
-		       sem_count);
-		dump_stack();
-	}
-	if (acx_debug & L_LOCK) {
-		unsigned long diff = jiffies - adev->sem_time;
-		if (diff > max_sem_time) {
-			where = sanitize_str(where);
-			printk("max sem hold time %ld jiffies from %s "
-			       "to %s\n", diff, adev->last_sem, where);
-			max_sem_time = diff;
-		}
-	}
-	up(&adev->sem);
-	if (acx_debug & L_LOCK) {
-		where = sanitize_str(where);
-		printk("%s: sem_up %d -> %d\n",
-		       where, sem_count, atomic_read(&adev->sem.count));
-	}
-}
 #endif /* PARANOID_LOCKING */
 
 
@@ -298,8 +243,8 @@ static const char *acx_get_status_name(u16 status)
 		"STOPPED", "SCANNING", "WAIT_AUTH",
 		"AUTHENTICATED", "ASSOCIATED", "INVALID??"
 	};
-	if (status > VEC_SIZE(str) - 1)
-		status = VEC_SIZE(str) - 1;
+	if (status > ARRAY_SIZE(str) - 1)
+		status = ARRAY_SIZE(str) - 1;
 
 	return str[status];
 }
@@ -332,20 +277,20 @@ const char *acx_get_packet_type_string(u16 fc)
 
 	switch (WF_FC_FTYPE & fc) {
 	case WF_FTYPE_MGMT:
-		if (fstype < VEC_SIZE(mgmt_arr))
+		if (fstype < ARRAY_SIZE(mgmt_arr))
 			str = mgmt_arr[fstype];
 		else
 			str = "MGMT/UNKNOWN";
 		break;
 	case WF_FTYPE_CTL:
 		ctl = fstype - 0x0a;
-		if (ctl < VEC_SIZE(ctl_arr))
+		if (ctl < ARRAY_SIZE(ctl_arr))
 			str = ctl_arr[ctl];
 		else
 			str = "CTL/UNKNOWN";
 		break;
 	case WF_FTYPE_DATA:
-		if (fstype < VEC_SIZE(data_arr))
+		if (fstype < ARRAY_SIZE(data_arr))
 			str = data_arr[fstype];
 		else
 			str = "DATA/UNKNOWN";
@@ -391,7 +336,7 @@ static inline const char *acx_wlan_reason_str(u16 reason)
 		/* 23 */ "802.1x failed",
 		/* 24 */ "cipher suite rejected"
 	};
-	return reason < VEC_SIZE(reason_str) ? reason_str[reason] : "?";
+	return reason < ARRAY_SIZE(reason_str) ? reason_str[reason] : "?";
 }
 
 
@@ -419,7 +364,7 @@ const char *acx_cmd_status_str(unsigned int state)
 		"Scan in progress",
 		"Failed"
 	};
-	return state < VEC_SIZE(cmd_error_strings) ?
+	return state < ARRAY_SIZE(cmd_error_strings) ?
 	    cmd_error_strings[state] : "?";
 }
 
@@ -468,29 +413,8 @@ static inline const char *get_status_string(unsigned int status)
 		/*26 */ "Assoc denied: requesting STA doesnt support DSSS-OFDM"
 	};
 
-	return status_str[status < VEC_SIZE(status_str) ? status : 2];
+	return status_str[status < ARRAY_SIZE(status_str) ? status : 2];
 }
-
-
-/***********************************************************************
-*/
-void acx_log_bad_eid(wlan_hdr_t * hdr, int len, wlan_ie_t * ie_ptr)
-{
-	if (acx_debug & L_ASSOC) {
-		int offset = (u8 *) ie_ptr - (u8 *) hdr;
-		printk("acx: unknown EID %d in mgmt frame at offset %d. IE: ",
-		       ie_ptr->eid, offset);
-		/* IE len can be bogus, IE can extend past packet end. Oh well... */
-		acx_dump_bytes(ie_ptr, ie_ptr->len + 2);
-		if (acx_debug & L_DATA) {
-			printk("frame (%s): ",
-			       acx_get_packet_type_string(le16_to_cpu
-							  (hdr->fc)));
-			acx_dump_bytes(hdr, len);
-		}
-	}
-}
-
 
 /***********************************************************************
 */
@@ -665,11 +589,12 @@ void acx_display_hardware_details(acx_device_t * adev)
 		break;
 	}
 
-	printk("acx: form factor 0x%02X (%s), "
-	       "radio type 0x%02X (%s), EEPROM version 0x%02X, "
-	       "uploaded firmware '%s' (0x%08X)\n",
-	       adev->form_factor, form_str, adev->radio_type, radio_str,
-	       adev->eeprom_version, adev->firmware_version, adev->firmware_id);
+	printk("acx: chipset %s, radio type 0x%02X (%s), "
+	       "form factor 0x%02X (%s), EEPROM version 0x%02X, "
+	       "uploaded firmware '%s''n",
+	       adev->chip_name, adev->radio_type, radio_str,
+	       adev->form_factor, form_str, adev->eeprom_version,
+	       adev->firmware_version);
 
 	FN_EXIT0;
 }
@@ -1439,13 +1364,13 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	p += sprintf(p,
 		     "failed at %s part (size %u), offset %u (struct size %u), "
 		     "please report\n", part_str, partlen,
-		     (int)st - (int)fw_stats, len);
+		     (int)((void *)st - (void *)fw_stats), len);
 
       fw_stats_bigger:
 	for (; st < st_end; st += 4)
 		p += sprintf(p,
-			     "UNKN%3d: %u\n", (int)st - (int)fw_stats,
-			     *(u32 *) st);
+			     "UNKN%3d: %u\n",
+			     (int)((void *)st - (void *)fw_stats), *(u32 *) st);
 
       fw_stats_end:
 	kfree(fw_stats);
@@ -1631,14 +1556,14 @@ static int manage_proc_entries(const struct net_device *ndev, int remove)
 	char procbuf[80];
 	int i;
 
-	for (i = 0; i < VEC_SIZE(proc_files); i++) {
+	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
 			 "driver/acx_%s%s", ndev->name, proc_files[i]);
 		log(L_INIT, "%sing /proc entry %s\n",
 		    remove ? "remov" : "creat", procbuf);
 		if (!remove) {
 			if (!create_proc_read_entry
-			    (procbuf, 0, 0, proc_funcs[i], adev)) {
+			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
 				printk("acx: cannot register /proc entry %s\n",
 				       procbuf);
 				return NOT_OK;
@@ -3144,69 +3069,6 @@ static int acx_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	return OK;
 }
 
-
-/***********************************************************************
-*/
-#ifdef UNUSED
-/* Returns the current tx level (ACX111) */
-static u8 acx111_s_get_tx_level(acx_device_t * adev)
-{
-	struct acx111_ie_tx_level tx_level;
-
-	tx_level.level = 0;
-	acx_s_interrogate(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
-	return tx_level.level;
-}
-#endif
-
-
-
-
-/***********************************************************************
-** acx_l_rx_ieee802_11_frame
-**
-** Called from IRQ context only
-*/
-
-/* All these contortions are for saner dup logging
-**
-** We want: (a) to know about excessive dups
-** (b) to not spam kernel log about occasional dups
-**
-** 1/64 threshold was chosen by running "ping -A"
-** It gave "rx: 59 DUPs in 2878 packets" only with 4 parallel
-** "ping -A" streams running. */
-/* 2005-10-11: bumped up to 1/8
-** subtract a $smallint from dup_count in order to
-** avoid "2 DUPs in 19 packets" messages */
-static inline int acx_l_handle_dup(acx_device_t * adev, u16 seq)
-{
-	if (adev->dup_count) {
-		adev->nondup_count++;
-		if (time_after(jiffies, adev->dup_msg_expiry)) {
-			/* Log only if more than 1 dup in 64 packets */
-			if (adev->nondup_count / 8 < adev->dup_count - 5) {
-				printk(KERN_INFO "%s: rx: %d DUPs in "
-				       "%d packets received in 10 secs\n",
-				       adev->ndev->name,
-				       adev->dup_count, adev->nondup_count);
-			}
-			adev->dup_count = 0;
-			adev->nondup_count = 0;
-		}
-	}
-	if (unlikely(seq == adev->last_seq_ctrl)) {
-		if (!adev->dup_count++)
-			adev->dup_msg_expiry = jiffies + 10 * HZ;
-		adev->stats.rx_errors++;
-		return 1;	/* a dup */
-	}
-	adev->last_seq_ctrl = seq;
-	return 0;
-}
-
-
-
 /***********************************************************************
 ** acx_l_process_rxbuf
 **
@@ -3214,13 +3076,12 @@ static inline int acx_l_handle_dup(acx_device_t * adev, u16 seq)
 */
 void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
-	struct wlan_hdr *hdr;
+	struct ieee80211_hdr *hdr;
 	unsigned int qual;
-	int buf_len;
-	u16 fc;
+	u16 fc, buf_len;
 
 	hdr = acx_get_wlan_hdr(adev, rxbuf);
-	fc = le16_to_cpu(hdr->fc);
+	fc = le16_to_cpu(hdr->frame_control);
 	/* length of frame from control field to first byte of FCS */
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 //	printk("Got %s\n",acx_get_packet_type_string(fc));
@@ -3434,101 +3295,6 @@ acx_l_handle_txrate_auto(acx_device_t * adev, struct client *txc,
 	}
 }
 
-
-/***********************************************************************
-** acx_i_start_xmit
-**
-** Called by network core. Can be called outside of process context.
-*/
-int
-acx_i_start_xmit(struct net_device *ndev,
-		 struct sk_buff *skb, struct ieee80211_tx_control *ctl)
-{
-	acx_device_t *adev = ndev2adev(ndev);
-	tx_t *tx;
-	void *txbuf;
-	unsigned long flags;
-
-	int txresult = NOT_OK;
-
-	FN_ENTER;
-
-	if (unlikely(!skb)) {
-		/* indicate success */
-		txresult = OK;
-		goto end_no_unlock;
-	}
-	if (unlikely(!adev)) {
-		goto end_no_unlock;
-	}
-
-	acx_lock(adev, flags);
-
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		goto end;
-	}
-	if (unlikely(!adev->initialized)) {
-		goto end;
-	}
-	if (unlikely(acx_queue_stopped(ndev))) {
-		log(L_DEBUG, "%s: called when queue stopped\n", __func__);
-		goto end;
-	}
-//      if (unlikely(ACX_STATUS_4_ASSOCIATED != adev->status)) {
-//              log(L_XFER, "trying to xmit, but not associated yet: "
-//                      "aborting...\n");
-//              /* silently drop the packet, since we're not connected yet */
-//              txresult = OK;
-//              /* ...but indicate an error nevertheless */
-//              adev->stats.tx_errors++;
-//              goto end;
-//      }
-
-	tx = acx_l_alloc_tx(adev);
-	if (unlikely(!tx)) {
-		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
-				   "dropping tx\n", ndev->name);
-		txresult = NOT_OK;
-		goto end;
-	}
-
-	txbuf = acx_l_get_txbuf(adev, tx);
-	if (unlikely(!txbuf)) {
-		/* Card was removed */
-		txresult = NOT_OK;
-		acx_l_dealloc_tx(adev, tx);
-		goto end;
-	}
-	//len = acx_ether_to_txbuf(adev, txbuf, skb);
-	memcpy((u8 *) txbuf, skb->data, skb->len);
-//      w_hdr = (struct wlan_hdr_a3*)txbuf;
-
-//      if (unlikely(len < 0)) {
-	/* Error in packet conversion */
-//              txresult = NOT_OK;
-//              acx_l_dealloc_tx(adev, tx);
-//              goto end;
-//	}
-
-	acx_l_tx_data(adev, tx, skb->len, ctl,skb);
-	ndev->trans_start = jiffies;
-
-	txresult = OK;
-	adev->stats.tx_packets++;
-	adev->stats.tx_bytes += skb->len;
-
-      end:
-	acx_unlock(adev, flags);
-
-      end_no_unlock:
-//	if ((txresult == OK) && skb)
-//		dev_kfree_skb_any(skb);
-
-	FN_EXIT1(txresult);
-	return txresult;
-}
-
-
 /***********************************************************************
 ** acx_l_update_ratevector
 **
@@ -3578,70 +3344,6 @@ void acx_l_update_ratevector(acx_device_t * adev)
 	}
 	FN_EXIT0;
 }
-
-
-
-
-/***********************************************************************
-** acx_l_sta_list_get_from_hash
-*/
-static inline client_t *acx_l_sta_list_get_from_hash(acx_device_t * adev,
-						     const u8 * address)
-{
-//      return adev->sta_hash_tab[address[5] % VEC_SIZE(adev->sta_hash_tab)];
-	return NULL;
-}
-
-
-/***********************************************************************
-** acx_l_sta_list_get
-*/
-client_t *acx_l_sta_list_get(acx_device_t * adev, const u8 * address)
-{
-	client_t *client;
-	FN_ENTER;
-	client = acx_l_sta_list_get_from_hash(adev, address);
-	while (client) {
-		if (mac_is_equal(address, client->address)) {
-			client->mtime = jiffies;
-			break;
-		}
-		client = client->next;
-	}
-	FN_EXIT0;
-	return client;
-}
-
-
-/***********************************************************************
-** acx_l_sta_list_del
-*/
-void acx_l_sta_list_del(acx_device_t * adev, client_t * victim)
-{
-	client_t *client, *next;
-
-	client = acx_l_sta_list_get_from_hash(adev, victim->address);
-	next = client;
-	/* tricky. next = client on first iteration only,
-	 ** on all other iters next = client->next */
-	while (next) {
-		if (next == victim) {
-			client->next = victim->next;
-			/* Overkill */
-			memset(victim, 0, sizeof(*victim));
-			break;
-		}
-		client = next;
-		next = client->next;
-	}
-}
-
-
-
-
-
-
-
 
 /***********************************************************************
 ** acx_set_status
@@ -3770,20 +3472,6 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 	FN_EXIT0;
 }
 
-
-
-static inline int find_pos(const u8 * p, int size, u8 v)
-{
-	int i;
-	for (i = 0; i < size; i++)
-		if (p[i] == v)
-			return i;
-	/* printk a message about strange byte? */
-	return 0;
-}
-
-
-
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
@@ -3834,7 +3522,7 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
 
 	struct ieee80211_rx_status status;
-	struct wlan_hdr *w_hdr;
+	struct ieee80211_hdr *w_hdr;
 	int buflen;
 	FN_ENTER;
 	if (likely(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
@@ -3864,7 +3552,7 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 			{
 				status.rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 			}
-			ieee80211_rx_irqsafe(adev->ndev, skb, &status);
+			ieee80211_rx_irqsafe(adev->ieee, skb, &status);
 			adev->stats.rx_packets++;
 			adev->stats.rx_bytes += skb->len;
 		}
@@ -3885,243 +3573,6 @@ static inline void acx_gen_challenge(wlan_ie_challenge_t * d)
 	get_random_bytes(d->challenge, WLAN_CHALLENGE_LEN);
 	FN_EXIT0;
 }
-
-
-
-
-
-
-/***********************************************************************
-** acx_s_complete_scan
-**
-** Called either from after_interrupt_task() if:
-** 1) there was Scan_Complete IRQ, or
-** 2) scanning expired in timer()
-** We need to decide which ESS or IBSS to join.
-** Iterates thru adev->sta_list:
-**	if adev->ap is not bcast, will join only specified
-**	ESS or IBSS with this bssid
-**	checks peers' caps for ESS/IBSS bit
-**	checks peers' SSID, allows exact match or hidden SSID
-** If station to join is chosen:
-**	points adev->ap_client to the chosen struct client
-**	sets adev->essid_for_assoc for future assoc attempt
-** Auth/assoc is not yet performed
-** Returns OK if there is no need to restart scan
-*/
-int acx_s_complete_scan(acx_device_t * adev)
-{
-	struct client *bss;
-	unsigned long flags;
-	u16 needed_cap;
-	int idx_found = -1;
-	int result = OK;
-
-	FN_ENTER;
-
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-		needed_cap = WF_MGMT_CAP_IBSS;	/* 2, we require Ad-Hoc */
-		break;
-	case ACX_MODE_2_STA:
-		needed_cap = WF_MGMT_CAP_ESS;	/* 1, we require Managed */
-		break;
-	default:
-		printk("acx: driver bug: mode=%d in complete_scan()\n",
-		       adev->mode);
-		dump_stack();
-		goto end;
-	}
-
-	acx_lock(adev, flags);
-
-	/* TODO: sta_iterator hiding implementation would be nice here... */
-
-//      for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
-//              bss = &adev->sta_list[i];
-//              if (!bss->used) continue;
-
-//              log(L_ASSOC, "scan table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
-//                      bss->essid, bss->channel, bss->sir, bss->snr);
-
-//              if (!mac_is_bcast(adev->ap))
-//                      if (!mac_is_equal(bss->bssid, adev->ap))
-//                              continue; /* keep looking */
-
-	/* broken peer with no mode flags set? */
-//              if (unlikely(!(bss->cap_info & (WF_MGMT_CAP_ESS | WF_MGMT_CAP_IBSS)))) {
-//                      printk("%s: strange peer "MACSTR" found with "
-//                              "neither ESS (AP) nor IBSS (Ad-Hoc) "
-//                              "capability - skipped\n",
-//                              adev->ndev->name, MAC(bss->address));
-//                      continue;
-//              }
-//              log(L_ASSOC, "peer_cap 0x%04X, needed_cap 0x%04X\n",
-//                     bss->cap_info, needed_cap);
-
-	/* does peer station support what we need? */
-///             if ((bss->cap_info & needed_cap) != needed_cap)
-//                      continue; /* keep looking */
-
-	/* strange peer with NO basic rates?! */
-//              if (unlikely(!bss->rate_bas)) {
-//                      printk("%s: strange peer "MACSTR" with empty rate set "
-//                              "- skipped\n",
-//                              adev->ndev->name, MAC(bss->address));
-//                      continue;
-//              }
-
-	/* do we support all basic rates of this peer? */
-//              if ((bss->rate_bas & adev->rate_oper) != bss->rate_bas) {
-/* we probably need to have all rates as operational rates,
-   even in case of an 11M-only configuration */
-#ifdef THIS_IS_TROUBLESOME
-	printk("%s: peer " MACSTR ": incompatible basic rates "
-	       "(AP requests 0x%04X, we have 0x%04X) "
-	       "- skipped\n",
-	       adev->ndev->name, MAC(bss->address),
-	       bss->rate_bas, adev->rate_oper);
-	continue;
-#else
-//                      printk("%s: peer "MACSTR": incompatible basic rates "
-//                              "(AP requests 0x%04X, we have 0x%04X). "
-//                              "Considering anyway...\n",
-//                              adev->ndev->name, MAC(bss->address),
-//                              bss->rate_bas, adev->rate_oper);
-#endif
-//              }
-
-//              if ( !(adev->reg_dom_chanmask & (1<<(bss->channel-1))) ) {
-//                      printk("%s: warning: peer "MACSTR" is on channel %d "
-//                              "outside of channel range of current "
-//                              "regulatory domain - couldn't join "
-//                              "even if other settings match. "
-//                              "You might want to adapt your config\n",
-//                              adev->ndev->name, MAC(bss->address),
-//                              bss->channel);
-//                      continue; /* keep looking */
-//              }
-
-//              if (!adev->essid_active || !strcmp(bss->essid, adev->essid)) {
-//                      log(L_ASSOC,
-//                             "found station with matching ESSID! ('%s' "
-//                             "station, '%s' config)\n",
-//                             bss->essid,
-//                             (adev->essid_active) ? adev->essid : "[any]");
-//                      /* TODO: continue looking for peer with better SNR */
-//                      bss->used = CLIENT_JOIN_CANDIDATE;
-//                      idx_found = i;
-
-	/* stop searching if this station is
-	 * on the current channel, otherwise
-	 * keep looking for an even better match */
-//                      if (bss->channel == adev->channel)
-//                              break;
-//              } else
-//              if (!bss->essid[0]
-//               || ((' ' == bss->essid[0]) && !bss->essid[1])
-//              ) {
-	/* hmm, station with empty or single-space SSID:
-	 * using hidden SSID broadcast?
-	 */
-	/* This behaviour is broken: which AP from zillion
-	 ** of APs with hidden SSID you'd try?
-	 ** We should use Probe requests to get Probe responses
-	 ** and check for real SSID (are those never hidden?) */
-//                      bss->used = CLIENT_JOIN_CANDIDATE;
-//                      if (idx_found == -1)
-//                              idx_found = i;
-//                      log(L_ASSOC, "found station with empty or "
-//                              "single-space (hidden) SSID, considering "
-//                              "for assoc attempt\n");
-	/* ...and keep looking for better matches */
-//              } else {
-//                      log(L_ASSOC, "ESSID doesn't match! ('%s' "
-//                              "station, '%s' config)\n",
-//                              bss->essid,
-//                              (adev->essid_active) ? adev->essid : "[any]");
-//              }
-//      }
-
-	/* TODO: iterate thru join candidates instead */
-	/* TODO: rescan if not associated within some timeout */
-	if (idx_found != -1) {
-		char *essid_src;
-		size_t essid_len;
-
-//              bss = &adev->sta_list[idx_found];
-//              adev->ap_client = bss;
-
-//              if (bss->essid[0] == '\0') {
-		/* if the ESSID of the station we found is empty
-		 * (no broadcast), then use user-configured ESSID
-		 * instead */
-//                      essid_src = adev->essid;
-//                      essid_len = adev->essid_len;
-//              } else {
-//                      essid_src = bss->essid;
-//                      essid_len = strlen(bss->essid);
-//              }
-
-		acx_update_capabilities(adev);
-
-		memcpy(adev->essid_for_assoc, essid_src, essid_len);
-		adev->essid_for_assoc[essid_len] = '\0';
-		adev->channel = bss->channel;
-		MAC_COPY(adev->bssid, bss->bssid);
-
-		bss->rate_cfg = (bss->rate_cap & adev->rate_oper);
-		bss->rate_cur = 1 << lowest_bit(bss->rate_cfg);
-		bss->rate_100 = acx_rate111to100(bss->rate_cur);
-
-		acxlog_mac(L_ASSOC,
-			   "matching station found: ", adev->bssid,
-			   ", joining\n");
-
-		/* TODO: do we need to switch to the peer's channel first? */
-
-	} else {		/* idx_found == -1 */
-		/* uh oh, no station found in range */
-		if (ACX_MODE_0_ADHOC == adev->mode) {
-			printk("%s: no matching station found in range, "
-			       "generating our own IBSS instead\n",
-			       adev->ndev->name);
-			/* we do it the HostAP way: */
-			MAC_COPY(adev->bssid, adev->dev_addr);
-			adev->bssid[0] |= 0x02;	/* 'local assigned addr' bit */
-			/* add IBSS bit to our caps... */
-			acx_update_capabilities(adev);
-
-			/* In order to cmd_join be called below */
-			idx_found = 0;
-		} else {
-			/* we shall scan again, AP can be
-			 ** just temporarily powered off */
-			log(L_ASSOC,
-			    "no matching station found in range yet\n");
-//                      acx_set_status(adev, ACX_STATUS_1_SCANNING);
-			result = NOT_OK;
-		}
-	}
-
-	acx_unlock(adev, flags);
-
-	if (idx_found != -1) {
-		if (ACX_MODE_0_ADHOC == adev->mode) {
-			/* need to update channel in beacon template */
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
-			if (ACX_STATE_IFACE_UP & adev->dev_state_mask)
-				acx_s_update_card_settings(adev);
-		}
-		/* Inform firmware on our decision to start or join BSS */
-//              acx_s_cmd_join_bssid(adev, adev->bssid);
-	}
-
-      end:
-	FN_EXIT1(result);
-	return result;
-}
-
 
 /***********************************************************************
 ** acx_s_read_fw
@@ -4259,7 +3710,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
 	options.WEPOption = 0x00;
 
-	log(L_ASSOC, "%s: writing WEP options\n", __func__);
+	log(L_ASSOC, "writing WEP options\n");
 	acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
 
 	acx100_s_set_wepkey(adev);
@@ -4886,6 +4337,7 @@ void acx_s_update_card_settings(acx_device_t * adev)
 		u8 *paddr;
 
 		paddr = &stationID[4];
+		MAC_COPY(adev->dev_addr, adev->ndev->dev_addr);
 		for (i = 0; i < ETH_ALEN; i++) {
 			/* copy the MAC address we obtained when we noticed
 			 * that the ethernet iface's MAC changed
@@ -5189,7 +4641,7 @@ void acx_s_update_card_settings(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-
+#if 0
 /***********************************************************************
 ** acx_e_after_interrupt_task
 */
@@ -5221,7 +4673,8 @@ static int acx_s_recalib_radio(acx_device_t * adev)
 		return NOT_OK;
 	}
 }
-
+#endif // if 0
+#if 0
 static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 {
 	int res;
@@ -5286,6 +4739,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 		}
 	}
 }
+#endif // if 0
 
 void acx_e_after_interrupt_task(acx_device_t * adev)
 {
@@ -5384,7 +4838,7 @@ void acx_schedule_task(acx_device_t * adev, unsigned int set_flag)
 	if (!adev->after_interrupt_jobs)
 	{
 		SET_BIT(adev->after_interrupt_jobs, set_flag);
-		SCHEDULE_WORK(&adev->after_interrupt_task);
+		schedule_work(&adev->after_interrupt_task);
 	}
 }
 
@@ -5414,7 +4868,7 @@ void acx_s_start(acx_device_t * adev)
 	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP
 		| GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
 		GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
-		GETSET_TX | GETSET_RX);
+		GETSET_TX | GETSET_RX | GETSET_STATION_ID);
 
 	log(L_INIT, "updating initial settings on iface activation\n");
 	acx_s_update_card_settings(adev);
@@ -5460,8 +4914,6 @@ void acx_update_capabilities(acx_device_t * adev)
 
 static void acx_select_opmode(acx_device_t * adev)
 {
-	u32 status;
-
 	if (adev->interface.operating) {
 		switch (adev->interface.type) {
 			case IEEE80211_IF_TYPE_AP:
@@ -5544,7 +4996,7 @@ void acx_remove_interface(struct net_device *net_dev,
 	printk("Removing interface: %d %d\n", adev->interface.operating, conf->type);
 	if (adev->initialized)
 		acx_select_opmode(adev);
-	FLUSH_SCHEDULED_WORK();
+	flush_scheduled_work();
 	acx_unlock(adev, flags);
 
 	printk(KERN_INFO "Virtual interface removed "
@@ -5557,7 +5009,6 @@ void acx_remove_interface(struct net_device *net_dev,
 int acx_net_reset(struct net_device *net_dev)
 {
 	acx_device_t *adev = ndev2adev(net_dev);
-	unsigned long flags;
 	FN_ENTER;
 	if (IS_PCI(adev))
 		acxpci_s_reset_dev(adev);
@@ -5690,7 +5141,6 @@ int acx_net_get_tx_stats(struct net_device *net_dev,
 			 struct ieee80211_tx_queue_stats *stats)
 {
 //        acx_device_t *adev = ndev2adev(net_dev);
-	unsigned long flags;
 	struct ieee80211_tx_queue_stats_data *data;
 	int err = -ENODEV;
 
@@ -5916,8 +5366,8 @@ int acx_net_set_key(struct net_device *net_dev,
 		if (err)
 			goto out_unlock;
 		key->hw_key_idx = index;
-		key->force_sw_encrypt = 0;
-		if (key->default_tx_key)
+		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);
+		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
 			adev->default_key_idx = index;
 		adev->key[index].enabled = 1;
 		break;
@@ -5929,10 +5379,10 @@ int acx_net_set_key(struct net_device *net_dev,
 		acx_clear_keys(adev);
 		err = 0;
 		break;
-	case ENABLE_COMPRESSION:
+     /* case ENABLE_COMPRESSION:
 	case DISABLE_COMPRESSION:
 		err = 0;
-		break;
+		break; */
 	}
       out_unlock:
 	acx_unlock(adev, flags);
