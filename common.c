@@ -30,8 +30,10 @@
 ** ---------------------------------------------------------------------
 */
 
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
+#include <linux/config.h>
+#endif
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -501,8 +503,8 @@ get_status_string(unsigned int status)
 	/* 9 */	"reserved",
 	/*10 */	"Cannot support all requested capabilities in Capability Information field",
 	/*11 */	"Reassoc denied (reason outside of 802.11b scope)",
-	/*12 */	"Assoc denied (reason outside of 802.11b scope), maybe MAC filtering by peer?",
-	/*13 */	"Responding station doesnt support specified auth algorithm",
+	/*12 */	"Assoc denied (reason outside of 802.11b scope) -- maybe MAC filtering by peer?",
+	/*13 */	"Responding station doesnt support specified auth algorithm -- maybe WEP auth Open vs. Restricted?",
 	/*14 */	"Auth rejected: wrong transaction sequence number",
 	/*15 */	"Auth rejected: challenge failure",
 	/*16 */	"Auth rejected: timeout for next frame in sequence",
@@ -619,8 +621,8 @@ acx_s_get_firmware_version(acx_device_t *adev)
 		}
 
 		adev->firmware_numver = (u32)(
-				(hexarr[0] << 24) + (hexarr[1] << 16)
-				+ (hexarr[2] << 8) + hexarr[3]);
+				(hexarr[0] << 24) | (hexarr[1] << 16)
+				| (hexarr[2] << 8) | hexarr[3]);
 		log(L_DEBUG, "firmware_numver 0x%08X\n", adev->firmware_numver);
 	}
 	if (IS_ACX111(adev)) {
@@ -718,12 +720,12 @@ acx_display_hardware_details(acx_device_t *adev)
 		break;
 	}
 
-	printk("acx: form factor 0x%02X (%s), "
-		"radio type 0x%02X (%s), EEPROM version 0x%02X, "
-		"uploaded firmware '%s' (0x%08X)\n",
-		adev->form_factor, form_str, adev->radio_type, radio_str,
-		adev->eeprom_version, adev->firmware_version,
-		adev->firmware_id);
+	printk("acx: === chipset %s, radio type 0x%02X (%s), "
+		"form factor 0x%02X (%s), EEPROM version 0x%02X: "
+		"uploaded firmware '%s' ===\n",
+		adev->chip_name, adev->radio_type, radio_str,
+		adev->form_factor, form_str, adev->eeprom_version,
+		adev->firmware_version);
 
 	FN_EXIT0;
 }
@@ -1203,10 +1205,12 @@ acx_s_proc_diag_output(char *buf, acx_device_t *adev)
 		"** PHY status **\n"
 		"tx_disabled %d, tx_level_dbm %d\n" /* "tx_level_val %d, tx_level_auto %d\n" */
 		"sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
+		"rate_basic 0x%04X, rate_oper 0x%04X\n"
 		"rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
 		"msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
 		adev->tx_disabled, adev->tx_level_dbm, /* adev->tx_level_val, adev->tx_level_auto, */
 		adev->sensitivity, adev->antenna, adev->ed_threshold, adev->cca, adev->preamble_mode,
+		adev->rate_basic, adev->rate_oper,
 		adev->rts_threshold, adev->frag_threshold, adev->short_retry, adev->long_retry,
 		adev->msdu_lifetime, adev->listen_interval, adev->beacon_interval);
 
@@ -4581,7 +4585,7 @@ acx_l_process_probe_response(acx_device_t *adev, wlan_fr_proberesp_t *req,
 
 	/* People moan about this being too noisy at L_ASSOC */
 	log(L_DEBUG,
-		"found %s: ESSID='%s' ch=%d "
+		"found %s: ESSID=\"%s\" ch=%d "
 		"BSSID="MACSTR" caps=0x%04X SIR=%d SNR=%d\n",
 		(bss->cap_info & WF_MGMT_CAP_IBSS) ? "Ad-Hoc peer" : "AP",
 		bss->essid, bss->channel, MAC(bss->bssid), bss->cap_info,
@@ -4619,7 +4623,7 @@ acx_l_process_assocresp(acx_device_t *adev, const wlan_fr_assocresp_t *req)
 			** other candidates... */
 
 			printk("%s: association FAILED: peer sent "
-				"response code %d (%s)\n",
+				"Status Code %d (%s)\n",
 				adev->ndev->name, st, get_status_string(st));
 			res = NOT_OK;
 		}
@@ -4698,6 +4702,8 @@ acx_l_process_authen(acx_device_t *adev, const wlan_fr_authen_t *req)
 	seq = ieee2host16(*(req->auth_seq));
 	status = ieee2host16(*(req->status));
 
+	log(L_ASSOC, "auth algorithm %d, auth sequence %d, status %d\n", alg, seq, status);
+
 	ap = (adev->mode == ACX_MODE_3_AP);
 
 	if (adev->auth_alg <= 1) {
@@ -4708,8 +4714,6 @@ acx_l_process_authen(acx_device_t *adev, const wlan_fr_authen_t *req)
 			goto end;
 		}
 	}
-	log(L_ASSOC, "algorithm is ok\n");
-
 	if (ap) {
 		clt = acx_l_sta_list_get_or_add(adev, hdr->a2);
 		if (STA_LIST_ADD_CAN_FAIL && !clt) {
@@ -4729,7 +4733,6 @@ acx_l_process_authen(acx_device_t *adev, const wlan_fr_authen_t *req)
 
 	/* now check which step in the authentication sequence we are
 	 * currently in, and act accordingly */
-	log(L_ASSOC, "acx_process_authen auth seq step %d\n", seq);
 	switch (seq) {
 	case 1:
 		if (!ap)
@@ -4786,7 +4789,7 @@ acx_l_process_authen(acx_device_t *adev, const wlan_fr_authen_t *req)
 		acx_l_transmit_assoc_req(adev);
 		break;
 	}
-	result = NOT_OK;
+	result = OK;
 end:
 	FN_EXIT1(result);
 	return result;
@@ -4866,8 +4869,8 @@ acx_l_transmit_authen1(acx_device_t *adev)
 
 	FN_ENTER;
 
-	log(L_ASSOC, "sending authentication1 request, "
-		"awaiting response\n");
+	log(L_ASSOC, "sending authentication1 request (auth algo %d), "
+		"awaiting response\n", adev->auth_alg);
 
 	tx = acx_l_alloc_tx(adev);
 	if (!tx)
@@ -4880,7 +4883,9 @@ acx_l_transmit_authen1(acx_device_t *adev)
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi;
-	head->dur = host2ieee16(0x8000);
+	/* duration should be 0 instead of 0x8000 to have
+	 * the firmware calculate the value, right? */
+	head->dur = 0;
 	MAC_COPY(head->da, adev->bssid);
 	MAC_COPY(head->sa, adev->dev_addr);
 	MAC_COPY(head->bssid, adev->bssid);
@@ -4936,11 +4941,11 @@ acx_l_transmit_authen2(acx_device_t *adev, const wlan_fr_authen_t *req,
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi;
-	head->dur = req->hdr->dur;
+	head->dur = 0 /* req->hdr->dur */;
 	MAC_COPY(head->da, req->hdr->a2);
 	MAC_COPY(head->sa, adev->dev_addr);
 	MAC_COPY(head->bssid, req->hdr->a3);
-	head->seq = req->hdr->seq;
+	head->seq = 0 /* req->hdr->seq */;
 
 	/* already in IEEE format, no endianness conversion */
 	body->auth_alg = *(req->auth_alg);
@@ -4992,8 +4997,11 @@ acx_l_transmit_authen3(acx_device_t *adev, const wlan_fr_authen_t *req)
 	}
 	body = (void*)(head + 1);
 
+	/* add WF_FC_ISWEPi: auth step 3 needs to be encrypted */
 	head->fc = WF_FC_ISWEPi + WF_FSTYPE_AUTHENi;
 	/* FIXME: is this needed?? authen4 does it...
+	 * I think it's even wrong since we shouldn't re-use old
+	 * values but instead let the firmware calculate proper ones
 	head->dur = req->hdr->dur;
 	head->seq = req->hdr->seq;
 	*/
@@ -5040,11 +5048,11 @@ acx_l_transmit_authen4(acx_device_t *adev, const wlan_fr_authen_t *req)
 	body = (void*)(head + 1);
 
 	head->fc = WF_FSTYPE_AUTHENi; /* 0xb0 */
-	head->dur = req->hdr->dur;
+	head->dur = 0 /* req->hdr->dur */;
 	MAC_COPY(head->da, req->hdr->a2);
 	MAC_COPY(head->sa, adev->dev_addr);
 	MAC_COPY(head->bssid, req->hdr->a3);
-	head->seq = req->hdr->seq;
+	head->seq = 0 /* req->hdr->seq  */;
 
 	/* already in IEEE format, no endianness conversion */
 	body->auth_alg = *(req->auth_alg);
@@ -5157,7 +5165,7 @@ acx_l_transmit_assoc_req(acx_device_t *adev)
 	/* calculate lengths */
 	packet_len = WLAN_HDR_A3_LEN + (p - body);
 
-	log(L_ASSOC, "association: requesting caps 0x%04X, ESSID '%s'\n",
+	log(L_ASSOC, "association: requesting caps 0x%04X, ESSID \"%s\"\n",
 		cap, adev->essid_for_assoc);
 
 	acx_l_tx_data(adev, tx, packet_len);
@@ -5274,7 +5282,7 @@ acx_s_complete_scan(acx_device_t *adev)
 		bss = &adev->sta_list[i];
 		if (!bss->used) continue;
 
-		log(L_ASSOC, "scan table: SSID='%s' CH=%d SIR=%d SNR=%d\n",
+		log(L_ASSOC, "scan table: SSID=\"%s\" CH=%d SIR=%d SNR=%d\n",
 			bss->essid, bss->channel, bss->sir, bss->snr);
 
 		if (!mac_is_bcast(adev->ap))
@@ -5351,9 +5359,7 @@ acx_s_complete_scan(acx_device_t *adev)
 			if (bss->channel == adev->channel)
 				break;
 		} else
-		if (!bss->essid[0]
-		 || ((' ' == bss->essid[0]) && !bss->essid[1])
-		) {
+		if (is_hidden_essid(bss->essid)) {
 			/* hmm, station with empty or single-space SSID:
 			 * using hidden SSID broadcast?
 			 */
@@ -5385,7 +5391,7 @@ acx_s_complete_scan(acx_device_t *adev)
 		bss = &adev->sta_list[idx_found];
 		adev->ap_client = bss;
 
-		if (bss->essid[0] == '\0') {
+		if (is_hidden_essid(bss->essid)) {
 			/* if the ESSID of the station we found is empty
 			 * (no broadcast), then use user-configured ESSID
 			 * instead */
@@ -6377,6 +6383,7 @@ acx_s_update_card_settings(acx_device_t *adev)
 		u8 *paddr;
 
 		paddr = &stationID[4];
+		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
 		for (i = 0; i < ETH_ALEN; i++) {
 			/* copy the MAC address we obtained when we noticed
 			 * that the ethernet iface's MAC changed
@@ -6784,7 +6791,7 @@ acx_s_after_interrupt_recalib(acx_device_t *adev)
 				adev->ndev->name);
 			adev->recalib_msg_ratelimit++;
 			if (adev->recalib_msg_ratelimit == 5)
-				printk("disabling above message\n");
+				printk("disabling above message until next recalib\n");
 		}
 		return;
 	}
@@ -6821,11 +6828,18 @@ acx_s_after_interrupt_recalib(acx_device_t *adev)
 	}
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 20)
+static void
+acx_e_after_interrupt_task(struct work_struct *work)
+{
+	acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
+#else
 static void
 acx_e_after_interrupt_task(void *data)
 {
 	struct net_device *ndev = (struct net_device*)data;
 	acx_device_t *adev = ndev2adev(ndev);
+#endif
 
 	FN_ENTER;
 
@@ -6940,8 +6954,12 @@ void
 acx_init_task_scheduler(acx_device_t *adev)
 {
 	/* configure task scheduler */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 20)
+	INIT_WORK(&adev->after_interrupt_task, acx_e_after_interrupt_task);
+#else
 	INIT_WORK(&adev->after_interrupt_task, acx_e_after_interrupt_task,
 			adev->ndev);
+#endif
 }
 
 
@@ -6962,7 +6980,7 @@ acx_s_start(acx_device_t *adev)
 	SET_BIT(adev->set_mask, SET_TEMPLATES|SET_STA_LIST|GETSET_WEP
 		|GETSET_TXPOWER|GETSET_ANTENNA|GETSET_ED_THRESH|GETSET_CCA
 		|GETSET_REG_DOMAIN|GETSET_MODE|GETSET_CHANNEL
-		|GETSET_TX|GETSET_RX);
+		|GETSET_TX|GETSET_RX|GETSET_STATION_ID);
 
 	log(L_INIT, "updating initial settings on iface activation\n");
 	acx_s_update_card_settings(adev);

@@ -45,7 +45,9 @@
 #define ACX_USB 1
 
 #include <linux/version.h>
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
 #include <linux/config.h>
+#endif
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -88,6 +90,7 @@
 #define PRODUCT_ID_WUG2400	0xb21a /* AboCom WUG2400 or SafeCom SWLUT-54125 */
 #define VENDOR_ID_AVM_GMBH	0x057c
 #define PRODUCT_ID_AVM_WLAN_USB	0x5601
+#define PRODUCT_ID_AVM_WLAN_USB_si	0x6201 /* "self install" named Version: driver kills kernel on inbound scans from fritz box ???  */
 #define VENDOR_ID_ZCOM		0x0cde
 #define PRODUCT_ID_ZCOM_XG750	0x0017 /* not tested yet */
 #define VENDOR_ID_TI		0x0451
@@ -112,8 +115,13 @@
 */
 static int acxusb_e_probe(struct usb_interface *, const struct usb_device_id *);
 static void acxusb_e_disconnect(struct usb_interface *);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+static void acxusb_i_complete_tx(struct urb *);
+static void acxusb_i_complete_rx(struct urb *);
+#else
 static void acxusb_i_complete_tx(struct urb *, struct pt_regs *);
 static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
+#endif
 static int acxusb_e_open(struct net_device *);
 static int acxusb_e_close(struct net_device *);
 static void acxusb_i_set_rx_mode(struct net_device *);
@@ -145,6 +153,7 @@ acxusb_ids[] = {
 	{ USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_UNBOOTED) },
 	{ USB_DEVICE(VENDOR_ID_DLINK, PRODUCT_ID_WUG2400) },
 	{ USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB) },
+	{ USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB_si) },
 	{ USB_DEVICE(VENDOR_ID_ZCOM, PRODUCT_ID_ZCOM_XG750) },
 	{ USB_DEVICE(VENDOR_ID_TI, PRODUCT_ID_TI_UNKNOWN) },
 	{}
@@ -1283,7 +1292,11 @@ end:
 ** USB receive is triggered.
 */
 static void
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+acxusb_i_complete_rx(struct urb *urb)
+#else
 acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
+#endif
 {
 	acx_device_t *adev;
 	rxbuffer_t *ptr;
@@ -1503,7 +1516,11 @@ end_unlock:
 ** This function is invoked upon termination of a USB transfer.
 */
 static void
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+acxusb_i_complete_tx(struct urb *urb)
+#else
 acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
+#endif
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;

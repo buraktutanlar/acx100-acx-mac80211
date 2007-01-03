@@ -298,12 +298,12 @@ DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	,0x1007, 0x20);	/* configure default k
 DEF_IE(1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	,0x1008, 0x04);
 DEF_IE(1xx_IE_DOT11_GROUP_ADDR		,0x1009, -1);
 DEF_IE(1xx_IE_DOT11_CURRENT_REG_DOMAIN	,0x100a, 0x02);
-//It's harmless to have larger struct. Use USB case always.
+/* It's harmless to have larger struct. Use USB case always. */
 DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);	/* in fact len=1 for PCI */
 DEF_IE(1xx_IE_DOT11_UNKNOWN_100C	,0x100c, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01); /* TNETW1450 has length 2!! */
 DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);	/* in fact len=1 for PCI */
-//USB doesn't return anything - len==0?!
+/* USB doesn't return anything - len==0?! */
 DEF_IE(100_IE_DOT11_ED_THRESHOLD	,0x100f, 0x04);
 DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID; TNETW1450: length 2 */
 DEF_IE(100_IE_DOT11_UNKNOWN_1011	,0x1011, -1);	/* mapped to cfgInvalid in FW150 */
@@ -495,7 +495,7 @@ DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 
 /* I've hoped it's a 802.11 PHY header, but no...
  * so far, I've seen on acx111:
- * 0000 3a00 0000 0000 IBBS Beacons
+ * 0000 3a00 0000 0000 IBSS Beacons
  * 0000 3c00 0000 0000 ESS Beacons
  * 0000 2700 0000 0000 Probe requests
  * --vda

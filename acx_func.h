@@ -241,6 +241,13 @@ has_only_one_bit(u16 v)
 }
 
 
+static inline int
+is_hidden_essid(char *essid)
+{
+	return (('\0' == essid[0]) ||
+		((' ' == essid[0]) && ('\0' == essid[1])));
+}
+
 /***********************************************************************
 ** LOCKING
 ** We have adev->sem and adev->lock.

@@ -30,12 +30,14 @@
 ** ---------------------------------------------------------------------
 */
 
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
+#include <linux/config.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/io.h>
-//#include <asm/uaccess.h> /* required for 2.4.x kernels; verify_write() */
+/* #include <asm/uaccess.h> */ /* required for 2.4.x kernels; verify_write() */
 #include <linux/if_arp.h>
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
@@ -568,7 +570,7 @@ acx_s_scan_add_station(
 		if (rate & 1) {
 			iwe.u.bitrate.value = *p * 500000; /* units of 500kb/s */
 			log(L_IOCTL, "scan, rate: %d\n", iwe.u.bitrate.value);
-			ptr = iwe_stream_add_value(ptr, ptr_rate, end_buf,
+			ptr_rate = iwe_stream_add_value(ptr, ptr_rate, end_buf,
 						&iwe, IW_EV_PARAM_LEN);
 		}
 		rate >>= 1;
@@ -661,6 +663,12 @@ acx_ioctl_set_essid(
 
 	log(L_IOCTL, "set ESSID '%*s', length %d, flags 0x%04X\n",
 					len, extra, len, dwrq->flags);
+
+#if WIRELESS_EXT >= 21
+	/* WE 21 gives real ESSID strlen, not +1 (trailing zero):
+	 * see LKML "[patch] drivers/net/wireless: correct reported ssid lengths" */
+	len += 1;
+#endif
 
 	acx_sem_lock(adev);
 
@@ -2232,7 +2240,10 @@ acx_ioctl_get_phy_chan_busy_percentage(
 
 	usage.busytime = le32_to_cpu(usage.busytime);
 	usage.totaltime = le32_to_cpu(usage.totaltime);
-	printk("%s: average busy percentage since last invocation: %d%% "
+	
+	/* yes, this is supposed to be "Medium" (singular of media),
+	   not "average"! OK, reword the message to make it obvious... */
+	printk("%s: busy percentage of medium (since last invocation): %d%% "
 		"(%u of %u microseconds)\n",
 		ndev->name,
 		usage.busytime / ((usage.totaltime / 100) + 1),

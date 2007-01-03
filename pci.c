@@ -31,8 +31,16 @@
 */
 #define ACX_PCI 1
 
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
+#include <linux/config.h>
+#endif
+
+/* Linux 2.6.18+ uses <linux/utsrelease.h> */
+#ifndef UTS_RELEASE
+#include <linux/utsrelease.h>
+#endif
+
 #include <linux/compiler.h> /* required for Lx 2.6.8 ?? */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -98,7 +106,11 @@
 /***********************************************************************
 */
 static void acxpci_i_tx_timeout(struct net_device *ndev);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
+#else
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+#endif
 static void acxpci_i_set_multicast_list(struct net_device *ndev);
 
 static int acxpci_e_open(struct net_device *ndev);
@@ -623,6 +635,13 @@ acxpci_s_upload_fw(acx_device_t *adev)
 
 	FN_ENTER;
 
+	/* print exact chipset and radio ID to make sure people really get a clue on which files exactly they are supposed to provide,
+	 * since firmware loading is the biggest enduser PITA with these chipsets.
+	 * Not printing radio ID in 0xHEX in order to not confuse them into wrong file naming */
+	printk(	"acx: need to load firmware for acx1%02d chipset with radio ID %02x, please provide via firmware hotplug:\n"
+		"acx: either one file only (<c>ombined firmware image file, radio-specific) or two files (radio-less base image file *plus* separate <r>adio-specific extension file)\n",
+		IS_ACX111(adev)*11, adev->radio_type);
+
 	/* Try combined, then main image */
 	adev->need_radio_fw = 0;
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
@@ -641,11 +660,11 @@ acxpci_s_upload_fw(acx_device_t *adev)
 
 	for (try = 1; try <= 5; try++) {
 		res = acxpci_s_write_fw(adev, fw_image, 0);
-		log(L_DEBUG|L_INIT, "acx_write_fw (main/combined):%d\n", res);
+		log(L_DEBUG|L_INIT, "acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG|L_INIT, "acx_validate_fw "
-					"(main/combined):%d\n", res);
+					"(main/combined): %d\n", res);
 		}
 
 		if (OK == res) {
@@ -1514,12 +1533,21 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("acx: cannot reserve PCI memory region 2\n");
 		goto fail_request_mem_region2;
 	}
-	mem1 = ioremap(phymem1, mem_region1_size);
+	
+	/* this used to be ioremap(), but ioremap_nocache()
+	 * is much less risky, right? (and slower?)
+	 * FIXME: we may want to go back to cached variant if it's
+	 * certain that our code really properly handles
+	 * cached operation (memory barriers, volatile?, ...)
+	 * (but always keep this comment here regardless!)
+	 * Possibly make this a driver config setting? */
+	
+	mem1 = ioremap_nocache(phymem1, mem_region1_size);
 	if (!mem1) {
 		printk("acx: ioremap() FAILED\n");
 		goto fail_ioremap1;
 	}
-	mem2 = ioremap(phymem2, mem_region2_size);
+	mem2 = ioremap_nocache(phymem2, mem_region2_size);
 	if (!mem2) {
 		printk("acx: ioremap() #2 FAILED\n");
 		goto fail_ioremap2;
@@ -1541,7 +1569,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ndev = alloc_netdev(sizeof(*adev), "wlan%d", dummy_netdev_init);
 	/* (NB: memsets to 0 entire area) */
 	if (!ndev) {
-		printk("acx: no memory for netdevice structure\n");
+		printk("acx: no memory for netdevice struct\n");
 		goto fail_alloc_netdev;
 	}
 
@@ -1619,7 +1647,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
 
-//TODO: merge them into one function, they are called just once and are the same for pci & usb
+/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_read_eeprom_version;
 
@@ -2073,7 +2101,7 @@ acxpci_e_open(struct net_device *ndev)
 
 	acx_init_task_scheduler(adev);
 
-//TODO: pci_set_power_state(pdev, PCI_D0); ?
+/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
 	/* request shared IRQ handler */
 	if (request_irq(ndev->irq, acxpci_i_interrupt, SA_SHIRQ, ndev->name, ndev)) {
@@ -2132,7 +2160,7 @@ acxpci_e_close(struct net_device *ndev)
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	free_irq(ndev->irq, ndev);
 
-//TODO: pci_set_power_state(pdev, PCI_D3hot); ?
+/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
 	/* We currently don't have to do anything else.
 	 * Higher layers know we're not ready from dev->start==0 and
@@ -2433,7 +2461,7 @@ log_unusual_irq(u16 irqtype) {
 		printk(" Key_Not_Found");
 	}
 	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
-		printk(" IV_ICV_Failure");
+		printk(" IV_ICV_Failure (crypto)");
 	}
 		/* HOST_INT_CMD_COMPLETE  */
 		/* HOST_INT_INFO          */
@@ -2475,7 +2503,11 @@ update_link_quality_led(acx_device_t *adev)
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ) /* a la orinoco.c */
 
 static irqreturn_t
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
+acxpci_i_interrupt(int irq, void *dev_id)
+#else
 acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+#endif
 {
 	acx_device_t *adev;
 	unsigned long flags;
@@ -3341,6 +3373,15 @@ handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger)
 		adev->stats.tx_fifo_errors++;
 		break;
 	case 0x80:
+		/* possibly ACPI C-state powersaving related!!!
+		 * (DMA timeout due to excessively high wakeup
+		 * latency after C-state activation!?)
+		 * Disable C-State powersaving and try again,
+		 * then PLEASE REPORT, I'm VERY interested in
+		 * whether my theory is correct that this is
+		 * actually the problem here.
+		 * In that case, use new Linux idle wakeup latency
+		 * requirements kernel API to prevent this issue. */
 		err = "DMA error";
 		adev->wstats.discard.misc++;
 		break;

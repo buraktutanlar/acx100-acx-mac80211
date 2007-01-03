@@ -307,7 +307,7 @@ IEEE16(WF_FSTYPE_CFACK_CFPOLL,		0x70)
 /* Macros to get/set the bitfields of the Duration Field      */
 /*  - the duration value is only valid when bit15 is zero     */
 /*  - the firmware handles these values, so I'm not going     */
-/*    these macros right now.                                 */
+/*    to use these macros right now.                          */
 /*------------------------------------------------------------*/
 
 /*--- Sequence Control  Macros -------------------------------*/
