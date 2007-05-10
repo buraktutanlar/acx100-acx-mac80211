@@ -3,6 +3,9 @@
 */
 
 #include <linux/version.h>
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
+#include <linux/config.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <asm/io.h>
@@ -742,6 +745,12 @@ acx_ioctl_set_nick(struct net_device *ndev,
 	int result;
 
 	FN_ENTER;
+
+#if WIRELESS_EXT >= 21
+	/* WE 21 gives real ESSID strlen, not +1 (trailing zero):
+	 * see LKML "[patch] drivers/net/wireless: correct reported ssid lengths" */
+	len += 1;
+#endif
 
 	acx_sem_lock(adev);
 

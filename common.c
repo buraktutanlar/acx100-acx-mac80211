@@ -2,6 +2,12 @@
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
+
+/*
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
+#include <linux/config.h>
+#endif
+*/
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -390,9 +396,9 @@ static inline const char *get_status_string(unsigned int status)
 		    "Cannot support all requested capabilities in Capability Information field",
 		/*11 */ "Reassoc denied (reason outside of 802.11b scope)",
 		/*12 */
-		    "Assoc denied (reason outside of 802.11b scope), maybe MAC filtering by peer?",
+		    "Assoc denied (reason outside of 802.11b scope) -- maybe MAC filtering by peer?",
 		/*13 */
-		    "Responding station doesnt support specified auth algorithm",
+		    "Responding station doesnt support specified auth algorithm -- maybe WRP auth Open vs. Restricted",
 		/*14 */ "Auth rejected: wrong transaction sequence number",
 		/*15 */ "Auth rejected: challenge failure",
 		/*16 */ "Auth rejected: timeout for next frame in sequence",
@@ -490,9 +496,9 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 			val = val * 16 + c;
 		}
 
-		adev->firmware_numver = (u32) ((hexarr[0] << 24) +
+		adev->firmware_numver = (u32) ((hexarr[0] << 24) |
 					       (hexarr[1] << 16)
-					       + (hexarr[2] << 8) + hexarr[3]);
+					       | (hexarr[2] << 8) | hexarr[3]);
 		log(L_DEBUG, "firmware_numver 0x%08X\n", adev->firmware_numver);
 	}
 	if (IS_ACX111(adev)) {
@@ -602,7 +608,7 @@ void acx_display_hardware_details(acx_device_t * adev)
 
 /***********************************************************************
 */
-int acx_e_change_mtu(struct net_device *ndev, int mtu)
+int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu)
 {
 	enum {
 		MIN_MTU = 256,
@@ -612,18 +618,18 @@ int acx_e_change_mtu(struct net_device *ndev, int mtu)
 	if (mtu < MIN_MTU || mtu > MAX_MTU)
 		return -EINVAL;
 
-	ndev->mtu = mtu;
-	return 0;
+//	hw->mtu = mtu;
+	return 1;
 }
 
 /***********************************************************************
 ** acx_e_get_stats, acx_e_get_wireless_stats
 */
 int
-acx_e_get_stats(struct net_device *ndev,
+acx_e_get_stats(struct ieee80211_hw *hw,
 		struct ieee80211_low_level_stats *stats)
 {
-	acx_device_t *adev = ndev2adev(ndev);
+	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	acx_lock(adev, flags);
 	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
@@ -631,9 +637,9 @@ acx_e_get_stats(struct net_device *ndev,
 	return 0;
 }
 
-struct iw_statistics *acx_e_get_wireless_stats(struct net_device *ndev)
+struct iw_statistics *acx_e_get_wireless_stats(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ndev2adev(ndev);
+	acx_device_t *adev = ieee2adev(hw);
 	return &adev->wstats;
 }
 
@@ -880,10 +886,10 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		printk("%s: " FUNC "(type:%s) FAILED\n", adev->ndev->name,
+		printk("%s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
 		       typestr);
 #else
-		printk("%s: " FUNC "(type:0x%X) FAILED\n", adev->ndev->name,
+		printk("%s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
 		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -919,10 +925,10 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		printk("%s: " FUNC "(type:%s) FAILED\n", adev->ndev->name,
+		printk("%s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
 		       typestr);
 #else
-		printk("%s: " FUNC "(type:0x%X) FAILED\n", adev->ndev->name,
+		printk("%s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
 		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -1063,10 +1069,15 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	p += sprintf(p, "bssid     " MACSTR "\n", MAC(adev->bssid));
 	p += sprintf(p, "ap_filter " MACSTR "\n", MAC(adev->ap));
 
-	p += sprintf(p, "\n" "** PHY status **\n" "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
-		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n" "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n" "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n", adev->tx_disabled, adev->tx_level_dbm,	/* adev->tx_level_val, adev->tx_level_auto, */
+	p += sprintf(p, "\n" "** PHY status **\n" 
+		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
+		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
+		     "rate_basic 0x%04X, rate_oper 0x%04X\n" 
+		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n" 
+		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n", 
+		     adev->tx_disabled, adev->tx_level_dbm,	/* adev->tx_level_val, adev->tx_level_auto, */
 		     adev->sensitivity, adev->antenna, adev->ed_threshold,
-		     adev->cca, adev->preamble_mode, adev->rts_threshold,
+		     adev->cca, adev->preamble_mode, adev->rate_basic, adev->rate_oper, adev->rts_threshold,
 		     adev->frag_threshold, adev->short_retry, adev->long_retry,
 		     adev->msdu_lifetime, adev->listen_interval,
 		     adev->beacon_interval);
@@ -1550,15 +1561,15 @@ static read_proc_t *const
 	acx_e_read_proc_phy
 };
 
-static int manage_proc_entries(const struct net_device *ndev, int remove)
+static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 {
-	acx_device_t *adev = ndev2adev((struct net_device *)ndev);
+	acx_device_t *adev = ieee2adev(hw);
 	char procbuf[80];
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
-			 "driver/acx_%s%s", ndev->name, proc_files[i]);
+			 "driver/acx_%s", proc_files[i]);
 		log(L_INIT, "%sing /proc entry %s\n",
 		    remove ? "remov" : "creat", procbuf);
 		if (!remove) {
@@ -1575,21 +1586,21 @@ static int manage_proc_entries(const struct net_device *ndev, int remove)
 	return OK;
 }
 
-int acx_proc_register_entries(const struct net_device *ndev)
+int acx_proc_register_entries(struct ieee80211_hw *ieee)
 {
-	return manage_proc_entries(ndev, 0);
+	return manage_proc_entries(ieee, 0);
 }
 
-int acx_proc_unregister_entries(const struct net_device *ndev)
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee)
 {
-	return manage_proc_entries(ndev, 1);
+	return manage_proc_entries(ieee, 1);
 }
 #endif /* CONFIG_PROC_FS */
-
-void acx_get_drvinfo(struct net_device *dev,                  
+/*
+void acx_get_drvinfo(struct ieee80211_hw *hw,                  
                             struct ethtool_drvinfo *info)
 {
-        acx_device_t *adev = ndev2adev(dev);                  
+        acx_device_t *adev = ieee2adev(hw);                  
 
         strncpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
         strncpy(info->version, UTS_RELEASE, sizeof(info->version));
@@ -1600,20 +1611,18 @@ struct ethtool_ops acx_ethtool_ops = {
         .get_drvinfo = acx_get_drvinfo,
         .get_link = ethtool_op_get_link,
 };
-
+*/
 void acx_free_modes(acx_device_t * adev)
 {
-        struct ieee80211_hw *ieee = adev->ieee;
-        int i;
 
-        for (i = 0; i < ieee->num_modes; i++) {
+/*        for (i = 0; i < ieee->num_modes; i++) {
                 kfree(ieee->modes[i].channels);
                 kfree(ieee->modes[i].rates);
-        }
-        kfree(ieee->modes);
-        ieee->modes = NULL;
-        ieee->num_modes = 0;
+        }*/
+        kfree(adev->modes);
+        adev->modes = NULL;
 }
+/*
 int acx_append_mode(struct ieee80211_hw *ieee,
                            int mode_id,
                            int nr_channels,
@@ -1638,7 +1647,6 @@ int acx_append_mode(struct ieee80211_hw *ieee,
                 goto err_free_channels;
         memcpy(mode->rates, rates, sizeof(*rates) * nr_rates);
 
-        ieee->num_modes++;
         err = 0;
       out:
         return err;
@@ -1648,421 +1656,95 @@ int acx_append_mode(struct ieee80211_hw *ieee,
         goto out;
 
 }
-int acx_setup_modes_bphy(acx_device_t * adev)        
+*/
+#define RATETAB_ENT(_rateid, _flags) \
+	{							\
+		.rate	= (_rateid),				\
+		.val	= (_rateid),				\
+		.val2   = (_rateid),				\
+		.flags  = (_flags),				\
+	}
+
+
+static struct ieee80211_rate __acx_ratetable[] = {
+                 RATETAB_ENT(RATE111_1,IEEE80211_RATE_CCK),
+                 RATETAB_ENT(RATE111_2,IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(RATE111_5,IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(RATE111_11,IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(RATE111_6,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_9,IEEE80211_RATE_OFDM), 
+                 RATETAB_ENT(RATE111_12,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_18,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_24,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_36,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_48,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(RATE111_54,IEEE80211_RATE_OFDM),
+        };
+
+#define acx_b_ratetable		(__acx_ratetable + 0)
+#define acx_b_ratetable_size	4
+#define acx_g_ratetable		(__acx_ratetable + 0)
+#define acx_g_ratetable_size	12
+
+#define CHANTAB_ENT(_chanid, _freq) \
+        {                                                       \
+                .chan   = (_chanid),                            \
+                .freq   = (_freq),                              \
+                .val    = (_chanid),                            \
+                .flag   = IEEE80211_CHAN_W_SCAN |               \
+                          IEEE80211_CHAN_W_ACTIVE_SCAN |        \
+                          IEEE80211_CHAN_W_IBSS,                \
+                .power_level    = 0xFF,                         \
+                .antenna_max    = 0xFF,                         \
+        }
+static struct ieee80211_channel channels[] = {
+                 CHANTAB_ENT(1, 2412),     
+                 CHANTAB_ENT(2, 2417),    
+                 CHANTAB_ENT(3, 2422),
+                 CHANTAB_ENT(4, 2427),               
+                 CHANTAB_ENT(5, 2432),
+                 CHANTAB_ENT(6, 2437),    
+                 CHANTAB_ENT(7, 2442),               
+                 CHANTAB_ENT(8, 2447),     
+                 CHANTAB_ENT(9, 2452),
+                 CHANTAB_ENT(10, 2457),
+                 CHANTAB_ENT(11, 2462),
+                 CHANTAB_ENT(12, 2467),      
+                 CHANTAB_ENT(13, 2472),      
+        };
+
+#define acx_chantable_size ARRAY_SIZE(channels)
+
+static int acx_setup_modes_bphy(acx_device_t * adev)        
 {
         int err = 0;
+	struct ieee80211_hw *hw = adev->ieee;
+	struct ieee80211_hw_mode *mode;
 
-        static const struct ieee80211_rate rates_100[] = {
-                {
-                 .rate = 10,
-                 .val = RATE100_1,          
-                 .flags = IEEE80211_RATE_CCK,
-                 .val2 = RATE100_1,
-                }, {       
-                 .rate = 20,
-                 .val = RATE100_2,
-                 .flags = IEEE80211_RATE_CCK_2,      
-                 .val2 = RATE100_2,    
-                }, {
-                 .rate = 55,
-                 .val = RATE100_5,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE100_5,     
-                }, {        
-                 .rate = 110,
-                 .val = RATE100_11,            
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE100_11,
-                }
-        };
-        static const struct ieee80211_rate rates_111[] = {  
-                {   
-                 .rate = 10,
-                 .val = RATE111_1,
-                 .flags = IEEE80211_RATE_CCK,
-                 .val2 = RATE111_1,
-                }, {
-                 .rate = 20,
-                 .val = RATE111_2,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_2,
-                }, {
-                 .rate = 55,
-                 .val = RATE111_5,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_5,
-                }, {    
-                 .rate = 110,
-                 .val = RATE111_11,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_11,
-                }          
-        };         
-        static const struct ieee80211_channel channels[] = {
-                {
-                 .chan = 1,
-                 .freq = 2412,
-                 .val = 1,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 2,
-                 .freq = 2417,
-                 .val = 2,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 3,
-                 .freq = 2422,
-                 .val = 3,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 4, 
-                 .freq = 2427,              
-                 .val = 4,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,                
-                }, {                   
-                 .chan = 5,
-                 .freq = 2432,
-                 .val = 5,        
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,          
-                }, {
-                 .chan = 6,         
-                 .freq = 2437,
-                 .val = 6,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 7,
-                 .freq = 2442,
-                 .val = 7,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 8,
-                 .freq = 2447,
-                 .val = 8,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 9,
-                 .freq = 2452,
-                 .val = 9,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 10,
-                 .freq = 2457,
-                 .val = 10,
-                 .flag =
-                 IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN
-                 | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 11,
-                 .freq = 2462,
-                 .val = 11,
-                 .flag =
-                 IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN
-                 |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 12,
-                 .freq = 2467,
-                 .val = 12,
-                 .flag =
-                 IEEE80211_CHAN_W_SCAN
-                 |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN
-                 |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level =
-                 0xFF,
-                 .antenna_max =
-                 0xFF,
-                }, {
-                 .chan = 13,
-                 .freq = 2472,
-                 .val = 13,
-                 .flag =
-                 IEEE80211_CHAN_W_SCAN
-                 |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN
-                 |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level =
-                 0xFF,
-                 .antenna_max =
-                 0xFF,
-                },      /*{
-                 .chan           = 14,
-                 .freq           = 2484,
-                 .val            = 14,
-                 .flag           = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level    = 0xFF,
-                 .antenna_max    = 0xFF,
-                }, */
-        };
-
-        if (IS_ACX100(adev))
-                err = acx_append_mode(adev->ieee, MODE_IEEE80211B,
-                              ARRAY_SIZE(channels), channels,
-                              ARRAY_SIZE(rates_100), rates_100);
-        else
-                err = acx_append_mode(adev->ieee, MODE_IEEE80211B,
-                              ARRAY_SIZE(channels), channels,
-                              ARRAY_SIZE(rates_111), rates_111);
+	mode = adev->modes;
+	mode->mode = MODE_IEEE80211B;
+	mode->num_channels = acx_chantable_size;
+	mode->channels = channels;
+	mode->num_rates = acx_b_ratetable_size;
+	mode->rates = acx_b_ratetable;
+	err = ieee80211_register_hwmode(hw,mode);
 
         return err;           
 }
 
-int acx_setup_modes_gphy(acx_device_t * adev)
+static int acx_setup_modes_gphy(acx_device_t * adev)
 {                 
         int err = 0;
-
-        static const struct ieee80211_rate rates[] = {
-                {              
-                 .rate = 10,
-                 .val = RATE111_1,
-                 .flags = IEEE80211_RATE_CCK,
-                 .val2 = RATE111_1,
-                }, {        
-                 .rate = 20,  
-                 .val = RATE111_2,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_2,   
-                }, {
-                 .rate = 55,                 
-                 .val = RATE111_5,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_5,
-                }, {  
-                 .rate = 60,   
-                 .val = RATE111_6,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_6,   
-                }, {
-                 .rate = 90,          
-                 .val = RATE111_9,
-                 .flags = IEEE80211_RATE_OFDM, 
-                 .val2 = RATE111_9,    
-                }, {
-                 .rate = 110,           
-                 .val = RATE111_11,
-                 .flags = IEEE80211_RATE_CCK_2,
-                 .val2 = RATE111_11,
-                }, {        
-                 .rate = 120,
-                 .val = RATE111_12,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_12,
-                }, {
-                 .rate = 180,
-                 .val = RATE111_18,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_18,
-                }, {
-                 .rate = 240,
-                 .val = RATE111_24,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_24,
-                }, {
-                 .rate = 360,
-                 .val = RATE111_36,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_36,
-                }, {
-                 .rate = 480,
-                 .val = RATE111_48,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_48,
-                }, {
-                 .rate = 540,      
-                 .val = RATE111_54,
-                 .flags = IEEE80211_RATE_OFDM,
-                 .val2 = RATE111_54,
-
-                },                 
-        };          
-        static const struct ieee80211_channel channels[] = {
-                {                 
-                 .chan = 1,
-                 .freq = 2412,     
-                 .val = 1,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,         
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 2,  
-                 .freq = 2417,     
-                 .val = 2,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 3,         
-                 .freq = 2422,
-                 .val = 3,   
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN | IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {         
-                 .chan = 4,        
-                 .freq = 2427,                
-                 .val = 4,          
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,         
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 5,  
-                 .freq = 2432,     
-                 .val = 5,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,         
-                }, {                
-                 .chan = 6,
-                 .freq = 2437,     
-                 .val = 6,
-                 .flag = IEEE80211_CHAN_W_SCAN |            
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {
-                 .chan = 7,
-                 .freq = 2442,                
-                 .val = 7,           
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,           
-                }, {
-                 .chan = 8,          
-                 .freq = 2447,       
-                 .val = 8,
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,           
-                 .antenna_max = 0xFF,
-                }, {                 
-                 .chan = 9,          
-                 .freq = 2452,
-                 .val = 9,         
-                 .flag = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,         
-                 .power_level = 0xFF,          
-                 .antenna_max = 0xFF,  
-                }, {                          
-                 .chan = 10,         
-                 .freq = 2457,
-                 .val = 10,  
-                 .flag =           
-                 IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN   
-                 | IEEE80211_CHAN_W_IBSS,      
-                 .power_level = 0xFF,  
-                 .antenna_max = 0xFF,
-                }, {                          
-                 .chan = 11,        
-                 .freq = 2462,
-                 .val = 11,        
-                 .flag =  
-                 IEEE80211_CHAN_W_SCAN |                    
-                 IEEE80211_CHAN_W_ACTIVE_SCAN  
-                 |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level = 0xFF,
-                 .antenna_max = 0xFF,
-                }, {       
-                 .chan = 12,                  
-                 .freq = 2467,       
-                 .val = 12,
-                 .flag =
-                 IEEE80211_CHAN_W_SCAN 
-                 |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN   
-                 |  
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level =      
-                 0xFF,    
-                 .antenna_max =                 
-                 0xFF,
-                }, {
-                 .chan = 13,                    
-                 .freq = 2472,       
-                 .val = 13,          
-                 .flag =             
-                 IEEE80211_CHAN_W_SCAN
-                 |                 
-                 IEEE80211_CHAN_W_ACTIVE_SCAN   
-                 |
-                 IEEE80211_CHAN_W_IBSS,         
-                 .power_level =                
-                 0xFF,                 
-                 .antenna_max =               
-                 0xFF,               
-                },      /*{   
-                 .chan           = 14,
-                 .freq           = 2484,
-                 .val            = 14,  
-                 .flag           = IEEE80211_CHAN_W_SCAN |
-                 IEEE80211_CHAN_W_ACTIVE_SCAN |
-                 IEEE80211_CHAN_W_IBSS,
-                 .power_level    = 0xFF,
-                 .antenna_max    = 0xFF,      
-                }, */               
-        };
-
-        if (IS_ACX111(adev)) {
-                err = acx_append_mode(adev->ieee, MODE_IEEE80211G,
-                                      ARRAY_SIZE(channels), channels,
-                                      ARRAY_SIZE(rates), rates);
-        }
+	struct ieee80211_hw *hw = adev->ieee;
+	struct ieee80211_hw_mode *mode;
+	
+	mode = adev->modes++; 
+	mode->mode = MODE_IEEE80211G;
+	mode->num_channels = acx_chantable_size;
+	mode->channels = channels;
+	mode->num_rates = acx_g_ratetable_size;
+	mode->rates = acx_g_ratetable;
+	err = ieee80211_register_hwmode(hw,mode);
 
         return err;                  
 }
@@ -2070,34 +1752,20 @@ int acx_setup_modes_gphy(acx_device_t * adev)
 int acx_setup_modes(acx_device_t * adev)
 {
         int err = -ENOMEM;
-        int nr;
-        struct ieee80211_hw *ieee = adev->ieee;
 
-        if (IS_ACX100(adev))
-                nr = 1;                
-        else
-                nr = 2;   
-        ieee->modes = kzalloc(sizeof(*(ieee->modes)) * nr, GFP_KERNEL);
-        if (!ieee->modes)
-                goto out;
-        ieee->num_modes = 0;                    
-
-        err = acx_setup_modes_gphy(adev);
-        if (err)                     
-                goto error;           
-        err = acx_setup_modes_bphy(adev);
-        if (err)
-                goto error;
-
-//        assert(ieee->num_modes == nr && nr > 0);
-      out:                             
+                    
+	if (!IS_ACX111(adev)) {
+		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
+        	err = acx_setup_modes_gphy(adev);
+	} else {
+		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
+	}
+	err = acx_setup_modes_bphy(adev);
+	if (err && adev->modes)
+		kfree(adev->modes);
         return err;                           
 
-      error:                  
-        acx_free_modes(adev);         
-        goto out;
 }
-
 
 /***********************************************************************
 ** acx_fill_beacon_or_proberesp_template
@@ -2314,7 +1982,7 @@ acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 **
 ** unified function for both ACX111 and ACX100
 */
-
+/*
 int acx_passive_scan(struct net_device *net_dev, int state,
 		     struct ieee80211_scan_conf *conf)
 {
@@ -2323,29 +1991,29 @@ int acx_passive_scan(struct net_device *net_dev, int state,
 		acx100_scan_t acx100;
 	} s;
 	unsigned long flags;
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(hw);
 	FN_ENTER;
 	acx_lock(adev, flags);
 	memset(&s, 0, sizeof(s));
-
+*/
 	/* first common positions... */
-
+/*
 	s.acx111.count = cpu_to_le16(adev->scan_count);
 	s.acx111.rate = adev->scan_rate;
 	s.acx111.options = ACX_SCAN_OPT_PASSIVE;
 	s.acx111.chan_duration = cpu_to_le16(adev->scan_duration);
 	s.acx111.max_probe_delay = cpu_to_le16(adev->scan_probe_delay);
-
+*/
 	/* ...then differences */
 
-	if (IS_ACX111(adev)) {
+//	if (IS_ACX111(adev)) {
 		/*s.acx111.channel_list_select = 0; *//* scan every allowed channel */
-		s.acx111.channel_list_select = 1;	/* scan given channels */
+//		s.acx111.channel_list_select = 1;	/* scan given channels */
 		/*s.acx111.modulation = 0x40; *//* long preamble? OFDM? -> only for active scan */
-		s.acx111.modulation = 0;
-		s.acx111.channel_list[0] = conf->scan_channel;
+//		s.acx111.modulation = 0;
+//		s.acx111.channel_list[0] = conf->scan_channel;
 		/*s.acx111.channel_list[1] = 4; */
-	} else {
+/*	} else {
 		s.acx100.start_chan = cpu_to_le16(conf->scan_channel);
 		s.acx100.flags = cpu_to_le16(conf->scan_channel);
 	}
@@ -2354,7 +2022,7 @@ int acx_passive_scan(struct net_device *net_dev, int state,
 	acx_unlock(adev, flags);
 	FN_EXIT0;
 	return 0;
-}
+}*/
 static void acx_s_scan_chan(acx_device_t * adev)
 {
 	union {
@@ -2912,7 +2580,8 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	/* copy the MAC address we just got from the card
 	 * into our MAC address used during current 802.11 session */
-	MAC_COPY(adev->dev_addr, adev->ndev->dev_addr);
+//	MAC_COPY(adev->dev_addr, adev->wiphy->dev_addr);
+	SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
 	MAC_BCAST(adev->ap);
 
 	adev->essid_len =
@@ -3295,6 +2964,83 @@ acx_l_handle_txrate_auto(acx_device_t * adev, struct client *txc,
 	}
 }
 
+int
+acx_i_start_xmit(struct ieee80211_hw *hw,
+                 struct sk_buff *skb, struct ieee80211_tx_control *ctl)
+{
+        acx_device_t *adev = ieee2adev(hw);
+        tx_t *tx;
+        void *txbuf;
+        unsigned long flags;
+
+        int txresult = NOT_OK;
+
+        FN_ENTER;
+
+        if (unlikely(!skb)) {
+                /* indicate success */
+                txresult = OK;
+                goto end_no_unlock;
+        }
+        if (unlikely(!adev)) {
+                goto end_no_unlock;
+        }
+
+        acx_lock(adev, flags);             
+
+        if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+                goto end;
+        }
+        if (unlikely(!adev->initialized)) {
+                goto end;
+        }
+/*        if (unlikely(acx_queue_stopped(ndev))) {
+                log(L_DEBUG, "%s: called when queue stopped\n", __func__);
+                goto end;
+        }*/
+        tx = acx_l_alloc_tx(adev);
+        if (unlikely(!tx)) {             
+                printk_ratelimited("%s: start_xmit: txdesc ring is full, "
+                                   "dropping tx\n", wiphy_name(adev->ieee->wiphy));
+                txresult = NOT_OK;           
+                goto end;
+        }           
+
+        txbuf = acx_l_get_txbuf(adev, tx);
+        if (unlikely(!txbuf)) {
+                /* Card was removed */
+                txresult = NOT_OK;
+                acx_l_dealloc_tx(adev, tx);
+                goto end;    
+        }
+        //len = acx_ether_to_txbuf(adev, txbuf, skb);
+        memcpy((u8 *) txbuf, skb->data, skb->len);
+//      w_hdr = (struct wlan_hdr_a3*)txbuf;
+
+//      if (unlikely(len < 0)) {   
+        /* Error in packet conversion */
+//              txresult = NOT_OK;
+//              acx_l_dealloc_tx(adev, tx);
+//              goto end;
+//      }
+
+        acx_l_tx_data(adev, tx, skb->len, ctl,skb);
+        //ndev->trans_start = jiffies;       
+
+        txresult = OK;
+        adev->stats.tx_packets++;               
+        adev->stats.tx_bytes += skb->len;
+
+      end:
+        acx_unlock(adev, flags);
+
+      end_no_unlock:
+//      if ((txresult == OK) && skb)
+//              dev_kfree_skb_any(skb);
+
+        FN_EXIT1(txresult);             
+        return txresult; 
+}   
 /***********************************************************************
 ** acx_l_update_ratevector
 **
@@ -3354,18 +3100,19 @@ void acx_l_update_ratevector(acx_device_t * adev)
 ** as acx_set_status(ACX_STATUS_4_ASSOCIATED), bacause this can
 ** wake queue. This can race with stop_queue elsewhere.
 ** See acx_stop_queue comment. */
+/*
 void acx_set_status(acx_device_t * adev, u16 new_status)
 {
-#define QUEUE_OPEN_AFTER_ASSOC 1	/* this really seems to be needed now */
-	u16 old_status = adev->status;
+#define QUEUE_OPEN_AFTER_ASSOC 1 */	/* this really seems to be needed now */
+/*	u16 old_status = adev->status;
 
 	FN_ENTER;
 
 	log(L_ASSOC, "%s(%d):%s\n",
 	    __func__, new_status, acx_get_status_name(new_status));
-
+*/
 	/* wireless_send_event never sleeps */
-	if (ACX_STATUS_4_ASSOCIATED == new_status) {
+/*	if (ACX_STATUS_4_ASSOCIATED == new_status) {
 		union iwreq_data wrqu;
 
 		wrqu.data.length = 0;
@@ -3380,8 +3127,8 @@ void acx_set_status(acx_device_t * adev, u16 new_status)
 	} else {
 		union iwreq_data wrqu;
 
-		/* send event with empty BSSID to indicate we're not associated */
-		MAC_ZERO(wrqu.ap_addr.sa_data);
+*/		/* send event with empty BSSID to indicate we're not associated */
+/*		MAC_ZERO(wrqu.ap_addr.sa_data);
 		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(adev->ndev, SIOCGIWAP, &wrqu, NULL);
 	}
@@ -3392,27 +3139,28 @@ void acx_set_status(acx_device_t * adev, u16 new_status)
 	switch (new_status) {
 	case ACX_STATUS_1_SCANNING:
 		adev->scan_retries = 0;
-		/* 1.0 s initial scan time */
+*/		/* 1.0 s initial scan time */
 //              acx_set_timer(adev, 1000000);
-		break;
+/*		break;
 	case ACX_STATUS_2_WAIT_AUTH:
 	case ACX_STATUS_3_AUTHENTICATED:
 		adev->auth_or_assoc_retries = 0;
+*/
 //              acx_set_timer(adev, 1500000); /* 1.5 s */
-		break;
+/*		break;
 	}
 
 #if QUEUE_OPEN_AFTER_ASSOC
 	if (new_status == ACX_STATUS_4_ASSOCIATED) {
 		if (old_status < ACX_STATUS_4_ASSOCIATED) {
-			/* ah, we're newly associated now,
+*/			/* ah, we're newly associated now,
 			 * so let's indicate carrier */
-			acx_carrier_on(adev->ndev, "after association");
+/*			acx_carrier_on(adev->ndev, "after association");
 			acx_wake_queue(adev->ndev, "after association");
 		}
 	} else {
-		/* not associated any more, so let's kill carrier */
-		if (old_status >= ACX_STATUS_4_ASSOCIATED) {
+*/		/* not associated any more, so let's kill carrier */
+/*		if (old_status >= ACX_STATUS_4_ASSOCIATED) {
 			acx_carrier_off(adev->ndev, "after losing association");
 			acx_stop_queue(adev->ndev, "after losing association");
 		}
@@ -3420,7 +3168,7 @@ void acx_set_status(acx_device_t * adev, u16 new_status)
 #endif
 	FN_EXIT0;
 }
-
+*/
 
 /***********************************************************************
 ** acx_i_timer
@@ -3544,7 +3292,6 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 			adev->acx_stats.last_rx = jiffies;
 			status.mactime = rxbuf->time;
 			status.channel = adev->channel;
-			status.hosttime = jiffies;
 			if (rxbuf->phy_stat_baseband & (1 << 3)) /* Uses OFDM */
 			{
 				status.rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
@@ -3740,7 +3487,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		printk("%s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
-		       adev->ndev->name);
+		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
 	/* ...and tell it to start allocating templates at that location */
@@ -3749,7 +3496,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 
 	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		printk("%s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
-		       adev->ndev->name);
+		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
 	res = OK;
@@ -3980,7 +3727,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
       failed:
-	printk("%s: %s() FAILED\n", adev->ndev->name, __func__);
+	printk("%s: %s() FAILED\n", wiphy_name(adev->ieee->wiphy), __func__);
 
       success:
 	FN_EXIT1(result);
@@ -4026,7 +3773,7 @@ int acx_s_init_mac(acx_device_t * adev)
 			goto fail;
 		if (OK != acx111_s_create_dma_regions(adev)) {
 			printk("%s: acx111_create_dma_regions FAILED\n",
-			       adev->ndev->name);
+			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
 	} else {
@@ -4036,12 +3783,12 @@ int acx_s_init_mac(acx_device_t * adev)
 			goto fail;
 		if (OK != acx100_s_create_dma_regions(adev)) {
 			printk("%s: acx100_create_dma_regions FAILED\n",
-			       adev->ndev->name);
+			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
 	}
 
-	MAC_COPY(adev->ndev->dev_addr, adev->dev_addr);
+	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	result = OK;
 
       fail:
@@ -4089,7 +3836,7 @@ void acx_s_set_sane_reg_domain(acx_device_t * adev, int do_set)
 			if (adev->reg_dom_chanmask & mask) {
 				printk("%s: adjusting selected channel from %d "
 				       "to %d due to new regulatory domain\n",
-				       adev->ndev->name, adev->channel, i);
+				       wiphy_name(adev->ieee->wiphy), adev->channel, i);
 				adev->channel = i;
 				break;
 			}
@@ -4172,7 +3919,7 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 
 	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
 		printk("%s: invalid sensitivity setting (1..3), "
-		       "setting to 1\n", adev->ndev->name);
+		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
 		adev->sensitivity = 1;
 	}
 	acx111_s_get_feature_config(adev, &feature1, &feature2);
@@ -4251,13 +3998,15 @@ void acx_s_update_card_settings(acx_device_t * adev)
 
 		acx_s_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 		paddr = &stationID[4];
+//		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
 		for (i = 0; i < ETH_ALEN; i++) {
 			/* we copy the MAC address (reversed in
 			 * the card) to the netdevice's MAC
 			 * address, and on ifup it will be
 			 * copied into iwadev->dev_addr */
-			adev->ndev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
+			adev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
 		}
+		SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
 		CLEAR_BIT(adev->get_mask, GETSET_STATION_ID);
 	}
 
@@ -4337,7 +4086,7 @@ void acx_s_update_card_settings(acx_device_t * adev)
 		u8 *paddr;
 
 		paddr = &stationID[4];
-		MAC_COPY(adev->dev_addr, adev->ndev->dev_addr);
+		MAC_COPY(adev->dev_addr, adev->ieee->wiphy->perm_addr);
 		for (i = 0; i < ETH_ALEN; i++) {
 			/* copy the MAC address we obtained when we noticed
 			 * that the ethernet iface's MAC changed
@@ -4698,10 +4447,10 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 			printk("%s: less than " STRING(RECALIB_PAUSE)
 			       " minutes since last radio recalibration, "
 			       "not recalibrating (maybe card is too hot?)\n",
-			       adev->ndev->name);
+			       wiphy_name(adev->ieee->wiphy));
 			adev->recalib_msg_ratelimit++;
 			if (adev->recalib_msg_ratelimit == 5)
-				printk("disabling above message\n");
+				printk("disabling above message until next recalib\n");
 		}
 		return;
 	}
@@ -4713,7 +4462,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 	res = acx_s_recalib_radio(adev);
 	if (res == OK) {
 		printk("%s: successfully recalibrated radio\n",
-		       adev->ndev->name);
+		       wiphy_name(adev->ieee->wiphy));
 		adev->recalib_time_last_success = jiffies;
 		adev->recalib_failure_count = 0;
 	} else {
@@ -4741,8 +4490,14 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 }
 #endif // if 0
 
+//#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 20)   
+void acx_e_after_interrupt_task(struct work_struct *work)
+{
+       acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
+/*#else
 void acx_e_after_interrupt_task(acx_device_t * adev)
 {
+#endif*/
 //      struct net_device *ndev = (struct net_device*)data;
 //      acx_device_t *adev = ndev2adev(ndev);
 
@@ -4848,7 +4603,7 @@ void acx_schedule_task(acx_device_t * adev, unsigned int set_flag)
 void acx_init_task_scheduler(acx_device_t * adev)
 {
 	/* configure task scheduler */
-	INIT_WORK(&adev->after_interrupt_task, acx_interrupt_tasklet, adev);
+	INIT_WORK(&adev->after_interrupt_task, acx_interrupt_tasklet);
 }
 
 
@@ -4943,10 +4698,10 @@ static void acx_select_opmode(acx_device_t * adev)
 }
 
 
-int acx_add_interface(struct net_device *net_dev,
+int acx_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_if_init_conf *conf)
 {
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(ieee);
 	unsigned long flags;
 	int err = -EOPNOTSUPP;
 
@@ -4980,10 +4735,10 @@ int acx_add_interface(struct net_device *net_dev,
 	return err;
 }
 
-void acx_remove_interface(struct net_device *net_dev,
+void acx_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
 {
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	FN_ENTER;
 
@@ -5006,9 +4761,9 @@ void acx_remove_interface(struct net_device *net_dev,
 	FN_EXIT0;
 }
 
-int acx_net_reset(struct net_device *net_dev)
+int acx_net_reset(struct ieee80211_hw *ieee)
 {
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(ieee);
 	FN_ENTER;
 	if (IS_PCI(adev))
 		acxpci_s_reset_dev(adev);
@@ -5036,9 +4791,9 @@ int acx_selectchannel(acx_device_t * adev, u8 channel)
 	return result;
 }
 
-int acx_net_config(struct net_device *net_dev, struct ieee80211_conf *conf)
+int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(hw);
 //        struct bcm43xx_radioinfo *radio;                    
 //        struct bcm43xx_phyinfo *phy;
 	unsigned long flags;
@@ -5097,10 +4852,10 @@ int acx_net_config(struct net_device *net_dev, struct ieee80211_conf *conf)
 	return 0;
 }
 
-int acx_config_interface(struct net_device *net_dev, int if_id,
+int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
 {
-	acx_device_t *adev = ndev2adev(net_dev);
+	acx_device_t *adev = ieee2adev(ieee);
 	unsigned long flags;
 	int err = -ENODEV;
 	FN_ENTER;
@@ -5137,7 +4892,7 @@ err_out:
 	return err;
 }
 
-int acx_net_get_tx_stats(struct net_device *net_dev,
+int acx_net_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
 {
 //        acx_device_t *adev = ndev2adev(net_dev);
@@ -5156,7 +4911,7 @@ int acx_net_get_tx_stats(struct net_device *net_dev,
 	FN_EXIT0;
 	return err;
 }
-int acx_net_conf_tx(struct net_device *net_dev,
+int acx_net_conf_tx(struct ieee80211_hw *hw,
 		    int queue, const struct ieee80211_tx_queue_params *params)
 {
 	FN_ENTER;
@@ -5323,12 +5078,12 @@ int acx_key_write(acx_device_t * adev,
 
 }
 
-int acx_net_set_key(struct net_device *net_dev,
+int acx_net_set_key(struct ieee80211_hw *ieee,
 		    set_key_cmd cmd,
 		    u8 * addr, struct ieee80211_key_conf *key, int aid)
 {
 //      return 0;
-	struct acx_device *adev = ndev2adev(net_dev);
+	struct acx_device *adev = ieee2adev(ieee);
 	unsigned long flags;
 	u8 algorithm;
 	u8 index;
@@ -5567,12 +5322,12 @@ static int __init acx_e_init_module(void)
 	       "recommended, visit http://acx100.sourceforge.net/wiki in case "
 	       "of further questions/discussion\n");
 
-#if defined(CONFIG_ACX_D80211_PCI)
+#if defined(CONFIG_ACX_MAC80211_PCI)
 	r1 = acxpci_e_init_module();
 #else
 	r1 = -EINVAL;
 #endif
-#if defined(CONFIG_ACX_D80211_USB)
+#if defined(CONFIG_ACX_MAC80211_USB)
 	r2 = acxusb_e_init_module();
 #else
 	r2 = -EINVAL;
@@ -5585,10 +5340,10 @@ static int __init acx_e_init_module(void)
 
 static void __exit acx_e_cleanup_module(void)
 {
-#if defined(CONFIG_ACX_D80211_PCI)
+#if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_e_cleanup_module();
 #endif
-#if defined(CONFIG_ACX_D80211_USB)
+#if defined(CONFIG_ACX_MAC80211_USB)
 	acxusb_e_cleanup_module();
 #endif
 }

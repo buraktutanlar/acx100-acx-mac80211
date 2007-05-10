@@ -111,7 +111,7 @@ TODO: from Efthym <efthym@gmx.net>:
 	
 [20060707]
 * Jeff Williams
-  Fixed Kconfig CONFIG_ACX_D80211_* in common.c and acx_struct.h
+  Fixed Kconfig CONFIG_ACX_MAC80211_* in common.c and acx_struct.h
 
 [20060707]
 * Matthias Meyer
@@ -122,6 +122,31 @@ TODO: from Efthym <efthym@gmx.net>:
   Added DeviceScape 80211 stack support to PCI
   Works with wpa_supplicant and hostapd
   Removed excess homegrown/linux-wlan 80211 stack
+
+[20070101] 0.3.36
+* Andreas Mohr <andi@lisas.de>
+  - cope with *tons* of Linux kernel API changes (via added version checks):
+    - linux/utsrelease.h required in 2.6.18
+    - linux/config.h include removal in 2.6.19
+    - pt_regs interrupt handler arg removal in 2.6.19
+    - INIT_WORK() change in 2.6.20-rc1-git1
+    - "ESSID last char missing" API change in WE-21
+    If anything fails to work for a real non-prerelease mainline kernel version
+    (supported ones, that is: >= 2.6.10), then please yell immediately!
+    Those people *REALLY* want me to concentrate on getting this stuff ready for
+    mainline, it seems...
+  - MAC address change fix (contributed by Carlos Martín Nieto/Luis Padilla)
+  - fix iwlist wlan0 scan output (updated wrong pointer variable --> only one single rate value listed, doh!)
+  - fix buggy hidden ESSID handling (didn't cover all variants in all places)
+  - corrected(?) duration/sequence values in assoc steps handling
+  - use ioremap_nocache() instead of ioremap() (safer)
+  - add another TNETW1450 USB ID
+  - FIX buggy "correction" of medium busy percentage log message
+  - small /proc/driver/acx_wlan0_diag addition
+  - much more verbose firmware image query log message
+  - updated format of main hardware status log message
+  - slightly enhanced Reason Code log messages
+  - minor cleanup
 
 [20060518]
 * Fix warnings about packed structs and printf format mismatches.

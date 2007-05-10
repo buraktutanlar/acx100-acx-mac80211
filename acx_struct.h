@@ -65,12 +65,12 @@ enum { acx_debug = 0 };
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
 
-#if !defined(CONFIG_ACX_D80211_PCI) && !defined(CONFIG_ACX_D80211_USB)
+#if !defined(CONFIG_ACX_MAC80211_PCI) && !defined(CONFIG_ACX_MAC80211_USB)
 #error Driver must include PCI and/or USB support. You selected neither.
 #endif
 
-#if defined(CONFIG_ACX_D80211_PCI)
- #if !defined(CONFIG_ACX_D80211_USB)
+#if defined(CONFIG_ACX_MAC80211_PCI)
+ #if !defined(CONFIG_ACX_MAC80211_USB)
   #define IS_PCI(adev)	1
  #else
   #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
@@ -79,8 +79,8 @@ enum { acx_debug = 0 };
  #define IS_PCI(adev)	0
 #endif
 
-#if defined(CONFIG_ACX_D80211_USB)
- #if !defined(CONFIG_ACX_D80211_PCI)
+#if defined(CONFIG_ACX_MAC80211_USB)
+ #if !defined(CONFIG_ACX_MAC80211_PCI)
   #define IS_USB(adev)	1
  #else
   #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
@@ -258,12 +258,12 @@ DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	,0x1007, 0x20);	/* configure default k
 DEF_IE(1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	,0x1008, 0x04);
 DEF_IE(1xx_IE_DOT11_GROUP_ADDR		,0x1009, -1);
 DEF_IE(1xx_IE_DOT11_CURRENT_REG_DOMAIN	,0x100a, 0x02);
-//It's harmless to have larger struct. Use USB case always.
+/* It's harmless to have larger struct. Use USB case always. */
 DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);	/* in fact len=1 for PCI */
 DEF_IE(1xx_IE_DOT11_UNKNOWN_100C	,0x100c, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01); /* TNETW1450 has length 2!! */
 DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);	/* in fact len=1 for PCI */
-//USB doesn't return anything - len==0?!
+/* USB doesn't return anything - len==0?! */
 DEF_IE(100_IE_DOT11_ED_THRESHOLD	,0x100f, 0x04);
 DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID; TNETW1450: length 2 */
 DEF_IE(100_IE_DOT11_UNKNOWN_1011	,0x1011, -1);	/* mapped to cfgInvalid in FW150 */
@@ -455,7 +455,7 @@ DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 
 /* I've hoped it's a 802.11 PHY header, but no...
  * so far, I've seen on acx111:
- * 0000 3a00 0000 0000 IBBS Beacons
+ * 0000 3a00 0000 0000 IBSS Beacons
  * 0000 3c00 0000 0000 ESS Beacons
  * 0000 2700 0000 0000 Probe requests
  * --vda
@@ -910,7 +910,7 @@ struct rxdesc {
 	u32	unknown2;
 } ACX_PACKED;		/* size 52 = 0x34 */
 
-#ifdef ACX_PCI
+#ifdef ACX_MAC80211_PCI
 
 /* Register I/O offsets */
 #define ACX100_EEPROM_ID_OFFSET	0x380
@@ -1010,7 +1010,7 @@ struct rxhostdesc {
 /***********************************************************************
 ** USB structures and constants
 */
-#ifdef ACX_USB
+#ifdef ACX_MAC80211_USB
 
 /* Used for usb_txbuffer.desc field */
 #define USB_TXBUF_TXDESC	0xA
@@ -1182,7 +1182,7 @@ struct acx_device {
 #endif
 
 	/*** Linux network device ***/
-	struct net_device	*ndev;		/* pointer to linux netdevice */
+	//struct device	*dev;		/* pointer to linux netdevice */
 
 	/*** Device statistics ***/
 	struct ieee80211_low_level_stats	ieee_stats;		/* wireless device statistics */
@@ -1195,6 +1195,7 @@ struct acx_device {
 #endif
 	struct acx_stats	acx_stats;
 	struct ieee80211_hw	*ieee;
+	struct ieee80211_hw_mode	*modes;
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
 
@@ -1362,7 +1363,7 @@ struct acx_device {
 
 	key_struct_t	wep_key_struct[10];
 
-	/*** Encryption Replacement for d80211 ***/
+	/*** Encryption Replacement for mac80211 ***/
 	struct acx_key	key[54];
 	u16 security_offset;
 	u8 default_key_idx;
@@ -1387,7 +1388,7 @@ struct acx_device {
 	dma_addr_t	rxhostdesc_startphy;
 
 	/*** PCI stuff ***/
-#ifdef ACX_PCI
+#ifdef ACX_MAC80211_PCI
 	/* pointers to tx buffers, tx host descriptors (in host memory)
 	** and tx descs in device memory */
 	unsigned int	tx_tail;
@@ -1437,7 +1438,7 @@ struct acx_device {
 #endif
 
 	/*** USB stuff ***/
-#ifdef ACX_USB
+#ifdef ACX_MAC80211_USB
 	struct usb_device	*usbdev;
 
 	rxbuffer_t	rxtruncbuf;
@@ -1452,12 +1453,12 @@ struct acx_device {
 
 };
 
-void *ieee80211_dev_hw_data(struct net_device *);
 
-static inline acx_device_t*
-ndev2adev(struct net_device *ndev)
+
+static inline
+acx_device_t * ieee2adev(struct ieee80211_hw *hw)
 {
-	return ieee80211_dev_hw_data(ndev);
+        return hw->priv;
 }
 
 

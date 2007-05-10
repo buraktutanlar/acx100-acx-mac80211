@@ -212,6 +212,13 @@ has_only_one_bit(u16 v)
 }
 
 
+static inline int
+is_hidden_essid(char *essid)
+{
+	return (('\0' == essid[0]) ||
+		((' ' == essid[0]) && ('\0' == essid[1])));
+}
+
 /***********************************************************************
 ** LOCKING
 ** We have adev->sem and adev->lock.
@@ -313,36 +320,35 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 ** IRQ -> acxpci_l_clean_txdesc -> acx_wake_queue
 ** Review carefully all callsites */
 static inline void
-acx_stop_queue(struct net_device *ndev, const char *msg)
-{
+acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
+{/*
 	if (netif_queue_stopped(ndev))
 		return;
-
-	netif_stop_queue(ndev);
+*/
+	ieee80211_stop_queues(hw);
 	if (msg)
 		log(L_BUFT, "tx: stop queue %s\n", msg);
 }
 
-static inline int
-acx_queue_stopped(struct net_device *ndev)
+/*static inline int
+acx_queue_stopped(struct ieee80211_hw *ieee)
 {
-	return netif_queue_stopped(ndev);
-}
+	return netif_queue_stopped(ieee);
+}*/
 
-/*
+
 static inline void
-acx_start_queue(struct net_device *ndev, const char *msg)
+acx_start_queue(struct ieee80211_hw *hw, const char *msg)
 {
-	netif_start_queue(ndev);
+	ieee80211_start_queues(hw);
 	if (msg)
 		log(L_BUFT, "tx: start queue %s\n", msg);
 }
-*/
 
 static inline void
-acx_wake_queue(struct net_device *ndev, const char *msg)
+acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
-	netif_wake_queue(ndev);
+	ieee80211_wake_queues(hw);
 	if (msg)
 		log(L_BUFT, "tx: wake queue %s\n", msg);
 }
@@ -441,8 +447,8 @@ acx100pci_ioctl_set_phy_amp_bias(
 ** /proc
 */
 #ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(const struct net_device *ndev);
-int acx_proc_unregister_entries(const struct net_device *ndev);
+int acx_proc_register_entries(struct ieee80211_hw *ieee);
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
 #else
 static inline int
 acx_proc_register_entries(const struct net_device *ndev) { return OK; }
@@ -594,29 +600,29 @@ const char* acx_cmd_status_str(unsigned int state);
 /*** Devicescape functions ***/
 int acx_setup_modes(acx_device_t *adev);
 void acx_free_modes(acx_device_t *adev);
-int acx_i_start_xmit(struct net_device *ndev, 
+int acx_i_start_xmit(struct ieee80211_hw* ieee, 
 			struct sk_buff *skb, 
 			struct ieee80211_tx_control *ctl);
-int acx_add_interface(struct net_device *net_dev,
+int acx_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
-void acx_remove_interface(struct net_device *net_dev,
+void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
-int acx_net_reset(struct net_device *net_dev);
-int acx_net_set_key(struct net_device *net_dev, 
+int acx_net_reset(struct ieee80211_hw* ieee);
+int acx_net_set_key(struct ieee80211_hw *hw, 
 		set_key_cmd cmd,
 		u8 *addr,
 		struct ieee80211_key_conf *key,
 		int aid);
-int acx_config_interface(struct net_device *net_dev, int if_id, 
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id, 
 		struct ieee80211_if_conf *conf);
-int acx_net_config(struct net_device *net_dev, struct ieee80211_conf *conf);
-int acx_net_get_tx_stats(struct net_device *net_dev, struct ieee80211_tx_queue_stats *stats);
-int acx_net_conf_tx(struct net_device *net_dev, int queue,
+int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
+int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
+int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 		const struct ieee80211_tx_queue_params *params);
-int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
+//int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
 //static void acx_netdev_init(struct net_device *ndev);
 int acxpci_s_reset_dev(acx_device_t *adev);
-void acx_e_after_interrupt_task(acx_device_t *adev);
+void acx_e_after_interrupt_task(struct work_struct* work);
 /*** End DeviceScape Functions **/
 
 void great_inquisitor(acx_device_t *adev);
@@ -624,10 +630,10 @@ void great_inquisitor(acx_device_t *adev);
 void acx_s_get_firmware_version(acx_device_t *adev);
 void acx_display_hardware_details(acx_device_t *adev);
 
-int acx_e_change_mtu(struct net_device *ndev, int mtu);
-int acx_e_get_stats(struct net_device *ndev, struct ieee80211_low_level_stats *stats);
-struct iw_statistics* acx_e_get_wireless_stats(struct net_device *ndev);
-void acx_interrupt_tasklet(void *data);
+int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu);
+int acx_e_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
+void acx_interrupt_tasklet(struct work_struct *work);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);
