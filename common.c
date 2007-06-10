@@ -2754,7 +2754,11 @@ acx_l_rxmonitor(acx_device_t *adev, const rxbuffer_t *rxbuf)
 	skb->dev = adev->ndev;
 	skb->dev->last_rx = jiffies;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
+	skb_reset_mac_header(skb);
+#else
 	skb->mac.raw = skb->data;
+#endif
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = htons(ETH_P_80211_RAW);
