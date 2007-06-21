@@ -334,7 +334,7 @@ acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 acx_queue_stopped(struct ieee80211_hw *ieee)
 {
 	return netif_queue_stopped(ieee);
-}*/
+}
 
 
 static inline void
@@ -369,6 +369,7 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 		log(L_BUFT, "tx: carrier on %s\n", msg);
 }
 
+*/
 
 
 /***********************************************************************
@@ -429,7 +430,7 @@ void acx_s_cmd_start_scan(acx_device_t *adev);
 /***********************************************************************
 ** Ioctls
 */
-int
+/*int
 acx111pci_ioctl_info(
 	struct net_device *ndev,
 	struct iw_request_info *info,
@@ -441,7 +442,7 @@ acx100pci_ioctl_set_phy_amp_bias(
 	struct iw_request_info *info,
 	struct iw_param *vwrq,
 	char *extra);
-
+*/
 
 /***********************************************************************
 ** /proc
@@ -451,9 +452,9 @@ int acx_proc_register_entries(struct ieee80211_hw *ieee);
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
 #else
 static inline int
-acx_proc_register_entries(const struct net_device *ndev) { return OK; }
+acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
 static inline int
-acx_proc_unregister_entries(const struct net_device *ndev) { return OK; }
+acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
 #endif
 
 
@@ -623,6 +624,9 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 //static void acx_netdev_init(struct net_device *ndev);
 int acxpci_s_reset_dev(acx_device_t *adev);
 void acx_e_after_interrupt_task(struct work_struct* work);
+void acx_i_set_multicast_list(struct ieee80211_hw *hw,
+                            unsigned short netflags, int mc_count);
+
 /*** End DeviceScape Functions **/
 
 void great_inquisitor(acx_device_t *adev);

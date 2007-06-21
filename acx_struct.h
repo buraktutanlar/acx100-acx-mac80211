@@ -536,7 +536,7 @@ typedef struct rxbuffer {
 **	phy_hdr_t phy			*/
 	struct ieee80211_hdr hdr_a3;
 	/* maximally sized data part of wlan packet */
-	u8	data_a3[WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN];
+	u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
 	/* can add hdr/data_a4 if needed */
 } ACX_PACKED rxbuffer_t;
 
@@ -728,7 +728,7 @@ struct client {
 	u8	stepup_count;
 	char	essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
 /* FIXME: this one is too damn big */
-	char	challenge_text[WLAN_CHALLENGE_LEN];
+	char	challenge_text[128]; /*WLAN_CHALLENGE_LEN*/
 };
 
 
@@ -1026,7 +1026,7 @@ typedef struct usb_txbuffer {
 	u8	ctrl2;
 	u16	data_len;
 	/* wlan packet content is placed here: */
-	u8	data[WLAN_A4FR_MAXLEN_WEP_FCS];
+	u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
 } ACX_PACKED usb_txbuffer_t;
 
 /* USB returns either rx packets (see rxbuffer) or
@@ -1191,11 +1191,12 @@ struct acx_device {
 	struct net_device_stats	stats;		/* net device statistics */
 
 #ifdef WIRELESS_EXT
-	struct iw_statistics	wstats;		/* wireless statistics */
+//	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
 	struct acx_stats	acx_stats;
 	struct ieee80211_hw	*ieee;
 	struct ieee80211_hw_mode	*modes;
+	struct ieee80211_rx_status rx_status;
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
 
@@ -1259,7 +1260,7 @@ struct acx_device {
 	u16		scan_duration;
 	u16		scan_probe_delay;
 #if WIRELESS_EXT > 15
-	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
+//	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
 #endif
 
 	/*** Virtual interface struct ***/
@@ -1293,6 +1294,9 @@ struct acx_device {
 	u16		scan_retries;
 	unsigned long	scan_start;		/* YES, jiffies is defined as "unsigned long" */
 
+
+	/* MAC80211 Template Reference */
+	struct sk_buff *beacon_cache;
 	/* stations known to us (if we're an ap) */
 //	client_t	sta_list[32];		/* tab is larger than list, so that */
 //	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */

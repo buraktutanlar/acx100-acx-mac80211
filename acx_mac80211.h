@@ -49,10 +49,6 @@ struct acx_interface {
                        __FUNCTION__, __FILE__, __LINE__);                               \
         } while (0)     
 
-#define ACX_MACFMT                "%02x:%02x:%02x:%02x:%02x:%02x"
-#define ACX_MACARG(x)       ((u8*)(x))[0], ((u8*)(x))[1], \
-                                ((u8*)(x))[2], ((u8*)(x))[3], \
-                                ((u8*)(x))[4], ((u8*)(x))[5]
 
 
 #define ACX_MODE_NOTADHOC 0xFFFF

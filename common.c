@@ -24,9 +24,9 @@
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
-#include <net/iw_handler.h>
+//#include <net/iw_handler.h>
 #include <linux/ethtool.h>
-#include <linux/utsrelease.h>
+//#include <linux/utsrelease.h>
 
 #include "acx.h"
 
@@ -98,6 +98,8 @@ const char *const
 #ifdef PARANOID_LOCKING
 static unsigned max_lock_time;
 static unsigned max_sem_time;
+
+/* Obvious or linux kernel specific derived code follows: */
 
 void acx_lock_unhold()
 {
@@ -240,110 +242,6 @@ void acx_print_mac(const char *head, const u8 * mac, const char *tail)
 }
 
 
-/***********************************************************************
-** acx_get_status_name
-*/
-static const char *acx_get_status_name(u16 status)
-{
-	static const char *const str[] = {
-		"STOPPED", "SCANNING", "WAIT_AUTH",
-		"AUTHENTICATED", "ASSOCIATED", "INVALID??"
-	};
-	if (status > ARRAY_SIZE(str) - 1)
-		status = ARRAY_SIZE(str) - 1;
-
-	return str[status];
-}
-
-
-/***********************************************************************
-** acx_get_packet_type_string
-*/
-#if ACX_DEBUG
-const char *acx_get_packet_type_string(u16 fc)
-{
-	static const char *const mgmt_arr[] = {
-		"MGMT/AssocReq", "MGMT/AssocResp", "MGMT/ReassocReq",
-		"MGMT/ReassocResp", "MGMT/ProbeReq", "MGMT/ProbeResp",
-		"MGMT/UNKNOWN", "MGMT/UNKNOWN", "MGMT/Beacon", "MGMT/ATIM",
-		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen"
-	};
-	static const char *const ctl_arr[] = {
-		"CTL/PSPoll", "CTL/RTS", "CTL/CTS", "CTL/Ack", "CTL/CFEnd",
-		"CTL/CFEndCFAck"
-	};
-	static const char *const data_arr[] = {
-		"DATA/DataOnly", "DATA/Data CFAck", "DATA/Data CFPoll",
-		"DATA/Data CFAck/CFPoll", "DATA/Null", "DATA/CFAck",
-		"DATA/CFPoll", "DATA/CFAck/CFPoll"
-	};
-	const char *str;
-	u8 fstype = (WF_FC_FSTYPE & fc) >> 4;
-	u8 ctl;
-
-	switch (WF_FC_FTYPE & fc) {
-	case WF_FTYPE_MGMT:
-		if (fstype < ARRAY_SIZE(mgmt_arr))
-			str = mgmt_arr[fstype];
-		else
-			str = "MGMT/UNKNOWN";
-		break;
-	case WF_FTYPE_CTL:
-		ctl = fstype - 0x0a;
-		if (ctl < ARRAY_SIZE(ctl_arr))
-			str = ctl_arr[ctl];
-		else
-			str = "CTL/UNKNOWN";
-		break;
-	case WF_FTYPE_DATA:
-		if (fstype < ARRAY_SIZE(data_arr))
-			str = data_arr[fstype];
-		else
-			str = "DATA/UNKNOWN";
-		break;
-	default:
-		str = "UNKNOWN";
-		break;
-	}
-	return str;
-}
-#endif
-
-
-/***********************************************************************
-** acx_wlan_reason_str
-*/
-static inline const char *acx_wlan_reason_str(u16 reason)
-{
-	static const char *const reason_str[] = {
-		/*  0 */ "?",
-		/*  1 */ "unspecified",
-		/*  2 */ "prev auth is not valid",
-		/*  3 */ "leaving BBS",
-		/*  4 */ "due to inactivity",
-		/*  5 */ "AP is busy",
-		/*  6 */ "got class 2 frame from non-auth'ed STA",
-		/*  7 */ "got class 3 frame from non-assoc'ed STA",
-		/*  8 */ "STA has left BSS",
-		/*  9 */ "assoc without auth is not allowed",
-		/* 10 */ "bad power setting (802.11h)",
-		/* 11 */ "bad channel (802.11i)",
-		/* 12 */ "?",
-		/* 13 */ "invalid IE",
-		/* 14 */ "MIC failure",
-		/* 15 */ "four-way handshake timeout",
-		/* 16 */ "group key handshake timeout",
-		/* 17 */ "IE is different",
-		/* 18 */ "invalid group cipher",
-		/* 19 */ "invalid pairwise cipher",
-		/* 20 */ "invalid AKMP",
-		/* 21 */ "unsupported RSN version",
-		/* 22 */ "invalid RSN IE cap",
-		/* 23 */ "802.1x failed",
-		/* 24 */ "cipher suite rejected"
-	};
-	return reason < ARRAY_SIZE(reason_str) ? reason_str[reason] : "?";
-}
 
 
 /***********************************************************************
@@ -372,54 +270,6 @@ const char *acx_cmd_status_str(unsigned int state)
 	};
 	return state < ARRAY_SIZE(cmd_error_strings) ?
 	    cmd_error_strings[state] : "?";
-}
-
-
-/***********************************************************************
-** get_status_string
-*/
-static inline const char *get_status_string(unsigned int status)
-{
-	/* A bit shortened, but hopefully still understandable */
-	static const char *const status_str[] = {
-		/* 0 */ "Successful",
-		/* 1 */ "Unspecified failure",
-		/* 2 */ "reserved",
-		/* 3 */ "reserved",
-		/* 4 */ "reserved",
-		/* 5 */ "reserved",
-		/* 6 */ "reserved",
-		/* 7 */ "reserved",
-		/* 8 */ "reserved",
-		/* 9 */ "reserved",
-		/*10 */
-		    "Cannot support all requested capabilities in Capability Information field",
-		/*11 */ "Reassoc denied (reason outside of 802.11b scope)",
-		/*12 */
-		    "Assoc denied (reason outside of 802.11b scope) -- maybe MAC filtering by peer?",
-		/*13 */
-		    "Responding station doesnt support specified auth algorithm -- maybe WRP auth Open vs. Restricted",
-		/*14 */ "Auth rejected: wrong transaction sequence number",
-		/*15 */ "Auth rejected: challenge failure",
-		/*16 */ "Auth rejected: timeout for next frame in sequence",
-		/*17 */ "Assoc denied: too many STAs on this AP",
-		/*18 */
-		    "Assoc denied: requesting STA doesnt support all data rates in basic set",
-		/*19 */
-		    "Assoc denied: requesting STA doesnt support Short Preamble",
-		/*20 */
-		    "Assoc denied: requesting STA doesnt support PBCC Modulation",
-		/*21 */
-		    "Assoc denied: requesting STA doesnt support Channel Agility"
-		    /*22 */ "reserved",
-		/*23 */ "reserved",
-		/*24 */ "reserved",
-		/*25 */
-		    "Assoc denied: requesting STA doesnt support Short Slot Time",
-		/*26 */ "Assoc denied: requesting STA doesnt support DSSS-OFDM"
-	};
-
-	return status_str[status < ARRAY_SIZE(status_str) ? status : 2];
 }
 
 /***********************************************************************
@@ -455,6 +305,8 @@ void acx_dump_bytes(const void *data, int num)
 
 /***********************************************************************
 ** acx_s_get_firmware_version
+** 
+** Obvious
 */
 void acx_s_get_firmware_version(acx_device_t * adev)
 {
@@ -541,6 +393,8 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 ** acx_display_hardware_details
 **
 ** Displays hw/fw version, radio type etc...
+**
+** Obvious
 */
 void acx_display_hardware_details(acx_device_t * adev)
 {
@@ -607,22 +461,6 @@ void acx_display_hardware_details(acx_device_t * adev)
 
 
 /***********************************************************************
-*/
-int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu)
-{
-	enum {
-		MIN_MTU = 256,
-		MAX_MTU = WLAN_DATA_MAXLEN - (ETH_HLEN)
-	};
-
-	if (mtu < MIN_MTU || mtu > MAX_MTU)
-		return -EINVAL;
-
-//	hw->mtu = mtu;
-	return 1;
-}
-
-/***********************************************************************
 ** acx_e_get_stats, acx_e_get_wireless_stats
 */
 int
@@ -635,12 +473,6 @@ acx_e_get_stats(struct ieee80211_hw *hw,
 	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
 	acx_unlock(adev, flags);
 	return 0;
-}
-
-struct iw_statistics *acx_e_get_wireless_stats(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	return &adev->wstats;
 }
 
 
@@ -997,18 +829,6 @@ static int acx_l_proc_output(char *buf, acx_device_t * adev)
 		     adev->form_factor,
 		     adev->eeprom_version,
 		     adev->firmware_version, adev->firmware_numver);
-/*
-	for (i = 0; i < VEC_SIZE(adev->sta_list); i++) {
-		struct client *bss = &adev->sta_list[i];
-		if (!bss->used) continue;
-		p += sprintf(p, "BSS %u BSSID "MACSTR" ESSID %s channel %u "
-			"Cap 0x%X SIR %u SNR %u\n",
-			i, MAC(bss->bssid), (char*)bss->essid, bss->channel,
-			bss->cap_info, bss->sir, bss->snr);
-	}
-*/
-	p += sprintf(p, "status:\t\t\t%u (%s)\n",
-		     adev->status, acx_get_status_name(adev->status));
 
 	FN_EXIT1(p - buf);
 	return p - buf;
@@ -1050,11 +870,9 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 		     "\n"
 		     "** network status **\n"
 		     "dev_state_mask 0x%04X\n"
-		     "status %u (%s), "
 		     "mode %u, channel %u, "
 		     "reg_dom_id 0x%02X, reg_dom_chanmask 0x%04X, ",
 		     adev->dev_state_mask,
-		     adev->status, acx_get_status_name(adev->status),
 		     adev->mode, adev->channel,
 		     adev->reg_dom_id, adev->reg_dom_chanmask);
 	p += sprintf(p,
@@ -1596,67 +1414,17 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee)
 	return manage_proc_entries(ieee, 1);
 }
 #endif /* CONFIG_PROC_FS */
-/*
-void acx_get_drvinfo(struct ieee80211_hw *hw,                  
-                            struct ethtool_drvinfo *info)
-{
-        acx_device_t *adev = ieee2adev(hw);                  
 
-        strncpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
-        strncpy(info->version, UTS_RELEASE, sizeof(info->version));
-	acx_put_devname(adev,info);
-}                  
-
-struct ethtool_ops acx_ethtool_ops = {
-        .get_drvinfo = acx_get_drvinfo,
-        .get_link = ethtool_op_get_link,
-};
-*/
+/****
+** Gathered From rt2x00 and bcm43xx_mac80211 projects
+**/
 void acx_free_modes(acx_device_t * adev)
 {
 
-/*        for (i = 0; i < ieee->num_modes; i++) {
-                kfree(ieee->modes[i].channels);
-                kfree(ieee->modes[i].rates);
-        }*/
         kfree(adev->modes);
         adev->modes = NULL;
 }
-/*
-int acx_append_mode(struct ieee80211_hw *ieee,
-                           int mode_id,
-                           int nr_channels,
-                           const struct ieee80211_channel *channels,
-                           int nr_rates, const struct ieee80211_rate *rates)
-{
-        struct ieee80211_hw_modes *mode;
-        int err = -ENOMEM;
 
-        mode = &(ieee->modes[ieee->num_modes]);
-
-        mode->mode = mode_id;
-        mode->num_channels = nr_channels;
-        mode->channels = kzalloc(sizeof(*channels) * nr_channels, GFP_KERNEL);
-        if (!mode->channels)
-                goto out;
-        memcpy(mode->channels, channels, sizeof(*channels) * nr_channels);
-
-        mode->num_rates = nr_rates;
-        mode->rates = kzalloc(sizeof(*rates) * nr_rates, GFP_KERNEL);
-        if (!mode->rates)
-                goto err_free_channels;
-        memcpy(mode->rates, rates, sizeof(*rates) * nr_rates);
-
-        err = 0;
-      out:
-        return err;
-
-      err_free_channels:              
-        kfree(mode->channels);         
-        goto out;
-
-}
-*/
 #define RATETAB_ENT(_rateid, _flags) \
 	{							\
 		.rate	= (_rateid),				\
@@ -1694,7 +1462,7 @@ static struct ieee80211_rate __acx_ratetable[] = {
                 .flag   = IEEE80211_CHAN_W_SCAN |               \
                           IEEE80211_CHAN_W_ACTIVE_SCAN |        \
                           IEEE80211_CHAN_W_IBSS,                \
-                .power_level    = 0xFF,                         \
+                .power_level    = 0xf,                         \
                 .antenna_max    = 0xFF,                         \
         }
 static struct ieee80211_channel channels[] = {
@@ -1770,97 +1538,34 @@ int acx_setup_modes(acx_device_t * adev)
 /***********************************************************************
 ** acx_fill_beacon_or_proberesp_template
 **
-** For frame format info, please see 802.11-1999.pdf item 7.2.3.9 and below!!
-**
-** NB: we use the fact that
-** struct acx_template_proberesp and struct acx_template_beacon are the same
-** (well, almost...)
-**
-** [802.11] Beacon's body consist of these IEs:
-** 1 Timestamp
-** 2 Beacon interval
-** 3 Capability information
-** 4 SSID
-** 5 Supported rates (up to 8 rates)
-** 6 FH Parameter Set (frequency-hopping PHYs only)
-** 7 DS Parameter Set (direct sequence PHYs only)
-** 8 CF Parameter Set (only if PCF is supported)
-** 9 IBSS Parameter Set (ad-hoc only)
-**
-** Beacon only:
-** 10 TIM (AP only) (see 802.11 7.3.2.6)
-** 11 Country Information (802.11d)
-** 12 FH Parameters (802.11d)                    
-** 13 FH Pattern Table (802.11d)
-** ... (?!! did not yet find relevant PDF file... --vda)
-** 19 ERP Information (extended rate PHYs)
-** 20 Extended Supported Rates (if more than 8 rates)
-**
-** Proberesp only: 
-** 10 Country information (802.11d)
-** 11 FH Parameters (802.11d)
-** 12 FH Pattern Table (802.11d)
-** 13-n Requested information elements (802.11d)
-** ????
-** 18 ERP Information (extended rate PHYs)
-** 19 Extended Supported Rates (if more than 8 rates)               
+** Origin: derived from rt2x00 project
 */
 static int               
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
                                         struct acx_template_beacon *templ,
-                                        u16 fc /* in host order! */)
+                                        struct sk_buff* skb /* in host order! */)
 {
-        int len;
-        u8 *p;
-
         FN_ENTER;
 
-        memset(templ, 0, sizeof(*templ));
-        MAC_BCAST(templ->da);
-        MAC_COPY(templ->sa, adev->dev_addr);
-        MAC_COPY(templ->bssid, adev->bssid);
-
-        templ->beacon_interval = cpu_to_le16(adev->beacon_interval);
-        acx_update_capabilities(adev);
-        templ->cap = cpu_to_le16(adev->capabilities);
-
-        p = templ->variable;
-        p = wlan_fill_ie_ssid(p, adev->essid_len, adev->essid);
-        p = wlan_fill_ie_rates(p, adev->rate_supported_len, adev->rate_supported);
-        p = wlan_fill_ie_ds_parms(p, adev->channel);
-        /* NB: should go AFTER tim, but acx seem to keep tim last always */
-        p = wlan_fill_ie_rates_ext(p, adev->rate_supported_len, adev->rate_supported);
-
-        switch (adev->mode) {
-        case ACX_MODE_0_ADHOC:
-                /* ATIM window */
-                p = wlan_fill_ie_ibss_parms(p, 0); break;
-        case ACX_MODE_3_AP:
-                /* TIM IE is set up as separate template */
-                break;
-        }
-
-        len = p - (u8*)templ;
-        templ->fc = cpu_to_le16(WF_FTYPE_MGMT | fc);
-        /* - 2: do not count 'u16 size' field */
-        templ->size = cpu_to_le16(len - 2);
-
-        FN_EXIT1(len);
-        return len;
+        memcpy(templ,skb->data, skb->len);
+        FN_EXIT1(skb->len);
+        return skb->len;
 }
 
 /***********************************************************************
 ** acx_s_set_beacon_template
+**
+**
 */
 static int
-acx_s_set_beacon_template(acx_device_t *adev)
+acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
 {
         struct acx_template_beacon bcn;
         int len, result;
 
         FN_ENTER;
-
-        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, WF_FSTYPE_BEACON);         
+	printk("Size of template: %08X, Size of beacon: %08X\n",sizeof(struct acx_template_beacon),skb->len);
+        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
 
         FN_EXIT1(result);
@@ -1903,8 +1608,7 @@ static inline unsigned int rate111to5bits(unsigned int rate)
 }
 
 
-static void
-acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
+void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 {
         acx_joinbss_t tmp;
         int dtim_interval;
@@ -1962,127 +1666,57 @@ acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         tmp.macmode = (adev->mode != ACX_MODE_MONITOR ? adev->mode : ACX_MODE_2_STA);
         tmp.channel = adev->channel;
         tmp.essid_len = adev->essid_len;
-        /* NOTE: the code memcpy'd essid_len + 1 before, which is WRONG! */
+
         memcpy(tmp.essid, adev->essid, tmp.essid_len);
         acx_s_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
 
         log(L_ASSOC|L_DEBUG, "BSS_Type = %u\n", tmp.macmode);
         acxlog_mac(L_ASSOC|L_DEBUG, "JoinBSSID MAC:", adev->bssid, "\n");
 
-        acx_update_capabilities(adev);
+/*        acx_update_capabilities(adev); */
         FN_EXIT0;
 }
 
-
-
 /***********************************************************************
-** acx_s_cmd_start_scan
-**
-** Issue scan command to the hardware
-**
-** unified function for both ACX111 and ACX100
+** acxpci_i_set_multicast_list
+** FIXME: most likely needs refinement
 */
-/*
-int acx_passive_scan(struct net_device *net_dev, int state,
-		     struct ieee80211_scan_conf *conf)
+void
+acx_i_set_multicast_list(struct ieee80211_hw *hw,
+                            unsigned short netflags, int mc_count)
 {
-	union {
-		acx111_scan_t acx111;
-		acx100_scan_t acx100;
-	} s;
-	unsigned long flags;
-	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
-	acx_lock(adev, flags);
-	memset(&s, 0, sizeof(s));
-*/
-	/* first common positions... */
-/*
-	s.acx111.count = cpu_to_le16(adev->scan_count);
-	s.acx111.rate = adev->scan_rate;
-	s.acx111.options = ACX_SCAN_OPT_PASSIVE;
-	s.acx111.chan_duration = cpu_to_le16(adev->scan_duration);
-	s.acx111.max_probe_delay = cpu_to_le16(adev->scan_probe_delay);
-*/
-	/* ...then differences */
+        acx_device_t *adev = ieee2adev(hw);
+        unsigned long flags;
 
-//	if (IS_ACX111(adev)) {
-		/*s.acx111.channel_list_select = 0; *//* scan every allowed channel */
-//		s.acx111.channel_list_select = 1;	/* scan given channels */
-		/*s.acx111.modulation = 0x40; *//* long preamble? OFDM? -> only for active scan */
-//		s.acx111.modulation = 0;
-//		s.acx111.channel_list[0] = conf->scan_channel;
-		/*s.acx111.channel_list[1] = 4; */
-/*	} else {
-		s.acx100.start_chan = cpu_to_le16(conf->scan_channel);
-		s.acx100.flags = cpu_to_le16(conf->scan_channel);
-	}
+        FN_ENTER;
 
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SCAN, &s, sizeof(s));
-	acx_unlock(adev, flags);
-	FN_EXIT0;
-	return 0;
-}*/
-static void acx_s_scan_chan(acx_device_t * adev)
-{
-	union {
-		acx111_scan_t acx111;
-		acx100_scan_t acx100;
-	} s;
+        acx_lock(adev, flags);
 
-	FN_ENTER;
+        /* firmwares don't have allmulti capability,
+         * so just use promiscuous mode instead in this case. */
+        if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
+                SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+                CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+                SET_BIT(adev->set_mask, SET_RXCONFIG);
+                /* let kernel know in case *we* needed to set promiscuous */
+        } else {
+                CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+                SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+                SET_BIT(adev->set_mask, SET_RXCONFIG);              
+        }
 
-	memset(&s, 0, sizeof(s));
+        /* cannot update card settings directly here, atomic context */
+        acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
-	/* first common positions... */
+        acx_unlock(adev, flags);       
 
-	s.acx111.count = cpu_to_le16(adev->scan_count);
-	s.acx111.rate = adev->scan_rate;
-	s.acx111.options = adev->scan_mode;
-	s.acx111.chan_duration = cpu_to_le16(adev->scan_duration);
-	s.acx111.max_probe_delay = cpu_to_le16(adev->scan_probe_delay);
-
-	/* ...then differences */
-
-	if (IS_ACX111(adev)) {
-		s.acx111.channel_list_select = 0;	/* scan every allowed channel */
-		/*s.acx111.channel_list_select = 1; *//* scan given channels */
-		/*s.acx111.modulation = 0x40; *//* long preamble? OFDM? -> only for active scan */
-		s.acx111.modulation = 0;
-		/*s.acx111.channel_list[0] = 6;
-		   s.acx111.channel_list[1] = 4; */
-	} else {
-		s.acx100.start_chan = cpu_to_le16(1);
-		s.acx100.flags = cpu_to_le16(0x8000);
-	}
-
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SCAN, &s, sizeof(s));
-	FN_EXIT0;
+        FN_EXIT0; 
 }
-
-
-void acx_s_cmd_start_scan(acx_device_t * adev)
-{
-	/* time_before check is 'just in case' thing */
-	if (!(adev->irq_status & HOST_INT_SCAN_COMPLETE)
-	    && time_before(jiffies, adev->scan_start + 10 * HZ)
-	    ) {
-		log(L_INIT, "start_scan: seems like previous scan "
-		    "is still running. Not starting anew. Please report\n");
-		return;
-	}
-
-	log(L_INIT, "starting radio scan\n");
-	/* remember that fw is commanded to do scan */
-	adev->scan_start = jiffies;
-	CLEAR_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
-	/* issue it */
-	acx_s_scan_chan(adev);
-}
-
 
 /***********************************************************************
 ** acx111 feature config
+**
+** Obvious
 */
 static int
 acx111_s_get_feature_config(acx_device_t * adev,
@@ -2110,6 +1744,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 
 	return OK;
 }
+
 
 static int
 acx111_s_set_feature_config(acx_device_t * adev,
@@ -2580,7 +2215,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	/* copy the MAC address we just got from the card
 	 * into our MAC address used during current 802.11 session */
-//	MAC_COPY(adev->dev_addr, adev->wiphy->dev_addr);
 	SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
 	MAC_BCAST(adev->ap);
 
@@ -2609,7 +2243,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 
 	adev->mode = ACX_MODE_2_STA;
-	adev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
 	adev->listen_interval = 100;
 	adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
 	adev->dtim_interval = DEFAULT_DTIM_INTERVAL;
@@ -2699,6 +2332,8 @@ void acx_s_set_defaults(acx_device_t * adev)
 ** set the power level of the radio module which it controls.
 ** Or maybe not, since the radio module probably has a function interface
 ** instead which then manages Tx level programming :-\
+**
+** Obvious
 */
 static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
@@ -2719,11 +2354,11 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		tx_level.level = 1;	/* 15 dBm */
 		adev->tx_level_dbm = 15;
 	}
-	if (level_dbm != adev->tx_level_dbm)
+/*	if (level_dbm != adev->tx_level_dbm)
 		log(L_INIT, "acx111 firmware has specific "
 		    "power levels only: adjusted %d dBm to %d dBm!\n",
 		    level_dbm, adev->tx_level_dbm);
-
+*/
 	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
 }
 
@@ -2746,29 +2381,11 @@ static int acx_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
 	struct ieee80211_hdr *hdr;
-	unsigned int qual;
 	u16 fc, buf_len;
-
 	hdr = acx_get_wlan_hdr(adev, rxbuf);
 	fc = le16_to_cpu(hdr->frame_control);
 	/* length of frame from control field to first byte of FCS */
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
-//	printk("Got %s\n",acx_get_packet_type_string(fc));
-	if (((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON)
-	    || (acx_debug & L_XFER_BEACON)
-	    ) {
-		log(L_XFER | L_DATA, "rx: %s "
-		    "time:%u len:%u signal:%u SNR:%u macstat:%02X "
-		    "phystat:%02X phyrate:%u status:%u\n",
-		    acx_get_packet_type_string(fc),
-		    le32_to_cpu(rxbuf->time),
-		    buf_len,
-		    acx_signal_to_winlevel(rxbuf->phy_level),
-		    acx_signal_to_winlevel(rxbuf->phy_snr),
-		    rxbuf->mac_status,
-		    rxbuf->phy_stat_baseband,
-		    rxbuf->phy_plcp_signal, adev->status);
-	}
 
 	if (unlikely(acx_debug & L_DATA)) {
 		printk("rx: 802.11 buf[%u]: ", buf_len);
@@ -2788,24 +2405,9 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	/* only consider packets originating from the MAC
 	 * address of the device that's managing our BSSID.
 	 * Disable it for now, since it removes information (levels
-	 * from different peers) and slows the Rx path. */
+	 * from different peers) and slows the Rx path. *//*
 	if (adev->ap_client && mac_is_equal(hdr->a2, adev->ap_client->address)) {
-#endif
-		adev->wstats.qual.level =
-		    acx_signal_to_winlevel(rxbuf->phy_level);
-		adev->wstats.qual.noise =
-		    acx_signal_to_winlevel(rxbuf->phy_snr);
-#ifndef OLD_QUALITY
-		qual = acx_signal_determine_quality(adev->wstats.qual.level,
-						    adev->wstats.qual.noise);
-#else
-		qual = (adev->wstats.qual.noise <= 100) ?
-		    100 - adev->wstats.qual.noise : 0;
-#endif
-		adev->wstats.qual.qual = qual;
-		adev->wstats.qual.updated = 7;	/* all 3 indicators updated */
-#ifdef FROM_SCAN_SOURCE_ONLY
-	}
+*/
 #endif
 }
 
@@ -2837,6 +2439,7 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 ** 22Mbit, of course, is PBCC always. */
 
 /* maps acx100 tx descr rate field to acx111 one */
+/*
 static u16 rate100to111(u8 r)
 {
 	switch (r) {
@@ -2859,110 +2462,7 @@ static u16 rate100to111(u8 r)
 	}
 }
 
-
-void
-acx_l_handle_txrate_auto(acx_device_t * adev, struct client *txc,
-			 u16 cur, u8 rate100, u16 rate111,
-			 u8 error, int pkts_to_ignore)
-{
-	u16 sent_rate;
-	int slower_rate_was_used;
-
-	/* vda: hmm. current code will do this:
-	 ** 1. send packets at 11 Mbit, stepup++
-	 ** 2. will try to send at 22Mbit. hardware will see no ACK,
-	 **    retries at 11Mbit, success. code notes that used rate
-	 **    is lower. stepup = 0, fallback++
-	 ** 3. repeat step 2 fallback_count times. Fall back to
-	 **    11Mbit. go to step 1.
-	 ** If stepup_count is large (say, 16) and fallback_count
-	 ** is small (3), this wouldn't be too bad wrt throughput */
-
-	if (unlikely(!cur)) {
-		printk("acx: BUG! ratemask is empty\n");
-		return;		/* or else we may lock up the box */
-	}
-
-	/* do some preparations, i.e. calculate the one rate that was
-	 * used to send this packet */
-	if (IS_ACX111(adev)) {
-		sent_rate = 1 << highest_bit(rate111 & RATE111_ALL);
-	} else {
-		sent_rate = rate100to111(rate100);
-	}
-	/* sent_rate has only one bit set now, corresponding to tx rate
-	 * which was used by hardware to tx this particular packet */
-
-	/* now do the actual auto rate management */
-	log(L_XFER, "tx: %sclient=%p/" MACSTR " used=%04X cur=%04X cfg=%04X "
-	    "__=%u/%u ^^=%u/%u\n",
-	    (txc->ignore_count > 0) ? "[IGN] " : "",
-	    txc, MAC(txc->address), sent_rate, cur, txc->rate_cfg,
-	    txc->fallback_count, adev->fallback_threshold,
-	    txc->stepup_count, adev->stepup_threshold);
-
-	/* we need to ignore old packets already in the tx queue since
-	 * they use older rate bytes configured before our last rate change,
-	 * otherwise our mechanism will get confused by interpreting old data.
-	 * Do it after logging above */
-	if (txc->ignore_count) {
-		txc->ignore_count--;
-		return;
-	}
-
-	/* true only if the only nonzero bit in sent_rate is
-	 ** less significant than highest nonzero bit in cur */
-	slower_rate_was_used = (cur > ((sent_rate << 1) - 1));
-
-	if (slower_rate_was_used || error) {
-		txc->stepup_count = 0;
-		if (++txc->fallback_count <= adev->fallback_threshold)
-			return;
-		txc->fallback_count = 0;
-
-		/* clear highest 1 bit in cur */
-		sent_rate = RATE111_54;
-		while (!(cur & sent_rate))
-			sent_rate >>= 1;
-		CLEAR_BIT(cur, sent_rate);
-		if (!cur)	/* we can't disable all rates! */
-			cur = sent_rate;
-		log(L_XFER, "tx: falling back to ratemask %04X\n", cur);
-
-	} else {		/* there was neither lower rate nor error */
-		txc->fallback_count = 0;
-		if (++txc->stepup_count <= adev->stepup_threshold)
-			return;
-		txc->stepup_count = 0;
-
-		/* Sanitize. Sort of not needed, but I dont trust hw that much...
-		 ** what if it can report bogus tx rates sometimes? */
-		while (!(cur & sent_rate))
-			sent_rate >>= 1;
-
-		/* try to find a higher sent_rate that isn't yet in our
-		 * current set, but is an allowed cfg */
-		while (1) {
-			sent_rate <<= 1;
-			if (sent_rate > txc->rate_cfg)
-				/* no higher rates allowed by config */
-				return;
-			if (!(cur & sent_rate) && (txc->rate_cfg & sent_rate))
-				/* found */
-				break;
-			/* not found, try higher one */
-		}
-		SET_BIT(cur, sent_rate);
-		log(L_XFER, "tx: stepping up to ratemask %04X\n", cur);
-	}
-
-	txc->rate_cur = cur;
-	txc->ignore_count = pkts_to_ignore;
-	/* calculate acx100 style rate byte if needed */
-	if (IS_ACX100(adev)) {
-		txc->rate_100 = acx_bitpos2rate100[highest_bit(cur)];
-	}
-}
+*/
 
 int
 acx_i_start_xmit(struct ieee80211_hw *hw,
@@ -2982,9 +2482,11 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
                 txresult = OK;
                 goto end_no_unlock;
         }
+
         if (unlikely(!adev)) {
                 goto end_no_unlock;
         }
+
 
         acx_lock(adev, flags);             
 
@@ -2994,11 +2496,9 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
         if (unlikely(!adev->initialized)) {
                 goto end;
         }
-/*        if (unlikely(acx_queue_stopped(ndev))) {
-                log(L_DEBUG, "%s: called when queue stopped\n", __func__);
-                goto end;
-        }*/
+
         tx = acx_l_alloc_tx(adev);
+
         if (unlikely(!tx)) {             
                 printk_ratelimited("%s: start_xmit: txdesc ring is full, "
                                    "dropping tx\n", wiphy_name(adev->ieee->wiphy));
@@ -3007,25 +2507,16 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
         }           
 
         txbuf = acx_l_get_txbuf(adev, tx);
+
         if (unlikely(!txbuf)) {
                 /* Card was removed */
                 txresult = NOT_OK;
                 acx_l_dealloc_tx(adev, tx);
                 goto end;    
         }
-        //len = acx_ether_to_txbuf(adev, txbuf, skb);
-        memcpy((u8 *) txbuf, skb->data, skb->len);
-//      w_hdr = (struct wlan_hdr_a3*)txbuf;
-
-//      if (unlikely(len < 0)) {   
-        /* Error in packet conversion */
-//              txresult = NOT_OK;
-//              acx_l_dealloc_tx(adev, tx);
-//              goto end;
-//      }
+        memcpy(txbuf, skb->data, skb->len);
 
         acx_l_tx_data(adev, tx, skb->len, ctl,skb);
-        //ndev->trans_start = jiffies;       
 
         txresult = OK;
         adev->stats.tx_packets++;               
@@ -3035,8 +2526,6 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
         acx_unlock(adev, flags);
 
       end_no_unlock:
-//      if ((txresult == OK) && skb)
-//              dev_kfree_skb_any(skb);
 
         FN_EXIT1(txresult);             
         return txresult; 
@@ -3092,88 +2581,11 @@ void acx_l_update_ratevector(acx_device_t * adev)
 }
 
 /***********************************************************************
-** acx_set_status
-**
-** This function is called in many atomic regions, must not sleep
-**
-** This function does not need locking UNLESS you call it
-** as acx_set_status(ACX_STATUS_4_ASSOCIATED), bacause this can
-** wake queue. This can race with stop_queue elsewhere.
-** See acx_stop_queue comment. */
-/*
-void acx_set_status(acx_device_t * adev, u16 new_status)
-{
-#define QUEUE_OPEN_AFTER_ASSOC 1 */	/* this really seems to be needed now */
-/*	u16 old_status = adev->status;
-
-	FN_ENTER;
-
-	log(L_ASSOC, "%s(%d):%s\n",
-	    __func__, new_status, acx_get_status_name(new_status));
-*/
-	/* wireless_send_event never sleeps */
-/*	if (ACX_STATUS_4_ASSOCIATED == new_status) {
-		union iwreq_data wrqu;
-
-		wrqu.data.length = 0;
-		wrqu.data.flags = 0;
-		wireless_send_event(adev->ndev, SIOCGIWSCAN, &wrqu, NULL);
-
-		wrqu.data.length = 0;
-		wrqu.data.flags = 0;
-		MAC_COPY(wrqu.ap_addr.sa_data, adev->bssid);
-		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
-		wireless_send_event(adev->ndev, SIOCGIWAP, &wrqu, NULL);
-	} else {
-		union iwreq_data wrqu;
-
-*/		/* send event with empty BSSID to indicate we're not associated */
-/*		MAC_ZERO(wrqu.ap_addr.sa_data);
-		wrqu.ap_addr.sa_family = ARPHRD_ETHER;
-		wireless_send_event(adev->ndev, SIOCGIWAP, &wrqu, NULL);
-	}
-
-
-	adev->status = new_status;
-
-	switch (new_status) {
-	case ACX_STATUS_1_SCANNING:
-		adev->scan_retries = 0;
-*/		/* 1.0 s initial scan time */
-//              acx_set_timer(adev, 1000000);
-/*		break;
-	case ACX_STATUS_2_WAIT_AUTH:
-	case ACX_STATUS_3_AUTHENTICATED:
-		adev->auth_or_assoc_retries = 0;
-*/
-//              acx_set_timer(adev, 1500000); /* 1.5 s */
-/*		break;
-	}
-
-#if QUEUE_OPEN_AFTER_ASSOC
-	if (new_status == ACX_STATUS_4_ASSOCIATED) {
-		if (old_status < ACX_STATUS_4_ASSOCIATED) {
-*/			/* ah, we're newly associated now,
-			 * so let's indicate carrier */
-/*			acx_carrier_on(adev->ndev, "after association");
-			acx_wake_queue(adev->ndev, "after association");
-		}
-	} else {
-*/		/* not associated any more, so let's kill carrier */
-/*		if (old_status >= ACX_STATUS_4_ASSOCIATED) {
-			acx_carrier_off(adev->ndev, "after losing association");
-			acx_stop_queue(adev->ndev, "after losing association");
-		}
-	}
-#endif
-	FN_EXIT0;
-}
-*/
-
-/***********************************************************************
 ** acx_i_timer
 **
 ** Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
+**
+** Obvious
 */
 void acx_i_timer(unsigned long address)
 {
@@ -3184,8 +2596,6 @@ void acx_i_timer(unsigned long address)
 
 	acx_lock(adev, flags);
 
-	log(L_DEBUG | L_ASSOC, "%s: adev->status=%d (%s)\n",
-	    __func__, adev->status, acx_get_status_name(adev->status));
 	FIXME();
 	/* We need calibration and stats gather tasks to perform here */
 
@@ -3199,6 +2609,8 @@ void acx_i_timer(unsigned long address)
 ** acx_set_timer
 **
 ** Sets the 802.11 state management timer's timeout.
+**
+** Linux derived
 */
 void acx_set_timer(acx_device_t * adev, int timeout_us)
 {
@@ -3220,6 +2632,10 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 	FN_EXIT0;
 }
 
+/** acx_plcp_get_bitrate_cck
+ **
+ ** Obvious
+*/
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
@@ -3236,6 +2652,7 @@ static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 }
 
 /* Extract the bitrate out of an OFDM PLCP header. */
+/** Obvious **/
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 {
         switch (plcp & 0xF) {
@@ -3265,41 +2682,59 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 **
 ** The end of the Rx path. Pulls data from a rxhostdesc into a socket
 ** buffer and feeds it to the network stack via netif_rx().
+** 
+** Look to bcm43xx or p54
 */
 static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
 
-	struct ieee80211_rx_status status;
+	struct ieee80211_rx_status* status = &adev->rx_status;
 	struct ieee80211_hdr *w_hdr;
 	int buflen;
 	FN_ENTER;
+
 	if (likely(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		struct sk_buff *skb;
 		w_hdr = acx_get_wlan_hdr(adev, rxbuf);
-//		buflen = RXBUF_BYTES_RCVD(adev, rxbuf); //+WLAN_FCS_LEN;
 		buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
 		skb = dev_alloc_skb(buflen + 2);
 		skb_reserve(skb, 2);
 		skb_put(skb, buflen);
 		memcpy(skb->data, w_hdr, buflen);
 
-//acx_rxbuf_to_ether(adev, rxbuf);
-		memset(&status, 0, sizeof(status));
+//		memset(&status, 0, sizeof(status));
 
 		if (likely(skb)) {
-//                      netif_rx(skb);
-//                      adev->ndev->last_rx = jiffies;
 			adev->acx_stats.last_rx = jiffies;
-			status.mactime = rxbuf->time;
-			status.channel = adev->channel;
+			status->mactime = rxbuf->time;
+			status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
+			status->noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+			status->flag = 0;
+			status->rate = rxbuf->phy_plcp_signal;
+			status->antenna = 1;
+/*
+#ifndef OLD_QUALITY
+		qual = acx_signal_determine_quality(adev->wstats.qual.level,
+						    adev->wstats.qual.noise);
+#else
+		qual = (adev->wstats.qual.noise <= 100) ?
+		    100 - adev->wstats.qual.noise : 0;
+#endif
+		adev->wstats.qual.qual = qual;
+		adev->wstats.qual.updated = 7;	*//* all 3 indicators updated */
+/*
+#ifdef FROM_SCAN_SOURCE_ONLY
+	}
+#endif
+*/
 			if (rxbuf->phy_stat_baseband & (1 << 3)) /* Uses OFDM */
 			{
-				status.rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+				status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 			} else
 			{
-				status.rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+				status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 			}
-			ieee80211_rx_irqsafe(adev->ieee, skb, &status);
+			ieee80211_rx_irqsafe(adev->ieee, skb, status);
 			adev->stats.rx_packets++;
 			adev->stats.rx_bytes += skb->len;
 		}
@@ -3308,18 +2743,6 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 }
 
 
-
-/***********************************************************************
-** acx_gen_challenge
-*/
-static inline void acx_gen_challenge(wlan_ie_challenge_t * d)
-{
-	FN_ENTER;
-	d->eid = WLAN_EID_CHALLENGE;
-	d->len = WLAN_CHALLENGE_LEN;
-	get_random_bytes(d->challenge, WLAN_CHALLENGE_LEN);
-	FN_EXIT0;
-}
 
 /***********************************************************************
 ** acx_s_read_fw
@@ -3414,7 +2837,7 @@ static void acx111_s_set_wepkey(acx_device_t * adev)
 		}
 	}
 }
-
+/* Obvious */
 static void acx_s_set_wepkey(acx_device_t * adev)
 {
 	if (IS_ACX111(adev))
@@ -3799,52 +3222,6 @@ int acx_s_init_mac(acx_device_t * adev)
 }
 
 
-void acx_s_set_sane_reg_domain(acx_device_t * adev, int do_set)
-{
-	unsigned mask;
-
-	unsigned int i;
-
-	for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
-		if (acx_reg_domain_ids[i] == adev->reg_dom_id)
-			break;
-
-	if (sizeof(acx_reg_domain_ids) == i) {
-		log(L_INIT, "Invalid or unsupported regulatory domain"
-		    " 0x%02X specified, falling back to FCC (USA)!"
-		    " Please report if this sounds fishy!\n", adev->reg_dom_id);
-		i = 0;
-		adev->reg_dom_id = acx_reg_domain_ids[i];
-
-		/* since there was a mismatch, we need to force updating */
-		do_set = 1;
-	}
-
-	if (do_set) {
-		acx_ie_generic_t dom;
-		dom.m.bytes[0] = adev->reg_dom_id;
-		acx_s_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
-	}
-
-	adev->reg_dom_chanmask = reg_domain_channel_masks[i];
-
-	mask = (1 << (adev->channel - 1));
-	if (!(adev->reg_dom_chanmask & mask)) {
-		/* hmm, need to adjust our channel to reside within domain */
-		mask = 1;
-		for (i = 1; i <= 14; i++) {
-			if (adev->reg_dom_chanmask & mask) {
-				printk("%s: adjusting selected channel from %d "
-				       "to %d due to new regulatory domain\n",
-				       wiphy_name(adev->ieee->wiphy), adev->channel, i);
-				adev->channel = i;
-				break;
-			}
-			mask <<= 1;
-		}
-	}
-}
-
 
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
@@ -3913,6 +3290,18 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 ** Called by ioctl commit handler, acx_start, acx_set_defaults,
 ** acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
 */
+void acx_s_set_sane_reg_domain(acx_device_t * adev, int do_set)
+{
+
+	FIXME();
+	if (do_set) {
+		acx_ie_generic_t dom;
+		dom.m.bytes[0] = adev->reg_dom_id;
+		acx_s_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
+	}
+
+}
+
 static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 {
 	u32 feature1, feature2;
@@ -3969,28 +3358,6 @@ void acx_s_update_card_settings(acx_device_t * adev)
 
 	/* Apply settings */
 
-#ifdef WHY_SHOULD_WE_BOTHER	/* imagine we were just powered off */
-	/* send a disassoc request in case it's required */
-	if (adev->
-	    set_mask & (GETSET_MODE | GETSET_RESCAN | GETSET_CHANNEL |
-			GETSET_WEP)) {
-		if (IEE80211_IF_TYPE_STA == adev->mode) {
-			if (ACX_STATUS_4_ASSOCIATED == adev->status) {
-				log(L_ASSOC, "we were ASSOCIATED - "
-				    "sending disassoc request\n");
-				acx_lock(adev, flags);
-//				acx_l_transmit_disassoc(adev, NULL);
-				/* FIXME: deauth? */
-				acx_unlock(adev, flags);
-			}
-			/* need to reset some other stuff as well */
-			log(L_DEBUG, "resetting bssid\n");
-			MAC_ZERO(adev->bssid);
-			SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST);
-			start_scan = 1;
-		}
-	}
-#endif
 
 	if (adev->get_mask & GETSET_STATION_ID) {
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
@@ -4294,15 +3661,19 @@ void acx_s_update_card_settings(acx_device_t * adev)
 		CLEAR_BIT(adev->set_mask, GETSET_MODE);
 	}
 	if (adev->set_mask & SET_TEMPLATES) {
-		log(L_INIT, "updating packet templates\n");
 		switch (adev->mode)
 		{
 			case ACX_MODE_3_AP:
-				acx_s_set_beacon_template(adev);
 				acx_s_set_tim_template(adev);
 				break;
 			default:
 				break;
+		}
+		if (adev->beacon_cache)
+		{
+			acx_s_set_beacon_template(adev, adev->beacon_cache);
+			dev_kfree_skb(adev->beacon_cache);
+			adev->beacon_cache = NULL;
 		}
 		CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
 	}
@@ -4383,9 +3754,9 @@ void acx_s_update_card_settings(acx_device_t * adev)
 	/* debug, rate, and nick don't need any handling */
 	/* what about sniffing mode?? */
 
-	log(L_INIT, "get_mask 0x%08X, set_mask 0x%08X - after update\n",
+/*	log(L_INIT, "get_mask 0x%08X, set_mask 0x%08X - after update\n",
 	    adev->get_mask, adev->set_mask);
-
+*/
 /* end: */
 	FN_EXIT0;
 }
@@ -4490,33 +3861,15 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 }
 #endif // if 0
 
-//#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 20)   
 void acx_e_after_interrupt_task(struct work_struct *work)
 {
        acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
-/*#else
-void acx_e_after_interrupt_task(acx_device_t * adev)
-{
-#endif*/
-//      struct net_device *ndev = (struct net_device*)data;
-//      acx_device_t *adev = ndev2adev(ndev);
 
 	FN_ENTER;
-
-//      acx_sem_lock(adev);
 
 	if (!adev->after_interrupt_jobs || !adev->initialized) 
 		goto end;	/* no jobs to do */
 
-#if TX_CLEANUP_IN_SOFTIRQ
-	/* can happen only on PCI */
-//      if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_TX_CLEANUP) {
-//              acx_lock(adev, flags);
-//              acxpci_l_clean_txdesc(adev);
-//              CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_TX_CLEANUP);
-//              acx_unlock(adev, flags);
-//      }
-#endif
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
 //		acx_s_after_interrupt_recalib(adev);
@@ -4561,7 +3914,6 @@ void acx_e_after_interrupt_task(acx_device_t * adev)
 
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
 		log(L_IRQ, "sending a start_scan cmd...\n");
-//              acx_s_cmd_start_scan(adev);
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_RESTART_SCAN);
 	}
@@ -4634,7 +3986,7 @@ void acx_s_start(acx_device_t * adev)
 
 /***********************************************************************
 ** acx_update_capabilities
-*/
+*//*
 void acx_update_capabilities(acx_device_t * adev)
 {
 	u16 cap = 0;
@@ -4646,8 +3998,8 @@ void acx_update_capabilities(acx_device_t * adev)
 	case ACX_MODE_0_ADHOC:
 		SET_BIT(cap, WF_MGMT_CAP_IBSS);
 		break;
-		/* other types of stations do not emit beacons */
-	}
+*/		/* other types of stations do not emit beacons */
+/*	}
 
 	if (adev->wep_restricted) {
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
@@ -4665,8 +4017,11 @@ void acx_update_capabilities(acx_device_t * adev)
 	    adev->capabilities, cap);
 	adev->capabilities = cap;
 }
-
-
+*/
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 static void acx_select_opmode(acx_device_t * adev)
 {
 	if (adev->interface.operating) {
@@ -4693,10 +4048,15 @@ static void acx_select_opmode(acx_device_t * adev)
 	}
 
 	SET_BIT(adev->set_mask, GETSET_MODE);
-	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	acx_s_update_card_settings(adev);
+//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
 }
 
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_if_init_conf *conf)
@@ -4725,8 +4085,8 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 
 	printk(KERN_INFO "Virtual interface added "
 	       "(type: 0x%08X, ID: %d, MAC: "
-	       ACX_MACFMT ")\n",
-	       conf->type, conf->if_id, ACX_MACARG(conf->mac_addr));
+	       MAC_FMT ")\n",
+	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
 
       out_unlock:
 	acx_unlock(adev, flags);
@@ -4734,6 +4094,10 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	FN_EXIT0;
 	return err;
 }
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 void acx_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
@@ -4756,10 +4120,14 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 
 	printk(KERN_INFO "Virtual interface removed "
 	       "(type: 0x%08X, ID: %d, MAC: "
-	       ACX_MACFMT ")\n",
-	       conf->type, conf->if_id, ACX_MACARG(conf->mac_addr));
+	       MAC_FMT ")\n",
+	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
 	FN_EXIT0;
 }
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_net_reset(struct ieee80211_hw *ieee)
 {
@@ -4774,11 +4142,17 @@ int acx_net_reset(struct ieee80211_hw *ieee)
 	return 0;
 }
 
-int acx_selectchannel(acx_device_t * adev, u8 channel)
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
+int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 {
 	int result;
 	acx_sem_lock(adev);
-
+	adev->rx_status.channel = channel;
+	adev->rx_status.freq = freq;
+	
 	adev->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
@@ -4791,12 +4165,15 @@ int acx_selectchannel(acx_device_t * adev, u8 channel)
 	return result;
 }
 
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	acx_device_t *adev = ieee2adev(hw);
-//        struct bcm43xx_radioinfo *radio;                    
-//        struct bcm43xx_phyinfo *phy;
 	unsigned long flags;
+	int change =0;
 	FN_ENTER;
 
 	acx_lock(adev, flags);
@@ -4805,15 +4182,13 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		acx_unlock(adev,flags);
 		return 0;
 	}
-	//radio = bcm43xx_current_radio(bcm);
-	//phy = bcm43xx_current_phy(bcm);
+	if (conf->beacon_int != adev->beacon_interval)
+		adev->beacon_interval = conf->beacon_int;
 	if (conf->channel != adev->channel) {
-//              acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &conf->channel, 1);
-//              acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &conf->channel, 1);
-		acx_selectchannel(adev, conf->channel);
-		acx_schedule_task(adev,
+		acx_selectchannel(adev, conf->channel,conf->freq);
+/*		acx_schedule_task(adev,
 				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
-				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ );
+*/				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ /*);*/
 	}
 /*
         if (conf->short_slot_time != adev->short_slot) {
@@ -4826,10 +4201,10 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
         }
 */
 	adev->tx_disabled = !conf->radio_enabled;
-	if (conf->power_level != 0){
-		adev->tx_level_dbm = (conf->power_level <= 20 ? conf->power_level:20);
+	if (conf->power_level != 0 && adev->tx_level_dbm > 15){
+		adev->tx_level_dbm =  conf->power_level;
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	} 
 
 //FIXME: This does not seem to wake up:
@@ -4845,12 +4220,18 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 
 	//TODO: phymode
 	//TODO: antennas
-
+	if (adev->set_mask > 0)
+		acx_s_update_card_settings(adev);
 	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 	return 0;
 }
+
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
@@ -4883,14 +4264,26 @@ int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
 			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
 	}
+	if (conf->beacon != 0)
+	{
+		adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
+		adev->beacon_cache = conf->beacon;
+		SET_BIT(adev->set_mask, SET_TEMPLATES);
+	}
 	if (adev->set_mask != 0)
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx_s_update_card_settings(adev);
+//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	acx_unlock(adev, flags);
 	err = 0;
 err_out:
 	FN_EXIT0;
 	return err;
 }
+
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_net_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
@@ -4911,6 +4304,11 @@ int acx_net_get_tx_stats(struct ieee80211_hw *hw,
 	FN_EXIT0;
 	return err;
 }
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
+
 int acx_net_conf_tx(struct ieee80211_hw *hw,
 		    int queue, const struct ieee80211_tx_queue_params *params)
 {
@@ -4950,6 +4348,11 @@ static void keymac_write(acx_device_t * adev, u8 index, const u32 * addr)
 	}
 }
 
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
+
 int acx_clear_keys(acx_device_t * adev)
 {
 	static const u32 zero_mac[2] = { 0 };
@@ -4980,6 +4383,11 @@ int acx_clear_keys(acx_device_t * adev)
 	}
 	return 1;
 }
+
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_key_write(acx_device_t * adev,
 		  u8 index,
@@ -5050,11 +4458,12 @@ int acx_key_write(acx_device_t * adev,
                 adev->wep_restricted = 1;
         }
 */
-	adev->auth_alg = algorithm;
+//	adev->auth_alg = algorithm;
 	/* set flag to make sure the card WEP settings get updated */
 	if (adev->wep_enabled) {
 		SET_BIT(adev->set_mask, GETSET_WEP);
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx_s_update_card_settings(adev);
+//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 /*
         log(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
@@ -5069,7 +4478,6 @@ int acx_key_write(acx_device_t * adev,
         }
 */
 	result = -EINPROGRESS;
-      end_unlock:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -5077,6 +4485,11 @@ int acx_key_write(acx_device_t * adev,
 
 
 }
+
+/**
+** Derived from mac80211 code, p54, bcm43xx_mac80211
+**
+*/
 
 int acx_net_set_key(struct ieee80211_hw *ieee,
 		    set_key_cmd cmd,
@@ -5152,6 +4565,8 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 ** Common function to parse ALL configoption struct formats
 ** (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
 ** FIXME: logging should be removed here and added to a /proc file instead
+**
+** Look into bcm43xx
 */
 void
 acx_s_parse_configoption(acx_device_t * adev,
@@ -5310,6 +4725,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 
 
 /***********************************************************************
+** Linux Kernel Specific
 */
 static int __init acx_e_init_module(void)
 {

@@ -14,7 +14,7 @@
 ** callback functions called by USB core are running in interrupt context
 ** and thus have names with _i_.
 */
-#define ACX_USB 1
+#define ACX_MAC80211_USB 1
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
@@ -44,7 +44,6 @@
 #define EP(intf, nr) (intf)->altsetting[0].endpoint[(nr)].desc
 #define GET_DEV(udev) usb_get_dev((udev))
 #define PUT_DEV(udev) usb_put_dev((udev))
-#define SET_NETDEV_OWNER(ndev, owner)	/* not needed anymore ??? */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14)
 /* removed in 2.6.14. We will use fake value for now */
@@ -97,15 +96,14 @@ static void acxusb_i_complete_rx(struct urb *);
 static void acxusb_i_complete_tx(struct urb *, struct pt_regs *);
 static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
 #endif
-static int acxusb_e_open(struct net_device *);
-static int acxusb_e_close(struct net_device *);
+static int acxusb_e_open(struct ieee80211_hw *);
+static int acxusb_e_close(struct ieee80211_hw *);
 //static void acxusb_i_set_rx_mode(struct net_device *);
 static int acxusb_boot(struct usb_device *, int is_tnetw1450, int *radio_type);
 
 static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
-static void acxusb_i_tx_timeout(struct net_device *);
-static void acxusb_netdev_init(struct net_device *ndev);
+/*static void acxusb_i_tx_timeout(struct net_device *);*/
 
 /* static void dump_device(struct usb_device *); */
 /* static void dump_device_descriptor(struct usb_device_descriptor *); */
@@ -286,7 +284,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	FN_ENTER;
 
-	devname = adev->ndev->name;
+	devname = wiphy_name(adev->ieee->wiphy);
 	/* no "wlan%%d: ..." please */
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
@@ -735,6 +733,21 @@ static int acxusb_s_fill_configoption(acx_device_t * adev)
 	return OK;
 }
 
+static const struct ieee80211_ops acxusb_hw_ops = {
+        .tx = acx_i_start_xmit,
+        .conf_tx = acx_net_conf_tx,
+        .add_interface = acx_add_interface,
+        .remove_interface = acx_remove_interface,
+        .open = acxusb_e_open,
+        .stop = acxusb_e_close,
+        .reset = acx_net_reset,
+        .config = acx_net_config,
+        .config_interface = acx_config_interface,
+        .set_multicast_list = acx_i_set_multicast_list,
+        .set_key = acx_net_set_key,         
+        .get_stats = acx_e_get_stats,
+        .get_tx_stats = acx_net_get_tx_stats,
+};
 
 /***********************************************************************
 ** acxusb_e_probe()
@@ -752,7 +765,6 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	acx_device_t *adev = NULL;
-	struct net_device *ndev = NULL;
 	struct usb_config_descriptor *config;
 	struct usb_endpoint_descriptor *epdesc;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
@@ -800,57 +812,32 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			if (usbdev->descriptor.idProduct != ACX100_PRODUCT_ID_BOOTED)
 				/* device not unbooted, but invalid USB ID!? */
 				goto end_nodev;
+		}
 	}
 
 /* Ok, so it's our device and it has already booted */
 
 	/* Allocate memory for a network device */
 
-	ieee = kzalloc(sizeof(*ieee), GFP_KERNEL);
+	ieee = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
 	if (!ieee) {
 		msg = "acx: no memory for ieee80211_dev\n";
 		goto end_nomem;
 	}
 
 
-        ieee->version = IEEE80211_VERSION;
-        ieee->name = KBUILD_MODNAME;
-        ieee->host_gen_beacon = 0;
-        ieee->rx_includes_fcs = 0;
-        ieee->monitor_during_oper = 0;
-        ieee->tx = acx_i_start_xmit;
-        ieee->open = acxusb_e_open;
-        ieee->stop = acxusb_e_close;
-        ieee->add_interface = acx_add_interface;
-        ieee->remove_interface = acx_remove_interface;
-        ieee->reset = acx_net_reset;
-        ieee->config = acx_net_config;
-        ieee->config_interface = acx_config_interface;
-//        ieee->set_multicast_list = acxusb_i_set_multicast_list;
-        ieee->set_key = acx_net_set_key;
-        ieee->get_stats = acx_e_get_stats;
+        ieee->flags &=   ~IEEE80211_HW_RX_INCLUDES_FCS &                
+                         ~IEEE80211_HW_MONITOR_DURING_OPER &
+                         ~IEEE80211_HW_WEP_INCLUDE_IV;
         ieee->queues = 1;
-        ieee->get_tx_stats = acx_net_get_tx_stats;
-        ieee->conf_tx = acx_net_conf_tx;
-        ieee->wep_include_iv = 0;
-        ieee->passive_scan = acx_passive_scan;
-
-	ndev = ieee80211_alloc_hw(sizeof(*adev), acxusb_netdev_init);
-	/* (NB: memsets to 0 entire area) */
-	if (!ndev) {
-		msg = "acx: no memory for netdev\n";
-		goto end_nomem;
-	}
 
 	/* Register the callbacks for the network device functions */
 
-	SET_MODULE_OWNER(ndev);
 
 	/* Setup private driver context */
 
-	adev = ndev2adev(ndev);
+	adev = ieee2adev(ieee);
 	adev->ieee = ieee;
-	adev->ndev = ndev;
 	
 	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
@@ -962,7 +949,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev->tx_free = ACX_TX_URB_CNT;
 
 	usb_set_intfdata(intf, adev);
-	SET_NETDEV_DEV(ndev, &intf->dev);
+	SET_IEEE80211_DEV(ieee, &intf->dev);
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
 	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
@@ -981,22 +968,19 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_s_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
 
-	MAC_COPY(ndev->dev_addr, adev->dev_addr);
+/*	MAC_COPY(ndev->dev_addr, adev->dev_addr); */
 
 	/* Register the network device */
 	log(L_INIT, "registering network device\n");
-	result = ieee80211_register_hw(ndev, ieee);
-//	result = register_netdev(ndev);
+	result = ieee80211_register_hw(adev->ieee);
 	if (result) {
 		msg = "acx: failed to register USB network device "
 		    "(error %d)\n";
 		goto end_nomem;
 	}
 
-	acx_proc_register_entries(ndev);
+	acx_proc_register_entries(ieee);
 
-//	acx_stop_queue(ndev, "on probe");
-//	acx_carrier_off(ndev, "on probe");
 
 	printk("acx: USB module " ACX_RELEASE " loaded successfully\n");
 
@@ -1013,7 +997,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
       end_nomem:
 	printk(msg, result);
 
-	if (ndev) {
+	if (ieee) {
 		if (adev->usb_rx) {
 			for (i = 0; i < ACX_RX_URB_CNT; i++)
 				usb_free_urb(adev->usb_rx[i].urb);
@@ -1024,7 +1008,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 				usb_free_urb(adev->usb_tx[i].urb);
 			kfree(adev->usb_tx);
 		}
-		free_netdev(ndev);
+		ieee80211_free_hw(ieee);
 	}
 
 	result = -ENOMEM;
@@ -1048,11 +1032,11 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 ** network devices have to be taken down and all allocated memory has
 ** to be freed.
 */
-static void acxusb_e_disconnect(struct usb_interface *intf)
+void acxusb_e_disconnect(struct usb_interface *intf)
 {
-	acx_device_t *adev = usb_get_intfdata(intf);
 	unsigned long flags;
 	int i;
+	acx_device_t *adev = usb_get_intfdata(intf);
 
 	FN_ENTER;
 
@@ -1070,13 +1054,13 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	 * _close() will try to grab it as well if it's called,
 	 * deadlocking the machine.
 	 */
-	unregister_netdev(adev->ndev);
+	acx_proc_unregister_entries(adev->ieee);
+	ieee80211_unregister_hw(adev->ieee);
 
 	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 	/* This device exists no more */
 	usb_set_intfdata(intf, NULL);
-	acx_proc_unregister_entries(adev->ndev);
 
 	/*
 	 * Here we only free them. _close() took care of
@@ -1096,40 +1080,20 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
 
-	free_netdev(adev->ndev);
+	ieee80211_free_hw(adev->ieee);
       end:
 	FN_EXIT0;
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-void acxusb_net_poll_controller(struct net_device *net_dev)
-{
-        acx_device_t *adev = ndev2adev(net_dev);
-        unsigned long flags;
-
-//        local_irq_save(flags);   
-//        acxusb_i_interrupt(adev->irq, adev, NULL);
-//        local_irq_restore(flags);
-}
-#endif /* CONFIG_NET_POLL_CONTROLLER */   
-static void acxusb_netdev_init(struct net_device *ndev)             
-{
-#ifdef CONFIG_NET_POLL_CONTROLLER
-        ndev->poll_controller = acxusb_net_poll_controller;            
-#endif
-
-        SET_ETHTOOL_OPS(ndev, &acx_ethtool_ops);
-
-}
 /***********************************************************************
 ** acxusb_e_open()
 ** This function is called when the user sets up the network interface.
 ** It initializes a management timer, sets up the USB card and starts
 ** the network tx queue and USB receive.
 */
-static int acxusb_e_open(struct net_device *ndev)
+int acxusb_e_open(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ndev2adev(ndev);
+	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	int i;
 
@@ -1158,10 +1122,7 @@ static int acxusb_e_open(struct net_device *ndev)
 	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
 
         acx_setup_modes(adev);
-        ieee80211_update_hw(adev->ndev, adev->ieee);
-        ieee80211_netif_oper(adev->ndev, NETIF_ATTACH);
-        ieee80211_netif_oper(adev->ndev, NETIF_START);
-        ieee80211_netif_oper(adev->ndev, NETIF_WAKE);
+	ieee80211_start_queues(adev->ieee);
 	acx_unlock(adev, flags);
 
 	acx_sem_unlock(adev);
@@ -1180,19 +1141,14 @@ static int acxusb_e_open(struct net_device *ndev)
 ** transfers, these are unlinked (asynchronously). The module in-use count
 ** is also decreased in this function.
 */
-static int acxusb_e_close(struct net_device *ndev)
+int acxusb_e_close(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ndev2adev(ndev);
+	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	int i;
 
 	FN_ENTER;
 
-#ifdef WE_STILL_DONT_CARE_ABOUT_IT
-	/* Transmit a disassociate frame */
-	lock acx_l_transmit_disassoc(adev, &client);
-	unlock
-#endif
 	    acx_sem_lock(adev);
 	if (adev->dev_state_mask & ACX_STATE_IFACE_UP)
 	{
@@ -1221,7 +1177,7 @@ static int acxusb_e_close(struct net_device *ndev)
 
 	/* Stop the transmit queue, mark the device as DOWN */
 	acx_lock(adev, flags);
-	acx_stop_queue(ndev, "on ifdown");
+//	acx_stop_queue(ndev, "on ifdown");
 //      acx_set_status(adev, ACX_STATUS_0_STOPPED);
 	/* stop pending rx/tx urb transfers */
 	for (i = 0; i < ACX_TX_URB_CNT; i++) {
@@ -1249,7 +1205,7 @@ static int acxusb_e_close(struct net_device *ndev)
 ** acxusb_l_poll_rx
 ** This function (re)initiates a bulk-in USB transfer on a given urb
 */
-static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
+void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 {
 	struct usb_device *usbdev;
 	struct urb *rxurb;
@@ -1304,12 +1260,7 @@ static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 ** The received data is then committed to the network stack and the next
 ** USB receive is triggered.
 */
-static void 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
-acxusb_i_complete_rx(struct urb *urb)
-#else
-acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
-#endif
+void acxusb_i_complete_rx(struct urb *urb)
 {
 	acx_device_t *adev;
 	rxbuffer_t *ptr;
@@ -1452,7 +1403,6 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 		if (RXBUF_IS_TXSTAT(ptr)) {
 			/* do rate handling */
 			usb_txstatus_t *stat = (void *)ptr;
-			u16 client_no = (u16) stat->hostdata;
 
 			log(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
 			    "queue_index:%02X mac_status:%02X hostdata:%08X "
@@ -1530,12 +1480,7 @@ acxusb_i_complete_rx(struct urb *urb, struct pt_regs *regs)
 **
 ** This function is invoked upon termination of a USB transfer.
 */
-static void 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)        
-acxusb_i_complete_tx(struct urb *urb)
-#else  
-acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
-#endif
+void acxusb_i_complete_tx(struct urb *urb)
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;
@@ -1586,10 +1531,9 @@ acxusb_i_complete_tx(struct urb *urb, struct pt_regs *regs)
 	adev->tx_free++;
 	if ((adev->tx_free >= TX_START_QUEUE)
 	    && (adev->status == ACX_STATUS_4_ASSOCIATED)
-	    && (acx_queue_stopped(adev->ndev))
-	    ) {
+/*	    && (acx_queue_stopped(adev->ndev)*/) {
 		log(L_BUF, "tx: wake queue (%u free txbufs)\n", adev->tx_free);
-		acx_wake_queue(adev->ndev, NULL);
+/*		acx_wake_queue(adev->ndev, NULL); */
 	}
 
       end_unlock:
@@ -1623,7 +1567,7 @@ tx_t *acxusb_l_alloc_tx(acx_device_t * adev)
 			if (adev->tx_free < TX_STOP_QUEUE) {
 				log(L_BUF, "tx: stop queue "
 				    "(%u free txbufs)\n", adev->tx_free);
-				acx_stop_queue(adev->ndev, NULL);
+/*				acx_stop_queue(adev->ndev, NULL); */
 			}
 			goto end;
 		}
@@ -1768,7 +1712,8 @@ static void acxusb_i_set_rx_mode(struct net_device *ndev)
 /***********************************************************************
 */
 #ifdef HAVE_TX_TIMEOUT
-static void acxusb_i_tx_timeout(struct net_device *ndev)
+/*
+void acxusb_i_tx_timeout(struct net_device *ndev)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -1777,17 +1722,18 @@ static void acxusb_i_tx_timeout(struct net_device *ndev)
 	FN_ENTER;
 
 	acx_lock(adev, flags);
-	/* unlink the URBs */
-	for (i = 0; i < ACX_TX_URB_CNT; i++) {
+*/	/* unlink the URBs */
+/*	for (i = 0; i < ACX_TX_URB_CNT; i++) {
 		acxusb_unlink_urb(adev->usb_tx[i].urb);
 		adev->usb_tx[i].busy = 0;
 	}
 	adev->tx_free = ACX_TX_URB_CNT;
-	/* TODO: stats update */
-	acx_unlock(adev, flags);
+*/	/* TODO: stats update */
+/*	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
+*/
 #endif
 
 
