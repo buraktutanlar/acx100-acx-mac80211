@@ -99,6 +99,12 @@ void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
 ** 
 */
 
+/* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
+#define acx_readl(v)	le32_to_cpu(readl((v)))
+#define acx_readw(v)	le16_to_cpu(readw((v)))
+#define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
+#define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
+
 /* Pick one */
 /* #define INLINE_IO static */
 #define INLINE_IO static inline
@@ -106,16 +112,16 @@ void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
 INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32
-	return readl((u8 *) adev->iobase + adev->io[offset]);
+	return acx_readl((u8 *) adev->iobase + adev->io[offset]);
 #else
-	return readw((u8 *) adev->iobase + adev->io[offset])
-	    + (readw((u8 *) adev->iobase + adev->io[offset] + 2) << 16);
+	return acx_readw((u8 *) adev->iobase + adev->io[offset])
+	    + (acx_readw((u8 *) adev->iobase + adev->io[offset] + 2) << 16);
 #endif
 }
 
 INLINE_IO u16 read_reg16(acx_device_t * adev, unsigned int offset)
 {
-	return readw((u8 *) adev->iobase + adev->io[offset]);
+	return acx_readw((u8 *) adev->iobase + adev->io[offset]);
 }
 
 INLINE_IO u8 read_reg8(acx_device_t * adev, unsigned int offset)
@@ -126,16 +132,16 @@ INLINE_IO u8 read_reg8(acx_device_t * adev, unsigned int offset)
 INLINE_IO void write_reg32(acx_device_t * adev, unsigned int offset, u32 val)
 {
 #if ACX_IO_WIDTH == 32
-	writel(val, (u8 *) adev->iobase + adev->io[offset]);
+	acx_writel(val, (u8 *) adev->iobase + adev->io[offset]);
 #else
-	writew(val & 0xffff, (u8 *) adev->iobase + adev->io[offset]);
-	writew(val >> 16, (u8 *) adev->iobase + adev->io[offset] + 2);
+	acx_writew(val & 0xffff, (u8 *) adev->iobase + adev->io[offset]);
+	acx_writew(val >> 16, (u8 *) adev->iobase + adev->io[offset] + 2);
 #endif
 }
 
 INLINE_IO void write_reg16(acx_device_t * adev, unsigned int offset, u16 val)
 {
-	writew(val, (u8 *) adev->iobase + adev->io[offset]);
+	acx_writew(val, (u8 *) adev->iobase + adev->io[offset]);
 }
 
 INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val)
@@ -160,7 +166,7 @@ INLINE_IO int adev_present(acx_device_t * adev)
 {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
-	return readl(adev->iobase) != 0xffffffff;
+	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
 
@@ -794,7 +800,7 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 static inline void
 acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 {
-	writel(type | (status << 16), adev->cmd_area);
+	acx_writel(type | (status << 16), adev->cmd_area);
 	write_flush(adev);
 }
 
@@ -808,7 +814,7 @@ static u32 acxpci_read_cmd_type_status(acx_device_t * adev)
 {
 	u32 cmd_type, cmd_status;
 
-	cmd_type = readl(adev->cmd_area);
+	cmd_type = acx_readl(adev->cmd_area);
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
@@ -1448,8 +1454,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS &
-			 ~IEEE80211_HW_MONITOR_DURING_OPER &
-			 ~IEEE80211_HW_WEP_INCLUDE_IV;
+			 ~IEEE80211_HW_MONITOR_DURING_OPER |
+			 IEEE80211_HW_WEP_INCLUDE_IV;
 	ieee->queues = 1;
 
 	/* (NB: memsets to 0 entire area) */
@@ -1634,7 +1640,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 /** done with board specific setup **/
 
 	/* need to be able to restore PCI state after a suspend */
+#ifdef CONFIG_PM
 	pci_save_state(pdev);
+#endif
 
 
 	acx_init_task_scheduler(adev);
@@ -1681,7 +1689,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_disable_device(pdev);
       fail_pci_enable_device:
 
+#ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
+#endif
       fail_register_netdev:
 	ieee80211_free_hw(ieee);
       done:
@@ -1809,7 +1819,9 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	ieee80211_free_hw(adev->ieee);
 
 	/* put device into ACPI D3 mode (shutdown) */
+#ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
+#endif
       end:
 	FN_EXIT0;
 }
@@ -2111,7 +2123,8 @@ static int acxpci_e_close(struct ieee80211_hw *hw)
               acxpci_s_down(hw);
 	}
 
-	acx_free_modes(adev);
+	if (adev->modes)
+		acx_free_modes(adev);
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
@@ -2283,12 +2296,12 @@ static void handle_info_irq(acx_device_t * adev)
 #endif
 	u32 info_type, info_status;
 
-	info_type = readl(adev->info_area);
+	info_type = acx_readl(adev->info_area);
 	info_status = (info_type >> 16);
 	info_type = (u16) info_type;
 
 	/* inform fw that we have read this info message */
-	writel(info_type | 0x00010000, adev->info_area);
+	acx_writel(info_type | 0x00010000, adev->info_area);
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(adev);
 
@@ -2426,9 +2439,9 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			 * with a full Tx buffer if we go into
 			 * acxpci_l_clean_txdesc() at a time when we won't wakeup
 			 * the net queue in there for some reason...) */
-			if (adev->tx_free <= TX_START_CLEAN) {
+//			if (adev->tx_free <= TX_START_CLEAN) {
 				acxpci_l_clean_txdesc(adev);
-			}
+//			}
 		}
 
 		/* Less frequent ones */
@@ -3164,7 +3177,8 @@ static void log_txbuffer(acx_device_t * adev)
 #endif
 
 
-static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger)
+static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
+		struct ieee80211_tx_status *status)
 {
 	const char *err = "unknown error";
 
@@ -3232,6 +3246,7 @@ static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger)
 			acx_schedule_task(adev,
 					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
+		status->excessive_retries++;
 		break;
 	case 0x40:
 		err = "Tx buffer overflow";
@@ -3341,12 +3356,12 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		num_cleaned++;
 
 		if ((adev->tx_free >= TX_START_QUEUE)
-		    && (adev->status == ACX_STATUS_4_ASSOCIATED)
+/*		    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
 		    /*&& (acx_queue_stopped(adev->ieee))*/
 		    ) {
 			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
 			    adev->tx_free);
-/*			acx_wake_queue(adev->ieee, NULL); */
+			acx_wake_queue(adev->ieee, NULL);
 		}
 
 		/* do error checking, rate handling and logging
@@ -3370,12 +3385,12 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		}
 */
 		if (unlikely(error))
-			handle_tx_error(adev, error, finger);
+			handle_tx_error(adev, error, finger,  &hostdesc->txstatus);
 
 		if (IS_ACX111(adev))
 			log(L_BUFT,
-			    "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X\n",
-			    finger, ack_failures, rts_failures, rts_ok, r111);
+			    "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X tx_free=%u\n",
+			    finger, ack_failures, rts_failures, rts_ok, r111, adev->tx_free);
 		else
 			log(L_BUFT,
 			    "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u rate=%u\n",
@@ -3387,6 +3402,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			hostdesc->txstatus.excessive_retries = rts_failures ;
 			hostdesc->txstatus.retry_count = ack_failures;
 			ieee80211_tx_status(adev->ieee,hostdesc->skb,&hostdesc->txstatus);
+			memset(&hostdesc->txstatus, 0, sizeof(struct ieee80211_tx_status));
 		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
@@ -4083,8 +4099,8 @@ int __init acxpci_e_init_module(void)
 #define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
 #endif
 	log(L_INIT,
-	    ENDIANNESS_STRING
-	    "PCI module " ACX_RELEASE " initialized, "
+	    "acx: " ENDIANNESS_STRING
+	    "acx: PCI module " ACX_RELEASE " initialized, "
 	    "waiting for cards to probe...\n");
 
 	res = pci_register_driver(&acxpci_drv_id);

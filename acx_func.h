@@ -344,7 +344,7 @@ acx_start_queue(struct ieee80211_hw *hw, const char *msg)
 	if (msg)
 		log(L_BUFT, "tx: start queue %s\n", msg);
 }
-
+*/
 static inline void
 acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
@@ -352,7 +352,7 @@ acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 	if (msg)
 		log(L_BUFT, "tx: wake queue %s\n", msg);
 }
-
+/*
 static inline void
 acx_carrier_off(struct net_device *ndev, const char *msg)
 {

@@ -1421,13 +1421,13 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee)
 void acx_free_modes(acx_device_t * adev)
 {
 
-        kfree(adev->modes);
-        adev->modes = NULL;
+//        kfree(adev->modes);
+//        adev->modes = NULL;
 }
 
-#define RATETAB_ENT(_rateid, _flags) \
+#define RATETAB_ENT(_rate, _rateid, _flags) \
 	{							\
-		.rate	= (_rateid),				\
+		.rate	= (_rate),				\
 		.val	= (_rateid),				\
 		.val2   = (_rateid),				\
 		.flags  = (_flags),				\
@@ -1435,18 +1435,18 @@ void acx_free_modes(acx_device_t * adev)
 
 
 static struct ieee80211_rate __acx_ratetable[] = {
-                 RATETAB_ENT(RATE111_1,IEEE80211_RATE_CCK),
-                 RATETAB_ENT(RATE111_2,IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(RATE111_5,IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(RATE111_11,IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(RATE111_6,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_9,IEEE80211_RATE_OFDM), 
-                 RATETAB_ENT(RATE111_12,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_18,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_24,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_36,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_48,IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(RATE111_54,IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(10,  RATE111_1,  IEEE80211_RATE_CCK),
+                 RATETAB_ENT(20,  RATE111_2,  IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(55,  RATE111_5,  IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(110, RATE111_11, IEEE80211_RATE_CCK_2),
+                 RATETAB_ENT(60,  RATE111_6,  IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(90,  RATE111_9,  IEEE80211_RATE_OFDM), 
+                 RATETAB_ENT(120, RATE111_12, IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(180, RATE111_18, IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(240, RATE111_24, IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(360, RATE111_36, IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(480, RATE111_48, IEEE80211_RATE_OFDM),
+                 RATETAB_ENT(540, RATE111_54, IEEE80211_RATE_OFDM),
         };
 
 #define acx_b_ratetable		(__acx_ratetable + 0)
@@ -1489,7 +1489,7 @@ static int acx_setup_modes_bphy(acx_device_t * adev)
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
 
-	mode = adev->modes;
+	mode = &adev->modes[0];
 	mode->mode = MODE_IEEE80211B;
 	mode->num_channels = acx_chantable_size;
 	mode->channels = channels;
@@ -1506,7 +1506,7 @@ static int acx_setup_modes_gphy(acx_device_t * adev)
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
 	
-	mode = adev->modes++; 
+	mode = &adev->modes[1]; 
 	mode->mode = MODE_IEEE80211G;
 	mode->num_channels = acx_chantable_size;
 	mode->channels = channels;
@@ -1522,15 +1522,15 @@ int acx_setup_modes(acx_device_t * adev)
         int err = -ENOMEM;
 
                     
-	if (!IS_ACX111(adev)) {
-		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
+	if (IS_ACX111(adev)) {
+/*		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);*/
         	err = acx_setup_modes_gphy(adev);
-	} else {
+	}/* else {
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
-	}
+	}*/
 	err = acx_setup_modes_bphy(adev);
-	if (err && adev->modes)
-		kfree(adev->modes);
+/*	if (err && adev->modes)
+		kfree(adev->modes);*/
         return err;                           
 
 }
@@ -2188,6 +2188,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	FN_ENTER;
 
+	acx_lock(adev, flags);
 	/* do it before getting settings, prevent bogus channel 0 warning */
 	adev->channel = 1;
 
@@ -2203,7 +2204,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	acx_s_update_card_settings(adev);
 
-	acx_lock(adev, flags);
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
@@ -3864,9 +3864,9 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 void acx_e_after_interrupt_task(struct work_struct *work)
 {
        acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
-
+	unsigned int flags;
 	FN_ENTER;
-
+	acx_lock(adev, flags);
 	if (!adev->after_interrupt_jobs || !adev->initialized) 
 		goto end;	/* no jobs to do */
 
@@ -3929,6 +3929,7 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		printk("Jobs still to be run: %x\n",adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
+	acx_unlock(adev, flags);
 //      acx_sem_unlock(adev);
 	FN_EXIT0;
 }
@@ -4024,33 +4025,63 @@ void acx_update_capabilities(acx_device_t * adev)
 */
 static void acx_select_opmode(acx_device_t * adev)
 {
+	int changed = 0;
 	if (adev->interface.operating) {
 		switch (adev->interface.type) {
 			case IEEE80211_IF_TYPE_AP:
-				adev->mode = ACX_MODE_3_AP;
+				if (adev->mode != ACX_MODE_3_AP)
+				{
+					adev->mode = ACX_MODE_3_AP;
+					changed = 1;
+				}
 				break;
 			case IEEE80211_IF_TYPE_IBSS:
-				adev->mode = ACX_MODE_0_ADHOC;
+				if (adev->mode != ACX_MODE_0_ADHOC)
+				{
+					adev->mode = ACX_MODE_0_ADHOC;
+					changed = 1;
+				}
 				break;
 			case IEEE80211_IF_TYPE_STA:
-				adev->mode = ACX_MODE_2_STA;
+				if (adev->mode != ACX_MODE_2_STA)
+				{
+					adev->mode = ACX_MODE_2_STA;
+					changed = 1;
+				}
 				break;
 			case IEEE80211_IF_TYPE_WDS:
 			default:
-				adev->mode = ACX_MODE_OFF;
+				if (adev->mode != ACX_MODE_OFF)
+				{
+					adev->mode = ACX_MODE_OFF;
+					changed = 1;
+				}
 			break;
 		}
 	} else {
 		if (adev->interface.type == IEEE80211_IF_TYPE_MNTR)
-			adev->mode = ACX_MODE_MONITOR;
+		{
+			if (adev->mode != ACX_MODE_MONITOR)
+			{
+				adev->mode = ACX_MODE_MONITOR;
+				changed = 1;
+			}
+		}
 		else
-			adev->mode = ACX_MODE_OFF;
+		{
+			if (adev->mode != ACX_MODE_OFF)
+			{
+				adev->mode = ACX_MODE_OFF;
+				changed = 1;
+			}
+		}
 	}
-
-	SET_BIT(adev->set_mask, GETSET_MODE);
-	acx_s_update_card_settings(adev);
+	if (changed)
+	{
+		SET_BIT(adev->set_mask, GETSET_MODE);
+		acx_s_update_card_settings(adev);
 //	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-
+	}
 }
 
 /**

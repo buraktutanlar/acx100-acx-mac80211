@@ -1195,7 +1195,7 @@ struct acx_device {
 #endif
 	struct acx_stats	acx_stats;
 	struct ieee80211_hw	*ieee;
-	struct ieee80211_hw_mode	*modes;
+	struct ieee80211_hw_mode	modes[2];
 	struct ieee80211_rx_status rx_status;
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
@@ -1383,7 +1383,7 @@ struct acx_device {
 	unsigned int	tx_free;
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
-
+	
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
