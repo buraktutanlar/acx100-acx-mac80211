@@ -123,6 +123,12 @@ static void acxpci_s_down(struct net_device *ndev);
 ** Register access
 */
 
+/* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
+#define acx_readl(v)	le32_to_cpu(readl((v)))
+#define acx_readw(v)	le16_to_cpu(readw((v)))
+#define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
+#define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
+
 /* Pick one */
 /* #define INLINE_IO static */
 #define INLINE_IO static inline
@@ -131,17 +137,17 @@ INLINE_IO u32
 read_reg32(acx_device_t *adev, unsigned int offset)
 {
 #if ACX_IO_WIDTH == 32
-	return readl((u8 *)adev->iobase + adev->io[offset]);
+	return acx_readl((u8 *)adev->iobase + adev->io[offset]);
 #else
-	return readw((u8 *)adev->iobase + adev->io[offset])
-	    + (readw((u8 *)adev->iobase + adev->io[offset] + 2) << 16);
+	return acx_readw((u8 *)adev->iobase + adev->io[offset])
+	    + (acx_readw((u8 *)adev->iobase + adev->io[offset] + 2) << 16);
 #endif
 }
 
 INLINE_IO u16
 read_reg16(acx_device_t *adev, unsigned int offset)
 {
-	return readw((u8 *)adev->iobase + adev->io[offset]);
+	return acx_readw((u8 *)adev->iobase + adev->io[offset]);
 }
 
 INLINE_IO u8
@@ -154,17 +160,17 @@ INLINE_IO void
 write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 {
 #if ACX_IO_WIDTH == 32
-	writel(val, (u8 *)adev->iobase + adev->io[offset]);
+	acx_writel(val, (u8 *)adev->iobase + adev->io[offset]);
 #else
-	writew(val & 0xffff, (u8 *)adev->iobase + adev->io[offset]);
-	writew(val >> 16, (u8 *)adev->iobase + adev->io[offset] + 2);
+	acx_writew(val & 0xffff, (u8 *)adev->iobase + adev->io[offset]);
+	acx_writew(val >> 16, (u8 *)adev->iobase + adev->io[offset] + 2);
 #endif
 }
 
 INLINE_IO void
 write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
 {
-	writew(val, (u8 *)adev->iobase + adev->io[offset]);
+	acx_writew(val, (u8 *)adev->iobase + adev->io[offset]);
 }
 
 INLINE_IO void
@@ -192,7 +198,7 @@ adev_present(acx_device_t *adev)
 {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
-	return readl(adev->iobase) != 0xffffffff;
+	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
 
@@ -835,7 +841,7 @@ acxpci_s_verify_init(acx_device_t *adev)
 static inline void
 acxpci_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 {
-	writel(type | (status << 16), adev->cmd_area);
+	acx_writel(type | (status << 16), adev->cmd_area);
 	write_flush(adev);
 }
 
@@ -848,7 +854,7 @@ acxpci_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
 
-	cmd_type = readl(adev->cmd_area);
+	cmd_type = acx_readl(adev->cmd_area);
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16)cmd_type;
 
@@ -1622,7 +1628,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	log(L_IRQ|L_INIT, "using IRQ %d\n", pdev->irq);
 
 	/* need to be able to restore PCI state after a suspend */
+#ifdef CONFIG_PM
 	pci_save_state(pdev);
+#endif
 	pci_set_drvdata(pdev, ndev);
 
 	/* ok, pci setup is finished, now start initializing the card */
@@ -1720,7 +1728,9 @@ fail_unknown_chiptype:
 	pci_disable_device(pdev);
 fail_pci_enable_device:
 
+#ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
+#endif
 
 done:
 	FN_EXIT1(result);
@@ -1840,7 +1850,9 @@ acxpci_e_remove(struct pci_dev *pdev)
 	free_netdev(ndev);
 
 	/* put device into ACPI D3 mode (shutdown) */
+#ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
+#endif
 
 end:
 	FN_EXIT0;
@@ -2412,12 +2424,12 @@ handle_info_irq(acx_device_t *adev)
 #endif
 	u32 info_type, info_status;
 
-	info_type = readl(adev->info_area);
+	info_type = acx_readl(adev->info_area);
 	info_status = (info_type >> 16);
 	info_type = (u16)info_type;
 
 	/* inform fw that we have read this info message */
-	writel(info_type | 0x00010000, adev->info_area);
+	acx_writel(info_type | 0x00010000, adev->info_area);
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(adev);
 
@@ -4206,8 +4218,8 @@ acxpci_e_init_module(void)
 #define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
 #endif
 	log(L_INIT,
-		ENDIANNESS_STRING
-		"PCI module " ACX_RELEASE " initialized, "
+		"acx: " ENDIANNESS_STRING
+		"acx: PCI module " ACX_RELEASE " initialized, "
 		"waiting for cards to probe...\n"
 	);
 
