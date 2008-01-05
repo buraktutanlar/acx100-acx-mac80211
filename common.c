@@ -4243,8 +4243,8 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
-#ifdef 0
-	int change =0;
+#if 0
+	int change = 0;
 #endif
 	FN_ENTER;
 
