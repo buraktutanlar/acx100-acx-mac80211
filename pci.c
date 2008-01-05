@@ -226,6 +226,8 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 	int result;
 	int count;
 
+	FN_ENTER;
+
 	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
 	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
 	write_flush(adev);
@@ -251,6 +253,7 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 	result = OK;
 
       fail:
+	FN_EXIT1(result);
 	return result;
 }
 
@@ -411,7 +414,7 @@ int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	write_flush(adev);
 	log(L_DEBUG, "radio PHY write 0x%02X at 0x%04X\n", value, reg);
 
-	FN_EXIT1(OK);
+	FN_EXIT0;
 	return OK;
 }
 
@@ -442,6 +445,8 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	/* we skip the first four bytes which contain the control sum */
 
 	const u8 *p = (u8 *) fw_image + 4;
+
+	FN_ENTER;
 
 	/* start the image checksum by adding the image size value */
 	sum = p[0] + p[1] + p[2] + p[3];
@@ -477,6 +482,7 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	    size, sum, le32_to_cpu(fw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
+	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
 	return (sum != le32_to_cpu(fw_image->chksum));
 }
 
@@ -506,6 +512,8 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	int result = OK;
 	/* we skip the first four bytes which contain the control sum */
 	const u8 *p = (u8 *) fw_image + 4;
+
+	FN_ENTER;
 
 	/* start the image checksum by adding the image size value */
 	sum = p[0] + p[1] + p[2] + p[3];
@@ -557,6 +565,7 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		}
 	}
 
+	FN_EXIT1(result);
 	return result;
 }
 
@@ -800,8 +809,10 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 static inline void
 acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 {
+	FN_ENTER;
 	acx_writel(type | (status << 16), adev->cmd_area);
 	write_flush(adev);
+	FN_EXIT0;
 }
 
 
@@ -814,6 +825,8 @@ static u32 acxpci_read_cmd_type_status(acx_device_t * adev)
 {
 	u32 cmd_type, cmd_status;
 
+	FN_ENTER;
+
 	cmd_type = acx_readl(adev->cmd_area);
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
@@ -821,6 +834,7 @@ static u32 acxpci_read_cmd_type_status(acx_device_t * adev)
 	log(L_CTL, "cmd_type:%04X cmd_status:%04X [%s]\n",
 	    cmd_type, cmd_status, acx_cmd_status_str(cmd_status));
 
+	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
 
@@ -846,6 +860,8 @@ static inline void init_mboxes(acx_device_t * adev)
 {
 	u32 cmd_offs, info_offs;
 
+	FN_ENTER;
+
 	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
 	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
 	adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
@@ -855,6 +871,7 @@ static inline void init_mboxes(acx_device_t * adev)
 	    "info_mbox_offset=%X info_area=%p\n",
 	    adev->iobase2,
 	    cmd_offs, adev->cmd_area, info_offs, adev->info_area);
+	FN_EXIT0;s
 }
 
 
@@ -864,8 +881,12 @@ static inline void read_eeprom_area(acx_device_t * adev)
 	int offs;
 	u8 tmp;
 
+	FN_ENTER;
+
 	for (offs = 0x8c; offs < 0xb9; offs++)
 		acxpci_read_eeprom_byte(adev, offs, &tmp);
+
+	FN_EXIT0;
 #endif
 }
 
@@ -1213,6 +1234,8 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
 	int i;
 
+	FN_ENTER;
+
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
@@ -1239,6 +1262,7 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 		       "unknown card: expected 'Global', got '%.*s\'. "
 		       "Please report\n", CARD_EEPROM_ID_SIZE, buffer);
 	}
+	FN_EXIT0;
 }
 #endif /* NONESSENTIAL_FEATURES */
 

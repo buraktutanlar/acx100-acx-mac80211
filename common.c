@@ -279,6 +279,8 @@ void acx_dump_bytes(const void *data, int num)
 {
 	const u8 *ptr = (const u8 *)data;
 
+FN_ENTER;
+
 	if (num <= 0) {
 		printk("\n");
 		return;
@@ -299,6 +301,9 @@ void acx_dump_bytes(const void *data, int num)
 			printk("%02X ", *ptr++);
 		printk("%02X\n", *ptr);
 	}
+
+FN_EXIT0;
+
 }
 #endif
 
@@ -743,6 +748,8 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	u16 len;
 	int res;
 
+FN_ENTER;
+
 	/* FIXME: no check whether this exceeds the array yet.
 	 * We should probably remember the number of entries... */
 	if (type < 0x1000)
@@ -765,6 +772,8 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}
+
+FN_EXIT1(res);
 	return res;
 }
 
@@ -1385,6 +1394,8 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 	char procbuf[80];
 	int i;
 
+FN_ENTER;
+
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
 			 "driver/acx_%s", proc_files[i]);
@@ -1395,12 +1406,14 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
 				printk("acx: cannot register /proc entry %s\n",
 				       procbuf);
+FN_EXIT1(NOT_OK);
 				return NOT_OK;
 			}
 		} else {
 			remove_proc_entry(procbuf, NULL);
 		}
 	}
+FN_EXIT0;
 	return OK;
 }
 
@@ -1489,6 +1502,8 @@ static int acx_setup_modes_bphy(acx_device_t * adev)
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
 
+FN_ENTER;
+
 	mode = &adev->modes[0];
 	mode->mode = MODE_IEEE80211B;
 	mode->num_channels = acx_chantable_size;
@@ -1497,14 +1512,18 @@ static int acx_setup_modes_bphy(acx_device_t * adev)
 	mode->rates = acx_b_ratetable;
 	err = ieee80211_register_hwmode(hw,mode);
 
-        return err;           
+FN_EXIT1(err);
+
+        return err;
 }
 
 static int acx_setup_modes_gphy(acx_device_t * adev)
-{                 
+{
         int err = 0;
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
+
+FN_ENTER;
 	
 	mode = &adev->modes[1]; 
 	mode->mode = MODE_IEEE80211G;
@@ -1514,14 +1533,17 @@ static int acx_setup_modes_gphy(acx_device_t * adev)
 	mode->rates = acx_g_ratetable;
 	err = ieee80211_register_hwmode(hw,mode);
 
-        return err;                  
+FN_EXIT1(err);
+
+        return err;
 }
 
 int acx_setup_modes(acx_device_t * adev)
 {
         int err = -ENOMEM;
 
-                    
+FN_ENTER;
+
 	if (IS_ACX111(adev)) {
 /*		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);*/
         	err = acx_setup_modes_gphy(adev);
@@ -1531,7 +1553,8 @@ int acx_setup_modes(acx_device_t * adev)
 	err = acx_setup_modes_bphy(adev);
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
-        return err;                           
+FN_EXIT1(err);
+        return err; 
 
 }
 
@@ -1708,7 +1731,7 @@ acx_i_set_multicast_list(struct ieee80211_hw *hw,
         /* cannot update card settings directly here, atomic context */
         acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
-        acx_unlock(adev, flags);       
+        acx_unlock(adev, flags);
 
         FN_EXIT0; 
 }
@@ -1724,6 +1747,8 @@ acx111_s_get_feature_config(acx_device_t * adev,
 {
 	struct acx111_ie_feature_config feat;
 
+	FN_ENTER;
+
 	if (!IS_ACX111(adev)) {
 		return NOT_OK;
 	}
@@ -1731,6 +1756,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 	memset(&feat, 0, sizeof(feat));
 
 	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
+		FN_EXIT1(NOT_OK); 
 		return NOT_OK;
 	}
 	log(L_DEBUG,
@@ -1742,6 +1768,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 	if (data_flow_options)
 		*data_flow_options = le32_to_cpu(feat.data_flow_options);
 
+	FN_EXIT0; 
 	return OK;
 }
 
@@ -1754,12 +1781,17 @@ acx111_s_set_feature_config(acx_device_t * adev,
 {
 	struct acx111_ie_feature_config feat;
 
+	FN_ENTER;
+
 	if (!IS_ACX111(adev)) {
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
 
-	if ((mode < 0) || (mode > 2))
+	if ((mode < 0) || (mode > 2)) {
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
+				}
 
 	if (mode != 2)
 		/* need to modify old data */
@@ -1788,9 +1820,11 @@ acx111_s_set_feature_config(acx_device_t * adev,
 	    le32_to_cpu(feat.data_flow_options));
 
 	if (OK != acx_s_configure(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
 
+	FN_EXIT0;
 	return OK;
 }
 
@@ -4025,6 +4059,8 @@ void acx_update_capabilities(acx_device_t * adev)
 */
 static void acx_select_opmode(acx_device_t * adev)
 {
+	FN_ENTER;
+
 	int changed = 0;
 	if (adev->interface.operating) {
 		switch (adev->interface.type) {
@@ -4180,6 +4216,9 @@ int acx_net_reset(struct ieee80211_hw *ieee)
 int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 {
 	int result;
+
+	FN_ENTER;
+
 	acx_sem_lock(adev);
 	adev->rx_status.channel = channel;
 	adev->rx_status.freq = freq;
@@ -4307,7 +4346,7 @@ int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
 	acx_unlock(adev, flags);
 	err = 0;
 err_out:
-	FN_EXIT0;
+	FN_EXIT1(err);
 	return err;
 }
 
