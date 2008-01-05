@@ -1,5 +1,5 @@
 /* temporary hack until proper Kconfig integration */
-//#define CONFIG_ACX_MAC80211_PCI 1
+#define CONFIG_ACX_MAC80211_PCI 1
 //#define CONFIG_ACX_MAC80211_USB 1
 
 #define ACX_RELEASE "v0.3.36-mac80211"

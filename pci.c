@@ -871,7 +871,7 @@ static inline void init_mboxes(acx_device_t * adev)
 	    "info_mbox_offset=%X info_area=%p\n",
 	    adev->iobase2,
 	    cmd_offs, adev->cmd_area, info_offs, adev->info_area);
-	FN_EXIT0;s
+	FN_EXIT0;
 }
 
 
