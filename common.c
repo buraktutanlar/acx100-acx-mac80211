@@ -1704,7 +1704,9 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 */
 void
 acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                            unsigned short netflags, int mc_count)
+                         unsigned int changed_flags,
+                         unsigned int *total_flags,
+                         int mc_count, struct dev_addr_list *mc_list)
 {
         acx_device_t *adev = ieee2adev(hw);
         unsigned long flags;
@@ -1713,9 +1715,12 @@ acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
         acx_lock(adev, flags);
 
+        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI);
+        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+                return;
         /* firmwares don't have allmulti capability,
          * so just use promiscuous mode instead in this case. */
-        if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
+        if (*total_flags) {
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
                 SET_BIT(adev->set_mask, SET_RXCONFIG);
@@ -4562,7 +4567,7 @@ int acx_key_write(acx_device_t * adev,
 */
 
 int acx_net_set_key(struct ieee80211_hw *ieee,
-		    set_key_cmd cmd,
+		    set_key_cmd cmd, 
 		    u8 * addr, struct ieee80211_key_conf *key, int aid)
 {
 //      return 0;
@@ -4575,11 +4580,11 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 //	TODO();
 	switch (key->alg) {
 	default:
-	case ALG_NONE:
+/*	case ALG_NONE:
 	case ALG_NULL:
 		algorithm = ACX_SEC_ALGO_NONE;
 		break;
-	case ALG_WEP:
+*/	case ALG_WEP:
 		if (key->keylen == 5)
 			algorithm = ACX_SEC_ALGO_WEP;
 		else
@@ -4604,20 +4609,21 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 		if (err)
 			goto out_unlock;
 		key->hw_key_idx = index;
-		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);
-		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
-			adev->default_key_idx = index;
+/*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
+/*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
+			adev->default_key_idx = index;*/
+                SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
 		adev->key[index].enabled = 1;
 		break;
 	case DISABLE_KEY:
 		adev->key[index].enabled = 0;
 		err = 0;
 		break;
-	case REMOVE_ALL_KEYS:
+/*	case REMOVE_ALL_KEYS:
 		acx_clear_keys(adev);
 		err = 0;
 		break;
-     /* case ENABLE_COMPRESSION:
+*/    /* case ENABLE_COMPRESSION:
 	case DISABLE_COMPRESSION:
 		err = 0;
 		break; */

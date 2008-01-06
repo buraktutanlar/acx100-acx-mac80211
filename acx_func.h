@@ -625,7 +625,20 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 int acxpci_s_reset_dev(acx_device_t *adev);
 void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                            unsigned short netflags, int mc_count);
+                            unsigned int changed_flags,
+                            unsigned int *total_flags,
+                            int mc_count, struct dev_addr_list *mc_list);
+
+enum ieee80211_filter_flags {
+FIF_PROMISC_IN_BSS,
+FIF_ALLMULTI,
+};
+
+enum ieee80211_key_flags {
+IEEE80211_KEY_FLAG_WMM_STA,
+IEEE80211_KEY_FLAG_GENERATE_IV,
+IEEE80211_KEY_FLAG_GENERATE_MMIC
+};
 
 /*** End DeviceScape Functions **/
 

@@ -83,7 +83,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void disable_acx_irq(acx_device_t * adev);
 
 static int acxpci_e_open(struct ieee80211_hw *hw);
-static int acxpci_e_close(struct ieee80211_hw *hw);
+static void acxpci_e_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
@@ -1440,7 +1440,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
         .remove_interface = acx_remove_interface,
 	.open = acxpci_e_open,
 	.stop = acxpci_e_close,
-        .reset = acx_net_reset,
+/*        .reset = acx_net_reset,*/
         .config = acx_net_config,
         .config_interface = acx_config_interface,
         .set_multicast_list = acx_i_set_multicast_list,
@@ -1477,9 +1477,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		       pci_name(pdev));
 		goto fail_alloc_netdev;
 	}
-	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS &
-			 ~IEEE80211_HW_MONITOR_DURING_OPER |
-			 IEEE80211_HW_WEP_INCLUDE_IV;
+	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
 	ieee->queues = 1;
 
 	/* (NB: memsets to 0 entire area) */
@@ -2135,7 +2133,7 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 **	>0	f/w reported error
 **	<0	driver reported error
 */
-static int acxpci_e_close(struct ieee80211_hw *hw)
+static void acxpci_e_close(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -2164,7 +2162,6 @@ static int acxpci_e_close(struct ieee80211_hw *hw)
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;
-	return OK;
 }
 
 
