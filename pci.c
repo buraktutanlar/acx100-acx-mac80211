@@ -83,7 +83,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void disable_acx_irq(acx_device_t * adev);
 
 static int acxpci_e_open(struct ieee80211_hw *hw);
-static void acxpci_e_close(struct ieee80211_hw *hw);
+static int acxpci_e_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
@@ -2133,7 +2133,7 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 **	>0	f/w reported error
 **	<0	driver reported error
 */
-static void acxpci_e_close(struct ieee80211_hw *hw)
+static int acxpci_e_close(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -2162,6 +2162,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;
+	return OK;
 }
 
 

@@ -1704,9 +1704,7 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 */
 void
 acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                         unsigned int changed_flags,
-                         unsigned int *total_flags,
-                         int mc_count, struct dev_addr_list *mc_list)
+                         unsigned short netflags, int mc_count)
 {
         acx_device_t *adev = ieee2adev(hw);
         unsigned long flags;
@@ -1715,12 +1713,7 @@ acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
         acx_lock(adev, flags);
 
-        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI);
-        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-                return;
-        /* firmwares don't have allmulti capability,
-         * so just use promiscuous mode instead in this case. */
-        if (*total_flags) {
+        if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
                 SET_BIT(adev->set_mask, SET_RXCONFIG);
