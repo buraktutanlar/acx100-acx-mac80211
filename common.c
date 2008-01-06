@@ -279,7 +279,7 @@ void acx_dump_bytes(const void *data, int num)
 {
 	const u8 *ptr = (const u8 *)data;
 
-FN_ENTER;
+	FN_ENTER;
 
 	if (num <= 0) {
 		printk("\n");
@@ -302,7 +302,7 @@ FN_ENTER;
 		printk("%02X\n", *ptr);
 	}
 
-FN_EXIT0;
+	FN_EXIT0;
 
 }
 #endif
@@ -748,7 +748,7 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	u16 len;
 	int res;
 
-FN_ENTER;
+	FN_ENTER;
 
 	/* FIXME: no check whether this exceeds the array yet.
 	 * We should probably remember the number of entries... */
@@ -773,7 +773,7 @@ FN_ENTER;
 		/* dump_stack() is already done in issue_cmd() */
 	}
 
-FN_EXIT1(res);
+	FN_EXIT1(res);
 	return res;
 }
 
@@ -1502,7 +1502,7 @@ static int acx_setup_modes_bphy(acx_device_t * adev)
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
 
-FN_ENTER;
+	FN_ENTER;
 
 	mode = &adev->modes[0];
 	mode->mode = MODE_IEEE80211B;
@@ -1512,8 +1512,7 @@ FN_ENTER;
 	mode->rates = acx_b_ratetable;
 	err = ieee80211_register_hwmode(hw,mode);
 
-FN_EXIT1(err);
-
+	FN_EXIT1(err);
         return err;
 }
 
@@ -1523,7 +1522,7 @@ static int acx_setup_modes_gphy(acx_device_t * adev)
 	struct ieee80211_hw *hw = adev->ieee;
 	struct ieee80211_hw_mode *mode;
 
-FN_ENTER;
+	FN_ENTER;
 	
 	mode = &adev->modes[1]; 
 	mode->mode = MODE_IEEE80211G;
@@ -1533,8 +1532,7 @@ FN_ENTER;
 	mode->rates = acx_g_ratetable;
 	err = ieee80211_register_hwmode(hw,mode);
 
-FN_EXIT1(err);
-
+	FN_EXIT1(err);
         return err;
 }
 
