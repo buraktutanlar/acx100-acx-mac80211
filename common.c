@@ -456,7 +456,7 @@ void acx_display_hardware_details(acx_device_t * adev)
 
 	printk("acx: chipset %s, radio type 0x%02X (%s), "
 	       "form factor 0x%02X (%s), EEPROM version 0x%02X, "
-	       "uploaded firmware '%s''n",
+	       "uploaded firmware '%s'\n",
 	       adev->chip_name, adev->radio_type, radio_str,
 	       adev->form_factor, form_str, adev->eeprom_version,
 	       adev->firmware_version);
@@ -1394,7 +1394,7 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 	char procbuf[80];
 	int i;
 
-FN_ENTER;
+	FN_ENTER;
 
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
@@ -1406,14 +1406,14 @@ FN_ENTER;
 			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
 				printk("acx: cannot register /proc entry %s\n",
 				       procbuf);
-FN_EXIT1(NOT_OK);
+	FN_EXIT1(NOT_OK);
 				return NOT_OK;
 			}
 		} else {
 			remove_proc_entry(procbuf, NULL);
 		}
 	}
-FN_EXIT0;
+	FN_EXIT0;
 	return OK;
 }
 
