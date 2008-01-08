@@ -641,7 +641,7 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 		}
 		printk("acx: firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_msleep(1000);	/* better wait for a while... */
+		acx_s_mdelay(1000);	/* better wait for a while... */
 	}
 
 	vfree(fw_image);
@@ -700,7 +700,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 			break;
 		printk("acx: radio firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_msleep(1000);	/* better wait for a while... */
+		acx_s_mdelay(1000);	/* better wait for a while... */
 	}
 
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -784,7 +784,7 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 		if (time_after(jiffies, timeout))
 			break;
 		/* Init may take up to ~0.5 sec total */
-		acx_s_msleep(50);
+		acx_s_mdelay(50);
 	}
 
 	FN_EXIT1(result);
@@ -956,7 +956,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	if (OK != acxpci_s_upload_fw(adev))
 		goto end_fail;
 
-	/* acx_s_msleep(10);    this one really shouldn't be required */
+	/* acx_s_mdelay(10);    this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
 	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
@@ -1063,7 +1063,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_msleep(8);
+			acx_s_mdelay(8);
 		}
 	} while (likely(--counter));
 
@@ -1129,7 +1129,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_msleep(8);
+			acx_s_mdelay(8);
 		}
 	} while (likely(--counter));
 
@@ -1326,7 +1326,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 	 * longer possible here? */
 	write_reg16(adev, IO_ACX_ENABLE, 0);
 
-	acx_s_msleep(100);
+	acx_s_mdelay(100);
 
 	acx_lock(adev, flags);
 	acxpci_free_desc_queues(adev);
@@ -1493,6 +1493,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/** Set up our private interface **/
 	spin_lock_init(&adev->lock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
+	printk("mutex_init(&adev->mutex); // adev = 0x%x\n", adev);
 	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well
 	 ** just _presume_ that we're under sem (instead of actually taking it): */

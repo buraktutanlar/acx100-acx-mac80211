@@ -555,7 +555,7 @@ int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
 void acxpci_set_interrupt_mask(acx_device_t *adev);
 int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
-void acx_s_msleep(int ms);
+void acx_s_mdelay(int ms);
 int acx_s_init_mac(acx_device_t *adev);
 void acx_set_reg_domain(acx_device_t *adev, unsigned char reg_dom_id);
 void acx_update_capabilities(acx_device_t *adev);
