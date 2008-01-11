@@ -4055,9 +4055,10 @@ void acx_update_capabilities(acx_device_t * adev)
 */
 static void acx_select_opmode(acx_device_t * adev)
 {
+	int changed = 0;
+
 	FN_ENTER;
 
-	int changed = 0;
 	if (adev->interface.operating) {
 		switch (adev->interface.type) {
 			case IEEE80211_IF_TYPE_AP:
@@ -4612,11 +4613,11 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 		adev->key[index].enabled = 0;
 		err = 0;
 		break;
-/*	case REMOVE_ALL_KEYS:
+	case REMOVE_ALL_KEYS:
 		acx_clear_keys(adev);
 		err = 0;
 		break;
-*/    /* case ENABLE_COMPRESSION:
+    /* case ENABLE_COMPRESSION:
 	case DISABLE_COMPRESSION:
 		err = 0;
 		break; */

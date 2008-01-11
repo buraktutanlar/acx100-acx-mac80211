@@ -1008,7 +1008,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 int
 acxpci_s_issue_cmd_timeo(acx_device_t * adev,
 			 unsigned int cmd,
-			 void *buffer, unsigned buflen, unsigned cmd_timeout)
+			 void *buffer, unsigned buflen, unsigned int cmd_timeout)
 {
 #else
 int
@@ -1016,7 +1016,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
 			       void *buffer,
 			       unsigned buflen,
-			       unsigned cmd_timeout, const char *cmdstr)
+			       unsigned int cmd_timeout, const char *cmdstr)
 {
 	unsigned long start = jiffies;
 #endif
@@ -1146,7 +1146,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       devname, (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		goto bad;
+		printk("counter seems to be a NULL pointer\nhack: don't do: 'goto bad;'\n");
 	} else if (cmd_timeout - counter > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
@@ -1493,7 +1493,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/** Set up our private interface **/
 	spin_lock_init(&adev->lock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	printk("mutex_init(&adev->mutex); // adev = 0x%x\n", adev);
+	printk("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
 	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well
 	 ** just _presume_ that we're under sem (instead of actually taking it): */
