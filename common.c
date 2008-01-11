@@ -1704,7 +1704,13 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 */
 void
 acx_i_set_multicast_list(struct ieee80211_hw *hw,
+                         #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
                          unsigned short netflags, int mc_count)
+                         #else
+                         unsigned int changed_flags,
+                         unsigned int *total_flags,
+                         int mc_count, struct dev_addr_list *mc_list)
+                         #endif
 {
         acx_device_t *adev = ieee2adev(hw);
         unsigned long flags;
@@ -1713,7 +1719,17 @@ acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
         acx_lock(adev, flags);
 
-        if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
+        #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI);
+        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+                return;
+	#endif
+
+        #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+	if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
+	#else
+	if (*total_flags) {
+	#endif
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
                 SET_BIT(adev->set_mask, SET_RXCONFIG);
@@ -4138,7 +4154,9 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
+		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 		adev->interface.if_id = conf->if_id;
+		#endif
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 	}
@@ -4147,10 +4165,18 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		acx_select_opmode(adev);
 	err = 0;
 
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	printk(KERN_INFO "Virtual interface added "
 	       "(type: 0x%08X, ID: %d, MAC: "
 	       MAC_FMT ")\n",
-	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
+	       conf->type,
+	       conf->if_id,
+	       MAC_ARG(conf->mac_addr));
+	#else
+	printk(KERN_INFO "Virtual interface added "
+	       "(type: 0x%08X)\n",
+	       conf->type);
+	#endif
 
       out_unlock:
 	acx_unlock(adev, flags);
@@ -4182,10 +4208,16 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	flush_scheduled_work();
 	acx_unlock(adev, flags);
 
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	printk(KERN_INFO "Virtual interface removed "
 	       "(type: 0x%08X, ID: %d, MAC: "
 	       MAC_FMT ")\n",
 	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
+	#else
+	printk(KERN_INFO "Virtual interface removed "
+	       "(type: 0x%08X)\n",
+	       conf->type);
+	#endif
 	FN_EXIT0;
 }
 /**
@@ -4302,8 +4334,13 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
-int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
+#else
+void acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf)
+#endif
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	unsigned long flags;
@@ -4346,7 +4383,10 @@ int acx_config_interface(struct ieee80211_hw *ieee, int if_id,
 	err = 0;
 err_out:
 	FN_EXIT1(err);
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return err;
+	#else
+	#endif
 }
 
 /**
@@ -4560,9 +4600,15 @@ int acx_key_write(acx_device_t * adev,
 **
 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 int acx_net_set_key(struct ieee80211_hw *ieee,
 		    set_key_cmd cmd, 
 		    u8 * addr, struct ieee80211_key_conf *key, int aid)
+#else
+int acx_net_set_key(struct ieee80211_hw *ieee,
+		    enum set_key_cmd cmd, const u8 *local_addr,
+		    const u8 * addr, struct ieee80211_key_conf *key)
+#endif
 {
 //      return 0;
 	struct acx_device *adev = ieee2adev(ieee);
@@ -4613,10 +4659,13 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 		adev->key[index].enabled = 0;
 		err = 0;
 		break;
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	case REMOVE_ALL_KEYS:
 		acx_clear_keys(adev);
 		err = 0;
 		break;
+	#else
+	#endif
     /* case ENABLE_COMPRESSION:
 	case DISABLE_COMPRESSION:
 		err = 0;
