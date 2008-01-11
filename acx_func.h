@@ -626,6 +626,9 @@ int acxpci_s_reset_dev(acx_device_t *adev);
 void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned short netflags, int mc_count);
+enum ieee80211_key_flags {
+IEEE80211_KEY_FLAG_GENERATE_IV,
+};
 
 /*** End DeviceScape Functions **/
 
