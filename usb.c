@@ -1763,6 +1763,7 @@ int __init acxusb_e_init_module(void)
 void __exit acxusb_e_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
+	log(L_INIT, "USB module " ACX_RELEASE " unloaded\n");
 }
 
 

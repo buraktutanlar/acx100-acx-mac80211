@@ -1150,7 +1150,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       devname, (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		printk("counter seems to be a NULL pointer\nhack: don't do: 'goto bad;'\n");
+		printk("counter seems to be a NULL pointer\nhack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
 	} else if (cmd_timeout - counter > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
@@ -4162,6 +4162,7 @@ void __exit acxpci_e_cleanup_module(void)
 	FN_ENTER;
 
 	pci_unregister_driver(&acxpci_drv_id);
-
+	log(L_INIT,
+	    "acx: PCI module " ACX_RELEASE " unloaded\n");
 	FN_EXIT0;
 }
