@@ -1143,7 +1143,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
-	if (counter =< 30) {		/* timed out! */
+	if (counter <= 30) {		/* timed out! */
 		printk("%s: " FUNC "(): timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
