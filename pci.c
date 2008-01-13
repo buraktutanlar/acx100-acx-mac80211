@@ -1143,14 +1143,14 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
-	if (!counter) {		/* timed out! */
+	if (counter =< 30) {		/* timed out! */
 		printk("%s: " FUNC "(): timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
 		       devname, (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		printk("counter seems to be a NULL pointer\nhack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
+		printk("hack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
 	} else if (cmd_timeout - counter > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
