@@ -4652,7 +4652,10 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 /*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
 /*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
 			adev->default_key_idx = index;*/
+		#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
                 SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
+		#else
+		#endif
 		adev->key[index].enabled = 1;
 		break;
 	case DISABLE_KEY:

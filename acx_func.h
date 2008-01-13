@@ -639,9 +639,6 @@ void acx_e_after_interrupt_task(struct work_struct* work);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned short netflags, int mc_count);
-enum ieee80211_key_flags {
-IEEE80211_KEY_FLAG_GENERATE_IV,
-};
 #else
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned int changed_flags,
