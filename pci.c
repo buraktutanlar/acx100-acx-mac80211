@@ -1143,7 +1143,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
-	if (counter <= 30) {		/* timed out! */
+	if (counter == 0) {		/* timed out! */
 		printk("%s: " FUNC "(): timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
@@ -1151,6 +1151,12 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 		printk("hack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
+	} else if (cmd_timeout - counter <= 30) {	/* if waited <=30ms... */
+		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
+		    "count:%d. Please report\n",
+		    (adev->irqs_active) ? "waited" : "polled",
+		    cmd_timeout - counter, counter);
+		printk("Your driver might not work. Please report the current situation including the following important values: counter: %d cmd_timeout: %dms cmd_timeout-counter: %dms\n", counter, cmd_timeout, cmd_timeout - counter);
 	} else if (cmd_timeout - counter > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
