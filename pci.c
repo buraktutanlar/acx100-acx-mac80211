@@ -1156,7 +1156,6 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		    "count:%d. Please report\n",
 		    (adev->irqs_active) ? "waited" : "polled",
 		    cmd_timeout - counter, counter);
-	}
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
