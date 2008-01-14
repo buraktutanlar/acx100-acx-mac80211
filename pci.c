@@ -1453,7 +1453,9 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.start = acxpci_e_open,
 	#endif
 	.stop = acxpci_e_close,
-/*        .reset = acx_net_reset,*/
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+        .reset = acx_net_reset,
+	#endif
         .config = acx_net_config,
         .config_interface = acx_config_interface,
 	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)

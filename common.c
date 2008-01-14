@@ -1540,7 +1540,7 @@ int acx_setup_modes(acx_device_t * adev)
 {
         int err = -ENOMEM;
 
-FN_ENTER;
+	FN_ENTER;
 
 	if (IS_ACX111(adev)) {
 /*		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);*/
@@ -1551,7 +1551,7 @@ FN_ENTER;
 	err = acx_setup_modes_bphy(adev);
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
-FN_EXIT1(err);
+	FN_EXIT1(err);
         return err; 
 
 }
