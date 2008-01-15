@@ -3336,16 +3336,51 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 ** Called by ioctl commit handler, acx_start, acx_set_defaults,
 ** acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
 */
-void acx_s_set_sane_reg_domain(acx_device_t * adev, int do_set)
+void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
+	unsigned mask;
 
-	FIXME();
+	unsigned int i;
+
+	for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
+		if (acx_reg_domain_ids[i] == adev->reg_dom_id)
+			break;
+
+	if (sizeof(acx_reg_domain_ids) == i) {
+		log(L_INIT, "Invalid or unsupported regulatory domain"
+			       " 0x%02X specified, falling back to FCC (USA)!"
+			       " Please report if this sounds fishy!\n",
+				adev->reg_dom_id);
+		i = 0;
+		adev->reg_dom_id = acx_reg_domain_ids[i];
+
+		/* since there was a mismatch, we need to force updating */
+		do_set = 1;
+	}
+
 	if (do_set) {
 		acx_ie_generic_t dom;
 		dom.m.bytes[0] = adev->reg_dom_id;
 		acx_s_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 	}
 
+	adev->reg_dom_chanmask = reg_domain_channel_masks[i];
+
+	mask = (1 << (adev->channel - 1));
+	if (!(adev->reg_dom_chanmask & mask)) {
+	/* hmm, need to adjust our channel to reside within domain */
+		mask = 1;
+		for (i = 1; i <= 14; i++) {
+			if (adev->reg_dom_chanmask & mask) {
+				printk("%s: adjusting selected channel from %d "
+					"to %d due to new regulatory domain\n",
+					wiphy_name(adev->ieee->wiphy), adev->channel, i);
+				adev->channel = i;
+				break;
+			}
+			mask <<= 1;
+		}
+	}
 }
 
 static void acx111_s_sens_radio_16_17(acx_device_t * adev)
@@ -3633,9 +3668,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					&adev->channel, 1);
 			FIXME();
 			/* This needs to be keyed on WEP? */
-//			acx111_s_feature_on(adev, 0,
-//					    FEATURE2_NO_TXCRYPT |
-//					    FEATURE2_SNIFFER);
+			acx111_s_feature_on(adev, 0,
+					    FEATURE2_NO_TXCRYPT |
+					    FEATURE2_SNIFFER);
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_TX);
 	}
