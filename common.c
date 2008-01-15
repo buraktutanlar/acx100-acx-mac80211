@@ -3367,7 +3367,7 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 }
 
 
-void acx_s_update_card_settings(acx_device_t * adev)
+void acx_s_update_card_settings(acx_device_t *adev)
 {
 	unsigned long flags;
 	unsigned int start_scan = 0;
@@ -4338,7 +4338,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
 #else
-void acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+static int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
 #endif
 {
