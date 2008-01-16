@@ -1496,6 +1496,7 @@ static struct ieee80211_channel channels[] = {
 
 #define acx_chantable_size ARRAY_SIZE(channels)
 
+/*
 static int acx_setup_modes_bphy(acx_device_t * adev)        
 {
         int err = 0;
@@ -1535,22 +1536,44 @@ static int acx_setup_modes_gphy(acx_device_t * adev)
 	FN_EXIT1(err);
         return err;
 }
+*/
 
 int acx_setup_modes(acx_device_t * adev)
 {
+	struct ieee80211_hw *hw = adev->ieee;
+	struct ieee80211_hw_mode *mode;
         int err = -ENOMEM;
 
 	FN_ENTER;
 
 	if (IS_ACX111(adev)) {
-/*		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);*/
+/*
+		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
         	err = acx_setup_modes_gphy(adev);
-	}/* else {
+*/
+		mode = &adev->modes[1]; 
+		mode->mode = MODE_IEEE80211G;
+		mode->num_channels = acx_chantable_size;
+		mode->num_rates = acx_g_ratetable_size;
+		mode->rates = acx_g_ratetable;
+	} else if (!IS_ACX111(adev)) {
+/*
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
-	}*/
-	err = acx_setup_modes_bphy(adev);
+		err = acx_setup_modes_bphy(adev);
+*/
+		mode = &adev->modes[0];
+		mode->mode = MODE_IEEE80211B;
+		mode->num_channels = acx_chantable_size;
+		mode->num_rates = acx_b_ratetable_size;
+		mode->rates = acx_b_ratetable;
+
+	}
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
+
+	mode->channels = channels;
+	err = ieee80211_register_hwmode(hw,mode);
+
 	FN_EXIT1(err);
         return err; 
 
@@ -3671,6 +3694,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx111_s_feature_on(adev, 0,
 					    FEATURE2_NO_TXCRYPT |
 					    FEATURE2_SNIFFER);
+			ieee80211_wake_queues(adev->ieee);
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_TX);
 	}
