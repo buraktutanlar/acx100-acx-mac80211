@@ -4398,7 +4398,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
 #else
 static int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-			 struct ieee80211_if_conf *conf)
+				struct ieee80211_if_conf *conf)
 #endif
 {
 	acx_device_t *adev = ieee2adev(ieee);
@@ -4442,10 +4442,7 @@ static int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	err = 0;
 err_out:
 	FN_EXIT1(err);
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return err;
-	#else
-	#endif
 }
 
 /**

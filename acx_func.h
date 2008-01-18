@@ -626,7 +626,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 		struct ieee80211_if_conf *conf);
 #else
 static int acx_config_interface(struct ieee80211_hw* ieee, int if_id, 
-		struct ieee80211_if_conf *conf);
+				struct ieee80211_if_conf *conf);
 #endif
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
