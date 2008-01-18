@@ -2153,6 +2153,10 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 /***********************************************************************
 ** acxpci_e_close
 **
+** This function stops the network functionality of the interface (invoked
+** when the user calls ifconfig <wlan> down). The tx queue is halted and
+** the device is marked as down.
+**
 ** Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
 ** from set to clear. I.e. called by "ifconfig DEV down"
 **
@@ -2170,6 +2174,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	FN_ENTER;
+	printk("putting interface DOWN - this is filled with printk's and will take 8-10 seconds!\n");
 	printk("acxpci_e_close: acx_lock()\n");
 	acx_s_mdelay(1000);
 	acx_lock(adev,flags);
