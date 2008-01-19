@@ -622,10 +622,11 @@ int acx_net_set_key(struct ieee80211_hw *hw,
 		struct ieee80211_key_conf *key);
 		#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id, 
-		struct ieee80211_if_conf *conf);
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf);
 #else
-static int acx_config_interface(struct ieee80211_hw* ieee, int if_id, 
+static int acx_config_interface(struct ieee80211_hw* ieee,
+				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf);
 #endif
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);

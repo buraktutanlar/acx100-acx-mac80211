@@ -1197,6 +1197,9 @@ struct acx_device {
 	struct ieee80211_hw	*ieee;
 	struct ieee80211_hw_mode	modes[2];
 	struct ieee80211_rx_status rx_status;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+	struct ieee80211_vif 	*vif;
+#endif
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
 

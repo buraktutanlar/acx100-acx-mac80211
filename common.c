@@ -4396,10 +4396,6 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
-#else
-static int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-				struct ieee80211_if_conf *conf)
-#endif
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	unsigned long flags;
@@ -4422,6 +4418,33 @@ static int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->interface.if_id == if_id)) {
+#else
+static int acx_config_interface(struct ieee80211_hw* ieee,
+				struct ieee80211_vif *vif,
+				struct ieee80211_if_conf *conf)
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	unsigned long flags;
+	int err = -ENODEV;
+	FN_ENTER;
+	if (!adev->interface.operating)
+		goto err_out;
+	acx_lock(adev, flags);
+
+	if (adev->initialized)
+		acx_select_opmode(adev);
+
+	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
+	    && (adev->vif == vif)) {
+		if (conf->bssid)
+		{
+			adev->interface.bssid = conf->bssid;
+ 	             	MAC_COPY(adev->bssid,conf->bssid);
+		}
+	}
+	if ((conf->type == IEEE80211_IF_TYPE_AP)
+	    && (adev->vif == vif)) {
+#endif
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
