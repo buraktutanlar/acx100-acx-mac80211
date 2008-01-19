@@ -4215,6 +4215,8 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		adev->interface.operating = 1;
 		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 		adev->interface.if_id = conf->if_id;
+		#else
+		adev->vif = conf->vif;
 		#endif
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
@@ -4233,8 +4235,10 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	       MAC_ARG(conf->mac_addr));
 	#else
 	printk(KERN_INFO "Virtual interface added "
-	       "(type: 0x%08X)\n",
-	       conf->type);
+	       "(type: 0x%08X), ID: %pd, MAC: %ps\n",
+	       conf->type,
+	       conf->vif,
+	       conf->mac_addr);
 	#endif
 
       out_unlock:
