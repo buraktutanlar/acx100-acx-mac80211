@@ -738,12 +738,22 @@ static const struct ieee80211_ops acxusb_hw_ops = {
         .conf_tx = acx_net_conf_tx,
         .add_interface = acx_add_interface,
         .remove_interface = acx_remove_interface,
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
         .open = acxusb_e_open,
+	#else
+	.start = acxusb_e_open,
+	#endif
         .stop = acxusb_e_close,
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
         .reset = acx_net_reset,
+	#endif
         .config = acx_net_config,
         .config_interface = acx_config_interface,
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
         .set_multicast_list = acx_i_set_multicast_list,
+	#else
+	.configure_filter = acx_i_set_multicast_list,
+	#endif
         .set_key = acx_net_set_key,         
         .get_stats = acx_e_get_stats,
         .get_tx_stats = acx_net_get_tx_stats,
@@ -826,9 +836,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 
 
-        ieee->flags &=   ~IEEE80211_HW_RX_INCLUDES_FCS &                
-                         ~IEEE80211_HW_MONITOR_DURING_OPER &
-                         ~IEEE80211_HW_WEP_INCLUDE_IV;
+        ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
         ieee->queues = 1;
 
 	/* Register the callbacks for the network device functions */
