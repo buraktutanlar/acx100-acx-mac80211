@@ -55,6 +55,8 @@ MODULE_AUTHOR("ACX100 Open Source Driver development team");
 MODULE_DESCRIPTION
     ("Driver for TI ACX1xx based wireless cards (CardBus/PCI/USB)");
 
+MODULE_VERSION(ACX_RELEASE);
+
 
 /***********************************************************************
 */
