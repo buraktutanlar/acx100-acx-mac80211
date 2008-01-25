@@ -625,7 +625,7 @@ int acx_net_set_key(struct ieee80211_hw *hw,
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf);
 #else
-static int acx_config_interface(struct ieee80211_hw* ieee,
+extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf);
 #endif

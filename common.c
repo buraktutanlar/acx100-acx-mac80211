@@ -4426,7 +4426,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->interface.if_id == if_id)) {
 #else
-static int acx_config_interface(struct ieee80211_hw* ieee,
+extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
 {
