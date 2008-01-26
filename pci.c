@@ -98,7 +98,6 @@ static void acxpci_s_down(struct ieee80211_hw *hw);
 
 void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
 {
-
         strncpy(info->bus_info,pci_name(adev->pdev), ETHTOOL_BUSINFO_LEN);
 }
 
@@ -1019,7 +1018,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 int
 acxpci_s_issue_cmd_timeo(acx_device_t * adev,
 			 unsigned int cmd,
-			 void *buffer, unsigned buflen, unsigned int cmd_timeout)
+			 void *buffer, unsigned buflen, unsigned cmd_timeout)
 {
 #else
 int
@@ -1027,7 +1026,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
 			       void *buffer,
 			       unsigned buflen,
-			       unsigned int cmd_timeout, const char *cmdstr)
+			       unsigned cmd_timeout, const char *cmdstr)
 {
 	unsigned long start = jiffies;
 #endif
