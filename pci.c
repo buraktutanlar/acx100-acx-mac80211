@@ -622,12 +622,12 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
 		 IS_ACX111(adev) * 11, adev->radio_type);
 
-	fw_image = acx_s_read_fw(adev->bus_dev, filename, &file_size);
+	fw_image = acx_s_read_fw(&adev->pdev->dev, filename, &file_size);
 	if (!fw_image) {
 		adev->need_radio_fw = 1;
 		filename[sizeof("tiacx1NN") - 1] = '\0';
 		fw_image =
-		    acx_s_read_fw(adev->bus_dev, filename, &file_size);
+		    acx_s_read_fw(&adev->pdev->dev, filename, &file_size);
 		if (!fw_image) {
 			FN_EXIT1(NOT_OK);
 			return NOT_OK;
@@ -687,7 +687,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 
 	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
 		 IS_ACX111(adev) * 11, adev->radio_type);
-	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
+	radio_image = acx_s_read_fw(&adev->pdev->dev, filename, &size);
 	if (!radio_image) {
 		printk("acx: can't load radio module '%s'\n", filename);
 		goto fail;
@@ -1499,7 +1499,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
-			/* mainline doesn't support the following flags yet */
+			/* TODO: mainline doesn't support the following flags yet */
 			/*
 			  ~IEEE80211_HW_MONITOR_DURING_OPER &
 			  ~IEEE80211_HW_WEP_INCLUDE_IV;
@@ -2050,7 +2050,7 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	acx_s_mwait(1000);
 	acx_lock(adev, flags);
 	disable_acx_irq(adev);
-        synchronize_irq(adev->irq);
+        synchronize_irq(adev->pdev->irq);
 	printk("acxpci_s_down: acx_unlock()\n");
 	acx_s_mwait(1000);
 	acx_unlock(adev, flags);
@@ -3524,7 +3524,8 @@ static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 {
 	void *ptr;
 
-	ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
+	ptr = dma_alloc_coherent(adev->pdev ? &adev->pdev->dev : NULL,
+				 size, phy, GFP_KERNEL);
 
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",

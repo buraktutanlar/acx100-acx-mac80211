@@ -836,7 +836,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
-			/* mainline doesn't support the following flags yet */
+			/* TODO: mainline doesn't support the following flags yet */
 			/*
 			  ~IEEE80211_HW_MONITOR_DURING_OPER &
 			  ~IEEE80211_HW_WEP_INCLUDE_IV;
