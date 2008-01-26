@@ -490,7 +490,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			    && ((*(u16 *) usbbuf & 0x3fff) == 0)
 			    && ((*(u16 *) usbbuf & 0xc000) == 0xc000))
 				break;
-			acx_s_mdelay(10);
+			acx_s_mwait(10);
 		}
 		if (i == 2)
 			goto fw_end;

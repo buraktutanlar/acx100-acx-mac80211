@@ -650,7 +650,7 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 		}
 		printk("acx: firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_mdelay(1000);	/* better wait for a while... */
+		acx_s_mwait(1000);	/* better wait for a while... */
 	}
 
 	vfree(fw_image);
@@ -709,7 +709,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 			break;
 		printk("acx: radio firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_mdelay(1000);	/* better wait for a while... */
+		acx_s_mwait(1000);	/* better wait for a while... */
 	}
 
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -793,7 +793,7 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 		if (time_after(jiffies, timeout))
 			break;
 		/* Init may take up to ~0.5 sec total */
-		acx_s_mdelay(50);
+		acx_s_mwait(50);
 	}
 
 	FN_EXIT1(result);
@@ -967,7 +967,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	if (OK != acxpci_s_upload_fw(adev))
 		goto end_fail;
 
-	/* acx_s_mdelay(10);    this one really shouldn't be required */
+	/* acx_s_mwait(10);    this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
 	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
@@ -1074,7 +1074,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mdelay(8);
+			acx_s_mwait(8);
 		}
 	} while (likely(--counter));
 
@@ -1140,7 +1140,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mdelay(8);
+			acx_s_mwait(8);
 		}
 	} while (likely(--counter));
 
@@ -1342,7 +1342,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 	 * longer possible here? */
 	write_reg16(adev, IO_ACX_ENABLE, 0);
 
-	acx_s_mdelay(100);
+	acx_s_mwait(100);
 
 	acx_lock(adev, flags);
 	acxpci_free_desc_queues(adev);
@@ -2043,12 +2043,12 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	/* then wait until interrupts have finished executing on other CPUs */
 	printk("acxpci_s_down: acx_lock()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	acx_lock(adev, flags);
 	disable_acx_irq(adev);
         synchronize_irq(adev->irq);
 	printk("acxpci_s_down: acx_unlock()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	acx_unlock(adev, flags);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
@@ -2067,7 +2067,7 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
 	printk("acxpci_s_down: flush_scheduled_work()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	flush_scheduled_work();
 
 	/* This is possible:
@@ -2081,7 +2081,7 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** ever happen because acx_i_timer() never does this if
 	 ** status is ACX_STATUS_0_STOPPED */
 	printk("acxpci_s_down: del_timer_sync()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	del_timer_sync(&adev->mgmt_timer);
 
 	FN_EXIT0;
@@ -2180,13 +2180,13 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	FN_ENTER;
 	printk("putting interface DOWN - this is filled with printk's and will take 8-10 seconds!\n");
 	printk("acxpci_e_close: acx_lock()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	acx_lock(adev,flags);
 	/* ifdown device */
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	if (adev->initialized) {
 		printk("acxpci_e_close: acxpci_s_down()\n");
-		acx_s_mdelay(1000);
+		acx_s_mwait(1000);
 		acxpci_s_down(hw);
 	}
 
@@ -2204,14 +2204,13 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
 	printk("acxpci_e_close: acx_unlock()\n");
-	acx_s_mdelay(1000);
+	acx_s_mwait(1000);
 	acx_unlock(adev,flags);
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;
 	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return OK;
-	#else
 	#endif
 }
 
