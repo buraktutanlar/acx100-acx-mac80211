@@ -1428,8 +1428,13 @@ struct acx_device {
 
 	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */
 
+#ifdef CONFIG_PCI
 	struct pci_dev	*pdev;
-
+#endif
+#ifdef CONFIG_VLYNQ
+	struct vlynq_device	*vdev;
+#endif
+	struct device *bus_dev;
 	unsigned long	membase;
 	unsigned long	membase2;
 	void __iomem	*iobase;
