@@ -7,7 +7,7 @@
 #acx-mac80211-objs :=  common.o $(acx-mac80211-obj-y)
 
 obj-m = acx-mac80211.o
-acx-mac80211-objs := common.o pci.o acx-mac80211.o
+acx-mac80211-objs := common.o pci.o #usb.o
 
 # Use this if you have proper Kconfig integration:
 

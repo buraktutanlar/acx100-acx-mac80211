@@ -1443,29 +1443,24 @@ static const u16 IO_ACX111[] = {
 };
 
 static const struct ieee80211_ops acxpci_hw_ops = {
-        .tx = acx_i_start_xmit,
-        .conf_tx = acx_net_conf_tx,
-        .add_interface = acx_add_interface,
-        .remove_interface = acx_remove_interface,
+	.tx = acx_i_start_xmit,
+	.conf_tx = acx_net_conf_tx,
+	.add_interface = acx_add_interface,
+	.remove_interface = acx_remove_interface,
 	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	.open = acxpci_e_open,
+	.reset = acx_net_reset,
+	.set_multicast_list = acx_i_set_multicast_list,
 	#else
 	.start = acxpci_e_open,
-	#endif
-	.stop = acxpci_e_close,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-        .reset = acx_net_reset,
-	#endif
-        .config = acx_net_config,
-        .config_interface = acx_config_interface,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-        .set_multicast_list = acx_i_set_multicast_list,
-	#else
 	.configure_filter = acx_i_set_multicast_list,
 	#endif
-        .set_key = acx_net_set_key,
-        .get_stats = acx_e_get_stats,
-        .get_tx_stats = acx_net_get_tx_stats,
+	.stop = acxpci_e_close,
+	.config = acx_net_config,
+	.config_interface = acx_config_interface,
+	.set_key = acx_net_set_key,
+	.get_stats = acx_e_get_stats,
+	.get_tx_stats = acx_net_get_tx_stats,
 };
 
 

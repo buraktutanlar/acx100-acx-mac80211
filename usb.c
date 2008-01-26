@@ -97,7 +97,11 @@ static void acxusb_i_complete_tx(struct urb *, struct pt_regs *);
 static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
 #endif
 static int acxusb_e_open(struct ieee80211_hw *);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 static int acxusb_e_close(struct ieee80211_hw *);
+#else
+static void acxusb_e_close(struct ieee80211_hw *);
+#endif
 //static void acxusb_i_set_rx_mode(struct net_device *);
 static int acxusb_boot(struct usb_device *, int is_tnetw1450, int *radio_type);
 
@@ -734,29 +738,24 @@ static int acxusb_s_fill_configoption(acx_device_t * adev)
 }
 
 static const struct ieee80211_ops acxusb_hw_ops = {
-        .tx = acx_i_start_xmit,
-        .conf_tx = acx_net_conf_tx,
-        .add_interface = acx_add_interface,
-        .remove_interface = acx_remove_interface,
+	.tx = acx_i_start_xmit,
+	.conf_tx = acx_net_conf_tx,
+	.add_interface = acx_add_interface,
+	.remove_interface = acx_remove_interface,
 	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-        .open = acxusb_e_open,
+	.open = acxusb_e_open,
+	.reset = acx_net_reset,
+	.set_multicast_list = acx_i_set_multicast_list,
 	#else
 	.start = acxusb_e_open,
-	#endif
-        .stop = acxusb_e_close,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-        .reset = acx_net_reset,
-	#endif
-        .config = acx_net_config,
-        .config_interface = acx_config_interface,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-        .set_multicast_list = acx_i_set_multicast_list,
-	#else
 	.configure_filter = acx_i_set_multicast_list,
 	#endif
-        .set_key = acx_net_set_key,         
-        .get_stats = acx_e_get_stats,
-        .get_tx_stats = acx_net_get_tx_stats,
+	.stop = acxusb_e_close,
+	.config = acx_net_config,
+	.config_interface = acx_config_interface,
+	.set_key = acx_net_set_key,         
+	.get_stats = acx_e_get_stats,
+	.get_tx_stats = acx_net_get_tx_stats,
 };
 
 /***********************************************************************
@@ -1149,7 +1148,11 @@ int acxusb_e_open(struct ieee80211_hw *hw)
 ** transfers, these are unlinked (asynchronously). The module in-use count
 ** is also decreased in this function.
 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 int acxusb_e_close(struct ieee80211_hw *hw)
+#else
+static void acxusb_e_close(struct ieee80211_hw *hw)
+#endif
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -1205,7 +1208,9 @@ int acxusb_e_close(struct ieee80211_hw *hw)
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return 0;
+	#endif
 }
 
 
