@@ -4274,13 +4274,12 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	flush_scheduled_work();
 	acx_unlock(adev, flags);
 
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	printk(KERN_INFO "Virtual interface removed "
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	       "(type: 0x%08X, ID: %d, MAC: "
 	       MAC_FMT ")\n",
 	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
 	#else
-	printk(KERN_INFO "Virtual interface removed "
 	       "(type: 0x%08X)\n",
 	       conf->type);
 	#endif

@@ -65,7 +65,7 @@ enum { acx_debug = 0 };
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
 
-#if !defined(CONFIG_ACX_MAC80211_PCI) && !defined(CONFIG_ACX_MAC80211_USB)
+#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
 #error Driver must include PCI and/or USB support. You selected neither.
 #endif
 

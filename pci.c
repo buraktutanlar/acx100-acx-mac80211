@@ -918,7 +918,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 		msg = "eCPU is already running. ";
 		goto end_unlock;
 	}
-#ifdef WE_DONT_NEED_THAT_DO_WE
+#if 0
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "eCPU did not start after boot from flash. ";
