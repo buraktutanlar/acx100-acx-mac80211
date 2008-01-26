@@ -1500,6 +1500,11 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
+			/* mainline doesn't support the following flags yet */
+			/*
+			  ~IEEE80211_HW_MONITOR_DURING_OPER &
+			  ~IEEE80211_HW_WEP_INCLUDE_IV;
+			*/
 	ieee->queues = 1;
 
 	/* (NB: memsets to 0 entire area) */
