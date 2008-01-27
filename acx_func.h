@@ -611,16 +611,16 @@ void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw* ieee);
 int acx_net_set_key(struct ieee80211_hw *hw, 
-		#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 		set_key_cmd cmd,
 		u8 *addr,
 		struct ieee80211_key_conf *key,
 		int aid);
-		#else
+#else
 		enum set_key_cmd cmd,
 		const u8 *local_addr, const u8 *addr,
 		struct ieee80211_key_conf *key);
-		#endif
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf);
