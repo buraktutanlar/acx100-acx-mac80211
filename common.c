@@ -1445,6 +1445,7 @@ void acx_free_modes(acx_device_t * adev)
 //        adev->modes = NULL;
 }
 
+/*
 #define RATETAB_ENT(_rate, _rateid, _flags) \
 	{							\
 		.rate	= (_rate),				\
@@ -1452,28 +1453,53 @@ void acx_free_modes(acx_device_t * adev)
 		.val2   = (_rateid),				\
 		.flags  = (_flags),				\
 	}
+*/
 
+static struct ieee80211_rate __acx_rates[] = {
+		{ .rate = 10,
+		  .val = RATE111_1,
+		  .flags = IEEE80211_RATE_CCK },
+		{ .rate = 20,
+		  .val = RATE111_2,
+		  .flags = IEEE80211_RATE_CCK_2 },
+		{ .rate = 55,
+		  .val = RATE111_5,
+		  .flags = IEEE80211_RATE_CCK_2 },
+		{ .rate = 110,
+		  .val = RATE111_11,
+		  .flags = IEEE80211_RATE_CCK_2 },
+		{ .rate = 60,
+		  .val = RATE111_6,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 90,
+		  .val = RATE111_9,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 120,
+		  .val = RATE111_12,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 180,
+		  .val = RATE111_18,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 240,
+		  .val = RATE111_24,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 360,
+		  .val = RATE111_36,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 480,
+		  .val = RATE111_48,
+		  .flags = IEEE80211_RATE_OFDM },
+		{ .rate = 540,
+		  .val = RATE111_54,
+		  .flags = IEEE80211_RATE_OFDM },
+	};
 
-static struct ieee80211_rate __acx_ratetable[] = {
-                 RATETAB_ENT(10,  RATE111_1,  IEEE80211_RATE_CCK),
-                 RATETAB_ENT(20,  RATE111_2,  IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(55,  RATE111_5,  IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(110, RATE111_11, IEEE80211_RATE_CCK_2),
-                 RATETAB_ENT(60,  RATE111_6,  IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(90,  RATE111_9,  IEEE80211_RATE_OFDM), 
-                 RATETAB_ENT(120, RATE111_12, IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(180, RATE111_18, IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(240, RATE111_24, IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(360, RATE111_36, IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(480, RATE111_48, IEEE80211_RATE_OFDM),
-                 RATETAB_ENT(540, RATE111_54, IEEE80211_RATE_OFDM),
-        };
-
-#define acx_b_ratetable		(__acx_ratetable + 0)
+#define acx_b_ratetable		(__acx_rates + 0)
 #define acx_b_ratetable_size	4
-#define acx_g_ratetable		(__acx_ratetable + 0)
+#define acx_g_ratetable		(__acx_rates + 0)
 #define acx_g_ratetable_size	12
 
+/*
 #define CHANTAB_ENT(_chanid, _freq) \
         {                                                       \
                 .chan   = (_chanid),                            \
@@ -1485,21 +1511,35 @@ static struct ieee80211_rate __acx_ratetable[] = {
                 .power_level    = 0xf,                         \
                 .antenna_max    = 0xFF,                         \
         }
+*/
 static struct ieee80211_channel channels[] = {
-                 CHANTAB_ENT(1, 2412),     
-                 CHANTAB_ENT(2, 2417),    
-                 CHANTAB_ENT(3, 2422),
-                 CHANTAB_ENT(4, 2427),               
-                 CHANTAB_ENT(5, 2432),
-                 CHANTAB_ENT(6, 2437),    
-                 CHANTAB_ENT(7, 2442),               
-                 CHANTAB_ENT(8, 2447),     
-                 CHANTAB_ENT(9, 2452),
-                 CHANTAB_ENT(10, 2457),
-                 CHANTAB_ENT(11, 2462),
-                 CHANTAB_ENT(12, 2467),      
-                 CHANTAB_ENT(13, 2472),      
-        };
+		{ .chan = 1,
+		  .freq = 2412},
+		{ .chan = 2,
+		  .freq = 2417},
+		{ .chan = 3,
+		  .freq = 2422},
+		{ .chan = 4,
+		  .freq = 2427},
+		{ .chan = 5,
+		  .freq = 2432},
+		{ .chan = 6,
+		  .freq = 2437},
+		{ .chan = 7,
+		  .freq = 2442},
+		{ .chan = 8,
+		  .freq = 2447},
+		{ .chan = 9,
+		  .freq = 2452},
+		{ .chan = 10,
+		  .freq = 2457},
+		{ .chan = 11,
+		  .freq = 2462},
+		{ .chan = 12,
+		  .freq = 2467},
+		{ .chan = 13,
+		  .freq = 2472},
+	};
 
 #define acx_chantable_size ARRAY_SIZE(channels)
 
