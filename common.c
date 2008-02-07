@@ -4332,7 +4332,7 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	       MAC_FMT ")\n",
 	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
 #else
-	       "(type: 0x%08X, ID: %pd, MAC: %s)\n",
+	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
 		conf->type,
 		conf->if_id, /* use conf->vif, and %pd here on 2.6.25 or later */
 		print_mac(mac, conf->mac_addr));
