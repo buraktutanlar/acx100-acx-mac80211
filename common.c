@@ -1563,7 +1563,7 @@ int acx_setup_modes(acx_device_t * adev)
 		mode->num_channels = acx_chantable_size;
 		mode->num_rates = acx_g_ratetable_size;
 		mode->rates = acx_g_ratetable;
-	} else if (!IS_ACX111(adev)) {
+	} else {
 /*
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
 		err = acx_setup_modes_bphy(adev);
@@ -4224,11 +4224,15 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
+/* for 2.6.25 or later */
+/*
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 		adev->interface.if_id = conf->if_id;
 #else
 		adev->vif = conf->vif;
 #endif
+*/
+		adev->interface.if_id = conf->if_id;
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 	}
@@ -4245,9 +4249,9 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	       conf->if_id,
 	       MAC_ARG(conf->mac_addr));
 #else
-	       "(type: 0x%08X), ID: %pd, MAC: %s\n",
+	       "(type: 0x%08X), ID: %d, MAC: %s\n",
 	       conf->type,
-	       conf->vif,
+	       conf->if_id, /* use conf->vif, and %pd here on 2.6.25 or later */
 	       print_mac(mac, conf->mac_addr));
 #endif
 
@@ -4294,7 +4298,7 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 #else
 	       "(type: 0x%08X, ID: %pd, MAC: %s)\n",
 		conf->type,
-		conf->vif,
+		conf->if_id, /* use conf->vif, and %pd here on 2.6.25 or later */
 		print_mac(mac, conf->mac_addr));
 #endif
 	FN_EXIT0;
@@ -4413,6 +4417,8 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
+/* for 2.6.25 or later */
+/*
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
@@ -4439,6 +4445,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->interface.if_id == if_id)) {
 #else
+*/
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4464,7 +4471,7 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
-#endif
+//#endif (see above)
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
