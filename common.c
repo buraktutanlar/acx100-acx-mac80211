@@ -4417,9 +4417,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
-/* for 2.6.25 or later */
-/*
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+//#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) (see below)
 int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 			 struct ieee80211_if_conf *conf)
 {
@@ -4444,8 +4442,9 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->interface.if_id == if_id)) {
+/* for 2.6.25 or later */
+/*
 #else
-*/
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4471,7 +4470,8 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
-//#endif (see above)
+#endif
+*/
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
