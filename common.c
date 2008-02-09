@@ -1595,6 +1595,13 @@ int acx_setup_modes(acx_device_t * adev)
         	err = acx_setup_modes_gphy(adev);
 */
 		mode = &adev->modes[0]; 
+
+/* from the zd1211rw driver: - do we need to do the same? */
+/*
+		memcpy(mode->channels, channels, sizeof(channels));
+		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
+*/
+
 		mode->mode = MODE_IEEE80211G;
 		mode->num_channels = ARRAY_SIZE(channels);
 		mode->num_rates = 12;
@@ -1605,6 +1612,13 @@ int acx_setup_modes(acx_device_t * adev)
 		err = acx_setup_modes_bphy(adev);
 */
 		mode = &adev->modes[1];
+
+/* from the zd1211rw driver: - do we need to do the same? */
+/*
+		memcpy(mode->channels, channels, sizeof(channels));
+		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
+*/
+
 		mode->mode = MODE_IEEE80211B;
 		mode->num_channels = ARRAY_SIZE(channels);
 		mode->num_rates = 4;
@@ -1768,15 +1782,15 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 ** acxpci_i_set_multicast_list
 ** FIXME: most likely needs refinement
 */
-void
-acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                         #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-                         unsigned short netflags, int mc_count)
-                         #else
-                         unsigned int changed_flags,
-                         unsigned int *total_flags,
-                         int mc_count, struct dev_addr_list *mc_list)
-                         #endif
+
+void acx_i_set_multicast_list(struct ieee80211_hw *hw,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+				unsigned short netflags, int mc_count)
+#else
+				unsigned int changed_flags,
+				unsigned int *total_flags,
+				int mc_count, struct dev_addr_list *mc_list)
+#endif
 {
         acx_device_t *adev = ieee2adev(hw);
         unsigned long flags;
@@ -4012,7 +4026,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 void acx_e_after_interrupt_task(struct work_struct *work)
 {
        acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
-	unsigned int flags;
+	unsigned long flags;
 	FN_ENTER;
 	acx_lock(adev, flags);
 	if (!adev->after_interrupt_jobs || !adev->initialized) 
@@ -4174,7 +4188,6 @@ void acx_update_capabilities(acx_device_t * adev)
 static void acx_select_opmode(acx_device_t * adev)
 {
 	int changed = 0;
-
 	FN_ENTER;
 
 	if (adev->interface.operating) {
@@ -4233,6 +4246,8 @@ static void acx_select_opmode(acx_device_t * adev)
 		acx_s_update_card_settings(adev);
 //	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
+
+	FN_EXIT0;
 }
 
 /**

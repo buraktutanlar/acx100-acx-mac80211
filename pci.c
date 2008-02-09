@@ -2034,6 +2034,7 @@ static void disable_acx_irq(acx_device_t * adev)
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	adev->irqs_active = 0;
+
 	FN_EXIT0;
 }
 
@@ -2046,13 +2047,9 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	/* then wait until interrupts have finished executing on other CPUs */
-	printk("acxpci_s_down: acx_lock()\n");
-	acx_s_mwait(1000);
 	acx_lock(adev, flags);
 	disable_acx_irq(adev);
         synchronize_irq(adev->irq);
-	printk("acxpci_s_down: acx_unlock()\n");
-	acx_s_mwait(1000);
 	acx_unlock(adev, flags);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
@@ -2070,9 +2067,9 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** Work around that by temporary sem unlock.
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
-	printk("acxpci_s_down: flush_scheduled_work()\n");
-	acx_s_mwait(1000);
+	acx_sem_unlock(adev);
 	flush_scheduled_work();
+	acx_sem_lock(adev);
 
 	/* This is possible:
 	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
@@ -2084,8 +2081,6 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** a timer which restarts itself. We guarantee this cannot
 	 ** ever happen because acx_i_timer() never does this if
 	 ** status is ACX_STATUS_0_STOPPED */
-	printk("acxpci_s_down: del_timer_sync()\n");
-	acx_s_mwait(1000);
 	del_timer_sync(&adev->mgmt_timer);
 
 	FN_EXIT0;
@@ -2180,17 +2175,11 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 #endif
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 	FN_ENTER;
-	printk("putting interface DOWN - this is filled with printk's and will take 8-10 seconds!\n");
-	printk("acxpci_e_close: acx_lock()\n");
-	acx_s_mwait(1000);
-	acx_lock(adev,flags);
+	acx_sem_lock(adev);
 	/* ifdown device */
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	if (adev->initialized) {
-		printk("acxpci_e_close: acxpci_s_down()\n");
-		acx_s_mwait(1000);
 		acxpci_s_down(hw);
 	}
 
@@ -2207,9 +2196,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
-	printk("acxpci_e_close: acx_unlock()\n");
-	acx_s_mwait(1000);
-	acx_unlock(adev,flags);
+	acx_sem_unlock(adev);
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;

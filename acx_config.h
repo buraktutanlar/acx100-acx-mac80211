@@ -34,11 +34,11 @@
 
 /* Locking: */
 /* very talkative */
-/* #define PARANOID_LOCKING 1 */
+#define PARANOID_LOCKING 1
 /* normal (use when bug-free) */
-#define DO_LOCKING 1
+/* #define DO_LOCKING 1 */
 /* else locking is disabled! */
 
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
-#define CMD_DISCOVERY 0
+#define CMD_DISCOVERY 1
