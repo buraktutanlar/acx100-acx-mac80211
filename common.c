@@ -1797,12 +1797,15 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
         FN_ENTER;
 
-        acx_lock(adev, flags);
+	acx_lock(adev, flags);
 
         #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
-        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI);
-        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-                return;
+	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
+			  FIF_CONTROL | FIF_OTHER_BSS);
+        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
+			 FIF_CONTROL | FIF_OTHER_BSS);
+/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+                return; */
 	#endif
 
         #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
@@ -2514,7 +2517,7 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	if (unlikely(acx_debug & L_DATA)) {
-		printk("rx: 802.11 buf[%u]: ", buf_len);
+		printk("rx: 802.11 buf[%u]: \n", buf_len);
 		acx_dump_bytes(hdr, buf_len);
 	}
 
@@ -4025,10 +4028,13 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 
 void acx_e_after_interrupt_task(struct work_struct *work)
 {
-       acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
+	acx_device_t *adev = container_of(work, acx_device_t, after_interrupt_task);
 	unsigned long flags;
+
 	FN_ENTER;
+
 	acx_lock(adev, flags);
+
 	if (!adev->after_interrupt_jobs || !adev->initialized) 
 		goto end;	/* no jobs to do */
 
@@ -4039,11 +4045,15 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 
 	/* a poor interrupt code wanted to do update_card_settings() */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
-		if (ACX_STATE_IFACE_UP & adev->dev_state_mask)
+		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
+			acx_unlock(adev, flags);
 			acx_s_update_card_settings(adev);
+			acx_lock(adev, flags);
+		}
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
+
 	/* 1) we detected that no Scan_Complete IRQ came from fw, or
 	 ** 2) we found too many STAs */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
@@ -4414,12 +4424,13 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	acx_lock(adev, flags);
 //FIXME();
 	if (!adev->initialized) {
-		acx_unlock(adev,flags);
+		acx_unlock(adev, flags);
 		return 0;
 	}
 	if (conf->beacon_int != adev->beacon_interval)
 		adev->beacon_interval = conf->beacon_int;
 	if (conf->channel != adev->channel) {
+		acx_unlock(adev, flags);
 		acx_selectchannel(adev, conf->channel,conf->freq);
 /*		acx_schedule_task(adev,
 				  ACX_AFTER_IRQ_UPDATE_CARD_CFG

@@ -938,7 +938,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	}
 #endif
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	adev->irq_status |= HOST_INT_SCAN_COMPLETE;
+	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
 
 	acx_unlock(adev, flags);
 
@@ -1038,7 +1038,6 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	FN_ENTER;
 
-
 	devname = wiphy_name(adev->ieee->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
@@ -1114,11 +1113,10 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (unlikely(cmd_timeout > 1199))
 		cmd_timeout = 1199;
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
-	adev->irq_status &= ~HOST_INT_CMD_COMPLETE;
-
+	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	/* we schedule away sometimes (timeout can be large) */
 	counter = cmd_timeout;
-	timeout = jiffies + cmd_timeout * HZ / 1000;
+	timeout = jiffies + HZ;
 	do {
 		if (!adev->irqs_active) {	/* IRQ disabled: poll */
 			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
@@ -2041,16 +2039,15 @@ static void disable_acx_irq(acx_device_t * adev)
 static void acxpci_s_down(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	/* then wait until interrupts have finished executing on other CPUs */
-	acx_lock(adev, flags);
+	acx_sem_lock(adev);
 	disable_acx_irq(adev);
         synchronize_irq(adev->irq);
-	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
 	 ** after something vital for its job has been shut down, so
@@ -2175,8 +2172,11 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 #endif
 {
 	acx_device_t *adev = ieee2adev(hw);
+
 	FN_ENTER;
+
 	acx_sem_lock(adev);
+
 	/* ifdown device */
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	if (adev->initialized) {
@@ -2583,21 +2583,22 @@ acxpci_i_interrupt(int irq, void *dev_id)
 acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 {
-
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
 	register u16 irqtype;
 	u16 unmasked;
 
+	FN_ENTER;
+
 	if (!adev)
 		return IRQ_NONE;
+
 	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
 	 * I am paranoid */
 
 	acx_lock(adev, flags);
 
 	unmasked = read_reg16(adev, IO_ACX_IRQ_STATUS_CLEAR);
-
 	if (unlikely(0xffff == unmasked)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
@@ -2638,10 +2639,13 @@ acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if ((irqtype & HOST_INT_RX_COMPLETE) || (irqtype & HOST_INT_TX_COMPLETE))
 			acx_schedule_task(adev, 0);
 	}
+
 	acx_unlock(adev, flags);
+	FN_EXIT0;
 	return IRQ_HANDLED;
       none:
 	acx_unlock(adev, flags);
+	FN_EXIT0;
 	return IRQ_NONE;
 
 }
@@ -3511,8 +3515,7 @@ static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 {
 	void *ptr;
 
-	ptr = dma_alloc_coherent(adev->pdev ? adev->bus_dev : NULL,
-				 size, phy, GFP_KERNEL);
+	ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
 
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
