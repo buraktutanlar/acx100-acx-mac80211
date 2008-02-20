@@ -3751,9 +3751,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					&adev->channel, 1);
 			FIXME();
 			/* This needs to be keyed on WEP? */
-			acx111_s_feature_on(adev, 0,
+/*			acx111_s_feature_on(adev, 0,
 					    FEATURE2_NO_TXCRYPT |
-					    FEATURE2_SNIFFER);
+					    FEATURE2_SNIFFER); */
 			acx_wake_queue(adev->ieee, NULL);
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_TX);
