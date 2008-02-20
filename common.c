@@ -1405,7 +1405,7 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
-			 "driver/acx_%s", proc_files[i]);
+			 "driver/acx%s", proc_files[i]);
 		log(L_INIT, "%sing /proc entry %s\n",
 		    remove ? "remov" : "creat", procbuf);
 		if (!remove) {
