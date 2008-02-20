@@ -4675,6 +4675,7 @@ int acx_key_write(acx_device_t * adev,
 		  const struct ieee80211_key_conf *key, const u8 * mac_addr)
 {
 // struct iw_point *dwrq = &wrqu->encoding;
+	int result;
 
 	FN_ENTER;
 /*
@@ -4759,11 +4760,11 @@ int acx_key_write(acx_device_t * adev,
                 }
         }
 */
-//	result = -EINPROGRESS;
+	result = -EINPROGRESS;
 //	acx_sem_unlock(adev);
 
-	FN_EXIT0;
-	return 0;
+	FN_EXIT1(result);
+	return result;
 
 
 }

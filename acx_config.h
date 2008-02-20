@@ -41,4 +41,4 @@
 
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
-#define CMD_DISCOVERY 1
+#define CMD_DISCOVERY 0
