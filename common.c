@@ -4432,6 +4432,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	if (conf->channel != adev->channel) {
 		acx_unlock(adev, flags);
 		acx_selectchannel(adev, conf->channel,conf->freq);
+		acx_lock(adev, flags);
 /*		acx_schedule_task(adev,
 				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
 */				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ /*);*/
@@ -4466,8 +4467,11 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 
 	//TODO: phymode
 	//TODO: antennas
-	if (adev->set_mask > 0)
+	if (adev->set_mask > 0) {
+		acx_unlock(adev, flags);
 		acx_s_update_card_settings(adev);
+		acx_lock(adev, flags);
+	}
 	acx_unlock(adev, flags);
 
 	FN_EXIT0;
@@ -4595,7 +4599,7 @@ int acx_net_conf_tx(struct ieee80211_hw *hw,
 	return 0;
 }
 
-static void keymac_write(acx_device_t * adev, u8 index, const u32 * addr)
+static void keymac_write(acx_device_t * adev, u16 index, const u32 * addr)
 {
 	/* for keys 0-3 there is no associated mac address */
 	if (index < 4)
@@ -4667,59 +4671,60 @@ int acx_clear_keys(acx_device_t * adev)
 */
 
 int acx_key_write(acx_device_t * adev,
-		  u8 index,
-		  u8 algorithm,
-		  const u8 * _key, int key_len, const u8 * mac_addr)
+		  u16 index, u8 algorithm,
+		  const struct ieee80211_key_conf *key, const u8 * mac_addr)
 {
 // struct iw_point *dwrq = &wrqu->encoding;
-//        acx_device_t *adev = ndev2adev(ndev);
-	int result;
 
 	FN_ENTER;
 /*
         log(L_IOCTL, "set encoding flags=0x%04X, size=%d, key: %s\n",
                         dwrq->flags, dwrq->length, extra ? "set" : "No key");
 */
-	acx_sem_lock(adev);
+//	acx_sem_lock(adev);
 
 //        index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
-	if (key_len > 0) {
+	if (key->keylen > 0) {
 		/* if index is 0 or invalid, use default key */
 		if (index > 3)
 			index = (int)adev->wep_current_index;
-		if ((algorithm == ACX_SEC_ALGO_WEP)
-		    || (algorithm == ACX_SEC_ALGO_WEP104)) {
-			if (key_len > 29)
-				key_len = 29;	/* restrict it */
-
-			if (key_len > 13) {
-				/* 29*8 == 232, WEP256 */
-				adev->wep_keys[index].size = 29;
-			} else if (key_len > 5) {
-				/* 13*8 == 104bit, WEP128 */
+		if ((algorithm == ACX_SEC_ALGO_WEP) ||
+		(algorithm == ACX_SEC_ALGO_WEP104)) {
+		switch(key->keylen) {
+			case 40 / 8:
+				/* WEP 40-bit =
+				   40-bit  entered key + 24 bit IV = 64-bit */
 				adev->wep_keys[index].size = 13;
-			} else if (key_len > 0) {
-				/* 5*8 == 40bit, WEP64 */
-				adev->wep_keys[index].size = 5;
-			} else {
-				/* disable key */
+				break;
+			case 104 / 8:
+				/* WEP 104-bit =
+				   104-bit entered key + 24-bit IV = 128-bit */
+				adev->wep_keys[index].size = 29;
+				break;
+			case 128 / 8:
+				/* WEP 128-bit =
+				  128-bit entered key + 24 bit IV = 152-bit */
+				adev->wep_keys[index].size = 16;
+				break;
+			default:
 				adev->wep_keys[index].size = 0;
+				return -EINVAL; /* shouldn't happen */
 			}
 
 			memset(adev->wep_keys[index].key, 0,
 			       sizeof(adev->wep_keys[index].key));
-			memcpy(adev->wep_keys[index].key, _key, key_len);
-		}
-	} else {
+			memcpy(adev->wep_keys[index].key, key, key->keylen);
+		} else {
 		/* set transmit key */
 		if (index <= 3)
-			adev->wep_current_index = index;
-		//               else if (0 == (dwrq->flags & IW_ENCODE_MODE)) {
+		adev->wep_current_index = index;
+//               else if (0 == (dwrq->flags & IW_ENCODE_MODE)) {
 		/* complain if we were not just setting
 		 * the key mode */
 //                        result = -EINVAL;
 //                        goto end_unlock;
 //                }
+		}
 	}
 
 	adev->wep_enabled = (algorithm == ALG_WEP);
@@ -4754,11 +4759,11 @@ int acx_key_write(acx_device_t * adev,
                 }
         }
 */
-	result = -EINPROGRESS;
-	acx_sem_unlock(adev);
+//	result = -EINPROGRESS;
+//	acx_sem_unlock(adev);
 
-	FN_EXIT1(result);
-	return result;
+	FN_EXIT0;
+	return 0;
 
 
 }
@@ -4782,7 +4787,7 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 	struct acx_device *adev = ieee2adev(ieee);
 	unsigned long flags;
 	u8 algorithm;
-	u8 index;
+	u16 index;
 	int err = -EINVAL;
 	FN_ENTER;
 //	TODO();
@@ -4812,8 +4817,7 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 	acx_lock(adev, flags);
 	switch (cmd) {
 	case SET_KEY:
-		err = acx_key_write(adev, index, algorithm,
-				    key->key, key->keylen, addr);
+		err = acx_key_write(adev, index, algorithm, key, addr);
 		if (err)
 			goto out_unlock;
 		key->hw_key_idx = index;
