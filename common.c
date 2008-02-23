@@ -2309,10 +2309,61 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 
 
 /***********************************************************************
+** FIXME: this should be solved in a general way for all radio types
+** by decoding the radio firmware module,
+** since it probably has some standard structure describing how to
+** set the power level of the radio module which it controls.
+** Or maybe not, since the radio module probably has a function interface
+** instead which then manages Tx level programming :-\
+**
+** Obvious
+*/
+static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
+{
+	struct acx111_ie_tx_level tx_level;
+
+	/* my acx111 card has two power levels in its configoptions (== EEPROM):
+	 * 1 (30mW) [15dBm]
+	 * 2 (10mW) [10dBm]
+	 * For now, just assume all other acx111 cards have the same.
+	 * FIXME: Ideally we would query it here, but we first need a
+	 * standard way to query individual configoptions easily.
+	 * Well, now we have proper cfgopt txpower variables, but this still
+	 * hasn't been done yet, since it also requires dBm <-> mW conversion here... */
+	if (level_dbm <= 12) {
+		tx_level.level = 2;	/* 10 dBm */
+		adev->tx_level_dbm = 10;
+	} else {
+		tx_level.level = 1;	/* 15 dBm */
+		adev->tx_level_dbm = 15;
+	}
+	if (level_dbm != adev->tx_level_dbm)
+		log(L_INIT, "acx111 firmware has specific "
+		    "power levels only: adjusted %d dBm to %d dBm!\n",
+		    level_dbm, adev->tx_level_dbm);
+
+	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
+}
+
+static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
+{
+	if (IS_ACX111(adev)) {
+		return acx111_s_set_tx_level(adev, level_dbm);
+	}
+	if (IS_PCI(adev)) {
+		return acx100pci_s_set_tx_level(adev, level_dbm);
+	}
+
+	return OK;
+}
+
+
+/***********************************************************************
 ** acx_s_set_defaults
 */
 void acx_s_set_defaults(acx_device_t * adev)
 {
+	struct ieee80211_conf *conf = &adev->ieee->conf;
 	unsigned long flags;
 
 	FN_ENTER;
@@ -2406,12 +2457,19 @@ void acx_s_set_defaults(acx_device_t * adev)
 	if (IS_ACX111(adev)) {
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
+		conf->power_level = adev->tx_level_dbm;
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		SET_BIT(adev->set_mask, GETSET_TXPOWER);
 	} else {
 		/* don't use max. level, since it might be dangerous
 		 * (e.g. WRT54G people experience
 		 * excessive Tx power damage!) */
 		adev->tx_level_dbm = 18;
+		conf->power_level = adev->tx_level_dbm;
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		SET_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
+
 	/* adev->tx_level_auto = 1; */
 	if (IS_ACX111(adev)) {
 		/* start with sensitivity level 1 out of 3: */
@@ -2453,54 +2511,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-
-/***********************************************************************
-** FIXME: this should be solved in a general way for all radio types
-** by decoding the radio firmware module,
-** since it probably has some standard structure describing how to
-** set the power level of the radio module which it controls.
-** Or maybe not, since the radio module probably has a function interface
-** instead which then manages Tx level programming :-\
-**
-** Obvious
-*/
-static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
-{
-	struct acx111_ie_tx_level tx_level;
-
-	/* my acx111 card has two power levels in its configoptions (== EEPROM):
-	 * 1 (30mW) [15dBm]
-	 * 2 (10mW) [10dBm]
-	 * For now, just assume all other acx111 cards have the same.
-	 * FIXME: Ideally we would query it here, but we first need a
-	 * standard way to query individual configoptions easily.
-	 * Well, now we have proper cfgopt txpower variables, but this still
-	 * hasn't been done yet, since it also requires dBm <-> mW conversion here... */
-	if (level_dbm <= 12) {
-		tx_level.level = 2;	/* 10 dBm */
-		adev->tx_level_dbm = 10;
-	} else {
-		tx_level.level = 1;	/* 15 dBm */
-		adev->tx_level_dbm = 15;
-	}
-/*	if (level_dbm != adev->tx_level_dbm)
-		log(L_INIT, "acx111 firmware has specific "
-		    "power levels only: adjusted %d dBm to %d dBm!\n",
-		    level_dbm, adev->tx_level_dbm);
-*/
-	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
-}
-
-static int acx_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
-{
-	if (IS_ACX111(adev)) {
-		return acx111_s_set_tx_level(adev, level_dbm);
-	}
-	if (IS_PCI(adev)) {
-		return acx100pci_s_set_tx_level(adev, level_dbm);
-	}
-	return OK;
-}
 
 /***********************************************************************
 ** acx_l_process_rxbuf
@@ -4448,8 +4458,9 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
         }
 */
 	adev->tx_disabled = !conf->radio_enabled;
-	if (conf->power_level != 0 && adev->tx_level_dbm > 15){
-		adev->tx_level_dbm =  conf->power_level;
+	if (conf->power_level != 0){
+		adev->tx_level_dbm = conf->power_level;
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
 		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	} 
