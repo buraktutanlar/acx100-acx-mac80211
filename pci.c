@@ -3194,7 +3194,6 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
 
 	/* flush writes before we tell the adapter that it's its turn now */
-	mmiowb();
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 	write_flush(adev);
 	/* log the packet content AFTER sending it,
