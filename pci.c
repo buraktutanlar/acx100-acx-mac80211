@@ -1299,6 +1299,8 @@ free_coherent(struct pci_dev *hwdev, size_t size,
 
 void acxpci_free_desc_queues(acx_device_t * adev)
 {
+	unsigned long flags;
+
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (ptr) { \
 		free_coherent(NULL, size, ptr, phyaddr); \
@@ -1313,14 +1315,18 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
 		       adev->txbuf_startphy);
 
+	acx_lock(adev, flags);
 	adev->txdesc_start = NULL;
+	acx_unlock(adev, flags);
 
 	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
 		       adev->rxhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
 		       adev->rxbuf_startphy);
 
+	acx_lock(adev, flags);
 	adev->rxdesc_start = NULL;
+	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
@@ -1341,9 +1347,11 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 
 	acx_s_mwait(100);
 
-	acx_lock(adev, flags);
+	/* NO locking for all parts of acxpci_free_desc_queues because: 
+	 * while calling dma_free_coherent() interrupts need to be 'free'
+	 * but if you spinlock the whole function (acxpci_free_desc_queues)
+	 * you'll get an error */
 	acxpci_free_desc_queues(adev);
-	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
