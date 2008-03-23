@@ -1337,8 +1337,6 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 */
 static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 {
-	unsigned long flags;
-
 	FN_ENTER;
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
 	 * here instead? Or are we that much down the road that it's no
@@ -2036,7 +2034,7 @@ static void disable_acx_irq(acx_device_t * adev)
 
 	/* I guess mask is not 0xffff because acx100 won't signal
 	 ** cmd completion then (needed for ifup).
-	 ** Someone with acx100 please confirm */
+	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	adev->irqs_active = 0;
@@ -2052,10 +2050,8 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	/* then wait until interrupts have finished executing on other CPUs */
-	acx_sem_lock(adev);
-	disable_acx_irq(adev);
-        synchronize_irq(adev->irq);
-	acx_sem_unlock(adev);
+	disable_acx_irq(adev); /* NO sem-locking here? */
+	synchronize_irq(adev->irq);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
 	 ** after something vital for its job has been shut down, so
@@ -2072,9 +2068,9 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** Work around that by temporary sem unlock.
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
-	acx_sem_unlock(adev);
+	acx_sem_unlock(adev); /* valid? */
 	flush_scheduled_work();
-	acx_sem_lock(adev);
+	acx_sem_lock(adev); /* valid? */
 
 	/* This is possible:
 	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->

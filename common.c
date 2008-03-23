@@ -4458,13 +4458,13 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
         }
 */
 	adev->tx_disabled = !conf->radio_enabled;
-	if (conf->power_level != 0){
+/*	if (conf->power_level != 0){
 		adev->tx_level_dbm = conf->power_level;
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
 		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	} 
-
+*/
 //FIXME: This does not seem to wake up:
 #if 0
 	if (conf->power_level == 0) {
