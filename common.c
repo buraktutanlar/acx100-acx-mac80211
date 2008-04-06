@@ -2046,6 +2046,7 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 ** Note that this fn messes up heavily with hardware, but we cannot
 ** lock it (we need to sleep). Not a problem since IRQs can't happen
 */
+/* OLD CODE? - let's rewrite it! */
 static int acx100_s_create_dma_regions(acx_device_t * adev)
 {
 	acx100_ie_queueconfig_t queueconf;
@@ -2607,67 +2608,71 @@ int
 acx_i_start_xmit(struct ieee80211_hw *hw,
                  struct sk_buff *skb, struct ieee80211_tx_control *ctl)
 {
-        acx_device_t *adev = ieee2adev(hw);
-        tx_t *tx;
-        void *txbuf;
-        unsigned long flags;
+	acx_device_t *adev = ieee2adev(hw);
+	tx_t *tx;
+	void *txbuf;
+	unsigned long flags;
 
-        int txresult = NOT_OK;
+	int txresult = NOT_OK;
 
-        FN_ENTER;
+	FN_ENTER;
 
-        if (unlikely(!skb)) {
-                /* indicate success */
-                txresult = OK;
-                goto end_no_unlock;
-        }
+	if (unlikely(!skb)) {
+		/* indicate success */
+		txresult = OK;
+		goto end_no_unlock;
+	}
 
-        if (unlikely(!adev)) {
-                goto end_no_unlock;
-        }
+	if (unlikely(!adev)) {
+		goto end_no_unlock;
+	}
 
 
-        acx_lock(adev, flags);             
+	acx_lock(adev, flags);
 
-        if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-                goto end;
-        }
-        if (unlikely(!adev->initialized)) {
-                goto end;
-        }
+	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		goto end;
+	}
+	if (unlikely(!adev->initialized)) {
+		goto end;
+	}
 
-        tx = acx_l_alloc_tx(adev);
+	acx_unlock(adev, flags);
+	tx = acx_l_alloc_tx(adev);
+	acx_lock(adev, flags);
 
-        if (unlikely(!tx)) {             
-                printk_ratelimited("%s: start_xmit: txdesc ring is full, "
-                                   "dropping tx\n", wiphy_name(adev->ieee->wiphy));
-                txresult = NOT_OK;           
-                goto end;
-        }           
+	if (unlikely(!tx)) {
+		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
+				   "dropping tx\n", wiphy_name(adev->ieee->wiphy));
+		txresult = NOT_OK;
+		goto end;
+	}
 
-        txbuf = acx_l_get_txbuf(adev, tx);
+	txbuf = acx_l_get_txbuf(adev, tx);
 
-        if (unlikely(!txbuf)) {
-                /* Card was removed */
-                txresult = NOT_OK;
-                acx_l_dealloc_tx(adev, tx);
-                goto end;    
-        }
-        memcpy(txbuf, skb->data, skb->len);
+	if (unlikely(!txbuf)) {
+		/* Card was removed */
+		txresult = NOT_OK;
+		acx_l_dealloc_tx(adev, tx);
+		goto end;
+	}
+	memcpy(txbuf, skb->data, skb->len);
 
-        acx_l_tx_data(adev, tx, skb->len, ctl,skb);
+	acx_unlock(adev, flags);
+	acx_l_tx_data(adev, tx, skb->len, ctl,skb);
+	acx_lock(adev, flags);
 
-        txresult = OK;
-        adev->stats.tx_packets++;               
-        adev->stats.tx_bytes += skb->len;
+	txresult = OK;
+	adev->stats.tx_packets++;
+	adev->stats.tx_bytes += skb->len;
 
       end:
-        acx_unlock(adev, flags);
+	acx_unlock(adev, flags);
 
       end_no_unlock:
 
-        FN_EXIT1(txresult);             
-        return txresult; 
+	FN_EXIT1(txresult);
+	return txresult; 
 }   
 /***********************************************************************
 ** acx_l_update_ratevector
