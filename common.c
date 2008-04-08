@@ -139,6 +139,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 	adev->last_lock = where;
 	rdtscl(adev->lock_time);
 }
+
 void acx_unlock_debug(acx_device_t * adev, const char *where)
 {
 #ifdef SMP
@@ -4360,11 +4361,13 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 //                assert(bcm->interface.monitor >= 0);
 	} else
 		adev->interface.operating = 0;
+
 	printk("Removing interface: %d %d\n", adev->interface.operating, conf->type);
+	acx_unlock(adev, flags);
+
 	if (adev->initialized)
 		acx_select_opmode(adev);
 	flush_scheduled_work();
-	acx_unlock(adev, flags);
 
 	printk(KERN_INFO "Virtual interface removed "
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
