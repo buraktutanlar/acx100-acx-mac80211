@@ -2618,18 +2618,18 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 
 	FN_ENTER;
 
+	acx_lock(adev, flags);
+
 	if (unlikely(!skb)) {
 		/* indicate success */
 		txresult = OK;
-		goto end_no_unlock;
+		goto end;
 	}
 
 	if (unlikely(!adev)) {
-		goto end_no_unlock;
+		goto end;
 	}
 
-
-	acx_lock(adev, flags);
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		goto end;
@@ -2649,7 +2649,11 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		goto end;
 	}
 
+	acx_unlock(adev, flags);
+
 	txbuf = acx_l_get_txbuf(adev, tx);
+
+	acx_lock(adev, flags);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
@@ -2660,17 +2664,17 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 	memcpy(txbuf, skb->data, skb->len);
 
 	acx_unlock(adev, flags);
+
 	acx_l_tx_data(adev, tx, skb->len, ctl,skb);
-	acx_lock(adev, flags);
 
 	txresult = OK;
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
 
+	acx_lock(adev, flags);
+
       end:
 	acx_unlock(adev, flags);
-
-      end_no_unlock:
 
 	FN_EXIT1(txresult);
 	return txresult; 
@@ -4314,9 +4318,14 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		adev->interface.type = conf->type;
 	}
 //	adev->mode = conf->type;
+
+	acx_unlock(adev, flags);
+
 	if (adev->initialized)
 		acx_select_opmode(adev);
 	err = 0;
+
+	acx_lock(adev, flags);
 
 	printk(KERN_INFO "Virtual interface added "
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
