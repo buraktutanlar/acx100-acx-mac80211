@@ -2430,28 +2430,29 @@ static void log_unusual_irq(u16 irqtype)
 	printk(" IRQ(s)\n");
 }
 
-
+/* FIXME: update_link_quality_led was a stub - let's comment it and avoid
+ * compiler warnings */
+/*
 static void update_link_quality_led(acx_device_t * adev)
 {
-/*	int qual; */
+	int qual;
 
-/*	qual =
+	qual =
 	    acx_signal_determine_quality(adev->wstats.qual.level,
 					 adev->wstats.qual.noise);
 	if (qual > adev->brange_max_quality)
 		qual = adev->brange_max_quality;
-*/
 
-/*	if (time_after(jiffies, adev->brange_time_last_state_change +
+	if (time_after(jiffies, adev->brange_time_last_state_change +
 		       (HZ / 2 -
 			HZ / 2 * (unsigned long)qual /
 			adev->brange_max_quality))) {
 		acxpci_l_power_led(adev, (adev->brange_last_state == 0));
-		adev->brange_last_state ^= 1;	*//* toggle */
-/*		adev->brange_time_last_state_change = jiffies;
+		adev->brange_last_state ^= 1;	// toggle
+		adev->brange_time_last_state_change = jiffies;
 	}
-*/
 }
+*/
 
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)	/* a la orinoco.c */
 
@@ -2564,9 +2565,11 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		}
 	}
 #endif
-	/* Routine to perform blink with range */
+	/* Routine to perform blink with range
+	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
 	if (unlikely(adev->led_power == 2))
 		update_link_quality_led(adev);
+	*/
 
 /* handled: */
 	if (adev->after_interrupt_jobs)
