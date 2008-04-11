@@ -2470,12 +2470,12 @@ void acx_interrupt_tasklet(struct work_struct *work)
 //	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	int irqtype;
 
+	FN_ENTER;
+
 	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
 	 * I am paranoid */
 	acx_sem_lock(adev);
 
-
-	FN_ENTER;
 	irqtype = adev->irq_reason;
 	adev->irq_reason = 0;
 
