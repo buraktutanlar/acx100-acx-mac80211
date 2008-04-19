@@ -4299,15 +4299,13 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
-/* for 2.6.25 or later */
-/*
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-		adev->interface.if_id = conf->if_id;
-#else
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 		adev->vif = conf->vif;
-#endif
-*/
+#else
 		adev->interface.if_id = conf->if_id;
+#endif
+
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 	}
@@ -4322,16 +4320,15 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	acx_lock(adev, flags);
 
 	printk(KERN_INFO "Virtual interface added "
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	       "(type: 0x%08X, ID: %d, MAC: "
-	       MAC_FMT ")\n",
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+	       "(type: 0x%08X), ID: %pd, MAC: %s\n",
+	       conf->type,
+	       conf->vif,
+	       print_mac(mac, conf->mac_addr));
+#else
+	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
 	       conf->type,
 	       conf->if_id,
-	       MAC_ARG(conf->mac_addr));
-#else
-	       "(type: 0x%08X), ID: %d, MAC: %s\n",
-	       conf->type,
-	       conf->if_id, /* use conf->vif, and %pd here on 2.6.25 or later */
 	       print_mac(mac, conf->mac_addr));
 #endif
 
@@ -4373,15 +4370,15 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	flush_scheduled_work();
 
 	printk(KERN_INFO "Virtual interface removed "
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	       "(type: 0x%08X, ID: %d, MAC: "
-	       MAC_FMT ")\n",
-	       conf->type, conf->if_id, MAC_ARG(conf->mac_addr));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+	       "(type: 0x%08X, ID: %pd, MAC: %s)\n",
+		conf->type,
+		conf->vif,
+		print_mac(mac, conf->mac_addr));
+
 #else
 	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
-		conf->type,
-		conf->if_id, /* use conf->vif, and %pd here on 2.6.25 or later */
-		print_mac(mac, conf->mac_addr));
+	       conf->type, conf->if_id, print_mac(mac, conf->mac_addr));
 #endif
 	FN_EXIT0;
 }
@@ -4505,35 +4502,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
-//#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24) (see below)
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-			 struct ieee80211_if_conf *conf)
-{
-	acx_device_t *adev = ieee2adev(ieee);
-	unsigned long flags;
-	int err = -ENODEV;
-	FN_ENTER;
-	if (!adev->interface.operating)
-		goto err_out;
-
-	if (adev->initialized)
-		acx_select_opmode(adev);
-
-	acx_lock(adev, flags);
-
-	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
-	    && (adev->interface.if_id == if_id)) {
-		if (conf->bssid)
-		{
-			adev->interface.bssid = conf->bssid;
- 	             	MAC_COPY(adev->bssid,conf->bssid);
-		}
-	}
-	if ((conf->type == IEEE80211_IF_TYPE_AP)
-	    && (adev->interface.if_id == if_id)) {
-/* for 2.6.25 or later */
-/*
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4559,8 +4528,34 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
+#else
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf)
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	unsigned long flags;
+	int err = -ENODEV;
+	FN_ENTER;
+	if (!adev->interface.operating)
+		goto err_out;
+
+	if (adev->initialized)
+		acx_select_opmode(adev);
+
+	acx_lock(adev, flags);
+
+	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
+	    && (adev->interface.if_id == if_id)) {
+		if (conf->bssid)
+		{
+			adev->interface.bssid = conf->bssid;
+ 	             	MAC_COPY(adev->bssid,conf->bssid);
+		}
+	}
+	if ((conf->type == IEEE80211_IF_TYPE_AP)
+	    && (adev->interface.if_id == if_id)) {
 #endif
-*/
+
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
