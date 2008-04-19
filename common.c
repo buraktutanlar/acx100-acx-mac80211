@@ -2391,7 +2391,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	/* copy the MAC address we just got from the card
 	 * into our MAC address used during current 802.11 session */
-	SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
+	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	MAC_BCAST(adev->ap);
 
 	adev->essid_len =
@@ -4515,10 +4515,11 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 	FN_ENTER;
 	if (!adev->interface.operating)
 		goto err_out;
-	acx_lock(adev, flags);
 
 	if (adev->initialized)
 		acx_select_opmode(adev);
+
+	acx_lock(adev, flags);
 
 	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
 	    && (adev->interface.if_id == if_id)) {

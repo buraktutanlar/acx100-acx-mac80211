@@ -2570,12 +2570,12 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		update_link_quality_led(adev);
 	*/
 
+	/* write_flush(adev); - not needed, last op was read anyway */
+	acx_sem_unlock(adev);
+
 /* handled: */
 	if (adev->after_interrupt_jobs)
 		acx_e_after_interrupt_task(&adev->after_interrupt_task);
-
-	/* write_flush(adev); - not needed, last op was read anyway */
-	acx_sem_unlock(adev);
 
 	FN_EXIT0;
 	return;			
