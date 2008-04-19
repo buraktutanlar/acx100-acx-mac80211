@@ -17,9 +17,6 @@
 #define ACX_MAC80211_USB 1
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
-#include <linux/config.h>
-#endif
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -45,11 +42,11 @@
 #define GET_DEV(udev) usb_get_dev((udev))
 #define PUT_DEV(udev) usb_put_dev((udev))
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14)
-/* removed in 2.6.14. We will use fake value for now */
+/* removed in 2.6.14. We will use fake value for now
+ * TODO: maybe we should just remove all lines that include
+ * URB_ASYNC_UNLINK somewhere?
+*/
 #define URB_ASYNC_UNLINK 0
-#endif
-
 
 /***********************************************************************
 */
@@ -89,13 +86,8 @@
 */
 static int acxusb_e_probe(struct usb_interface *, const struct usb_device_id *);
 static void acxusb_e_disconnect(struct usb_interface *);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
 static void acxusb_i_complete_tx(struct urb *);
 static void acxusb_i_complete_rx(struct urb *);
-#else
-static void acxusb_i_complete_tx(struct urb *, struct pt_regs *);
-static void acxusb_i_complete_rx(struct urb *, struct pt_regs *);
-#endif
 static int acxusb_e_open(struct ieee80211_hw *);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 static int acxusb_e_close(struct ieee80211_hw *);
@@ -742,14 +734,14 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.conf_tx = acx_net_conf_tx,
 	.add_interface = acx_add_interface,
 	.remove_interface = acx_remove_interface,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	.open = acxusb_e_open,
 	.reset = acx_net_reset,
 	.set_multicast_list = acx_i_set_multicast_list,
-	#else
+#else
 	.start = acxusb_e_open,
 	.configure_filter = acx_i_set_multicast_list,
-	#endif
+#endif
 	.stop = acxusb_e_close,
 	.config = acx_net_config,
 	.config_interface = acx_config_interface,
@@ -776,9 +768,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_device_t *adev = NULL;
 	struct usb_config_descriptor *config;
 	struct usb_endpoint_descriptor *epdesc;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 	struct usb_host_endpoint *ep;
-#endif
 	struct usb_interface_descriptor *ifdesc;
 	const char *msg;
 	int numconfigs, numfaces, numep;
@@ -897,16 +887,10 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		adev->bulkoutep = 1;
 		adev->bulkinep = 1;
 		for (i = 0; i < numep; i++) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 			ep = usbdev->ep_in[i];
 			if (!ep)
 				continue;
 			epdesc = &ep->desc;
-#else
-			epdesc = usb_epnum_to_ep_desc(usbdev, i);
-			if (!epdesc)
-				continue;
-#endif
 			if (epdesc->bmAttributes & USB_ENDPOINT_XFER_BULK) {
 				if (epdesc->bEndpointAddress & 0x80)
 					adev->bulkinep =
@@ -1213,9 +1197,9 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return 0;
-	#endif
+#endif
 }
 
 
@@ -1804,7 +1788,6 @@ static void dump_device(struct usb_device *usbdev)
 	printk("  toggle[0]: 0x%X  toggle[1]: 0x%X\n",
 	       (unsigned int)(usbdev->toggle[0]),
 	       (unsigned int)(usbdev->toggle[1]));
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 	/* This saw a change after 2.6.10 */
 	printk("  ep_in wMaxPacketSize: ");
 	for (i = 0; i < 16; ++i)
@@ -1818,16 +1801,6 @@ static void dump_device(struct usb_device *usbdev)
 			printk("%d:%d ", i,
 			       usbdev->ep_out[i]->desc.wMaxPacketSize);
 	printk("\n");
-#else
-	printk("  epmaxpacketin: ");
-	for (i = 0; i < 16; i++)
-		printk("%d ", usbdev->epmaxpacketin[i]);
-	printk("\n");
-	printk("  epmaxpacketout: ");
-	for (i = 0; i < 16; i++)
-		printk("%d ", usbdev->epmaxpacketout[i]);
-	printk("\n");
-#endif
 	printk("  parent: 0x%X\n", (unsigned int)usbdev->parent);
 	printk("  bus: 0x%X\n", (unsigned int)usbdev->bus);
 #ifdef NO_DATATYPE

@@ -2,12 +2,6 @@
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
-
-/*
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
-#include <linux/config.h>
-#endif
-*/
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -1800,20 +1794,20 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
 	acx_lock(adev, flags);
 
-        #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
 			  FIF_CONTROL | FIF_OTHER_BSS);
         *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
 			 FIF_CONTROL | FIF_OTHER_BSS);
 /*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
                 return; */
-	#endif
+#endif
 
-        #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
-	#else
+#else
 	if (*total_flags) {
-	#endif
+#endif
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
                 SET_BIT(adev->set_mask, SET_RXCONFIG);

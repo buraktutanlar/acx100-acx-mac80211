@@ -4,9 +4,6 @@
 #define ACX_MAC80211_PCI 1
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18)
-#include <linux/config.h>     
-#endif        
 
 /* Linux 2.6.18+ uses <linux/utsrelease.h> */      
 #ifndef UTS_RELEASE
@@ -195,6 +192,9 @@ static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
 static txhostdesc_t *get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
 {
 	int index = (u8 *) txdesc - (u8 *) adev->txdesc_start;
+
+	FN_ENTER;
+
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
@@ -204,6 +204,9 @@ static txhostdesc_t *get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
 		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
+
+	FN_EXIT0;
+
 	return &adev->txhostdesc_start[index * 2];
 }
 
@@ -1457,14 +1460,14 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.conf_tx = acx_net_conf_tx,
 	.add_interface = acx_add_interface,
 	.remove_interface = acx_remove_interface,
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	.open = acxpci_e_open,
 	.reset = acx_net_reset,
 	.set_multicast_list = acx_i_set_multicast_list,
-	#else
+#else
 	.start = acxpci_e_open,
 	.configure_filter = acx_i_set_multicast_list,
-	#endif
+#endif
 	.stop = acxpci_e_close,
 	.config = acx_net_config,
 	.config_interface = acx_config_interface,
@@ -1886,11 +1889,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 */
 #ifdef CONFIG_PM
 static int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 11)
 acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
-#else
-acxpci_e_suspend(struct pci_dev *pdev, u32 state)
-#endif
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
@@ -2204,9 +2203,9 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
 	return OK;
-	#endif
+#endif
 }
 
 
@@ -2577,18 +2576,14 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 	/* write_flush(adev); - not needed, last op was read anyway */
 	acx_sem_unlock(adev);
+
 	FN_EXIT0;
 	return;			
 
 }
 
 
-static irqreturn_t
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)
-acxpci_i_interrupt(int irq, void *dev_id)
-#else
-acxpci_i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-#endif
+static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
@@ -4482,13 +4477,6 @@ static const struct pci_device_id acxpci_id_tbl[] __devinitdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
-
-/* FIXME: checks should be removed once driver is included in the kernel */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 11)
-/* pci_name() got introduced at start of 2.6.x,
- * got mandatory (slot_name member removed) in 2.6.11-bk1 */
-#define pci_name(x) x->slot_name
-#endif
 
 static struct pci_driver
  acxpci_drv_id = {
