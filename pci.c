@@ -4523,8 +4523,7 @@ int __init acxpci_e_init_module(void)
 
 #ifdef CONFIG_PCI
 	res = pci_register_driver(&acxpci_drv_id);
-#endif
-#ifdef CONFIG_VLYNQ
+#elif CONFIG_VLYNQ
 	res = vlynq_register_driver(&vlynq_acx);
 #endif
 	FN_EXIT1(res);
@@ -4544,8 +4543,7 @@ void __exit acxpci_e_cleanup_module(void)
 
 #ifdef CONFIG_PCI
 	pci_unregister_driver(&acxpci_drv_id);
-#endif
-#ifdef CONFIG_VLYNQ
+#elif CONFIG_VLYNQ
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
 	log(L_INIT,
