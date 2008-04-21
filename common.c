@@ -4568,10 +4568,12 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 		adev->beacon_cache = conf->beacon;
 		SET_BIT(adev->set_mask, SET_TEMPLATES);
 	}
+
+	acx_unlock(adev, flags);
+
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
 //		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	acx_unlock(adev, flags);
 	err = 0;
 err_out:
 	FN_EXIT1(err);
