@@ -3,12 +3,6 @@ struct acx_key {
 	u8 algorithm;
 };
 
-struct acx_stats {        
-        u8 link_quality;
-        /* Store the last TX/RX times here for updating the leds. */
-        unsigned long last_tx;
-        unsigned long last_rx;
-};
 struct acx_interface {                
         /* Opaque ID of the operating interface (!= monitor
          * interface) from the ieee80211 subsystem.
@@ -69,4 +63,3 @@ struct acx_interface {
 #define ACX_OFDM_RATE_36MB          0x48
 #define ACX_OFDM_RATE_48MB          0x60               
 #define ACX_OFDM_RATE_54MB          0x6C
-extern struct ethtool_ops acx_ethtool_ops;  

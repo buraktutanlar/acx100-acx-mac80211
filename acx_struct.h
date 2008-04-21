@@ -1193,7 +1193,6 @@ struct acx_device {
 #ifdef WIRELESS_EXT
 //	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
-	struct acx_stats	acx_stats;
 	struct ieee80211_hw	*ieee;
 	struct ieee80211_hw_mode	modes[2];
 	struct ieee80211_rx_status rx_status;

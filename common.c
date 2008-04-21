@@ -2848,7 +2848,6 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 //		memset(&status, 0, sizeof(status));
 
 		if (likely(skb)) {
-			adev->acx_stats.last_rx = jiffies;
 			status->mactime = rxbuf->time;
 			status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 			status->noise = acx_signal_to_winlevel(rxbuf->phy_snr);
