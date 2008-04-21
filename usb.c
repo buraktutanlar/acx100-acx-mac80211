@@ -853,7 +853,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 
 	adev->usbdev = usbdev;
-	spin_lock_init(&adev->lock);	/* initial state: unlocked */
+	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	mutex_init(&adev->mutex);
 
 	/* Check that this is really the hardware we know about.

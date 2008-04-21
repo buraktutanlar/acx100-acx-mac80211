@@ -121,7 +121,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 	unsigned int count = 100 * 1000 * 1000;
 	where = sanitize_str(where);
 	while (--count) {
-		if (!spin_is_locked(&adev->lock))
+		if (!spin_is_locked(&adev->spinlock))
 			break;
 		cpu_relax();
 	}
@@ -137,7 +137,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 void acx_unlock_debug(acx_device_t * adev, const char *where)
 {
 #ifdef SMP
-	if (!spin_is_locked(&adev->lock)) {
+	if (!spin_is_locked(&adev->spinlock)) {
 		where = sanitize_str(where);
 		printk(KERN_EMERG "STRAY UNLOCK at %s!\n", where);
 		BUG();

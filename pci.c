@@ -1524,7 +1524,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
-	spin_lock_init(&adev->lock);	/* initial state: unlocked */
+	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	printk("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
 	mutex_init(&adev->mutex);
@@ -4217,7 +4217,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
-	spin_lock_init(&adev->lock);	/* initial state: unlocked */
+	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well

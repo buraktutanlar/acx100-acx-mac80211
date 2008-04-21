@@ -222,7 +222,7 @@ is_hidden_essid(char *essid)
 
 /***********************************************************************
 ** LOCKING
-** We have adev->sem and adev->lock.
+** We have adev->sem and adev->spinlock.
 **
 ** We employ following naming convention in order to get locking right:
 **
@@ -278,13 +278,13 @@ static inline void
 acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
 	acx_lock_debug(adev, where);
-	spin_lock_irqsave(&adev->lock, *fp);
+	spin_lock_irqsave(&adev->spinlock, *fp);
 }
 static inline void
 acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
 	acx_unlock_debug(adev, where);
-	spin_unlock_irqrestore(&adev->lock, *fp);
+	spin_unlock_irqrestore(&adev->spinlock, *fp);
 }
 #define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
 #define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
@@ -293,8 +293,8 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 
 #elif defined(DO_LOCKING)
 
-#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->lock, flags)
-#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->lock, flags)
+#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
+#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
 #define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
 #define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 #define acx_lock_unhold()	((void)0)
