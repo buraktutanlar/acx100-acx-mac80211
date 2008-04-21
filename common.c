@@ -4853,12 +4853,6 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 		adev->key[index].enabled = 0;
 		err = 0;
 		break;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	case REMOVE_ALL_KEYS:
-		acx_clear_keys(adev);
-		err = 0;
-		break;
-#endif
     /* case ENABLE_COMPRESSION:
 	case DISABLE_COMPRESSION:
 		err = 0;
