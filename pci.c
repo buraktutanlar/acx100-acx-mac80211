@@ -85,11 +85,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void disable_acx_irq(acx_device_t * adev);
 
 static int acxpci_e_open(struct ieee80211_hw *hw);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-static int acxpci_e_close(struct ieee80211_hw *hw);
-#else
 static void acxpci_e_close(struct ieee80211_hw *hw);
-#endif
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
@@ -1460,14 +1456,8 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.conf_tx = acx_net_conf_tx,
 	.add_interface = acx_add_interface,
 	.remove_interface = acx_remove_interface,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	.open = acxpci_e_open,
-	.reset = acx_net_reset,
-	.set_multicast_list = acx_i_set_multicast_list,
-#else
 	.start = acxpci_e_open,
 	.configure_filter = acx_i_set_multicast_list,
-#endif
 	.stop = acxpci_e_close,
 	.config = acx_net_config,
 	.config_interface = acx_config_interface,
@@ -1780,14 +1770,10 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	}
 
 
-	acx_lock(adev, flags);
-	acx_unlock(adev, flags);
 	adev->initialized = 0;
 
 	/* If device wasn't hot unplugged... */
 	if (adev_present(adev)) {
-
-		acx_sem_lock(adev);
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
@@ -1819,7 +1805,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		}
 		acx_unlock(adev, flags);
 
-		acx_sem_unlock(adev);
 	}
 
 	/* unregister the device to not let the kernel
@@ -2168,11 +2153,7 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 **	>0	f/w reported error
 **	<0	driver reported error
 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-static int acxpci_e_close(struct ieee80211_hw *hw)
-#else
 static void acxpci_e_close(struct ieee80211_hw *hw)
-#endif
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -2203,9 +2184,6 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 
 	log(L_INIT, "closed device\n");
 	FN_EXIT0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	return OK;
-#endif
 }
 
 
