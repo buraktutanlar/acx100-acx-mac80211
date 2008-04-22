@@ -2378,8 +2378,11 @@ void acx_s_set_defaults(acx_device_t * adev)
 	if (IS_ACX100(adev))
 		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
 
+	acx_unlock(adev, flags);
+
 	acx_s_update_card_settings(adev);
 
+	acx_lock(adev, flags);
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
@@ -2454,16 +2457,20 @@ void acx_s_set_defaults(acx_device_t * adev)
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
 		conf->power_level = adev->tx_level_dbm;
+		acx_unlock(adev, flags);
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
+		acx_lock(adev, flags);
 	} else {
 		/* don't use max. level, since it might be dangerous
 		 * (e.g. WRT54G people experience
 		 * excessive Tx power damage!) */
 		adev->tx_level_dbm = 18;
 		conf->power_level = adev->tx_level_dbm;
+		acx_unlock(adev, flags);
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
+		acx_lock(adev, flags);
 	}
 
 	/* adev->tx_level_auto = 1; */
@@ -3643,9 +3650,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_STA_LIST) {
-		acx_lock(adev, flags);
 		CLEAR_BIT(adev->set_mask, SET_STA_LIST);
-		acx_unlock(adev, flags);
 	}
 	if (adev->set_mask & SET_RATE_FALLBACK) {
 		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
@@ -3733,7 +3738,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		/* Enable Tx */
 		log(L_INIT, "updating power LED status: %u\n", adev->led_power);
 
-		acx_lock(adev, flags);
+		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
 		if (IS_PCI(adev))
 			acxpci_l_power_led(adev, adev->led_power);
 		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
@@ -4071,7 +4076,9 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 	 ** 2) we found too many STAs */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
 		log(L_IRQ, "sending a stop scan cmd...\n");
+		acx_unlock(adev, flags);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
+		acx_lock(adev, flags);
 		/* HACK: set the IRQ bit, since we won't get a
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
 		 * since _we_, not a fw, have stopped the scan */
