@@ -3828,8 +3828,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			adev->aid = 0;
 			//acx111_s_feature_off(adev, 0,
 			//	    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-			MAC_COPY(adev->bssid,adev->dev_addr);
-			acx_s_cmd_join_bssid(adev,adev->dev_addr);
+			MAC_COPY(adev->bssid, adev->dev_addr);
+			acx_s_cmd_join_bssid(adev, adev->dev_addr);
 			break;
 		case ACX_MODE_MONITOR:
 			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
