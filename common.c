@@ -1456,13 +1456,13 @@ static struct ieee80211_rate __acx_rates[] = {
 		  .flags = IEEE80211_RATE_CCK },
 		{ .rate = 20,
 		  .val = RATE111_2,
-		  .flags = IEEE80211_RATE_CCK_2 },
+		  .flags = IEEE80211_RATE_CCK },
 		{ .rate = 55,
 		  .val = RATE111_5,
-		  .flags = IEEE80211_RATE_CCK_2 },
+		  .flags = IEEE80211_RATE_CCK },
 		{ .rate = 110,
 		  .val = RATE111_11,
-		  .flags = IEEE80211_RATE_CCK_2 },
+		  .flags = IEEE80211_RATE_CCK },
 		{ .rate = 60,
 		  .val = RATE111_6,
 		  .flags = IEEE80211_RATE_OFDM },
@@ -1487,7 +1487,7 @@ static struct ieee80211_rate __acx_rates[] = {
 		{ .rate = 540,
 		  .val = RATE111_54,
 		  .flags = IEEE80211_RATE_OFDM },
-	};
+};
 
 #define acx_b_ratetable		(__acx_rates + 0)
 #define acx_g_ratetable		(__acx_rates + 0)
