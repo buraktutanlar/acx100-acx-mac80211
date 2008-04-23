@@ -2052,9 +2052,9 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** Work around that by temporary sem unlock.
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
-	acx_sem_unlock(adev); /* valid? */
+	acx_sem_unlock(adev);
 	flush_scheduled_work();
-	acx_sem_lock(adev); /* valid? */
+	acx_sem_lock(adev);
 
 	/* This is possible:
 	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
