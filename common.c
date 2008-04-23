@@ -2639,9 +2639,7 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		goto end;
 	}
 
-	acx_unlock(adev, flags);
 	tx = acx_l_alloc_tx(adev);
-	acx_lock(adev, flags);
 
 	if (unlikely(!tx)) {
 		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
@@ -2650,11 +2648,7 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		goto end;
 	}
 
-	acx_unlock(adev, flags);
-
 	txbuf = acx_l_get_txbuf(adev, tx);
-
-	acx_lock(adev, flags);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
@@ -2664,15 +2658,11 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 	}
 	memcpy(txbuf, skb->data, skb->len);
 
-	acx_unlock(adev, flags);
-
 	acx_l_tx_data(adev, tx, skb->len, ctl,skb);
 
 	txresult = OK;
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
-
-	acx_lock(adev, flags);
 
       end:
 	acx_unlock(adev, flags);

@@ -2446,6 +2446,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 	acx_device_t *adev = container_of(work,struct acx_device, after_interrupt_task);
 //	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	int irqtype;
+	unsigned long flags;
 
 	FN_ENTER;
 
@@ -2469,6 +2470,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 #endif
 		/* ACK all IRQs ASAP */
 
+		acx_lock(adev, flags);
 
 		/* Handle most important IRQ types first */
 		if (irqtype & HOST_INT_RX_COMPLETE) {
@@ -2487,6 +2489,8 @@ void acx_interrupt_tasklet(struct work_struct *work)
 				acxpci_l_clean_txdesc(adev);
 //			}
 		}
+
+		acx_unlock(adev, flags);
 
 		/* Less frequent ones */
 		if (irqtype & (0
