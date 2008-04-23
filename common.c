@@ -2524,6 +2524,9 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
 	struct ieee80211_hdr *hdr;
 	u16 fc, buf_len;
+
+	FN_ENTER;
+
 	hdr = acx_get_wlan_hdr(adev, rxbuf);
 	fc = le16_to_cpu(hdr->frame_control);
 	/* length of frame from control field to first byte of FCS */
@@ -2551,6 +2554,8 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	if (adev->ap_client && mac_is_equal(hdr->a2, adev->ap_client->address)) {
 */
 #endif
+
+	FN_EXIT0;
 }
 
 
