@@ -1624,7 +1624,7 @@ int acx_setup_modes(acx_device_t * adev)
 		kfree(adev->modes);*/
 
 	mode->channels = channels;
-	err = ieee80211_register_hwmode(hw,mode);
+	err = ieee80211_register_hwmode(hw, mode);
 
 	FN_EXIT1(err);
         return err; 

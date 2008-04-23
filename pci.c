@@ -1691,9 +1691,14 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_save_state(pdev);
 #endif
 
+	err = acx_setup_modes(adev);
+	if (err) {
+	printk("can't register hwmode\n");
+		goto fail_register_netdev;
+	}
 
 	acx_init_task_scheduler(adev);
-	err = ieee80211_register_hw(adev->ieee);
+	err = ieee80211_register_hw(ieee);
 	if (OK != err) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", err);
 		goto fail_register_netdev;
@@ -2126,7 +2131,6 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 	 * dev->tbusy==0.  Our rx path knows to pass up received/
 	 * frames because of dev->flags&IFF_UP is true.
 	 */
-	acx_setup_modes(adev);
 	ieee80211_start_queues(adev->ieee);
 
 	adev->initialized = 1;
@@ -4291,6 +4295,12 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 
 /** done with board specific setup **/
+
+	err = acx_setup_modes(adev);
+	if (err) {
+	printk("can't register hwmode\n");
+		goto fail_register_netdev;
+	}
 
 	acx_init_task_scheduler(adev);
 	result = ieee80211_register_hw(adev->ieee);

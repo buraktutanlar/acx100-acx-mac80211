@@ -966,6 +966,12 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 /*	MAC_COPY(ndev->dev_addr, adev->dev_addr); */
 
+	err = acx_setup_modes(adev);
+	if (err) {
+	printk("can't register hwmode\n");
+		goto fail_register_netdev;
+	}
+
 	/* Register the network device */
 	log(L_INIT, "registering network device\n");
 	result = ieee80211_register_hw(adev->ieee);
@@ -1117,7 +1123,6 @@ int acxusb_e_open(struct ieee80211_hw *hw)
 
 	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
 
-        acx_setup_modes(adev);
 	ieee80211_start_queues(adev->ieee);
 	acx_unlock(adev, flags);
 
