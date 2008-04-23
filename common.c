@@ -4215,7 +4215,7 @@ void acx_update_capabilities(acx_device_t * adev)
 ** Derived from mac80211 code, p54, bcm43xx_mac80211
 **
 */
-static void acx_select_opmode(acx_device_t * adev)
+static void acx_s_select_opmode(acx_device_t * adev)
 {
 	int changed = 0;
 	FN_ENTER;
@@ -4320,10 +4320,11 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	acx_unlock(adev, flags);
 
 	if (adev->initialized)
-		acx_select_opmode(adev);
-	err = 0;
+		acx_s_select_opmode(adev);
 
 	acx_lock(adev, flags);
+
+	err = 0;
 
 	printk(KERN_INFO "Virtual interface added "
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
@@ -4372,7 +4373,7 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	acx_unlock(adev, flags);
 
 	if (adev->initialized)
-		acx_select_opmode(adev);
+		acx_s_select_opmode(adev);
 	flush_scheduled_work();
 
 	printk(KERN_INFO "Virtual interface removed "
@@ -4519,10 +4520,11 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 	FN_ENTER;
 	if (!adev->interface.operating)
 		goto err_out;
-	acx_lock(adev, flags);
 
 	if (adev->initialized)
-		acx_select_opmode(adev);
+		acx_s_select_opmode(adev);
+
+	acx_lock(adev, flags);
 
 	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
 	    && (adev->vif == vif)) {
@@ -4546,7 +4548,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 		goto err_out;
 
 	if (adev->initialized)
-		acx_select_opmode(adev);
+		acx_s_select_opmode(adev);
 
 	acx_lock(adev, flags);
 
