@@ -774,6 +774,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int numconfigs, numfaces, numep;
 	int result = OK;
 	int i;
+	int err;
 	int radio_type;
 	/* this one needs to be more precise in case there appears
 	 * a TNETW1450 from the same vendor */
@@ -968,8 +969,8 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	err = acx_setup_modes(adev);
 	if (err) {
-	printk("can't register hwmode\n");
-		goto fail_register_netdev;
+		msg = "can't register hwmode\n";
+		goto end_nomem;
 	}
 
 	/* Register the network device */
