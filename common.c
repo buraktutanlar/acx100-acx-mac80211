@@ -4323,9 +4323,8 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 
 	printk(KERN_INFO "Virtual interface added "
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-	       "(type: 0x%08X), ID: %pd, MAC: %s\n",
+	       "(type: 0x%08X), MAC: %s\n",
 	       conf->type,
-	       conf->vif,
 	       print_mac(mac, conf->mac_addr));
 #else
 	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
@@ -4373,9 +4372,8 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 
 	printk(KERN_INFO "Virtual interface removed "
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-	       "(type: 0x%08X, ID: %pd, MAC: %s)\n",
+	       "(type: 0x%08X, MAC: %s)\n",
 		conf->type,
-		conf->vif,
 		print_mac(mac, conf->mac_addr));
 
 #else
