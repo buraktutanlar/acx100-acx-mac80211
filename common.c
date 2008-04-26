@@ -4300,13 +4300,6 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-		adev->vif = conf->vif;
-#else
-		adev->interface.if_id = conf->if_id;
-#endif
-
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 	}
@@ -4322,16 +4315,10 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	err = 0;
 
 	printk(KERN_INFO "Virtual interface added "
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-	       "(type: 0x%08X), MAC: %s\n",
-	       conf->type,
-	       print_mac(mac, conf->mac_addr));
-#else
 	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
 	       conf->type,
-	       conf->if_id,
+	       adev->interface.if_id,
 	       print_mac(mac, conf->mac_addr));
-#endif
 
       out_unlock:
 	acx_unlock(adev, flags);
@@ -4371,15 +4358,9 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	flush_scheduled_work();
 
 	printk(KERN_INFO "Virtual interface removed "
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
-	       "(type: 0x%08X, MAC: %s)\n",
-		conf->type,
-		print_mac(mac, conf->mac_addr));
-
-#else
 	       "(type: 0x%08X, ID: %d, MAC: %s)\n",
-	       conf->type, conf->if_id, print_mac(mac, conf->mac_addr));
-#endif
+	       conf->type, adev->interface.if_id, print_mac(mac, conf->mac_addr));
+
 	FN_EXIT0;
 }
 /**

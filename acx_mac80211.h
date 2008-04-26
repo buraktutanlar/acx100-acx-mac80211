@@ -8,9 +8,7 @@ struct acx_interface {
          * interface) from the ieee80211 subsystem.
          * Do not modify.
          */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
         int if_id;
-#endif
         /* MAC address. */                  
         u8 *mac_addr;        
         /* Current BSSID (if any). */       
