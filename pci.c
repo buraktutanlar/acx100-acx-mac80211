@@ -2447,6 +2447,12 @@ void acx_interrupt_tasklet(struct work_struct *work)
 	int irqtype;
 	unsigned long flags;
 
+#define IRQ_ITERATE 0
+#if IRQ_ITERATE
+	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
+	u16 unmasked;
+#endif
+
 	FN_ENTER;
 
 	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
@@ -2456,7 +2462,6 @@ void acx_interrupt_tasklet(struct work_struct *work)
 	irqtype = adev->irq_reason;
 	adev->irq_reason = 0;
 
-#define IRQ_ITERATE 0
 #if IRQ_ITERATE
 	if (jiffies != adev->irq_last_jiffies) {
 		adev->irq_loops_this_jiffy = 0;
