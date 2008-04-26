@@ -139,11 +139,6 @@ static struct usb_driver
 	.id_table = acxusb_ids
 };
 
-void acxusb_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
-{
-
-        usb_make_path(adev->usbdev, info->bus_info, sizeof info->bus_info);
-}
 /***********************************************************************
 ** USB helper
 **

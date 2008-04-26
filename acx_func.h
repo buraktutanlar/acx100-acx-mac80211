@@ -535,15 +535,6 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
-void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
-void acxusb_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
-static inline void acx_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
-{
-	if (IS_PCI(adev))
-		acxpci_put_devname(adev,info);
-	else
-		acxusb_put_devname(adev,info);
-}
 void acxpci_l_power_led(acx_device_t *adev, int enable);
 int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);

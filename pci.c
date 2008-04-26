@@ -89,11 +89,6 @@ static void acxpci_e_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
-void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
-{
-        strncpy(info->bus_info,pci_name(adev->pdev), ETHTOOL_BUSINFO_LEN);
-}
-
 /***********************************************************************
 ** Register access
 **
