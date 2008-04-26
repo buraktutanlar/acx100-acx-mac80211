@@ -2474,8 +2474,6 @@ void acx_interrupt_tasklet(struct work_struct *work)
 #endif
 		/* ACK all IRQs ASAP */
 
-		acx_lock(adev, flags);
-
 		/* Handle most important IRQ types first */
 		if (irqtype & HOST_INT_RX_COMPLETE) {
 			log(L_IRQ, "got Rx_Complete IRQ\n");
@@ -2493,8 +2491,6 @@ void acx_interrupt_tasklet(struct work_struct *work)
 				acxpci_l_clean_txdesc(adev);
 //			}
 		}
-
-		acx_unlock(adev, flags);
 
 		/* Less frequent ones */
 		if (irqtype & (0
