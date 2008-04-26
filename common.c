@@ -1492,19 +1492,6 @@ static struct ieee80211_rate __acx_rates[] = {
 #define acx_b_ratetable		(__acx_rates + 0)
 #define acx_g_ratetable		(__acx_rates + 0)
 
-/*
-#define CHANTAB_ENT(_chanid, _freq) \
-        {                                                       \
-                .chan   = (_chanid),                            \
-                .freq   = (_freq),                              \
-                .val    = (_chanid),                            \
-                .flag   = IEEE80211_CHAN_W_SCAN |               \
-                          IEEE80211_CHAN_W_ACTIVE_SCAN |        \
-                          IEEE80211_CHAN_W_IBSS,                \
-                .power_level    = 0xf,                         \
-                .antenna_max    = 0xFF,                         \
-        }
-*/
 static struct ieee80211_channel channels[] = {
 		{ .chan = 1,
 		  .freq = 2412},
@@ -1533,48 +1520,6 @@ static struct ieee80211_channel channels[] = {
 		{ .chan = 13,
 		  .freq = 2472},
 	};
-
-/*
-static int acx_setup_modes_bphy(acx_device_t * adev)        
-{
-        int err = 0;
-	struct ieee80211_hw *hw = adev->ieee;
-	struct ieee80211_hw_mode *mode;
-
-	FN_ENTER;
-
-	mode = &adev->modes[0];
-	mode->mode = MODE_IEEE80211B;
-	mode->num_channels = acx_chantable_size;
-	mode->channels = channels;
-	mode->num_rates = acx_b_ratetable_size;
-	mode->rates = acx_b_ratetable;
-	err = ieee80211_register_hwmode(hw,mode);
-
-	FN_EXIT1(err);
-        return err;
-}
-
-static int acx_setup_modes_gphy(acx_device_t * adev)
-{
-        int err = 0;
-	struct ieee80211_hw *hw = adev->ieee;
-	struct ieee80211_hw_mode *mode;
-
-	FN_ENTER;
-	
-	mode = &adev->modes[1]; 
-	mode->mode = MODE_IEEE80211G;
-	mode->num_channels = acx_chantable_size;
-	mode->channels = channels;
-	mode->num_rates = acx_g_ratetable_size;
-	mode->rates = acx_g_ratetable;
-	err = ieee80211_register_hwmode(hw,mode);
-
-	FN_EXIT1(err);
-        return err;
-}
-*/
 
 int acx_setup_modes(acx_device_t * adev)
 {
