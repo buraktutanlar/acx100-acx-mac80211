@@ -1489,9 +1489,6 @@ static struct ieee80211_rate __acx_rates[] = {
 		  .flags = IEEE80211_RATE_OFDM },
 };
 
-#define acx_b_ratetable		(__acx_rates + 0)
-#define acx_g_ratetable		(__acx_rates + 0)
-
 static struct ieee80211_channel channels[] = {
 		{ .chan = 1,
 		  .freq = 2412},
@@ -1545,7 +1542,7 @@ int acx_setup_modes(acx_device_t * adev)
 		mode->mode = MODE_IEEE80211G;
 		mode->num_channels = ARRAY_SIZE(channels);
 		mode->num_rates = 12;
-		mode->rates = acx_g_ratetable;
+		mode->rates = __acx_rates;
 	} else {
 /*
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
@@ -1562,7 +1559,7 @@ int acx_setup_modes(acx_device_t * adev)
 		mode->mode = MODE_IEEE80211B;
 		mode->num_channels = ARRAY_SIZE(channels);
 		mode->num_rates = 4;
-		mode->rates = acx_b_ratetable;
+		mode->rates = __acx_rates;
 
 	}
 /*	if (err && adev->modes)
