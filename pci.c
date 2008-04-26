@@ -2515,19 +2515,21 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		/* These we just log, but either they happen rarely
 		 * or we keep them masked out */
 		if (irqtype & (0 | HOST_INT_RX_DATA
-			       /* | HOST_INT_TX_COMPLETE   */
-			       | HOST_INT_TX_XFER
-			       /* | HOST_INT_RX_COMPLETE   */
-			       | HOST_INT_DTIM
-			       | HOST_INT_BEACON
-			       | HOST_INT_TIMER
-			       | HOST_INT_KEY_NOT_FOUND
-			       | HOST_INT_IV_ICV_FAILURE
-			       /* | HOST_INT_CMD_COMPLETE  */
-			       /* | HOST_INT_INFO          */
-			       | HOST_INT_OVERFLOW | HOST_INT_PROCESS_ERROR
-			       /* | HOST_INT_SCAN_COMPLETE */
-			       | HOST_INT_FCS_THRESHOLD | HOST_INT_UNKNOWN)) {
+				/* | HOST_INT_TX_COMPLETE   */
+				| HOST_INT_TX_XFER
+		/* | HOST_INT_RX_COMPLETE   */
+				| HOST_INT_DTIM
+				| HOST_INT_BEACON
+				| HOST_INT_TIMER
+				| HOST_INT_KEY_NOT_FOUND
+				| HOST_INT_IV_ICV_FAILURE
+				/* | HOST_INT_CMD_COMPLETE  */
+				/* | HOST_INT_INFO          */
+				| HOST_INT_OVERFLOW
+				| HOST_INT_PROCESS_ERROR
+				/* | HOST_INT_SCAN_COMPLETE */
+				| HOST_INT_FCS_THRESHOLD
+				| HOST_INT_UNKNOWN)) {
 			log_unusual_irq(irqtype);
 		}
 #if IRQ_ITERATE
