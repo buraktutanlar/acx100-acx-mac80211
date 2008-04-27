@@ -4293,8 +4293,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 /** done with board specific setup **/
 
-	err = acx_setup_modes(adev);
-	if (err) {
+	result = acx_setup_modes(adev);
+	if (result) {
 	printk("can't register hwmode\n");
 		goto fail_register_netdev;
 	}
