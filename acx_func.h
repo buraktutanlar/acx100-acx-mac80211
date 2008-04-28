@@ -602,16 +602,9 @@ void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw* ieee);
 int acx_net_set_key(struct ieee80211_hw *hw, 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-		set_key_cmd cmd,
-		u8 *addr,
-		struct ieee80211_key_conf *key,
-		int aid);
-#else
 		enum set_key_cmd cmd,
 		const u8 *local_addr, const u8 *addr,
 		struct ieee80211_key_conf *key);
-#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
@@ -630,15 +623,10 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 //static void acx_netdev_init(struct net_device *ndev);
 int acxpci_s_reset_dev(acx_device_t *adev);
 void acx_e_after_interrupt_task(struct work_struct* work);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-void acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                            unsigned short netflags, int mc_count);
-#else
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned int changed_flags,
                             unsigned int *total_flags,
                             int mc_count, struct dev_addr_list *mc_list);
-#endif
 
 /*** End DeviceScape Functions **/
 

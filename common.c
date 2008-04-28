@@ -1721,13 +1721,9 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 */
 
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-				unsigned short netflags, int mc_count)
-#else
 				unsigned int changed_flags,
 				unsigned int *total_flags,
 				int mc_count, struct dev_addr_list *mc_list)
-#endif
 {
         acx_device_t *adev = ieee2adev(hw);
         unsigned long flags;
@@ -1745,11 +1741,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                 return; */
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	if (netflags & (IFF_PROMISC | IFF_ALLMULTI)) {
-#else
 	if (*total_flags) {
-#endif
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
                 SET_BIT(adev->set_mask, SET_RXCONFIG);
@@ -4718,15 +4710,9 @@ int acx_key_write(acx_device_t * adev,
 **
 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-int acx_net_set_key(struct ieee80211_hw *ieee,
-		    set_key_cmd cmd, 
-		    u8 * addr, struct ieee80211_key_conf *key, int aid)
-#else
 int acx_net_set_key(struct ieee80211_hw *ieee,
 		    enum set_key_cmd cmd, const u8 *local_addr,
 		    const u8 * addr, struct ieee80211_key_conf *key)
-#endif
 {
 //      return 0;
 	struct acx_device *adev = ieee2adev(ieee);

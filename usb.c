@@ -89,11 +89,7 @@ static void acxusb_e_disconnect(struct usb_interface *);
 static void acxusb_i_complete_tx(struct urb *);
 static void acxusb_i_complete_rx(struct urb *);
 static int acxusb_e_open(struct ieee80211_hw *);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-static int acxusb_e_close(struct ieee80211_hw *);
-#else
 static void acxusb_e_close(struct ieee80211_hw *);
-#endif
 //static void acxusb_i_set_rx_mode(struct net_device *);
 static int acxusb_boot(struct usb_device *, int is_tnetw1450, int *radio_type);
 
@@ -729,14 +725,8 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.conf_tx = acx_net_conf_tx,
 	.add_interface = acx_add_interface,
 	.remove_interface = acx_remove_interface,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	.open = acxusb_e_open,
-	.reset = acx_net_reset,
-	.set_multicast_list = acx_i_set_multicast_list,
-#else
 	.start = acxusb_e_open,
 	.configure_filter = acx_i_set_multicast_list,
-#endif
 	.stop = acxusb_e_close,
 	.config = acx_net_config,
 	.config_interface = acx_config_interface,
@@ -1138,11 +1128,7 @@ int acxusb_e_open(struct ieee80211_hw *hw)
 ** transfers, these are unlinked (asynchronously). The module in-use count
 ** is also decreased in this function.
 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-int acxusb_e_close(struct ieee80211_hw *hw)
-#else
 static void acxusb_e_close(struct ieee80211_hw *hw)
-#endif
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -1198,9 +1184,6 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	return 0;
-#endif
 }
 
 
