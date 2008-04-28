@@ -300,7 +300,7 @@ void acx_dump_bytes(const void *data, int num)
 	}
 	if (num > 0) {
 		while (--num > 0)
-			printk("%02X \n", *ptr++);
+			printk("%02X ", *ptr++);
 		printk("%02X\n", *ptr);
 	}
 
