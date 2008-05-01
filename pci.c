@@ -752,7 +752,7 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 	write_flush(adev);
 
 	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "disable soft reset and go to init mode");
+	log(L_DEBUG, "disable soft reset and go to init mode\n");
 	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
 
 	/* now start a burst read from initial EEPROM */
