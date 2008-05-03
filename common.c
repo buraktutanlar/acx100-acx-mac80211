@@ -852,7 +852,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 {
 	char *p = buf;
 	unsigned long flags;
-	unsigned int len = 0, partlen;
+	ssize_t len = 0, partlen;
 	u32 temp1, temp2;
 	u8 *st, *st_end;
 #ifdef __BIG_ENDIAN
@@ -942,8 +942,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (len > sizeof(*fw_stats)) {
 		p += sprintf(p,
 			     "firmware version with bigger fw_stats struct detected\n"
-			     "(%u vs. %u), please report\n", len,
-			     sizeof(fw_stats_t));
+			     "(%zu vs. %zu), please report\n", len, sizeof(fw_stats_t));
 		if (len > sizeof(*fw_stats)) {
 			p += sprintf(p, "struct size exceeded allocation!\n");
 			len = sizeof(*fw_stats);
@@ -1202,9 +1201,9 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
       fw_stats_fail:
 	st -= partlen;
 	p += sprintf(p,
-		     "failed at %s part (size %u), offset %u (struct size %u), "
+		     "failed at %s part (size %zu), offset %zu (struct size %zu), "
 		     "please report\n", part_str, partlen,
-		     (int)((void *)st - (void *)fw_stats), len);
+		     ((void *)st - (void *)fw_stats), len);
 
       fw_stats_bigger:
 	for (; st < st_end; st += 4)
@@ -1602,7 +1601,7 @@ acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
         int len, result;
 
         FN_ENTER;
-	printk("Size of template: %08X, Size of beacon: %08X\n",sizeof(struct acx_template_beacon),skb->len);
+	printk("Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
         len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
 
