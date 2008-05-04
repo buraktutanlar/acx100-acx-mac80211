@@ -1498,13 +1498,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			*/
 	ieee->queues = 1;
 
-	/* (NB: memsets to 0 entire area) */
-	if (!ieee) {
-		printk("acx: could not allocate ieee structure %s\n",
-		       pci_name(pdev));
-		goto fail_alloc_netdev;
-	}
-
 	adev = ieee2adev(ieee);
 
 	memset(adev, 0, sizeof(*adev));
