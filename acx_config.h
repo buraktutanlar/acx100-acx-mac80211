@@ -1,3 +1,6 @@
+#ifndef _ACX_CONFIG_H_
+#define _ACX_CONFIG_H_
+
 /* temporary hack until proper Kconfig integration */
 #define CONFIG_ACX_MAC80211_PCI 1
 //#define CONFIG_ACX_MAC80211_USB 1
@@ -42,3 +45,5 @@
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
 #define CMD_DISCOVERY 0
+
+#endif /* _ACX_CONFIG_H_ */

@@ -1,3 +1,6 @@
+#ifndef _ACX_MAC80211_H_
+#define _ACX_MAC80211_H_
+
 struct acx_key {
 	u8 enabled:1;
 	u8 algorithm;
@@ -61,3 +64,5 @@ struct acx_interface {
 #define ACX_OFDM_RATE_36MB          0x48
 #define ACX_OFDM_RATE_48MB          0x60               
 #define ACX_OFDM_RATE_54MB          0x6C
+
+#endif /* _ACX_MAC80211_H_ */

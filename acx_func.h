@@ -1,3 +1,6 @@
+#ifndef _ACX_FUNC_H_
+#define _ACX_FUNC_H_
+
 /** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
@@ -644,3 +647,5 @@ int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 void __exit acxusb_e_cleanup_module(void);
+
+#endif /* _ACX_FUNC_H_ */

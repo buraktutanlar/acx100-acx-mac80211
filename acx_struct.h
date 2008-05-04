@@ -1,3 +1,6 @@
+#ifndef _ACX_STRUCT_H_
+#define _ACX_STRUCT_H_
+
 /**** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
@@ -2046,3 +2049,5 @@ enum {
 };
 
 //extern const struct iw_handler_def acx_ioctl_handler_def;
+
+#endif /* _ACX_STRUCT_H_ */
