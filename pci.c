@@ -1762,9 +1762,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		goto end;
 	}
 
-
-	adev->initialized = 0;
-
 	/* If device wasn't hot unplugged... */
 	if (adev_present(adev)) {
 
@@ -1772,6 +1769,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		if (adev->initialized) {
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			adev->initialized = 0;
 		}
 #ifdef REDUNDANT
 		/* put the eCPU to sleep to save power
