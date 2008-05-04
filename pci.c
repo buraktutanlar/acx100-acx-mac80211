@@ -1841,8 +1841,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 
 	/* remove dev registration */
+	pci_set_drvdata(pdev, NULL);
 
-	free_irq(adev->irq, adev);
 	acx_sem_unlock(adev);
 
 	/* Free netdev (quite late,
@@ -2162,6 +2162,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	free_irq(adev->irq, adev);
 
 /* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
