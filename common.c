@@ -1731,14 +1731,12 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
 	acx_lock(adev, flags);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
 			  FIF_CONTROL | FIF_OTHER_BSS);
         *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
 			 FIF_CONTROL | FIF_OTHER_BSS);
 /*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
                 return; */
-#endif
 
 	if (*total_flags) {
                 SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
@@ -4220,9 +4218,7 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	unsigned long flags;
 	int err = -EOPNOTSUPP;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 	DECLARE_MAC_BUF(mac);
-#endif
 
 	FN_ENTER;
 	acx_lock(adev, flags);
@@ -4270,9 +4266,7 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 	DECLARE_MAC_BUF(mac);
-#endif
 
 	FN_ENTER;
 
@@ -4752,9 +4746,7 @@ int acx_net_set_key(struct ieee80211_hw *ieee,
 /*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
 /*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
 			adev->default_key_idx = index;*/
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
                 SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
-#endif
 		adev->key[index].enabled = 1;
 		break;
 	case DISABLE_KEY:
