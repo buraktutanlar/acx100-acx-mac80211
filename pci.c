@@ -1553,37 +1553,43 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_unknown_chiptype;
 	}
 
-	/* Figure out our resources */
-	phymem1 = pci_resource_start(pdev, mem_region1);
-	phymem2 = pci_resource_start(pdev, mem_region2);
-	if (!request_mem_region
-	    (phymem1, pci_resource_len(pdev, mem_region1), "acx_1")) {
-		printk("acx: cannot reserve PCI memory region 1 (are you sure "
-		       "you have CardBus support in kernel?)\n");
+	/* Figure out our resources
+	 *
+	 * Request our PCI IO regions
+	 */
+	err = pci_request_region(pdev, mem_region1, "acx_1");
+	if (err) {
+		printk(KERN_WARNING "acx: pci_request_region (1/2) FAILED!"
+			"No cardbus support in kernel?\n");
 		goto fail_request_mem_region1;
 	}
-	if (!request_mem_region
-	    (phymem2, pci_resource_len(pdev, mem_region2), "acx_2")) {
-		printk("acx: cannot reserve PCI memory region 2\n");
+
+	phymem1 = pci_resource_start(pdev, mem_region1);
+
+	err = pci_request_region(pdev, mem_region2, "acx_2");
+	if (err) {
+		printk(KERN_WARNING "acx: pci_request_region (2/2) FAILED!\n");
 		goto fail_request_mem_region2;
 	}
-	/* this used to be ioremap(), but ioremap_nocache()
-	 * is much less risky, right? (and slower?)
-	 * FIXME: we may want to go back to cached variant if it's
-	 * certain that our code really properly handles
-	 * cached operation (memory barriers, volatile?, ...)
-	 * (but always keep this comment here regardless!)
-	 * Possibly make this a driver config setting?
+
+	phymem2 = pci_resource_start(pdev, mem_region2);
+
+	/*
+	 * We got them? Map them!
+	 *
+	 * We pass 0 as the third argument to pci_iomap(): it will map the full
+	 * region in this case, which is what we want.
 	 */
 	
-	mem1 = ioremap_nocache(phymem1, mem_region1_size);
+	mem1 = pci_iomap(pdev, mem_region1, 0);
 	if (!mem1) {
-		printk("acx: ioremap() FAILED\n");
+		printk(KERN_WARNING "acx: ioremap() FAILED\n");
 		goto fail_ioremap1;
 	}
-	mem2 = ioremap_nocache(phymem2, mem_region2_size);
+
+	mem2 = pci_iomap(pdev, mem_region2, 0);
 	if (!mem2) {
-		printk("acx: ioremap() #2 FAILED\n");
+		printk(KERN_WARNING "acx: ioremap() #2 FAILED\n");
 		goto fail_ioremap2;
 	}
 
@@ -1609,6 +1615,14 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
 
+	/* request shared IRQ handler */
+	if (request_irq
+	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
+		printk("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		result = -EAGAIN;
+		goto done;
+	}
+	log(L_DEBUG | L_IRQ, "request_irq %d successful\n", adev->irq);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -1704,37 +1718,35 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	acxpci_s_delete_dma_regions(adev);
 	pci_set_drvdata(pdev, NULL);
 
-      fail_init_mac:
-      fail_read_eeprom_version:
-      fail_reset:
+fail_init_mac:
+fail_read_eeprom_version:
+fail_reset:
 
-      fail_alloc_netdev:
-      fail_irq:
+fail_alloc_netdev:
+fail_irq:
+	pci_iounmap(pdev, mem2);
 
-	iounmap(mem2);
-      fail_ioremap2:
+fail_ioremap2:
+	pci_iounmap(pdev, mem1);
 
-	iounmap(mem1);
-      fail_ioremap1:
+fail_ioremap1:
+	pci_release_region(pdev, mem_region2);
 
-	release_mem_region(pci_resource_start(pdev, mem_region2),
-			   pci_resource_len(pdev, mem_region2));
-      fail_request_mem_region2:
+fail_request_mem_region2:
+	pci_release_region(pdev, mem_region1);
 
-	release_mem_region(pci_resource_start(pdev, mem_region1),
-			   pci_resource_len(pdev, mem_region1));
-      fail_request_mem_region1:
-      fail_unknown_chiptype:
-
+fail_request_mem_region1:
+fail_unknown_chiptype:
 	pci_disable_device(pdev);
-      fail_pci_enable_device:
 
+fail_pci_enable_device:
 #ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
-      fail_register_netdev:
+
+fail_register_netdev:
 	ieee80211_free_hw(ieee);
-      done:
+done:
 	FN_EXIT1(result);
 	return result;
 }
@@ -2098,15 +2110,6 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 
 /* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
-	/* request shared IRQ handler */
-	if (request_irq
-	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
-		printk("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
-		result = -EAGAIN;
-		goto done;
-	}
-	log(L_DEBUG | L_IRQ, "request_irq %d successful\n", adev->irq);
-
 	/* ifup device */
 	acxpci_s_up(hw);
 
@@ -2120,7 +2123,6 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 	ieee80211_start_queues(adev->ieee);
 
 	adev->initialized = 1;
-      done:
 	acx_sem_unlock(adev);
 
 	FN_EXIT1(result);
@@ -4210,6 +4212,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		printk("acx: cannot reserve VLYNQ memory region\n");
 		goto fail_request_mem_region;
 	}
+
 	adev->iobase = ioremap(vdev->mem_start, vdev->mem_end - vdev->mem_start);
 	if (!adev->iobase) {
 		printk("acx: ioremap() FAILED\n");
@@ -4233,6 +4236,14 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	}
 	SET_IEEE80211_DEV(ieee, &vdev->dev);
 
+	/* request shared IRQ handler */
+	if (request_irq
+	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
+		printk("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		result = -EAGAIN;
+		goto done;
+	}
+	log(L_DEBUG | L_IRQ, "request_irq %d successful\n", adev->irq);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
