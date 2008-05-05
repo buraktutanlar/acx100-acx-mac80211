@@ -2557,24 +2557,23 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
-
 	if (unlikely(!skb)) {
 		/* indicate success */
 		txresult = OK;
-		goto end;
+		goto out;
 	}
 
 	if (unlikely(!adev)) {
-		goto end;
+		goto out;
 	}
 
+	acx_lock(adev, flags);
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		goto end;
+		goto out_unlock;
 	}
 	if (unlikely(!adev->initialized)) {
-		goto end;
+		goto out_unlock;
 	}
 
 	tx = acx_l_alloc_tx(adev);
@@ -2583,7 +2582,7 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
 				   "dropping tx\n", wiphy_name(adev->ieee->wiphy));
 		txresult = NOT_OK;
-		goto end;
+		goto out_unlock;
 	}
 
 	txbuf = acx_l_get_txbuf(adev, tx);
@@ -2592,7 +2591,7 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		/* Card was removed */
 		txresult = NOT_OK;
 		acx_l_dealloc_tx(adev, tx);
-		goto end;
+		goto out_unlock;
 	}
 	memcpy(txbuf, skb->data, skb->len);
 
@@ -2602,9 +2601,10 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
 
-      end:
+out_unlock:
 	acx_unlock(adev, flags);
 
+out:
 	FN_EXIT1(txresult);
 	return txresult; 
 }   
