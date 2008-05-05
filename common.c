@@ -4264,21 +4264,21 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	DECLARE_MAC_BUF(mac);
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
+	acx_sem_lock(adev);
 	if (conf->type == IEEE80211_IF_TYPE_MNTR) {
 		adev->interface.monitor--;
 //                assert(bcm->interface.monitor >= 0);
-	} else
+	} else {
 		adev->interface.operating = 0;
+	}
 
 	printk("Removing interface: %d %d\n", adev->interface.operating, conf->type);
-	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
