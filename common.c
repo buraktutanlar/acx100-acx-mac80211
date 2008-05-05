@@ -2567,14 +2567,14 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 		goto out;
 	}
 
-	acx_lock(adev, flags);
-
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		goto out_unlock;
+		goto out;
 	}
 	if (unlikely(!adev->initialized)) {
-		goto out_unlock;
+		goto out;
 	}
+
+	acx_lock(adev, flags);
 
 	tx = acx_l_alloc_tx(adev);
 
