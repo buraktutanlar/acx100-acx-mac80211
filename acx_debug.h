@@ -2,7 +2,7 @@
 #define _ACX_DEBUG_H_
 
 /*
- * acx_log.h: logging constants and helpers
+ * acx_debug.h: logging constants and helpers
  *
  * Copyright (c) 2008, the ACX100 project (http://acx100.sourceforge.net).
  *
