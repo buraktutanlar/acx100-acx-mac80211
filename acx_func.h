@@ -68,9 +68,9 @@ void log_fn_exit_v(const char *funcname, int v);
 
 #else
 
-#define FN_ENTER
-#define FN_EXIT1(v)
-#define FN_EXIT0
+#define FN_ENTER do {} while(0)
+#define FN_EXIT1(v) do {} while(0)
+#define FN_EXIT0 do {} while(0)
 
 #endif /* ACX_DEBUG > 1 */
 
