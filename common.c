@@ -2207,6 +2207,9 @@ void acx_s_set_defaults(acx_device_t * adev)
 {
 	struct ieee80211_conf *conf = &adev->ieee->conf;
 	unsigned long flags;
+	u16 default_irq_mask = (IS_ACX111(adev)) ?
+		ACX111_DEFAULT_IRQ_MASK :
+		ACX100_DEFAULT_IRQ_MASK;
 
 	FN_ENTER;
 
@@ -2232,7 +2235,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
-		acxpci_set_interrupt_mask(adev);
+		adev->irq_mask = default_irq_mask;
 
 	adev->led_power = 1;	/* LED is active on startup */
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */

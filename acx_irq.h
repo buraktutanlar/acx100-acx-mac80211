@@ -43,4 +43,58 @@
 #define ACX_IRQ_UNKNOWN		0x8000
 
 #define ACX_IRQ_ALL		0xffff
+
+/*
+ * The default masks for ACX100 and ACX111 differ!
+ *
+ * The ACX*_DEFAULT_IRQ_MASK values define what the masks of the card should
+ * initially be set to. The ACX*_DISABLE_ALL_IRQS define what mask should be set
+ * in order to not receive anymore interrupts.
+ *
+ * FIXME: the values below are taken from the existing code, they may not be
+ * accurate. I don't have any RE skill, so I cannot really tell :/
+ */
+
+/*
+ * ACX111
+ */
+#define ACX111_DEFAULT_NEGATED_IRQ_MASK ( \
+	ACX_IRQ_TX_COMPLETE | \
+	ACX_IRQ_RX_COMPLETE | \
+	ACX_IRQ_IV_ICV_FAILURE | \
+	ACX_IRQ_CMD_COMPLETE | \
+	ACX_IRQ_INFO | \
+	ACX_IRQ_SCAN_COMPLETE | \
+	ACX_IRQ_FCS_THRESHOLD \
+)
+
+#define ACX111_DEFAULT_IRQ_MASK \
+	((u16) ~ ACX111_DEFAULT_NEGATED_IRQ_MASK )
+
+#define ACX111_DISABLE_ALL_IRQS \
+	((u16) ~ (ACX_IRQ_UNKNOWN))
+
+/*
+ * ACX100
+ */
+#define ACX100_DEFAULT_NEGATED_IRQ_MASK ( \
+	ACX_IRQ_TX_COMPLETE | \
+	ACX_IRQ_RX_COMPLETE | \
+	ACX_IRQ_CMD_COMPLETE | \
+	ACX_IRQ_INFO | \
+	ACX_IRQ_SCAN_COMPLETE \
+)
+
+#define ACX100_DEFAULT_IRQ_MASK \
+	((u16) ~ ACX100_DEFAULT_NEGATED_IRQ_MASK )
+
+/*
+ * About the value below: the original code said:
+ *
+ * "Or else acx100 won't signal cmd completion, right?"
+ *
+ * Also, why isn't ACX_IRQ_UNKNOWN part of that mask? Good question.
+ */
+#define ACX100_DISABLE_ALL_IRQS \
+	((u16) ~ (ACX_IRQ_CMD_COMPLETE))
 #endif /* _ACX_IRQ_H_ */

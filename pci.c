@@ -2067,12 +2067,16 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 
 static void disable_acx_irq(acx_device_t * adev)
 {
+	u16 disable_irq_mask = (IS_ACX111(adev)) ?
+		ACX111_DISABLE_ALL_IRQS :
+		ACX100_DISABLE_ALL_IRQS;
+
 	FN_ENTER;
 
 	/* I guess mask is not ACX_IRQ_ALL because acx100 won't signal
 	 ** cmd completion then (needed for ifup).
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
+	write_reg16(adev, IO_ACX_IRQ_MASK, disable_irq_mask);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	adev->irqs_active = 0;
 
@@ -4022,56 +4026,6 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
 
 	FN_EXIT1(p - buf);
 	return p - buf;
-}
-
-
-/***********************************************************************
-** Obvious
-*/
-void acxpci_set_interrupt_mask(acx_device_t * adev)
-{
-	if (IS_ACX111(adev)) {
-		adev->irq_mask = (u16) ~ (0
-					  /* | ACX_IRQ_RX_DATA        */
-					  | ACX_IRQ_TX_COMPLETE
-					  /* | ACX_IRQ_TX_XFER        */
-					  | ACX_IRQ_RX_COMPLETE
-					  /* | ACX_IRQ_DTIM           */
-					  /* | ACX_IRQ_BEACON         */
-					  /* | ACX_IRQ_TIMER          */
-					  /* | ACX_IRQ_KEY_NOT_FOUND  */
-					  | ACX_IRQ_IV_ICV_FAILURE
-					  | ACX_IRQ_CMD_COMPLETE
-					  | ACX_IRQ_INFO
-					  /* | ACX_IRQ_OVERFLOW       */
-					  /* | ACX_IRQ_PROCESS_ERROR  */
-					  | ACX_IRQ_SCAN_COMPLETE
-					  | ACX_IRQ_FCS_THRESHOLD
-					  /* | ACX_IRQ_UNKNOWN        */
-		    );
-		/* Or else acx100 won't signal cmd completion, right? */
-		adev->irq_mask_off = (u16) ~ (ACX_IRQ_CMD_COMPLETE);	/* 0xfdff */
-	} else {
-		adev->irq_mask = (u16) ~ (0
-					  /* | ACX_IRQ_RX_DATA        */
-					  | ACX_IRQ_TX_COMPLETE
-					  /* | ACX_IRQ_TX_XFER        */
-					  | ACX_IRQ_RX_COMPLETE
-					  /* | ACX_IRQ_DTIM           */
-					  /* | ACX_IRQ_BEACON         */
-					  /* | ACX_IRQ_TIMER          */
-					  /* | ACX_IRQ_KEY_NOT_FOUND  */
-					  /* | ACX_IRQ_IV_ICV_FAILURE */
-					  | ACX_IRQ_CMD_COMPLETE
-					  | ACX_IRQ_INFO
-					  /* | ACX_IRQ_OVERFLOW       */
-					  /* | ACX_IRQ_PROCESS_ERROR  */
-					  | ACX_IRQ_SCAN_COMPLETE
-					  /* | ACX_IRQ_FCS_THRESHOLD  */
-					  /* | ACX_IRQ_UNKNOWN        */
-		    );
-		adev->irq_mask_off = (u16) ~ (ACX_IRQ_UNKNOWN);	/* 0x7fff */
-	}
 }
 
 
