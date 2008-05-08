@@ -2679,54 +2679,54 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 
 	struct ieee80211_rx_status* status = &adev->rx_status;
 	struct ieee80211_hdr *w_hdr;
+	struct sk_buff *skb;
 	int buflen;
 	FN_ENTER;
 
-	if (likely(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		struct sk_buff *skb;
-		w_hdr = acx_get_wlan_hdr(adev, rxbuf);
-		buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
-		skb = dev_alloc_skb(buflen + 2);
-		skb_reserve(skb, 2);
-		skb_put(skb, buflen);
-		memcpy(skb->data, w_hdr, buflen);
-
-//		memset(&status, 0, sizeof(status));
-
-		if (likely(skb)) {
-			status->mactime = rxbuf->time;
-			status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
-			status->noise = acx_signal_to_winlevel(rxbuf->phy_snr);
-			status->flag = 0;
-			status->rate = rxbuf->phy_plcp_signal;
-			status->antenna = 1;
-/*
-#ifndef OLD_QUALITY
-		qual = acx_signal_determine_quality(adev->wstats.qual.level,
-						    adev->wstats.qual.noise);
-#else
-		qual = (adev->wstats.qual.noise <= 100) ?
-		    100 - adev->wstats.qual.noise : 0;
-#endif
-		adev->wstats.qual.qual = qual;
-		adev->wstats.qual.updated = 7;	*//* all 3 indicators updated */
-/*
-#ifdef FROM_SCAN_SOURCE_ONLY
+	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		acx_log_ratelimited(LOG_WARNING, L_ANY,
+			"asked to receive a packet but interface is down??\n");
+		goto out;
 	}
-#endif
-*/
-			if (rxbuf->phy_stat_baseband & (1 << 3)) /* Uses OFDM */
-			{
-				status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
-			} else
-			{
-				status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
-			}
-			ieee80211_rx_irqsafe(adev->ieee, skb, status);
-			adev->stats.rx_packets++;
-			adev->stats.rx_bytes += skb->len;
-		}
+
+	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
+	buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
+	/*
+	 * Allocate our skb
+	 */
+	skb = dev_alloc_skb(buflen + 2);
+
+	if (!skb) {
+		acx_log_ratelimited(LOG_WARNING, L_ANY,
+			"skb allocation FAILED\n");
+		goto out;
 	}
+
+	skb_reserve(skb, 2);
+	skb_put(skb, buflen);
+	memcpy(skb->data, w_hdr, buflen);
+
+//	memset(&status, 0, sizeof(status));
+
+	status->mactime = rxbuf->time;
+	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
+	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+	status->flag = 0;
+	status->rate = rxbuf->phy_plcp_signal;
+	status->antenna = 1;
+	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
+		status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+	} else {
+		status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+	}
+
+	/*
+	 * FIXME: should it really be done here??
+	 */
+	ieee80211_rx_irqsafe(adev->ieee, skb, status);
+	adev->stats.rx_packets++;
+	adev->stats.rx_bytes += skb->len;
+out:
 	FN_EXIT0;
 }
 
@@ -3944,6 +3944,8 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+		acx_log_ratelimited(LOG_WARNING, L_ANY,
+			"too many TX errors??\n");
 //		acx_s_after_interrupt_recalib(adev);
 	}
 
