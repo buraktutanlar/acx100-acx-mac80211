@@ -2211,9 +2211,21 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	if (adev->modes)
 		acx_free_modes(adev);
 	/* disable all IRQs, release shared IRQ handler */
-	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	free_irq(adev->irq, adev);
+	/*
+	 * FIXME: acxpci_s_down() calls disable_acx_irq(), which makes this
+	 * trigger a kernel warning "trying to free an already-free IRQ"...
+	 *
+	 * Attempt to get around this by checking whether ->irqs_active is zero,
+	 * in which case we don't attempt to free_irq().
+	 */
+	if (!(adev->irqs_active)) {
+		acx_log(LOG_WARNING, L_ANY,
+			"IRQ is already freed, not freeing it again!\n");
+	} else {
+		write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+		write_reg16(adev, IO_ACX_FEMR, 0x0);
+		free_irq(adev->irq, adev);
+	}
 
 /* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
