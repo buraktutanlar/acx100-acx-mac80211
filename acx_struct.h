@@ -1129,8 +1129,10 @@ struct acx_device {
 	/*
 	 * IRQ handling
 	 */
-	/* The IRQ we have */
+	/* The IRQ we have inherited */
 	unsigned int	irq;
+	/* Are IRQs currently activated? FIXME: should get rid of this */
+	u8		irqs_active;
 	/* The interrupts we can acknowledge (see acx_irq.h) */
 	u16		irq_mask;
 	/* The interrupts we do NOT want to acknowledge */
@@ -1395,7 +1397,6 @@ struct acx_device {
 	unsigned int	rxhostdesc_area_size;
 
 	u8		need_radio_fw;
-	u8		irqs_active;	/* whether irq sending is activated */
 
 	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */
 
