@@ -1120,10 +1120,37 @@ typedef struct acx111_ie_configoption {
 struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
-	/*** Locking ***/
+	/*
+	 * Locking 
+	 */
 	struct mutex		mutex;
 	spinlock_t		spinlock;
 	spinlock_t		irqlock;
+	/*
+	 * IRQ handling
+	 */
+	/* The IRQ we have */
+	unsigned int	irq;
+	/* The interrupts we can acknowledge (see acx_irq.h) */
+	u16		irq_mask;
+	/* The interrupts we do NOT want to acknowledge */
+	u16		irq_mask_off;
+	/*
+	 * FIXME: these ones should disappear
+	 */
+	unsigned int	irq_loops_this_jiffy;
+	unsigned long	irq_last_jiffies;
+	/* Barely used in USB case (FIXME?) */
+	u16		irq_status;
+	int		irq_savedstate;
+	int		irq_reason;
+	/* Mask of jobs we have to schedule post interrupt */
+	u8		after_interrupt_jobs;
+	/* 
+	 * Work queue for the bottom half. FIXME: only one, consider a
+	 * delayed_work struct some day?
+	 */
+	struct work_struct	after_interrupt_task;
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
 	const char		*last_lock;
@@ -1198,14 +1225,7 @@ struct acx_device {
 	u32		get_mask;		/* mask of settings to fetch from the card */
 	u32		set_mask;		/* mask of settings to write to the card */
 	u32		initialized:1;
-	/* Barely used in USB case */
-	u16		irq_status;
-	int		irq_savedstate;
-	int		irq_reason;
-	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
-	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
 
-	unsigned int	irq;
 
 	/*** scanning ***/
 	u16		scan_count;		/* number of times to do channel scan */
@@ -1394,10 +1414,6 @@ struct acx_device {
 	u8 __iomem	*cmd_area;
 	u8 __iomem	*info_area;
 
-	u16		irq_mask;		/* interrupt types to mask out (not wanted) with many IRQs activated */
-	u16		irq_mask_off;		/* interrupt types to mask out (not wanted) with IRQs off */
-	unsigned int	irq_loops_this_jiffy;
-	unsigned long	irq_last_jiffies;
 #endif
 
 	/*** USB stuff ***/
