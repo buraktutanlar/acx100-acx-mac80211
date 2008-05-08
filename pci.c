@@ -1946,8 +1946,8 @@ acx_sem_lock(adev);
 
 ieee80211_unregister_hw(hw);	/* this one cannot sleep */
 acxpci_s_down(hw);
-/* down() does not set it to 0xffff, but here we really want that */
-write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+/* down() does not set it to ACX_IRQ_ALL, but here we really want that */
+write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
 write_reg16(adev, IO_ACX_FEMR, 0x0);
 acxpci_s_delete_dma_regions(adev);
 pci_save_state(pdev);
@@ -2069,7 +2069,7 @@ static void disable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
 
-	/* I guess mask is not 0xffff because acx100 won't signal
+	/* I guess mask is not ACX_IRQ_ALL because acx100 won't signal
 	 ** cmd completion then (needed for ifup).
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
@@ -2212,7 +2212,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	if (adev->modes)
 		acx_free_modes(adev);
 	/* disable all IRQs, release shared IRQ handler */
-	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	free_irq(adev->irq, adev);
 
@@ -2586,7 +2586,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			acx_log(LOG_WARNING, L_ANY,
 				"too many interrupts per jiffy!\n");
 			/* Looks like card floods us with IRQs! Try to stop that */
-			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+			write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
 			/* This will short-circuit all future attempts to handle IRQ.
 			 * We cant do much more... */
 			adev->irq_mask = 0;
@@ -2631,12 +2631,12 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	acx_lock(adev, flags);
 
 	unmasked = read_reg16(adev, IO_ACX_IRQ_STATUS_CLEAR);
-	if (unlikely(0xffff == unmasked)) {
-		/* 0xffff value hints at missing hardware,
+	if (unlikely(unmasked == ACX_IRQ_ALL)) {
+		/* ACX_IRQ_ALL value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
 		acx_log(LOG_WARNING, L_IRQ, 
-			"IRQ type:FFFF - device removed? IRQ_NONE\n");
+			"IRQ type:FFFF (ALL) - device removed? IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2651,7 +2651,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	}
 
 	/* Go ahead and ACK our interrupt */
-	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
+	write_reg16(adev, IO_ACX_IRQ_ACK, ACX_IRQ_ALL);
 	if (irqtype & ACX_IRQ_CMD_COMPLETE) {
 		acx_log(LOG_DEBUG, L_IRQ, "got Command_Complete IRQ\n");
 		/* save the state for the running issue_cmd() */
