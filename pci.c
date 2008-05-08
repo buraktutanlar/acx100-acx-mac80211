@@ -2034,10 +2034,6 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
-	enable_acx_irq(adev);
-	acx_unlock(adev, flags);
-
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
 	 ** used to use it. But we don't do that anymore, our OS
 	 ** has reliable software timers */
@@ -2050,6 +2046,11 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	acx_s_start(adev);
+
+	acx_lock(adev, flags);
+	enable_acx_irq(adev);
+	acx_unlock(adev, flags);
+
 
 	FN_EXIT0;
 }
