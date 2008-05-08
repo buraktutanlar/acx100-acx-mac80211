@@ -16,7 +16,7 @@
  * set to 2 if you want extensive debug log
  */
 #define ACX_DEBUG 2
-#define ACX_DEFAULT_MSG (L_INIT|L_IRQ|L_ASSOC)
+#define ACX_DEFAULT_MSG (L_INIT|L_ASSOC)
 
 #if ACX_DEBUG
 extern unsigned int acx_debug;
