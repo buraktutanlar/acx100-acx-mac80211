@@ -1135,8 +1135,6 @@ struct acx_device {
 	u8		irqs_active;
 	/* The interrupts we can acknowledge (see acx_irq.h) */
 	u16		irq_mask;
-	/* The interrupts we do NOT want to acknowledge */
-	u16		irq_mask_off;
 	/*
 	 * FIXME: these ones should disappear
 	 */
