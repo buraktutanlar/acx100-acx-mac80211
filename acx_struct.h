@@ -128,15 +128,6 @@ typedef struct txhostdesc txhostdesc_t;
 #define ACX1FF_CMD_LNA_CONTROL		0x20 /* new firmware? TNETW1450? */
 #define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21 /* new firmware? TNETW1450? */
 
-/* 'After Interrupt' Commands */
-#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
-#define ACX_AFTER_IRQ_CMD_ASSOCIATE	0x02
-#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x04
-#define ACX_AFTER_IRQ_UPDATE_CARD_CFG	0x08
-#define ACX_AFTER_IRQ_TX_CLEANUP	0x10
-#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x20
-#define ACX_AFTER_IRQ_RESTART_SCAN	0x40
-
 /***********************************************************************
 ** Tx/Rx buffer sizes and watermarks
 **
@@ -810,24 +801,6 @@ typedef struct {
 /***********************************************************************
 ** PCI structures
 */
-/* IRQ Constants
-** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE) */
-#define HOST_INT_RX_DATA	0x0001
-#define HOST_INT_TX_COMPLETE	0x0002
-#define HOST_INT_TX_XFER	0x0004
-#define HOST_INT_RX_COMPLETE	0x0008
-#define HOST_INT_DTIM		0x0010
-#define HOST_INT_BEACON		0x0020
-#define HOST_INT_TIMER		0x0040
-#define HOST_INT_KEY_NOT_FOUND	0x0080
-#define HOST_INT_IV_ICV_FAILURE	0x0100
-#define HOST_INT_CMD_COMPLETE	0x0200
-#define HOST_INT_INFO		0x0400
-#define HOST_INT_OVERFLOW	0x0800
-#define HOST_INT_PROCESS_ERROR	0x1000
-#define HOST_INT_SCAN_COMPLETE	0x2000
-#define HOST_INT_FCS_THRESHOLD	0x4000
-#define HOST_INT_UNKNOWN	0x8000
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */

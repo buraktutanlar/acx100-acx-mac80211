@@ -36,6 +36,7 @@
 
 #include "acx.h"
 #include "acx_log.h"
+#include "acx_irq.h"
 
 /***********************************************************************
 */
@@ -800,10 +801,10 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 	timeout = jiffies + 2 * HZ;
 	for (;;) {
 		u16 irqstat = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if (irqstat & HOST_INT_FCS_THRESHOLD) {
+		if (irqstat & ACX_IRQ_FCS_THRESHOLD) {
 			result = OK;
 			write_reg16(adev, IO_ACX_IRQ_ACK,
-				    HOST_INT_FCS_THRESHOLD);
+				    ACX_IRQ_FCS_THRESHOLD);
 			break;
 		}
 		if (time_after(jiffies, timeout))
@@ -956,7 +957,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	}
 #endif
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+	SET_BIT(adev->irq_status, ACX_IRQ_SCAN_COMPLETE);
 
 	acx_unlock(adev, flags);
 
@@ -1136,21 +1137,21 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (unlikely(cmd_timeout > 1199))
 		cmd_timeout = 1199;
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
-	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
+	CLEAR_BIT(adev->irq_status, ACX_IRQ_CMD_COMPLETE);
 	/* we schedule away sometimes (timeout can be large) */
 	counter = cmd_timeout;
 	timeout = jiffies + HZ;
 	do {
 		if (!adev->irqs_active) {	/* IRQ disabled: poll */
 			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-			if (irqtype & HOST_INT_CMD_COMPLETE) {
+			if (irqtype & ACX_IRQ_CMD_COMPLETE) {
 				write_reg16(adev, IO_ACX_IRQ_ACK,
-					    HOST_INT_CMD_COMPLETE);
+					    ACX_IRQ_CMD_COMPLETE);
 				break;
 			}
 		} else {	/* Wait when IRQ will set the bit */
 			irqtype = adev->irq_status;
-			if (irqtype & HOST_INT_CMD_COMPLETE)
+			if (irqtype & ACX_IRQ_CMD_COMPLETE)
 				break;
 		}
 
@@ -2410,42 +2411,42 @@ static void log_unusual_irq(u16 irqtype)
 	 */
 
 	printk("acx: got");
-	if (irqtype & HOST_INT_RX_DATA) {
+	if (irqtype & ACX_IRQ_RX_DATA) {
 		printk(" Rx_Data");
 	}
-	/* HOST_INT_TX_COMPLETE   */
-	if (irqtype & HOST_INT_TX_XFER) {
+	/* ACX_IRQ_TX_COMPLETE   */
+	if (irqtype & ACX_IRQ_TX_XFER) {
 		printk(" Tx_Xfer");
 	}
-	/* HOST_INT_RX_COMPLETE   */
-	if (irqtype & HOST_INT_DTIM) {
+	/* ACX_IRQ_RX_COMPLETE   */
+	if (irqtype & ACX_IRQ_DTIM) {
 		printk(" DTIM");
 	}
-	if (irqtype & HOST_INT_BEACON) {
+	if (irqtype & ACX_IRQ_BEACON) {
 		printk(" Beacon");
 	}
-	if (irqtype & HOST_INT_TIMER) {
+	if (irqtype & ACX_IRQ_TIMER) {
 		printk(" Timer");
 	}
-	if (irqtype & HOST_INT_KEY_NOT_FOUND) {
+	if (irqtype & ACX_IRQ_KEY_NOT_FOUND) {
 		printk(" Key_Not_Found");
 	}
-	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
+	if (irqtype & ACX_IRQ_IV_ICV_FAILURE) {
 		printk(" IV_ICV_Failure (crypto)");
 	}
-	/* HOST_INT_CMD_COMPLETE  */
-	/* HOST_INT_INFO          */
-	if (irqtype & HOST_INT_OVERFLOW) {
+	/* ACX_IRQ_CMD_COMPLETE  */
+	/* ACX_IRQ_INFO          */
+	if (irqtype & ACX_IRQ_OVERFLOW) {
 		printk(" Overflow");
 	}
-	if (irqtype & HOST_INT_PROCESS_ERROR) {
+	if (irqtype & ACX_IRQ_PROCESS_ERROR) {
 		printk(" Process_Error");
 	}
-	/* HOST_INT_SCAN_COMPLETE */
-	if (irqtype & HOST_INT_FCS_THRESHOLD) {
+	/* ACX_IRQ_SCAN_COMPLETE */
+	if (irqtype & ACX_IRQ_FCS_THRESHOLD) {
 		printk(" FCS_Threshold");
 	}
-	if (irqtype & HOST_INT_UNKNOWN) {
+	if (irqtype & ACX_IRQ_UNKNOWN) {
 		printk(" Unknown");
 	}
 	printk(" IRQ(s)\n");
@@ -2519,11 +2520,11 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		/* ACK all IRQs ASAP */
 
 		/* Handle most important IRQ types first */
-		if (irqtype & HOST_INT_RX_COMPLETE) {
+		if (irqtype & ACX_IRQ_RX_COMPLETE) {
 			acx_log(LOG_DEBUG, L_IRQ, "got Rx_Complete IRQ\n");
 			acxpci_l_process_rxdesc(adev);
 		}
-		if (irqtype & HOST_INT_TX_COMPLETE) {
+		if (irqtype & ACX_IRQ_TX_COMPLETE) {
 			acx_log(LOG_DEBUG, L_IRQ, "got Tx_Complete IRQ\n");
 			/* don't clean up on each Tx complete, wait a bit
 			 * unless we're going towards full, in which case
@@ -2538,39 +2539,39 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 		/* Less frequent ones */
 		if (irqtype & (0
-			       | HOST_INT_CMD_COMPLETE
-			       | HOST_INT_INFO | HOST_INT_SCAN_COMPLETE)) {
-			if (irqtype & HOST_INT_INFO) {
+			       | ACX_IRQ_CMD_COMPLETE
+			       | ACX_IRQ_INFO | ACX_IRQ_SCAN_COMPLETE)) {
+			if (irqtype & ACX_IRQ_INFO) {
 				handle_info_irq(adev);
 			}
-			if (irqtype & HOST_INT_SCAN_COMPLETE) {
+			if (irqtype & ACX_IRQ_SCAN_COMPLETE) {
 				acx_log(LOG_DEBUG, L_IRQ,
 					"got Scan_Complete IRQ\n");
 				/* need to do that in process context */
 				/* remember that fw is not scanning anymore */
 				SET_BIT(adev->irq_status,
-					HOST_INT_SCAN_COMPLETE);
+					ACX_IRQ_SCAN_COMPLETE);
 			}
 		}
 
 		/* These we just log, but either they happen rarely
 		 * or we keep them masked out */
-		if (irqtype & (0 | HOST_INT_RX_DATA
-				/* | HOST_INT_TX_COMPLETE   */
-				| HOST_INT_TX_XFER
-		/* | HOST_INT_RX_COMPLETE   */
-				| HOST_INT_DTIM
-				| HOST_INT_BEACON
-				| HOST_INT_TIMER
-				| HOST_INT_KEY_NOT_FOUND
-				| HOST_INT_IV_ICV_FAILURE
-				/* | HOST_INT_CMD_COMPLETE  */
-				/* | HOST_INT_INFO          */
-				| HOST_INT_OVERFLOW
-				| HOST_INT_PROCESS_ERROR
-				/* | HOST_INT_SCAN_COMPLETE */
-				| HOST_INT_FCS_THRESHOLD
-				| HOST_INT_UNKNOWN)) {
+		if (irqtype & (0 | ACX_IRQ_RX_DATA
+				/* | ACX_IRQ_TX_COMPLETE   */
+				| ACX_IRQ_TX_XFER
+		/* | ACX_IRQ_RX_COMPLETE   */
+				| ACX_IRQ_DTIM
+				| ACX_IRQ_BEACON
+				| ACX_IRQ_TIMER
+				| ACX_IRQ_KEY_NOT_FOUND
+				| ACX_IRQ_IV_ICV_FAILURE
+				/* | ACX_IRQ_CMD_COMPLETE  */
+				/* | ACX_IRQ_INFO          */
+				| ACX_IRQ_OVERFLOW
+				| ACX_IRQ_PROCESS_ERROR
+				/* | ACX_IRQ_SCAN_COMPLETE */
+				| ACX_IRQ_FCS_THRESHOLD
+				| ACX_IRQ_UNKNOWN)) {
 			log_unusual_irq(irqtype);
 		}
 #if IRQ_ITERATE
@@ -2651,10 +2652,10 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	/* Go ahead and ACK our interrupt */
 	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
-	if (irqtype & HOST_INT_CMD_COMPLETE) {
+	if (irqtype & ACX_IRQ_CMD_COMPLETE) {
 		acx_log(LOG_DEBUG, L_IRQ, "got Command_Complete IRQ\n");
 		/* save the state for the running issue_cmd() */
-		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
+		SET_BIT(adev->irq_status, ACX_IRQ_CMD_COMPLETE);
 	}
 
 	/* Only accept IRQs, if we are initialized properly.
@@ -2668,7 +2669,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 		/* save the reason code and call our bottom half. */
 		adev->irq_reason = irqtype;
 
-		if ((irqtype & HOST_INT_RX_COMPLETE) || (irqtype & HOST_INT_TX_COMPLETE))
+		if ((irqtype & ACX_IRQ_RX_COMPLETE) || (irqtype & ACX_IRQ_TX_COMPLETE))
 			acx_schedule_task(adev, 0);
 	}
 
@@ -2774,7 +2775,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
-	write_reg16(adev, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
+	write_reg16(adev, IO_ACX_HINT_TRIG, ACX_IRQ_BEACON);
 
 	/* dump Acx111 Mem Configuration */
 	printk("dump mem config:\n"
@@ -3350,7 +3351,7 @@ static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
 			}
 
 			acx_schedule_task(adev,
-					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+					  ACX_TASKLET_CMD_RADIO_RECALIB);
 		}
 		status->excessive_retries++;
 		break;
@@ -4031,45 +4032,45 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 {
 	if (IS_ACX111(adev)) {
 		adev->irq_mask = (u16) ~ (0
-					  /* | HOST_INT_RX_DATA        */
-					  | HOST_INT_TX_COMPLETE
-					  /* | HOST_INT_TX_XFER        */
-					  | HOST_INT_RX_COMPLETE
-					  /* | HOST_INT_DTIM           */
-					  /* | HOST_INT_BEACON         */
-					  /* | HOST_INT_TIMER          */
-					  /* | HOST_INT_KEY_NOT_FOUND  */
-					  | HOST_INT_IV_ICV_FAILURE
-					  | HOST_INT_CMD_COMPLETE
-					  | HOST_INT_INFO
-					  /* | HOST_INT_OVERFLOW       */
-					  /* | HOST_INT_PROCESS_ERROR  */
-					  | HOST_INT_SCAN_COMPLETE
-					  | HOST_INT_FCS_THRESHOLD
-					  /* | HOST_INT_UNKNOWN        */
+					  /* | ACX_IRQ_RX_DATA        */
+					  | ACX_IRQ_TX_COMPLETE
+					  /* | ACX_IRQ_TX_XFER        */
+					  | ACX_IRQ_RX_COMPLETE
+					  /* | ACX_IRQ_DTIM           */
+					  /* | ACX_IRQ_BEACON         */
+					  /* | ACX_IRQ_TIMER          */
+					  /* | ACX_IRQ_KEY_NOT_FOUND  */
+					  | ACX_IRQ_IV_ICV_FAILURE
+					  | ACX_IRQ_CMD_COMPLETE
+					  | ACX_IRQ_INFO
+					  /* | ACX_IRQ_OVERFLOW       */
+					  /* | ACX_IRQ_PROCESS_ERROR  */
+					  | ACX_IRQ_SCAN_COMPLETE
+					  | ACX_IRQ_FCS_THRESHOLD
+					  /* | ACX_IRQ_UNKNOWN        */
 		    );
 		/* Or else acx100 won't signal cmd completion, right? */
-		adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
+		adev->irq_mask_off = (u16) ~ (ACX_IRQ_CMD_COMPLETE);	/* 0xfdff */
 	} else {
 		adev->irq_mask = (u16) ~ (0
-					  /* | HOST_INT_RX_DATA        */
-					  | HOST_INT_TX_COMPLETE
-					  /* | HOST_INT_TX_XFER        */
-					  | HOST_INT_RX_COMPLETE
-					  /* | HOST_INT_DTIM           */
-					  /* | HOST_INT_BEACON         */
-					  /* | HOST_INT_TIMER          */
-					  /* | HOST_INT_KEY_NOT_FOUND  */
-					  /* | HOST_INT_IV_ICV_FAILURE */
-					  | HOST_INT_CMD_COMPLETE
-					  | HOST_INT_INFO
-					  /* | HOST_INT_OVERFLOW       */
-					  /* | HOST_INT_PROCESS_ERROR  */
-					  | HOST_INT_SCAN_COMPLETE
-					  /* | HOST_INT_FCS_THRESHOLD  */
-					  /* | HOST_INT_UNKNOWN        */
+					  /* | ACX_IRQ_RX_DATA        */
+					  | ACX_IRQ_TX_COMPLETE
+					  /* | ACX_IRQ_TX_XFER        */
+					  | ACX_IRQ_RX_COMPLETE
+					  /* | ACX_IRQ_DTIM           */
+					  /* | ACX_IRQ_BEACON         */
+					  /* | ACX_IRQ_TIMER          */
+					  /* | ACX_IRQ_KEY_NOT_FOUND  */
+					  /* | ACX_IRQ_IV_ICV_FAILURE */
+					  | ACX_IRQ_CMD_COMPLETE
+					  | ACX_IRQ_INFO
+					  /* | ACX_IRQ_OVERFLOW       */
+					  /* | ACX_IRQ_PROCESS_ERROR  */
+					  | ACX_IRQ_SCAN_COMPLETE
+					  /* | ACX_IRQ_FCS_THRESHOLD  */
+					  /* | ACX_IRQ_UNKNOWN        */
 		    );
-		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
+		adev->irq_mask_off = (u16) ~ (ACX_IRQ_UNKNOWN);	/* 0x7fff */
 	}
 }
 

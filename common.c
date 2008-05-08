@@ -25,6 +25,7 @@
 #include "acx.h"
 #include "acx_debug.h"
 #include "acx_log.h"
+#include "acx_irq.h"
 
 
 /***********************************************************************
@@ -1662,7 +1663,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
         }
 
         /* cannot update card settings directly here, atomic context */
-        acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+        acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
 
         acx_unlock(adev, flags);
 
@@ -3874,7 +3875,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 
 	/* clear flag beforehand, since we want to make sure
 	 * it's cleared; then only set it again on specific circumstances */
-	CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+	CLEAR_BIT(adev->after_interrupt_jobs, ACX_TASKLET_CMD_RADIO_RECALIB);
 
 	/* better wait a bit between recalibrations to
 	 * prevent overheating due to torturing the card
@@ -3924,7 +3925,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 			adev->recalib_failure_count++;
 			adev->recalib_time_last_attempt = jiffies;
 			acx_schedule_task(adev,
-					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+					  ACX_TASKLET_CMD_RADIO_RECALIB);
 		}
 	}
 }
@@ -3943,26 +3944,26 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		goto end;	/* no jobs to do */
 
 	/* we see lotsa tx errors */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_RADIO_RECALIB) {
 		acx_log_ratelimited(LOG_WARNING, L_ANY,
 			"too many TX errors??\n");
 //		acx_s_after_interrupt_recalib(adev);
 	}
 
 	/* a poor interrupt code wanted to do update_card_settings() */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_UPDATE_CARD_CFG) {
 		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 			acx_unlock(adev, flags);
 			acx_s_update_card_settings(adev);
 			acx_lock(adev, flags);
 		}
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+			  ACX_TASKLET_UPDATE_CARD_CFG);
 	}
 
 	/* 1) we detected that no Scan_Complete IRQ came from fw, or
 	 ** 2) we found too many STAs */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_STOP_SCAN) {
 		acx_log(LOG_DEBUG, L_IRQ, "sending a stop scan cmd...\n");
 		acx_unlock(adev, flags);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
@@ -3970,15 +3971,15 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		/* HACK: set the IRQ bit, since we won't get a
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
 		 * since _we_, not a fw, have stopped the scan */
-		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+		SET_BIT(adev->irq_status, ACX_IRQ_SCAN_COMPLETE);
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
+			  ACX_TASKLET_CMD_STOP_SCAN);
 	}
 
 	/* either fw sent Scan_Complete or we detected that
 	 ** no Scan_Complete IRQ came from fw. Finish scanning,
 	 ** pick join partner if any */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_COMPLETE_SCAN) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_COMPLETE_SCAN) {
 		/* + scan kills current join status - restore it
 		 **   (do we need it for STA?) */
 		/* + does it happen only with active scans?
@@ -3987,21 +3988,21 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		/* + was not verified that everything is restored
 		 **   (but at least we start to emit beacons again) */
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_COMPLETE_SCAN);
+			  ACX_TASKLET_COMPLETE_SCAN);
 	}
 
 	/* STA auth or assoc timed out, start over again */
 
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_RESTART_SCAN) {
 		acx_log(LOG_DEBUG, L_IRQ, "sending a start_scan cmd...\n");
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_RESTART_SCAN);
+			  ACX_TASKLET_RESTART_SCAN);
 	}
 
 	/* whee, we got positive assoc response! 8) */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
+	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_ASSOCIATE) {
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
+			  ACX_TASKLET_CMD_ASSOCIATE);
 	}
       end:
 	if(adev->after_interrupt_jobs)
@@ -4164,7 +4165,7 @@ static void acx_s_select_opmode(acx_device_t * adev)
 	{
 		SET_BIT(adev->set_mask, GETSET_MODE);
 		acx_s_update_card_settings(adev);
-//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+//	acx_schedule_task(adev,	ACX_TASKLET_UPDATE_CARD_CFG);
 	}
 
 	FN_EXIT0;
@@ -4324,8 +4325,8 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		acx_selectchannel(adev, conf->channel,conf->freq);
 		acx_lock(adev, flags);
 /*		acx_schedule_task(adev,
-				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
-*/				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ /*);*/
+				  ACX_TASKLET_UPDATE_CARD_CFG
+*/				  /*+ ACX_TASKLET_RESTART_SCAN */ /*);*/
 	}
 /*
         if (conf->short_slot_time != adev->short_slot) {
@@ -4334,7 +4335,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
                         acx_short_slot_timing_enable(adev);
                 else
                         acx_short_slot_timing_disable(adev);
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
         }
 */
 	adev->tx_disabled = !conf->radio_enabled;
@@ -4342,7 +4343,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		adev->tx_level_dbm = conf->power_level;
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
-		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		//acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
 	} 
 */
 //FIXME: This does not seem to wake up:
@@ -4447,7 +4448,7 @@ int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
 
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
-//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+//		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
 	err = 0;
 err_out:
 	FN_EXIT1(err);
@@ -4639,7 +4640,7 @@ int acx_key_write(acx_device_t * adev,
 	if (adev->wep_enabled) {
 		SET_BIT(adev->set_mask, GETSET_WEP);
 		acx_s_update_card_settings(adev);
-//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+//		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
 	}
 /*
         log(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
