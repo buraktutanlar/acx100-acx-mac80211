@@ -173,7 +173,7 @@ static void acxusb_unlink_urb(struct urb *urb)
 			mdelay(1);
 		}
 		if (!timeout) {
-			acx_log(LOG_INFO, L_ANY, "urb unlink timeout!\n");
+			acx_log(LOG_WARNING, L_ANY, "urb unlink timeout!\n");
 		}
 	}
 }
@@ -285,7 +285,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	loc = kmalloc(buflen + 4 + BOGUS_SAFETY_PADDING, GFP_KERNEL);
 	if (!loc) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"%s: " FUNC "(): no memory for data buffer\n", devname);
 		goto bad;
 	}
@@ -339,7 +339,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	    );
 
 	if (result == -ENODEV) {
-		acx_log(LOG_INFO, L_CTL, "no device present (unplug?)\n");
+		acx_log(LOG_WARNING, L_CTL, "no device present (unplug?)\n");
 		goto good;
 	}
 
@@ -362,7 +362,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
 	    );
 	if (result < 0) {
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(): USB read error %d\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(): USB read error %d\n",
 			devname, result);
 		goto bad;
 	}
@@ -384,7 +384,7 @@ read 4 bytes <==== MUST BE 12!!
 
 	cmd_status = le16_to_cpu(loc->status);
 	if (cmd_status != 1) {
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC 
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC 
 			"(): cmd_status is not SUCCESS: %d (%s)\n",
 			devname, cmd_status, acx_cmd_status_str(cmd_status));
 		/* TODO: goto bad; ? */
@@ -403,10 +403,10 @@ read 4 bytes <==== MUST BE 12!!
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
 #if ACX_DEBUG
-	acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(cmd:%s) FAILED\n",
+	acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(cmd:%s) FAILED\n",
 		devname, cmdstr);
 #else
-	acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(cmd:0x%04X) FAILED\n",
+	acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(cmd:0x%04X) FAILED\n",
 		devname, cmd);
 #endif
 	dump_stack();
@@ -458,7 +458,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 
 	usbbuf = kmalloc(USB_RWMEM_MAXLEN, GFP_KERNEL);
 	if (!usbbuf) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"no memory for USB transfer buffer (%d bytes)\n",
 			USB_RWMEM_MAXLEN);
 		result = -ENOMEM;
@@ -544,7 +544,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		}
 
 		if (sum != le32_to_cpu(fw_image->chksum)) {
-			acx_log(LOG_INFO, L_ANY,"FATAL: firmware upload: "
+			acx_log(LOG_WARNING, L_ANY,"FATAL: firmware upload: "
 				"checksums don't match! "
 				"(0x%08x vs. 0x%08x)\n", sum, fw_image->chksum);
 			goto fw_end;
@@ -651,7 +651,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			    );
 			offset += blk_len;
 			if (result < 0) {
-				acx_log(LOG_INFO, L_ANY,
+				acx_log(LOG_WARNING, L_ANY,
 					"error %d during upload "
 					"of firmware, aborting\n", result);
 				goto end;
@@ -667,7 +667,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 					 3000	/* timeout in ms */
 		    );
 		if (result < 0) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"error %d during tx of checksum, aborting\n",
 				result);
 			goto end;
@@ -679,13 +679,13 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 					 3000	/* timeout in ms */
 		    );
 		if (result < 0) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"error %d during ACK of checksum, aborting\n",
 				result);
 			goto end;
 		}
 		if (*usbbuf != 0x10) {
-			acx_log(LOG_INFO, L_ANY, "invalid checksum?\n");
+			acx_log(LOG_WARNING, L_ANY, "invalid checksum?\n");
 			result = -EINVAL;
 			goto end;
 		}
@@ -860,14 +860,14 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	 */
 	numconfigs = (int)usbdev->descriptor.bNumConfigurations;
 	if (numconfigs != 1)
-		acx_log(LOG_INFO, L_ANY, "number of configurations is %d, "
+		acx_log(LOG_WARNING, L_ANY, "number of configurations is %d, "
 		       "this driver only knows how to handle 1, "
 		       "be prepared for surprises\n", numconfigs);
 
 	config = &usbdev->config->desc;
 	numfaces = config->bNumInterfaces;
 	if (numfaces != 1)
-		acx_log(LOG_INFO, L_ANY, "number of interfaces is %d, "
+		acx_log(LOG_WARNING, L_ANY, "number of interfaces is %d, "
 		       "this driver only knows how to handle 1, "
 		       "be prepared for surprises\n", numfaces);
 
@@ -1221,7 +1221,7 @@ void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 
 	inpipe = usb_rcvbulkpipe(usbdev, adev->bulkinep);
 	if (unlikely(rxurb->status == -EINPROGRESS)) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 		       "error, rx triggered while rx urb in progress\n");
 		/* FIXME: this is nasty, receive is being cancelled by this code
 		 * on the other hand, this should not happen anyway...
@@ -1243,8 +1243,9 @@ void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 	/* ATOMIC: we may be called from complete_rx() usb callback */
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
-	log(L_USBRXTX, "SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
-	    rxnum, inpipe, (int)RXBUFSIZE, errcode);
+	acx_log(LOG_DEBUG, L_USBRXTX,
+		"SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
+		rxnum, inpipe, (int)RXBUFSIZE, errcode);
       end:
 	FN_EXIT0;
 }
@@ -1284,7 +1285,8 @@ void acxusb_i_complete_rx(struct urb *urb)
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		log(L_USBRXTX, "rx: device is down, not doing anything\n");
+		acx_log(LOG_DEBUG, L_USBRXTX,
+			"rx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
@@ -1293,22 +1295,24 @@ void acxusb_i_complete_rx(struct urb *urb)
 	remsize = size;
 	rxnum = rx - adev->usb_rx;
 
-	log(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
-	    rxnum, urb->status, size);
+	acx_log(LOG_DEBUG, L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
+		rxnum, urb->status, size);
 
 	/* Send the URB that's waiting. */
-	log(L_USBRXTX, "rxnum=%d, sending=%d\n", rxnum, rxnum ^ 1);
+	acx_log(LOG_DEBUG, L_USBRXTX, "rxnum=%d, sending=%d\n",
+		rxnum, rxnum ^ 1);
 	acxusb_l_poll_rx(adev, &adev->usb_rx[rxnum ^ 1]);
 
 	if (unlikely(size > sizeof(rxbuffer_t)))
-		acx_log(LOG_INFO, L_ANY, "acx_usb: rx too large: %d, please report\n", size);
+		acx_log(LOG_WARNING, L_ANY,
+			"rx too large: %d, please report\n", size);
 
 	/* check if the transfer was aborted */
 	switch (urb->status) {
 	case 0:		/* No error */
 		break;
 	case -EOVERFLOW:
-		acx_log(LOG_INFO, L_ANY, "rx data overrun\n");
+		acx_log(LOG_WARNING, L_ANY, "rx data overrun\n");
 		adev->rxtruncsize = 0;	/* Not valid anymore. */
 		goto end_unlock;
 	case -ECONNRESET:
@@ -1320,12 +1324,12 @@ void acxusb_i_complete_rx(struct urb *urb)
 	default:
 		adev->rxtruncsize = 0;
 		adev->stats.rx_errors++;
-		acx_log(LOG_INFO, L_ANY, "rx error (urb status=%d)\n", urb->status);
+		acx_log(LOG_WARNING, L_ANY, "rx error (urb status=%d)\n", urb->status);
 		goto end_unlock;
 	}
 
 	if (unlikely(!size))
-		acx_log(LOG_INFO, L_ANY, "warning, encountered zerolength rx packet\n");
+		acx_log(LOG_WARNING, L_ANY, "warning, encountered zerolength rx packet\n");
 
 	if (urb->transfer_buffer != inbuf)
 		goto end_unlock;
@@ -1337,16 +1341,17 @@ void acxusb_i_complete_rx(struct urb *urb)
 	ptr = inbuf;
 	if (adev->rxtruncsize) {
 		int tail_size;
+		acx_log(LOG_WARNING, L_ANY,
+			"handling truncated frame (truncsize=%d size=%d "
+			"packetsize(from trunc)=%d)\n",
+			adev->rxtruncsize, size, packetsize);
 
 		ptr = &adev->rxtruncbuf;
 		packetsize = RXBUF_BYTES_USED(ptr);
-		if (acx_debug & L_USBRXTX) {
-			acx_log(LOG_INFO, L_ANY, "handling truncated frame (truncsize=%d size=%d "
-			       "packetsize(from trunc)=%d)\n",
-			       adev->rxtruncsize, size, packetsize);
-			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-			acx_dump_bytes(inbuf, RXBUF_HDRSIZE);
-		}
+		acx_log_dump(LOG_WARNING, L_USBRXTX, ptr, RXBUF_HDRSIZE,
+			"Dumping ptr:\n");
+		acx_log_dump(LOG_WARNING, L_USBRXTX, inbuf, RXBUF_HDRSIZE,
+			"Dumping inbuf:\n");
 
 		/* bytes needed for rxtruncbuf completion: */
 		tail_size = packetsize - adev->rxtruncsize;
@@ -1371,18 +1376,16 @@ void acxusb_i_complete_rx(struct urb *urb)
 			memcpy(((char *)ptr) + adev->rxtruncsize, inbuf,
 			       tail_size);
 
-			if (acx_debug & L_USBRXTX) {
-				acx_log(LOG_INFO, L_ANY, "full trailing packet + 12 bytes:\n");
-				acx_dump_bytes(inbuf,
-					       tail_size + RXBUF_HDRSIZE);
-			}
+			acx_log_dump(LOG_DEBUG, L_USBRXTX, inbuf,
+				tail_size + RXBUF_HDRSIZE,
+				"full trainling packet + 12 bytes:\n");
 			acx_l_process_rxbuf(adev, ptr);
 			adev->rxtruncsize = 0;
 			ptr = (rxbuffer_t *) (((char *)inbuf) + tail_size);
 			remsize -= tail_size;
 		}
-		log(L_USBRXTX, "post-merge size=%d remsize=%d\n",
-		    size, remsize);
+		acx_log(LOG_INFO, L_USBRXTX, "post-merge size=%d remsize=%d\n",
+			size, remsize);
 	}
 
 	/* size = USB data block size
@@ -1391,7 +1394,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 	 */
 	while (remsize) {
 		if (remsize < RXBUF_HDRSIZE) {
-			acx_log(LOG_INFO, L_ANY, "truncated rx header (%d bytes)!\n",
+			acx_log(LOG_WARNING, L_ANY, "truncated rx header (%d bytes)!\n",
 			       remsize);
 			if (ACX_DEBUG)
 				acx_dump_bytes(ptr, remsize);
@@ -1399,20 +1402,22 @@ void acxusb_i_complete_rx(struct urb *urb)
 		}
 
 		packetsize = RXBUF_BYTES_USED(ptr);
-		log(L_USBRXTX, "packet with packetsize=%d\n", packetsize);
+		acx_log(LOG_DEBUG, L_USBRXTX,
+			"packet with packetsize=%d\n", packetsize);
 
 		if (RXBUF_IS_TXSTAT(ptr)) {
 			/* do rate handling */
 			usb_txstatus_t *stat = (void *)ptr;
 
-			log(L_USBRXTX, "tx: stat: mac_cnt_rcvd:%04X "
-			    "queue_index:%02X mac_status:%02X hostdata:%08X "
-			    "rate:%u ack_failures:%02X rts_failures:%02X "
-			    "rts_ok:%02X\n",
-			    stat->mac_cnt_rcvd,
-			    stat->queue_index, stat->mac_status, stat->hostdata,
-			    stat->rate, stat->ack_failures, stat->rts_failures,
-			    stat->rts_ok);
+			acx_log(LOG_DEBUG, L_USBRXTX,
+				"tx: stat: mac_cnt_rcvd:%04X "
+				"queue_index:%02X mac_status:%02X "
+				"hostdata:%08X rate:%u ack_failures:%02X "
+				"rts_failures:%02X rts_ok:%02X\n",
+				stat->mac_cnt_rcvd, stat->queue_index,
+				stat->mac_status, stat->hostdata, stat->rate,
+				stat->ack_failures, stat->rts_failures,
+				stat->rts_ok);
 /*
 			if (adev->rate_auto && client_no < VEC_SIZE(adev->sta_list)) {
 				client_t *clt = &adev->sta_list[client_no];
@@ -1430,7 +1435,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 		}
 
 		if (packetsize > sizeof(rxbuffer_t)) {
-			acx_log(LOG_INFO, L_ANY, "packet exceeds max wlan "
+			acx_log(LOG_WARNING, L_ANY, "packet exceeds max wlan "
 			       "frame size (%d > %d). size=%d\n",
 			       packetsize, (int)sizeof(rxbuffer_t), size);
 			if (ACX_DEBUG)
@@ -1441,13 +1446,9 @@ void acxusb_i_complete_rx(struct urb *urb)
 
 		if (packetsize > remsize) {
 			/* frame truncation handling */
-			if (acx_debug & L_USBRXTX) {
-				acx_log(LOG_INFO, L_ANY, "need to truncate packet, "
-				       "packetsize=%d remsize=%d "
-				       "size=%d bytes:",
-				       packetsize, remsize, size);
-				acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-			}
+			acx_log_dump(LOG_WARNING, L_USBRXTX, ptr, RXBUF_HDRSIZE,
+				"need to truncate packet (packetsize=%d, "
+				"remsize=%d, size=%d):\n");
 			memcpy(&adev->rxtruncbuf, ptr, remsize);
 			adev->rxtruncsize = remsize;
 			break;
@@ -1459,11 +1460,8 @@ void acxusb_i_complete_rx(struct urb *urb)
 	      next:
 		ptr = (rxbuffer_t *) (((char *)ptr) + packetsize);
 		remsize -= packetsize;
-		if ((acx_debug & L_USBRXTX) && remsize) {
-			acx_log(LOG_INFO, L_ANY, "more than one packet in buffer, "
-			       "second packet hdr:");
-			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
-		}
+		acx_log_dump(LOG_WARNING, L_USBRXTX, ptr, RXBUF_HDRSIZE,
+			"more than one packet in buffer! Second packet hdr:\n");
 	}
 
       end_unlock:
@@ -1504,12 +1502,13 @@ void acxusb_i_complete_tx(struct urb *urb)
 	 * to play with them. The urb may get unlinked.
 	 */
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		log(L_USBRXTX, "tx: device is down, not doing anything\n");
+		acx_log(LOG_INFO, L_USBRXTX,
+			"tx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
-	log(L_USBRXTX, "RETURN TX (%d): status=%d size=%d\n",
-	    txnum, urb->status, urb->actual_length);
+	acx_log(LOG_INFO, L_USBRXTX, "RETURN TX (%d): status=%d size=%d\n",
+		txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
 	switch (urb->status) {
@@ -1523,7 +1522,7 @@ void acxusb_i_complete_tx(struct urb *urb)
 		break;
 		/* FIXME: real error-handling code here please */
 	default:
-		acx_log(LOG_INFO, L_ANY, "tx error, urb status=%d\n", urb->status);
+		acx_log(LOG_WARNING, L_ANY, "tx error, urb status=%d\n", urb->status);
 		/* FIXME: real error-handling code here please */
 	}
 
@@ -1533,7 +1532,8 @@ void acxusb_i_complete_tx(struct urb *urb)
 	if ((adev->tx_free >= TX_START_QUEUE)
 	    && (adev->status == ACX_STATUS_4_ASSOCIATED)
 /*	    && (acx_queue_stopped(adev->ndev)*/) {
-		log(L_BUF, "tx: wake queue (%u free txbufs)\n", adev->tx_free);
+		acx_log(LOG_DEBUG, L_BUF,
+			"tx: wake queue (%u free txbufs)\n", adev->tx_free);
 /*		acx_wake_queue(adev->ndev, NULL); */
 	}
 
@@ -1559,22 +1559,23 @@ tx_t *acxusb_l_alloc_tx(acx_device_t * adev)
 	do {
 		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!adev->usb_tx[head].busy) {
-			log(L_USBRXTX, "allocated tx %d\n", head);
+			acx_log(LOG_DEBUG, L_USBRXTX,
+				"allocated tx %d\n", head);
 			tx = &adev->usb_tx[head];
 			tx->busy = 1;
 			adev->tx_free--;
 			/* Keep a few free descs between head and tail of tx ring.
 			 ** It is not absolutely needed, just feels safer */
 			if (adev->tx_free < TX_STOP_QUEUE) {
-				log(L_BUF, "tx: stop queue "
-				    "(%u free txbufs)\n", adev->tx_free);
+				acx_log(LOG_DEBUG, L_BUF, "tx: stop queue "
+					"(%u free txbufs)\n", adev->tx_free);
 /*				acx_stop_queue(adev->ndev, NULL); */
 			}
 			goto end;
 		}
 	} while (likely(head != adev->tx_head));
 	tx = NULL;
-	acx_log_ratelimited(LOG_INFO, L_ANY, "tx buffers full\n");
+	acx_log_ratelimited(LOG_WARNING, L_ANY, "tx buffers full\n");
       end:
 	adev->tx_head = head;
 	FN_EXIT0;
@@ -1661,13 +1662,11 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	txbuf->ctrl2 = 0;
 	txbuf->data_len = cpu_to_le16(wlanpkt_len);
 
-	if (unlikely(acx_debug & L_DATA)) {
-		acx_log(LOG_INFO, L_ANY, "dump of bulk out urb:\n");
-		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
-	}
+	acx_log_dump(LOG_DEBUG, L_DATA, txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE,
+		"dump of bulk out urb:\n");
 
 	if (unlikely(txurb->status == -EINPROGRESS)) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"trying to submit tx urb while already in progress\n");
 	}
 
@@ -1689,7 +1688,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 		wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
 	if (unlikely(ucode)) {
-		acx_log(LOG_INFO, L_ANY, "submit_urb() error=%d txsize=%d\n",
+		acx_log(LOG_WARNING, L_ANY, "submit_urb() error=%d txsize=%d\n",
 		       ucode, wlanpkt_len + USB_TXBUF_HDRSIZE);
 
 		/* on error, just mark the frame as done and update
