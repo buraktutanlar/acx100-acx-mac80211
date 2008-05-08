@@ -240,7 +240,7 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 	    adev->firmware_version, fw.hw_id);
 
 	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
-		acx_log(LOG_INFO, L_ANY, "acx: strange firmware version string "
+		acx_log(LOG_WARNING, L_ANY, "acx: strange firmware version string "
 		       "'%s', please report\n", adev->firmware_version);
 		adev->firmware_numver = 0x01090407;	/* assume 1.9.4.7 */
 	} else {
@@ -270,7 +270,7 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 	if (IS_ACX111(adev)) {
 		if (adev->firmware_numver == 0x00010011) {
 			/* This one does not survive floodpinging */
-			acx_log(LOG_INFO, L_ANY, "firmware '%s' is known "
+			acx_log(LOG_WARNING, L_ANY, "firmware '%s' is known "
 				"to be buggy, please upgrade\n",
 				adev->firmware_version);
 		}
@@ -295,7 +295,7 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 		adev->chip_name = "TNETW1450";
 		break;
 	default:
-		acx_log(LOG_INFO, L_ANY,"unknown chip ID 0x%08X, "
+		acx_log(LOG_WARNING, L_ANY,"unknown chip ID 0x%08X, "
 			"please report\n", adev->firmware_id);
 		break;
 	}
@@ -633,10 +633,10 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), typestr);
 #else
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -674,10 +674,10 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), typestr);
 #else
-		acx_log(LOG_INFO, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -1313,7 +1313,7 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 		if (!remove) {
 			if (!create_proc_read_entry
 			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
-				acx_log(LOG_INFO, L_ANY,
+				acx_log(LOG_WARNING, L_ANY,
 				"cannot register /proc entry %s\n", procbuf);
 				FN_EXIT1(NOT_OK);
 				return NOT_OK;
@@ -2179,7 +2179,7 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		adev->tx_level_dbm = 15;
 	}
 	if (level_dbm != adev->tx_level_dbm)
-		acx_log(LOG_INFO, L_INIT, "acx111 firmware has specific "
+		acx_log(LOG_WARNING, L_INIT, "acx111 firmware has specific "
 			"power levels only: adjusted %d dBm to %d dBm!\n",
 			level_dbm, adev->tx_level_dbm);
 
@@ -2487,7 +2487,7 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 	tx = acx_l_alloc_tx(adev);
 
 	if (unlikely(!tx)) {
-		acx_log_ratelimited(LOG_INFO, L_ANY, "%s: start_xmit: "
+		acx_log_ratelimited(LOG_WARNING, L_ANY, "%s: start_xmit: "
 			"txdesc ring is full, dropping tx\n",
 			wiphy_name(adev->ieee->wiphy));
 		txresult = NOT_OK;
@@ -2607,7 +2607,7 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 		"%s(%u ms)\n", __func__, timeout_us / 1000);
 
 	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acx_log(LOG_INFO, L_ANY, "attempt to set the timer "
+		acx_log(LOG_WARNING, L_ANY, "attempt to set the timer "
 			"when the card interface is not up!\n");
 		goto end;
 	}
@@ -2754,7 +2754,7 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
 		if (fw_entry->size >= 8)
 			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
 		if (fw_entry->size != *size) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"acx: firmware size does not match "
 				"firmware header: %d != %d, "
 				"aborting fw upload\n",
@@ -2772,7 +2772,7 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
 		release_firmware(fw_entry);
 		return res;
 	}
-	acx_log(LOG_INFO, L_ANY, "acx: firmware image '%s' was not provided. "
+	acx_log(LOG_WARNING, L_ANY, "acx: firmware image '%s' was not provided. "
 		"Check your hotplug scripts\n", file);
 
 	/* checksum will be verified in write_fw, so don't bother here */
@@ -2901,7 +2901,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"%s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
 			wiphy_name(adev->ieee->wiphy));
 		goto fail;
@@ -2911,7 +2911,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	pt.PacketTemplateStart = pt.WEPCacheEnd;
 
 	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"%s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
 			wiphy_name(adev->ieee->wiphy));
 		goto fail;
@@ -3146,7 +3146,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
       failed:
-	acx_log(LOG_INFO, L_ANY, "%s: %s() FAILED\n",
+	acx_log(LOG_WARNING, L_ANY, "%s: %s() FAILED\n",
 		wiphy_name(adev->ieee->wiphy), __func__);
 
       success:
@@ -3192,7 +3192,7 @@ int acx_s_init_mac(acx_device_t * adev)
 		if (OK != acx_s_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx111_s_create_dma_regions(adev)) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"%s: acx111_create_dma_regions FAILED\n",
 				wiphy_name(adev->ieee->wiphy));
 			goto fail;
@@ -3203,7 +3203,7 @@ int acx_s_init_mac(acx_device_t * adev)
 		if (OK != acx_s_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx100_s_create_dma_regions(adev)) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"%s: acx100_create_dma_regions FAILED\n",
 				wiphy_name(adev->ieee->wiphy));
 			goto fail;
@@ -3215,7 +3215,7 @@ int acx_s_init_mac(acx_device_t * adev)
 
       fail:
 	if (result)
-		acx_log(LOG_INFO, L_ANY, "init_mac() FAILED\n");
+		acx_log(LOG_WARNING, L_ANY, "init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;
 }
@@ -3303,7 +3303,7 @@ void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 			break;
 
 	if (sizeof(acx_reg_domain_ids) == i) {
-		acx_log(LOG_INFO, L_INIT,
+		acx_log(LOG_WARNING, L_INIT,
 			"Invalid or unsupported regulatory domain"
 			" 0x%02X specified, falling back to FCC (USA)!"
 			" Please report if this sounds fishy!\n",
@@ -3354,7 +3354,7 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 	u32 feature1, feature2;
 
 	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"%s: invalid sensitivity setting (1..3), "
 			"setting to 1\n", wiphy_name(adev->ieee->wiphy));
 		adev->sensitivity = 1;
@@ -3432,7 +3432,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		    || (RADIO_RALINK_15 == adev->radio_type)) {
 			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
 		} else {
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"don't know how to get sensitivity "
 				"for radio type 0x%02X\n", adev->radio_type);
 			adev->sensitivity = 0;
@@ -3464,7 +3464,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					  ACX100_IE_DOT11_ED_THRESHOLD);
 			adev->ed_threshold = ed_threshold[4];
 		} else {
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"acx111 doesn't support ED\n");
 			adev->ed_threshold = 0;
 		}
@@ -3483,7 +3483,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					  ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 			adev->cca = cca[4];
 		} else {
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"acx111 doesn't support CCA\n");
 			adev->cca = 0;
 		}
@@ -3558,7 +3558,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx111_s_sens_radio_16_17(adev);
 			break;
 		default:
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"don't know how to modify sensitivity "
 				"for radio type 0x%02X\n", adev->radio_type);
 		}
@@ -3591,7 +3591,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx_s_configure(adev, &ed_threshold,
 					ACX100_IE_DOT11_ED_THRESHOLD);
 		} else
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"acx111 doesn't support ED!\n");
 		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
 	}
@@ -3609,7 +3609,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx_s_configure(adev, &cca,
 					ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 		} else
-			acx_log(LOG_INFO, L_INIT,
+			acx_log(LOG_WARNING, L_INIT,
 				"acx111 doesn't support CCA!\n");
 		CLEAR_BIT(adev->set_mask, GETSET_CCA);
 	}
@@ -4756,7 +4756,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 	    || (!is_acx111 && (adev->eeprom_version == 5))) {
 		/* these versions are known to be supported */
 	} else {
-		acx_log(LOG_INFO, L_ANY,
+		acx_log(LOG_WARNING, L_ANY,
 			"unknown chip and EEPROM version combination "
 			"(%s, v%d), "
 			"don't know how to parse config options yet. "
@@ -4788,7 +4788,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 		pEle += sizeof(adev->cfgopt_probe_delay);
 		if ((adev->cfgopt_probe_delay < 100)
 		    || (adev->cfgopt_probe_delay > 500)) {
-			acx_log(LOG_INFO, L_ANY,
+			acx_log(LOG_WARNING, L_ANY,
 				"strange probe_delay value %d, "
 				"tweaking to 200\n", adev->cfgopt_probe_delay);
 			adev->cfgopt_probe_delay = 200;
