@@ -4451,7 +4451,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		}
 		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
-		acx_log(L_INFO, L_INIT,
+		acx_log(LOG_INFO, L_INIT,
 			"switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
 		/* stop our eCPU */
