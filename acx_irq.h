@@ -25,9 +25,9 @@
 
 /* IRQ Constants
 ** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE) */
-#define ACX_IRQ_RX_DATA	0x0001
+#define ACX_IRQ_RX_DATA		0x0001
 #define ACX_IRQ_TX_COMPLETE	0x0002
-#define ACX_IRQ_TX_XFER	0x0004
+#define ACX_IRQ_TX_XFER		0x0004
 #define ACX_IRQ_RX_COMPLETE	0x0008
 #define ACX_IRQ_DTIM		0x0010
 #define ACX_IRQ_BEACON		0x0020
@@ -42,5 +42,5 @@
 #define ACX_IRQ_FCS_THRESHOLD	0x4000
 #define ACX_IRQ_UNKNOWN		0x8000
 
-
+#define ACX_IRQ_ALL		0xffff
 #endif /* _ACX_IRQ_H_ */
