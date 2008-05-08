@@ -5,6 +5,8 @@
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
+#include "acx_debug.h"
+
 /***********************************************************************
 ** Forward declarations of types
 */

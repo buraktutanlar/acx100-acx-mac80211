@@ -7,18 +7,11 @@
 
 #include <linux/version.h>
 #include "acx_debug.h"
+#include "acx_log.h"
 
 void acx_print_mac(const char *head, const u8 *mac, const char *tail);
 
 /* Optimized out to nothing in non-debug build */
-static inline void
-acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
-{
-	if (acx_debug & level) {
-		acx_print_mac(head, mac, tail);
-	}
-}
-
 
 /***********************************************************************
 ** MAC address helpers
@@ -79,15 +72,6 @@ mac_is_mcast(const u8 *mac)
 {
 	return (mac[0] & 1) && !mac_is_bcast(mac);
 }
-
-#define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
-#define MAC(bytevector) \
-	((unsigned char *)bytevector)[0], \
-	((unsigned char *)bytevector)[1], \
-	((unsigned char *)bytevector)[2], \
-	((unsigned char *)bytevector)[3], \
-	((unsigned char *)bytevector)[4], \
-	((unsigned char *)bytevector)[5]
 
 
 /***********************************************************************
@@ -243,7 +227,7 @@ acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 */
 	ieee80211_stop_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: stop queue %s\n", msg);
+		acx_log(LOG_DEBUG, L_BUFT, "tx: stop queue %s\n", msg);
 }
 
 /*static inline int
@@ -266,7 +250,7 @@ acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
 	ieee80211_wake_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: wake queue %s\n", msg);
+		acx_log(LOG_DEBUG, L_BUFT, "tx: wake queue %s\n", msg);
 }
 /*
 static inline void
