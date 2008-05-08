@@ -1123,6 +1123,7 @@ struct acx_device {
 	/*** Locking ***/
 	struct mutex		mutex;
 	spinlock_t		spinlock;
+	spinlock_t		irqlock;
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
 	const char		*last_lock;
