@@ -9,6 +9,8 @@
  * This file is licensed under GPLv2.
  */
 
+#include "acx_struct.h"
+
 /*
  * List of jobs that have to be done post interrupt.
  *
@@ -97,4 +99,15 @@
  */
 #define ACX100_DISABLE_ALL_IRQS \
 	((u16) ~ (ACX_IRQ_CMD_COMPLETE))
+
+/*
+ * Function prototypes
+ */
+
+/*
+ * These two functions disable the interrupts on the card itself.
+ */
+//void acx_enable_irqs(acx_device_t *adev, u16 mask);
+//u16 acx_disable_irqs(acx_device_t *adev, u16 mask);
+
 #endif /* _ACX_IRQ_H_ */
