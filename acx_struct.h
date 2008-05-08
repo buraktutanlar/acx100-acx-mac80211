@@ -4,7 +4,9 @@
 /**** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
+#include <linux/version.h>
 
+#include "acx_mac80211.h"
 #include "acx_debug.h"
 
 /***********************************************************************

@@ -1,6 +1,8 @@
 #ifndef _ACX_MAC80211_H_
 #define _ACX_MAC80211_H_
 
+#include <net/mac80211.h>
+
 struct acx_key {
 	u8 enabled:1;
 	u8 algorithm;
