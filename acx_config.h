@@ -7,12 +7,6 @@
 
 #define ACX_RELEASE "v0.3.38-mac80211"
 
-/* set to 0 if you don't want any debugging code to be compiled in */
-/* set to 1 if you want some debugging */
-/* set to 2 if you want extensive debug log */
-#define ACX_DEBUG 2
-#define ACX_DEFAULT_MSG (L_ASSOC|L_INIT)
-
 /* assume 32bit I/O width
  * (16bit is also compatible with Compact Flash) */
 #define ACX_IO_WIDTH 32
