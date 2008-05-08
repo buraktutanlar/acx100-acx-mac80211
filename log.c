@@ -95,15 +95,13 @@ void acx_log_dump(int level, int what, const void *buf, ssize_t buflen,
 }
 /**
  * acx_log_ratelimited: like acx_log(), but rate limited via printk_ratelimit().
- * Note that we log anyway if ACX_LOG_LEVEL is 2.
  */
 void acx_log_ratelimited(int level, int what, const char *fmt, ...)
 {
 	va_list args;
 	
-	if (ACX_LOG_LEVEL < 2)
-		if (printk_ratelimit())
-			return;
+	if (printk_ratelimit())
+		return;
 
 	va_start(args, fmt);
 	acx_log(level, what, fmt, args);
