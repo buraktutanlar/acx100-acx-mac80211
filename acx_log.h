@@ -4,9 +4,10 @@
 /*
  * acx_log.h: logging constants and functions.
  *
- * Copyright (c) 2008, the ACX100 project (http://acx100.sourceforge.net).
+ * Copyright (c) 2008, Francis Galiegue <fgaliegue@gmail.com> for the ACX100
+ * driver project.
  *
- * See the README file for licensing.
+ * This file is licensed under GPL version 2.
  */
 
 /*

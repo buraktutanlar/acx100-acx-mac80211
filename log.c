@@ -5,9 +5,10 @@
  * reliably. Until then, this will contain all logging routines used everywhere
  * in the code.
  *
- * Copyright (c) 2008, the ACX100 project (http://acx100.sourceforge.net).
+ * Copyright (c) 2008, Francis Galiegue <fgaliegue@gmail.com> for the ACX100
+ * driver project.
  *
- * See the README file for licensing conditions.
+ * This file is licensed under the GPL version 2.
  */
 #include <linux/jiffies.h>
 
