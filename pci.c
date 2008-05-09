@@ -1362,7 +1362,7 @@ static const u16 IO_ACX100[] = {
 	0x007c,			/* IO_ACX_INT_TRIG */
 	0x0098,			/* IO_ACX_IRQ_MASK */
 	0x00a4,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00a8,			/* IO_ACX_IRQ_STATUS_CLEAR */
+	0x00a8,			/* IO_ACX_IRQ_REASON */
 	0x00ac,			/* IO_ACX_IRQ_ACK */
 	0x00b0,			/* IO_ACX_HINT_TRIG */
 
@@ -1404,7 +1404,7 @@ static const u16 IO_ACX111[] = {
 	0x00d4,			/* IO_ACX_IRQ_MASK */
 	/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
 	0x00f0,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00e4,			/* IO_ACX_IRQ_STATUS_CLEAR */
+	0x00e4,			/* IO_ACX_IRQ_REASON */
 	0x00e8,			/* IO_ACX_IRQ_ACK */
 	0x00ec,			/* IO_ACX_HINT_TRIG */
 
@@ -2526,7 +2526,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			log_unusual_irq(irqtype);
 		}
 #if IRQ_ITERATE
-		unmasked = read_reg16(adev, IO_ACX_IRQ_STATUS_CLEAR);
+		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 		irqtype = unmasked & ~adev->irq_mask;
 		/* Bail out if no new IRQ bits or if all are masked out */
 		if (!irqtype)
@@ -2581,7 +2581,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	acx_lock(adev, flags);
 
-	unmasked = read_reg16(adev, IO_ACX_IRQ_STATUS_CLEAR);
+	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 	if (unlikely(unmasked == ACX_IRQ_ALL)) {
 		/* ACX_IRQ_ALL value hints at missing hardware,
 		 * so don't do anything.

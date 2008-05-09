@@ -874,6 +874,10 @@ struct rxdesc {
 
 /* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
 ** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
+
+/*
+ * NOTE about IO_ACX_IRQ_REASON: this register is CLEARED ON READ.
+ */
 enum {
 	IO_ACX_SOFT_RESET = 0,
 
@@ -887,7 +891,7 @@ enum {
 	IO_ACX_INT_TRIG,
 	IO_ACX_IRQ_MASK,
 	IO_ACX_IRQ_STATUS_NON_DES,
-	IO_ACX_IRQ_STATUS_CLEAR, /* CLEAR = clear on read */
+	IO_ACX_IRQ_REASON,
 	IO_ACX_IRQ_ACK,
 	IO_ACX_HINT_TRIG,
 
@@ -1146,7 +1150,7 @@ struct acx_device {
 	unsigned long	irq_last_jiffies;
 	/* Barely used in USB case (FIXME?) */
 	u16		irq_status;
-	int		irq_reason;
+	int		irq_reason; /* FIXME: should be u16 */
 	/* Mask of jobs we have to schedule post interrupt */
 	u8		after_interrupt_jobs;
 	/* 
