@@ -1543,7 +1543,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
-	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
+	spin_lock_init(&adev->spinlock);
+	spin_lock_init(&adev->irqlock);
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	acx_log(LOG_INFO, L_ANY,
 		"mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
