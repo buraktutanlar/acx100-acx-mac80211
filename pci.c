@@ -99,8 +99,8 @@ static void acxpci_s_down(struct ieee80211_hw *hw);
  * to the adapter), yet the written data has to reach the adapter immediately. */
 static inline void write_flush(acx_device_t * adev)
 {
-	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
-	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
+	/* readb(adev->iobase + adev->io[ACX_IO_INFO_MAILBOX_OFFS]); */
+	/* faster version (accesses the first register, ACX_IO_SOFT_RESET,
 	 * which should also be safe): */
 	//readb(adev->iobase);
 	smp_wmb();
@@ -108,7 +108,7 @@ static inline void write_flush(acx_device_t * adev)
 
 static inline int adev_present(acx_device_t * adev)
 {
-	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
+	/* fast version (accesses the first register, ACX_IO_SOFT_RESET,
 	 * which should be safe): */
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
@@ -178,13 +178,13 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 
 	FN_ENTER;
 
-	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
+	write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
+	write_reg32(adev, ACX_IO_EEPROM_ADDR, addr);
 	write_flush(adev);
-	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
+	write_reg32(adev, ACX_IO_EEPROM_CTL, 2);
 
 	count = 0xffff;
-	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+	while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -199,7 +199,7 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 		cpu_relax();
 	}
 
-	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
+	*charbuf = read_reg8(adev, ACX_IO_EEPROM_DATA);
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "EEPROM at 0x%04X = 0x%02X\n",
 		addr, *charbuf);
 	result = OK;
@@ -249,20 +249,20 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	 * but you probably have to modify GPIO_OUT, too,
 	 * and you probably need to activate a different GPIO
 	 * line instead! */
-	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
+	gpio_orig = read_reg16(adev, ACX_IO_GPIO_OE);
+	write_reg16(adev, ACX_IO_GPIO_OE, gpio_orig & ~1);
 	write_flush(adev);
 
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
-		write_reg32(adev, IO_ACX_EEPROM_DATA, *(charbuf + i));
+		write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
+		write_reg32(adev, ACX_IO_EEPROM_ADDR, addr + i);
+		write_reg32(adev, ACX_IO_EEPROM_DATA, *(charbuf + i));
 		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
+		write_reg32(adev, ACX_IO_EEPROM_CTL, 1);
 
 		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+		while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
 				acx_log(LOG_WARNING, L_ANY, "WARNING, DANGER!!! "
 					"Timeout waiting for EEPROM write\n");
@@ -273,18 +273,18 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	}
 
 	/* disable EEPROM writing */
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
+	write_reg16(adev, ACX_IO_GPIO_OE, gpio_orig);
 	write_flush(adev);
 
 	/* now start a verification run */
 	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
+		write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
+		write_reg32(adev, ACX_IO_EEPROM_ADDR, addr + i);
 		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
+		write_reg32(adev, ACX_IO_EEPROM_CTL, 2);
 
 		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+		while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
 				acx_log(LOG_WARNING, L_ANY,
 					"timeout waiting for EEPROM read\n");
@@ -293,7 +293,7 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 			cpu_relax();
 		}
 
-		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
+		data_verify[i] = read_reg16(adev, ACX_IO_EEPROM_DATA);
 	}
 
 	if (0 == memcmp(charbuf, data_verify, len))
@@ -311,7 +311,7 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 ** acxpci_s_read_phy_reg
 **
 ** Messing with rx/tx disabling and enabling here
-** (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
+** (write_reg32(adev, ACX_IO_ENABLE, 0b000000xx)) kills traffic
 */
 int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
@@ -320,12 +320,12 @@ int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 
 	FN_ENTER;
 
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
+	write_reg32(adev, ACX_IO_PHY_ADDR, reg);
 	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 2);
+	write_reg32(adev, ACX_IO_PHY_CTL, 2);
 
 	count = 0xffff;
-	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
+	while (read_reg32(adev, ACX_IO_PHY_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
@@ -341,7 +341,7 @@ int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	}
 
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "count was %u\n", count);
-	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
+	*charbuf = read_reg8(adev, ACX_IO_PHY_DATA);
 
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "radio PHY at 0x%04X = 0x%02X\n",
 		*charbuf, reg);
@@ -362,10 +362,10 @@ int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	/* mprusko said that 32bit accesses result in distorted sensitivity
 	 * on his card. Unconfirmed, looks like it's not true (most likely since we
 	 * now properly flush writes). */
-	write_reg32(adev, IO_ACX_PHY_DATA, value);
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
+	write_reg32(adev, ACX_IO_PHY_DATA, value);
+	write_reg32(adev, ACX_IO_PHY_ADDR, reg);
 	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 1);
+	write_reg32(adev, ACX_IO_PHY_CTL, 1);
 	write_flush(adev);
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"radio PHY write 0x%02X at 0x%04X\n",
@@ -409,13 +409,13 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	sum = p[0] + p[1] + p[2] + p[3];
 	p += 4;
 
-	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
+	write_reg32(adev, ACX_IO_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0);	/* use basic mode */
+	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 0);	/* use basic mode */
 #else
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1);	/* use autoincrement mode */
-	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset);	/* configure start address */
+	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 1);	/* use autoincrement mode */
+	write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset);	/* configure start address */
 	write_flush(adev);
 #endif
 
@@ -429,10 +429,10 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset + len - 4);
 		write_flush(adev);
 #endif
-		write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
+		write_reg32(adev, ACX_IO_SLV_MEM_DATA, v32);
 	}
 
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
@@ -477,13 +477,13 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	sum = p[0] + p[1] + p[2] + p[3];
 	p += 4;
 
-	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
+	write_reg32(adev, ACX_IO_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0);	/* use basic mode */
+	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 0);	/* use basic mode */
 #else
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1);	/* use autoincrement mode */
-	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset);	/* configure start address */
+	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 1);	/* use autoincrement mode */
+	write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset);	/* configure start address */
 #endif
 
 	len = 0;
@@ -495,9 +495,9 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset + len - 4);
 #endif
-		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
+		w32 = read_reg32(adev, ACX_IO_SLV_MEM_DATA);
 
 		if (unlikely(w32 != v32)) {
 			acx_log(LOG_WARNING, L_ANY,"FATAL: firmware upload: "
@@ -711,23 +711,23 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 	FN_ENTER;
 
 	/* halt eCPU */
-	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
-	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
+	temp = read_reg16(adev, ACX_IO_ECPU_CTRL) | 0x1;
+	write_reg16(adev, ACX_IO_ECPU_CTRL, temp);
 
 	/* now do soft reset of eCPU, set bit */
-	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
+	temp = read_reg16(adev, ACX_IO_SOFT_RESET) | 0x1;
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "enable soft reset\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
+	write_reg16(adev, ACX_IO_SOFT_RESET, temp);
 	write_flush(adev);
 
 	/* now clear bit again: deassert eCPU reset */
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"disable soft reset and go to init mode\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
+	write_reg16(adev, ACX_IO_SOFT_RESET, temp & ~0x1);
 
 	/* now start a burst read from initial EEPROM */
-	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
-	write_reg16(adev, IO_ACX_EE_START, temp);
+	temp = read_reg16(adev, ACX_IO_EE_START) | 0x1;
+	write_reg16(adev, ACX_IO_EE_START, temp);
 	write_flush(adev);
 
 	FN_EXIT0;
@@ -746,10 +746,10 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 
 	timeout = jiffies + 2 * HZ;
 	for (;;) {
-		u16 irqstat = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		u16 irqstat = read_reg16(adev, ACX_IO_IRQ_STATUS_NON_DES);
 		if (irqstat & ACX_IRQ_FCS_THRESHOLD) {
 			result = OK;
-			write_reg16(adev, IO_ACX_IRQ_ACK,
+			write_reg16(adev, ACX_IO_IRQ_ACK,
 				    ACX_IRQ_FCS_THRESHOLD);
 			break;
 		}
@@ -834,8 +834,8 @@ static inline void init_mboxes(acx_device_t * adev)
 
 	FN_ENTER;
 
-	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
-	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
+	cmd_offs = read_reg32(adev, ACX_IO_CMD_MAILBOX_OFFS);
+	info_offs = read_reg32(adev, ACX_IO_INFO_MAILBOX_OFFS);
 	adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
 	adev->info_area = (u8 *) adev->iobase2 + info_offs;
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "iobase2=%p\n", adev->iobase2);
@@ -884,20 +884,20 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	acxpci_l_reset_mac(adev);
 #endif
 
-	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
+	ecpu_ctrl = read_reg16(adev, ACX_IO_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "eCPU is already running. ";
 		goto end_unlock;
 	}
 #if 0
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
+	if (read_reg16(adev, ACX_IO_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "eCPU did not start after boot from flash. ";
 		goto end_unlock;
 	}
 
 	/* check sense on reset flags */
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
+	if (read_reg16(adev, ACX_IO_SOR_CFG) & 0x10) {
 		printk("%s: eCPU did not start after boot (SOR), "
 		       "is this fatal?\n", wiphy_name(adev->ieee->wiphy));
 	}
@@ -915,7 +915,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 
 	count = 0xffff;
 	do {
-		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+		hardware_info = read_reg16(adev, ACX_IO_EEPROM_INFORMATION);
 		if (!--count) {
 			msg = "eCPU didn't indicate radio type";
 			goto end_fail;
@@ -934,7 +934,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	/* acx_s_mwait(10);    this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
-	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+	write_reg16(adev, ACX_IO_ECPU_CTRL, ecpu_ctrl & ~0x1);
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"booted eCPU up and waiting for completion...\n");
 
@@ -1071,7 +1071,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* now write the actual command type */
 	acxpci_write_cmd_type_status(adev, cmd, 0);
 	/* execute command */
-	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_CMD);
+	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_CMD);
 	write_flush(adev);
 
 	/* wait for firmware to process command */
@@ -1089,9 +1089,9 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	timeout = jiffies + HZ;
 	do {
 		if (!adev->irqs_active) {	/* IRQ disabled: poll */
-			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+			irqtype = read_reg16(adev, ACX_IO_IRQ_STATUS_NON_DES);
 			if (irqtype & ACX_IRQ_CMD_COMPLETE) {
-				write_reg16(adev, IO_ACX_IRQ_ACK,
+				write_reg16(adev, ACX_IO_IRQ_ACK,
 					    ACX_IRQ_CMD_COMPLETE);
 				break;
 			}
@@ -1321,7 +1321,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
 	 * here instead? Or are we that much down the road that it's no
 	 * longer possible here? */
-	write_reg16(adev, IO_ACX_ENABLE, 0);
+	write_reg16(adev, ACX_IO_ENABLE, 0);
 
 	acx_s_mwait(100);
 
@@ -1350,86 +1350,86 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 ** id	- ptr to the device id entry that matched this device
 */
 static const u16 IO_ACX100[] = {
-	0x0000,			/* IO_ACX_SOFT_RESET */
+	0x0000,			/* ACX_IO_SOFT_RESET */
 
-	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
-	0x0018,			/* IO_ACX_SLV_MEM_DATA */
-	0x001c,			/* IO_ACX_SLV_MEM_CTL */
-	0x0020,			/* IO_ACX_SLV_END_CTL */
+	0x0014,			/* ACX_IO_SLV_MEM_ADDR */
+	0x0018,			/* ACX_IO_SLV_MEM_DATA */
+	0x001c,			/* ACX_IO_SLV_MEM_CTL */
+	0x0020,			/* ACX_IO_SLV_END_CTL */
 
-	0x0034,			/* IO_ACX_FEMR */
+	0x0034,			/* ACX_IO_FEMR */
 
-	0x007c,			/* IO_ACX_INT_TRIG */
-	0x0098,			/* IO_ACX_IRQ_MASK */
-	0x00a4,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00a8,			/* IO_ACX_IRQ_REASON */
-	0x00ac,			/* IO_ACX_IRQ_ACK */
-	0x00b0,			/* IO_ACX_HINT_TRIG */
+	0x007c,			/* ACX_IO_INT_TRIG */
+	0x0098,			/* ACX_IO_IRQ_MASK */
+	0x00a4,			/* ACX_IO_IRQ_STATUS_NON_DES */
+	0x00a8,			/* ACX_IO_IRQ_REASON */
+	0x00ac,			/* ACX_IO_IRQ_ACK */
+	0x00b0,			/* ACX_IO_HINT_TRIG */
 
-	0x0104,			/* IO_ACX_ENABLE */
+	0x0104,			/* ACX_IO_ENABLE */
 
-	0x0250,			/* IO_ACX_EEPROM_CTL */
-	0x0254,			/* IO_ACX_EEPROM_ADDR */
-	0x0258,			/* IO_ACX_EEPROM_DATA */
-	0x025c,			/* IO_ACX_EEPROM_CFG */
+	0x0250,			/* ACX_IO_EEPROM_CTL */
+	0x0254,			/* ACX_IO_EEPROM_ADDR */
+	0x0258,			/* ACX_IO_EEPROM_DATA */
+	0x025c,			/* ACX_IO_EEPROM_CFG */
 
-	0x0268,			/* IO_ACX_PHY_ADDR */
-	0x026c,			/* IO_ACX_PHY_DATA */
-	0x0270,			/* IO_ACX_PHY_CTL */
+	0x0268,			/* ACX_IO_PHY_ADDR */
+	0x026c,			/* ACX_IO_PHY_DATA */
+	0x0270,			/* ACX_IO_PHY_CTL */
 
-	0x0290,			/* IO_ACX_GPIO_OE */
+	0x0290,			/* ACX_IO_GPIO_OE */
 
-	0x0298,			/* IO_ACX_GPIO_OUT */
+	0x0298,			/* ACX_IO_GPIO_OUT */
 
-	0x02a4,			/* IO_ACX_CMD_MAILBOX_OFFS */
-	0x02a8,			/* IO_ACX_INFO_MAILBOX_OFFS */
-	0x02ac,			/* IO_ACX_EEPROM_INFORMATION */
+	0x02a4,			/* ACX_IO_CMD_MAILBOX_OFFS */
+	0x02a8,			/* ACX_IO_INFO_MAILBOX_OFFS */
+	0x02ac,			/* ACX_IO_EEPROM_INFORMATION */
 
-	0x02d0,			/* IO_ACX_EE_START */
-	0x02d4,			/* IO_ACX_SOR_CFG */
-	0x02d8			/* IO_ACX_ECPU_CTRL */
+	0x02d0,			/* ACX_IO_EE_START */
+	0x02d4,			/* ACX_IO_SOR_CFG */
+	0x02d8			/* ACX_IO_ECPU_CTRL */
 };
 
 static const u16 IO_ACX111[] = {
-	0x0000,			/* IO_ACX_SOFT_RESET */
+	0x0000,			/* ACX_IO_SOFT_RESET */
 
-	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
-	0x0018,			/* IO_ACX_SLV_MEM_DATA */
-	0x001c,			/* IO_ACX_SLV_MEM_CTL */
-	0x0020,			/* IO_ACX_SLV_END_CTL */
+	0x0014,			/* ACX_IO_SLV_MEM_ADDR */
+	0x0018,			/* ACX_IO_SLV_MEM_DATA */
+	0x001c,			/* ACX_IO_SLV_MEM_CTL */
+	0x0020,			/* ACX_IO_SLV_END_CTL */
 
-	0x0034,			/* IO_ACX_FEMR */
+	0x0034,			/* ACX_IO_FEMR */
 
-	0x00b4,			/* IO_ACX_INT_TRIG */
-	0x00d4,			/* IO_ACX_IRQ_MASK */
+	0x00b4,			/* ACX_IO_INT_TRIG */
+	0x00d4,			/* ACX_IO_IRQ_MASK */
 	/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
-	0x00f0,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00e4,			/* IO_ACX_IRQ_REASON */
-	0x00e8,			/* IO_ACX_IRQ_ACK */
-	0x00ec,			/* IO_ACX_HINT_TRIG */
+	0x00f0,			/* ACX_IO_IRQ_STATUS_NON_DES */
+	0x00e4,			/* ACX_IO_IRQ_REASON */
+	0x00e8,			/* ACX_IO_IRQ_ACK */
+	0x00ec,			/* ACX_IO_HINT_TRIG */
 
-	0x01d0,			/* IO_ACX_ENABLE */
+	0x01d0,			/* ACX_IO_ENABLE */
 
-	0x0338,			/* IO_ACX_EEPROM_CTL */
-	0x033c,			/* IO_ACX_EEPROM_ADDR */
-	0x0340,			/* IO_ACX_EEPROM_DATA */
-	0x0344,			/* IO_ACX_EEPROM_CFG */
+	0x0338,			/* ACX_IO_EEPROM_CTL */
+	0x033c,			/* ACX_IO_EEPROM_ADDR */
+	0x0340,			/* ACX_IO_EEPROM_DATA */
+	0x0344,			/* ACX_IO_EEPROM_CFG */
 
-	0x0350,			/* IO_ACX_PHY_ADDR */
-	0x0354,			/* IO_ACX_PHY_DATA */
-	0x0358,			/* IO_ACX_PHY_CTL */
+	0x0350,			/* ACX_IO_PHY_ADDR */
+	0x0354,			/* ACX_IO_PHY_DATA */
+	0x0358,			/* ACX_IO_PHY_CTL */
 
-	0x0374,			/* IO_ACX_GPIO_OE */
+	0x0374,			/* ACX_IO_GPIO_OE */
 
-	0x037c,			/* IO_ACX_GPIO_OUT */
+	0x037c,			/* ACX_IO_GPIO_OUT */
 
-	0x0388,			/* IO_ACX_CMD_MAILBOX_OFFS */
-	0x038c,			/* IO_ACX_INFO_MAILBOX_OFFS */
-	0x0390,			/* IO_ACX_EEPROM_INFORMATION */
+	0x0388,			/* ACX_IO_CMD_MAILBOX_OFFS */
+	0x038c,			/* ACX_IO_INFO_MAILBOX_OFFS */
+	0x0390,			/* ACX_IO_EEPROM_INFORMATION */
 
-	0x0100,			/* IO_ACX_EE_START */
-	0x0104,			/* IO_ACX_SOR_CFG */
-	0x0108,			/* IO_ACX_ECPU_CTRL */
+	0x0100,			/* ACX_IO_EE_START */
+	0x0104,			/* ACX_IO_SOR_CFG */
+	0x0108,			/* ACX_IO_ECPU_CTRL */
 };
 
 static const struct ieee80211_ops acxpci_hw_ops = {
@@ -1798,8 +1798,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		} else {
 			u16 temp;
 			/* halt eCPU */
-			temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
-			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
+			temp = read_reg16(adev, ACX_IO_ECPU_CTRL) | 0x1;
+			write_reg16(adev, ACX_IO_ECPU_CTRL, temp);
 			write_flush(adev);
 		}
 		acx_unlock(adev, flags);
@@ -1894,8 +1894,8 @@ acx_sem_lock(adev);
 ieee80211_unregister_hw(hw);	/* this one cannot sleep */
 acxpci_s_down(hw);
 /* down() does not set it to ACX_IRQ_ALL, but here we really want that */
-write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
-write_reg16(adev, IO_ACX_FEMR, 0x0);
+write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
+write_reg16(adev, ACX_IO_FEMR, 0x0);
 acxpci_s_delete_dma_regions(adev);
 pci_save_state(pdev);
 pci_set_power_state(pdev, PCI_D3hot);
@@ -1969,8 +1969,8 @@ acx_log(LOG_INFO, L_ANY, "resume: acx up done\n");
 static void enable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x8000);
+	write_reg16(adev, ACX_IO_IRQ_MASK, adev->irq_mask);
+	write_reg16(adev, ACX_IO_FEMR, 0x8000);
 	adev->irqs_active = 1;
 	FN_EXIT0;
 }
@@ -2023,8 +2023,8 @@ static void disable_acx_irq(acx_device_t * adev)
 	/* I guess mask is not ACX_IRQ_ALL because acx100 won't signal
 	 ** cmd completion then (needed for ifup).
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
-	write_reg16(adev, IO_ACX_IRQ_MASK, disable_irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_reg16(adev, ACX_IO_IRQ_MASK, disable_irq_mask);
+	write_reg16(adev, ACX_IO_FEMR, 0x0);
 	adev->irqs_active = 0;
 
 	FN_EXIT0;
@@ -2163,8 +2163,8 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	if (adev->modes)
 		acx_free_modes(adev);
 	/* disable all IRQs, release shared IRQ handler */
-	write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
+	write_reg16(adev, ACX_IO_FEMR, 0x0);
 	free_irq(adev->irq, adev);
 
 /* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
@@ -2340,7 +2340,7 @@ static void handle_info_irq(acx_device_t * adev)
 
 	/* inform fw that we have read this info message */
 	acx_writel(info_type | 0x00010000, adev->info_area);
-	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
+	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(adev);
 
 	acx_log(LOG_DEBUG, L_CTL,
@@ -2526,7 +2526,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			log_unusual_irq(irqtype);
 		}
 #if IRQ_ITERATE
-		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
+		unmasked = read_reg16(adev, ACX_IO_IRQ_REASON);
 		irqtype = unmasked & ~adev->irq_mask;
 		/* Bail out if no new IRQ bits or if all are masked out */
 		if (!irqtype)
@@ -2537,7 +2537,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			acx_log(LOG_WARNING, L_ANY,
 				"too many interrupts per jiffy!\n");
 			/* Looks like card floods us with IRQs! Try to stop that */
-			write_reg16(adev, IO_ACX_IRQ_MASK, ACX_IRQ_ALL);
+			write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
 			/* This will short-circuit all future attempts to handle IRQ.
 			 * We cant do much more... */
 			adev->irq_mask = 0;
@@ -2581,7 +2581,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	acx_lock(adev, flags);
 
-	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
+	unmasked = read_reg16(adev, ACX_IO_IRQ_REASON);
 	if (unlikely(unmasked == ACX_IRQ_ALL)) {
 		/* ACX_IRQ_ALL value hints at missing hardware,
 		 * so don't do anything.
@@ -2602,7 +2602,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	}
 
 	/* Go ahead and ACK our interrupt */
-	write_reg16(adev, IO_ACX_IRQ_ACK, ACX_IRQ_ALL);
+	write_reg16(adev, ACX_IO_IRQ_ACK, ACX_IRQ_ALL);
 	if (irqtype & ACX_IRQ_CMD_COMPLETE) {
 		acx_log(LOG_DEBUG, L_IRQ, "got Command_Complete IRQ\n");
 		/* save the state for the running issue_cmd() */
@@ -2651,11 +2651,11 @@ void acxpci_l_power_led(acx_device_t * adev, int enable)
 			"Please report in case toggling the power LED "
 			"doesn't work for your card!\n");
 	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
+		write_reg16(adev, ACX_IO_GPIO_OUT,
+			    read_reg16(adev, ACX_IO_GPIO_OUT) & ~gpio_pled);
 	else
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
+		write_reg16(adev, ACX_IO_GPIO_OUT,
+			    read_reg16(adev, ACX_IO_GPIO_OUT) | gpio_pled);
 }
 
 
@@ -2726,7 +2726,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
-	write_reg16(adev, IO_ACX_HINT_TRIG, ACX_IRQ_BEACON);
+	write_reg16(adev, ACX_IO_HINT_TRIG, ACX_IRQ_BEACON);
 
 	/* dump Acx111 Mem Configuration */
 	printk("dump mem config:\n"
@@ -2969,11 +2969,11 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
 
 	acx_sem_lock(adev);
 
-	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
+	/* Need to lock accesses to [ACX_IO_GPIO_OUT]:
 	 * IRQ handler uses it to update LED */
 	acx_lock(adev, flags);
-	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
-	write_reg16(adev, IO_ACX_GPIO_OUT,
+	gpio_old = read_reg16(adev, ACX_IO_GPIO_OUT);
+	write_reg16(adev, ACX_IO_GPIO_OUT,
 		    (gpio_old & 0xf8ff) | ((u16) * extra << 8));
 	acx_unlock(adev, flags);
 
@@ -3184,7 +3184,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
 
 	/* flush writes before we tell the adapter that it's its turn now */
-	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_TXPRC);
 	write_flush(adev);
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed

@@ -28,8 +28,8 @@
  */
 //void acx_enable_irqs(acx_device_t *adev, u16 mask)
 //{
-//	write_reg16(adev, IO_ACX_IRQ_MASK, mask);
-//	write_reg16(adev, IO_ACX_FEMR, 0x0);
+//	write_reg16(adev, ACX_IO_IRQ_MASK, mask);
+//	write_reg16(adev, ACX_IO_FEMR, 0x0);
 //	smp_wmb();
 //}
 
@@ -45,9 +45,9 @@
  */
 //u16 acx_disable_irqs(acx_device_t *adev, u16 mask)
 //{
-//	u16 saved_mask = read_reg16(adev, IO_ACX_IRQ_MASK);
-//	write_reg16(adev, IO_ACX_IRQ_MASK, mask);
-//	write_reg16(adev, IO_ACX_FEMR, 0x0);
+//	u16 saved_mask = read_reg16(adev, ACX_IO_IRQ_MASK);
+//	write_reg16(adev, ACX_IO_IRQ_MASK, mask);
+//	write_reg16(adev, ACX_IO_FEMR, 0x0);
 //	smp_wmb();
 //	return saved_mask;
 //}
@@ -85,7 +85,7 @@
 //	if (!adev->initialized)
 //		goto out;
 //
-//	reason = read_reg16(adev, IO_ACX_IRQ_REASON);
+//	reason = read_reg16(adev, ACX_IO_IRQ_REASON);
 //	if (reason == ACX_IRQ_ALL) {
 //		/*
 //		 * Original code says this is because of missing hardware?
@@ -100,7 +100,7 @@
 //	/*
 //	 * If it's not an interrupt the card is currently handling, out
 //	 */
-//	reason &= read_reg16(adev, IO_ACX_IRQ_MASK);
+//	reason &= read_reg16(adev, ACX_IO_IRQ_MASK);
 //	if (!reason)
 //		goto out;
 //	
@@ -110,7 +110,7 @@
 //	 * FIXME: the original code writes ACX_IRQ_ALL?? Other drivers write
 //	 * only the real reason, I choose to do it that way.
 //	 */
-//	write_reg16(adev, IO_ACX_IRQ_ACK, reason);
+//	write_reg16(adev, ACX_IO_IRQ_ACK, reason);
 //	/*
 //	 * FIXME: the current code leaves some interrupts in the clear, let's
 //	 * try not to here
