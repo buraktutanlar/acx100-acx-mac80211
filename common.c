@@ -44,17 +44,13 @@ module_param_named(debug, acx_debug, uint, 0);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 #endif
 
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("GPLv2");
-#endif
+MODULE_LICENSE("GPL");
 /* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
 MODULE_AUTHOR("ACX100 Open Source Driver development team");
 MODULE_DESCRIPTION
     ("Driver for TI ACX1xx based wireless cards (CardBus/PCI/USB)");
 
-#ifdef MODULE_VERSION
 MODULE_VERSION(ACX_RELEASE);
-#endif
 
 /***********************************************************************
 */
