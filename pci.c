@@ -102,8 +102,7 @@ static inline void write_flush(acx_device_t * adev)
 	/* readb(adev->iobase + adev->io[ACX_IO_INFO_MAILBOX_OFFS]); */
 	/* faster version (accesses the first register, ACX_IO_SOFT_RESET,
 	 * which should also be safe): */
-	//readb(adev->iobase);
-	smp_wmb();
+	readb(adev->iobase);
 }
 
 static inline int adev_present(acx_device_t * adev)
