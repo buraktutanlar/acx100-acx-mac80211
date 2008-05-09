@@ -35,15 +35,6 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf);
 
 
 
-/***********************************************************************
-*/
-#if ACX_DEBUG
-unsigned int acx_debug /* will add __read_mostly later */  = ACX_DEFAULT_MSG;
-/* parameter is 'debug', corresponding var is acx_debug */
-module_param_named(debug, acx_debug, uint, 0);
-MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
-#endif
-
 MODULE_LICENSE("GPL");
 /* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
 MODULE_AUTHOR("ACX100 Open Source Driver development team");

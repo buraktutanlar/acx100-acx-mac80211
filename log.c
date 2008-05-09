@@ -10,7 +10,7 @@
  *
  * This file is licensed under the GPL version 2.
  */
-#include <linux/jiffies.h>
+#include <linux/module.h> /* Needed for MODULE_* */
 
 #include "acx_config.h"
 #include "acx_log.h"
@@ -28,6 +28,21 @@ static const char *const printk_levels[MAX_LOG_LEVEL + 1] = {
 	KERN_DEBUG
 };
 
+/*
+ * "debug" module parameter, only if ACX_DEBUG is set.
+ *
+ * If not set, statically define it to ACX_DEFAULT_MSG.
+ */
+#if ACX_DEBUG
+unsigned int acx_debug = ACX_DEFAULT_MSG;
+/* parameter is 'debug', corresponding var is acx_debug */
+module_param_named(debug, acx_debug, uint, 0);
+MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
+#else
+static unsigned int acx_debug = ACX_DEFAULT_MSG;
+#endif
+
+
 /**
  * acx_log: the logging function
  * @level: what level to log (LOG_WARNING, LOG_INFO or LOG_DEBUG).
@@ -43,7 +58,7 @@ void acx_log(int level, int what, const char *fmt, ...)
 
 	if (level > ACX_LOG_LEVEL)
 		return;
-	if (!(what & ACX_DEFAULT_MSG))
+	if (!(what & acx_debug))
 		return;
 	
 	/*
@@ -79,7 +94,7 @@ void acx_log_dump(int level, int what, const void *buf, ssize_t buflen,
 
 	if (level > ACX_LOG_LEVEL)
 		return;
-	if (!(what & ACX_DEFAULT_MSG))
+	if (!(what & acx_debug))
 		return;
 	
 	/*
