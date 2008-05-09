@@ -266,7 +266,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		u16 cmd;
 		u16 status;
 		u8 data[1];
-	} ACX_PACKED *loc;
+	} __attribute__ ((packed)) *loc;
 	const char *devname;
 	int acklen, blocklen, inpipe, outpipe;
 	int cmd_status;

@@ -692,7 +692,7 @@ void great_inquisitor(acx_device_t * adev)
 		u16 len;
 		/* 0x200 was too large here: */
 		u8 data[0x100 - 4];
-	} ACX_PACKED ie;
+	} __attribute__ ((packed)) ie;
 	u16 type;
 
 	FN_ENTER;
@@ -2070,7 +2070,7 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 		u16 len;
 		u16 rx_cfg1;
 		u16 rx_cfg2;
-	} ACX_PACKED cfg;
+	} __attribute__ ((packed)) cfg;
 	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
 		adev->rx_config_1 = (u16) (0
@@ -3769,7 +3769,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u16 type;
 			u16 len;
 			u8 val;
-		} ACX_PACKED keyindic;
+		} __attribute__ ((packed)) keyindic;
 #endif
 		acx_log(LOG_DEBUG, L_INIT, "updating WEP key settings\n");
 

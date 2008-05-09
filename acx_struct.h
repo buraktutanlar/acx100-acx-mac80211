@@ -22,11 +22,6 @@ typedef struct txhostdesc txhostdesc_t;
 
 
 /***********************************************************************
-** Random helpers
-*/
-#define ACX_PACKED __attribute__ ((packed))
-
-/***********************************************************************
 ** Constants
 */
 #define OK	0
@@ -432,7 +427,7 @@ DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 typedef struct phy_hdr {
 	u8	unknown[4];
 	u8	acx111_unknown[4];
-} ACX_PACKED phy_hdr_t;
+} __attribute__ ((packed)) phy_hdr_t;
 
 /* seems to be a bit similar to hfa384x_rx_frame.
  * These fields are still not quite obvious, though.
@@ -507,7 +502,7 @@ typedef struct rxbuffer {
 	/* maximally sized data part of wlan packet */
 	u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
 	/* can add hdr/data_a4 if needed */
-} ACX_PACKED rxbuffer_t;
+} __attribute__ ((packed)) rxbuffer_t;
 
 
 /*--- Firmware statistics ----------------------------------------------------*/
@@ -518,7 +513,7 @@ typedef struct rxbuffer {
 
 typedef struct fw_stats_tx {
 	u32	tx_desc_of;
-} ACX_PACKED fw_stats_tx_t;
+} __attribute__ ((packed)) fw_stats_tx_t;
 
 typedef struct fw_stats_rx {
 	u32	rx_oom;
@@ -529,14 +524,14 @@ typedef struct fw_stats_rx {
 	u32	rx_xfr_hint_trig;
 	u32	rx_aci_events; /* later versions only */
 	u32	rx_aci_resets; /* later versions only */
-} ACX_PACKED fw_stats_rx_t;
+} __attribute__ ((packed)) fw_stats_rx_t;
 
 typedef struct fw_stats_dma {
 	u32	rx_dma_req;
 	u32	rx_dma_err;
 	u32	tx_dma_req;
 	u32	tx_dma_err;
-} ACX_PACKED fw_stats_dma_t;
+} __attribute__ ((packed)) fw_stats_dma_t;
 
 typedef struct fw_stats_irq {
 	u32	cmd_cplt;
@@ -557,7 +552,7 @@ typedef struct fw_stats_irq {
 	u32	host_acks;
 	u32	pci_pm;
 	u32	acm_wakeups;
-} ACX_PACKED fw_stats_irq_t;
+} __attribute__ ((packed)) fw_stats_irq_t;
 
 typedef struct fw_stats_wep {
 	u32	wep_key_count;
@@ -567,7 +562,7 @@ typedef struct fw_stats_wep {
 	u32	wep_decrypt_fail;
 	u32	wep_pkt_decrypt;
 	u32	wep_decrypt_irqs;
-} ACX_PACKED fw_stats_wep_t;
+} __attribute__ ((packed)) fw_stats_wep_t;
 
 typedef struct fw_stats_pwr {
 	u32	tx_start_ctr;
@@ -578,12 +573,12 @@ typedef struct fw_stats_pwr {
 	u32	no_lppd_too_noisy;
 	u32	no_lppd_too_short;
 	u32	no_lppd_matching_frame;
-} ACX_PACKED fw_stats_pwr_t;
+} __attribute__ ((packed)) fw_stats_pwr_t;
 
 typedef struct fw_stats_mic {
 	u32	mic_rx_pkts;
 	u32	mic_calc_fail;
-} ACX_PACKED fw_stats_mic_t;
+} __attribute__ ((packed)) fw_stats_mic_t;
 
 typedef struct fw_stats_aes {
 	u32	aes_enc_fail;
@@ -592,7 +587,7 @@ typedef struct fw_stats_aes {
 	u32	aes_dec_pkts;
 	u32	aes_enc_irq;
 	u32	aes_dec_irq;
-} ACX_PACKED fw_stats_aes_t;
+} __attribute__ ((packed)) fw_stats_aes_t;
 
 typedef struct fw_stats_event {
 	u32	heartbeat;
@@ -603,7 +598,7 @@ typedef struct fw_stats_event {
 	u32	oom_late;
 	u32	phy_tx_err;
 	u32	tx_stuck;
-} ACX_PACKED fw_stats_event_t;
+} __attribute__ ((packed)) fw_stats_event_t;
 
 /* mainly for size calculation only */
 typedef struct fw_stats {
@@ -628,7 +623,7 @@ typedef struct fw_ver {
 	u16	size;
 	char	fw_id[20];
 	u32	hw_id;
-} ACX_PACKED fw_ver_t;
+} __attribute__ ((packed)) fw_ver_t;
 
 #define FW_ID_SIZE 20
 
@@ -723,7 +718,7 @@ struct client {
 
 typedef struct {
 	u32	v;
-} ACX_PACKED acx_ptr;
+} __attribute__ ((packed)) acx_ptr;
 
 #if ACX_DEBUG
 #define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
@@ -829,13 +824,13 @@ struct txdesc {
 		struct {
 			u8	rate;		/* 0x2a */
 			u8	queue_ctrl;	/* 0x2b */
-		} ACX_PACKED r1;
+		} __attribute__ ((packed)) r1;
 		struct {
 			u16	rate111;	/* 0x2a */
-		} ACX_PACKED r2;
-	} ACX_PACKED u;
+		} __attribute__ ((packed)) r2;
+	} __attribute__ ((packed)) u;
 	u32	queue_info;			/* 0x2c (acx100, reserved on acx111) */
-} ACX_PACKED;		/* size : 48 = 0x30 */
+} __attribute__ ((packed));		/* size : 48 = 0x30 */
 /* NB: acx111 txdesc structure is 4 byte larger */
 /* All these 4 extra bytes are reserved. tx alloc code takes them into account */
 
@@ -859,7 +854,7 @@ struct rxdesc {
 	u8	queue_ctrl;
 	u16	unknown;
 	u32	unknown2;
-} ACX_PACKED;		/* size 52 = 0x34 */
+} __attribute__ ((packed));		/* size 52 = 0x34 */
 
 #ifdef ACX_MAC80211_PCI
 
@@ -945,7 +940,7 @@ struct txhostdesc {
 	struct ieee80211_tx_status txstatus;
 	struct sk_buff *skb;	
 
-} ACX_PACKED;
+} __attribute__ ((packed));
 
 struct rxhostdesc {
 	acx_ptr	data_phy;			/* 0x00 [rxbuffer_t *] */
@@ -958,7 +953,7 @@ struct rxhostdesc {
 	u32	Status;			/* 0x14 */
 /* From here on you can use this area as you want (variable length, too!) */
 	rxbuffer_t *data;
-} ACX_PACKED;
+} __attribute__ ((packed));
 
 #endif /* ACX_PCI */
 
@@ -982,7 +977,7 @@ typedef struct usb_txbuffer {
 	u16	data_len;
 	/* wlan packet content is placed here: */
 	u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
-} ACX_PACKED usb_txbuffer_t;
+} __attribute__ ((packed)) usb_txbuffer_t;
 
 /* USB returns either rx packets (see rxbuffer) or
 ** these "tx status" structs: */
@@ -997,7 +992,7 @@ typedef struct usb_txstatus {
 	u8	rts_ok;
 //	struct ieee80211_tx_status txstatus;
 //	struct sk_buff *skb;	
-} ACX_PACKED usb_txstatus_t;
+} __attribute__ ((packed)) usb_txstatus_t;
 
 typedef struct usb_tx {
 	unsigned	busy:1;
@@ -1031,37 +1026,37 @@ typedef struct co_antennas {
 	u8	type;
 	u8	len;
 	u8	list[2];
-} ACX_PACKED co_antennas_t;
+} __attribute__ ((packed)) co_antennas_t;
 
 typedef struct co_powerlevels {
 	u8	type;
 	u8	len;
 	u16	list[8];
-} ACX_PACKED co_powerlevels_t;
+} __attribute__ ((packed)) co_powerlevels_t;
 
 typedef struct co_datarates {
 	u8	type;
 	u8	len;
 	u8	list[8];
-} ACX_PACKED co_datarates_t;
+} __attribute__ ((packed)) co_datarates_t;
 
 typedef struct co_domains {
 	u8	type;
 	u8	len;
 	u8	list[6];
-} ACX_PACKED co_domains_t;
+} __attribute__ ((packed)) co_domains_t;
 
 typedef struct co_product_id {
 	u8	type;
 	u8	len;
 	u8	list[128];
-} ACX_PACKED co_product_id_t;
+} __attribute__ ((packed)) co_product_id_t;
 
 typedef struct co_manuf_id {
 	u8	type;
 	u8	len;
 	u8	list[128];
-} ACX_PACKED co_manuf_t;
+} __attribute__ ((packed)) co_manuf_t;
 
 typedef struct co_fixed {
 	char	NVSv[8];
@@ -1078,7 +1073,7 @@ typedef struct co_fixed {
 	u8	dot11PhyType; /* FIXME: does 802.11 call it "dot11PHYType"? */
 	u8	dot11TempType;
 	u8	table_count;
-} ACX_PACKED co_fixed_t;
+} __attribute__ ((packed)) co_fixed_t;
 
 typedef struct acx111_ie_configoption {
 	u16			type;
@@ -1092,7 +1087,7 @@ typedef struct acx111_ie_configoption {
 	co_product_id_t		product_id;
 	co_manuf_t		manufacturer;
 	u8			_padding[4];
-} ACX_PACKED acx111_ie_configoption_t;
+} __attribute__ ((packed)) acx111_ie_configoption_t;
 
 /***********************************************************************
 ** Main acx per-device data structure
@@ -1569,7 +1564,7 @@ typedef struct acx100_ie_memblocksize {
 	u16	type;
 	u16	len;
 	u16	size;
-} ACX_PACKED acx100_ie_memblocksize_t;
+} __attribute__ ((packed)) acx100_ie_memblocksize_t;
 
 typedef struct acx100_ie_queueconfig {
 	u16	type;
@@ -1586,7 +1581,7 @@ typedef struct acx100_ie_queueconfig {
 	u8	TxQueuePri;
 	u8	NumTxDesc;
 	u16	pad2;
-} ACX_PACKED acx100_ie_queueconfig_t;
+} __attribute__ ((packed)) acx100_ie_queueconfig_t;
 
 typedef struct acx111_ie_queueconfig {
 	u16	type;
@@ -1599,7 +1594,7 @@ typedef struct acx111_ie_queueconfig {
 	u8	tx1_attributes;
 	u16	reserved2;
 	u8	reserved3;
-} ACX_PACKED acx111_ie_queueconfig_t;
+} __attribute__ ((packed)) acx111_ie_queueconfig_t;
 
 typedef struct acx100_ie_memconfigoption {
 	u16	type;
@@ -1610,7 +1605,7 @@ typedef struct acx100_ie_memconfigoption {
 	u32	tx_mem;
 	u16	RxBlockNum;
 	u16	TxBlockNum;
-} ACX_PACKED acx100_ie_memconfigoption_t;
+} __attribute__ ((packed)) acx100_ie_memconfigoption_t;
 
 typedef struct acx111_ie_memoryconfig {
 	u16	type;
@@ -1639,7 +1634,7 @@ typedef struct acx111_ie_memoryconfig {
 	u8	tx_queue1_reserved2;
 	u8	tx_queue1_attributes;
 	/* end of tx1 block */
-} ACX_PACKED acx111_ie_memoryconfig_t;
+} __attribute__ ((packed)) acx111_ie_memoryconfig_t;
 
 typedef struct acx_ie_memmap {
 	u16	type;
@@ -1654,20 +1649,20 @@ typedef struct acx_ie_memmap {
 	u32	QueueEnd;
 	u32	PoolStart;
 	u32	PoolEnd;
-} ACX_PACKED acx_ie_memmap_t;
+} __attribute__ ((packed)) acx_ie_memmap_t;
 
 typedef struct acx111_ie_feature_config {
 	u16	type;
 	u16	len;
 	u32	feature_options;
 	u32	data_flow_options;
-} ACX_PACKED acx111_ie_feature_config_t;
+} __attribute__ ((packed)) acx111_ie_feature_config_t;
 
 typedef struct acx111_ie_tx_level {
 	u16	type;
 	u16	len;
 	u8	level;
-} ACX_PACKED acx111_ie_tx_level_t;
+} __attribute__ ((packed)) acx111_ie_tx_level_t;
 
 #define PS_CFG_ENABLE		0x80
 #define PS_CFG_PENDING		0x40 /* status flag when entering PS */
@@ -1691,7 +1686,7 @@ typedef struct acx100_ie_powersave {
 	u8	options;
 	u8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u16	enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} ACX_PACKED acx100_ie_powersave_t;
+} __attribute__ ((packed)) acx100_ie_powersave_t;
 
 typedef struct acx111_ie_powersave {
 	u16	type;
@@ -1702,7 +1697,7 @@ typedef struct acx111_ie_powersave {
 	u8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u32	beacon_rx_time;
 	u32	enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} ACX_PACKED acx111_ie_powersave_t;
+} __attribute__ ((packed)) acx111_ie_powersave_t;
 
 
 /***********************************************************************
@@ -1736,7 +1731,7 @@ typedef struct acx100_scan {
 	u8	options;	/* bit mask, see defines above */
 	u16	chan_duration;
 	u16	max_probe_delay;
-} ACX_PACKED acx100_scan_t;			/* length 0xc */
+} __attribute__ ((packed)) acx100_scan_t;			/* length 0xc */
 
 #define ACX111_SCAN_RATE_6	0x0B
 #define ACX111_SCAN_RATE_9	0x0F
@@ -1765,7 +1760,7 @@ typedef struct acx111_scan {
 	u8	channel_list[26];	/* bits 7:0 first byte: channels 8:1 */
 						/* bits 7:0 second byte: channels 16:9 */
 						/* 26 bytes is enough to cover 802.11a */
-} ACX_PACKED acx111_scan_t;
+} __attribute__ ((packed)) acx111_scan_t;
 
 /*
 ** Radio calibration command structure
@@ -1776,7 +1771,7 @@ typedef struct acx111_cmd_radiocalib {
  * calib based on DC, AfeDC, Tx mismatch, Tx equilization */
 	u32	methods;
 	u32	interval;
-} ACX_PACKED acx111_cmd_radiocalib_t;
+} __attribute__ ((packed)) acx111_cmd_radiocalib_t;
 
 /*
 ** Packet template structures
@@ -1807,7 +1802,7 @@ typedef struct acx_template_tim {
 	u8	bitmap_ctrl;	/* 04 1 Bitmap Control * (except bit0) */
 					/* 05 n Partial Virtual Bitmap * */
 	u8	variable[0x100 - 1-1-1-1-1];
-} ACX_PACKED acx_template_tim_t;
+} __attribute__ ((packed)) acx_template_tim_t;
 
 typedef struct acx_template_probereq {
 	u16	size;
@@ -1820,7 +1815,7 @@ typedef struct acx_template_probereq {
 				/* 18 n SSID * */
 				/* nn n Supported Rates * */
 	u8	variable[0x44 - 2-2-6-6-6-2];
-} ACX_PACKED acx_template_probereq_t;
+} __attribute__ ((packed)) acx_template_probereq_t;
 
 typedef struct acx_template_proberesp {
 	u16	size;
@@ -1837,14 +1832,14 @@ typedef struct acx_template_proberesp {
 					/* nn n Supported Rates * */
 					/* nn 1 DS Parameter Set * */
 	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2];
-} ACX_PACKED acx_template_proberesp_t;
+} __attribute__ ((packed)) acx_template_proberesp_t;
 #define acx_template_beacon_t acx_template_proberesp_t
 #define acx_template_beacon acx_template_proberesp
 
 typedef struct acx_template_nullframe {
 	u16	size;
 	struct ieee80211_hdr hdr;
-} ACX_PACKED acx_template_nullframe_t;
+} __attribute__ ((packed)) acx_template_nullframe_t;
 
 
 /*
@@ -1860,12 +1855,12 @@ typedef struct acx_joinbss {
 			u8	dtim_interval;
 			u8	rates_basic;
 			u8	rates_supported;
-		} ACX_PACKED acx100;
+		} __attribute__ ((packed)) acx100;
 		struct {
 			u16	rates_basic;
 			u8	dtim_interval;
-		} ACX_PACKED acx111;
-	} ACX_PACKED u;
+		} __attribute__ ((packed)) acx111;
+	} __attribute__ ((packed)) u;
 	u8	genfrm_txrate;	/* generated frame (bcn, proberesp, RTS, PSpoll) tx rate */
 	u8	genfrm_mod_pre;	/* generated frame modulation/preamble:
 						** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
@@ -1874,7 +1869,7 @@ typedef struct acx_joinbss {
 	u8	channel;
 	u8	essid_len;
 	char	essid[IW_ESSID_MAX_SIZE];
-} ACX_PACKED acx_joinbss_t;
+} __attribute__ ((packed)) acx_joinbss_t;
 
 #define JOINBSS_RATES_1		0x01
 #define JOINBSS_RATES_2		0x02
@@ -1909,18 +1904,18 @@ typedef struct mem_read_write {
 	u16	type; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg.; or maybe it's actually 0x30 for MAC? Better verify it by writing and reading back and checking whether the value holds! */
 	u32	len;
 	u32	data;
-} ACX_PACKED mem_read_write_t;
+} __attribute__ ((packed)) mem_read_write_t;
 
 typedef struct firmware_image {
 	u32	chksum;
 	u32	size;
 	u8	data[1]; /* the byte array of the actual firmware... */
-} ACX_PACKED firmware_image_t;
+} __attribute__ ((packed)) firmware_image_t;
 
 typedef struct acx_cmd_radioinit {
 	u32	offset;
 	u32	len;
-} ACX_PACKED acx_cmd_radioinit_t;
+} __attribute__ ((packed)) acx_cmd_radioinit_t;
 
 typedef struct acx100_ie_wep_options {
 	u16	type;
@@ -1928,7 +1923,7 @@ typedef struct acx100_ie_wep_options {
 	u16	NumKeys;	/* max # of keys */
 	u8	WEPOption;	/* 0 == decrypt default key only, 1 == override decrypt */
 	u8	Pad;		/* used only for acx111 */
-} ACX_PACKED acx100_ie_wep_options_t;
+} __attribute__ ((packed)) acx100_ie_wep_options_t;
 
 typedef struct ie_dot11WEPDefaultKey {
 	u16	type;
@@ -1937,7 +1932,7 @@ typedef struct ie_dot11WEPDefaultKey {
 	u8	keySize;
 	u8	defaultKeyNum;
 	u8	key[29];	/* check this! was Key[19] */
-} ACX_PACKED ie_dot11WEPDefaultKey_t;
+} __attribute__ ((packed)) ie_dot11WEPDefaultKey_t;
 
 typedef struct acx111WEPDefaultKey {
 	u8	MacAddr[ETH_ALEN];
@@ -1949,20 +1944,20 @@ typedef struct acx111WEPDefaultKey {
 	u8	defaultKeyNum;
 	u8	counter[6];
 	u8	key[32];	/* up to 32 bytes (for TKIP!) */
-} ACX_PACKED acx111WEPDefaultKey_t;
+} __attribute__ ((packed)) acx111WEPDefaultKey_t;
 
 typedef struct ie_dot11WEPDefaultKeyID {
 	u16	type;
 	u16	len;
 	u8	KeyID;
-} ACX_PACKED ie_dot11WEPDefaultKeyID_t;
+} __attribute__ ((packed)) ie_dot11WEPDefaultKeyID_t;
 
 typedef struct acx100_cmd_wep_mgmt {
 	u8	MacAddr[ETH_ALEN];
 	u16	Action;
 	u16	KeySize;
 	u8	Key[29]; /* 29*8 == 232bits == WEP256 */
-} ACX_PACKED acx100_cmd_wep_mgmt_t;
+} __attribute__ ((packed)) acx100_cmd_wep_mgmt_t;
 
 typedef struct acx_ie_generic {
 	u16	type;
@@ -1972,8 +1967,8 @@ typedef struct acx_ie_generic {
 		u16	aid;
 		/* generic member for quick implementation of commands */
 		u8	bytes[32];
-	} ACX_PACKED m;
-} ACX_PACKED acx_ie_generic_t;
+	} __attribute__ ((packed)) m;
+} __attribute__ ((packed)) acx_ie_generic_t;
 
 #define ACX_SEC_KEYSIZE                     16
 /* Security algorithms. */                
