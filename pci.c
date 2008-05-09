@@ -1809,10 +1809,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	 * (e.g. ioctls) access a half-deconfigured device
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
-	 * Well, netdev did, but ieee80211 stack does not, so we
-	 * have to do so manually...
 	 */
-	acxpci_e_close(hw);
 	acx_log(LOG_INFO, L_INIT,
 		"removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
@@ -4365,10 +4362,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * (e.g. ioctls) access a half-deconfigured device
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
-	 * Well, netdev did, but ieee80211 stack does not, so we
-	 * have to do so manually...
 	 */
-	acxpci_e_close(hw);
 	acx_log(LOG_INFO, L_INIT, "removing device %s\n",
 		wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
