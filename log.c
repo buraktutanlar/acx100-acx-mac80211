@@ -108,6 +108,7 @@ void acx_log_dump(int level, int what, const void *buf, ssize_t buflen,
 	va_start(args, fmt);
 	
 	acx_log(level, what, fmt, args);
+	va_end(args);
 	acx_dump_bytes(printk_level, buf, buflen);
 }
 /**
