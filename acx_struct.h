@@ -856,7 +856,8 @@ struct rxdesc {
 	u32	unknown2;
 } __attribute__ ((packed));		/* size 52 = 0x34 */
 
-#ifdef ACX_MAC80211_PCI
+#if 0
+//#ifdef ACX_MAC80211_PCI
 
 /* Register I/O offsets */
 #define ACX100_EEPROM_ID_OFFSET	0x380
