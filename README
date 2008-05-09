@@ -34,7 +34,7 @@ SMP support is flaky/nonexistent. Use at your OWN RISK.
 
 You MUST use a kernel >= 2.6.25 and the mac80211 stack. Note that
 compat-wireless support is not there yet, this driver is for now only worked on
-with stable kernel trees.
+with stable kernel trees. What's more, the mac80211 stack evolves quickly.
 
 The driver is known to compile. The USB version is UNTESTED. The VLYNQ version
 (used in some NetGear APs with OpenWRT firmware) kind of works. Many problems
@@ -56,6 +56,8 @@ The maintainer has only tested out-of-kernel tree compile however. This is easy
 enough:
 
 make
+
+HOWEVER, this Makefile doesn't seem to work with OpenWRT :(
 
 As root, modprobe mac80211 (unless you have built it into the kernel itself) and
 insmos acx-mac80211.ko.
