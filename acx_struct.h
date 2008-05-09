@@ -1137,6 +1137,8 @@ struct acx_device {
 	u8		irqs_active;
 	/* The interrupts we can acknowledge (see acx_irq.h) */
 	u16		irq_mask;
+	/* The mask of IRQs saved by the IRQ top half routine */
+	u16		irq_saved_mask;
 	/*
 	 * FIXME: these ones should disappear
 	 */
@@ -1144,7 +1146,6 @@ struct acx_device {
 	unsigned long	irq_last_jiffies;
 	/* Barely used in USB case (FIXME?) */
 	u16		irq_status;
-	int		irq_savedstate;
 	int		irq_reason;
 	/* Mask of jobs we have to schedule post interrupt */
 	u8		after_interrupt_jobs;
