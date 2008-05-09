@@ -33,6 +33,8 @@
  */
 //void acx_enable_irqs(acx_device_t *adev, u16 mask)
 //{
+//	write_reg16(adev, IO_ACX_IRQ_MASK, mask);
+//	write_reg16(adev, IO_ACX_FEMR, 0x0);
 //}
 
 /**
@@ -40,8 +42,16 @@
  * that was present on the card.
  * @adev: the device on which to disable the IRQs.
  * @mask: the mask to set.
+ *
+ * FIXME: I couldn't actually find an example of reading the current interrupt
+ * mask, but it would make sense that you read it from the same location that
+ * you write to...
  */
 //u16 acx_disable_irqs(acx_device_t *adev, u16 mask)
 //{
+//	u16 saved_mask = read_reg16(adev, IO_ACX_IRQ_MASK);
+//	write_reg16(adev, IO_ACX_IRQ_MASK, mask);
+//	write_reg16(adev, IO_ACX_FEMR, 0x0);
+//	return saved_mask;
 //}
 
