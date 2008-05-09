@@ -37,6 +37,7 @@
 #include "acx.h"
 #include "acx_log.h"
 #include "acx_irq.h"
+#include "acx_util.h"
 
 /***********************************************************************
 */
@@ -91,68 +92,12 @@ static void acxpci_e_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
-/***********************************************************************
-** Register access
-**
-** 
-*/
-
-/* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
-#define acx_readl(v)	le32_to_cpu(readl((v)))
-#define acx_readw(v)	le16_to_cpu(readw((v)))
-#define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
-#define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
-
-/* Pick one */
-/* #define INLINE_IO static */
-#define INLINE_IO static inline
-
-INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset)
-{
-#if ACX_IO_WIDTH == 32
-	return acx_readl((u8 *) adev->iobase + adev->io[offset]);
-#else
-	return acx_readw((u8 *) adev->iobase + adev->io[offset])
-	    + (acx_readw((u8 *) adev->iobase + adev->io[offset] + 2) << 16);
-#endif
-}
-
-INLINE_IO u16 read_reg16(acx_device_t * adev, unsigned int offset)
-{
-	return acx_readw((u8 *) adev->iobase + adev->io[offset]);
-}
-
-INLINE_IO u8 read_reg8(acx_device_t * adev, unsigned int offset)
-{
-	return readb((u8 *) adev->iobase + adev->io[offset]);
-}
-
-INLINE_IO void write_reg32(acx_device_t * adev, unsigned int offset, u32 val)
-{
-#if ACX_IO_WIDTH == 32
-	acx_writel(val, (u8 *) adev->iobase + adev->io[offset]);
-#else
-	acx_writew(val & 0xffff, (u8 *) adev->iobase + adev->io[offset]);
-	acx_writew(val >> 16, (u8 *) adev->iobase + adev->io[offset] + 2);
-#endif
-}
-
-INLINE_IO void write_reg16(acx_device_t * adev, unsigned int offset, u16 val)
-{
-	acx_writew(val, (u8 *) adev->iobase + adev->io[offset]);
-}
-
-INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val)
-{
-	writeb(val, (u8 *) adev->iobase + adev->io[offset]);
-}
-
 /* Handle PCI posting properly:
  * Make sure that writes reach the adapter in case they require to be executed
  * *before* the next write, by reading a random (and safely accessible) register.
  * This call has to be made if there is no read following (which would flush the data
  * to the adapter), yet the written data has to reach the adapter immediately. */
-INLINE_IO void write_flush(acx_device_t * adev)
+static inline void write_flush(acx_device_t * adev)
 {
 	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
 	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
@@ -160,7 +105,7 @@ INLINE_IO void write_flush(acx_device_t * adev)
 	readb(adev->iobase);
 }
 
-INLINE_IO int adev_present(acx_device_t * adev)
+static inline int adev_present(acx_device_t * adev)
 {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
