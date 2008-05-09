@@ -45,7 +45,7 @@ MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 #endif
 
 #ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual MPL/GPL");
+MODULE_LICENSE("GPLv2");
 #endif
 /* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
 MODULE_AUTHOR("ACX100 Open Source Driver development team");
