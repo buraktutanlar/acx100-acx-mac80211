@@ -30,24 +30,6 @@ struct acx_interface {
          */
         unsigned int promisc:1;             
 };
-#ifdef TODO
-# undef TODO
-#endif
-#define TODO()  \
-        do {                                                                            \
-                printk(KERN_INFO "TODO: Incomplete code in %s() at %s:%d\n",        \
-                       __FUNCTION__, __FILE__, __LINE__);                               \
-        } while (0)
-
-#ifdef FIXME
-# undef FIXME
-#endif
-#define FIXME()  \
-        do {                                                                            \
-                printk(KERN_INFO "FIXME: Possibly broken code in %s() at %s:%d\n",  \
-                       __FUNCTION__, __FILE__, __LINE__);                               \
-        } while (0)     
-
 
 
 #define ACX_MODE_NOTADHOC 0xFFFF

@@ -23,6 +23,30 @@
 #define ACX_LOG_LEVEL ACX_DEBUG
 
 /*
+ * TODO() and FIXME() macros
+ * these macros that inform the user (via printk) if we have possibly
+ * broken or incomplete code
+ */
+
+#ifdef TODO
+# undef TODO
+#endif
+#define TODO() \
+	do { \
+		printk(KERN_INFO "TODO: Incomplete code in %s() at %s:%d\n", \
+			__FUNCTION__, __FILE__, __LINE__); \
+	} while (0)
+
+#ifdef FIXME
+# undef FIXME
+#endif
+#define FIXME() \
+	do { \
+		printk(KERN_INFO "FIXME: Possibly broken code in %s() at %s:%d\n", \
+			__FUNCTION__, __FILE__, __LINE__); \
+	} while (0)
+
+/*
  * Helpers to log MAC addresses
  */
 
