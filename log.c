@@ -10,6 +10,7 @@
  *
  * This file is licensed under the GPL version 2.
  */
+#include <linux/jiffies.h>
 #include <linux/module.h> /* Needed for MODULE_* */
 
 #include "acx_config.h"
