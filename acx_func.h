@@ -505,14 +505,9 @@ int acx_net_set_key(struct ieee80211_hw *hw,
 		const u8 *local_addr, const u8 *addr,
 		struct ieee80211_key_conf *key);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf);
-#else
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-			 struct ieee80211_if_conf *conf);
-#endif
 
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);

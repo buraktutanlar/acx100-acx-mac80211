@@ -9,16 +9,6 @@ struct acx_key {
 };
 
 struct acx_interface {                
-        /* Opaque ID of the operating interface (!= monitor
-         * interface) from the ieee80211 subsystem.
-         * Do not modify.
-         */
-        int if_id;
-        /* MAC address. */                  
-        u8 *mac_addr;        
-        /* Current BSSID (if any). */       
-        u8 *bssid;
-
         /* Interface type. (IEEE80211_IF_TYPE_XXX) */
         int type; 
         /* Counter of active monitor interfaces. */
