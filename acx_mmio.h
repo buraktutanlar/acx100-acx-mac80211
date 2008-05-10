@@ -1,5 +1,5 @@
-#ifndef _ACX_COMMANDS_H_
-#define _ACX_COMMANDS_H_
+#ifndef _ACX_MMIO_H_
+#define _ACX_MMIO_H_
 
 /*
  * acx_mmio.h: querying/configuration commands and on-chip (EEPROM?) registers.
@@ -291,4 +291,4 @@
 #define ACX100_REG_DOT11_UNKNOWN_1013_LEN	(-1)
 
 
-#endif /* _ACX_COMMANDS_H_ */
+#endif /* _ACX_MMIO_H_ */
