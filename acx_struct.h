@@ -1,11 +1,23 @@
 #ifndef _ACX_STRUCT_H_
 #define _ACX_STRUCT_H_
 
-/**** (legal) claimer in README
-** Copyright (C) 2003  ACX100 Open Source Project
-*/
+/* 
+ * acx_struct.h: common structures.
+ *
+ * Copyright (C) 2003-2008, the ACX100 Open Source Project.
+ *
+ * This file is licensed under the GPL version 2. See the README file for more
+ * information.
+ */
 #include <linux/version.h>
 
+/*
+ * We must not even enter here if neither USB nor PCI support are enabled. This
+ * file will take care of that for us.
+ *
+ * FIXME: hack!
+ */
+#include "acx_config.h"
 #include "acx_mac80211.h"
 #include "acx_debug.h"
 
@@ -37,10 +49,6 @@ typedef struct txhostdesc txhostdesc_t;
 /* Supported interfaces */
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
-
-#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
-#error Driver must include PCI and/or USB support. You selected neither.
-#endif
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
  #if !defined(CONFIG_ACX_MAC80211_USB)
