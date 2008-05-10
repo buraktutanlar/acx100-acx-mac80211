@@ -1331,13 +1331,7 @@ struct acx_device {
 };
 
 
-
-static inline
-acx_device_t * ieee2adev(struct ieee80211_hw *hw)
-{
-        return hw->priv;
-}
-
+#define ieee2adev(ieee80211_hw) ((ieee80211_hw)->priv)
 
 /* For use with ACX1xx_IE_RXCONFIG */
 /*  bit     description
