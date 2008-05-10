@@ -30,7 +30,7 @@
 /*
  * NOTE about ACX_IO_IRQ_REASON: this register is CLEARED ON READ.
  */
-#define	ACX_IO_SOFT_RESET,		0
+#define	ACX_IO_SOFT_RESET		0
 #define	ACX_IO_SLV_MEM_ADDR 		1
 #define	ACX_IO_SLV_MEM_DATA 		2
 #define	ACX_IO_SLV_MEM_CTL 		3
