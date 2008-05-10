@@ -1023,7 +1023,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	if (cmd != ACX1xx_CMD_INTERROGATE)
 		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
-			"input buffer: ");
+			"input buffer:\n");
 
 	/* wait for firmware to become idle for our command submission */
 	timeout = HZ / 5;
