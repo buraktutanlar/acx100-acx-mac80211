@@ -27,7 +27,7 @@
 
 /* Information Elements: Network Parameters, Static Configuration Entities */
 /* these are handled by real_cfgtable in firmware "Rev 1.5.0" (FW150) */
-DEF_IE(1xx_IE_UNKNOWN_00		,0x0000, -1);	/* mapped to cfgInvalid in FW150 */
+//DEF_IE(1xx_IE_UNKNOWN_00		,0x0000, -1);	/* mapped to cfgInvalid in FW150 */
 DEF_IE(100_IE_ACX_TIMER			,0x0001, 0x10);
 DEF_IE(1xx_IE_POWER_MGMT		,0x0002, 0x06); /* TNETW1450: length 0x18!! */
 DEF_IE(1xx_IE_QUEUE_CONFIG		,0x0003, 0x1c);
