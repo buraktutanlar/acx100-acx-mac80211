@@ -10,8 +10,6 @@
  * information.
  */
 #include <linux/version.h>
-#include "acx_commands.h"
-#include "acx_firmware.h"
 
 /*
  * We must not even enter here if neither USB nor PCI support are enabled. This
@@ -22,6 +20,8 @@
 #include "acx_config.h"
 #include "acx_mac80211.h"
 #include "acx_debug.h"
+#include "acx_commands.h"
+#include "acx_firmware.h"
 
 /***********************************************************************
 ** Forward declarations of types
