@@ -221,7 +221,7 @@ int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
 	acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
-	acx_log(L_DEBUG, L_REALLYVERBOSE,
+	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
@@ -1341,6 +1341,9 @@ void acxusb_i_complete_rx(struct urb *urb)
 	ptr = inbuf;
 	if (adev->rxtruncsize) {
 		int tail_size;
+		/*
+		 * FIXME: packetsize UNDEFINED, says gcc. And it is, indeed.
+		 */
 		acx_log(LOG_WARNING, L_ANY,
 			"handling truncated frame (truncsize=%d size=%d "
 			"packetsize(from trunc)=%d)\n",
