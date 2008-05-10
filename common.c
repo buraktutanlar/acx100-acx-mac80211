@@ -166,17 +166,6 @@ void acx_s_mwait(int ms)
 
 
 /***********************************************************************
-** Not inlined: it's larger than it seems
-*/
-void acx_print_mac(const char *head, const u8 * mac, const char *tail)
-{
-	printk("%s" MACSTR "%s", head, MAC(mac), tail);
-}
-
-
-
-
-/***********************************************************************
 ** acx_cmd_status_str
 */
 const char *acx_cmd_status_str(unsigned int state)

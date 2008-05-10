@@ -14,8 +14,6 @@
  */
 #include "acx_struct.h"
 
-void acx_print_mac(const char *head, const u8 *mac, const char *tail);
-
 /* Optimized out to nothing in non-debug build */
 
 /***********************************************************************
