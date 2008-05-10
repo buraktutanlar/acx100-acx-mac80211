@@ -46,10 +46,6 @@ typedef struct txhostdesc txhostdesc_t;
 #define IS_ACX100(adev)	((adev)->chip_type == CHIPTYPE_ACX100)
 #define IS_ACX111(adev)	((adev)->chip_type == CHIPTYPE_ACX111)
 
-/* Supported interfaces */
-#define DEVTYPE_PCI		0
-#define DEVTYPE_USB		1
-
 #if defined(CONFIG_ACX_MAC80211_PCI)
 #define IS_PCI(adev) (1)
 #define IS_USB(adev) (0)
@@ -1084,7 +1080,6 @@ struct acx_device {
 
 	/*** Hardware identification ***/
 	const char		*chip_name;
-	u8			dev_type;
 	u8			chip_type;
 	u8			form_factor;
 	u8			radio_type;
