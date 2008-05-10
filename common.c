@@ -569,8 +569,6 @@ static const u16 acx111_ie_len_dot11[] = {
 };
 
 
-#undef FUNC
-#define FUNC "configure"
 #if !ACX_DEBUG
 int acx_s_configure(acx_device_t * adev, void *pdr, int type)
 {
@@ -588,7 +586,7 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	acx_log(LOG_DEBUG, L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
+	acx_log(LOG_DEBUG, L_CTL, "configure (type:%s,len:%u)\n", typestr, len);
 	if (unlikely(!len)) {
 		acx_log(LOG_DEBUG, L_ANY, "zero-length type %s?!\n", typestr);
 	}
@@ -598,10 +596,11 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY, "%s: configure (type:%s) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), typestr);
 #else
-		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY,
+			"%s: configure (type:0x%X) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -609,8 +608,6 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	return res;
 }
 
-#undef FUNC
-#define FUNC "interrogate"
 #if !ACX_DEBUG
 int acx_s_interrogate(acx_device_t * adev, void *pdr, int type)
 {
@@ -632,17 +629,20 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	acx_log(LOG_DEBUG, L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
+	acx_log(LOG_DEBUG, L_CTL, "interrogate (type:%s,len:%u)\n",
+		typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:%s) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY,
+			"%s: interrogate (type:%s) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), typestr);
 #else
-		acx_log(LOG_WARNING, L_ANY, "%s: " FUNC "(type:0x%X) FAILED\n",
+		acx_log(LOG_WARNING, L_ANY,
+			"%s: interrogate (type:0x%X) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
