@@ -79,6 +79,7 @@
 #define L_REALLYVERBOSE	0x2000	/* Flood me, baby! */
 #define L_ANY		0xffff
 
+#define ACX_DEFAULT_MSG (L_INIT|L_ASSOC)
 /*
  * Log levels.
  */
@@ -115,6 +116,7 @@ void acx_log_dump(int level, int what, const void *buf, ssize_t buflen,
 #define __FUNCTION_EXIT_WITHARG 2
 
 void __function_enter_exit(const char *, int, int);
+
 #define FN_ENTER do { \
 	__function_enter_exit(__func__, __FUNCTION_ENTER, 0); \
 } while (0)
