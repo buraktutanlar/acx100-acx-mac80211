@@ -79,7 +79,7 @@
 #define L_REALLYVERBOSE	0x2000	/* Flood me, baby! */
 #define L_ANY		0xffff
 
-#define ACX_DEFAULT_MSG (L_INIT|L_ASSOC)
+#define ACX_DEFAULT_MSG (L_INIT|L_ASSOC|L_FUNC|L_IRQ)
 /*
  * Log levels.
  */
