@@ -372,7 +372,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 /*
    check for result==buflen+4? Was seen:
 
-interrogate(type:ACX100_REG_DOT11_ED_THRESHOLD,len:4)
+query(type:ACX100_REG_DOT11_ED_THRESHOLD,len:4)
 issue_cmd(cmd:ACX1xx_CMD_QUERY,buflen:8,type:4111)
 ctrl inpipe=0x80000280 outpipe=0x80000200
 sending USB control msg (out) (blocklen=8)
@@ -707,7 +707,7 @@ static void acxusb_s_read_eeprom_version(acx_device_t * adev)
 	u8 eeprom_ver[0x8];
 
 	memset(eeprom_ver, 0, sizeof(eeprom_ver));
-	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_REG_EEPROM_VER);
+	acx_s_query(adev, &eeprom_ver, ACX1FF_REG_EEPROM_VER);
 
 	/* FIXME: which one of those values to take? */
 	adev->eeprom_version = eeprom_ver[5];

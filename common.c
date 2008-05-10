@@ -206,7 +206,7 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 	FN_ENTER;
 
 	memset(fw.fw_id, 'E', FW_ID_SIZE);
-	acx_s_interrogate(adev, &fw, ACX1xx_REG_FWREV);
+	acx_s_query(adev, &fw, ACX1xx_REG_FWREV);
 	memcpy(adev->firmware_version, fw.fw_id, FW_ID_SIZE);
 	adev->firmware_version[FW_ID_SIZE] = '\0';
 
@@ -610,11 +610,11 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 }
 
 #if !ACX_DEBUG
-int acx_s_interrogate(acx_device_t * adev, void *pdr, int type)
+int acx_s_query(acx_device_t * adev, void *pdr, int type)
 {
 #else
 int
-acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
+acx_s_query_debug(acx_device_t * adev, void *pdr, int type,
 			const char *typestr)
 {
 #endif
@@ -630,7 +630,7 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	acx_log(LOG_DEBUG, L_CTL, "interrogate (type:%s,len:%u)\n",
+	acx_log(LOG_DEBUG, L_CTL, "query (type:%s,len:%u)\n",
 		typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
@@ -639,11 +639,11 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		acx_log(LOG_WARNING, L_ANY,
-			"%s: interrogate (type:%s) FAILED\n",
+			"%s: query (type:%s) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), typestr);
 #else
 		acx_log(LOG_WARNING, L_ANY,
-			"%s: interrogate (type:0x%X) FAILED\n",
+			"%s: query (type:0x%X) FAILED\n",
 			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -807,7 +807,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 
 	part_str = "statistics query command";
 
-	if (OK != acx_s_interrogate(adev, st, ACX1xx_REG_FIRMWARE_STATISTICS))
+	if (OK != acx_s_query(adev, st, ACX1xx_REG_FIRMWARE_STATISTICS))
 		goto fw_stats_end;
 
 	st += sizeof(u16);
@@ -1652,7 +1652,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 
 	memset(&feat, 0, sizeof(feat));
 
-	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_REG_FEATURE_CONFIG)) {
+	if (OK != acx_s_query(adev, &feat, ACX1xx_REG_FEATURE_CONFIG)) {
 		FN_EXIT1(NOT_OK); 
 		return NOT_OK;
 	}
@@ -1860,7 +1860,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 	FN_ENTER;
 
 	/* read out the acx100 physical start address for the queues */
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_REG_MEMORY_MAP)) {
+	if (OK != acx_s_query(adev, &memmap, ACX1xx_REG_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -1904,7 +1904,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
 
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_REG_MEMORY_MAP)) {
+	if (OK != acx_s_query(adev, &memmap, ACX1xx_REG_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -1998,7 +1998,7 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 		goto fail;
 	}
 
-	acx_s_interrogate(adev, &queueconf, ACX1xx_REG_MEMORY_CONFIG_OPTIONS);
+	acx_s_query(adev, &queueconf, ACX1xx_REG_MEMORY_CONFIG_OPTIONS);
 
 	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
@@ -2821,7 +2821,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 
 	FN_ENTER;
 
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
+	if (OK != acx_s_query(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -2867,7 +2867,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 */
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
+	if (OK != acx_s_query(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
 		acx_log(LOG_WARNING, L_ANY,
 			"%s: ACX1xx_REG_MEMORY_MAP read #2 FAILED\n",
 			wiphy_name(adev->ieee->wiphy));
@@ -3085,7 +3085,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
 
-	if (OK != acx_s_interrogate(adev, &mm, ACX1xx_REG_MEMORY_MAP))
+	if (OK != acx_s_query(adev, &mm, ACX1xx_REG_MEMORY_MAP))
 		goto failed_acx100;
 
 	mm.QueueStart = cpu_to_le32(le32_to_cpu(mm.PacketTemplateEnd) + 4);
@@ -3206,7 +3206,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 		adev->ps_wakeup_cfg, adev->ps_listen_interval,
 		adev->ps_options, adev->ps_hangover_period,
 		adev->ps_enhanced_transition_time);
-	acx_s_interrogate(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
 	acx_log(LOG_DEBUG, L_INIT, "Previous PS mode settings: "
 		"wakeup_cfg 0x%02X, "
 		"listen interval %u, options 0x%02X, "
@@ -3233,11 +3233,11 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 		    cpu_to_le16(adev->ps_enhanced_transition_time);
 	}
 	acx_s_configure(adev, &pm, ACX1xx_REG_POWER_MGMT);
-	acx_s_interrogate(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
 	acx_log(LOG_DEBUG, L_INIT, "wakeup_cfg: 0x%02X\n",
 		pm.acx111.wakeup_cfg);
 	acx_s_mwait(40);
-	acx_s_interrogate(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
 	acx_log(LOG_DEBUG, L_INIT, "wakeup_cfg: 0x%02X\n",
 		pm.acx111.wakeup_cfg);
 	acx_log(LOG_DEBUG, L_INIT, "power save mode change %s\n",
@@ -3379,7 +3379,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 stationID[4 + ACX1xx_REG_DOT11_STATION_ID_LEN];
 		const u8 *paddr;
 
-		acx_s_interrogate(adev, &stationID, ACX1xx_REG_DOT11_STATION_ID);
+		acx_s_query(adev, &stationID, ACX1xx_REG_DOT11_STATION_ID);
 		paddr = &stationID[4];
 //		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
 		for (i = 0; i < ETH_ALEN; i++) {
@@ -3414,7 +3414,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 antenna[4 + ACX1xx_REG_DOT11_CURRENT_ANTENNA_LEN];
 
 		memset(antenna, 0, sizeof(antenna));
-		acx_s_interrogate(adev, antenna,
+		acx_s_query(adev, antenna,
 				  ACX1xx_REG_DOT11_CURRENT_ANTENNA);
 		adev->antenna = antenna[4];
 		acx_log(LOG_INFO, L_INIT, "got antenna value 0x%02X\n",
@@ -3427,7 +3427,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u8 ed_threshold[4 + ACX100_REG_DOT11_ED_THRESHOLD_LEN];
 
 			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_s_interrogate(adev, ed_threshold,
+			acx_s_query(adev, ed_threshold,
 					  ACX100_REG_DOT11_ED_THRESHOLD);
 			adev->ed_threshold = ed_threshold[4];
 		} else {
@@ -3446,7 +3446,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u8 cca[4 + ACX1xx_REG_DOT11_CURRENT_CCA_MODE_LEN];
 
 			memset(cca, 0, sizeof(adev->cca));
-			acx_s_interrogate(adev, cca,
+			acx_s_query(adev, cca,
 					  ACX1xx_REG_DOT11_CURRENT_CCA_MODE);
 			adev->cca = cca[4];
 		} else {
@@ -3463,7 +3463,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	if (adev->get_mask & GETSET_REG_DOMAIN) {
 		acx_ie_generic_t dom;
 
-		acx_s_interrogate(adev, &dom,
+		acx_s_query(adev, &dom,
 				  ACX1xx_REG_DOT11_CURRENT_REG_DOMAIN);
 		adev->reg_dom_id = dom.m.bytes[0];
 		acx_s_set_sane_reg_domain(adev, 0);
