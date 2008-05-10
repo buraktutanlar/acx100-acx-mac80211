@@ -311,9 +311,9 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	acklen = buflen + 4 + BOGUS_SAFETY_PADDING;
 	blocklen = buflen;
 	if (buffer && buflen) {
-		/* if it's an INTERROGATE command, just pass the length
+		/* if it's an QUERY command, just pass the length
 		 * of parameters to read, as data */
-		if (cmd == ACX1xx_CMD_INTERROGATE) {
+		if (cmd == ACX1xx_CMD_QUERY) {
 			blocklen = 4;
 			acklen = buflen + 4;
 		}
@@ -373,7 +373,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
    check for result==buflen+4? Was seen:
 
 interrogate(type:ACX100_REG_DOT11_ED_THRESHOLD,len:4)
-issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
+issue_cmd(cmd:ACX1xx_CMD_QUERY,buflen:8,type:4111)
 ctrl inpipe=0x80000280 outpipe=0x80000200
 sending USB control msg (out) (blocklen=8)
 01 00 00 00 0F 10 04 00
@@ -389,7 +389,7 @@ read 4 bytes <==== MUST BE 12!!
 			devname, cmd_status, acx_cmd_status_str(cmd_status));
 		/* TODO: goto bad; ? */
 	}
-	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
+	if ((cmd == ACX1xx_CMD_QUERY) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
 		acx_log(LOG_DEBUG, L_CTL,
 			"response frame: cmd=0x%04X status=%d\n",

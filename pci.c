@@ -1021,7 +1021,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		goto bad;
 	}
 
-	if (cmd != ACX1xx_CMD_INTERROGATE)
+	if (cmd != ACX1xx_CMD_QUERY)
 		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
 			"input buffer:\n");
 
@@ -1058,15 +1058,15 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	/* now write the parameters of the command if needed */
 	if (buffer && buflen) {
-		/* if it's an INTERROGATE command, just pass the length
+		/* if it's an QUERY command, just pass the length
 		 * of parameters to read, as data */
 #if CMD_DISCOVERY
-		if (cmd == ACX1xx_CMD_INTERROGATE)
+		if (cmd == ACX1xx_CMD_QUERY)
 			memset_io(adev->cmd_area + 4, 0xAA, buflen);
 #endif
 		/* adev->cmd_area points to PCI device's memory, not to RAM! */
 		memcpy_toio(adev->cmd_area + 4, buffer,
-			    (cmd == ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
+			    (cmd == ACX1xx_CMD_QUERY) ? 4 : buflen);
 	}
 	/* now write the actual command type */
 	acxpci_write_cmd_type_status(adev, cmd, 0);
@@ -1158,7 +1158,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 
 	/* read in result parameters if needed */
-	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
+	if (buffer && buflen && (cmd == ACX1xx_CMD_QUERY)) {
 		/* adev->cmd_area points to PCI device's memory, not to RAM! */
 		memcpy_fromio(buffer, adev->cmd_area + 4, buflen);
 		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,

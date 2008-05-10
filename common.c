@@ -635,7 +635,7 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
+	res = acx_s_issue_cmd(adev, ACX1xx_CMD_QUERY, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		acx_log(LOG_WARNING, L_ANY,
@@ -672,7 +672,7 @@ void great_inquisitor(acx_device_t * adev)
 			type = 0x1000;
 		ie.type = cpu_to_le16(type);
 		ie.len = cpu_to_le16(sizeof(ie) - 4);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
+		acx_s_issue_cmd(adev, ACX1xx_CMD_QUERY, &ie, sizeof(ie));
 	}
 	FN_EXIT0;
 }
