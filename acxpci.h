@@ -35,6 +35,10 @@
 #define	ACX_IO_SLV_MEM_DATA 		2
 #define	ACX_IO_SLV_MEM_CTL 		3
 #define	ACX_IO_SLV_END_CTL 		4
+/*
+ * Original code said that the following is the "function event mask". Whatever
+ * that means.
+ */
 #define	ACX_IO_FEMR 			5
 #define	ACX_IO_INT_TRIG 		6
 #define	ACX_IO_IRQ_MASK 		7
