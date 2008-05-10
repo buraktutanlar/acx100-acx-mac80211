@@ -244,14 +244,6 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 		acx_log(LOG_DEBUG, L_ANY, "firmware_numver 0x%08X\n",
 			adev->firmware_numver);
 	}
-	if (IS_ACX111(adev)) {
-		if (adev->firmware_numver == 0x00010011) {
-			/* This one does not survive floodpinging */
-			acx_log(LOG_WARNING, L_ANY, "firmware '%s' is known "
-				"to be buggy, please upgrade\n",
-				adev->firmware_version);
-		}
-	}
 
 	adev->firmware_id = le32_to_cpu(fw.hw_id);
 
