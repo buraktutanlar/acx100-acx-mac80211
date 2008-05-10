@@ -8,6 +8,11 @@
 #include <linux/version.h>
 #include "acx_debug.h"
 #include "acx_log.h"
+/*
+ * FIXME: this file is needed only so that the lock debugging functions have an
+ * acx_device_t structure to play with :(
+ */
+#include "acx_struct.h"
 
 void acx_print_mac(const char *head, const u8 *mac, const char *tail);
 
