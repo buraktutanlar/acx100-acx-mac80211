@@ -20,7 +20,7 @@
 #include "acx_config.h"
 #include "acx_mac80211.h"
 #include "acx_debug.h"
-#include "acx_commands.h"
+#include "acx_mmio.h"
 #include "acx_firmware.h"
 #include "acx_hwstructs.h"
 

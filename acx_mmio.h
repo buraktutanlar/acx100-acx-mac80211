@@ -2,9 +2,9 @@
 #define _ACX_COMMANDS_H_
 
 /*
- * acx_commands.h: querying/configuration commands and on-chip (EEPROM?)
- * registers. Differ depending on the chipset and bus type (PCI or USB - it
- * appears that VLYNQ behaves like PCI most of the time - most).
+ * acx_mmio.h: querying/configuration commands and on-chip (EEPROM?) registers.
+ * Differ depending on the chipset and bus type (PCI or USB - it appears that
+ * VLYNQ behaves like PCI most of the time - most).
  *
  * Copyright (c) 2003, 2008 ACX100 driver project.
  *
