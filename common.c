@@ -944,9 +944,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	partlen = sizeof(fw_stats_wep_t);
 	st += partlen;
 
-	if ((IS_PCI(adev) && IS_ACX100(adev))
-	    || (IS_USB(adev) && IS_ACX100(adev))
-	    ) {
+	if (IS_ACX100(adev)) {
 		/* at least ACX100 PCI F/W 1.9.8.b
 		 * and ACX100 USB F/W 1.0.7-USB
 		 * don't have those two fields... */
