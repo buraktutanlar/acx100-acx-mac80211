@@ -51,24 +51,15 @@ typedef struct txhostdesc txhostdesc_t;
 #define DEVTYPE_USB		1
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
- #if !defined(CONFIG_ACX_MAC80211_USB)
-  #define IS_PCI(adev)	1
- #else
-  #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
- #endif
+#define IS_PCI(adev) (1)
+#define IS_USB(adev) (0)
 #else
- #define IS_PCI(adev)	0
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
- #if !defined(CONFIG_ACX_MAC80211_PCI)
-  #define IS_USB(adev)	1
- #else
-  #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
- #endif
-#else
- #define IS_USB(adev)	0
-#endif
+/*
+ * If not PCI, it IS a USB device. We cannot have both at the same time.
+ */
+#define IS_PCI(adev) (0)
+#define IS_USB(adev) (1)
+#endif /* !defined(CONFIG_ACX_MAC80211_PCI) */
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
