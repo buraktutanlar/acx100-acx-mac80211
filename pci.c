@@ -35,7 +35,7 @@
 #endif
 
 #include "acx.h"
-#include "acxpci.h"
+#include "acx_struct_pci.h"
 #include "acx_log.h"
 #include "acx_irq.h"
 #include "acx_util.h"
