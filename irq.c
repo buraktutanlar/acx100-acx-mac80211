@@ -129,7 +129,12 @@
 //
 //
 //out:
-//	//mmiowb(); Necessary?
+//	/*
+//	 * This guarantees that the compiler will NOT do reordering at this
+//	 * point: we want these commands to be issued BEFORE the spinlock gets
+//	 * unlocked!
+//	 */
+//	mmiowb();
 //	spin_unlock(&adev->irqlock);
 //	return ret;
 //}
@@ -159,6 +164,12 @@
 //
 //
 //	acx_enable_irqs(adev, adev->irq_saved_mask);
+//	/*
+//	 * This guarantees that the compiler will NOT do reordering at this
+//	 * point: we want these commands to be issued BEFORE the spinlock gets
+//	 * unlocked!
+//	 */
+//	mmiowmb();
 //	spin_unlock_irqrestore(&adev->irqlock, flags);
 //}
 
