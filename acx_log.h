@@ -95,9 +95,18 @@
  */
 
 void acx_log(int level, int what, const char *fmt, ...);
-void acx_log_ratelimited(int level, int what, const char *fmt, ...);
 void acx_log_dump(int level, int what, const void *buf, ssize_t buflen,
 	const char *fmt, ...);
+
+/*
+ * This one needs to be a macro! We don't want nested va_start()/va_end()
+ * calls...
+ */
+
+#define acx_log_ratelimited(level, what, fmt...) do { \
+	if (!printk_ratelimit()) \
+		acx_log(level, what, fmt); \
+} while (0)
 
 #if ACX_LOG_LEVEL == 2
 
