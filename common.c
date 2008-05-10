@@ -26,6 +26,7 @@
 #include "acx_debug.h"
 #include "acx_log.h"
 #include "acx_irq.h"
+#include "acx_commands.h"
 
 
 /***********************************************************************
