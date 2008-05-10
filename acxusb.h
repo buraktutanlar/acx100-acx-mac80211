@@ -9,8 +9,6 @@
  *
  * This file is licensed under the GPLv2. See the README file for details.
  */
-#ifdef ACX_MAC80211_USB
-
 /* Used for usb_txbuffer.desc field */
 #define USB_TXBUF_TXDESC	0xA
 /* Size of header (everything up to data[]) */
