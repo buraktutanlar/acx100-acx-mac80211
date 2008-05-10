@@ -156,11 +156,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 void acx_s_mwait(int ms)
 {
 	FN_ENTER;
-#ifdef CONFIG_X86
 	mdelay(ms);
-#else
-	msleep(ms);
-#endif
 	FN_EXIT0;
 }
 
