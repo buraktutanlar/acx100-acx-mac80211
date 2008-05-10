@@ -1501,7 +1501,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	adev->ieee = ieee;
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
-	adev->dev_type = DEVTYPE_PCI;
 
 /** Finished with private interface **/
 
@@ -4177,7 +4176,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->ieee = ieee;
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
-	adev->dev_type = DEVTYPE_PCI;
 
 /** Finished with private interface **/
 

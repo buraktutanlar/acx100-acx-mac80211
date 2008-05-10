@@ -839,7 +839,6 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev = ieee2adev(ieee);
 	adev->ieee = ieee;
 	
-	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
 	if (is_tnetw1450) {
 		/* well, actually it's a TNETW1450, but since it
