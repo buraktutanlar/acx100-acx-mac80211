@@ -26,7 +26,6 @@
  * FIXME: some devices use ssb_*, whatever that turns out to be. Maybe this
  * could be used instead of using self-constructed offsets?
  *
- * FIXME, 2: use smp_[rw]mb() after each read/write?
  */
 
 #define acx_readl(val)	le32_to_cpu(readl((val)))

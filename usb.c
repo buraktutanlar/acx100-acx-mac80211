@@ -221,7 +221,7 @@ int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
 	acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
-	acx_log(L_DEBUG, L_REALLYVERBOSE,
+	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
 		"write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
@@ -304,16 +304,16 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 **
 ** Configure: write (cmd,status,rid,frmlen,data[frmlen])
 **
-** Possibly bogus special handling of ACX1xx_IE_SCAN_STATUS removed
+** Possibly bogus special handling of ACX1xx_REG_SCAN_STATUS removed
 */
 
 	/* now write the parameters of the command if needed */
 	acklen = buflen + 4 + BOGUS_SAFETY_PADDING;
 	blocklen = buflen;
 	if (buffer && buflen) {
-		/* if it's an INTERROGATE command, just pass the length
+		/* if it's an QUERY command, just pass the length
 		 * of parameters to read, as data */
-		if (cmd == ACX1xx_CMD_INTERROGATE) {
+		if (cmd == ACX1xx_CMD_QUERY) {
 			blocklen = 4;
 			acklen = buflen + 4;
 		}
@@ -372,8 +372,8 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 /*
    check for result==buflen+4? Was seen:
 
-interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
-issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
+query(type:ACX100_REG_DOT11_ED_THRESHOLD,len:4)
+issue_cmd(cmd:ACX1xx_CMD_QUERY,buflen:8,type:4111)
 ctrl inpipe=0x80000280 outpipe=0x80000200
 sending USB control msg (out) (blocklen=8)
 01 00 00 00 0F 10 04 00
@@ -389,7 +389,7 @@ read 4 bytes <==== MUST BE 12!!
 			devname, cmd_status, acx_cmd_status_str(cmd_status));
 		/* TODO: goto bad; ? */
 	}
-	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
+	if ((cmd == ACX1xx_CMD_QUERY) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
 		acx_log(LOG_DEBUG, L_CTL,
 			"response frame: cmd=0x%04X status=%d\n",
@@ -707,7 +707,7 @@ static void acxusb_s_read_eeprom_version(acx_device_t * adev)
 	u8 eeprom_ver[0x8];
 
 	memset(eeprom_ver, 0, sizeof(eeprom_ver));
-	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
+	acx_s_query(adev, &eeprom_ver, ACX1FF_REG_EEPROM_VER);
 
 	/* FIXME: which one of those values to take? */
 	adev->eeprom_version = eeprom_ver[5];
@@ -839,7 +839,6 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev = ieee2adev(ieee);
 	adev->ieee = ieee;
 	
-	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
 	if (is_tnetw1450) {
 		/* well, actually it's a TNETW1450, but since it
@@ -947,7 +946,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	SET_IEEE80211_DEV(ieee, &intf->dev);
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
-	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
+	   until ifup (it's available via reading ACX1xx_REG_DOT11_STATION_ID)... */
 
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -1341,6 +1340,9 @@ void acxusb_i_complete_rx(struct urb *urb)
 	ptr = inbuf;
 	if (adev->rxtruncsize) {
 		int tail_size;
+		/*
+		 * FIXME: packetsize UNDEFINED, says gcc. And it is, indeed.
+		 */
 		acx_log(LOG_WARNING, L_ANY,
 			"handling truncated frame (truncsize=%d size=%d "
 			"packetsize(from trunc)=%d)\n",

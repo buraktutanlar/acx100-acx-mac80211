@@ -8,8 +8,11 @@
 #include <linux/version.h>
 #include "acx_debug.h"
 #include "acx_log.h"
-
-void acx_print_mac(const char *head, const u8 *mac, const char *tail);
+/*
+ * FIXME: this file is needed only so that the lock debugging functions have an
+ * acx_device_t structure to play with :(
+ */
+#include "acx_struct.h"
 
 /* Optimized out to nothing in non-debug build */
 
@@ -297,9 +300,9 @@ acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsig
 int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
 #define acx_s_configure(adev,pdr,type) \
 	acx_s_configure_debug(adev,pdr,type,#type)
-int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_interrogate(adev,pdr,type) \
-	acx_s_interrogate_debug(adev,pdr,type,#type)
+int acx_s_query_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_query(adev,pdr,type) \
+	acx_s_query_debug(adev,pdr,type,#type)
 
 #else
 
@@ -320,7 +323,7 @@ acx_s_issue_cmd(acx_device_t *adev, unsigned cmd, void *param, unsigned len)
 	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
 }
 int acx_s_configure(acx_device_t *adev, void *pdr, int type);
-int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
+int acx_s_query(acx_device_t *adev, void *pdr, int type);
 
 #endif
 

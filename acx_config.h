@@ -5,6 +5,22 @@
 #define CONFIG_ACX_MAC80211_PCI 1
 //#define CONFIG_ACX_MAC80211_USB 1
 
+/*
+ * Err out immediately if both are set
+ */
+
+#if defined(CONFIG_ACX_MAC80211_PCI) && defined(CONFIG_ACX_MAC80211_USB)
+#error The driver does NOT support building both USB and PCI at the moment
+#endif
+
+/*
+ * Also err out if none is set...
+ */
+#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
+#error Driver must include PCI and/or USB support. You selected neither.
+#endif
+
+
 #define ACX_RELEASE "v0.3.38-mac80211"
 
 /* assume 32bit I/O width

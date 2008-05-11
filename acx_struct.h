@@ -1,22 +1,35 @@
 #ifndef _ACX_STRUCT_H_
 #define _ACX_STRUCT_H_
 
-/**** (legal) claimer in README
-** Copyright (C) 2003  ACX100 Open Source Project
-*/
+/* 
+ * acx_struct.h: common structures.
+ *
+ * Copyright (C) 2003-2008, the ACX100 Open Source Project.
+ *
+ * This file is licensed under the GPL version 2. See the README file for more
+ * information.
+ */
 #include <linux/version.h>
 
+/*
+ * We must not even enter here if neither USB nor PCI support are enabled. This
+ * file will take care of that for us.
+ *
+ * FIXME: hack!
+ */
+#include "acx_config.h"
 #include "acx_mac80211.h"
 #include "acx_debug.h"
+#include "acx_mmio.h"
+#include "acx_firmware.h"
+#include "acx_hwstructs.h"
+
 
 /***********************************************************************
 ** Forward declarations of types
 */
-typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
 typedef struct client client_t;
-typedef struct rxdesc rxdesc_t;
-typedef struct txdesc txdesc_t;
 typedef struct rxhostdesc rxhostdesc_t;
 typedef struct txhostdesc txhostdesc_t;
 
@@ -34,33 +47,16 @@ typedef struct txhostdesc txhostdesc_t;
 #define IS_ACX100(adev)	((adev)->chip_type == CHIPTYPE_ACX100)
 #define IS_ACX111(adev)	((adev)->chip_type == CHIPTYPE_ACX111)
 
-/* Supported interfaces */
-#define DEVTYPE_PCI		0
-#define DEVTYPE_USB		1
-
-#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
-#error Driver must include PCI and/or USB support. You selected neither.
-#endif
-
 #if defined(CONFIG_ACX_MAC80211_PCI)
- #if !defined(CONFIG_ACX_MAC80211_USB)
-  #define IS_PCI(adev)	1
- #else
-  #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
- #endif
+#define IS_PCI(adev) (1)
+#define IS_USB(adev) (0)
 #else
- #define IS_PCI(adev)	0
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
- #if !defined(CONFIG_ACX_MAC80211_PCI)
-  #define IS_USB(adev)	1
- #else
-  #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
- #endif
-#else
- #define IS_USB(adev)	0
-#endif
+/*
+ * If not PCI, it IS a USB device. We cannot have both at the same time.
+ */
+#define IS_PCI(adev) (0)
+#define IS_USB(adev) (1)
+#endif /* !defined(CONFIG_ACX_MAC80211_PCI) */
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
@@ -87,43 +83,6 @@ typedef struct txhostdesc txhostdesc_t;
 #define RADIO_UNKNOWN_19	0x19
 #define RADIO_UNKNOWN_1B	0x1b    /* radio in SafeCom SWLUT-54125 USB adapter; entirely unknown!! */
 
-/* Controller Commands */
-/* can be found in table cmdTable in firmware "Rev. 1.5.0" (FW150) */
-#define ACX1xx_CMD_RESET		0x00
-#define ACX1xx_CMD_INTERROGATE		0x01
-#define ACX1xx_CMD_CONFIGURE		0x02
-#define ACX1xx_CMD_ENABLE_RX		0x03
-#define ACX1xx_CMD_ENABLE_TX		0x04
-#define ACX1xx_CMD_DISABLE_RX		0x05
-#define ACX1xx_CMD_DISABLE_TX		0x06
-#define ACX1xx_CMD_FLUSH_QUEUE		0x07
-#define ACX1xx_CMD_SCAN			0x08
-#define ACX1xx_CMD_STOP_SCAN		0x09
-#define ACX1xx_CMD_CONFIG_TIM		0x0a
-#define ACX1xx_CMD_JOIN			0x0b
-#define ACX1xx_CMD_WEP_MGMT		0x0c
-#ifdef OLD_FIRMWARE_VERSIONS
-#define ACX100_CMD_HALT			0x0e	/* mapped to unknownCMD in FW150 */
-#else
-#define ACX1xx_CMD_MEM_READ		0x0d
-#define ACX1xx_CMD_MEM_WRITE		0x0e
-#endif
-#define ACX1xx_CMD_SLEEP		0x0f
-#define ACX1xx_CMD_WAKE			0x10
-#define ACX1xx_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */
-#define ACX100_CMD_INIT_MEMORY		0x12
-#define ACX1FF_CMD_DISABLE_RADIO	0x12	/* new firmware? TNETW1450? */
-#define ACX1xx_CMD_CONFIG_BEACON	0x13
-#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x14
-#define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
-#define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x16
-#define ACX1xx_CMD_FCC_TEST		0x17
-#define ACX1xx_CMD_RADIOINIT		0x18
-#define ACX111_CMD_RADIOCALIB		0x19
-#define ACX1FF_CMD_NOISE_HISTOGRAM	0x1c /* new firmware? TNETW1450? */
-#define ACX1FF_CMD_RX_RESET		0x1d /* new firmware? TNETW1450? */
-#define ACX1FF_CMD_LNA_CONTROL		0x20 /* new firmware? TNETW1450? */
-#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21 /* new firmware? TNETW1450? */
 
 /***********************************************************************
 ** Tx/Rx buffer sizes and watermarks
@@ -146,248 +105,6 @@ typedef struct txhostdesc txhostdesc_t;
 #define TX_STOP_QUEUE 3
 /* we start queue if we have >= N free txbufs: */
 #define TX_START_QUEUE 5
-
-/***********************************************************************
-** Interrogate/Configure cmd constants
-**
-** NB: length includes JUST the data part of the IE
-** (does not include size of the (type,len) pair)
-**
-** TODO: seems that acx100, acx100usb, acx111 have some differences,
-** fix code with regard to this!
-*/
-
-#define DEF_IE(name, val, len) enum { ACX##name=val, ACX##name##_LEN=len }
-
-/* Information Elements: Network Parameters, Static Configuration Entities */
-/* these are handled by real_cfgtable in firmware "Rev 1.5.0" (FW150) */
-DEF_IE(1xx_IE_UNKNOWN_00		,0x0000, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(100_IE_ACX_TIMER			,0x0001, 0x10);
-DEF_IE(1xx_IE_POWER_MGMT		,0x0002, 0x06); /* TNETW1450: length 0x18!! */
-DEF_IE(1xx_IE_QUEUE_CONFIG		,0x0003, 0x1c);
-DEF_IE(100_IE_BLOCK_SIZE		,0x0004, 0x02);
-DEF_IE(1FF_IE_SLOT_TIME			,0x0004, 0x08); /* later firmware versions only? */
-DEF_IE(1xx_IE_MEMORY_CONFIG_OPTIONS	,0x0005, 0x14);
-DEF_IE(1FF_IE_QUEUE_HEAD		,0x0005, 0x14 /* FIXME: length? */);
-DEF_IE(1xx_IE_RATE_FALLBACK		,0x0006, 0x01); /* TNETW1450: length 2 */
-DEF_IE(100_IE_WEP_OPTIONS		,0x0007, 0x03);
-DEF_IE(111_IE_RADIO_BAND		,0x0007, -1);
-DEF_IE(1FF_IE_TIMING_CFG		,0x0007, -1);	/* later firmware versions; TNETW1450 only? */
-DEF_IE(100_IE_SSID			,0x0008, 0x20); /* huh? */
-DEF_IE(1xx_IE_MEMORY_MAP		,0x0008, 0x28); /* huh? TNETW1450 has length 0x40!! */
-DEF_IE(1xx_IE_SCAN_STATUS		,0x0009, 0x04); /* mapped to cfgInvalid in FW150 */
-DEF_IE(1xx_IE_ASSOC_ID			,0x000a, 0x02);
-DEF_IE(1xx_IE_UNKNOWN_0B		,0x000b, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1FF_IE_TX_POWER_LEVEL_TABLE	,0x000b, 0x18); /* later firmware versions; TNETW1450 only? */
-DEF_IE(100_IE_UNKNOWN_0C		,0x000c, -1);	/* very small implementation in FW150! */
-/* ACX100 has an equivalent struct in the cmd mailbox directly after reset.
- * 0x14c seems extremely large, will trash stack on failure (memset!)
- * in case of small input struct --> OOPS! */
-DEF_IE(111_IE_CONFIG_OPTIONS		,0x000c, 0x14c);
-DEF_IE(1xx_IE_FWREV			,0x000d, 0x18);
-DEF_IE(1xx_IE_FCS_ERROR_COUNT		,0x000e, 0x04);
-DEF_IE(1xx_IE_MEDIUM_USAGE		,0x000f, 0x08);
-DEF_IE(1xx_IE_RXCONFIG			,0x0010, 0x04);
-DEF_IE(100_IE_UNKNOWN_11		,0x0011, -1);	/* NONBINARY: large implementation in FW150! link quality readings or so? */
-DEF_IE(111_IE_QUEUE_THRESH		,0x0011, -1);
-DEF_IE(100_IE_UNKNOWN_12		,0x0012, -1);	/* NONBINARY: VERY large implementation in FW150!! */
-DEF_IE(111_IE_BSS_POWER_SAVE		,0x0012, /* -1 */ 2);
-DEF_IE(1xx_IE_FIRMWARE_STATISTICS	,0x0013, 0x9c); /* TNETW1450: length 0x134!! */
-DEF_IE(1FF_IE_RX_INTR_CONFIG		,0x0014, 0x14); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1xx_IE_FEATURE_CONFIG		,0x0015, 0x08);
-DEF_IE(111_IE_KEY_CHOOSE		,0x0016, 0x04);	/* for rekeying. really len=4?? */
-DEF_IE(1FF_IE_MISC_CONFIG_TABLE		,0x0017, 0x04); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_WONE_CONFIG		,0x0018, -1);	/* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_TID_CONFIG		,0x001a, 0x2c); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_CALIB_ASSESSMENT		,0x001e, 0x04); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_BEACON_FILTER_OPTIONS	,0x001f, 0x02); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_LOW_RSSI_THRESH_OPT	,0x0020, 0x04); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_NOISE_HISTOGRAM_RESULTS	,0x0021, 0x30); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_PACKET_DETECT_THRESH	,0x0023, 0x04); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_TX_CONFIG_OPTIONS		,0x0024, 0x04); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_CCA_THRESHOLD		,0x0025, 0x02); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_EVENT_MASK		,0x0026, 0x08); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_DTIM_PERIOD		,0x0027, 0x02); /* later firmware versions, TNETW1450 only? */
-DEF_IE(1FF_IE_ACI_CONFIG_SET		,0x0029, 0x06); /* later firmware versions; maybe TNETW1450 only? */
-DEF_IE(1FF_IE_EEPROM_VER		,0x0030, 0x04); /* later firmware versions; maybe TNETW1450 only? */
-DEF_IE(1xx_IE_DOT11_STATION_ID		,0x1001, 0x06);
-DEF_IE(100_IE_DOT11_UNKNOWN_1002	,0x1002, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(111_IE_DOT11_FRAG_THRESH		,0x1002, -1);	/* mapped to cfgInvalid in FW150; TNETW1450 has length 2!! */
-DEF_IE(100_IE_DOT11_BEACON_PERIOD	,0x1003, 0x02);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1xx_IE_DOT11_DTIM_PERIOD		,0x1004, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1FF_IE_DOT11_MAX_RX_LIFETIME	,0x1004, -1);	/* later firmware versions; maybe TNETW1450 only? */
-DEF_IE(1xx_IE_DOT11_SHORT_RETRY_LIMIT	,0x1005, 0x01); /* TNETW1450: length 2 */
-DEF_IE(1xx_IE_DOT11_LONG_RETRY_LIMIT	,0x1006, 0x01); /* TNETW1450: length 2 */
-DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE	,0x1007, 0x20);	/* configure default keys; TNETW1450 has length 0x24!! */
-DEF_IE(1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME	,0x1008, 0x04);
-DEF_IE(1xx_IE_DOT11_GROUP_ADDR		,0x1009, -1);
-DEF_IE(1xx_IE_DOT11_CURRENT_REG_DOMAIN	,0x100a, 0x02);
-/* It's harmless to have larger struct. Use USB case always. */
-DEF_IE(1xx_IE_DOT11_CURRENT_ANTENNA	,0x100b, 0x02);	/* in fact len=1 for PCI */
-DEF_IE(1xx_IE_DOT11_UNKNOWN_100C	,0x100c, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1xx_IE_DOT11_TX_POWER_LEVEL	,0x100d, 0x01); /* TNETW1450 has length 2!! */
-DEF_IE(1xx_IE_DOT11_CURRENT_CCA_MODE	,0x100e, 0x02);	/* in fact len=1 for PCI */
-/* USB doesn't return anything - len==0?! */
-DEF_IE(100_IE_DOT11_ED_THRESHOLD	,0x100f, 0x04);
-DEF_IE(1xx_IE_DOT11_WEP_DEFAULT_KEY_SET	,0x1010, 0x01);	/* set default key ID; TNETW1450: length 2 */
-DEF_IE(100_IE_DOT11_UNKNOWN_1011	,0x1011, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(1FF_IE_DOT11_CURR_5GHZ_REGDOM	,0x1011, -1);	/* later firmware versions; maybe TNETW1450 only? */
-DEF_IE(100_IE_DOT11_UNKNOWN_1012	,0x1012, -1);	/* mapped to cfgInvalid in FW150 */
-DEF_IE(100_IE_DOT11_UNKNOWN_1013	,0x1013, -1);	/* mapped to cfgInvalid in FW150 */
-
-#if 0
-/* Experimentally obtained on acx100, fw 1.9.8.b
-** -1 means that fw returned 'invalid IE'
-** 0200 FC00 nnnn... are test read contents: u16 type, u16 len, data
-** (AA are poison bytes marking bytes not written by fw)
-**
-** Looks like acx100 fw does not update len field (thus len=256-4=FC here)
-** A number of IEs seem to trash type,len fields
-** IEs marked 'huge' return gobs of data (no poison bytes remain)
-*/
-DEF_IE(100_IE_INVAL_00,			0x0000, -1);
-DEF_IE(100_IE_INVAL_01,			0x0001, -1);	/* IE_ACX_TIMER, len=16 on older fw */
-DEF_IE(100_IE_POWER_MGMT,		0x0002, 4);	/* 0200FC00 00040000 AAAAAAAA */
-DEF_IE(100_IE_QUEUE_CONFIG,		0x0003, 28);	/* 0300FC00 48060000 9CAD0000 0101AAAA DCB00000 E4B00000 9CAA0000 00AAAAAA */
-DEF_IE(100_IE_BLOCK_SIZE,		0x0004, 2);	/* 0400FC00 0001AAAA AAAAAAAA AAAAAAAA */
-/* write only: */
-DEF_IE(100_IE_MEMORY_CONFIG_OPTIONS,	0x0005, 20);
-DEF_IE(100_IE_RATE_FALLBACK,		0x0006, 1);	/* 0600FC00 00AAAAAA AAAAAAAA AAAAAAAA */
-/* write only: */
-DEF_IE(100_IE_WEP_OPTIONS,		0x0007, 3);
-DEF_IE(100_IE_MEMORY_MAP,		0x0008, 40);	/* huge: 0800FC00 30000000 6CA20000 70A20000... */
-/* gives INVAL on read: */
-DEF_IE(100_IE_SCAN_STATUS,		0x0009, -1);
-DEF_IE(100_IE_ASSOC_ID,			0x000a, 2);	/* huge: 0A00FC00 00000000 01040800 00000000... */
-DEF_IE(100_IE_INVAL_0B,			0x000b, -1);
-/* 'command rejected': */
-DEF_IE(100_IE_CONFIG_OPTIONS,		0x000c, -3);
-DEF_IE(100_IE_FWREV,			0x000d, 24);	/* 0D00FC00 52657620 312E392E 382E6200 AAAAAAAA AAAAAAAA 05050201 AAAAAAAA */
-DEF_IE(100_IE_FCS_ERROR_COUNT,		0x000e, 4);
-DEF_IE(100_IE_MEDIUM_USAGE,		0x000f, 8);	/* E41F0000 2D780300 FCC91300 AAAAAAAA */
-DEF_IE(100_IE_RXCONFIG,			0x0010, 4);	/* 1000FC00 00280000 AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_QUEUE_THRESH,		0x0011, 12);	/* 1100FC00 AAAAAAAA 00000000 00000000 */
-DEF_IE(100_IE_BSS_POWER_SAVE,		0x0012, 1);	/* 1200FC00 00AAAAAA AAAAAAAA AAAAAAAA */
-/* read only, variable len */
-DEF_IE(100_IE_FIRMWARE_STATISTICS,	0x0013, 256); /* 0000AC00 00000000 ... */
-DEF_IE(100_IE_INT_CONFIG,		0x0014, 20);	/* 00000000 00000000 00000000 00000000 5D74D105 00000000 AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_FEATURE_CONFIG,		0x0015, 8);	/* 1500FC00 16000000 AAAAAAAA AAAAAAAA */
-/* returns 'invalid MAC': */
-DEF_IE(100_IE_KEY_CHOOSE,		0x0016, -4);
-DEF_IE(100_IE_INVAL_17,			0x0017, -1);
-DEF_IE(100_IE_UNKNOWN_18,		0x0018, 0);	/* null len?! 1800FC00 AAAAAAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_UNKNOWN_19,		0x0019, 256);	/* huge: 1900FC00 9C1F00EA FEFFFFEA FEFFFFEA... */
-DEF_IE(100_IE_INVAL_1A,			0x001A, -1);
-
-DEF_IE(100_IE_DOT11_INVAL_1000,			0x1000, -1);
-DEF_IE(100_IE_DOT11_STATION_ID,			0x1001, 6);	/* huge: 0110FC00 58B10E2F 03000000 00000000... */
-DEF_IE(100_IE_DOT11_INVAL_1002,			0x1002, -1);
-DEF_IE(100_IE_DOT11_INVAL_1003,			0x1003, -1);
-DEF_IE(100_IE_DOT11_INVAL_1004,			0x1004, -1);
-DEF_IE(100_IE_DOT11_SHORT_RETRY_LIMIT,		0x1005, 1);
-DEF_IE(100_IE_DOT11_LONG_RETRY_LIMIT,		0x1006, 1);
-/* write only: */
-DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_WRITE,	0x1007, 32);
-DEF_IE(100_IE_DOT11_MAX_XMIT_MSDU_LIFETIME,	0x1008, 4);	/* huge: 0810FC00 00020000 F4010000 00000000... */
-/* undoc but returns something */
-DEF_IE(100_IE_DOT11_GROUP_ADDR,			0x1009, 12);	/* huge: 0910FC00 00000000 00000000 00000000... */
-DEF_IE(100_IE_DOT11_CURRENT_REG_DOMAIN,		0x100a, 1);	/* 0A10FC00 30AAAAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_DOT11_CURRENT_ANTENNA,		0x100b, 1);	/* 0B10FC00 8FAAAAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_DOT11_INVAL_100C,			0x100c, -1);
-DEF_IE(100_IE_DOT11_TX_POWER_LEVEL,		0x100d, 2);	/* 00000000 0100AAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_DOT11_CURRENT_CCA_MODE,		0x100e, 1);	/* 0E10FC00 0DAAAAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_DOT11_ED_THRESHOLD,		0x100f, 4);	/* 0F10FC00 70000000 AAAAAAAA AAAAAAAA */
-/* set default key ID  */
-DEF_IE(100_IE_DOT11_WEP_DEFAULT_KEY_SET,	0x1010, 1);	/* 1010FC00 00AAAAAA AAAAAAAA AAAAAAAA */
-DEF_IE(100_IE_DOT11_INVAL_1011,			0x1011, -1);
-DEF_IE(100_IE_DOT11_INVAL_1012,			0x1012, -1);
-DEF_IE(100_IE_DOT11_INVAL_1013,			0x1013, -1);
-DEF_IE(100_IE_DOT11_UNKNOWN_1014,		0x1014, 256);	/* huge */
-DEF_IE(100_IE_DOT11_UNKNOWN_1015,		0x1015, 256);	/* huge */
-DEF_IE(100_IE_DOT11_UNKNOWN_1016,		0x1016, 256);	/* huge */
-DEF_IE(100_IE_DOT11_UNKNOWN_1017,		0x1017, 256);	/* huge */
-DEF_IE(100_IE_DOT11_UNKNOWN_1018,		0x1018, 256);	/* huge */
-DEF_IE(100_IE_DOT11_UNKNOWN_1019,		0x1019, 256);	/* huge */
-#endif
-
-#if 0
-/* Experimentally obtained on PCI acx111 Xterasys XN-2522g, fw 1.2.1.34
-** -1 means that fw returned 'invalid IE'
-** 0400 0800 nnnn... are test read contents: u16 type, u16 len, data
-** (AA are poison bytes marking bytes not written by fw)
-**
-** Looks like acx111 fw reports real len!
-*/
-DEF_IE(111_IE_INVAL_00,			0x0000, -1);
-DEF_IE(111_IE_INVAL_01,			0x0001, -1);
-DEF_IE(111_IE_POWER_MGMT,		0x0002, 12);
-/* write only, variable len: 12 + rxqueue_cnt*8 + txqueue_cnt*4: */
-DEF_IE(111_IE_MEMORY_CONFIG,		0x0003, 24);
-DEF_IE(111_IE_BLOCK_SIZE,		0x0004, 8); /* 04000800 AA00AAAA AAAAAAAA */
-/* variable len: 8 + rxqueue_cnt*8 + txqueue_cnt*8: */
-DEF_IE(111_IE_QUEUE_HEAD,		0x0005, 24);
-DEF_IE(111_IE_RATE_FALLBACK,		0x0006, 1);
-/* acx100 name:WEP_OPTIONS */
-/* said to have len:1 (not true, actually returns 12 bytes): */
-DEF_IE(111_IE_RADIO_BAND,		0x0007, 12); /* 07000C00 AAAA1F00 FF03AAAA AAAAAAAA */
-DEF_IE(111_IE_MEMORY_MAP,		0x0008, 48);
-/* said to have len:4, but gives INVAL on read: */
-DEF_IE(111_IE_SCAN_STATUS,		0x0009, -1);
-DEF_IE(111_IE_ASSOC_ID,			0x000a, 2);
-/* write only, len is not known: */
-DEF_IE(111_IE_UNKNOWN_0B,		0x000b, 0);
-/* read only, variable len. I see 67 byte reads: */
-DEF_IE(111_IE_CONFIG_OPTIONS,		0x000c, 67); /* 0C004300 01160500 ... */
-DEF_IE(111_IE_FWREV,			0x000d, 24);
-DEF_IE(111_IE_FCS_ERROR_COUNT,		0x000e, 4);
-DEF_IE(111_IE_MEDIUM_USAGE,		0x000f, 8);
-DEF_IE(111_IE_RXCONFIG,			0x0010, 4);
-DEF_IE(111_IE_QUEUE_THRESH,		0x0011, 12);
-DEF_IE(111_IE_BSS_POWER_SAVE,		0x0012, 1);
-/* read only, variable len. I see 240 byte reads: */
-DEF_IE(111_IE_FIRMWARE_STATISTICS,	0x0013, 240); /* 1300F000 00000000 ... */
-/* said to have len=17. looks like fw pads it to 20: */
-DEF_IE(111_IE_INT_CONFIG,		0x0014, 20); /* 14001400 00000000 00000000 00000000 00000000 00000000 */
-DEF_IE(111_IE_FEATURE_CONFIG,		0x0015, 8);
-/* said to be name:KEY_INDICATOR, len:4, but gives INVAL on read: */
-DEF_IE(111_IE_KEY_CHOOSE,		0x0016, -1);
-/* said to have len:4, but in fact returns 8: */
-DEF_IE(111_IE_MAX_USB_XFR,		0x0017, 8); /* 17000800 00014000 00000000 */
-DEF_IE(111_IE_INVAL_18,			0x0018, -1);
-DEF_IE(111_IE_INVAL_19,			0x0019, -1);
-/* undoc but returns something: */
-/* huh, fw indicates len=20 but uses 4 more bytes in buffer??? */
-DEF_IE(111_IE_UNKNOWN_1A,		0x001A, 20); /* 1A001400 AA00AAAA 0000020F FF030000 00020000 00000007 04000000 */
-
-DEF_IE(111_IE_DOT11_INVAL_1000,			0x1000, -1);
-DEF_IE(111_IE_DOT11_STATION_ID,			0x1001, 6);
-DEF_IE(111_IE_DOT11_FRAG_THRESH,		0x1002, 2);
-/* acx100 only? gives INVAL on read: */
-DEF_IE(111_IE_DOT11_BEACON_PERIOD,		0x1003, -1);
-/* said to be MAX_RECV_MSDU_LIFETIME: */
-DEF_IE(111_IE_DOT11_DTIM_PERIOD,		0x1004, 4);
-DEF_IE(111_IE_DOT11_SHORT_RETRY_LIMIT,		0x1005, 1);
-DEF_IE(111_IE_DOT11_LONG_RETRY_LIMIT,		0x1006, 1);
-/* acx100 only? gives INVAL on read: */
-DEF_IE(111_IE_DOT11_WEP_DEFAULT_KEY_WRITE,	0x1007, -1);
-DEF_IE(111_IE_DOT11_MAX_XMIT_MSDU_LIFETIME,	0x1008, 4);
-/* undoc but returns something. maybe it's 2 multicast MACs to listen to? */
-DEF_IE(111_IE_DOT11_GROUP_ADDR,			0x1009, 12); /* 09100C00 00000000 00000000 00000000 */
-DEF_IE(111_IE_DOT11_CURRENT_REG_DOMAIN,		0x100a, 1);
-DEF_IE(111_IE_DOT11_CURRENT_ANTENNA,		0x100b, 2);
-DEF_IE(111_IE_DOT11_INVAL_100C,			0x100c, -1);
-DEF_IE(111_IE_DOT11_TX_POWER_LEVEL,		0x100d, 1);
-/* said to have len=1 but gives INVAL on read: */
-DEF_IE(111_IE_DOT11_CURRENT_CCA_MODE,		0x100e, -1);
-/* said to have len=4 but gives INVAL on read: */
-DEF_IE(111_IE_DOT11_ED_THRESHOLD,		0x100f, -1);
-/* set default key ID. write only: */
-DEF_IE(111_IE_DOT11_WEP_DEFAULT_KEY_SET,	0x1010, 1);
-/* undoc but returns something: */
-DEF_IE(111_IE_DOT11_UNKNOWN_1011,		0x1011, 1); /* 11100100 20 */
-DEF_IE(111_IE_DOT11_INVAL_1012,			0x1012, -1);
-DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
-#endif
 
 
 /***********************************************************************
@@ -505,129 +222,6 @@ typedef struct rxbuffer {
 } __attribute__ ((packed)) rxbuffer_t;
 
 
-/*--- Firmware statistics ----------------------------------------------------*/
-
-/* define a random 100 bytes more to catch firmware versions which
- * provide a bigger struct */
-#define FW_STATS_FUTURE_EXTENSION	100
-
-typedef struct fw_stats_tx {
-	u32	tx_desc_of;
-} __attribute__ ((packed)) fw_stats_tx_t;
-
-typedef struct fw_stats_rx {
-	u32	rx_oom;
-	u32	rx_hdr_of;
-	u32	rx_hw_stuck; /* old: u32	rx_hdr_use_next */
-	u32	rx_dropped_frame;
-	u32	rx_frame_ptr_err;
-	u32	rx_xfr_hint_trig;
-	u32	rx_aci_events; /* later versions only */
-	u32	rx_aci_resets; /* later versions only */
-} __attribute__ ((packed)) fw_stats_rx_t;
-
-typedef struct fw_stats_dma {
-	u32	rx_dma_req;
-	u32	rx_dma_err;
-	u32	tx_dma_req;
-	u32	tx_dma_err;
-} __attribute__ ((packed)) fw_stats_dma_t;
-
-typedef struct fw_stats_irq {
-	u32	cmd_cplt;
-	u32	fiq;
-	u32	rx_hdrs;
-	u32	rx_cmplt;
-	u32	rx_mem_of;
-	u32	rx_rdys;
-	u32	irqs;
-	u32	tx_procs;
-	u32	decrypt_done;
-	u32	dma_0_done;
-	u32	dma_1_done;
-	u32	tx_exch_complet;
-	u32	commands;
-	u32	rx_procs;
-	u32	hw_pm_mode_changes;
-	u32	host_acks;
-	u32	pci_pm;
-	u32	acm_wakeups;
-} __attribute__ ((packed)) fw_stats_irq_t;
-
-typedef struct fw_stats_wep {
-	u32	wep_key_count;
-	u32	wep_default_key_count;
-	u32	dot11_def_key_mib;
-	u32	wep_key_not_found;
-	u32	wep_decrypt_fail;
-	u32	wep_pkt_decrypt;
-	u32	wep_decrypt_irqs;
-} __attribute__ ((packed)) fw_stats_wep_t;
-
-typedef struct fw_stats_pwr {
-	u32	tx_start_ctr;
-	u32	no_ps_tx_too_short;
-	u32	rx_start_ctr;
-	u32	no_ps_rx_too_short;
-	u32	lppd_started;
-	u32	no_lppd_too_noisy;
-	u32	no_lppd_too_short;
-	u32	no_lppd_matching_frame;
-} __attribute__ ((packed)) fw_stats_pwr_t;
-
-typedef struct fw_stats_mic {
-	u32	mic_rx_pkts;
-	u32	mic_calc_fail;
-} __attribute__ ((packed)) fw_stats_mic_t;
-
-typedef struct fw_stats_aes {
-	u32	aes_enc_fail;
-	u32	aes_dec_fail;
-	u32	aes_enc_pkts;
-	u32	aes_dec_pkts;
-	u32	aes_enc_irq;
-	u32	aes_dec_irq;
-} __attribute__ ((packed)) fw_stats_aes_t;
-
-typedef struct fw_stats_event {
-	u32	heartbeat;
-	u32	calibration;
-	u32	rx_mismatch;
-	u32	rx_mem_empty;
-	u32	rx_pool;
-	u32	oom_late;
-	u32	phy_tx_err;
-	u32	tx_stuck;
-} __attribute__ ((packed)) fw_stats_event_t;
-
-/* mainly for size calculation only */
-typedef struct fw_stats {
-	u16			type;
-	u16			len;
-	fw_stats_tx_t		tx;
-	fw_stats_rx_t		rx;
-	fw_stats_dma_t		dma;
-	fw_stats_irq_t		irq;
-	fw_stats_wep_t		wep;
-	fw_stats_pwr_t		pwr;
-	fw_stats_mic_t		mic;
-	fw_stats_aes_t		aes;
-	fw_stats_event_t	evt;
-	u8			_padding[FW_STATS_FUTURE_EXTENSION];
-} fw_stats_t;
-
-/* Firmware version struct */
-
-typedef struct fw_ver {
-	u16	cmd;
-	u16	size;
-	char	fw_id[20];
-	u32	hw_id;
-} __attribute__ ((packed)) fw_ver_t;
-
-#define FW_ID_SIZE 20
-
-
 /*--- WEP stuff --------------------------------------------------------------*/
 #define DOT11_MAX_DEFAULT_WEP_KEYS	4
 
@@ -695,269 +289,6 @@ struct client {
 	char	challenge_text[128]; /*WLAN_CHALLENGE_LEN*/
 };
 
-
-/***********************************************************************
-** Hardware structures
-*/
-
-/* An opaque typesafe helper type
- *
- * Some hardware fields are actually pointers,
- * but they have to remain u32, since using ptr instead
- * (8 bytes on 64bit systems!) would disrupt the fixed descriptor
- * format the acx firmware expects in the non-user area.
- * Since we cannot cram an 8 byte ptr into 4 bytes, we need to
- * enforce that pointed to data remains in low memory
- * (address value needs to fit in 4 bytes) on 64bit systems.
- *
- * This is easy to get wrong, thus we are using a small struct
- * and special macros to access it. Macros will check for
- * attempts to overflow an acx_ptr with value > 0xffffffff.
- *
- * Attempts to use acx_ptr without macros result in compile-time errors */
-
-typedef struct {
-	u32	v;
-} __attribute__ ((packed)) acx_ptr;
-
-#if ACX_DEBUG
-#define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
-#else
-#define CHECK32(n) ((void)0)
-#endif
-
-/* acx_ptr <-> integer conversion */
-#define cpu2acx(n) ({ CHECK32(n); ((acx_ptr){ .v = cpu_to_le32(n) }); })
-#define acx2cpu(a) (le32_to_cpu(a.v))
-
-/* acx_ptr <-> pointer conversion */
-#define ptr2acx(p) ({ CHECK32(p); ((acx_ptr){ .v = cpu_to_le32((u32)(long)(p)) }); })
-#define acx2ptr(a) ((void*)le32_to_cpu(a.v))
-
-/* Values for rate field (acx100 only) */
-#define RATE100_1		10
-#define RATE100_2		20
-#define RATE100_5		55
-#define RATE100_11		110
-#define RATE100_22		220
-/* This bit denotes use of PBCC:
-** (PBCC encoding is usable with 11 and 22 Mbps speeds only) */
-#define RATE100_PBCC511		0x80
-
-/* Bit values for rate111 field */
-#define RATE111_1		0x0001	/* DBPSK */
-#define RATE111_2		0x0002	/* DQPSK */
-#define RATE111_5		0x0004	/* CCK or PBCC */
-#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
-#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
-#define RATE111_11		0x0020	/* CCK or PBCC */
-#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
-#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
-#define RATE111_22		0x0100	/* PBCC */
-#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
-#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
-#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
-#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
-#define RATE111_RESERVED	0x2000
-#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
-#define RATE111_SHORTPRE	0x8000  /* short preamble */
-/* Special 'try everything' value */
-#define RATE111_ALL		0x1fff
-/* These bits denote acx100 compatible settings */
-#define RATE111_ACX100_COMPAT	0x0127
-/* These bits denote 802.11b compatible settings */
-#define RATE111_80211B_COMPAT	0x0027
-
-/* Descriptor Ctl field bits
- * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
- */
-#define DESC_CTL_SHORT_PREAMBLE	0x01	/* preamble type: 0 = long; 1 = short */
-#define DESC_CTL_FIRSTFRAG	0x02	/* this is the 1st frag of the frame */
-#define DESC_CTL_AUTODMA	0x04
-#define DESC_CTL_RECLAIM	0x08	/* ready to reuse */
-#define DESC_CTL_HOSTDONE	0x20	/* host has finished processing */
-#define DESC_CTL_ACXDONE	0x40	/* acx has finished processing */
-/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
-#define DESC_CTL_HOSTOWN	0x80
-#define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
-
-/* Descriptor Status field
- */
-#define	DESC_STATUS_FULL	(1 << 31)
-
-/* NB: some bits may be interesting for Monitor mode tx (aka Raw tx): */
-#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
-#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
-#define DESC_CTL2_MORE_FRAG	0x04
-#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
-#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
-#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
-#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
-#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
-
-/***********************************************************************
-** PCI structures
-*/
-
-/* Outside of "#ifdef PCI" because USB needs to know sizeof()
-** of txdesc and rxdesc: */
-struct txdesc {
-	acx_ptr	pNextDesc;	/* pointer to next txdesc */
-	acx_ptr	HostMemPtr;			/* 0x04 */
-	acx_ptr	AcxMemPtr;			/* 0x08 */
-	u32	tx_time;			/* 0x0c */
-	u16	total_length;			/* 0x10 */
-	u16	Reserved;			/* 0x12 */
-
-/* The following 16 bytes do not change when acx100 owns the descriptor */
-/* BUG: fw clears last byte of this area which is supposedly reserved
-** for driver use. amd64 blew up. We dare not use it now */
-	u32	dummy[4];
-
-	u8	Ctl_8;			/* 0x24, 8bit value */
-	u8	Ctl2_8;			/* 0x25, 8bit value */
-	u8	error;			/* 0x26 */
-	u8	ack_failures;		/* 0x27 */
-	u8	rts_failures;		/* 0x28 */
-	u8	rts_ok;			/* 0x29 */
-	union {
-		struct {
-			u8	rate;		/* 0x2a */
-			u8	queue_ctrl;	/* 0x2b */
-		} __attribute__ ((packed)) r1;
-		struct {
-			u16	rate111;	/* 0x2a */
-		} __attribute__ ((packed)) r2;
-	} __attribute__ ((packed)) u;
-	u32	queue_info;			/* 0x2c (acx100, reserved on acx111) */
-} __attribute__ ((packed));		/* size : 48 = 0x30 */
-/* NB: acx111 txdesc structure is 4 byte larger */
-/* All these 4 extra bytes are reserved. tx alloc code takes them into account */
-
-struct rxdesc {
-	acx_ptr	pNextDesc;			/* 0x00 */
-	acx_ptr	HostMemPtr;			/* 0x04 */
-	acx_ptr	ACXMemPtr;			/* 0x08 */
-	u32	rx_time;			/* 0x0c */
-	u16	total_length;			/* 0x10 */
-	u16	WEP_length;			/* 0x12 */
-	u32	WEP_ofs;			/* 0x14 */
-
-/* the following 16 bytes do not change when acx100 owns the descriptor */
-	u8	driverWorkspace[16];		/* 0x18 */
-
-	u8	Ctl_8;
-	u8	rate;
-	u8	error;
-	u8	SNR;				/* Signal-to-Noise Ratio */
-	u8	RxLevel;
-	u8	queue_ctrl;
-	u16	unknown;
-	u32	unknown2;
-} __attribute__ ((packed));		/* size 52 = 0x34 */
-
-#if 0
-//#ifdef ACX_MAC80211_PCI
-
-/* Register I/O offsets */
-#define ACX100_EEPROM_ID_OFFSET	0x380
-
-/* please add further ACX hardware register definitions only when
-   it turns out you need them in the driver, and please try to use
-   firmware functionality instead, since using direct I/O access instead
-   of letting the firmware do it might confuse the firmware's state
-   machine */
-
-/* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
-** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
-
-/*
- * NOTE about ACX_IO_IRQ_REASON: this register is CLEARED ON READ.
- */
-enum {
-	ACX_IO_SOFT_RESET = 0,
-
-	ACX_IO_SLV_MEM_ADDR,
-	ACX_IO_SLV_MEM_DATA,
-	ACX_IO_SLV_MEM_CTL,
-	ACX_IO_SLV_END_CTL,
-
-	ACX_IO_FEMR,		/* Function Event Mask */
-
-	ACX_IO_INT_TRIG,
-	ACX_IO_IRQ_MASK,
-	ACX_IO_IRQ_STATUS_NON_DES,
-	ACX_IO_IRQ_REASON,
-	ACX_IO_IRQ_ACK,
-	ACX_IO_HINT_TRIG,
-
-	ACX_IO_ENABLE,
-
-	ACX_IO_EEPROM_CTL,
-	ACX_IO_EEPROM_ADDR,
-	ACX_IO_EEPROM_DATA,
-	ACX_IO_EEPROM_CFG,
-
-	ACX_IO_PHY_ADDR,
-	ACX_IO_PHY_DATA,
-	ACX_IO_PHY_CTL,
-
-	ACX_IO_GPIO_OE,
-
-	ACX_IO_GPIO_OUT,
-
-	ACX_IO_CMD_MAILBOX_OFFS,
-	ACX_IO_INFO_MAILBOX_OFFS,
-	ACX_IO_EEPROM_INFORMATION,
-
-	ACX_IO_EE_START,
-	ACX_IO_SOR_CFG,
-	ACX_IO_ECPU_CTRL
-};
-/* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
-** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
-
-/* Values for ACX_IO_INT_TRIG register: */
-/* inform hw that rxdesc in queue needs processing */
-#define INT_TRIG_RXPRC		0x08
-/* inform hw that txdesc in queue needs processing */
-#define INT_TRIG_TXPRC		0x04
-/* ack that we received info from info mailbox */
-#define INT_TRIG_INFOACK	0x02
-/* inform hw that we have filled command mailbox */
-#define INT_TRIG_CMD		0x01
-
-struct txhostdesc {
-	acx_ptr	data_phy;			/* 0x00 [u8 *] */
-	u16	data_offset;			/* 0x04 */
-	u16	reserved;			/* 0x06 */
-	u16	Ctl_16;	/* 16bit value, endianness!! */
-	u16	length;			/* 0x0a */
-	acx_ptr	desc_phy_next;		/* 0x0c [txhostdesc *] */
-	acx_ptr	pNext;			/* 0x10 [txhostdesc *] */
-	u32	Status;			/* 0x14, unused on Tx */
-/* From here on you can use this area as you want (variable length, too!) */
-	u8	*data;
-	struct ieee80211_tx_status txstatus;
-	struct sk_buff *skb;	
-
-} __attribute__ ((packed));
-
-struct rxhostdesc {
-	acx_ptr	data_phy;			/* 0x00 [rxbuffer_t *] */
-	u16	data_offset;			/* 0x04 */
-	u16	reserved;			/* 0x06 */
-	u16	Ctl_16;			/* 0x08; 16bit value, endianness!! */
-	u16	length;			/* 0x0a */
-	acx_ptr	desc_phy_next;		/* 0x0c [rxhostdesc_t *] */
-	acx_ptr	pNext;			/* 0x10 [rxhostdesc_t *] */
-	u32	Status;			/* 0x14 */
-/* From here on you can use this area as you want (variable length, too!) */
-	rxbuffer_t *data;
-} __attribute__ ((packed));
-
-#endif /* ACX_PCI */
-
 /***********************************************************************
 ** USB structures and constants
 */
@@ -1019,76 +350,6 @@ typedef struct usb_rx {
 	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
 } usb_rx_t;
 #endif /* ACX_USB */
-
-
-/* Config Option structs */
-
-typedef struct co_antennas {
-	u8	type;
-	u8	len;
-	u8	list[2];
-} __attribute__ ((packed)) co_antennas_t;
-
-typedef struct co_powerlevels {
-	u8	type;
-	u8	len;
-	u16	list[8];
-} __attribute__ ((packed)) co_powerlevels_t;
-
-typedef struct co_datarates {
-	u8	type;
-	u8	len;
-	u8	list[8];
-} __attribute__ ((packed)) co_datarates_t;
-
-typedef struct co_domains {
-	u8	type;
-	u8	len;
-	u8	list[6];
-} __attribute__ ((packed)) co_domains_t;
-
-typedef struct co_product_id {
-	u8	type;
-	u8	len;
-	u8	list[128];
-} __attribute__ ((packed)) co_product_id_t;
-
-typedef struct co_manuf_id {
-	u8	type;
-	u8	len;
-	u8	list[128];
-} __attribute__ ((packed)) co_manuf_t;
-
-typedef struct co_fixed {
-	char	NVSv[8];
-/*	u16	NVS_vendor_offs;	ACX111-only */
-/*	u16	unknown;		ACX111-only */
-	u8	MAC[6];	/* ACX100-only */
-	u16	probe_delay;	/* ACX100-only */
-	u32	eof_memory;
-	u8	dot11CCAModes;
-	u8	dot11Diversity;
-	u8	dot11ShortPreambleOption;
-	u8	dot11PBCCOption;
-	u8	dot11ChannelAgility;
-	u8	dot11PhyType; /* FIXME: does 802.11 call it "dot11PHYType"? */
-	u8	dot11TempType;
-	u8	table_count;
-} __attribute__ ((packed)) co_fixed_t;
-
-typedef struct acx111_ie_configoption {
-	u16			type;
-	u16			len;
-/* Do not access below members directly, they are in fact variable length */
-	co_fixed_t		fixed;
-	co_antennas_t		antennas;
-	co_powerlevels_t	power_levels;
-	co_datarates_t		data_rates;
-	co_domains_t		domains;
-	co_product_id_t		product_id;
-	co_manuf_t		manufacturer;
-	u8			_padding[4];
-} __attribute__ ((packed)) acx111_ie_configoption_t;
 
 /***********************************************************************
 ** Main acx per-device data structure
@@ -1187,7 +448,6 @@ struct acx_device {
 
 	/*** Hardware identification ***/
 	const char		*chip_name;
-	u8			dev_type;
 	u8			chip_type;
 	u8			form_factor;
 	u8			radio_type;
@@ -1433,15 +693,9 @@ struct acx_device {
 };
 
 
+#define ieee2adev(ieee80211_hw) ((ieee80211_hw)->priv)
 
-static inline
-acx_device_t * ieee2adev(struct ieee80211_hw *hw)
-{
-        return hw->priv;
-}
-
-
-/* For use with ACX1xx_IE_RXCONFIG */
+/* For use with ACX1xx_REG_RXCONFIG */
 /*  bit     description
  *    13   include additional header (length etc.) *required*
  *		struct is defined in 'struct rxbuffer'
@@ -1497,7 +751,7 @@ acx_device_t * ieee2adev(struct ieee80211_hw *hw)
 #define RX_CFG2_RCV_ACK_FRAMES		0x0002
 #define RX_CFG2_RCV_OTHER		0x0001
 
-/* For use with ACX1xx_IE_FEATURE_CONFIG */
+/* For use with ACX1xx_REG_FEATURE_CONFIG */
 #define FEATURE1_80MHZ_CLOCK	0x00000040L
 #define FEATURE1_4X		0x00000020L
 #define FEATURE1_LOW_RX		0x00000008L
@@ -1905,12 +1159,6 @@ typedef struct mem_read_write {
 	u32	data;
 } __attribute__ ((packed)) mem_read_write_t;
 
-typedef struct firmware_image {
-	u32	chksum;
-	u32	size;
-	u8	data[1]; /* the byte array of the actual firmware... */
-} __attribute__ ((packed)) firmware_image_t;
-
 typedef struct acx_cmd_radioinit {
 	u32	offset;
 	u32	len;
@@ -1995,7 +1243,7 @@ acx_struct_size_check(void)
 	CHECK_SIZEOF(acx100_ie_queueconfig_t, 0x20);
 	CHECK_SIZEOF(acx_joinbss_t, 0x30);
 	/* IEs need 4 bytes for (type,len) tuple */
-	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_IE_CONFIG_OPTIONS_LEN + 4);
+	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_REG_CONFIG_OPTIONS_LEN + 4);
 }
 
 
