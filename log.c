@@ -56,6 +56,7 @@ void acx_log(int level, int what, const char *fmt, ...)
 {
 	va_list args;
 	const char *printk_level;
+	char fmt_end;
 
 	if (level > ACX_LOG_LEVEL)
 		return;
@@ -68,6 +69,8 @@ void acx_log(int level, int what, const char *fmt, ...)
 	if (level > MAX_LOG_LEVEL)
 		level = MAX_LOG_LEVEL;
 	
+	fmt_end = fmt[strlen(fmt) - 1];
+
 	printk_level = printk_levels[level];
 	va_start(args, fmt);
 
@@ -75,6 +78,10 @@ void acx_log(int level, int what, const char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 
+	if (fmt_end != '\n') {
+		printk("\n");
+		printk(KERN_WARNING "MISSING NEWLINE, please fix\n");
+	}
 	return;
 }
 
