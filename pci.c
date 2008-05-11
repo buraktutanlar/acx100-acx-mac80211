@@ -4493,6 +4493,11 @@ int __init acxpci_e_init_module(void)
 #elif CONFIG_VLYNQ
 	res = vlynq_register_driver(&vlynq_acx);
 #endif
+
+	if (res) {
+		printk(KERN_ERR "acx_pci: can't register pci/vlynq driver\n");
+	}
+
 	FN_EXIT1(res);
 	return res;
 }
