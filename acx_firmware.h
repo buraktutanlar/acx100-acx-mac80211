@@ -26,6 +26,12 @@
  */
 #define FW_STATS_FUTURE_EXTENSION	100
 
+typedef struct firmware_image {
+	u32	chksum;
+	u32	size;
+	u8	data[1]; /* the byte array of the actual firmware... */
+} __attribute__ ((packed)) firmware_image_t;
+
 typedef struct fw_stats_tx {
 	u32	tx_desc_of;
 } __attribute__ ((packed)) fw_stats_tx_t;

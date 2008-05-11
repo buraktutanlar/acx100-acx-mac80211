@@ -1159,12 +1159,6 @@ typedef struct mem_read_write {
 	u32	data;
 } __attribute__ ((packed)) mem_read_write_t;
 
-typedef struct firmware_image {
-	u32	chksum;
-	u32	size;
-	u8	data[1]; /* the byte array of the actual firmware... */
-} __attribute__ ((packed)) firmware_image_t;
-
 typedef struct acx_cmd_radioinit {
 	u32	offset;
 	u32	len;
