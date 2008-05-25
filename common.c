@@ -4160,6 +4160,7 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
+		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 	}
 //	adev->mode = conf->type;
@@ -4174,8 +4175,9 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	err = 0;
 
 	acx_log(LOG_INFO, L_ANY, "Virtual interface added "
-		"(type: 0x%08X, MAC: %s)\n",
+		"(type: 0x%08X, ID: %d, MAC: %s)\n",
 		conf->type,
+		adev->interface.if_id,
 		print_mac(mac, conf->mac_addr));
 
       out_unlock:
@@ -4215,8 +4217,9 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	flush_scheduled_work();
 
 	acx_log(LOG_INFO, L_ANY, "Virtual interface removed "
-		"(type: 0x%08X, MAC: %s)\n",
-		conf->type, print_mac(mac, conf->mac_addr));
+		"(type: 0x%08X, ID: %d, MAC: %s)\n",
+		conf->type, adev->interface.if_id,
+		print_mac(mac, conf->mac_addr));
 
 	FN_EXIT0;
 }
@@ -4338,6 +4341,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4354,8 +4358,44 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 
 	acx_lock(adev, flags);
 
+	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
+	    && (adev->vif == vif)) {
+		if (conf->bssid)
+		{
+			adev->interface.bssid = conf->bssid;
+ 	             	MAC_COPY(adev->bssid,conf->bssid);
+		}
+	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
+#else
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf)
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	unsigned long flags;
+	int err = -ENODEV;
+	FN_ENTER;
+	if (!adev->interface.operating)
+		goto err_out;
+
+	if (adev->initialized)
+		acx_s_select_opmode(adev);
+
+	acx_lock(adev, flags);
+
+	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
+	    && (adev->interface.if_id == if_id)) {
+		if (conf->bssid)
+		{
+			adev->interface.bssid = conf->bssid;
+ 	             	MAC_COPY(adev->bssid,conf->bssid);
+		}
+	}
+	if ((conf->type == IEEE80211_IF_TYPE_AP)
+	    && (adev->interface.if_id == if_id)) {
+#endif
+
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
