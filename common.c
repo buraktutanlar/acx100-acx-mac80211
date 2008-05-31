@@ -4820,7 +4820,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 	/*
 	 * FIXME: see above
 	 */
-	acx_log(LOG_INFO, L_ANY, "PowerLevelID:%02X Len:%02X Data:",
+	acx_log(LOG_INFO, L_ANY, "PowerLevelID:%02X Len:%02X Data:\n",
 		adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_power_levels.list[i] =
@@ -4836,7 +4836,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 	/*
 	 * FIXME again
 	 */
-	acx_log(LOG_INFO, L_ANY, "DataRatesID:%02X Len:%02X Data:",
+	acx_log(LOG_INFO, L_ANY, "DataRatesID:%02X Len:%02X Data:\n",
 		adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_data_rates.list[i] = pEle[i + 2];
@@ -4851,7 +4851,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 	/*
 	 * And again
 	 */
-	acx_log(LOG_INFO, L_ANY, "DomainID:%02X Len:%02X Data:",
+	acx_log(LOG_INFO, L_ANY, "DomainID:%02X Len:%02X Data:\n",
 		adev->cfgopt_domains.type, adev->cfgopt_domains.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_domains.list[i] = pEle[i + 2];
@@ -4900,10 +4900,9 @@ static int __init acx_e_init_module(void)
 	acx_struct_size_check();
 
 	acx_log(LOG_INFO, L_ANY, "this driver is still EXPERIMENTAL\n");
-	acx_log(LOG_INFO, L_ANY, "acx: reading README file and/or "
-		"Craig's HOWTO is recommended, "
-		"visit http://acx100.sourceforge.net/wiki in case "
-		"of further questions/discussion\n");
+	acx_log(LOG_INFO, L_ANY, "please read the README file and/or "
+		"go to http://acx100.sourceforge.net/wiki for "
+		"further information\n");
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	r1 = acxpci_e_init_module();
