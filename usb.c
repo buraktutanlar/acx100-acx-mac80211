@@ -304,7 +304,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 **
 ** Configure: write (cmd,status,rid,frmlen,data[frmlen])
 **
-** Possibly bogus special handling of ACX1xx_REG_SCAN_STATUS removed
+** Possibly bogus special handling of ACX1xx_IE_SCAN_STATUS removed
 */
 
 	/* now write the parameters of the command if needed */
@@ -372,7 +372,7 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 /*
    check for result==buflen+4? Was seen:
 
-query(type:ACX100_REG_DOT11_ED_THRESHOLD,len:4)
+interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
 issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
 ctrl inpipe=0x80000280 outpipe=0x80000200
 sending USB control msg (out) (blocklen=8)
@@ -707,7 +707,7 @@ static void acxusb_s_read_eeprom_version(acx_device_t * adev)
 	u8 eeprom_ver[0x8];
 
 	memset(eeprom_ver, 0, sizeof(eeprom_ver));
-	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_REG_EEPROM_VER);
+	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
 
 	/* FIXME: which one of those values to take? */
 	adev->eeprom_version = eeprom_ver[5];
@@ -946,7 +946,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	SET_IEEE80211_DEV(ieee, &intf->dev);
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
-	   until ifup (it's available via reading ACX1xx_REG_DOT11_STATION_ID)... */
+	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
 
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);

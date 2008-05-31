@@ -697,7 +697,7 @@ struct acx_device {
 
 #define ieee2adev(ieee80211_hw) ((ieee80211_hw)->priv)
 
-/* For use with ACX1xx_REG_RXCONFIG */
+/* For use with ACX1xx_IE_RXCONFIG */
 /*  bit     description
  *    13   include additional header (length etc.) *required*
  *		struct is defined in 'struct rxbuffer'
@@ -753,7 +753,7 @@ struct acx_device {
 #define RX_CFG2_RCV_ACK_FRAMES		0x0002
 #define RX_CFG2_RCV_OTHER		0x0001
 
-/* For use with ACX1xx_REG_FEATURE_CONFIG */
+/* For use with ACX1xx_IE_FEATURE_CONFIG */
 #define FEATURE1_80MHZ_CLOCK	0x00000040L
 #define FEATURE1_4X		0x00000020L
 #define FEATURE1_LOW_RX		0x00000008L
@@ -1245,7 +1245,7 @@ acx_struct_size_check(void)
 	CHECK_SIZEOF(acx100_ie_queueconfig_t, 0x20);
 	CHECK_SIZEOF(acx_joinbss_t, 0x30);
 	/* IEs need 4 bytes for (type,len) tuple */
-	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_REG_CONFIG_OPTIONS_LEN + 4);
+	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_IE_CONFIG_OPTIONS_LEN + 4);
 }
 
 
