@@ -42,7 +42,7 @@
  *
  */
 #define ACX1xx_CMD_RESET		0x00
-#define ACX1xx_CMD_QUERY		0x01
+#define ACX1xx_CMD_INTERROGATE		0x01
 #define ACX1xx_CMD_CONFIGURE		0x02
 #define ACX1xx_CMD_ENABLE_RX		0x03
 #define ACX1xx_CMD_ENABLE_TX		0x04

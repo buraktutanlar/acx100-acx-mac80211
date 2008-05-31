@@ -642,7 +642,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 
 	FN_ENTER;
 
-	acx_s_query(adev, &mm, ACX1xx_REG_MEMORY_MAP);
+	acx_s_interrogate(adev, &mm, ACX1xx_REG_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
 	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
@@ -689,7 +689,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 			      &radioinit, sizeof(radioinit),
 			      CMD_TIMEOUT_MS(1000));
 
-	res = acx_s_query(adev, &mm, ACX1xx_REG_MEMORY_MAP);
+	res = acx_s_interrogate(adev, &mm, ACX1xx_REG_MEMORY_MAP);
       fail:
 	FN_EXIT1(res);
 	return res;
@@ -1021,7 +1021,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		goto bad;
 	}
 
-	if (cmd != ACX1xx_CMD_QUERY)
+	if (cmd != ACX1xx_CMD_INTERROGATE)
 		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
 			"input buffer:\n");
 
@@ -1058,15 +1058,15 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	/* now write the parameters of the command if needed */
 	if (buffer && buflen) {
-		/* if it's an QUERY command, just pass the length
+		/* if it's an INTERROGATE command, just pass the length
 		 * of parameters to read, as data */
 #if CMD_DISCOVERY
-		if (cmd == ACX1xx_CMD_QUERY)
+		if (cmd == ACX1xx_CMD_INTERROGATE)
 			memset_io(adev->cmd_area + 4, 0xAA, buflen);
 #endif
 		/* adev->cmd_area points to PCI device's memory, not to RAM! */
 		memcpy_toio(adev->cmd_area + 4, buffer,
-			    (cmd == ACX1xx_CMD_QUERY) ? 4 : buflen);
+			    (cmd == ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
 	acxpci_write_cmd_type_status(adev, cmd, 0);
@@ -1158,7 +1158,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 
 	/* read in result parameters if needed */
-	if (buffer && buflen && (cmd == ACX1xx_CMD_QUERY)) {
+	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
 		/* adev->cmd_area points to PCI device's memory, not to RAM! */
 		memcpy_fromio(buffer, adev->cmd_area + 4, buflen);
 		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
@@ -1661,7 +1661,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (IS_ACX111(adev)) {
 		/* ACX111: configopt struct needs to be queried after full init */
-		acx_s_query(adev, &co, ACX111_REG_CONFIG_OPTIONS);
+		acx_s_interrogate(adev, &co, ACX111_REG_CONFIG_OPTIONS);
 	}
 /* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
@@ -2715,27 +2715,27 @@ acx111pci_ioctl_info(struct net_device *ndev,
 	memset(&memconf, 0, sizeof(memconf));
 	/* BTW, fails with 12 (Write only) error code.
 	 ** Retained for easy testing of issue_cmd error handling :) */
-	acx_s_query(adev, &memconf, ACX1xx_REG_QUEUE_CONFIG);
+	acx_s_interrogate(adev, &memconf, ACX1xx_REG_QUEUE_CONFIG);
 
 	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0, sizeof(queueconf));
-	acx_s_query(adev, &queueconf, ACX1xx_REG_MEMORY_CONFIG_OPTIONS);
+	acx_s_interrogate(adev, &queueconf, ACX1xx_REG_MEMORY_CONFIG_OPTIONS);
 
 	/* get Acx111 Memory Map */
 	memset(memmap, 0, sizeof(memmap));
-	acx_s_query(adev, &memmap, ACX1xx_REG_MEMORY_MAP);
+	acx_s_interrogate(adev, &memmap, ACX1xx_REG_MEMORY_MAP);
 
 	/* get Acx111 Rx Config */
 	memset(rxconfig, 0, sizeof(rxconfig));
-	acx_s_query(adev, &rxconfig, ACX1xx_REG_RXCONFIG);
+	acx_s_interrogate(adev, &rxconfig, ACX1xx_REG_RXCONFIG);
 
 	/* get Acx111 fcs error count */
 	memset(fcserror, 0, sizeof(fcserror));
-	acx_s_query(adev, &fcserror, ACX1xx_REG_FCS_ERROR_COUNT);
+	acx_s_interrogate(adev, &fcserror, ACX1xx_REG_FCS_ERROR_COUNT);
 
 	/* get Acx111 rate fallback */
 	memset(ratefallback, 0, sizeof(ratefallback));
-	acx_s_query(adev, &ratefallback, ACX1xx_REG_RATE_FALLBACK);
+	acx_s_interrogate(adev, &ratefallback, ACX1xx_REG_RATE_FALLBACK);
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
@@ -4254,7 +4254,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	if (OK != acx_s_init_mac(adev))
 		goto fail_init_mac;
 
-	acx_s_query(adev, &co, ACX111_REG_CONFIG_OPTIONS);
+	acx_s_interrogate(adev, &co, ACX111_REG_CONFIG_OPTIONS);
 /* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_read_eeprom_version;
