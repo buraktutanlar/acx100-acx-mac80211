@@ -1,108 +1,20 @@
+#ifndef _ACX_FUNC_H_
+#define _ACX_FUNC_H_
+
 /** (legal) claimer in README
 ** Copyright (C) 2003  ACX100 Open Source Project
 */
 
-
-/***********************************************************************
-** LOGGING
-**
-** - Avoid SHOUTING needlessly. Avoid excessive verbosity.
-**   Gradually remove messages which are old debugging aids.
-**
-** - Use printk() for messages which are to be always logged.
-**   Supply either 'acx:' or '<devname>:' prefix so that user
-**   can figure out who's speaking among other kernel chatter.
-**   acx: is for general issues (e.g. "acx: no firmware image!")
-**   while <devname>: is related to a particular device
-**   (think about multi-card setup). Double check that message
-**   is not confusing to the average user.
-**
-** - use printk KERN_xxx level only if message is not a WARNING
-**   but is INFO, ERR etc.
-**
-** - Use printk_ratelimited() for messages which may flood
-**   (e.g. "rx DUP pkt!").
-**
-** - Use log() for messages which may be omitted (and they
-**   _will_ be omitted in non-debug builds). Note that
-**   message levels may be disabled at compile-time selectively,
-**   thus select them wisely. Example: L_DEBUG is the lowest
-**   (most likely to be compiled out) -> use for less important stuff.
-**
-** - Do not print important stuff with log(), or else people
-**   will never build non-debug driver.
-**
-** Style:
-** hex: capital letters, zero filled (e.g. 0x02AC)
-** str: dont start from capitals, no trailing periods ("tx: queue is stopped")
-*/
-#if ACX_DEBUG > 1
-
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
-
-#define FN_ENTER \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_enter(__func__); \
-		} \
-	} while (0)
-
-#define FN_EXIT1(v) \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit_v(__func__, v); \
-		} \
-	} while (0)
-#define FN_EXIT0 \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit(__func__); \
-		} \
-	} while (0)
-
-#else
-
-#define FN_ENTER
-#define FN_EXIT1(v)
-#define FN_EXIT0
-
-#endif /* ACX_DEBUG > 1 */
-
-
-#if ACX_DEBUG
-
-#define log(chan, args...) \
-	do { \
-		if (acx_debug & (chan)) \
-			printk(args); \
-	} while (0)
-#define printk_ratelimited(args...) printk(args)
-
-#else /* Non-debug build: */
-
-#define log(chan, args...)
-/* Standard way of log flood prevention */
-#define printk_ratelimited(args...) \
-do { \
-	if (printk_ratelimit()) \
-		printk(args); \
-} while (0)
-
-#endif /* ACX_DEBUG */
-
-void acx_print_mac(const char *head, const u8 *mac, const char *tail);
+#include <linux/version.h>
+#include "acx_debug.h"
+#include "acx_log.h"
+/*
+ * FIXME: this file is needed only so that the lock debugging functions have an
+ * acx_device_t structure to play with :(
+ */
+#include "acx_struct.h"
 
 /* Optimized out to nothing in non-debug build */
-static inline void
-acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
-{
-	if (acx_debug & level) {
-		acx_print_mac(head, mac, tail);
-	}
-}
-
 
 /***********************************************************************
 ** MAC address helpers
@@ -164,15 +76,6 @@ mac_is_mcast(const u8 *mac)
 	return (mac[0] & 1) && !mac_is_bcast(mac);
 }
 
-#define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
-#define MAC(bytevector) \
-	((unsigned char *)bytevector)[0], \
-	((unsigned char *)bytevector)[1], \
-	((unsigned char *)bytevector)[2], \
-	((unsigned char *)bytevector)[3], \
-	((unsigned char *)bytevector)[4], \
-	((unsigned char *)bytevector)[5]
-
 
 /***********************************************************************
 ** Random helpers
@@ -221,7 +124,7 @@ is_hidden_essid(char *essid)
 
 /***********************************************************************
 ** LOCKING
-** We have adev->sem and adev->lock.
+** We have adev->sem and adev->spinlock.
 **
 ** We employ following naming convention in order to get locking right:
 **
@@ -277,13 +180,13 @@ static inline void
 acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
 	acx_lock_debug(adev, where);
-	spin_lock_irqsave(&adev->lock, *fp);
+	spin_lock_irqsave(&adev->spinlock, *fp);
 }
 static inline void
 acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 {
 	acx_unlock_debug(adev, where);
-	spin_unlock_irqrestore(&adev->lock, *fp);
+	spin_unlock_irqrestore(&adev->spinlock, *fp);
 }
 #define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
 #define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
@@ -292,8 +195,8 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 
 #elif defined(DO_LOCKING)
 
-#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->lock, flags)
-#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->lock, flags)
+#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
+#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
 #define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
 #define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 #define acx_lock_unhold()	((void)0)
@@ -327,7 +230,7 @@ acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 */
 	ieee80211_stop_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: stop queue %s\n", msg);
+		acx_log(LOG_DEBUG, L_BUFT, "tx: stop queue %s\n", msg);
 }
 
 /*static inline int
@@ -350,7 +253,7 @@ acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
 	ieee80211_wake_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: wake queue %s\n", msg);
+		acx_log(LOG_DEBUG, L_BUFT, "tx: wake queue %s\n", msg);
 }
 /*
 static inline void
@@ -397,9 +300,9 @@ acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsig
 int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
 #define acx_s_configure(adev,pdr,type) \
 	acx_s_configure_debug(adev,pdr,type,#type)
-int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_interrogate(adev,pdr,type) \
-	acx_s_interrogate_debug(adev,pdr,type,#type)
+int acx_s_query_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_query(adev,pdr,type) \
+	acx_s_query_debug(adev,pdr,type,#type)
 
 #else
 
@@ -420,7 +323,7 @@ acx_s_issue_cmd(acx_device_t *adev, unsigned cmd, void *param, unsigned len)
 	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
 }
 int acx_s_configure(acx_device_t *adev, void *pdr, int type);
-int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
+int acx_s_query(acx_device_t *adev, void *pdr, int type);
 
 #endif
 
@@ -534,15 +437,6 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
-void acxpci_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
-void acxusb_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info);
-static inline void acx_put_devname(acx_device_t *adev, struct ethtool_drvinfo *info)
-{
-	if (IS_PCI(adev))
-		acxpci_put_devname(adev,info);
-	else
-		acxusb_put_devname(adev,info);
-}
 void acxpci_l_power_led(acx_device_t *adev, int enable);
 int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
@@ -555,7 +449,7 @@ int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
 void acxpci_set_interrupt_mask(acx_device_t *adev);
 int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
-void acx_s_msleep(int ms);
+void acx_s_mwait(int ms);
 int acx_s_init_mac(acx_device_t *adev);
 void acx_set_reg_domain(acx_device_t *adev, unsigned char reg_dom_id);
 void acx_update_capabilities(acx_device_t *adev);
@@ -610,12 +504,19 @@ void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw* ieee);
 int acx_net_set_key(struct ieee80211_hw *hw, 
-		set_key_cmd cmd,
-		u8 *addr,
-		struct ieee80211_key_conf *key,
-		int aid);
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id, 
-		struct ieee80211_if_conf *conf);
+		enum set_key_cmd cmd,
+		const u8 *local_addr, const u8 *addr,
+		struct ieee80211_key_conf *key);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+extern int acx_config_interface(struct ieee80211_hw* ieee,
+				struct ieee80211_vif *vif,
+				struct ieee80211_if_conf *conf);
+#else
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf);
+#endif
+
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
 int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
@@ -625,7 +526,9 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 int acxpci_s_reset_dev(acx_device_t *adev);
 void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
-                            unsigned short netflags, int mc_count);
+                            unsigned int changed_flags,
+                            unsigned int *total_flags,
+                            int mc_count, struct dev_addr_list *mc_list);
 
 /*** End DeviceScape Functions **/
 
@@ -643,3 +546,5 @@ int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 void __exit acxusb_e_cleanup_module(void);
+
+#endif /* _ACX_FUNC_H_ */

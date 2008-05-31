@@ -1,14 +1,27 @@
+#ifndef _ACX_CONFIG_H_
+#define _ACX_CONFIG_H_
+
 /* temporary hack until proper Kconfig integration */
-//#define CONFIG_ACX_MAC80211_PCI 1
+#define CONFIG_ACX_MAC80211_PCI 1
 //#define CONFIG_ACX_MAC80211_USB 1
 
-#define ACX_RELEASE "v0.3.36-mac80211"
+/*
+ * Err out immediately if both are set
+ */
 
-/* set to 0 if you don't want any debugging code to be compiled in */
-/* set to 1 if you want some debugging */
-/* set to 2 if you want extensive debug log */
-#define ACX_DEBUG 2
-#define ACX_DEFAULT_MSG (L_ASSOC|L_INIT)
+#if defined(CONFIG_ACX_MAC80211_PCI) && defined(CONFIG_ACX_MAC80211_USB)
+#error The driver does NOT support building both USB and PCI at the moment
+#endif
+
+/*
+ * Also err out if none is set...
+ */
+#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
+#error Driver must include PCI and/or USB support. You selected neither.
+#endif
+
+
+#define ACX_RELEASE "v0.3.38-mac80211"
 
 /* assume 32bit I/O width
  * (16bit is also compatible with Compact Flash) */
@@ -34,11 +47,13 @@
 
 /* Locking: */
 /* very talkative */
-/* #define PARANOID_LOCKING 1 */
+#define PARANOID_LOCKING 1
 /* normal (use when bug-free) */
-#define DO_LOCKING 1
+/* #define DO_LOCKING 1 */
 /* else locking is disabled! */
 
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
 #define CMD_DISCOVERY 0
+
+#endif /* _ACX_CONFIG_H_ */

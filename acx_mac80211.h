@@ -1,14 +1,13 @@
+#ifndef _ACX_MAC80211_H_
+#define _ACX_MAC80211_H_
+
+#include <net/mac80211.h>
+
 struct acx_key {
 	u8 enabled:1;
 	u8 algorithm;
 };
 
-struct acx_stats {        
-        u8 link_quality;
-        /* Store the last TX/RX times here for updating the leds. */
-        unsigned long last_tx;
-        unsigned long last_rx;
-};
 struct acx_interface {                
         /* Opaque ID of the operating interface (!= monitor
          * interface) from the ieee80211 subsystem.
@@ -31,24 +30,6 @@ struct acx_interface {
          */
         unsigned int promisc:1;             
 };
-#ifdef TODO
-# undef TODO
-#endif
-#define TODO()  \
-        do {                                                                            \
-                printk(KERN_INFO "TODO: Incomplete code in %s() at %s:%d\n",        \
-                       __FUNCTION__, __FILE__, __LINE__);                               \
-        } while (0)
-
-#ifdef FIXME
-# undef FIXME
-#endif
-#define FIXME()  \
-        do {                                                                            \
-                printk(KERN_INFO "FIXME: Possibly broken code in %s() at %s:%d\n",  \
-                       __FUNCTION__, __FILE__, __LINE__);                               \
-        } while (0)     
-
 
 
 #define ACX_MODE_NOTADHOC 0xFFFF
@@ -67,4 +48,5 @@ struct acx_interface {
 #define ACX_OFDM_RATE_36MB          0x48
 #define ACX_OFDM_RATE_48MB          0x60               
 #define ACX_OFDM_RATE_54MB          0x6C
-extern struct ethtool_ops acx_ethtool_ops;  
+
+#endif /* _ACX_MAC80211_H_ */
