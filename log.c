@@ -23,10 +23,22 @@
 static void acx_dump_bytes(const char *prefix, const void *data,
 	ssize_t len);
 
+/*
+ * HACK for debugging: if ACX_LOG_LEVEL is set to 2, set all printk_prefixes to
+ * KERN_EMERG.
+ *
+ * After all, we want ACX_LOG_LEVEL to 2 for heavy debugging, so...
+ */
 static const char *const printk_levels[MAX_LOG_LEVEL + 1] = {
+#if ACX_LOG_LEVEL < 2
 	KERN_WARNING,
 	KERN_INFO,
 	KERN_DEBUG
+#else
+	KERN_EMERG,
+	KERN_EMERG,
+	KERN_EMERG
+#endif
 };
 
 /*

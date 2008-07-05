@@ -4470,6 +4470,8 @@ int __init acxpci_e_init_module(void)
 
 	FN_ENTER;
 
+	printk(KERN_EMERG);
+
 #if (ACX_IO_WIDTH==32)
 	acx_log(LOG_INFO, L_ANY, "compiled to use 32bit I/O access. "
 		"I/O timing issues might occur, such as "
