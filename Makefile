@@ -28,8 +28,9 @@ ifneq ($(KERNELRELEASE),)
 	obj-$(CONFIG_ACX_MAC80211) += acx-mac80211.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_PCI) += pci.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
-	acx-mac80211-objs := common.o log.o $(acx-mac80211-obj-y)
+	acx-mac80211-objs := common.o pci.o usb.o $(acx-mac80211-obj-y)
 
+<<<<<<< HEAD:Makefile
 # Otherwise we were called directly from the command
 # line; invoke the kernel build system.
 # Second pass, the actual build.
@@ -38,6 +39,10 @@ else
 	PWD := $(shell pwd)
 all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+=======
+obj-m = acx-mac80211.o
+acx-mac80211-objs := common.o pci.o #usb.o
+>>>>>>> 3e18534... New logging framework, redo:Makefile
 
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean

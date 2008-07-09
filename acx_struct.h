@@ -1,38 +1,58 @@
 #ifndef _ACX_STRUCT_H_
 #define _ACX_STRUCT_H_
 
-/* 
- * acx_struct.h: common structures.
- *
- * Copyright (C) 2003-2008, the ACX100 Open Source Project.
- *
- * This file is licensed under the GPL version 2. See the README file for more
- * information.
- */
+/**** (legal) claimer in README
+** Copyright (C) 2003  ACX100 Open Source Project
+*/
 #include <linux/version.h>
-
-/*
- * We must not even enter here if neither USB nor PCI support are enabled. This
- * file will take care of that for us.
- *
- * FIXME: hack!
- */
-#include "acx_config.h"
-#include "acx_mac80211.h"
-#include "acx_debug.h"
-#include "acx_mmio.h"
 #include "acx_firmware.h"
-#include "acx_hwstructs.h"
-
+#include "acx_commands.h"
 
 /***********************************************************************
 ** Forward declarations of types
 */
+typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
 typedef struct client client_t;
+typedef struct rxdesc rxdesc_t;
+typedef struct txdesc txdesc_t;
 typedef struct rxhostdesc rxhostdesc_t;
 typedef struct txhostdesc txhostdesc_t;
 
+
+/***********************************************************************
+** Debug / log functionality
+*/
+enum {
+	L_LOCK		= (ACX_DEBUG>1)*0x0001,	/* locking debug log */
+	L_INIT		= (ACX_DEBUG>0)*0x0002,	/* special card initialization logging */
+	L_IRQ		= (ACX_DEBUG>0)*0x0004,	/* interrupt stuff */
+	L_ASSOC		= (ACX_DEBUG>0)*0x0008,	/* assocation (network join) and station log */
+	L_FUNC		= (ACX_DEBUG>1)*0x0020,	/* logging of function enter / leave */
+	L_XFER		= (ACX_DEBUG>1)*0x0080,	/* logging of transfers and mgmt */
+	L_DATA		= (ACX_DEBUG>1)*0x0100,	/* logging of transfer data */
+	L_DEBUG		= (ACX_DEBUG>1)*0x0200,	/* log of debug info */
+	L_IOCTL		= (ACX_DEBUG>0)*0x0400,	/* log ioctl calls */
+	L_CTL		= (ACX_DEBUG>1)*0x0800,	/* log of low-level ctl commands */
+	L_BUFR		= (ACX_DEBUG>1)*0x1000,	/* debug rx buffer mgmt (ring buffer etc.) */
+	L_XFER_BEACON	= (ACX_DEBUG>1)*0x2000,	/* also log beacon packets */
+	L_BUFT		= (ACX_DEBUG>1)*0x4000,	/* debug tx buffer mgmt (ring buffer etc.) */
+	L_USBRXTX	= (ACX_DEBUG>0)*0x8000,	/* debug USB rx/tx operations */
+	L_BUF		= L_BUFR + L_BUFT,
+	L_ANY		= 0xffff
+};
+
+#if ACX_DEBUG
+extern unsigned int acx_debug;
+#else
+enum { acx_debug = 0 };
+#endif
+
+
+/***********************************************************************
+** Random helpers
+*/
+#define ACX_PACKED __attribute__ ((packed))
 
 /***********************************************************************
 ** Constants
@@ -47,16 +67,33 @@ typedef struct txhostdesc txhostdesc_t;
 #define IS_ACX100(adev)	((adev)->chip_type == CHIPTYPE_ACX100)
 #define IS_ACX111(adev)	((adev)->chip_type == CHIPTYPE_ACX111)
 
+/* Supported interfaces */
+#define DEVTYPE_PCI		0
+#define DEVTYPE_USB		1
+
+#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
+#error Driver must include PCI and/or USB support. You selected neither.
+#endif
+
 #if defined(CONFIG_ACX_MAC80211_PCI)
-#define IS_PCI(adev) (1)
-#define IS_USB(adev) (0)
+ #if !defined(CONFIG_ACX_MAC80211_USB)
+  #define IS_PCI(adev)	1
+ #else
+  #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
+ #endif
 #else
-/*
- * If not PCI, it IS a USB device. We cannot have both at the same time.
- */
-#define IS_PCI(adev) (0)
-#define IS_USB(adev) (1)
-#endif /* !defined(CONFIG_ACX_MAC80211_PCI) */
+ #define IS_PCI(adev)	0
+#endif
+
+#if defined(CONFIG_ACX_MAC80211_USB)
+ #if !defined(CONFIG_ACX_MAC80211_PCI)
+  #define IS_USB(adev)	1
+ #else
+  #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
+ #endif
+#else
+ #define IS_USB(adev)	0
+#endif
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
@@ -83,6 +120,15 @@ typedef struct txhostdesc txhostdesc_t;
 #define RADIO_UNKNOWN_19	0x19
 #define RADIO_UNKNOWN_1B	0x1b    /* radio in SafeCom SWLUT-54125 USB adapter; entirely unknown!! */
 
+
+/* 'After Interrupt' Commands */
+#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
+#define ACX_AFTER_IRQ_CMD_ASSOCIATE	0x02
+#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x04
+#define ACX_AFTER_IRQ_UPDATE_CARD_CFG	0x08
+#define ACX_AFTER_IRQ_TX_CLEANUP	0x10
+#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x20
+#define ACX_AFTER_IRQ_RESTART_SCAN	0x40
 
 /***********************************************************************
 ** Tx/Rx buffer sizes and watermarks
@@ -128,6 +174,167 @@ typedef struct txhostdesc txhostdesc_t;
 #define DOT11RATEBYTE_BASIC	0x80	/* flags rates included in basic rate set */
 
 
+
+/***********************************************************************
+** Hardware structures
+*/
+
+/* An opaque typesafe helper type
+ *
+ * Some hardware fields are actually pointers,
+ * but they have to remain u32, since using ptr instead
+ * (8 bytes on 64bit systems!) would disrupt the fixed descriptor
+ * format the acx firmware expects in the non-user area.
+ * Since we cannot cram an 8 byte ptr into 4 bytes, we need to
+ * enforce that pointed to data remains in low memory
+ * (address value needs to fit in 4 bytes) on 64bit systems.
+ *
+ * This is easy to get wrong, thus we are using a small struct
+ * and special macros to access it. Macros will check for
+ * attempts to overflow an acx_ptr with value > 0xffffffff.
+ *
+ * Attempts to use acx_ptr without macros result in compile-time errors */
+
+typedef struct {
+	u32	v;
+} __attribute__ ((packed)) acx_ptr;
+
+#if ACX_DEBUG
+#define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
+#else
+#define CHECK32(n) ((void)0)
+#endif
+
+/* acx_ptr <-> integer conversion */
+#define cpu2acx(n) ({ CHECK32(n); ((acx_ptr){ .v = cpu_to_le32(n) }); })
+#define acx2cpu(a) (le32_to_cpu(a.v))
+
+/* acx_ptr <-> pointer conversion */
+#define ptr2acx(p) ({ CHECK32(p); ((acx_ptr){ .v = cpu_to_le32((u32)(long)(p)) }); })
+#define acx2ptr(a) ((void*)le32_to_cpu(a.v))
+
+/* Values for rate field (acx100 only) */
+#define RATE100_1		10
+#define RATE100_2		20
+#define RATE100_5		55
+#define RATE100_11		110
+#define RATE100_22		220
+/* This bit denotes use of PBCC:
+** (PBCC encoding is usable with 11 and 22 Mbps speeds only) */
+#define RATE100_PBCC511		0x80
+
+/* Bit values for rate111 field */
+#define RATE111_1		0x0001	/* DBPSK */
+#define RATE111_2		0x0002	/* DQPSK */
+#define RATE111_5		0x0004	/* CCK or PBCC */
+#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
+#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
+#define RATE111_11		0x0020	/* CCK or PBCC */
+#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
+#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
+#define RATE111_22		0x0100	/* PBCC */
+#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
+#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
+#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
+#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
+#define RATE111_RESERVED	0x2000
+#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
+#define RATE111_SHORTPRE	0x8000  /* short preamble */
+/* Special 'try everything' value */
+#define RATE111_ALL		0x1fff
+/* These bits denote acx100 compatible settings */
+#define RATE111_ACX100_COMPAT	0x0127
+/* These bits denote 802.11b compatible settings */
+#define RATE111_80211B_COMPAT	0x0027
+
+/* Descriptor Ctl field bits
+ * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
+ */
+#define DESC_CTL_SHORT_PREAMBLE	0x01	/* preamble type: 0 = long; 1 = short */
+#define DESC_CTL_FIRSTFRAG	0x02	/* this is the 1st frag of the frame */
+#define DESC_CTL_AUTODMA	0x04
+#define DESC_CTL_RECLAIM	0x08	/* ready to reuse */
+#define DESC_CTL_HOSTDONE	0x20	/* host has finished processing */
+#define DESC_CTL_ACXDONE	0x40	/* acx has finished processing */
+/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
+#define DESC_CTL_HOSTOWN	0x80
+#define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
+
+/* Descriptor Status field
+ */
+#define	DESC_STATUS_FULL	(1 << 31)
+
+/* NB: some bits may be interesting for Monitor mode tx (aka Raw tx): */
+#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
+#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
+#define DESC_CTL2_MORE_FRAG	0x04
+#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
+#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
+#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
+#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
+#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
+
+/***********************************************************************
+** PCI structures
+*/
+
+/* Outside of "#ifdef PCI" because USB needs to know sizeof()
+** of txdesc and rxdesc: */
+struct txdesc {
+	acx_ptr	pNextDesc;	/* pointer to next txdesc */
+	acx_ptr	HostMemPtr;			/* 0x04 */
+	acx_ptr	AcxMemPtr;			/* 0x08 */
+	u32	tx_time;			/* 0x0c */
+	u16	total_length;			/* 0x10 */
+	u16	Reserved;			/* 0x12 */
+
+/* The following 16 bytes do not change when acx100 owns the descriptor */
+/* BUG: fw clears last byte of this area which is supposedly reserved
+** for driver use. amd64 blew up. We dare not use it now */
+	u32	dummy[4];
+
+	u8	Ctl_8;			/* 0x24, 8bit value */
+	u8	Ctl2_8;			/* 0x25, 8bit value */
+	u8	error;			/* 0x26 */
+	u8	ack_failures;		/* 0x27 */
+	u8	rts_failures;		/* 0x28 */
+	u8	rts_ok;			/* 0x29 */
+	union {
+		struct {
+			u8	rate;		/* 0x2a */
+			u8	queue_ctrl;	/* 0x2b */
+		} __attribute__ ((packed)) r1;
+		struct {
+			u16	rate111;	/* 0x2a */
+		} __attribute__ ((packed)) r2;
+	} __attribute__ ((packed)) u;
+	u32	queue_info;			/* 0x2c (acx100, reserved on acx111) */
+} __attribute__ ((packed));		/* size : 48 = 0x30 */
+/* NB: acx111 txdesc structure is 4 byte larger */
+/* All these 4 extra bytes are reserved. tx alloc code takes them into account */
+
+struct rxdesc {
+	acx_ptr	pNextDesc;			/* 0x00 */
+	acx_ptr	HostMemPtr;			/* 0x04 */
+	acx_ptr	ACXMemPtr;			/* 0x08 */
+	u32	rx_time;			/* 0x0c */
+	u16	total_length;			/* 0x10 */
+	u16	WEP_length;			/* 0x12 */
+	u32	WEP_ofs;			/* 0x14 */
+
+/* the following 16 bytes do not change when acx100 owns the descriptor */
+	u8	driverWorkspace[16];		/* 0x18 */
+
+	u8	Ctl_8;
+	u8	rate;
+	u8	error;
+	u8	SNR;				/* Signal-to-Noise Ratio */
+	u8	RxLevel;
+	u8	queue_ctrl;
+	u16	unknown;
+	u32	unknown2;
+} __attribute__ ((packed));		/* size 52 = 0x34 */
+
 /***********************************************************************
 ** rxbuffer_t
 **
@@ -144,7 +351,7 @@ typedef struct txhostdesc txhostdesc_t;
 typedef struct phy_hdr {
 	u8	unknown[4];
 	u8	acx111_unknown[4];
-} __attribute__ ((packed)) phy_hdr_t;
+} ACX_PACKED phy_hdr_t;
 
 /* seems to be a bit similar to hfa384x_rx_frame.
  * These fields are still not quite obvious, though.
@@ -219,7 +426,15 @@ typedef struct rxbuffer {
 	/* maximally sized data part of wlan packet */
 	u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
 	/* can add hdr/data_a4 if needed */
-} __attribute__ ((packed)) rxbuffer_t;
+} ACX_PACKED rxbuffer_t;
+
+
+/*--- Firmware statistics ----------------------------------------------------*/
+
+/* define a random 100 bytes more to catch firmware versions which
+ * provide a bigger struct */
+#define FW_STATS_FUTURE_EXTENSION	100
+#define FW_ID_SIZE 20
 
 
 /*--- WEP stuff --------------------------------------------------------------*/
@@ -289,6 +504,298 @@ struct client {
 	char	challenge_text[128]; /*WLAN_CHALLENGE_LEN*/
 };
 
+
+
+/* Config Option structs */
+
+typedef struct co_antennas {
+	u8	type;
+	u8	len;
+	u8	list[2];
+} __attribute__ ((packed)) co_antennas_t;
+
+typedef struct co_powerlevels {
+	u8	type;
+	u8	len;
+	u16	list[8];
+} __attribute__ ((packed)) co_powerlevels_t;
+
+typedef struct co_datarates {
+	u8	type;
+	u8	len;
+	u8	list[8];
+} __attribute__ ((packed)) co_datarates_t;
+
+typedef struct co_domains {
+	u8	type;
+	u8	len;
+	u8	list[6];
+} __attribute__ ((packed)) co_domains_t;
+
+typedef struct co_product_id {
+	u8	type;
+	u8	len;
+	u8	list[128];
+} __attribute__ ((packed)) co_product_id_t;
+
+typedef struct co_manuf_id {
+	u8	type;
+	u8	len;
+	u8	list[128];
+} __attribute__ ((packed)) co_manuf_t;
+
+typedef struct co_fixed {
+	char	NVSv[8];
+/*	u16	NVS_vendor_offs;	ACX111-only */
+/*	u16	unknown;		ACX111-only */
+	u8	MAC[6];	/* ACX100-only */
+	u16	probe_delay;	/* ACX100-only */
+	u32	eof_memory;
+	u8	dot11CCAModes;
+	u8	dot11Diversity;
+	u8	dot11ShortPreambleOption;
+	u8	dot11PBCCOption;
+	u8	dot11ChannelAgility;
+	u8	dot11PhyType; /* FIXME: does 802.11 call it "dot11PHYType"? */
+	u8	dot11TempType;
+	u8	table_count;
+} __attribute__ ((packed)) co_fixed_t;
+
+typedef struct acx111_ie_configoption {
+	u16			type;
+	u16			len;
+/* Do not access below members directly, they are in fact variable length */
+	co_fixed_t		fixed;
+	co_antennas_t		antennas;
+	co_powerlevels_t	power_levels;
+	co_datarates_t		data_rates;
+	co_domains_t		domains;
+	co_product_id_t		product_id;
+	co_manuf_t		manufacturer;
+	u8			_padding[4];
+} __attribute__ ((packed)) acx111_ie_configoption_t;
+
+/***********************************************************************
+** Hardware structures
+*/
+
+/* An opaque typesafe helper type
+ *
+ * Some hardware fields are actually pointers,
+ * but they have to remain u32, since using ptr instead
+ * (8 bytes on 64bit systems!) would disrupt the fixed descriptor
+ * format the acx firmware expects in the non-user area.
+ * Since we cannot cram an 8 byte ptr into 4 bytes, we need to
+ * enforce that pointed to data remains in low memory
+ * (address value needs to fit in 4 bytes) on 64bit systems.
+ *
+ * This is easy to get wrong, thus we are using a small struct
+ * and special macros to access it. Macros will check for
+ * attempts to overflow an acx_ptr with value > 0xffffffff.
+ *
+ * Attempts to use acx_ptr without macros result in compile-time errors */
+
+#if ACX_DEBUG
+#define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
+#else
+#define CHECK32(n) ((void)0)
+#endif
+
+/* acx_ptr <-> integer conversion */
+#define cpu2acx(n) ({ CHECK32(n); ((acx_ptr){ .v = cpu_to_le32(n) }); })
+#define acx2cpu(a) (le32_to_cpu(a.v))
+
+/* acx_ptr <-> pointer conversion */
+#define ptr2acx(p) ({ CHECK32(p); ((acx_ptr){ .v = cpu_to_le32((u32)(long)(p)) }); })
+#define acx2ptr(a) ((void*)le32_to_cpu(a.v))
+
+/* Values for rate field (acx100 only) */
+#define RATE100_1		10
+#define RATE100_2		20
+#define RATE100_5		55
+#define RATE100_11		110
+#define RATE100_22		220
+/* This bit denotes use of PBCC:
+** (PBCC encoding is usable with 11 and 22 Mbps speeds only) */
+#define RATE100_PBCC511		0x80
+
+/* Bit values for rate111 field */
+#define RATE111_1		0x0001	/* DBPSK */
+#define RATE111_2		0x0002	/* DQPSK */
+#define RATE111_5		0x0004	/* CCK or PBCC */
+#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
+#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
+#define RATE111_11		0x0020	/* CCK or PBCC */
+#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
+#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
+#define RATE111_22		0x0100	/* PBCC */
+#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
+#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
+#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
+#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
+#define RATE111_RESERVED	0x2000
+#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
+#define RATE111_SHORTPRE	0x8000  /* short preamble */
+/* Special 'try everything' value */
+#define RATE111_ALL		0x1fff
+/* These bits denote acx100 compatible settings */
+#define RATE111_ACX100_COMPAT	0x0127
+/* These bits denote 802.11b compatible settings */
+#define RATE111_80211B_COMPAT	0x0027
+
+/* Descriptor Ctl field bits
+ * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
+ */
+#define DESC_CTL_SHORT_PREAMBLE	0x01	/* preamble type: 0 = long; 1 = short */
+#define DESC_CTL_FIRSTFRAG	0x02	/* this is the 1st frag of the frame */
+#define DESC_CTL_AUTODMA	0x04
+#define DESC_CTL_RECLAIM	0x08	/* ready to reuse */
+#define DESC_CTL_HOSTDONE	0x20	/* host has finished processing */
+#define DESC_CTL_ACXDONE	0x40	/* acx has finished processing */
+/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
+#define DESC_CTL_HOSTOWN	0x80
+#define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
+
+/* Descriptor Status field
+ */
+#define	DESC_STATUS_FULL	(1 << 31)
+
+/* NB: some bits may be interesting for Monitor mode tx (aka Raw tx): */
+#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
+#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
+#define DESC_CTL2_MORE_FRAG	0x04
+#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
+#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
+#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
+#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
+#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
+
+/***********************************************************************
+** PCI structures
+*/
+/* IRQ Constants
+** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE) */
+#define HOST_INT_RX_DATA	0x0001
+#define HOST_INT_TX_COMPLETE	0x0002
+#define HOST_INT_TX_XFER	0x0004
+#define HOST_INT_RX_COMPLETE	0x0008
+#define HOST_INT_DTIM		0x0010
+#define HOST_INT_BEACON		0x0020
+#define HOST_INT_TIMER		0x0040
+#define HOST_INT_KEY_NOT_FOUND	0x0080
+#define HOST_INT_IV_ICV_FAILURE	0x0100
+#define HOST_INT_CMD_COMPLETE	0x0200
+#define HOST_INT_INFO		0x0400
+#define HOST_INT_OVERFLOW	0x0800
+#define HOST_INT_PROCESS_ERROR	0x1000
+#define HOST_INT_SCAN_COMPLETE	0x2000
+#define HOST_INT_FCS_THRESHOLD	0x4000
+#define HOST_INT_UNKNOWN	0x8000
+
+/* Outside of "#ifdef PCI" because USB needs to know sizeof()
+** of txdesc and rxdesc: */
+#ifdef ACX_MAC80211_PCI
+
+/* Register I/O offsets */
+#define ACX100_EEPROM_ID_OFFSET	0x380
+
+/* please add further ACX hardware register definitions only when
+   it turns out you need them in the driver, and please try to use
+   firmware functionality instead, since using direct I/O access instead
+   of letting the firmware do it might confuse the firmware's state
+   machine */
+
+/* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
+** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
+
+/*
+ * NOTE about IO_ACX_IRQ_REASON: this register is CLEARED ON READ.
+ */
+enum {
+	IO_ACX_SOFT_RESET = 0,
+
+	IO_ACX_SLV_MEM_ADDR,
+	IO_ACX_SLV_MEM_DATA,
+	IO_ACX_SLV_MEM_CTL,
+	IO_ACX_SLV_END_CTL,
+
+	IO_ACX_FEMR,		/* Function Event Mask */
+
+	IO_ACX_INT_TRIG,
+	IO_ACX_IRQ_MASK,
+	IO_ACX_IRQ_STATUS_NON_DES,
+	IO_ACX_IRQ_REASON,
+	IO_ACX_IRQ_ACK,
+	IO_ACX_HINT_TRIG,
+
+	IO_ACX_ENABLE,
+
+	IO_ACX_EEPROM_CTL,
+	IO_ACX_EEPROM_ADDR,
+	IO_ACX_EEPROM_DATA,
+	IO_ACX_EEPROM_CFG,
+
+	IO_ACX_PHY_ADDR,
+	IO_ACX_PHY_DATA,
+	IO_ACX_PHY_CTL,
+
+	IO_ACX_GPIO_OE,
+
+	IO_ACX_GPIO_OUT,
+
+	IO_ACX_CMD_MAILBOX_OFFS,
+	IO_ACX_INFO_MAILBOX_OFFS,
+	IO_ACX_EEPROM_INFORMATION,
+
+	IO_ACX_EE_START,
+	IO_ACX_SOR_CFG,
+	IO_ACX_ECPU_CTRL
+};
+/* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
+** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
+
+/* Values for IO_ACX_INT_TRIG register: */
+/* inform hw that rxdesc in queue needs processing */
+#define INT_TRIG_RXPRC		0x08
+/* inform hw that txdesc in queue needs processing */
+#define INT_TRIG_TXPRC		0x04
+/* ack that we received info from info mailbox */
+#define INT_TRIG_INFOACK	0x02
+/* inform hw that we have filled command mailbox */
+#define INT_TRIG_CMD		0x01
+
+struct txhostdesc {
+	acx_ptr	data_phy;			/* 0x00 [u8 *] */
+	u16	data_offset;			/* 0x04 */
+	u16	reserved;			/* 0x06 */
+	u16	Ctl_16;	/* 16bit value, endianness!! */
+	u16	length;			/* 0x0a */
+	acx_ptr	desc_phy_next;		/* 0x0c [txhostdesc *] */
+	acx_ptr	pNext;			/* 0x10 [txhostdesc *] */
+	u32	Status;			/* 0x14, unused on Tx */
+/* From here on you can use this area as you want (variable length, too!) */
+	u8	*data;
+	struct ieee80211_tx_status txstatus;
+	struct sk_buff *skb;	
+
+} ACX_PACKED;
+
+struct rxhostdesc {
+	acx_ptr	data_phy;			/* 0x00 [rxbuffer_t *] */
+	u16	data_offset;			/* 0x04 */
+	u16	reserved;			/* 0x06 */
+	u16	Ctl_16;			/* 0x08; 16bit value, endianness!! */
+	u16	length;			/* 0x0a */
+	acx_ptr	desc_phy_next;		/* 0x0c [rxhostdesc_t *] */
+	acx_ptr	pNext;			/* 0x10 [rxhostdesc_t *] */
+	u32	Status;			/* 0x14 */
+/* From here on you can use this area as you want (variable length, too!) */
+	rxbuffer_t *data;
+} ACX_PACKED;
+
+#endif /* ACX_PCI */
+
+
 /***********************************************************************
 ** USB structures and constants
 */
@@ -309,7 +816,7 @@ typedef struct usb_txbuffer {
 	u16	data_len;
 	/* wlan packet content is placed here: */
 	u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
-} __attribute__ ((packed)) usb_txbuffer_t;
+} ACX_PACKED usb_txbuffer_t;
 
 /* USB returns either rx packets (see rxbuffer) or
 ** these "tx status" structs: */
@@ -324,7 +831,7 @@ typedef struct usb_txstatus {
 	u8	rts_ok;
 //	struct ieee80211_tx_status txstatus;
 //	struct sk_buff *skb;	
-} __attribute__ ((packed)) usb_txstatus_t;
+} ACX_PACKED usb_txstatus_t;
 
 typedef struct usb_tx {
 	unsigned	busy:1;
@@ -383,38 +890,9 @@ typedef struct usb_rx {
 struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
-	/*
-	 * Locking 
-	 */
+	/*** Locking ***/
 	struct mutex		mutex;
 	spinlock_t		spinlock;
-	spinlock_t		irqlock;
-	/*
-	 * IRQ handling
-	 */
-	/* The IRQ we have inherited */
-	unsigned int	irq;
-	/* Are IRQs currently activated? FIXME: should get rid of this */
-	u8		irqs_active;
-	/* The interrupts we can acknowledge (see acx_irq.h) */
-	u16		irq_mask;
-	/* The mask of IRQs saved by the IRQ top half routine */
-	u16		irq_saved_mask;
-	/*
-	 * FIXME: these ones should disappear
-	 */
-	unsigned int	irq_loops_this_jiffy;
-	unsigned long	irq_last_jiffies;
-	/* Barely used in USB case (FIXME?) */
-	u16		irq_status;
-	int		irq_reason; /* FIXME: should be u16 */
-	/* Mask of jobs we have to schedule post interrupt */
-	u8		after_interrupt_jobs;
-	/* 
-	 * Work queue for the bottom half. FIXME: only one, consider a
-	 * delayed_work struct some day?
-	 */
-	struct work_struct	after_interrupt_task;
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
 	const char		*last_lock;
@@ -448,6 +926,7 @@ struct acx_device {
 
 	/*** Hardware identification ***/
 	const char		*chip_name;
+	u8			dev_type;
 	u8			chip_type;
 	u8			form_factor;
 	u8			radio_type;
@@ -486,7 +965,14 @@ struct acx_device {
 	u32		get_mask;		/* mask of settings to fetch from the card */
 	u32		set_mask;		/* mask of settings to write to the card */
 	u32		initialized:1;
+	/* Barely used in USB case */
+	u16		irq_status;
+	int		irq_savedstate;
+	int		irq_reason;
+	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
+	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
 
+	unsigned int	irq;
 
 	/*** scanning ***/
 	u16		scan_count;		/* number of times to do channel scan */
@@ -656,6 +1142,7 @@ struct acx_device {
 	unsigned int	rxhostdesc_area_size;
 
 	u8		need_radio_fw;
+	u8		irqs_active;	/* whether irq sending is activated */
 
 	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */
 
@@ -674,6 +1161,10 @@ struct acx_device {
 	u8 __iomem	*cmd_area;
 	u8 __iomem	*info_area;
 
+	u16		irq_mask;		/* interrupt types to mask out (not wanted) with many IRQs activated */
+	u16		irq_mask_off;		/* interrupt types to mask out (not wanted) with IRQs off */
+	unsigned int	irq_loops_this_jiffy;
+	unsigned long	irq_last_jiffies;
 #endif
 
 	/*** USB stuff ***/
@@ -693,7 +1184,13 @@ struct acx_device {
 };
 
 
-#define ieee2adev(ieee80211_hw) ((ieee80211_hw)->priv)
+
+static inline
+acx_device_t * ieee2adev(struct ieee80211_hw *hw)
+{
+        return hw->priv;
+}
+
 
 /* For use with ACX1xx_REG_RXCONFIG */
 /*  bit     description
@@ -817,7 +1314,7 @@ typedef struct acx100_ie_memblocksize {
 	u16	type;
 	u16	len;
 	u16	size;
-} __attribute__ ((packed)) acx100_ie_memblocksize_t;
+} ACX_PACKED acx100_ie_memblocksize_t;
 
 typedef struct acx100_ie_queueconfig {
 	u16	type;
@@ -834,7 +1331,7 @@ typedef struct acx100_ie_queueconfig {
 	u8	TxQueuePri;
 	u8	NumTxDesc;
 	u16	pad2;
-} __attribute__ ((packed)) acx100_ie_queueconfig_t;
+} ACX_PACKED acx100_ie_queueconfig_t;
 
 typedef struct acx111_ie_queueconfig {
 	u16	type;
@@ -847,7 +1344,7 @@ typedef struct acx111_ie_queueconfig {
 	u8	tx1_attributes;
 	u16	reserved2;
 	u8	reserved3;
-} __attribute__ ((packed)) acx111_ie_queueconfig_t;
+} ACX_PACKED acx111_ie_queueconfig_t;
 
 typedef struct acx100_ie_memconfigoption {
 	u16	type;
@@ -858,7 +1355,7 @@ typedef struct acx100_ie_memconfigoption {
 	u32	tx_mem;
 	u16	RxBlockNum;
 	u16	TxBlockNum;
-} __attribute__ ((packed)) acx100_ie_memconfigoption_t;
+} ACX_PACKED acx100_ie_memconfigoption_t;
 
 typedef struct acx111_ie_memoryconfig {
 	u16	type;
@@ -887,7 +1384,7 @@ typedef struct acx111_ie_memoryconfig {
 	u8	tx_queue1_reserved2;
 	u8	tx_queue1_attributes;
 	/* end of tx1 block */
-} __attribute__ ((packed)) acx111_ie_memoryconfig_t;
+} ACX_PACKED acx111_ie_memoryconfig_t;
 
 typedef struct acx_ie_memmap {
 	u16	type;
@@ -902,20 +1399,20 @@ typedef struct acx_ie_memmap {
 	u32	QueueEnd;
 	u32	PoolStart;
 	u32	PoolEnd;
-} __attribute__ ((packed)) acx_ie_memmap_t;
+} ACX_PACKED acx_ie_memmap_t;
 
 typedef struct acx111_ie_feature_config {
 	u16	type;
 	u16	len;
 	u32	feature_options;
 	u32	data_flow_options;
-} __attribute__ ((packed)) acx111_ie_feature_config_t;
+} ACX_PACKED acx111_ie_feature_config_t;
 
 typedef struct acx111_ie_tx_level {
 	u16	type;
 	u16	len;
 	u8	level;
-} __attribute__ ((packed)) acx111_ie_tx_level_t;
+} ACX_PACKED acx111_ie_tx_level_t;
 
 #define PS_CFG_ENABLE		0x80
 #define PS_CFG_PENDING		0x40 /* status flag when entering PS */
@@ -939,7 +1436,7 @@ typedef struct acx100_ie_powersave {
 	u8	options;
 	u8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u16	enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} __attribute__ ((packed)) acx100_ie_powersave_t;
+} ACX_PACKED acx100_ie_powersave_t;
 
 typedef struct acx111_ie_powersave {
 	u16	type;
@@ -950,7 +1447,7 @@ typedef struct acx111_ie_powersave {
 	u8	hangover_period; /* remaining wake time after Tx MPDU w/ PS bit, in values of 1/1024 seconds */
 	u32	beacon_rx_time;
 	u32	enhanced_ps_transition_time; /* rem. wake time for Enh. PS */
-} __attribute__ ((packed)) acx111_ie_powersave_t;
+} ACX_PACKED acx111_ie_powersave_t;
 
 
 /***********************************************************************
@@ -984,7 +1481,7 @@ typedef struct acx100_scan {
 	u8	options;	/* bit mask, see defines above */
 	u16	chan_duration;
 	u16	max_probe_delay;
-} __attribute__ ((packed)) acx100_scan_t;			/* length 0xc */
+} ACX_PACKED acx100_scan_t;			/* length 0xc */
 
 #define ACX111_SCAN_RATE_6	0x0B
 #define ACX111_SCAN_RATE_9	0x0F
@@ -1013,7 +1510,7 @@ typedef struct acx111_scan {
 	u8	channel_list[26];	/* bits 7:0 first byte: channels 8:1 */
 						/* bits 7:0 second byte: channels 16:9 */
 						/* 26 bytes is enough to cover 802.11a */
-} __attribute__ ((packed)) acx111_scan_t;
+} ACX_PACKED acx111_scan_t;
 
 /*
 ** Radio calibration command structure
@@ -1024,7 +1521,7 @@ typedef struct acx111_cmd_radiocalib {
  * calib based on DC, AfeDC, Tx mismatch, Tx equilization */
 	u32	methods;
 	u32	interval;
-} __attribute__ ((packed)) acx111_cmd_radiocalib_t;
+} ACX_PACKED acx111_cmd_radiocalib_t;
 
 /*
 ** Packet template structures
@@ -1055,7 +1552,7 @@ typedef struct acx_template_tim {
 	u8	bitmap_ctrl;	/* 04 1 Bitmap Control * (except bit0) */
 					/* 05 n Partial Virtual Bitmap * */
 	u8	variable[0x100 - 1-1-1-1-1];
-} __attribute__ ((packed)) acx_template_tim_t;
+} ACX_PACKED acx_template_tim_t;
 
 typedef struct acx_template_probereq {
 	u16	size;
@@ -1068,7 +1565,7 @@ typedef struct acx_template_probereq {
 				/* 18 n SSID * */
 				/* nn n Supported Rates * */
 	u8	variable[0x44 - 2-2-6-6-6-2];
-} __attribute__ ((packed)) acx_template_probereq_t;
+} ACX_PACKED acx_template_probereq_t;
 
 typedef struct acx_template_proberesp {
 	u16	size;
@@ -1085,14 +1582,14 @@ typedef struct acx_template_proberesp {
 					/* nn n Supported Rates * */
 					/* nn 1 DS Parameter Set * */
 	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2];
-} __attribute__ ((packed)) acx_template_proberesp_t;
+} ACX_PACKED acx_template_proberesp_t;
 #define acx_template_beacon_t acx_template_proberesp_t
 #define acx_template_beacon acx_template_proberesp
 
 typedef struct acx_template_nullframe {
 	u16	size;
 	struct ieee80211_hdr hdr;
-} __attribute__ ((packed)) acx_template_nullframe_t;
+} ACX_PACKED acx_template_nullframe_t;
 
 
 /*
@@ -1108,12 +1605,12 @@ typedef struct acx_joinbss {
 			u8	dtim_interval;
 			u8	rates_basic;
 			u8	rates_supported;
-		} __attribute__ ((packed)) acx100;
+		} ACX_PACKED acx100;
 		struct {
 			u16	rates_basic;
 			u8	dtim_interval;
-		} __attribute__ ((packed)) acx111;
-	} __attribute__ ((packed)) u;
+		} ACX_PACKED acx111;
+	} ACX_PACKED u;
 	u8	genfrm_txrate;	/* generated frame (bcn, proberesp, RTS, PSpoll) tx rate */
 	u8	genfrm_mod_pre;	/* generated frame modulation/preamble:
 						** bit7: PBCC, bit6: OFDM (else CCK/DQPSK/DBPSK)
@@ -1122,7 +1619,7 @@ typedef struct acx_joinbss {
 	u8	channel;
 	u8	essid_len;
 	char	essid[IW_ESSID_MAX_SIZE];
-} __attribute__ ((packed)) acx_joinbss_t;
+} ACX_PACKED acx_joinbss_t;
 
 #define JOINBSS_RATES_1		0x01
 #define JOINBSS_RATES_2		0x02
@@ -1157,12 +1654,13 @@ typedef struct mem_read_write {
 	u16	type; /* 0x0 int. RAM / 0xffff MAC reg. / 0x81 PHY RAM / 0x82 PHY reg.; or maybe it's actually 0x30 for MAC? Better verify it by writing and reading back and checking whether the value holds! */
 	u32	len;
 	u32	data;
-} __attribute__ ((packed)) mem_read_write_t;
+} ACX_PACKED mem_read_write_t;
+
 
 typedef struct acx_cmd_radioinit {
 	u32	offset;
 	u32	len;
-} __attribute__ ((packed)) acx_cmd_radioinit_t;
+} ACX_PACKED acx_cmd_radioinit_t;
 
 typedef struct acx100_ie_wep_options {
 	u16	type;
@@ -1170,7 +1668,7 @@ typedef struct acx100_ie_wep_options {
 	u16	NumKeys;	/* max # of keys */
 	u8	WEPOption;	/* 0 == decrypt default key only, 1 == override decrypt */
 	u8	Pad;		/* used only for acx111 */
-} __attribute__ ((packed)) acx100_ie_wep_options_t;
+} ACX_PACKED acx100_ie_wep_options_t;
 
 typedef struct ie_dot11WEPDefaultKey {
 	u16	type;
@@ -1179,7 +1677,7 @@ typedef struct ie_dot11WEPDefaultKey {
 	u8	keySize;
 	u8	defaultKeyNum;
 	u8	key[29];	/* check this! was Key[19] */
-} __attribute__ ((packed)) ie_dot11WEPDefaultKey_t;
+} ACX_PACKED ie_dot11WEPDefaultKey_t;
 
 typedef struct acx111WEPDefaultKey {
 	u8	MacAddr[ETH_ALEN];
@@ -1191,20 +1689,20 @@ typedef struct acx111WEPDefaultKey {
 	u8	defaultKeyNum;
 	u8	counter[6];
 	u8	key[32];	/* up to 32 bytes (for TKIP!) */
-} __attribute__ ((packed)) acx111WEPDefaultKey_t;
+} ACX_PACKED acx111WEPDefaultKey_t;
 
 typedef struct ie_dot11WEPDefaultKeyID {
 	u16	type;
 	u16	len;
 	u8	KeyID;
-} __attribute__ ((packed)) ie_dot11WEPDefaultKeyID_t;
+} ACX_PACKED ie_dot11WEPDefaultKeyID_t;
 
 typedef struct acx100_cmd_wep_mgmt {
 	u8	MacAddr[ETH_ALEN];
 	u16	Action;
 	u16	KeySize;
 	u8	Key[29]; /* 29*8 == 232bits == WEP256 */
-} __attribute__ ((packed)) acx100_cmd_wep_mgmt_t;
+} ACX_PACKED acx100_cmd_wep_mgmt_t;
 
 typedef struct acx_ie_generic {
 	u16	type;
@@ -1214,8 +1712,8 @@ typedef struct acx_ie_generic {
 		u16	aid;
 		/* generic member for quick implementation of commands */
 		u8	bytes[32];
-	} __attribute__ ((packed)) m;
-} __attribute__ ((packed)) acx_ie_generic_t;
+	} ACX_PACKED m;
+} ACX_PACKED acx_ie_generic_t;
 
 #define ACX_SEC_KEYSIZE                     16
 /* Security algorithms. */                

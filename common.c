@@ -23,10 +23,6 @@
 //#include <linux/utsrelease.h>
 
 #include "acx.h"
-#include "acx_debug.h"
-#include "acx_log.h"
-#include "acx_irq.h"
-#include "acx_mmio.h"
 
 
 /***********************************************************************
@@ -36,7 +32,18 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf);
 
 
 
-MODULE_LICENSE("GPL");
+/***********************************************************************
+*/
+#if ACX_DEBUG
+unsigned int acx_debug /* will add __read_mostly later */  = ACX_DEFAULT_MSG;
+/* parameter is 'debug', corresponding var is acx_debug */
+module_param_named(debug, acx_debug, uint, 0);
+MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
+#endif
+
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual MPL/GPL");
+#endif
 /* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
 MODULE_AUTHOR("ACX100 Open Source Driver development team");
 MODULE_DESCRIPTION
@@ -140,15 +147,75 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 		diff -= adev->lock_time;
 		if (diff > max_lock_time) {
 			where = sanitize_str(where);
-			acx_log(LOG_DEBUG, L_LOCK, "max lock hold time "
-				"%ld CPU ticks from %s to %s\n", diff,
-				adev->last_lock, where);
+			printk("max lock hold time %ld CPU ticks from %s "
+			       "to %s\n", diff, adev->last_lock, where);
 			max_lock_time = diff;
 		}
 	}
 }
 #endif /* PARANOID_LOCKING */
 
+
+/***********************************************************************
+*/
+#if ACX_DEBUG > 1
+
+static int acx_debug_func_indent;
+#define DEBUG_TSC 0
+#define FUNC_INDENT_INCREMENT 2
+
+#if DEBUG_TSC
+#define TIMESTAMP(d) unsigned long d; rdtscl(d)
+#else
+#define TIMESTAMP(d) unsigned long d = jiffies
+#endif
+
+static const char spaces[] = "          " "          ";	/* Nx10 spaces */
+
+void log_fn_enter(const char *funcname)
+{
+	int indent;
+	TIMESTAMP(d);
+
+	indent = acx_debug_func_indent;
+	if (indent >= sizeof(spaces))
+		indent = sizeof(spaces) - 1;
+
+	printk("%08ld %s==> %s\n",
+	       d % 100000000, spaces + (sizeof(spaces) - 1) - indent, funcname);
+
+	acx_debug_func_indent += FUNC_INDENT_INCREMENT;
+}
+void log_fn_exit(const char *funcname)
+{
+	int indent;
+	TIMESTAMP(d);
+
+	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+
+	indent = acx_debug_func_indent;
+	if (indent >= sizeof(spaces))
+		indent = sizeof(spaces) - 1;
+
+	printk("%08ld %s<== %s\n",
+	       d % 100000000, spaces + (sizeof(spaces) - 1) - indent, funcname);
+}
+void log_fn_exit_v(const char *funcname, int v)
+{
+	int indent;
+	TIMESTAMP(d);
+
+	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+
+	indent = acx_debug_func_indent;
+	if (indent >= sizeof(spaces))
+		indent = sizeof(spaces) - 1;
+
+	printk("%08ld %s<== %s: %08X\n",
+	       d % 100000000,
+	       spaces + (sizeof(spaces) - 1) - indent, funcname, v);
+}
+#endif /* ACX_DEBUG > 1 */
 
 
 /***********************************************************************
@@ -161,6 +228,13 @@ void acx_s_mwait(int ms)
 	FN_EXIT0;
 }
 
+/***********************************************************************
+** Not inlined: it's larger than it seems
+*/
+void acx_print_mac(const char *head, const u8 * mac, const char *tail)
+{
+	printk("%s" MACSTR "%s", head, MAC(mac), tail);
+}
 
 /***********************************************************************
 ** acx_cmd_status_str
@@ -191,6 +265,42 @@ const char *acx_cmd_status_str(unsigned int state)
 }
 
 /***********************************************************************
+*/
+#if ACX_DEBUG
+void acx_dump_bytes(const void *data, int num)
+{
+	const u8 *ptr = (const u8 *)data;
+
+	FN_ENTER;
+
+	if (num <= 0) {
+		printk("\n");
+		return;
+	}
+
+	while (num >= 16) {
+		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
+		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+		       ptr[0], ptr[1], ptr[2], ptr[3],
+		       ptr[4], ptr[5], ptr[6], ptr[7],
+		       ptr[8], ptr[9], ptr[10], ptr[11],
+		       ptr[12], ptr[13], ptr[14], ptr[15]);
+		num -= 16;
+		ptr += 16;
+	}
+	if (num > 0) {
+		while (--num > 0)
+			printk("%02X ", *ptr++);
+		printk("%02X\n", *ptr);
+	}
+
+	FN_EXIT0;
+
+}
+#endif
+
+
+/***********************************************************************
 ** acx_s_get_firmware_version
 ** 
 ** Obvious
@@ -210,11 +320,11 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 	memcpy(adev->firmware_version, fw.fw_id, FW_ID_SIZE);
 	adev->firmware_version[FW_ID_SIZE] = '\0';
 
-	acx_log(LOG_DEBUG, L_ANY, "fw_ver: fw_id='%s' hw_id=%08X\n",
+	log(L_DEBUG, "fw_ver: fw_id='%s' hw_id=%08X\n",
 	    adev->firmware_version, fw.hw_id);
 
 	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
-		acx_log(LOG_WARNING, L_ANY, "acx: strange firmware version string "
+		printk("acx: strange firmware version string "
 		       "'%s', please report\n", adev->firmware_version);
 		adev->firmware_numver = 0x01090407;	/* assume 1.9.4.7 */
 	} else {
@@ -238,8 +348,14 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 		adev->firmware_numver = (u32) ((hexarr[0] << 24) |
 					       (hexarr[1] << 16)
 					       | (hexarr[2] << 8) | hexarr[3]);
-		acx_log(LOG_DEBUG, L_ANY, "firmware_numver 0x%08X\n",
-			adev->firmware_numver);
+		log(L_DEBUG, "firmware_numver 0x%08X\n", adev->firmware_numver);
+	}
+	if (IS_ACX111(adev)) {
+		if (adev->firmware_numver == 0x00010011) {
+			/* This one does not survive floodpinging */
+			printk("acx: firmware '%s' is known to be buggy, "
+			       "please upgrade\n", adev->firmware_version);
+		}
 	}
 
 	adev->firmware_id = le32_to_cpu(fw.hw_id);
@@ -261,8 +377,8 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 		adev->chip_name = "TNETW1450";
 		break;
 	default:
-		acx_log(LOG_WARNING, L_ANY,"unknown chip ID 0x%08X, "
-			"please report\n", adev->firmware_id);
+		printk("acx: unknown chip ID 0x%08X, "
+		       "please report\n", adev->firmware_id);
 		break;
 	}
 
@@ -330,7 +446,7 @@ void acx_display_hardware_details(acx_device_t * adev)
 		break;
 	}
 
-	acx_log(LOG_INFO, L_ANY, "acx: chipset %s, radio type 0x%02X (%s), "
+	printk("acx: chipset %s, radio type 0x%02X (%s), "
 	       "form factor 0x%02X (%s), EEPROM version 0x%02X, "
 	       "uploaded firmware '%s'\n",
 	       adev->chip_name, adev->radio_type, radio_str,
@@ -570,6 +686,8 @@ static const u16 acx111_ie_len_dot11[] = {
 };
 
 
+#undef FUNC
+#define FUNC "configure"
 #if !ACX_DEBUG
 int acx_s_configure(acx_device_t * adev, void *pdr, int type)
 {
@@ -587,9 +705,9 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	acx_log(LOG_DEBUG, L_CTL, "configure (type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
 	if (unlikely(!len)) {
-		acx_log(LOG_DEBUG, L_ANY, "zero-length type %s?!\n", typestr);
+		log(L_DEBUG, "zero-length type %s?!\n", typestr);
 	}
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
@@ -597,18 +715,19 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_WARNING, L_ANY, "%s: configure (type:%s) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), typestr);
+		printk("%s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       typestr);
 #else
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: configure (type:0x%X) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), type);
+		printk("%s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}
 	return res;
 }
 
+#undef FUNC
+#define FUNC "interrogate"
 #if !ACX_DEBUG
 int acx_s_query(acx_device_t * adev, void *pdr, int type)
 {
@@ -630,21 +749,18 @@ acx_s_query_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	acx_log(LOG_DEBUG, L_CTL, "query (type:%s,len:%u)\n",
-		typestr, len);
+	log(L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_QUERY, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: query (type:%s) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), typestr);
+		printk("%s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       typestr);
 #else
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: query (type:0x%X) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), type);
+		printk("%s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}
@@ -661,7 +777,7 @@ void great_inquisitor(acx_device_t * adev)
 		u16 len;
 		/* 0x200 was too large here: */
 		u8 data[0x100 - 4];
-	} __attribute__ ((packed)) ie;
+	} ACX_PACKED ie;
 	u16 type;
 
 	FN_ENTER;
@@ -1272,14 +1388,14 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf),
 			 "driver/acx%s", proc_files[i]);
-		acx_log(LOG_INFO, L_INIT, "%sing /proc entry %s\n",
+		log(L_INIT, "%sing /proc entry %s\n",
 		    remove ? "remov" : "creat", procbuf);
 		if (!remove) {
 			if (!create_proc_read_entry
 			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
-				acx_log(LOG_WARNING, L_ANY,
-				"cannot register /proc entry %s\n", procbuf);
-				FN_EXIT1(NOT_OK);
+				printk("acx: cannot register /proc entry %s\n",
+				       procbuf);
+	FN_EXIT1(NOT_OK);
 				return NOT_OK;
 			}
 		} else {
@@ -1473,9 +1589,7 @@ acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
         int len, result;
 
         FN_ENTER;
-	acx_log(LOG_INFO, L_ANY, "size of template: %08zX, "
-		"size of beacon: %08X\n",
-		sizeof(struct acx_template_beacon),skb->len);
+	printk("Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
         len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
 
@@ -1550,14 +1664,13 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
                 ** Just use RATE111_nnn constants... */
                 tmp.u.acx111.dtim_interval = dtim_interval;
                 tmp.u.acx111.rates_basic = cpu_to_le16(adev->rate_basic);
-                acx_log(LOG_INFO, L_ASSOC, "rates_basic:%04X, "
-			"rates_supported:%04X\n",
+                log(L_ASSOC, "rates_basic:%04X, rates_supported:%04X\n",
                         adev->rate_basic, adev->rate_oper);
         } else {
                 tmp.u.acx100.dtim_interval = dtim_interval;
                 tmp.u.acx100.rates_basic = rate111to5bits(adev->rate_basic);
                 tmp.u.acx100.rates_supported = rate111to5bits(adev->rate_oper);
-                acx_log(LOG_INFO, L_ASSOC, "rates_basic:%04X->%02X, "
+                log(L_ASSOC, "rates_basic:%04X->%02X, "
                         "rates_supported:%04X->%02X\n",
                         adev->rate_basic, tmp.u.acx100.rates_basic,
                         adev->rate_oper, tmp.u.acx100.rates_supported);
@@ -1582,9 +1695,8 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         memcpy(tmp.essid, adev->essid, tmp.essid_len);
         acx_s_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
 
-        acx_log(LOG_DEBUG, L_ASSOC, "BSS_Type = %u\n", tmp.macmode);
-        acx_log(LOG_DEBUG, L_ASSOC, "JoinBSSID MAC:" MACSTR "\n",
-		adev->bssid, "\n");
+        log(L_ASSOC|L_DEBUG, "BSS_Type = %u\n", tmp.macmode);
+        acxlog_mac(L_ASSOC|L_DEBUG, "JoinBSSID MAC:", adev->bssid, "\n");
 
 /*        acx_update_capabilities(adev); */
         FN_EXIT0;
@@ -1626,7 +1738,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
         }
 
         /* cannot update card settings directly here, atomic context */
-        acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
+        acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
         acx_unlock(adev, flags);
 
@@ -1656,7 +1768,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 		FN_EXIT1(NOT_OK); 
 		return NOT_OK;
 	}
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
+	log(L_DEBUG,
 	    "got Feature option:0x%X, DataFlow option: 0x%X\n",
 	    feat.feature_options, feat.data_flow_options);
 
@@ -1709,7 +1821,7 @@ acx111_s_set_feature_config(acx_device_t * adev,
 		SET_BIT(feat.data_flow_options, cpu_to_le32(data_flow_options));
 	}
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
+	log(L_DEBUG,
 	    "old: feature 0x%08X dataflow 0x%08X. mode: %u\n"
 	    "new: feature 0x%08X dataflow 0x%08X\n",
 	    feature_options, data_flow_options, mode,
@@ -1772,7 +1884,7 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	    (le32_to_cpu(mmt->PoolEnd) -
 	     le32_to_cpu(mmt->PoolStart)) / adev->memblocksize;
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "TotalMemoryBlocks=%u (%u bytes)\n",
+	log(L_DEBUG, "TotalMemoryBlocks=%u (%u bytes)\n",
 	    TotalMemoryBlocks, TotalMemoryBlocks * adev->memblocksize);
 
 	/* MemoryConfigOption.DMA_config bitmask:
@@ -1788,10 +1900,9 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc =
 		    cpu2acx(adev->rxhostdesc_startphy);
-		acx_log(LOG_DEBUG, L_REALLYVERBOSE, "pRxHostDesc 0x%08X, "
-			"rxhostdesc_startphy 0x%lX\n",
-			acx2cpu(MemoryConfigOption.pRxHostDesc),
-			(long)adev->rxhostdesc_startphy);
+		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
+		    acx2cpu(MemoryConfigOption.pRxHostDesc),
+		    (long)adev->rxhostdesc_startphy);
 	} else {
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
 	}
@@ -1807,9 +1918,9 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	/* size of the tx and rx descriptor queues */
 	TotalTxBlockSize = TxBlockNum * adev->memblocksize;
 	TotalRxBlockSize = RxBlockNum * adev->memblocksize;
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "TxBlockNum %u RxBlockNum %u "
-		"TotalTxBlockSize %u TotalTxBlockSize %u\n",
-		TxBlockNum, RxBlockNum, TotalTxBlockSize, TotalRxBlockSize);
+	log(L_DEBUG, "TxBlockNum %u RxBlockNum %u TotalTxBlockSize %u "
+	    "TotalTxBlockSize %u\n", TxBlockNum, RxBlockNum,
+	    TotalTxBlockSize, TotalRxBlockSize);
 
 
 	/* align the tx descriptor queue to an alignment of 0x20 (32 bytes) */
@@ -1821,8 +1932,8 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	MemoryConfigOption.tx_mem =
 	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + TotalRxBlockSize +
 			 0x1f) & ~0x1f);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "rx_mem %08X rx_mem %08X\n",
-		MemoryConfigOption.tx_mem, MemoryConfigOption.rx_mem);
+	log(L_DEBUG, "rx_mem %08X rx_mem %08X\n", MemoryConfigOption.tx_mem,
+	    MemoryConfigOption.rx_mem);
 
 	/* alert the device to our decision */
 	if (OK !=
@@ -1867,7 +1978,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 	tx_queue_start = le32_to_cpu(memmap.QueueStart);
 	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "initializing Queue Indicator\n");
+	log(L_DEBUG, "initializing Queue Indicator\n");
 
 	memset(&queueconf, 0, sizeof(queueconf));
 
@@ -2003,16 +2114,16 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
 
-	acx_log(LOG_DEBUG, L_INIT, "dump queue head (from card):\n"
-		"len: %u\n"
-		"tx_memory_block_address: %X\n"
-		"rx_memory_block_address: %X\n"
-		"tx1_queue address: %X\n"
-		"rx1_queue address: %X\n",
-		le16_to_cpu(queueconf.len),
-		le32_to_cpu(queueconf.tx_memory_block_address),
-		le32_to_cpu(queueconf.rx_memory_block_address),
-		tx_queue_start, rx_queue_start);
+	log(L_INIT, "dump queue head (from card):\n"
+	    "len: %u\n"
+	    "tx_memory_block_address: %X\n"
+	    "rx_memory_block_address: %X\n"
+	    "tx1_queue address: %X\n"
+	    "rx1_queue address: %X\n",
+	    le16_to_cpu(queueconf.len),
+	    le32_to_cpu(queueconf.tx_memory_block_address),
+	    le32_to_cpu(queueconf.rx_memory_block_address),
+	    tx_queue_start, rx_queue_start);
 
 	if (IS_PCI(adev))
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
@@ -2037,7 +2148,7 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 		u16 len;
 		u16 rx_cfg1;
 		u16 rx_cfg2;
-	} __attribute__ ((packed)) cfg;
+	} ACX_PACKED cfg;
 	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
 		adev->rx_config_1 = (u16) (0
@@ -2104,9 +2215,8 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 	else
 		adev->phy_header_len = 0;
 
-	acx_log(LOG_DEBUG, L_INIT, "setting RXconfig to %04X:%04X\n",
-		adev->rx_config_1, adev->rx_config_2);
-
+	log(L_INIT, "setting RXconfig to %04X:%04X\n",
+	    adev->rx_config_1, adev->rx_config_2);
 	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
 	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
 	acx_s_configure(adev, &cfg, ACX1xx_REG_RXCONFIG);
@@ -2143,9 +2253,9 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		adev->tx_level_dbm = 15;
 	}
 	if (level_dbm != adev->tx_level_dbm)
-		acx_log(LOG_WARNING, L_INIT, "acx111 firmware has specific "
-			"power levels only: adjusted %d dBm to %d dBm!\n",
-			level_dbm, adev->tx_level_dbm);
+		log(L_INIT, "acx111 firmware has specific "
+		    "power levels only: adjusted %d dBm to %d dBm!\n",
+		    level_dbm, adev->tx_level_dbm);
 
 	return acx_s_configure(adev, &tx_level, ACX1xx_REG_DOT11_TX_POWER_LEVEL);
 }
@@ -2170,9 +2280,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 {
 	struct ieee80211_conf *conf = &adev->ieee->conf;
 	unsigned long flags;
-	u16 default_irq_mask = (IS_ACX111(adev)) ?
-		ACX111_DEFAULT_IRQ_MASK :
-		ACX100_DEFAULT_IRQ_MASK;
 
 	FN_ENTER;
 
@@ -2198,7 +2305,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
-		adev->irq_mask = default_irq_mask;
+		acxpci_set_interrupt_mask(adev);
 
 	adev->led_power = 1;	/* LED is active on startup */
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
@@ -2344,7 +2451,11 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	/* length of frame from control field to first byte of FCS */
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 
-	acx_log_dump(LOG_DEBUG, L_DATA, hdr, buf_len, "RX: 802.11 buffer:\n");
+	if (unlikely(acx_debug & L_DATA)) {
+		printk("rx: 802.11 buf[%u]: \n", buf_len);
+		acx_dump_bytes(hdr, buf_len);
+	}
+
 
 	acx_l_rx(adev, rxbuf);
 	/* Now check Rx quality level, AFTER processing packet.
@@ -2454,9 +2565,8 @@ acx_i_start_xmit(struct ieee80211_hw *hw,
 	tx = acx_l_alloc_tx(adev);
 
 	if (unlikely(!tx)) {
-		acx_log_ratelimited(LOG_WARNING, L_ANY, "%s: start_xmit: "
-			"txdesc ring is full, dropping tx\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk_ratelimited("%s: start_xmit: txdesc ring is full, "
+				   "dropping tx\n", wiphy_name(adev->ieee->wiphy));
 		txresult = NOT_OK;
 		goto out_unlock;
 	}
@@ -2527,10 +2637,10 @@ void acx_l_update_ratevector(acx_device_t * adev)
 		bcfg >>= 1;
 	}
 	adev->rate_supported_len = supp - adev->rate_supported;
-
-	acx_log_dump(LOG_DEBUG, L_ASSOC, adev->rate_supported,
-		adev->rate_supported_len, "new ratevector:\n");
-
+	if (acx_debug & L_ASSOC) {
+		printk("new ratevector: ");
+		acx_dump_bytes(adev->rate_supported, adev->rate_supported_len);
+	}
 	FN_EXIT0;
 }
 
@@ -2570,12 +2680,10 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 {
 	FN_ENTER;
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE | L_IRQ,
-		"%s(%u ms)\n", __func__, timeout_us / 1000);
-
+	log(L_DEBUG | L_IRQ, "%s(%u ms)\n", __func__, timeout_us / 1000);
 	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		acx_log(LOG_WARNING, L_ANY, "attempt to set the timer "
-			"when the card interface is not up!\n");
+		printk("attempt to set the timer "
+		       "when the card interface is not up!\n");
 		goto end;
 	}
 
@@ -2651,8 +2759,7 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 	FN_ENTER;
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		acx_log_ratelimited(LOG_WARNING, L_ANY,
-			"asked to receive a packet but interface is down??\n");
+		printk("asked to receive a packet but interface is down??\n");
 		goto out;
 	}
 
@@ -2664,8 +2771,7 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 	skb = dev_alloc_skb(buflen + 2);
 
 	if (!skb) {
-		acx_log_ratelimited(LOG_WARNING, L_ANY,
-			"skb allocation FAILED\n");
+		printk("skb allocation FAILED\n");
 		goto out;
 	}
 
@@ -2715,22 +2821,21 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
 	const struct firmware *fw_entry;
 
 	res = NULL;
-	acx_log(LOG_INFO, L_INIT, "requesting firmware image '%s'\n", file);
+	log(L_INIT, "requesting firmware image '%s'\n", file);
 	if (!request_firmware(&fw_entry, file, dev)) {
 		*size = 8;
 		if (fw_entry->size >= 8)
 			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
 		if (fw_entry->size != *size) {
-			acx_log(LOG_WARNING, L_ANY,
-				"acx: firmware size does not match "
-				"firmware header: %d != %d, "
-				"aborting fw upload\n",
+			printk("acx: firmware size does not match "
+			       "firmware header: %d != %d, "
+			       "aborting fw upload\n",
 			       (int)fw_entry->size, (int)*size);
 			goto release_ret;
 		}
 		res = vmalloc(*size);
 		if (!res) {
-			acx_log(LOG_INFO, L_ANY, "acx: no memory for firmware "
+			printk("acx: no memory for firmware "
 			       "(%u bytes)\n", *size);
 			goto release_ret;
 		}
@@ -2739,8 +2844,8 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
 		release_firmware(fw_entry);
 		return res;
 	}
-	acx_log(LOG_WARNING, L_ANY, "acx: firmware image '%s' was not provided. "
-		"Check your hotplug scripts\n", file);
+	printk("acx: firmware image '%s' was not provided. "
+	       "Check your hotplug scripts\n", file);
 
 	/* checksum will be verified in write_fw, so don't bother here */
 	return res;
@@ -2757,9 +2862,8 @@ static void acx100_s_set_wepkey(acx_device_t * adev)
 
 	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
 		if (adev->wep_keys[i].size != 0) {
-			acx_log(LOG_DEBUG, L_INIT, "setting WEP key: %d with "
-				"total size: %d\n",
-				i, (int)adev->wep_keys[i].size);
+			log(L_INIT, "setting WEP key: %d with "
+			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
 			dk.action = 1;
 			dk.keySize = adev->wep_keys[i].size;
 			dk.defaultKeyNum = i;
@@ -2777,9 +2881,8 @@ static void acx111_s_set_wepkey(acx_device_t * adev)
 
 	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
 		if (adev->wep_keys[i].size != 0) {
-			acx_log(LOG_DEBUG, L_INIT, "setting WEP key: %d with "
-				"total size: %d\n", i,
-				(int)adev->wep_keys[i].size);
+			log(L_INIT, "setting WEP key: %d with "
+			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
 			memset(&dk, 0, sizeof(dk));
 			dk.action = cpu_to_le16(1);	/* "add key"; yes, that's a 16bit value */
 			dk.keySize = adev->wep_keys[i].size;
@@ -2825,7 +2928,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 		goto fail;
 	}
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "CodeEnd:%X\n", pt.CodeEnd);
+	log(L_DEBUG, "CodeEnd:%X\n", pt.CodeEnd);
 
 	pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
 	pt.WEPCacheEnd = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
@@ -2838,15 +2941,14 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
 	options.WEPOption = 0x00;
 
-	acx_log(LOG_DEBUG, L_ASSOC, "writing WEP options\n");
+	log(L_ASSOC, "writing WEP options\n");
 	acx_s_configure(adev, &options, ACX100_REG_WEP_OPTIONS);
 
 	acx100_s_set_wepkey(adev);
 
 	if (adev->wep_keys[adev->wep_current_index].size != 0) {
-		acx_log(LOG_DEBUG, L_ASSOC,
-			"setting active default WEP key number: %d\n",
-			adev->wep_current_index);
+		log(L_ASSOC, "setting active default WEP key number: %d\n",
+		    adev->wep_current_index);
 		dk.KeyID = adev->wep_current_index;
 		acx_s_configure(adev, &dk, ACX1xx_REG_DOT11_WEP_DEFAULT_KEY_SET);	/* 0x1010 */
 	}
@@ -2868,9 +2970,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_s_query(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: ACX1xx_REG_MEMORY_MAP read #2 FAILED\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk("%s: ACX1xx_REG_MEMORY_MAP read #2 FAILED\n",
+		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
 	/* ...and tell it to start allocating templates at that location */
@@ -2878,9 +2979,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	pt.PacketTemplateStart = pt.WEPCacheEnd;
 
 	if (OK != acx_s_configure(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: ACX1xx_REG_MEMORY_MAP write #2 FAILED\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk("%s: ACX1xx_REG_MEMORY_MAP write #2 FAILED\n",
+		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
 	res = OK;
@@ -3051,8 +3151,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 
 	FN_ENTER;
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE | L_INIT,
-		"initializing max packet templates\n");
+	log(L_DEBUG | L_INIT, "initializing max packet templates\n");
 
 	if (OK != acx_s_init_max_probe_request_template(adev))
 		goto failed;
@@ -3082,8 +3181,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	if (OK != acx_s_set_tim_template(adev))
 		goto failed_acx100;
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
+	log(L_DEBUG, "sizeof(memmap)=%d bytes\n", (int)sizeof(mm));
 
 	if (OK != acx_s_query(adev, &mm, ACX1xx_REG_MEMORY_MAP))
 		goto failed_acx100;
@@ -3096,7 +3194,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	goto success;
 
       failed_acx100:
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE | L_INIT,
+	log(L_DEBUG | L_INIT,
 	    /* "cb=0x%X\n" */
 	    "ACXMemoryMap:\n"
 	    ".CodeStart=0x%X\n"
@@ -3113,8 +3211,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
       failed:
-	acx_log(LOG_WARNING, L_ANY, "%s: %s() FAILED\n",
-		wiphy_name(adev->ieee->wiphy), __func__);
+	printk("%s: %s() FAILED\n", wiphy_name(adev->ieee->wiphy), __func__);
 
       success:
 	FN_EXIT1(result);
@@ -3159,9 +3256,8 @@ int acx_s_init_mac(acx_device_t * adev)
 		if (OK != acx_s_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx111_s_create_dma_regions(adev)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"%s: acx111_create_dma_regions FAILED\n",
-				wiphy_name(adev->ieee->wiphy));
+			printk("%s: acx111_create_dma_regions FAILED\n",
+			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
 	} else {
@@ -3170,9 +3266,8 @@ int acx_s_init_mac(acx_device_t * adev)
 		if (OK != acx_s_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx100_s_create_dma_regions(adev)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"%s: acx100_create_dma_regions FAILED\n",
-				wiphy_name(adev->ieee->wiphy));
+			printk("%s: acx100_create_dma_regions FAILED\n",
+			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
 	}
@@ -3182,7 +3277,7 @@ int acx_s_init_mac(acx_device_t * adev)
 
       fail:
 	if (result)
-		acx_log(LOG_WARNING, L_ANY, "init_mac() FAILED\n");
+		printk("acx: init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;
 }
@@ -3199,27 +3294,26 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	} pm;
 
 	/* change 802.11 power save mode settings */
-	acx_log(LOG_DEBUG, L_INIT, "updating 802.11 power save mode settings: "
-		"wakeup_cfg 0x%02X, listen interval %u, "
-		"options 0x%02X, hangover period %u, "
-		"enhanced_ps_transition_time %u\n",
-		adev->ps_wakeup_cfg, adev->ps_listen_interval,
-		adev->ps_options, adev->ps_hangover_period,
-		adev->ps_enhanced_transition_time);
+	log(L_INIT, "updating 802.11 power save mode settings: "
+	    "wakeup_cfg 0x%02X, listen interval %u, "
+	    "options 0x%02X, hangover period %u, "
+	    "enhanced_ps_transition_time %u\n",
+	    adev->ps_wakeup_cfg, adev->ps_listen_interval,
+	    adev->ps_options, adev->ps_hangover_period,
+	    adev->ps_enhanced_transition_time);
 	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
-	acx_log(LOG_DEBUG, L_INIT, "Previous PS mode settings: "
-		"wakeup_cfg 0x%02X, "
-		"listen interval %u, options 0x%02X, "
-		"hangover period %u, "
-		"enhanced_ps_transition_time %u, beacon_rx_time %u\n",
-		pm.acx111.wakeup_cfg,
-		pm.acx111.listen_interval,
-		pm.acx111.options,
-		pm.acx111.hangover_period,
-		IS_ACX111(adev) ?
-		pm.acx111.enhanced_ps_transition_time
-		: pm.acx100.enhanced_ps_transition_time,
-		IS_ACX111(adev) ? pm.acx111.beacon_rx_time : (u32) - 1);
+	log(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
+	    "listen interval %u, options 0x%02X, "
+	    "hangover period %u, "
+	    "enhanced_ps_transition_time %u, beacon_rx_time %u\n",
+	    pm.acx111.wakeup_cfg,
+	    pm.acx111.listen_interval,
+	    pm.acx111.options,
+	    pm.acx111.hangover_period,
+	    IS_ACX111(adev) ?
+	    pm.acx111.enhanced_ps_transition_time
+	    : pm.acx100.enhanced_ps_transition_time,
+	    IS_ACX111(adev) ? pm.acx111.beacon_rx_time : (u32) - 1);
 	pm.acx111.wakeup_cfg = adev->ps_wakeup_cfg;
 	pm.acx111.listen_interval = adev->ps_listen_interval;
 	pm.acx111.options = adev->ps_options;
@@ -3234,15 +3328,13 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	}
 	acx_s_configure(adev, &pm, ACX1xx_REG_POWER_MGMT);
 	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
-	acx_log(LOG_DEBUG, L_INIT, "wakeup_cfg: 0x%02X\n",
-		pm.acx111.wakeup_cfg);
+	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	acx_s_mwait(40);
 	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
-	acx_log(LOG_DEBUG, L_INIT, "wakeup_cfg: 0x%02X\n",
-		pm.acx111.wakeup_cfg);
-	acx_log(LOG_DEBUG, L_INIT, "power save mode change %s\n",
-		(pm.acx111.wakeup_cfg & PS_CFG_PENDING) ?
-			"FAILED" : "was successful");
+	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
+	log(L_INIT, "power save mode change %s\n",
+	    (pm.acx111.
+	     wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
 	/* FIXME: maybe verify via PS_CFG_PENDING bit here
 	 * that power save mode change was successful. */
 	/* FIXME: we shouldn't trigger a scan immediately after
@@ -3270,11 +3362,10 @@ void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 			break;
 
 	if (sizeof(acx_reg_domain_ids) == i) {
-		acx_log(LOG_WARNING, L_INIT,
-			"Invalid or unsupported regulatory domain"
-			" 0x%02X specified, falling back to FCC (USA)!"
-			" Please report if this sounds fishy!\n",
-			adev->reg_dom_id);
+		log(L_INIT, "Invalid or unsupported regulatory domain"
+			       " 0x%02X specified, falling back to FCC (USA)!"
+			       " Please report if this sounds fishy!\n",
+				adev->reg_dom_id);
 		i = 0;
 		adev->reg_dom_id = acx_reg_domain_ids[i];
 
@@ -3291,28 +3382,19 @@ void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 	adev->reg_dom_chanmask = reg_domain_channel_masks[i];
 
 	mask = (1 << (adev->channel - 1));
-
-	/*
-	 * Check our channels wrt the current regulatory domain
-	 */
-	if (adev->reg_dom_chanmask & mask)
-		return;
-	
-	/*
-	 * Hmm nope, need to adjust channels!
-	 */
-
-	mask = 1;
-	for (i = 1; i <= 14; i++) {
-		if (!(adev->reg_dom_chanmask & mask)) {
+	if (!(adev->reg_dom_chanmask & mask)) {
+	/* hmm, need to adjust our channel to reside within domain */
+		mask = 1;
+		for (i = 1; i <= 14; i++) {
+			if (adev->reg_dom_chanmask & mask) {
+				printk("%s: adjusting selected channel from %d "
+					"to %d due to new regulatory domain\n",
+					wiphy_name(adev->ieee->wiphy), adev->channel, i);
+				adev->channel = i;
+				break;
+			}
 			mask <<= 1;
-			continue;
 		}
-		acx_log(LOG_INFO, L_ANY, "%s: adjusting selected channel "
-			"from %d to %d due to new regulatory domain\n",
-			wiphy_name(adev->ieee->wiphy), adev->channel, i);
-		adev->channel = i;
-		break;
 	}
 }
 
@@ -3321,9 +3403,8 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 	u32 feature1, feature2;
 
 	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: invalid sensitivity setting (1..3), "
-			"setting to 1\n", wiphy_name(adev->ieee->wiphy));
+		printk("%s: invalid sensitivity setting (1..3), "
+		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
 		adev->sensitivity = 1;
 	}
 	acx111_s_get_feature_config(adev, &feature1, &feature2);
@@ -3344,15 +3425,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	FN_ENTER;
 
-	acx_log(LOG_DEBUG, L_INIT, "get_mask 0x%08X, set_mask 0x%08X\n",
-		adev->get_mask, adev->set_mask);
+	log(L_INIT, "get_mask 0x%08X, set_mask 0x%08X\n",
+	    adev->get_mask, adev->set_mask);
 
 	/* Track dependencies betweed various settings */
 
 	if (adev->set_mask & (GETSET_MODE | GETSET_RESCAN | GETSET_WEP)) {
-		acx_log(LOG_DEBUG, L_INIT,
-			"important setting has been changed. "
-			"Need to update packet templates, too\n");
+		log(L_INIT, "important setting has been changed. "
+		    "Need to update packet templates, too\n");
 		SET_BIT(adev->set_mask, SET_TEMPLATES);
 	}
 	if (adev->set_mask & GETSET_CHANNEL) {
@@ -3399,13 +3479,11 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		    || (RADIO_RALINK_15 == adev->radio_type)) {
 			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
 		} else {
-			acx_log(LOG_WARNING, L_INIT,
-				"don't know how to get sensitivity "
-				"for radio type 0x%02X\n", adev->radio_type);
+			log(L_INIT, "don't know how to get sensitivity "
+			    "for radio type 0x%02X\n", adev->radio_type);
 			adev->sensitivity = 0;
 		}
-		acx_log(LOG_DEBUG, L_INIT, "got sensitivity value %u\n",
-			adev->sensitivity);
+		log(L_INIT, "got sensitivity value %u\n", adev->sensitivity);
 
 		CLEAR_BIT(adev->get_mask, GETSET_SENSITIVITY);
 	}
@@ -3417,8 +3495,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		acx_s_query(adev, antenna,
 				  ACX1xx_REG_DOT11_CURRENT_ANTENNA);
 		adev->antenna = antenna[4];
-		acx_log(LOG_INFO, L_INIT, "got antenna value 0x%02X\n",
-			adev->antenna);
+		log(L_INIT, "got antenna value 0x%02X\n", adev->antenna);
 		CLEAR_BIT(adev->get_mask, GETSET_ANTENNA);
 	}
 
@@ -3431,13 +3508,11 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					  ACX100_REG_DOT11_ED_THRESHOLD);
 			adev->ed_threshold = ed_threshold[4];
 		} else {
-			acx_log(LOG_WARNING, L_INIT,
-				"acx111 doesn't support ED\n");
+			log(L_INIT, "acx111 doesn't support ED\n");
 			adev->ed_threshold = 0;
 		}
-		acx_log(LOG_INFO, L_INIT,
-			"got Energy Detect (ED) threshold %u\n",
-			adev->ed_threshold);
+		log(L_INIT, "got Energy Detect (ED) threshold %u\n",
+		    adev->ed_threshold);
 		CLEAR_BIT(adev->get_mask, GETSET_ED_THRESH);
 	}
 
@@ -3450,13 +3525,11 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					  ACX1xx_REG_DOT11_CURRENT_CCA_MODE);
 			adev->cca = cca[4];
 		} else {
-			acx_log(LOG_WARNING, L_INIT,
-				"acx111 doesn't support CCA\n");
+			log(L_INIT, "acx111 doesn't support CCA\n");
 			adev->cca = 0;
 		}
-		acx_log(LOG_INFO, L_INIT,
-			"got Channel Clear Assessment (CCA) value %u\n",
-			adev->cca);
+		log(L_INIT, "got Channel Clear Assessment (CCA) value %u\n",
+		    adev->cca);
 		CLEAR_BIT(adev->get_mask, GETSET_CCA);
 	}
 
@@ -3467,8 +3540,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 				  ACX1xx_REG_DOT11_CURRENT_REG_DOMAIN);
 		adev->reg_dom_id = dom.m.bytes[0];
 		acx_s_set_sane_reg_domain(adev, 0);
-		acx_log(LOG_INFO, L_INIT,
-			"got regulatory domain 0x%02X\n", adev->reg_dom_id);
+		log(L_INIT, "got regulatory domain 0x%02X\n", adev->reg_dom_id);
 		CLEAR_BIT(adev->get_mask, GETSET_REG_DOMAIN);
 	}
 
@@ -3499,21 +3571,20 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		rate[4] =
 		    (adev->
 		     rate_auto) ? /* adev->txrate_fallback_retries */ 1 : 0;
-		acx_log(LOG_DEBUG, L_INIT,
-			"updating Tx fallback to %u retries\n", rate[4]);
+		log(L_INIT, "updating Tx fallback to %u retries\n", rate[4]);
 		acx_s_configure(adev, &rate, ACX1xx_REG_RATE_FALLBACK);
 		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
 	}
 	if (adev->set_mask & GETSET_TXPOWER) {
-		acx_log(LOG_DEBUG, L_INIT, "updating transmit power: %u dBm\n",
-			adev->tx_level_dbm);
+		log(L_INIT, "updating transmit power: %u dBm\n",
+		    adev->tx_level_dbm);
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
 
 	if (adev->set_mask & GETSET_SENSITIVITY) {
-		acx_log(LOG_DEBUG, L_INIT, "updating sensitivity value: %u\n",
-			adev->sensitivity);
+		log(L_INIT, "updating sensitivity value: %u\n",
+		    adev->sensitivity);
 		switch (adev->radio_type) {
 		case RADIO_RFMD_11:
 		case RADIO_MAXIM_0D:
@@ -3525,9 +3596,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx111_s_sens_radio_16_17(adev);
 			break;
 		default:
-			acx_log(LOG_WARNING, L_INIT,
-				"don't know how to modify sensitivity "
-				"for radio type 0x%02X\n", adev->radio_type);
+			log(L_INIT, "don't know how to modify sensitivity "
+			    "for radio type 0x%02X\n", adev->radio_type);
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_SENSITIVITY);
 	}
@@ -3538,8 +3608,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 		memset(antenna, 0, sizeof(antenna));
 		antenna[4] = adev->antenna;
-		acx_log(LOG_DEBUG, L_INIT, "updating antenna value: 0x%02X\n",
-			adev->antenna);
+		log(L_INIT, "updating antenna value: 0x%02X\n", adev->antenna);
 		acx_s_configure(adev, &antenna,
 				ACX1xx_REG_DOT11_CURRENT_ANTENNA);
 		CLEAR_BIT(adev->set_mask, GETSET_ANTENNA);
@@ -3547,9 +3616,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_ED_THRESH) {
 		/* ed_threshold */
-		acx_log(LOG_INFO, L_INIT,
-			"updating Energy Detect (ED) threshold: %u\n",
-			adev->ed_threshold);
+		log(L_INIT, "updating Energy Detect (ED) threshold: %u\n",
+		    adev->ed_threshold);
 		if (IS_ACX100(adev)) {
 			u8 ed_threshold[4 + ACX100_REG_DOT11_ED_THRESHOLD_LEN];
 
@@ -3558,16 +3626,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx_s_configure(adev, &ed_threshold,
 					ACX100_REG_DOT11_ED_THRESHOLD);
 		} else
-			acx_log(LOG_WARNING, L_INIT,
-				"acx111 doesn't support ED!\n");
+			log(L_INIT, "acx111 doesn't support ED!\n");
 		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
 	}
 
 	if (adev->set_mask & GETSET_CCA) {
 		/* CCA value */
-		acx_log(LOG_DEBUG, L_INIT,
-			"updating Channel Clear Assessment (CCA) value: "
-			"0x%02X\n", adev->cca);
+		log(L_INIT, "updating Channel Clear Assessment "
+		    "(CCA) value: 0x%02X\n", adev->cca);
 		if (IS_ACX100(adev)) {
 			u8 cca[4 + ACX1xx_REG_DOT11_CURRENT_CCA_MODE_LEN];
 
@@ -3576,15 +3642,13 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			acx_s_configure(adev, &cca,
 					ACX1xx_REG_DOT11_CURRENT_CCA_MODE);
 		} else
-			acx_log(LOG_WARNING, L_INIT,
-				"acx111 doesn't support CCA!\n");
+			log(L_INIT, "acx111 doesn't support CCA!\n");
 		CLEAR_BIT(adev->set_mask, GETSET_CCA);
 	}
 
 	if (adev->set_mask & GETSET_LED_POWER) {
 		/* Enable Tx */
-		acx_log(LOG_INFO, L_INIT,
-			"updating power LED status: %u\n", adev->led_power);
+		log(L_INIT, "updating power LED status: %u\n", adev->led_power);
 
 		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
 		if (IS_PCI(adev))
@@ -3602,15 +3666,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_CHANNEL) {
 		/* channel */
-		acx_log(LOG_INFO, L_INIT, "updating channel to: %u\n",
-			adev->channel);
+		log(L_INIT, "updating channel to: %u\n", adev->channel);
 		CLEAR_BIT(adev->set_mask, GETSET_CHANNEL);
 	}
 
 	if (adev->set_mask & GETSET_TX) {
 		/* set Tx */
-		acx_log(LOG_INFO, L_INIT, "updating: %s Tx\n",
-			adev->tx_disabled ? "disable" : "enable");
+		log(L_INIT, "updating: %s Tx\n",
+		    adev->tx_disabled ? "disable" : "enable");
 		if (adev->tx_disabled)
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 		else {
@@ -3628,8 +3691,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_RX) {
 		/* Enable Rx */
-		acx_log(LOG_INFO, L_INIT,
-			"updating: enable Rx on channel: %u\n", adev->channel);
+		log(L_INIT, "updating: enable Rx on channel: %u\n",
+		    adev->channel);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_RX);
 	}
@@ -3638,10 +3701,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 short_retry[4 + ACX1xx_REG_DOT11_SHORT_RETRY_LIMIT_LEN];
 		u8 long_retry[4 + ACX1xx_REG_DOT11_LONG_RETRY_LIMIT_LEN];
 
-		acx_log(LOG_INFO, L_INIT,
-			"updating short retry limit: %u, "
-			"long retry limit: %u\n",
-			adev->short_retry, adev->long_retry);
+		log(L_INIT,
+		    "updating short retry limit: %u, long retry limit: %u\n",
+		    adev->short_retry, adev->long_retry);
 		short_retry[0x4] = adev->short_retry;
 		long_retry[0x4] = adev->long_retry;
 		acx_s_configure(adev, &short_retry,
@@ -3655,8 +3717,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 xmt_msdu_lifetime[4 +
 				     ACX1xx_REG_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
 
-		acx_log(LOG_DEBUG, L_INIT, "updating tx MSDU lifetime: %u\n",
-			adev->msdu_lifetime);
+		log(L_INIT, "updating tx MSDU lifetime: %u\n",
+		    adev->msdu_lifetime);
 		*(u32 *) & xmt_msdu_lifetime[4] =
 		    cpu_to_le32((u32) adev->msdu_lifetime);
 		acx_s_configure(adev, &xmt_msdu_lifetime,
@@ -3665,9 +3727,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_REG_DOMAIN) {
-		acx_log(LOG_INFO, L_INIT,
-			"updating regulatory domain: 0x%02X\n",
-			adev->reg_dom_id);
+		log(L_INIT, "updating regulatory domain: 0x%02X\n",
+		    adev->reg_dom_id);
 		acx_s_set_sane_reg_domain(adev, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
 	}
@@ -3736,16 +3797,15 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u16 type;
 			u16 len;
 			u8 val;
-		} __attribute__ ((packed)) keyindic;
+		} ACX_PACKED keyindic;
 #endif
-		acx_log(LOG_DEBUG, L_INIT, "updating WEP key settings\n");
+		log(L_INIT, "updating WEP key settings\n");
 
 		acx_s_set_wepkey(adev);
 		if (adev->wep_enabled) {
 			dkey.KeyID = adev->wep_current_index;
-			acx_log(LOG_DEBUG, L_INIT,
-				"setting WEP key %u as default\n",
-				dkey.KeyID);
+			log(L_INIT, "setting WEP key %u as default\n",
+			    dkey.KeyID);
 			acx_s_configure(adev, &dkey,
 					ACX1xx_REG_DOT11_WEP_DEFAULT_KEY_SET);
 #ifdef DEBUG_WEP
@@ -3762,11 +3822,10 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		acx100_ie_wep_options_t options;
 
 		if (IS_ACX111(adev)) {
-			acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-				"setting WEP Options for acx111 "
-				"is not supported\n");
+			log(L_DEBUG,
+			    "setting WEP Options for acx111 is not supported\n");
 		} else {
-			acx_log(LOG_DEBUG, L_INIT, "setting WEP Options\n");
+			log(L_INIT, "setting WEP Options\n");
 
 			/* let's choose maximum setting: 4 default keys,
 			 * plus 10 other keys: */
@@ -3841,7 +3900,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 
 	/* clear flag beforehand, since we want to make sure
 	 * it's cleared; then only set it again on specific circumstances */
-	CLEAR_BIT(adev->after_interrupt_jobs, ACX_TASKLET_CMD_RADIO_RECALIB);
+	CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 
 	/* better wait a bit between recalibrations to
 	 * prevent overheating due to torturing the card
@@ -3891,7 +3950,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 			adev->recalib_failure_count++;
 			adev->recalib_time_last_attempt = jiffies;
 			acx_schedule_task(adev,
-					  ACX_TASKLET_CMD_RADIO_RECALIB);
+					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
 	}
 }
@@ -3910,42 +3969,41 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		goto end;	/* no jobs to do */
 
 	/* we see lotsa tx errors */
-	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_RADIO_RECALIB) {
-		acx_log_ratelimited(LOG_WARNING, L_ANY,
-			"too many TX errors??\n");
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+		printk("too many TX errors??\n");
 //		acx_s_after_interrupt_recalib(adev);
 	}
 
 	/* a poor interrupt code wanted to do update_card_settings() */
-	if (adev->after_interrupt_jobs & ACX_TASKLET_UPDATE_CARD_CFG) {
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
 		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 			acx_unlock(adev, flags);
 			acx_s_update_card_settings(adev);
 			acx_lock(adev, flags);
 		}
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_TASKLET_UPDATE_CARD_CFG);
+			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
 	/* 1) we detected that no Scan_Complete IRQ came from fw, or
 	 ** 2) we found too many STAs */
-	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_STOP_SCAN) {
-		acx_log(LOG_DEBUG, L_IRQ, "sending a stop scan cmd...\n");
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
+		log(L_IRQ, "sending a stop scan cmd...\n");
 		acx_unlock(adev, flags);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
 		acx_lock(adev, flags);
 		/* HACK: set the IRQ bit, since we won't get a
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
 		 * since _we_, not a fw, have stopped the scan */
-		SET_BIT(adev->irq_status, ACX_IRQ_SCAN_COMPLETE);
+		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_TASKLET_CMD_STOP_SCAN);
+			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
 	}
 
 	/* either fw sent Scan_Complete or we detected that
 	 ** no Scan_Complete IRQ came from fw. Finish scanning,
 	 ** pick join partner if any */
-	if (adev->after_interrupt_jobs & ACX_TASKLET_COMPLETE_SCAN) {
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_COMPLETE_SCAN) {
 		/* + scan kills current join status - restore it
 		 **   (do we need it for STA?) */
 		/* + does it happen only with active scans?
@@ -3954,27 +4012,26 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 		/* + was not verified that everything is restored
 		 **   (but at least we start to emit beacons again) */
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_TASKLET_COMPLETE_SCAN);
+			  ACX_AFTER_IRQ_COMPLETE_SCAN);
 	}
 
 	/* STA auth or assoc timed out, start over again */
 
-	if (adev->after_interrupt_jobs & ACX_TASKLET_RESTART_SCAN) {
-		acx_log(LOG_DEBUG, L_IRQ, "sending a start_scan cmd...\n");
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
+		log(L_IRQ, "sending a start_scan cmd...\n");
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_TASKLET_RESTART_SCAN);
+			  ACX_AFTER_IRQ_RESTART_SCAN);
 	}
 
 	/* whee, we got positive assoc response! 8) */
-	if (adev->after_interrupt_jobs & ACX_TASKLET_CMD_ASSOCIATE) {
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
 		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_TASKLET_CMD_ASSOCIATE);
+			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
 	}
       end:
 	if(adev->after_interrupt_jobs)
 	{
-		acx_log(LOG_DEBUG, L_ANY, "Jobs still to be run: %x\n",
-			adev->after_interrupt_jobs);
+		printk("Jobs still to be run: %x\n",adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
 	acx_unlock(adev, flags);
@@ -4026,8 +4083,7 @@ void acx_s_start(acx_device_t * adev)
 		GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
 		GETSET_TX | GETSET_RX | GETSET_STATION_ID);
 
-	acx_log(LOG_INFO, L_INIT,
-		"updating initial settings on iface activation\n");
+	log(L_INIT, "updating initial settings on iface activation\n");
 	acx_s_update_card_settings(adev);
 
 	FN_EXIT0;
@@ -4131,7 +4187,7 @@ static void acx_s_select_opmode(acx_device_t * adev)
 	{
 		SET_BIT(adev->set_mask, GETSET_MODE);
 		acx_s_update_card_settings(adev);
-//	acx_schedule_task(adev,	ACX_TASKLET_UPDATE_CARD_CFG);
+//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
 	FN_EXIT0;
@@ -4173,10 +4229,10 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 
 	err = 0;
 
-	acx_log(LOG_INFO, L_ANY, "Virtual interface added "
-		"(type: 0x%08X, MAC: %s)\n",
-		conf->type,
-		print_mac(mac, conf->mac_addr));
+	printk(KERN_INFO "Virtual interface added "
+	       "(type: 0x%08X, MAC: %s)\n",
+	       conf->type,
+	       print_mac(mac, conf->mac_addr));
 
       out_unlock:
 	acx_unlock(adev, flags);
@@ -4206,17 +4262,16 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 		adev->interface.operating = 0;
 	}
 
-	acx_log(LOG_INFO, L_ANY, "Removing interface: %d %d\n",
-		adev->interface.operating, conf->type);
+	printk("Removing interface: %d %d\n", adev->interface.operating, conf->type);
 	acx_sem_unlock(adev);
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
 	flush_scheduled_work();
 
-	acx_log(LOG_INFO, L_ANY, "Virtual interface removed "
-		"(type: 0x%08X, MAC: %s)\n",
-		conf->type, print_mac(mac, conf->mac_addr));
+	printk(KERN_INFO "Virtual interface removed "
+	       "(type: 0x%08X, MAC: %s)\n",
+	       conf->type, print_mac(mac, conf->mac_addr));
 
 	FN_EXIT0;
 }
@@ -4255,7 +4310,7 @@ int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 	adev->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
-	acx_log(LOG_DEBUG, L_IOCTL, "Changing to channel %d\n", channel);
+	log(L_IOCTL, "Changing to channel %d\n", channel);
 	SET_BIT(adev->set_mask, GETSET_CHANNEL);
 	result = -EINPROGRESS;	/* need to call commit handler */
 
@@ -4288,8 +4343,8 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		acx_selectchannel(adev, conf->channel,conf->freq);
 		acx_lock(adev, flags);
 /*		acx_schedule_task(adev,
-				  ACX_TASKLET_UPDATE_CARD_CFG
-*/				  /*+ ACX_TASKLET_RESTART_SCAN */ /*);*/
+				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
+*/				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ /*);*/
 	}
 /*
         if (conf->short_slot_time != adev->short_slot) {
@@ -4298,7 +4353,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
                         acx_short_slot_timing_enable(adev);
                 else
                         acx_short_slot_timing_disable(adev);
-		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
+		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
         }
 */
 	adev->tx_disabled = !conf->radio_enabled;
@@ -4306,7 +4361,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		adev->tx_level_dbm = conf->power_level;
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
-		//acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
+		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	} 
 */
 //FIXME: This does not seem to wake up:
@@ -4374,7 +4429,7 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
-//		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
+//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	err = 0;
 err_out:
 	FN_EXIT1(err);
@@ -4566,7 +4621,7 @@ int acx_key_write(acx_device_t * adev,
 	if (adev->wep_enabled) {
 		SET_BIT(adev->set_mask, GETSET_WEP);
 		acx_s_update_card_settings(adev);
-//		acx_schedule_task(adev, ACX_TASKLET_UPDATE_CARD_CFG);
+//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 /*
         log(L_IOCTL, "len=%d, key at 0x%p, flags=0x%X\n",
@@ -4675,20 +4730,20 @@ acx_s_parse_configoption(acx_device_t * adev,
 	int i;
 	int is_acx111 = IS_ACX111(adev);
 
-	acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, pcfg, sizeof(*pcfg),
-		"configoption struct content:\n");
+	if (acx_debug & L_DEBUG) {
+		printk("configoption struct content:\n");
+		acx_dump_bytes(pcfg, sizeof(*pcfg));
+	}
 
 	if ((is_acx111 && (adev->eeprom_version == 5))
 	    || (!is_acx111 && (adev->eeprom_version == 4))
 	    || (!is_acx111 && (adev->eeprom_version == 5))) {
 		/* these versions are known to be supported */
 	} else {
-		acx_log(LOG_WARNING, L_ANY,
-			"unknown chip and EEPROM version combination "
-			"(%s, v%d), "
-			"don't know how to parse config options yet. "
-			"Please report\n", is_acx111 ? "ACX111" : "ACX100",
-			adev->eeprom_version);
+		printk("unknown chip and EEPROM version combination (%s, v%d), "
+		       "don't know how to parse config options yet. "
+		       "Please report\n", is_acx111 ? "ACX111" : "ACX100",
+		       adev->eeprom_version);
 		return;
 	}
 
@@ -4715,9 +4770,8 @@ acx_s_parse_configoption(acx_device_t * adev,
 		pEle += sizeof(adev->cfgopt_probe_delay);
 		if ((adev->cfgopt_probe_delay < 100)
 		    || (adev->cfgopt_probe_delay > 500)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"strange probe_delay value %d, "
-				"tweaking to 200\n", adev->cfgopt_probe_delay);
+			printk("strange probe_delay value %d, "
+			       "tweaking to 200\n", adev->cfgopt_probe_delay);
 			adev->cfgopt_probe_delay = 200;
 		}
 	}
@@ -4725,10 +4779,9 @@ acx_s_parse_configoption(acx_device_t * adev,
 	adev->cfgopt_eof_memory = le32_to_cpu(*(u32 *) pEle);
 	pEle += sizeof(adev->cfgopt_eof_memory);
 
-	acx_log(LOG_INFO, L_ANY, "NVS_vendor_offs:%04X probe_delay:%d "
-		"eof_memory:%d\n",
-		adev->cfgopt_NVS_vendor_offs, adev->cfgopt_probe_delay,
-		adev->cfgopt_eof_memory);
+	printk("NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
+	       adev->cfgopt_NVS_vendor_offs,
+	       adev->cfgopt_probe_delay, adev->cfgopt_eof_memory);
 
 	adev->cfgopt_dot11CCAModes = *pEle++;
 	adev->cfgopt_dot11Diversity = *pEle++;
@@ -4737,13 +4790,14 @@ acx_s_parse_configoption(acx_device_t * adev,
 	adev->cfgopt_dot11ChannelAgility = *pEle++;
 	adev->cfgopt_dot11PhyType = *pEle++;
 	adev->cfgopt_dot11TempType = *pEle++;
-	acx_log(LOG_INFO, L_ANY,
-		"CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
-		"PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
-		adev->cfgopt_dot11CCAModes, adev->cfgopt_dot11Diversity,
-		adev->cfgopt_dot11ShortPreambleOption,
-		adev->cfgopt_dot11PBCCOption, adev->cfgopt_dot11ChannelAgility,
-		adev->cfgopt_dot11PhyType, adev->cfgopt_dot11TempType);
+	printk("CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
+	       "PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
+	       adev->cfgopt_dot11CCAModes,
+	       adev->cfgopt_dot11Diversity,
+	       adev->cfgopt_dot11ShortPreambleOption,
+	       adev->cfgopt_dot11PBCCOption,
+	       adev->cfgopt_dot11ChannelAgility,
+	       adev->cfgopt_dot11PhyType, adev->cfgopt_dot11TempType);
 
 	/* then use common parsing for next part which has common layout */
 
@@ -4751,12 +4805,8 @@ acx_s_parse_configoption(acx_device_t * adev,
 
 	adev->cfgopt_antennas.type = pEle[0];
 	adev->cfgopt_antennas.len = pEle[1];
-
-	/*
-	 * FIXME: a candidate for acx_log_dump(), but the code is bizarre
-	 */
-	acx_log(LOG_INFO, L_ANY, "AntennaID:%02X Len:%02X Data:",
-		adev->cfgopt_antennas.type, adev->cfgopt_antennas.len);
+	printk("AntennaID:%02X Len:%02X Data:",
+	       adev->cfgopt_antennas.type, adev->cfgopt_antennas.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_antennas.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
@@ -4766,12 +4816,8 @@ acx_s_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] + 2;
 	adev->cfgopt_power_levels.type = pEle[0];
 	adev->cfgopt_power_levels.len = pEle[1];
-
-	/*
-	 * FIXME: see above
-	 */
-	acx_log(LOG_INFO, L_ANY, "PowerLevelID:%02X Len:%02X Data:",
-		adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
+	printk("PowerLevelID:%02X Len:%02X Data:",
+	       adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_power_levels.list[i] =
 		    le16_to_cpu(*(u16 *) & pEle[i * 2 + 2]);
@@ -4782,12 +4828,8 @@ acx_s_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] * 2 + 2;
 	adev->cfgopt_data_rates.type = pEle[0];
 	adev->cfgopt_data_rates.len = pEle[1];
-
-	/*
-	 * FIXME again
-	 */
-	acx_log(LOG_INFO, L_ANY, "DataRatesID:%02X Len:%02X Data:",
-		adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
+	printk("DataRatesID:%02X Len:%02X Data:",
+	       adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_data_rates.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
@@ -4797,12 +4839,8 @@ acx_s_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] + 2;
 	adev->cfgopt_domains.type = pEle[0];
 	adev->cfgopt_domains.len = pEle[1];
-
-	/*
-	 * And again
-	 */
-	acx_log(LOG_INFO, L_ANY, "DomainID:%02X Len:%02X Data:",
-		adev->cfgopt_domains.type, adev->cfgopt_domains.len);
+	printk("DomainID:%02X Len:%02X Data:",
+	       adev->cfgopt_domains.type, adev->cfgopt_domains.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_domains.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
@@ -4815,10 +4853,10 @@ acx_s_parse_configoption(acx_device_t * adev,
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_product_id.list[i] = pEle[i + 2];
 	}
-	acx_log(LOG_INFO, L_ANY, "ProductID:%02X Len:%02X Data:%.*s\n",
-		adev->cfgopt_product_id.type, adev->cfgopt_product_id.len,
-		adev->cfgopt_product_id.len,
-		(char *)adev->cfgopt_product_id.list);
+	printk("ProductID:%02X Len:%02X Data:%.*s\n",
+	       adev->cfgopt_product_id.type, adev->cfgopt_product_id.len,
+	       adev->cfgopt_product_id.len,
+	       (char *)adev->cfgopt_product_id.list);
 
 	pEle += pEle[1] + 2;
 	adev->cfgopt_manufacturer.type = pEle[0];
@@ -4826,10 +4864,10 @@ acx_s_parse_configoption(acx_device_t * adev,
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_manufacturer.list[i] = pEle[i + 2];
 	}
-	acx_log(LOG_INFO, L_ANY, "ManufacturerID:%02X Len:%02X Data:%.*s\n",
-		adev->cfgopt_manufacturer.type, adev->cfgopt_manufacturer.len,
-		adev->cfgopt_manufacturer.len,
-		(char *)adev->cfgopt_manufacturer.list);
+	printk("ManufacturerID:%02X Len:%02X Data:%.*s\n",
+	       adev->cfgopt_manufacturer.type, adev->cfgopt_manufacturer.len,
+	       adev->cfgopt_manufacturer.len,
+	       (char *)adev->cfgopt_manufacturer.list);
 /*
 	printk("EEPROM part:\n");
 	for (i=0; i<58; i++) {
@@ -4849,11 +4887,10 @@ static int __init acx_e_init_module(void)
 
 	acx_struct_size_check();
 
-	acx_log(LOG_INFO, L_ANY, "this driver is still EXPERIMENTAL\n");
-	acx_log(LOG_INFO, L_ANY, "acx: reading README file and/or "
-		"Craig's HOWTO is recommended, "
-		"visit http://acx100.sourceforge.net/wiki in case "
-		"of further questions/discussion\n");
+	printk("acx: this driver is still EXPERIMENTAL\n"
+	       "acx: reading README file and/or Craig's HOWTO is "
+	       "recommended, visit http://acx100.sourceforge.net/wiki in case "
+	       "of further questions/discussion\n");
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	r1 = acxpci_e_init_module();
