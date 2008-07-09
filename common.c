@@ -503,11 +503,23 @@ u8 acx_rate111to100(u16 r)
 
 /***********************************************************************
 ** Calculate level like the feb 2003 windows driver seems to do
+*
+* Note: the FreeBSD and DragonFlyBSD drivers seems to use different
+* so-called correction constants depending on the chip. They will be
+* defined for now, but as it is still unknown whether they are correct
+* or not, only the original value will be used. Something else to take
+* into account is that the OpenBSD driver uses another approach and
+* defines the maximum RSSI value depending on the chip, rather than
+* using a value of 100 for all of them, as it is currently done here. 
 */
+#define ACX100_RSSI_CORR 8
+#define ACX111_RSSI_CORR 5
+
 static u8 acx_signal_to_winlevel(u8 rawlevel)
 {
 	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
-	u8 winlevel = ((4 + (rawlevel * 5)) / 8);
+	u8 winlevel = (((ACX100_RSSI_CORR / 2) + (rawlevel * 5)) /
+			ACX100_RSSI_CORR);
 
 	if (winlevel > 100)
 		winlevel = 100;
@@ -2253,9 +2265,10 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		adev->tx_level_dbm = 15;
 	}
 	if (level_dbm != adev->tx_level_dbm)
-		log(L_INIT, "acx111 firmware has specific "
-		    "power levels only: adjusted %d dBm to %d dBm!\n",
-		    level_dbm, adev->tx_level_dbm);
+		log(L_INIT, "only predefined transmission "
+		    "power levels are supported at this time: "
+		    "adjusted %d dBm to %d dBm\n", level_dbm,
+		    adev->tx_level_dbm);
 
 	return acx_s_configure(adev, &tx_level, ACX1xx_REG_DOT11_TX_POWER_LEVEL);
 }
@@ -2465,14 +2478,8 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	 * be expressed in dBm, or it's some pretty complicated
 	 * calculation. */
 
-#ifdef FROM_SCAN_SOURCE_ONLY
-	/* only consider packets originating from the MAC
-	 * address of the device that's managing our BSSID.
-	 * Disable it for now, since it removes information (levels
-	 * from different peers) and slows the Rx path. *//*
-	if (adev->ap_client && mac_is_equal(hdr->a2, adev->ap_client->address)) {
-*/
-#endif
+	/* TODO: only the RSSI seems to be reported */
+	adev->rx_status.ssi = acx_signal_to_winlevel(rxbuf->phy_level);
 
 	FN_EXIT0;
 }
@@ -2782,8 +2789,11 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 //	memset(&status, 0, sizeof(status));
 
 	status->mactime = rxbuf->time;
+	status->ssi = acx_signal_to_winlevel(rxbuf->phy_level);
+	/* TODO: they do not seem to be reported, at least on the acx111
+	(and TNETW1450?), therefore commenting them out 
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
-	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 	status->flag = 0;
 	status->rate = rxbuf->phy_plcp_signal;
 	status->antenna = 1;

@@ -1498,6 +1498,23 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			*/
 	ieee->queues = 1;
 
+	/* TODO: although in the original driver the maximum value was 100,
+	* the OpenBSD driver assigns maximum values depending on the type of
+	* radio transceiver (i.e. Radia, Maxim, etc.). This value is always a
+	* positive integer which most probably indicates the gain of the AGC
+	* in the rx path of the chip, in dB steps (0.625 dB, for example?).
+	* The mapping of this rssi value to dBm is still unknown, but it can
+	* nevertheless be used as a measure of relative signal strength. The
+	* other two values, i.e. max_signal and max_noise, do not seem to be
+	* supported on my acx111 card (they are always 0), although iwconfig
+	* reports them (in dBm) when using ndiswrapper with the Windows XP
+	* driver. The GPL-licensed part of the AVM FRITZ!WLAN USB Stick
+	* driver sources (for the TNETW1450, though) seems to also indicate
+	* that only the RSSI is supported. In conclusion, the max_signal and
+	* max_noise values will not be initialised by now, as they do not
+	* seem to be supported or how to acquire them is still unknown. */
+	ieee->max_rssi = 100;
+
 	adev = ieee2adev(ieee);
 
 	memset(adev, 0, sizeof(*adev));
