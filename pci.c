@@ -1832,7 +1832,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
 	 */
-	acxpci_e_close(hw);
+//	acxpci_e_close(hw);
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 
@@ -2179,7 +2179,6 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	free_irq(adev->irq, adev);
 
 /* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
@@ -4511,11 +4510,11 @@ int __init acxpci_e_init_module(void)
 	printk(KERN_EMERG);
 
 #if (ACX_IO_WIDTH==32)
-	printk("acx: compiled to use 32bit I/O access. "
+	log(L_INIT, "acx: compiled to use 32bit I/O access. "
 	       "I/O timing issues might occur, such as "
 	       "non-working firmware upload. Report them\n");
 #else
-	printk("acx: compiled to use 16bit I/O access only "
+	log(L_INIT, "acx: compiled to use 16bit I/O access only "
 	       "(compatibility mode)\n");
 #endif
 
