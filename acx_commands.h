@@ -41,19 +41,19 @@
  * ----------------------------------------------------------------------------
  *
  */
-#define ACX1xx_CMD_RESET		0x00
-#define ACX1xx_CMD_QUERY		0x01
-#define ACX1xx_CMD_CONFIGURE		0x02
-#define ACX1xx_CMD_ENABLE_RX		0x03
-#define ACX1xx_CMD_ENABLE_TX		0x04
-#define ACX1xx_CMD_DISABLE_RX		0x05
-#define ACX1xx_CMD_DISABLE_TX		0x06
-#define ACX1xx_CMD_FLUSH_QUEUE		0x07
-#define ACX1xx_CMD_SCAN			0x08
-#define ACX1xx_CMD_STOP_SCAN		0x09
-#define ACX1xx_CMD_CONFIG_TIM		0x0a
-#define ACX1xx_CMD_JOIN			0x0b
-#define ACX1xx_CMD_WEP_MGMT		0x0c
+#define ACX1xx_CMD_RESET		0x0000
+#define ACX1xx_CMD_QUERY		0x0001
+#define ACX1xx_CMD_CONFIGURE		0x0002
+#define ACX1xx_CMD_ENABLE_RX		0x0003
+#define ACX1xx_CMD_ENABLE_TX		0x0004
+#define ACX1xx_CMD_DISABLE_RX		0x0005
+#define ACX1xx_CMD_DISABLE_TX		0x0006
+#define ACX1xx_CMD_FLUSH_QUEUE		0x0007
+#define ACX1xx_CMD_SCAN			0x0008
+#define ACX1xx_CMD_STOP_SCAN		0x0009
+#define ACX1xx_CMD_CONFIG_TIM		0x000a
+#define ACX1xx_CMD_JOIN			0x000b
+#define ACX1xx_CMD_WEP_MGMT		0x000c
 
 /*
  * FIXME: get rid of this? We don't have any old firmware lying around, do we?
@@ -62,32 +62,36 @@
 /* mapped to unknownCMD in FW150 */
 #define ACX100_CMD_HALT			0x0e
 #else
-#define ACX1xx_CMD_MEM_READ		0x0d
-#define ACX1xx_CMD_MEM_WRITE		0x0e
-#endif
-#define ACX1xx_CMD_SLEEP		0x0f
-#define ACX1xx_CMD_WAKE			0x10
+#define ACX1xx_CMD_MEM_READ		0x000d
+#define ACX1xx_CMD_MEM_WRITE		0x000e
+#endif /* OLD_FIRMWARE_VERSIONS */
+#define ACX1xx_CMD_SLEEP		0x000f
+#define ACX1xx_CMD_WAKE			0x0010
 /* mapped to unknownCMD in FW150 */
-#define ACX1xx_CMD_UNKNOWN_11		0x11
-#define ACX100_CMD_INIT_MEMORY		0x12
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_DISABLE_RADIO	0x12
-#define ACX1xx_CMD_CONFIG_BEACON	0x13
-#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x14
-#define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
-#define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x16
-#define ACX1xx_CMD_FCC_TEST		0x17
-#define ACX1xx_CMD_RADIOINIT		0x18
-#define ACX111_CMD_RADIOCALIB		0x19
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_NOISE_HISTOGRAM	0x1c
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_RX_RESET		0x1d
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_LNA_CONTROL		0x20
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21
+/* #define ACX1xx_CMD_UNKNOWN_11		0x0011 */ // not used by BSD driver too
+#define ACX100_CMD_INIT_MEMORY		0x0012
+#define ACX1FF_CMD_DISABLE_RADIO	0x0012	/* new firmware? TNETW1450? + NOT in BSD driver */
+#define ACX1xx_CMD_CONFIG_BEACON	0x0013
+#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x0014
+#define ACX1xx_CMD_CONFIG_NULL_DATA	0x0015
+#define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x0016
+#define ACX1xx_CMD_FCC_TEST		0x0017	/* known as ACX_CMD_TEST in BSD driver */
+#define ACX1xx_CMD_RADIOINIT		0x0018
+#define ACX111_CMD_RADIOCALIB		0x0019
+#define ACX1FF_CMD_NOISE_HISTOGRAM	0x001c	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_RX_RESET		0x001d	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_LNA_CONTROL		0x0020	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x0021	/* new firmware? TNETW1450? */
 
+
+/* 'After Interrupt' Commands */
+#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
+#define ACX_AFTER_IRQ_CMD_ASSOCIATE	0x02
+#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x04
+#define ACX_AFTER_IRQ_UPDATE_CARD_CFG	0x08
+#define ACX_AFTER_IRQ_TX_CLEANUP	0x10
+#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x20
+#define ACX_AFTER_IRQ_RESTART_SCAN	0x40
 
 /*
  * REGISTERS
@@ -101,12 +105,12 @@
  * ----------------------------------------------------------------------------
  */
 //DEF_IE(1xx_IE_UNKNOWN_00		,0x0000, -1);	/* mapped to cfgInvalid in FW150 */
-#define ACX100_REG_ACX_TIMER			(0x0001)
-#define ACX100_REG_ACX_TIMER_LEN 		(0x10)
+#define ACX100_REG_ACX_TIMER			(0x0001) /* ??? unknown in BSD driver ??? */
+#define ACX100_REG_ACX_TIMER_LEN 		(0x10)	 /* ??? unknown in BSD driver ??? */
 /* TNETW1450: length 0x18!! */
 #define ACX1xx_REG_POWER_MGMT			(0x0002)
 #define ACX1xx_REG_POWER_MGMT_LEN 		(0x06)
-#define ACX1xx_REG_QUEUE_CONFIG			(0x0003)
+#define ACX1xx_REG_QUEUE_CONFIG			(0x0003) /* ??? known as ACX_CMD_IE_MEMORYCONFIG in BSD driver ??? */
 #define ACX1xx_REG_QUEUE_CONFIG_LEN		(0x1c)
 #define ACX100_REG_BLOCK_SIZE			(0x0004)
 #define ACX100_REG_BLOCK_SIZE_LEN		(0x02)
@@ -115,11 +119,11 @@
 #define ACX1FF_REG_SLOT_TIME_LEN			(0x08)
 #define ACX1xx_REG_MEMORY_CONFIG_OPTIONS		(0x0005)
 #define ACX1xx_REG_MEMORY_CONFIG_OPTIONS_LEN	(0x14)
-#define ACX1FF_REG_QUEUE_HEAD			(0x0005)
+#define ACX1FF_REG_QUEUE_HEAD			(0x0005) /* sure it's not ACX_CMD_IE_QUEUECONFIG ??? */
 /* FIXME: length? */
 #define ACX1FF_REG_QUEUE_HEAD_LEN		(0x14)
 /* TNETW1450: length 2 */
-#define ACX1xx_REG_RATE_FALLBACK			(0x0006)
+#define ACX1xx_REG_RATE_FALLBACK		(0x0006)
 #define ACX1xx_REG_RATE_FALLBACK_LEN		(0x01)
 #define ACX100_REG_WEP_OPTIONS			(0x0007)
 #define ACX100_REG_WEP_OPTIONS_LEN		(0x03)
@@ -140,13 +144,13 @@
 #define ACX1xx_REG_ASSOC_ID			(0x000a)
 #define ACX1xx_REG_ASSOC_ID_LEN			(0x02)
 /* mapped to cfgInvalid in FW150 */
-#define ACX1xx_REG_UNKNOWN_0B			(0x000b)
+#define ACX1xx_REG_UNKNOWN_0B			(0x000b) /* unknown in BSD driver */
 #define ACX1xx_REG_UNKNOWN_0B_LEN		(-1)
 /* later firmware versions; TNETW1450 only? */
-#define ACX1FF_REG_TX_POWER_LEVEL_TABLE		(0x000b)
+#define ACX1FF_REG_TX_POWER_LEVEL_TABLE		(0x000b) /* unknown in BSD driver */
 #define ACX1FF_REG_TX_POWER_LEVEL_TABLE_LEN	(0x18)
 /* very small implementation in FW150! */
-#define ACX100_REG_UNKNOWN_0C			(0x000c)
+#define ACX100_REG_UNKNOWN_0C			(0x000c) /* unknown in BSD driver */
 #define ACX100_REG_UNKNOWN_0C_LEN		(-1)
 /*
  * ACX100 has an equivalent struct in the cmd mailbox directly after reset.
@@ -155,7 +159,7 @@
  */
 #define ACX111_REG_CONFIG_OPTIONS		(0x000c)
 #define ACX111_REG_CONFIG_OPTIONS_LEN		(0x14c)
-#define ACX1xx_REG_FWREV				(0x000d)
+#define ACX1xx_REG_FWREV			(0x000d)
 #define ACX1xx_REG_FWREV_LEN			(0x18)
 #define ACX1xx_REG_FCS_ERROR_COUNT		(0x000e)
 #define ACX1xx_REG_FCS_ERROR_COUNT_LEN		(0x04)

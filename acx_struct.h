@@ -121,15 +121,6 @@ enum { acx_debug = 0 };
 #define RADIO_UNKNOWN_1B	0x1b    /* radio in SafeCom SWLUT-54125 USB adapter; entirely unknown!! */
 
 
-/* 'After Interrupt' Commands */
-#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
-#define ACX_AFTER_IRQ_CMD_ASSOCIATE	0x02
-#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x04
-#define ACX_AFTER_IRQ_UPDATE_CARD_CFG	0x08
-#define ACX_AFTER_IRQ_TX_CLEANUP	0x10
-#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x20
-#define ACX_AFTER_IRQ_RESTART_SCAN	0x40
-
 /***********************************************************************
 ** Tx/Rx buffer sizes and watermarks
 **
@@ -674,23 +665,24 @@ typedef struct acx111_ie_configoption {
 ** PCI structures
 */
 /* IRQ Constants
-** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE) */
-#define HOST_INT_RX_DATA	0x0001
-#define HOST_INT_TX_COMPLETE	0x0002
-#define HOST_INT_TX_XFER	0x0004
-#define HOST_INT_RX_COMPLETE	0x0008
-#define HOST_INT_DTIM		0x0010
-#define HOST_INT_BEACON		0x0020
-#define HOST_INT_TIMER		0x0040
-#define HOST_INT_KEY_NOT_FOUND	0x0080
-#define HOST_INT_IV_ICV_FAILURE	0x0100
-#define HOST_INT_CMD_COMPLETE	0x0200
-#define HOST_INT_INFO		0x0400
-#define HOST_INT_OVERFLOW	0x0800
-#define HOST_INT_PROCESS_ERROR	0x1000
-#define HOST_INT_SCAN_COMPLETE	0x2000
-#define HOST_INT_FCS_THRESHOLD	0x4000
-#define HOST_INT_UNKNOWN	0x8000
+** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE)
+** descriptions taken from BSD driver */
+#define HOST_INT_RX_DATA	0x0001	/* IN:  packet transferred from remote host to device */
+#define HOST_INT_TX_COMPLETE	0x0002	/* OUT: packet transferred from device      to remote host */
+#define HOST_INT_TX_XFER	0x0004	/* OUT: packet transferred from host        to device */
+#define HOST_INT_RX_COMPLETE	0x0008	/* IN:  packet transferred from device      to host */
+#define HOST_INT_DTIM		0x0010	/* not documented yet */
+#define HOST_INT_BEACON		0x0020	/* not documented yet */
+#define HOST_INT_TIMER		0x0040	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN1 */
+#define HOST_INT_KEY_NOT_FOUND	0x0080	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN2 */
+#define HOST_INT_IV_ICV_FAILURE	0x0100	/* not documented yet */
+#define HOST_INT_CMD_COMPLETE	0x0200	/* not documented yet */
+#define HOST_INT_INFO		0x0400	/* not documented yet */
+#define HOST_INT_OVERFLOW	0x0800	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN3 */
+#define HOST_INT_PROCESS_ERROR	0x1000	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN4 */
+#define HOST_INT_SCAN_COMPLETE	0x2000	/* not documented yet */
+#define HOST_INT_FCS_THRESHOLD	0x4000	/* not documented yet - in BSD driver: ACX_DEV_INTF_BOOT ??? */
+#define HOST_INT_UNKNOWN	0x8000	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN5 */
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */
