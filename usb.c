@@ -198,7 +198,7 @@ int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	   mem.len = cpu_to_le32(4);
 	   acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
 	   *charbuf = mem.data;
-	   log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
+	   log(L_DEBUG, "acx: read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
 	 */
 
 	FN_EXIT1(OK);
@@ -219,7 +219,7 @@ int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
 	acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
-	log(L_DEBUG, "write radio PHY[0x%04X]=0x%02X\n", reg, value);
+	log(L_DEBUG, "acx: write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -276,13 +276,13 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, FUNC "(cmd:%s,buflen:%u,type:0x%04X)\n",
+	log(L_CTL, "acx: " FUNC "(cmd:%s,buflen:%u,type:0x%04X)\n",
 	    cmdstr, buflen,
 	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	loc = kmalloc(buflen + 4 + BOGUS_SAFETY_PADDING, GFP_KERNEL);
 	if (!loc) {
-		printk("%s: " FUNC "(): no memory for data buffer\n", devname);
+		printk("acx: %s: " FUNC "(): no memory for data buffer\n", devname);
 		goto bad;
 	}
 
@@ -320,8 +320,8 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* obtain the I/O pipes */
 	outpipe = usb_sndctrlpipe(usbdev, 0);
 	inpipe = usb_rcvctrlpipe(usbdev, 0);
-	log(L_CTL, "ctrl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
-	log(L_CTL, "sending USB control msg (out) (blocklen=%d)\n", blocklen);
+	log(L_CTL, "acx: trl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
+	log(L_CTL, "acx: sending USB control msg (out) (blocklen=%d)\n", blocklen);
 	if (acx_debug & L_DATA)
 		acx_dump_bytes(loc, blocklen);
 
@@ -335,17 +335,17 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	    );
 
 	if (result == -ENODEV) {
-		log(L_CTL, "no device present (unplug?)\n");
+		log(L_CTL, "acx: no device present (unplug?)\n");
 		goto good;
 	}
 
-	log(L_CTL, "wrote %d bytes\n", result);
+	log(L_CTL, "acx: wrote %d bytes\n", result);
 	if (result < 0) {
 		goto bad;
 	}
 
 	/* check for device acknowledge */
-	log(L_CTL, "sending USB control msg (in) (acklen=%d)\n", acklen);
+	log(L_CTL, "acx: sending USB control msg (in) (acklen=%d)\n", acklen);
 	loc->status = 0;	/* delete old status flag -> set to IDLE */
 	/* shall we zero out the rest? */
 	result = usb_control_msg(usbdev, inpipe, ACX_USB_REQ_CMD,	/* request */
@@ -357,11 +357,11 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
 	    );
 	if (result < 0) {
-		printk("%s: " FUNC "(): USB read error %d\n", devname, result);
+		printk("acx: %s: " FUNC "(): USB read error %d\n", devname, result);
 		goto bad;
 	}
 	if (acx_debug & L_CTL) {
-		printk("read %d bytes: ", result);
+		printk("acx: read %d bytes: ", result);
 		acx_dump_bytes(loc, result);
 	}
 
@@ -380,13 +380,13 @@ read 4 bytes <==== MUST BE 12!!
 
 	cmd_status = le16_to_cpu(loc->status);
 	if (cmd_status != 1) {
-		printk("%s: " FUNC "(): cmd_status is not SUCCESS: %d (%s)\n",
+		printk("acx: %s: " FUNC "(): cmd_status is not SUCCESS: %d (%s)\n",
 		       devname, cmd_status, acx_cmd_status_str(cmd_status));
 		/* TODO: goto bad; ? */
 	}
 	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
-		log(L_CTL, "response frame: cmd=0x%04X status=%d\n",
+		log(L_CTL, "acx: response frame: cmd=0x%04X status=%d\n",
 		    le16_to_cpu(loc->cmd), cmd_status);
 	}
       good:
@@ -397,9 +397,9 @@ read 4 bytes <==== MUST BE 12!!
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
 #if ACX_DEBUG
-	printk("%s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
+	printk("acx: %s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
 #else
-	printk("%s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
+	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
 #endif
 	dump_stack();
 	kfree(loc);
@@ -461,7 +461,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		outpipe = usb_sndbulkpipe(usbdev, 1);
 		inpipe = usb_rcvbulkpipe(usbdev, 2);
 
-		printk(KERN_DEBUG "wait for device ready\n");
+		printk(KERN_DEBUG "acx: wait for device ready\n");
 		for (i = 0; i <= 2; i++) {
 			result = usb_bulk_msg(usbdev, inpipe,
 					      usbbuf,
@@ -496,7 +496,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		result = -EIO;
 		goto end;
 	}
-	log(L_INIT, "firmware size: %d bytes\n", file_size);
+	log(L_INIT, "acx: firmware size: %d bytes\n", file_size);
 
 	img_checksum = le32_to_cpu(fw_image->chksum);
 
@@ -550,7 +550,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			}
 
 			log(L_INIT,
-			    "uploading firmware (%d bytes, offset=%d)\n",
+			    "acx: uploading firmware (%d bytes, offset=%d)\n",
 			    blk_len, offset);
 			memcpy(usbbuf, ((u8 *) fw_image) + offset, blk_len);
 
@@ -568,7 +568,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			offset += blk_len;
 		}
 		if (need_padding) {
-			printk(KERN_DEBUG "send padding\n");
+			printk(KERN_DEBUG "acx: send padding\n");
 			memset(usbbuf, 0, 4);
 			result =
 			    usb_bulk_msg(usbdev, outpipe, usbbuf, 4,
@@ -576,7 +576,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			if ((result < 0) || (num_processed != 4))
 				goto fw_end;
 		}
-		printk(KERN_DEBUG "read firmware upload result\n");
+		printk(KERN_DEBUG "acx: read firmware upload result\n");
 		memset(cmdbuf, 0, 20);	/* additional memset */
 		result =
 		    usb_bulk_msg(usbdev, inpipe, cmdbuf, 20, &num_processed,
@@ -614,7 +614,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 				goto fw_end;
 		}
 
-		printk("TNETW1450 firmware upload successful!\n");
+		printk("acx: TNETW1450 firmware successfully uploaded\n");
 		result = 0;
 		goto end;
 	      fw_end:
@@ -631,7 +631,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 				blk_len = USB_RWMEM_MAXLEN;
 			}
 			log(L_INIT,
-			    "uploading firmware (%d bytes, offset=%d)\n",
+			    "acx: uploading firmware (%d bytes, offset=%d)\n",
 			    blk_len, offset);
 			memcpy(usbbuf, ((u8 *) fw_image) + offset, blk_len);
 			result = usb_control_msg(usbdev, outpipe, ACX_USB_REQ_UPLOAD_FW, USB_TYPE_VENDOR | USB_DIR_OUT, (file_size - 8) & 0xffff,	/* value */
@@ -642,8 +642,8 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			    );
 			offset += blk_len;
 			if (result < 0) {
-				printk(KERN_ERR "acx: error %d during upload "
-				       "of firmware, aborting\n", result);
+				printk(KERN_ERR "acx: error %d while uploading "
+				       "the firmware, aborting\n", result);
 				goto end;
 			}
 		}
@@ -790,7 +790,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			 * simply return immediately.
 			 */
 			log(L_INIT,
-			    "finished booting, returning from probe()\n");
+			    "acx: finished booting, returning from probe()\n");
 			result = OK;	/* success */
 			goto end;
 		} else {
@@ -861,7 +861,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	ifdesc = &intf->altsetting->desc;
 	numep = ifdesc->bNumEndpoints;
-	log(L_DEBUG, "# of endpoints: %d\n", numep);
+	log(L_DEBUG, "acx: # of endpoints: %d\n", numep);
 
 	if (is_tnetw1450) {
 		adev->bulkoutep = 1;
@@ -887,11 +887,11 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			}
 		}
 	}
-	log(L_DEBUG, "bulkout ep: 0x%X\n", adev->bulkoutep);
-	log(L_DEBUG, "bulkin ep: 0x%X\n", adev->bulkinep);
+	log(L_DEBUG, "acx: bulkout ep: 0x%X\n", adev->bulkoutep);
+	log(L_DEBUG, "acx: bulkin ep: 0x%X\n", adev->bulkinep);
 
 	/* already done by memset: adev->rxtruncsize = 0; */
-	log(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
+	log(L_DEBUG, "acx: TXBUFSIZE=%d RXBUFSIZE=%d\n",
 	    (int)TXBUFSIZE, (int)RXBUFSIZE);
 
 	/* Allocate the RX/TX containers. */
@@ -954,12 +954,12 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	err = acx_setup_modes(adev);
 	if (err) {
-		msg = "can't register hwmode\n";
+		msg = "acx: can't register hwmode\n";
 		goto end_nomem;
 	}
 
 	/* Register the network device */
-	log(L_INIT, "registering network device\n");
+	log(L_INIT, "acx: registering network device\n");
 	result = ieee80211_register_hw(adev->ieee);
 	if (result) {
 		msg = "acx: failed to register USB network device "
@@ -1214,7 +1214,7 @@ void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 		 */
 		usb_unlink_urb(rxurb);
 	} else if (unlikely(rxurb->status == -ECONNRESET)) {
-		log(L_USBRXTX, "acx_usb: _poll_rx: connection reset\n");
+		log(L_USBRXTX, "acx: _poll_rx: connection reset\n");
 		goto end;
 	}
 	rxurb->actual_length = 0;
@@ -1229,7 +1229,7 @@ void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 	errcode = usb_submit_urb(rxurb, GFP_ATOMIC);
 	/* FIXME: evaluate the error code! */
 	log(L_USBRXTX,
-		"SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
+		"acx: SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
 		rxnum, inpipe, (int)RXBUFSIZE, errcode);
       end:
 	FN_EXIT0;
@@ -1271,7 +1271,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 	 */
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		log(L_USBRXTX,
-			"rx: device is down, not doing anything\n");
+			"acx: rx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
@@ -1280,11 +1280,11 @@ void acxusb_i_complete_rx(struct urb *urb)
 	remsize = size;
 	rxnum = rx - adev->usb_rx;
 
-	log(L_USBRXTX, "RETURN RX (%d) status=%d size=%d\n",
+	log(L_USBRXTX, "acx: RETURN RX (%d) status=%d size=%d\n",
 		rxnum, urb->status, size);
 
 	/* Send the URB that's waiting. */
-	log(L_USBRXTX, "rxnum=%d, sending=%d\n",
+	log(L_USBRXTX, "acx: rxnum=%d, sending=%d\n",
 		rxnum, rxnum ^ 1);
 	acxusb_l_poll_rx(adev, &adev->usb_rx[rxnum ^ 1]);
 
@@ -1328,14 +1328,14 @@ void acxusb_i_complete_rx(struct urb *urb)
 		ptr = &adev->rxtruncbuf;
 		packetsize = RXBUF_BYTES_USED(ptr);
 		log(L_ANY,
-			"handling truncated frame (truncsize=%d size=%d "
+			"acx: handling truncated frame (truncsize=%d size=%d "
 			"packetsize(from trunc)=%d)\n",
 			adev->rxtruncsize, size, packetsize);
 
 		ptr = &adev->rxtruncbuf;
 		packetsize = RXBUF_BYTES_USED(ptr);
 		if (acx_debug & L_USBRXTX) {
-			printk("handling truncated frame (truncsize=%d size=%d "
+			printk("acx: handling truncated frame (truncsize=%d size=%d "
 			       "packetsize(from trunc)=%d)\n",
 			       adev->rxtruncsize, size, packetsize);
 			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
@@ -1366,7 +1366,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 			       tail_size);
 
 			if (acx_debug & L_USBRXTX) {
-				printk("full trailing packet + 12 bytes:\n");
+				printk("acx: full trailing packet + 12 bytes:\n");
 				acx_dump_bytes(inbuf,
 					       tail_size + RXBUF_HDRSIZE);
 			}
@@ -1375,7 +1375,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 			ptr = (rxbuffer_t *) (((char *)inbuf) + tail_size);
 			remsize -= tail_size;
 		}
-		printk("post-merge size=%d remsize=%d\n",
+		printk("acx: post-merge size=%d remsize=%d\n",
 			size, remsize);
 	}
 
@@ -1394,14 +1394,14 @@ void acxusb_i_complete_rx(struct urb *urb)
 
 		packetsize = RXBUF_BYTES_USED(ptr);
 		log(L_USBRXTX,
-			"packet with packetsize=%d\n", packetsize);
+			"acx: packet with packetsize=%d\n", packetsize);
 
 		if (RXBUF_IS_TXSTAT(ptr)) {
 			/* do rate handling */
 			usb_txstatus_t *stat = (void *)ptr;
 
 			log(L_USBRXTX,
-				"tx: stat: mac_cnt_rcvd:%04X "
+				"acx: tx: stat: mac_cnt_rcvd:%04X "
 				"queue_index:%02X mac_status:%02X "
 				"hostdata:%08X rate:%u ack_failures:%02X "
 				"rts_failures:%02X rts_ok:%02X\n",
@@ -1438,7 +1438,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 		if (packetsize > remsize) {
 			/* frame truncation handling */
 			if (acx_debug & L_USBRXTX) {
-				printk("need to truncate packet, "
+				printk("acx: need to truncate packet, "
 				       "packetsize=%d remsize=%d "
 				       "size=%d bytes:",
 				       packetsize, remsize, size);
@@ -1456,7 +1456,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 		ptr = (rxbuffer_t *) (((char *)ptr) + packetsize);
 		remsize -= packetsize;
 		if ((acx_debug & L_USBRXTX) && remsize) {
-			printk("more than one packet in buffer, "
+			printk("acx: more than one packet in buffer, "
 			       "second packet hdr:");
 			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 		}
@@ -1500,11 +1500,11 @@ void acxusb_i_complete_tx(struct urb *urb)
 	 * to play with them. The urb may get unlinked.
 	 */
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		printk("tx: device is down, not doing anything\n");
+		printk("acx: tx: device is down, not doing anything\n");
 		goto end_unlock;
 	}
 
-	printk("RETURN TX (%d): status=%d size=%d\n",
+	printk("acx: RETURN TX (%d): status=%d size=%d\n",
 		txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
@@ -1530,7 +1530,7 @@ void acxusb_i_complete_tx(struct urb *urb)
 	    && (adev->status == ACX_STATUS_4_ASSOCIATED)
 /*	    && (acx_queue_stopped(adev->ndev)*/) {
 		log(L_BUF,
-			"tx: wake queue (%u free txbufs)\n", adev->tx_free);
+			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
 /*		acx_wake_queue(adev->ndev, NULL); */
 	}
 
@@ -1557,14 +1557,14 @@ tx_t *acxusb_l_alloc_tx(acx_device_t * adev)
 		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!adev->usb_tx[head].busy) {
 			log(L_USBRXTX,
-				"allocated tx %d\n", head);
+				"acx: allocated tx %d\n", head);
 			tx = &adev->usb_tx[head];
 			tx->busy = 1;
 			adev->tx_free--;
 			/* Keep a few free descs between head and tail of tx ring.
 			 ** It is not absolutely needed, just feels safer */
 			if (adev->tx_free < TX_STOP_QUEUE) {
-				log(L_BUF, "tx: stop queue "
+				log(L_BUF, "acx: tx: stop queue "
 					"(%u free txbufs)\n", adev->tx_free);
 /*				acx_stop_queue(adev->ndev, NULL); */
 			}
@@ -1625,7 +1625,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	whdr = (struct ieee80211_hdr *) txbuf->data;
 	txnum = tx - adev->usb_tx;
 
-	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
+	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
 	    txnum, adev->tx_free, wlanpkt_len);
 /*
 	switch (adev->mode) {
@@ -1660,7 +1660,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	txbuf->data_len = cpu_to_le16(wlanpkt_len);
 
 	if (unlikely(acx_debug & L_DATA)) {
-		printk("dump of bulk out urb:\n");
+		printk("acx: dump of bulk out urb:\n");
 		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
 	}
 
@@ -1681,7 +1681,7 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 
 	txurb->transfer_flags = URB_ASYNC_UNLINK | URB_ZERO_PACKET;
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
-	log(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
+	log(L_USBRXTX, "acx: SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
 	    "rate=%u errcode=%d\n", txnum, outpipe, txbuf,
 	    wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
@@ -1746,7 +1746,7 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 */
 int __init acxusb_e_init_module(void)
 {
-	log(L_INIT, "USB module " ACX_RELEASE " initialized, "
+	log(L_INIT, "acx: USB module " ACX_RELEASE " initialized, "
 	    "probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }
@@ -1762,7 +1762,7 @@ int __init acxusb_e_init_module(void)
 void __exit acxusb_e_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
-	log(L_INIT, "USB module " ACX_RELEASE " unloaded\n");
+	log(L_INIT, "acx: USB module " ACX_RELEASE " unloaded\n");
 }
 
 
@@ -1777,36 +1777,36 @@ static void dump_device(struct usb_device *usbdev)
 	int i;
 	struct usb_config_descriptor *cd;
 
-	printk("acx device dump:\n");
-	printk("  devnum: %d\n", usbdev->devnum);
-	printk("  speed: %d\n", usbdev->speed);
-	printk("  tt: 0x%X\n", (unsigned int)(usbdev->tt));
-	printk("  ttport: %d\n", (unsigned int)(usbdev->ttport));
-	printk("  toggle[0]: 0x%X  toggle[1]: 0x%X\n",
+	printk("acx: device dump:\n");
+	printk("acx:   devnum: %d\n", usbdev->devnum);
+	printk("acx:   speed: %d\n", usbdev->speed);
+	printk("acx:   tt: 0x%X\n", (unsigned int)(usbdev->tt));
+	printk("acx:   ttport: %d\n", (unsigned int)(usbdev->ttport));
+	printk("acx:   toggle[0]: 0x%X  toggle[1]: 0x%X\n",
 	       (unsigned int)(usbdev->toggle[0]),
 	       (unsigned int)(usbdev->toggle[1]));
 	/* This saw a change after 2.6.10 */
-	printk("  ep_in wMaxPacketSize: ");
+	printk("acx:   ep_in wMaxPacketSize: ");
 	for (i = 0; i < 16; ++i)
 		if (usbdev->ep_in[i] != NULL)
 			printk("%d:%d ", i,
 			       usbdev->ep_in[i]->desc.wMaxPacketSize);
 	printk("\n");
-	printk("  ep_out wMaxPacketSize: ");
+	printk("acx:   ep_out wMaxPacketSize: ");
 	for (i = 0; i < ARRAY_SIZE(usbdev->ep_out); ++i)
 		if (usbdev->ep_out[i] != NULL)
 			printk("%d:%d ", i,
 			       usbdev->ep_out[i]->desc.wMaxPacketSize);
 	printk("\n");
-	printk("  parent: 0x%X\n", (unsigned int)usbdev->parent);
-	printk("  bus: 0x%X\n", (unsigned int)usbdev->bus);
+	printk("acx:   parent: 0x%X\n", (unsigned int)usbdev->parent);
+	printk("acx:   bus: 0x%X\n", (unsigned int)usbdev->bus);
 #ifdef NO_DATATYPE
 	printk("  configs: ");
 	for (i = 0; i < usbdev->descriptor.bNumConfigurations; i++)
 		printk("0x%X ", usbdev->config[i]);
 	printk("\n");
 #endif
-	printk("  actconfig: %p\n", usbdev->actconfig);
+	printk("acx:   actconfig: %p\n", usbdev->actconfig);
 	dump_device_descriptor(&usbdev->descriptor);
 
 	cd = &usbdev->config->desc;
@@ -1818,23 +1818,23 @@ static void dump_device(struct usb_device *usbdev)
 */
 static void dump_config_descriptor(struct usb_config_descriptor *cd)
 {
-	printk("Configuration Descriptor:\n");
+	printk("acx: Configuration Descriptor:\n");
 	if (!cd) {
-		printk("NULL\n");
+		printk("acx: NULL\n");
 		return;
 	}
-	printk("  bLength: %d (0x%X)\n", cd->bLength, cd->bLength);
-	printk("  bDescriptorType: %d (0x%X)\n", cd->bDescriptorType,
+	printk("acx:  bLength: %d (0x%X)\n", cd->bLength, cd->bLength);
+	printk("acx:  bDescriptorType: %d (0x%X)\n", cd->bDescriptorType,
 	       cd->bDescriptorType);
-	printk("  bNumInterfaces: %d (0x%X)\n", cd->bNumInterfaces,
+	printk("acx:  bNumInterfaces: %d (0x%X)\n", cd->bNumInterfaces,
 	       cd->bNumInterfaces);
-	printk("  bConfigurationValue: %d (0x%X)\n", cd->bConfigurationValue,
+	printk("acx:  bConfigurationValue: %d (0x%X)\n", cd->bConfigurationValue,
 	       cd->bConfigurationValue);
-	printk("  iConfiguration: %d (0x%X)\n", cd->iConfiguration,
+	printk("acx:  iConfiguration: %d (0x%X)\n", cd->iConfiguration,
 	       cd->iConfiguration);
-	printk("  bmAttributes: %d (0x%X)\n", cd->bmAttributes,
+	printk("acx:  bmAttributes: %d (0x%X)\n", cd->bmAttributes,
 	       cd->bmAttributes);
-	/* printk("  MaxPower: %d (0x%X)\n", cd->bMaxPower, cd->bMaxPower); */
+	/* printk("acx:  MaxPower: %d (0x%X)\n", cd->bMaxPower, cd->bMaxPower); */
 }
 
 
@@ -1845,27 +1845,27 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd)
 		printk("NULL\n");
 		return;
 	}
-	printk("  bLength: %d (0x%X)\n", dd->bLength, dd->bLength);
-	printk("  bDescriptortype: %d (0x%X)\n", dd->bDescriptorType,
+	printk("acx:  bLength: %d (0x%X)\n", dd->bLength, dd->bLength);
+	printk("acx:  bDescriptortype: %d (0x%X)\n", dd->bDescriptorType,
 	       dd->bDescriptorType);
-	printk("  bcdUSB: %d (0x%X)\n", dd->bcdUSB, dd->bcdUSB);
-	printk("  bDeviceClass: %d (0x%X)\n", dd->bDeviceClass,
+	printk("acx:  bcdUSB: %d (0x%X)\n", dd->bcdUSB, dd->bcdUSB);
+	printk("acx:  bDeviceClass: %d (0x%X)\n", dd->bDeviceClass,
 	       dd->bDeviceClass);
-	printk("  bDeviceSubClass: %d (0x%X)\n", dd->bDeviceSubClass,
+	printk("acx:  bDeviceSubClass: %d (0x%X)\n", dd->bDeviceSubClass,
 	       dd->bDeviceSubClass);
-	printk("  bDeviceProtocol: %d (0x%X)\n", dd->bDeviceProtocol,
+	printk("acx:  bDeviceProtocol: %d (0x%X)\n", dd->bDeviceProtocol,
 	       dd->bDeviceProtocol);
-	printk("  bMaxPacketSize0: %d (0x%X)\n", dd->bMaxPacketSize0,
+	printk("acx:  bMaxPacketSize0: %d (0x%X)\n", dd->bMaxPacketSize0,
 	       dd->bMaxPacketSize0);
-	printk("  idVendor: %d (0x%X)\n", dd->idVendor, dd->idVendor);
-	printk("  idProduct: %d (0x%X)\n", dd->idProduct, dd->idProduct);
-	printk("  bcdDevice: %d (0x%X)\n", dd->bcdDevice, dd->bcdDevice);
-	printk("  iManufacturer: %d (0x%X)\n", dd->iManufacturer,
+	printk("acx:  idVendor: %d (0x%X)\n", dd->idVendor, dd->idVendor);
+	printk("acx:  idProduct: %d (0x%X)\n", dd->idProduct, dd->idProduct);
+	printk("acx:  bcdDevice: %d (0x%X)\n", dd->bcdDevice, dd->bcdDevice);
+	printk("acx:  iManufacturer: %d (0x%X)\n", dd->iManufacturer,
 	       dd->iManufacturer);
-	printk("  iProduct: %d (0x%X)\n", dd->iProduct, dd->iProduct);
-	printk("  iSerialNumber: %d (0x%X)\n", dd->iSerialNumber,
+	printk("acx:  iProduct: %d (0x%X)\n", dd->iProduct, dd->iProduct);
+	printk("acx:  iSerialNumber: %d (0x%X)\n", dd->iSerialNumber,
 	       dd->iSerialNumber);
-	printk("  bNumConfigurations: %d (0x%X)\n", dd->bNumConfigurations,
+	printk("acx:  bNumConfigurations: %d (0x%X)\n", dd->bNumConfigurations,
 	       dd->bNumConfigurations);
 }
 #endif /* UNUSED */
