@@ -332,7 +332,7 @@ acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 */
 	ieee80211_stop_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: stop queue %s\n", msg);
+		log(L_BUFT, "acx: tx: stop queue %s\n", msg);
 }
 
 /*static inline int
@@ -347,7 +347,7 @@ acx_start_queue(struct ieee80211_hw *hw, const char *msg)
 {
 	ieee80211_start_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: start queue %s\n", msg);
+		log(L_BUFT, "acx: tx: start queue %s\n", msg);
 }
 */
 static inline void
@@ -355,7 +355,7 @@ acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
 	ieee80211_wake_queues(hw);
 	if (msg)
-		log(L_BUFT, "tx: wake queue %s\n", msg);
+		log(L_BUFT, "acx: tx: wake queue %s\n", msg);
 }
 /*
 static inline void
@@ -363,7 +363,7 @@ acx_carrier_off(struct net_device *ndev, const char *msg)
 {
 	netif_carrier_off(ndev);
 	if (msg)
-		log(L_BUFT, "tx: carrier off %s\n", msg);
+		log(L_BUFT, "acx: tx: carrier off %s\n", msg);
 }
 
 static inline void
@@ -371,7 +371,7 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 {
 	netif_carrier_on(ndev);
 	if (msg)
-		log(L_BUFT, "tx: carrier on %s\n", msg);
+		log(L_BUFT, "acx: tx: carrier on %s\n", msg);
 }
 
 */

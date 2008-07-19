@@ -1046,7 +1046,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		goto bad;
 	}
 
-	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_QUERY)) {
+	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_INTERROGATE)) {
 		printk("input buffer (len=%u):\n", buflen);
 		acx_dump_bytes(buffer, buflen);
 	}

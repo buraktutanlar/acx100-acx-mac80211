@@ -124,7 +124,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 		cpu_relax();
 	}
 	if (!count) {
-		printk(KERN_EMERG "LOCKUP: already taken at %s!\n",
+		printk(KERN_EMERG "acx: LOCKUP: already taken at %s!\n",
 		       adev->last_lock);
 		BUG();
 	}
@@ -137,7 +137,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #ifdef SMP
 	if (!spin_is_locked(&adev->spinlock)) {
 		where = sanitize_str(where);
-		printk(KERN_EMERG "STRAY UNLOCK at %s!\n", where);
+		printk(KERN_EMERG "acx: STRAY UNLOCK at %s!\n", where);
 		BUG();
 	}
 #endif
@@ -716,7 +716,7 @@ acx_s_configure_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	log(L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, "acx: " FUNC "(type:%s,len:%u)\n", typestr, len);
 	if (unlikely(!len)) {
 		log(L_DEBUG, "zero-length type %s?!\n", typestr);
 	}
@@ -760,7 +760,7 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	log(L_CTL, FUNC "(type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, "acx: " FUNC "(type:%s,len:%u)\n", typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
@@ -2269,7 +2269,7 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		    "adjusted %d dBm to %d dBm\n", level_dbm,
 		    adev->tx_level_dbm);
 
-	return acx_s_configure(adev, &tx_level, ACX1xx_REG_DOT11_TX_POWER_LEVEL);
+	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
 }
 
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
@@ -2951,7 +2951,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	options.WEPOption = 0x00;
 
 	log(L_ASSOC, "writing WEP options\n");
-	acx_s_configure(adev, &options, ACX100_REG_WEP_OPTIONS);
+	acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
 
 	acx100_s_set_wepkey(adev);
 
@@ -2978,8 +2978,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 */
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
-	if (OK != acx_s_query(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
-		printk("%s: ACX1xx_REG_MEMORY_MAP read #2 FAILED\n",
+	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		printk("%s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
@@ -2987,8 +2987,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	/* (no endianness conversion needed) */
 	pt.PacketTemplateStart = pt.WEPCacheEnd;
 
-	if (OK != acx_s_configure(adev, &pt, ACX1xx_REG_MEMORY_MAP)) {
-		printk("%s: ACX1xx_REG_MEMORY_MAP write #2 FAILED\n",
+	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		printk("%s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
@@ -3310,7 +3310,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	    adev->ps_wakeup_cfg, adev->ps_listen_interval,
 	    adev->ps_options, adev->ps_hangover_period,
 	    adev->ps_enhanced_transition_time);
-	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "Previous PS mode settings: wakeup_cfg 0x%02X, "
 	    "listen interval %u, options 0x%02X, "
 	    "hangover period %u, "
@@ -3335,11 +3335,11 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 		pm.acx100.enhanced_ps_transition_time =
 		    cpu_to_le16(adev->ps_enhanced_transition_time);
 	}
-	acx_s_configure(adev, &pm, ACX1xx_REG_POWER_MGMT);
-	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_configure(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	acx_s_mwait(40);
-	acx_s_query(adev, &pm, ACX1xx_REG_POWER_MGMT);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	log(L_INIT, "power save mode change %s\n",
 	    (pm.acx111.
@@ -3581,7 +3581,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		    (adev->
 		     rate_auto) ? /* adev->txrate_fallback_retries */ 1 : 0;
 		log(L_INIT, "updating Tx fallback to %u retries\n", rate[4]);
-		acx_s_configure(adev, &rate, ACX1xx_REG_RATE_FALLBACK);
+		acx_s_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
 	}
 	if (adev->set_mask & GETSET_TXPOWER) {
