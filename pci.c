@@ -35,10 +35,6 @@
 #endif
 
 #include "acx.h"
-#include "acx_struct_pci.h"
-#include "acx_log.h"
-#include "acx_irq.h"
-#include "acx_util.h"
 
 /***********************************************************************
 */
@@ -93,22 +89,78 @@ static void acxpci_e_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
+/***********************************************************************
+** Register access
+**
+** 
+*/
+
+/* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
+#define acx_readl(v)	le32_to_cpu(readl((v)))
+#define acx_readw(v)	le16_to_cpu(readw((v)))
+#define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
+#define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
+
+/* Pick one */
+/* #define INLINE_IO static */
+#define INLINE_IO static inline
+
+INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset)
+{
+#if ACX_IO_WIDTH == 32
+	return acx_readl((u8 *) adev->iobase + adev->io[offset]);
+#else
+	return acx_readw((u8 *) adev->iobase + adev->io[offset])
+	    + (acx_readw((u8 *) adev->iobase + adev->io[offset] + 2) << 16);
+#endif
+}
+
+INLINE_IO u16 read_reg16(acx_device_t * adev, unsigned int offset)
+{
+	return acx_readw((u8 *) adev->iobase + adev->io[offset]);
+}
+
+INLINE_IO u8 read_reg8(acx_device_t * adev, unsigned int offset)
+{
+	return readb((u8 *) adev->iobase + adev->io[offset]);
+}
+
+INLINE_IO void write_reg32(acx_device_t * adev, unsigned int offset, u32 val)
+{
+#if ACX_IO_WIDTH == 32
+	acx_writel(val, (u8 *) adev->iobase + adev->io[offset]);
+#else
+	acx_writew(val & 0xffff, (u8 *) adev->iobase + adev->io[offset]);
+	acx_writew(val >> 16, (u8 *) adev->iobase + adev->io[offset] + 2);
+#endif
+}
+
+INLINE_IO void write_reg16(acx_device_t * adev, unsigned int offset, u16 val)
+{
+	acx_writew(val, (u8 *) adev->iobase + adev->io[offset]);
+}
+
+INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val)
+{
+	writeb(val, (u8 *) adev->iobase + adev->io[offset]);
+}
+
 /* Handle PCI posting properly:
  * Make sure that writes reach the adapter in case they require to be executed
  * *before* the next write, by reading a random (and safely accessible) register.
  * This call has to be made if there is no read following (which would flush the data
  * to the adapter), yet the written data has to reach the adapter immediately. */
-static inline void write_flush(acx_device_t * adev)
+INLINE_IO void write_flush(acx_device_t * adev)
 {
-	/* readb(adev->iobase + adev->io[ACX_IO_INFO_MAILBOX_OFFS]); */
-	/* faster version (accesses the first register, ACX_IO_SOFT_RESET,
+	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
+	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should also be safe): */
 	readb(adev->iobase);
 }
 
-static inline int adev_present(acx_device_t * adev)
+INLINE_IO int adev_present(acx_device_t * adev)
 {
-	/* fast version (accesses the first register, ACX_IO_SOFT_RESET,
+	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
@@ -135,12 +187,12 @@ static txhostdesc_t *get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
 	FN_ENTER;
 
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
-		acx_log(LOG_WARNING, L_ANY, "bad txdesc ptr %p\n", txdesc);
+		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 	index /= adev->txdesc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
-		acx_log(LOG_WARNING, L_ANY, "bad txdesc ptr %p\n", txdesc);
+		printk("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 
@@ -178,30 +230,28 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 
 	FN_ENTER;
 
-	write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
-	write_reg32(adev, ACX_IO_EEPROM_ADDR, addr);
+	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
 	write_flush(adev);
-	write_reg32(adev, ACX_IO_EEPROM_CTL, 2);
+	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
 
 	count = 0xffff;
-	while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
+	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
 		if (unlikely(!--count)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"%s: timeout waiting for EEPROM read\n",
-				wiphy_name(adev->ieee->wiphy));
+			printk("%s: timeout waiting for EEPROM read\n",
+			       wiphy_name(adev->ieee->wiphy));
 			result = NOT_OK;
 			goto fail;
 		}
 		cpu_relax();
 	}
 
-	*charbuf = read_reg8(adev, ACX_IO_EEPROM_DATA);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "EEPROM at 0x%04X = 0x%02X\n",
-		addr, *charbuf);
+	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
+	log(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
 	result = OK;
 
       fail:
@@ -225,15 +275,15 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	int result = NOT_OK;
 	u16 gpio_orig;
 
-	acx_log(LOG_WARNING, L_ANY, "WARNING! I would write to EEPROM now. "
-		"Since I really DON'T want to unless you know "
-		"what you're doing (THIS CODE WILL PROBABLY "
-		"NOT WORK YET!), I will abort that now. And "
-		"definitely make sure to make a "
-		"/proc/driver/acx_wlan0_eeprom backup copy first!!! "
-		"(the EEPROM content includes the PCI config header!! "
-		"If you kill important stuff, then you WILL "
-		"get in trouble and people DID get in trouble already)\n");
+	printk("acx: WARNING! I would write to EEPROM now. "
+	       "Since I really DON'T want to unless you know "
+	       "what you're doing (THIS CODE WILL PROBABLY "
+	       "NOT WORK YET!), I will abort that now. And "
+	       "definitely make sure to make a "
+	       "/proc/driver/acx_wlan0_eeprom backup copy first!!! "
+	       "(the EEPROM content includes the PCI config header!! "
+	       "If you kill important stuff, then you WILL "
+	       "get in trouble and people DID get in trouble already)\n");
 	return OK;
 
 	FN_ENTER;
@@ -249,23 +299,23 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	 * but you probably have to modify GPIO_OUT, too,
 	 * and you probably need to activate a different GPIO
 	 * line instead! */
-	gpio_orig = read_reg16(adev, ACX_IO_GPIO_OE);
-	write_reg16(adev, ACX_IO_GPIO_OE, gpio_orig & ~1);
+	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
+	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
 	write_flush(adev);
 
 	/* ok, now start writing the data out */
 	for (i = 0; i < len; i++) {
-		write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
-		write_reg32(adev, ACX_IO_EEPROM_ADDR, addr + i);
-		write_reg32(adev, ACX_IO_EEPROM_DATA, *(charbuf + i));
+		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
+		write_reg32(adev, IO_ACX_EEPROM_DATA, *(charbuf + i));
 		write_flush(adev);
-		write_reg32(adev, ACX_IO_EEPROM_CTL, 1);
+		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
 
 		count = 0xffff;
-		while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
+		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
-				acx_log(LOG_WARNING, L_ANY, "WARNING, DANGER!!! "
-					"Timeout waiting for EEPROM write\n");
+				printk("WARNING, DANGER!!! "
+				       "Timeout waiting for EEPROM write\n");
 				goto end;
 			}
 			cpu_relax();
@@ -273,27 +323,26 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	}
 
 	/* disable EEPROM writing */
-	write_reg16(adev, ACX_IO_GPIO_OE, gpio_orig);
+	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
 	write_flush(adev);
 
 	/* now start a verification run */
 	for (i = 0; i < len; i++) {
-		write_reg32(adev, ACX_IO_EEPROM_CFG, 0);
-		write_reg32(adev, ACX_IO_EEPROM_ADDR, addr + i);
+		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
 		write_flush(adev);
-		write_reg32(adev, ACX_IO_EEPROM_CTL, 2);
+		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
 
 		count = 0xffff;
-		while (read_reg16(adev, ACX_IO_EEPROM_CTL)) {
+		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
-				acx_log(LOG_WARNING, L_ANY,
-					"timeout waiting for EEPROM read\n");
+				printk("timeout waiting for EEPROM read\n");
 				goto end;
 			}
 			cpu_relax();
 		}
 
-		data_verify[i] = read_reg16(adev, ACX_IO_EEPROM_DATA);
+		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
 	}
 
 	if (0 == memcmp(charbuf, data_verify, len))
@@ -311,7 +360,7 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 ** acxpci_s_read_phy_reg
 **
 ** Messing with rx/tx disabling and enabling here
-** (write_reg32(adev, ACX_IO_ENABLE, 0b000000xx)) kills traffic
+** (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
 */
 int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
@@ -320,31 +369,29 @@ int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 
 	FN_ENTER;
 
-	write_reg32(adev, ACX_IO_PHY_ADDR, reg);
+	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
 	write_flush(adev);
-	write_reg32(adev, ACX_IO_PHY_CTL, 2);
+	write_reg32(adev, IO_ACX_PHY_CTL, 2);
 
 	count = 0xffff;
-	while (read_reg32(adev, ACX_IO_PHY_CTL)) {
+	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
 		/* scheduling away instead of CPU burning loop
 		 * doesn't seem to work here at all:
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
 		if (unlikely(!--count)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"%s: timeout waiting for phy read\n",
-				wiphy_name(adev->ieee->wiphy));
+			printk("%s: timeout waiting for phy read\n",
+			       wiphy_name(adev->ieee->wiphy));
 			*charbuf = 0;
 			goto fail;
 		}
 		cpu_relax();
 	}
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "count was %u\n", count);
-	*charbuf = read_reg8(adev, ACX_IO_PHY_DATA);
+	log(L_DEBUG, "count was %u\n", count);
+	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "radio PHY at 0x%04X = 0x%02X\n",
-		*charbuf, reg);
+	log(L_DEBUG, "radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
 	result = OK;
 	goto fail;		/* silence compiler warning */
       fail:
@@ -362,14 +409,12 @@ int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	/* mprusko said that 32bit accesses result in distorted sensitivity
 	 * on his card. Unconfirmed, looks like it's not true (most likely since we
 	 * now properly flush writes). */
-	write_reg32(adev, ACX_IO_PHY_DATA, value);
-	write_reg32(adev, ACX_IO_PHY_ADDR, reg);
+	write_reg32(adev, IO_ACX_PHY_DATA, value);
+	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
 	write_flush(adev);
-	write_reg32(adev, ACX_IO_PHY_CTL, 1);
+	write_reg32(adev, IO_ACX_PHY_CTL, 1);
 	write_flush(adev);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"radio PHY write 0x%02X at 0x%04X\n",
-		value, reg);
+	log(L_DEBUG, "radio PHY write 0x%02X at 0x%04X\n", value, reg);
 
 	FN_EXIT0;
 	return OK;
@@ -409,13 +454,13 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	sum = p[0] + p[1] + p[2] + p[3];
 	p += 4;
 
-	write_reg32(adev, ACX_IO_SLV_END_CTL, 0);
+	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 0);	/* use basic mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0);	/* use basic mode */
 #else
-	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 1);	/* use autoincrement mode */
-	write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset);	/* configure start address */
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1);	/* use autoincrement mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset);	/* configure start address */
 	write_flush(adev);
 #endif
 
@@ -429,15 +474,14 @@ acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset + len - 4);
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 		write_flush(adev);
 #endif
-		write_reg32(adev, ACX_IO_SLV_MEM_DATA, v32);
+		write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
 	}
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"firmware written, size:%d sum1:%x sum2:%x\n",
-		size, sum, le32_to_cpu(fw_image->chksum));
+	log(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
+	    size, sum, le32_to_cpu(fw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
@@ -477,13 +521,13 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	sum = p[0] + p[1] + p[2] + p[3];
 	p += 4;
 
-	write_reg32(adev, ACX_IO_SLV_END_CTL, 0);
+	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
 
 #if NO_AUTO_INCREMENT
-	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 0);	/* use basic mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0);	/* use basic mode */
 #else
-	write_reg32(adev, ACX_IO_SLV_MEM_CTL, 1);	/* use autoincrement mode */
-	write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset);	/* configure start address */
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1);	/* use autoincrement mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset);	/* configure start address */
 #endif
 
 	len = 0;
@@ -495,17 +539,16 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		len += 4;
 
 #if NO_AUTO_INCREMENT
-		write_reg32(adev, ACX_IO_SLV_MEM_ADDR, offset + len - 4);
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 #endif
-		w32 = read_reg32(adev, ACX_IO_SLV_MEM_DATA);
+		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
 
 		if (unlikely(w32 != v32)) {
-			acx_log(LOG_WARNING, L_ANY,"FATAL: firmware upload: "
-				"data parts at offset %d don't match "
-				"(0x%08X vs. 0x%08X)! I/O timing issues "
-				"or defective memory, with DWL-xx0+? "
-				"ACX_IO_WIDTH=16 may help. Please report\n",
-				len, v32, w32);
+			printk("acx: FATAL: firmware upload: "
+			       "data parts at offset %d don't match (0x%08X vs. 0x%08X)! "
+			       "I/O timing issues or defective memory, with DWL-xx0+? "
+			       "ACX_IO_WIDTH=16 may help. Please report\n",
+			       len, v32, w32);
 			result = NOT_OK;
 			break;
 		}
@@ -518,8 +561,8 @@ acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	/* sum control verification */
 	if (result != NOT_OK) {
 		if (sum != le32_to_cpu(fw_image->chksum)) {
-			acx_log(LOG_WARNING, L_ANY, "FATAL: firmware upload: "
-				"checksums don't match!\n");
+			printk("acx: FATAL: firmware upload: "
+			       "checksums don't match!\n");
 			result = NOT_OK;
 		}
 	}
@@ -550,30 +593,23 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 	 * really get a clue on which files exactly they need to provide.
 	 * Firmware loading is a frequent end-user PITA with these chipsets.
 	 */
-	acx_log(LOG_INFO, L_ANY,
-		"need firmware for acx1%02d chipset "
-		"with radio ID %02X\n",
-		IS_ACX111(adev)*11, adev->radio_type);
-	acx_log(LOG_INFO, L_ANY, "Please provide via firmware hotplug:\n");
-	acx_log(LOG_INFO, L_ANY, "either combined firmware "
-		"(single file named 'tiacx1%02dc%02X')\n"
+	printk( "acx: need firmware for acx1%02d chipset with radio ID %02X\n"
+		"Please provide via firmware hotplug:\n"
+		"either combined firmware (single file named 'tiacx1%02dc%02X')\n"
 		"or two files (base firmware file 'tiacx1%02d' "
 		"+ radio fw 'tiacx1%02dr%02X')\n",
+		IS_ACX111(adev)*11, adev->radio_type,
 		IS_ACX111(adev)*11, adev->radio_type,
 		IS_ACX111(adev)*11,
 		IS_ACX111(adev)*11, adev->radio_type
 		);
 
-	/* print exact chipset and radio ID to make sure people really get a
-	 * clue on which files exactly they are supposed to provide, since
-	 * firmware loading is the biggest enduser PITA with these chipsets.
-	 * Not printing radio ID in 0xHEX in order to not confuse them into
-	 * wrong file naming
-	 * COMMENTED OUT: this was already printed above
-	 */
-//	printk(	"acx: need to load firmware for acx1%02d chipset with radio ID %02x, please provide via firmware hotplug:\n"
-//		"acx: either one file only (<c>ombined firmware image file, radio-specific) or two files (radio-less base image file *plus* separate <r>adio-specific extension file)\n",
-//		IS_ACX111(adev)*11, adev->radio_type);
+	/* print exact chipset and radio ID to make sure people really get a clue on which files exactly they are supposed to provide,
+	 * since firmware loading is the biggest enduser PITA with these chipsets.
+	 * Not printing radio ID in 0xHEX in order to not confuse them into wrong file naming */
+	printk(	"acx: need to load firmware for acx1%02d chipset with radio ID %02x, please provide via firmware hotplug:\n"
+		"acx: either one file only (<c>ombined firmware image file, radio-specific) or two files (radio-less base image file *plus* separate <r>adio-specific extension file)\n",
+		IS_ACX111(adev)*11, adev->radio_type);
 
 	/* Try combined, then main image */
 	adev->need_radio_fw = 0;
@@ -594,21 +630,19 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 
 	for (try = 1; try <= 5; try++) {
 		res = acxpci_s_write_fw(adev, fw_image, 0);
-		acx_log(LOG_DEBUG, L_INIT | L_REALLYVERBOSE,
-			"acx_write_fw (main/combined): %d\n", res);
+		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, fw_image, 0);
-			acx_log(LOG_DEBUG, L_INIT | L_REALLYVERBOSE,
-				"acx_validate_fw (main/combined): %d\n", res);
+			log(L_DEBUG | L_INIT, "acx_validate_fw "
+			    		"(main/combined): %d\n", res);
 		}
 
 		if (OK == res) {
 			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
 			break;
 		}
-		acx_log(LOG_WARNING, L_ANY,
-			"firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
+		printk("acx: firmware upload attempt #%d FAILED, "
+		       "retrying...\n", try);
 		acx_s_mwait(1000);	/* better wait for a while... */
 	}
 
@@ -649,8 +683,7 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 		 IS_ACX111(adev) * 11, adev->radio_type);
 	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
 	if (!radio_image) {
-		acx_log(LOG_WARNING, L_ANY, "can't load radio module '%s'\n",
-			filename);
+		printk("acx: can't load radio module '%s'\n", filename);
 		goto fail;
 	}
 
@@ -658,19 +691,17 @@ int acxpci_s_upload_radio(acx_device_t * adev)
 
 	for (try = 1; try <= 5; try++) {
 		res = acxpci_s_write_fw(adev, radio_image, offset);
-		acx_log(LOG_DEBUG, L_INIT | L_REALLYVERBOSE,
-			"acx_write_fw (radio): %d\n", res);
+		log(L_DEBUG | L_INIT, "acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, radio_image, offset);
-			acx_log(LOG_DEBUG, L_INIT | L_REALLYVERBOSE,
-				"acx_validate_fw (radio): %d\n", res);
+			log(L_DEBUG | L_INIT, "acx_validate_fw (radio): %d\n",
+			    res);
 		}
 
 		if (OK == res)
 			break;
-		acx_log(LOG_WARNING, L_ANY,
-			"radio firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
+		printk("acx: radio firmware upload attempt #%d FAILED, "
+		       "retrying...\n", try);
 		acx_s_mwait(1000);	/* better wait for a while... */
 	}
 
@@ -711,23 +742,22 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 	FN_ENTER;
 
 	/* halt eCPU */
-	temp = read_reg16(adev, ACX_IO_ECPU_CTRL) | 0x1;
-	write_reg16(adev, ACX_IO_ECPU_CTRL, temp);
+	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
+	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 
 	/* now do soft reset of eCPU, set bit */
-	temp = read_reg16(adev, ACX_IO_SOFT_RESET) | 0x1;
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "enable soft reset\n");
-	write_reg16(adev, ACX_IO_SOFT_RESET, temp);
+	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
+	log(L_DEBUG, "enable soft reset\n");
+	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
 	write_flush(adev);
 
 	/* now clear bit again: deassert eCPU reset */
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"disable soft reset and go to init mode\n");
-	write_reg16(adev, ACX_IO_SOFT_RESET, temp & ~0x1);
+	log(L_DEBUG, "disable soft reset and go to init mode\n");
+	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
 
 	/* now start a burst read from initial EEPROM */
-	temp = read_reg16(adev, ACX_IO_EE_START) | 0x1;
-	write_reg16(adev, ACX_IO_EE_START, temp);
+	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
+	write_reg16(adev, IO_ACX_EE_START, temp);
 	write_flush(adev);
 
 	FN_EXIT0;
@@ -746,11 +776,11 @@ static int acxpci_s_verify_init(acx_device_t * adev)
 
 	timeout = jiffies + 2 * HZ;
 	for (;;) {
-		u16 irqstat = read_reg16(adev, ACX_IO_IRQ_STATUS_NON_DES);
-		if (irqstat & ACX_IRQ_FCS_THRESHOLD) {
+		u16 irqstat = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if (irqstat & HOST_INT_FCS_THRESHOLD) {
 			result = OK;
-			write_reg16(adev, ACX_IO_IRQ_ACK,
-				    ACX_IRQ_FCS_THRESHOLD);
+			write_reg16(adev, IO_ACX_IRQ_ACK,
+				    HOST_INT_FCS_THRESHOLD);
 			break;
 		}
 		if (time_after(jiffies, timeout))
@@ -803,8 +833,8 @@ static u32 acxpci_read_cmd_type_status(acx_device_t * adev)
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
-	acx_log(LOG_DEBUG, L_CTL, "cmd_type:%04X cmd_status:%04X [%s]\n",
-		cmd_type, cmd_status, acx_cmd_status_str(cmd_status));
+	log(L_CTL, "cmd_type:%04X cmd_status:%04X [%s]\n",
+	    cmd_type, cmd_status, acx_cmd_status_str(cmd_status));
 
 	FN_EXIT1(cmd_status);
 	return cmd_status;
@@ -834,16 +864,15 @@ static inline void init_mboxes(acx_device_t * adev)
 
 	FN_ENTER;
 
-	cmd_offs = read_reg32(adev, ACX_IO_CMD_MAILBOX_OFFS);
-	info_offs = read_reg32(adev, ACX_IO_INFO_MAILBOX_OFFS);
+	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
+	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
 	adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
 	adev->info_area = (u8 *) adev->iobase2 + info_offs;
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "iobase2=%p\n", adev->iobase2);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "cmd_mbox_offset=%X cmd_area=%p\n",
-		cmd_offs, adev->cmd_area);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"info_mbox_offset=%X info_area=%p\n",
-		info_offs, adev->info_area);
+	log(L_DEBUG, "iobase2=%p\n"
+	    "cmd_mbox_offset=%X cmd_area=%p\n"
+	    "info_mbox_offset=%X info_area=%p\n",
+	    adev->iobase2,
+	    cmd_offs, adev->cmd_area, info_offs, adev->info_area);
 	FN_EXIT0;
 }
 
@@ -884,26 +913,26 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	acxpci_l_reset_mac(adev);
 #endif
 
-	ecpu_ctrl = read_reg16(adev, ACX_IO_ECPU_CTRL) & 1;
+	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "eCPU is already running. ";
 		goto end_unlock;
 	}
 #if 0
-	if (read_reg16(adev, ACX_IO_SOR_CFG) & 2) {
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "eCPU did not start after boot from flash. ";
 		goto end_unlock;
 	}
 
 	/* check sense on reset flags */
-	if (read_reg16(adev, ACX_IO_SOR_CFG) & 0x10) {
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
 		printk("%s: eCPU did not start after boot (SOR), "
 		       "is this fatal?\n", wiphy_name(adev->ieee->wiphy));
 	}
 #endif
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	SET_BIT(adev->irq_status, ACX_IRQ_SCAN_COMPLETE);
+	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
 
 	acx_unlock(adev, flags);
 
@@ -915,7 +944,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 
 	count = 0xffff;
 	do {
-		hardware_info = read_reg16(adev, ACX_IO_EEPROM_INFORMATION);
+		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
 		if (!--count) {
 			msg = "eCPU didn't indicate radio type";
 			goto end_fail;
@@ -934,17 +963,15 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	/* acx_s_mwait(10);    this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
-	write_reg16(adev, ACX_IO_ECPU_CTRL, ecpu_ctrl & ~0x1);
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"booted eCPU up and waiting for completion...\n");
+	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
 	/* wait for eCPU bootup */
 	if (OK != acxpci_s_verify_init(adev)) {
 		msg = "timeout waiting for eCPU. ";
 		goto end_fail;
 	}
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-		"eCPU has woken up, card is ready to be configured\n");
+	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 
 	init_mboxes(adev);
 	acxpci_write_cmd_type_status(adev, 0, 0);
@@ -959,7 +986,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
       end_unlock:
 	acx_unlock(adev, flags);
       end_fail:
-	acx_log(LOG_WARNING, L_ANY, "%sreset_dev() FAILED\n", msg);
+	printk("acx: %sreset_dev() FAILED\n", msg);
       end:
 	FN_EXIT1(result);
 	return result;
@@ -1009,21 +1036,20 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	acx_log(LOG_DEBUG, L_CTL,
-		FUNC "(cmd:%s,buflen:%u,timeout:%ums,type:0x%04X)\n",
-		cmdstr, buflen, cmd_timeout,
-		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
+	log(L_CTL, FUNC "(cmd:%s,buflen:%u,timeout:%ums,type:0x%04X)\n",
+	    cmdstr, buflen, cmd_timeout,
+	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: " FUNC "(): firmware is not loaded yet, "
-			"cannot execute commands!\n", devname);
+		printk("%s: " FUNC "(): firmware is not loaded yet, "
+		       "cannot execute commands!\n", devname);
 		goto bad;
 	}
 
-	if (cmd != ACX1xx_CMD_INTERROGATE)
-		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
-			"input buffer:\n");
+	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_QUERY)) {
+		printk("input buffer (len=%u):\n", buflen);
+		acx_dump_bytes(buffer, buflen);
+	}
 
 	/* wait for firmware to become idle for our command submission */
 	timeout = HZ / 5;
@@ -1046,14 +1072,12 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	if (!counter) {
 		/* the card doesn't get idle, we're in trouble */
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: " FUNC "(): cmd_status is not IDLE: 0x%04X!=0\n",
-			devname, cmd_status);
+		printk("%s: " FUNC "(): cmd_status is not IDLE: 0x%04X!=0\n",
+		       devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) {	/* if waited >10ms... */
-		acx_log(LOG_DEBUG, L_CTL | L_REALLYVERBOSE,
-			FUNC "(): waited for IDLE %dms. "
-			"Please report\n", 199 - counter);
+		log(L_CTL | L_DEBUG, FUNC "(): waited for IDLE %dms. "
+		    "Please report\n", 199 - counter);
 	}
 
 	/* now write the parameters of the command if needed */
@@ -1071,7 +1095,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* now write the actual command type */
 	acxpci_write_cmd_type_status(adev, cmd, 0);
 	/* execute command */
-	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_CMD);
+	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_CMD);
 	write_flush(adev);
 
 	/* wait for firmware to process command */
@@ -1083,21 +1107,21 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (unlikely(cmd_timeout > 1199))
 		cmd_timeout = 1199;
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
-	CLEAR_BIT(adev->irq_status, ACX_IRQ_CMD_COMPLETE);
+	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	/* we schedule away sometimes (timeout can be large) */
 	counter = cmd_timeout;
 	timeout = jiffies + HZ;
 	do {
 		if (!adev->irqs_active) {	/* IRQ disabled: poll */
-			irqtype = read_reg16(adev, ACX_IO_IRQ_STATUS_NON_DES);
-			if (irqtype & ACX_IRQ_CMD_COMPLETE) {
-				write_reg16(adev, ACX_IO_IRQ_ACK,
-					    ACX_IRQ_CMD_COMPLETE);
+			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+			if (irqtype & HOST_INT_CMD_COMPLETE) {
+				write_reg16(adev, IO_ACX_IRQ_ACK,
+					    HOST_INT_CMD_COMPLETE);
 				break;
 			}
 		} else {	/* Wait when IRQ will set the bit */
 			irqtype = adev->irq_status;
-			if (irqtype & ACX_IRQ_CMD_COMPLETE)
+			if (irqtype & HOST_INT_CMD_COMPLETE)
 				break;
 		}
 
@@ -1118,37 +1142,30 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
 	if ((cmd_timeout - counter) == 0) {		/* timed out! */
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: " FUNC "(): timed out %s for CMD_COMPLETE. "
-			"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
-			"cmd_status:%d (%s)\n",
-			devname, (adev->irqs_active) ? "waiting" : "polling",
-			irqtype, adev->irq_status, cmd_timeout,
-			cmd_status, acx_cmd_status_str(cmd_status));
-		acx_log(LOG_WARNING, L_ANY, "hack: don't do: 'goto bad;' "
-			"counter: %d, cmd_timeout: %d, "
-			"cmd_timeout-counter: %d\n",
-			counter, cmd_timeout, cmd_timeout - counter);
+		printk("%s: " FUNC "(): timed out %s for CMD_COMPLETE. "
+		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
+		       "cmd_status:%d (%s)\n",
+		       devname, (adev->irqs_active) ? "waiting" : "polling",
+		       irqtype, adev->irq_status, cmd_timeout,
+		       cmd_status, acx_cmd_status_str(cmd_status));
+		printk("hack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
 	} else if (counter == 0) {	/* maybe timed out! */
-		acx_log(LOG_DEBUG, L_CTL | L_REALLYVERBOSE,
-			FUNC "(): %s for CMD_COMPLETE %dms. "
-			"count:%d. Please report\n",
-			(adev->irqs_active) ? "waited" : "polled",
-			cmd_timeout - counter, counter);
+		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
+		    "count:%d. Please report\n",
+		    (adev->irqs_active) ? "waited" : "polled",
+		    cmd_timeout - counter, counter);
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
-		acx_log(LOG_DEBUG, L_CTL | L_REALLYVERBOSE,
-			FUNC "(): %s for CMD_COMPLETE %dms. "
-			"count:%d. Please report\n",
-			(adev->irqs_active) ? "waited" : "polled",
-			cmd_timeout - counter, counter);
+		log(L_CTL | L_DEBUG, FUNC "(): %s for CMD_COMPLETE %dms. "
+		    "count:%d. Please report\n",
+		    (adev->irqs_active) ? "waited" : "polled",
+		    cmd_timeout - counter, counter);
 	}
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: " FUNC "(): cmd_status is not SUCCESS: %d (%s). "
-			"Took %dms of %d\n",
-			devname, cmd_status, acx_cmd_status_str(cmd_status),
-			cmd_timeout - counter, cmd_timeout);
+		printk("%s: " FUNC "(): cmd_status is not SUCCESS: %d (%s). "
+		       "Took %dms of %d\n",
+		       devname, cmd_status, acx_cmd_status_str(cmd_status),
+		       cmd_timeout - counter, cmd_timeout);
 		/* zero out result buffer
 		 * WARNING: this will trash stack in case of illegally large input
 		 * length! */
@@ -1161,12 +1178,14 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
 		/* adev->cmd_area points to PCI device's memory, not to RAM! */
 		memcpy_fromio(buffer, adev->cmd_area + 4, buflen);
-		acx_log_dump(LOG_DEBUG, L_REALLYVERBOSE, buffer, buflen,
-			"output buffer:\n");
+		if (acx_debug & L_DEBUG) {
+			printk("output buffer (len=%u): ", buflen);
+			acx_dump_bytes(buffer, buflen);
+		}
 	}
 /* ok: */
-	acx_log(LOG_DEBUG, L_CTL, FUNC "(%s): took %ld jiffies to complete\n",
-		cmdstr, jiffies - start);
+	log(L_CTL, FUNC "(%s): took %ld jiffies to complete\n",
+	    cmdstr, jiffies - start);
 	FN_EXIT1(OK);
 	return OK;
 
@@ -1174,11 +1193,9 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
 #if ACX_DEBUG
-	acx_log(LOG_WARNING, L_ANY,
-		"%s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
+	printk("%s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
 #else
-	acx_log(LOG_WARNING, L_ANY,
-		"%s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
+	printk("%s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
 #endif
 	dump_stack();
 	FN_EXIT1(NOT_OK);
@@ -1232,28 +1249,25 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 		if (OK != acxpci_read_eeprom_byte(adev,
 						  ACX100_EEPROM_ID_OFFSET + i,
 						  &buffer[i])) {
-			acx_log(LOG_DEBUG, L_ANY, "reading EEPROM FAILED\n");
+			printk("acx: reading EEPROM FAILED\n");
 			break;
 		}
 	}
 
 	for (i = 0; i < ARRAY_SIZE(device_ids); i++) {
-		if (memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE))
-			continue;
-		if (device_ids[i].descr) {
-			acx_log(LOG_INFO, L_ANY,
-				"EEPROM card ID string check "
-				"found %s card ID: is this %s?\n",
-				device_ids[i].descr,
-				device_ids[i].type);
+		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
+			if (device_ids[i].descr) {
+				printk("acx: EEPROM card ID string check "
+				       "found %s card ID: is this %s?\n",
+				       device_ids[i].descr, device_ids[i].type);
+			}
+			break;
 		}
-		break;
 	}
 	if (i == ARRAY_SIZE(device_ids)) {
-		acx_log(LOG_WARNING, L_ANY,
-			"EEPROM card ID string check found "
-			"unknown card: expected 'Global', got '%.*s\'. "
-			"Please report\n", CARD_EEPROM_ID_SIZE, buffer);
+		printk("acx: EEPROM card ID string check found "
+		       "unknown card: expected 'Global', got '%.*s\'. "
+		       "Please report\n", CARD_EEPROM_ID_SIZE, buffer);
 	}
 	FN_EXIT0;
 }
@@ -1321,7 +1335,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
 	 * here instead? Or are we that much down the road that it's no
 	 * longer possible here? */
-	write_reg16(adev, ACX_IO_ENABLE, 0);
+	write_reg16(adev, IO_ACX_ENABLE, 0);
 
 	acx_s_mwait(100);
 
@@ -1350,86 +1364,86 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 ** id	- ptr to the device id entry that matched this device
 */
 static const u16 IO_ACX100[] = {
-	0x0000,			/* ACX_IO_SOFT_RESET */
+	0x0000,			/* IO_ACX_SOFT_RESET */
 
-	0x0014,			/* ACX_IO_SLV_MEM_ADDR */
-	0x0018,			/* ACX_IO_SLV_MEM_DATA */
-	0x001c,			/* ACX_IO_SLV_MEM_CTL */
-	0x0020,			/* ACX_IO_SLV_END_CTL */
+	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
+	0x0018,			/* IO_ACX_SLV_MEM_DATA */
+	0x001c,			/* IO_ACX_SLV_MEM_CTL */
+	0x0020,			/* IO_ACX_SLV_END_CTL */
 
-	0x0034,			/* ACX_IO_FEMR */
+	0x0034,			/* IO_ACX_FEMR */
 
-	0x007c,			/* ACX_IO_INT_TRIG */
-	0x0098,			/* ACX_IO_IRQ_MASK */
-	0x00a4,			/* ACX_IO_IRQ_STATUS_NON_DES */
-	0x00a8,			/* ACX_IO_IRQ_REASON */
-	0x00ac,			/* ACX_IO_IRQ_ACK */
-	0x00b0,			/* ACX_IO_HINT_TRIG */
+	0x007c,			/* IO_ACX_INT_TRIG */
+	0x0098,			/* IO_ACX_IRQ_MASK */
+	0x00a4,			/* IO_ACX_IRQ_STATUS_NON_DES */
+	0x00a8,			/* IO_ACX_IRQ_REASON */
+	0x00ac,			/* IO_ACX_IRQ_ACK */
+	0x00b0,			/* IO_ACX_HINT_TRIG */
 
-	0x0104,			/* ACX_IO_ENABLE */
+	0x0104,			/* IO_ACX_ENABLE */
 
-	0x0250,			/* ACX_IO_EEPROM_CTL */
-	0x0254,			/* ACX_IO_EEPROM_ADDR */
-	0x0258,			/* ACX_IO_EEPROM_DATA */
-	0x025c,			/* ACX_IO_EEPROM_CFG */
+	0x0250,			/* IO_ACX_EEPROM_CTL */
+	0x0254,			/* IO_ACX_EEPROM_ADDR */
+	0x0258,			/* IO_ACX_EEPROM_DATA */
+	0x025c,			/* IO_ACX_EEPROM_CFG */
 
-	0x0268,			/* ACX_IO_PHY_ADDR */
-	0x026c,			/* ACX_IO_PHY_DATA */
-	0x0270,			/* ACX_IO_PHY_CTL */
+	0x0268,			/* IO_ACX_PHY_ADDR */
+	0x026c,			/* IO_ACX_PHY_DATA */
+	0x0270,			/* IO_ACX_PHY_CTL */
 
-	0x0290,			/* ACX_IO_GPIO_OE */
+	0x0290,			/* IO_ACX_GPIO_OE */
 
-	0x0298,			/* ACX_IO_GPIO_OUT */
+	0x0298,			/* IO_ACX_GPIO_OUT */
 
-	0x02a4,			/* ACX_IO_CMD_MAILBOX_OFFS */
-	0x02a8,			/* ACX_IO_INFO_MAILBOX_OFFS */
-	0x02ac,			/* ACX_IO_EEPROM_INFORMATION */
+	0x02a4,			/* IO_ACX_CMD_MAILBOX_OFFS */
+	0x02a8,			/* IO_ACX_INFO_MAILBOX_OFFS */
+	0x02ac,			/* IO_ACX_EEPROM_INFORMATION */
 
-	0x02d0,			/* ACX_IO_EE_START */
-	0x02d4,			/* ACX_IO_SOR_CFG */
-	0x02d8			/* ACX_IO_ECPU_CTRL */
+	0x02d0,			/* IO_ACX_EE_START */
+	0x02d4,			/* IO_ACX_SOR_CFG */
+	0x02d8			/* IO_ACX_ECPU_CTRL */
 };
 
 static const u16 IO_ACX111[] = {
-	0x0000,			/* ACX_IO_SOFT_RESET */
+	0x0000,			/* IO_ACX_SOFT_RESET */
 
-	0x0014,			/* ACX_IO_SLV_MEM_ADDR */
-	0x0018,			/* ACX_IO_SLV_MEM_DATA */
-	0x001c,			/* ACX_IO_SLV_MEM_CTL */
-	0x0020,			/* ACX_IO_SLV_END_CTL */
+	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
+	0x0018,			/* IO_ACX_SLV_MEM_DATA */
+	0x001c,			/* IO_ACX_SLV_MEM_CTL */
+	0x0020,			/* IO_ACX_SLV_END_CTL */
 
-	0x0034,			/* ACX_IO_FEMR */
+	0x0034,			/* IO_ACX_FEMR */
 
-	0x00b4,			/* ACX_IO_INT_TRIG */
-	0x00d4,			/* ACX_IO_IRQ_MASK */
+	0x00b4,			/* IO_ACX_INT_TRIG */
+	0x00d4,			/* IO_ACX_IRQ_MASK */
 	/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
-	0x00f0,			/* ACX_IO_IRQ_STATUS_NON_DES */
-	0x00e4,			/* ACX_IO_IRQ_REASON */
-	0x00e8,			/* ACX_IO_IRQ_ACK */
-	0x00ec,			/* ACX_IO_HINT_TRIG */
+	0x00f0,			/* IO_ACX_IRQ_STATUS_NON_DES */
+	0x00e4,			/* IO_ACX_IRQ_REASON */
+	0x00e8,			/* IO_ACX_IRQ_ACK */
+	0x00ec,			/* IO_ACX_HINT_TRIG */
 
-	0x01d0,			/* ACX_IO_ENABLE */
+	0x01d0,			/* IO_ACX_ENABLE */
 
-	0x0338,			/* ACX_IO_EEPROM_CTL */
-	0x033c,			/* ACX_IO_EEPROM_ADDR */
-	0x0340,			/* ACX_IO_EEPROM_DATA */
-	0x0344,			/* ACX_IO_EEPROM_CFG */
+	0x0338,			/* IO_ACX_EEPROM_CTL */
+	0x033c,			/* IO_ACX_EEPROM_ADDR */
+	0x0340,			/* IO_ACX_EEPROM_DATA */
+	0x0344,			/* IO_ACX_EEPROM_CFG */
 
-	0x0350,			/* ACX_IO_PHY_ADDR */
-	0x0354,			/* ACX_IO_PHY_DATA */
-	0x0358,			/* ACX_IO_PHY_CTL */
+	0x0350,			/* IO_ACX_PHY_ADDR */
+	0x0354,			/* IO_ACX_PHY_DATA */
+	0x0358,			/* IO_ACX_PHY_CTL */
 
-	0x0374,			/* ACX_IO_GPIO_OE */
+	0x0374,			/* IO_ACX_GPIO_OE */
 
-	0x037c,			/* ACX_IO_GPIO_OUT */
+	0x037c,			/* IO_ACX_GPIO_OUT */
 
-	0x0388,			/* ACX_IO_CMD_MAILBOX_OFFS */
-	0x038c,			/* ACX_IO_INFO_MAILBOX_OFFS */
-	0x0390,			/* ACX_IO_EEPROM_INFORMATION */
+	0x0388,			/* IO_ACX_CMD_MAILBOX_OFFS */
+	0x038c,			/* IO_ACX_INFO_MAILBOX_OFFS */
+	0x0390,			/* IO_ACX_EEPROM_INFORMATION */
 
-	0x0100,			/* ACX_IO_EE_START */
-	0x0104,			/* ACX_IO_SOR_CFG */
-	0x0108,			/* ACX_IO_ECPU_CTRL */
+	0x0100,			/* IO_ACX_EE_START */
+	0x0104,			/* IO_ACX_SOR_CFG */
+	0x0108,			/* IO_ACX_ECPU_CTRL */
 };
 
 static const struct ieee80211_ops acxpci_hw_ops = {
@@ -1472,9 +1486,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!ieee) {
-		acx_log(LOG_WARNING, L_ANY,
-			"could not allocate ieee80211 structure %s\n",
-			pci_name(pdev));
+		printk("acx: could not allocate ieee80211 structure %s\n",
+		       pci_name(pdev));
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
@@ -1506,11 +1519,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
-	spin_lock_init(&adev->spinlock);
-	spin_lock_init(&adev->irqlock);
+	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	acx_log(LOG_INFO, L_ANY,
-		"mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
+	printk("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
 	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well
 	 ** just _presume_ that we're under sem (instead of actually taking it): */
@@ -1518,6 +1529,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	adev->ieee = ieee;
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
+	adev->dev_type = DEVTYPE_PCI;
 
 /** Finished with private interface **/
 
@@ -1526,7 +1538,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Enable the PCI device */
 	if (pci_enable_device(pdev)) {
-		acx_log(LOG_WARNING, L_ANY, "pci_enable_device() FAILED\n");
+		printk("acx: pci_enable_device() FAILED\n");
 		result = -ENODEV;
 		goto fail_pci_enable_device;
 	}
@@ -1554,8 +1566,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		mem_region2 = PCI_ACX111_REGION2;
 		mem_region2_size = PCI_ACX111_REGION2_SIZE;
 	} else {
-		acx_log(LOG_WARNING, L_ANY,
-			"unknown chip type 0x%04X\n", chip_type);
+		printk("acx: unknown chip type 0x%04X\n", chip_type);
 		goto fail_unknown_chiptype;
 	}
 
@@ -1565,7 +1576,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 	err = pci_request_region(pdev, mem_region1, "acx_1");
 	if (err) {
-		acx_log(LOG_WARNING, L_ANY, "pci_request_region (1/2) FAILED!"
+		printk(KERN_WARNING "acx: pci_request_region (1/2) FAILED!"
 			"No cardbus support in kernel?\n");
 		goto fail_request_mem_region1;
 	}
@@ -1574,7 +1585,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = pci_request_region(pdev, mem_region2, "acx_2");
 	if (err) {
-		acx_log(LOG_WARNING, L_ANY, "pci_request_region (2/2) FAILED!\n");
+		printk(KERN_WARNING "acx: pci_request_region (2/2) FAILED!\n");
 		goto fail_request_mem_region2;
 	}
 
@@ -1589,22 +1600,22 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	
 	mem1 = pci_iomap(pdev, mem_region1, 0);
 	if (!mem1) {
-		acx_log(LOG_WARNING, L_ANY, "ioremap() FAILED\n");
+		printk(KERN_WARNING "acx: ioremap() FAILED\n");
 		goto fail_ioremap1;
 	}
 
 	mem2 = pci_iomap(pdev, mem_region2, 0);
 	if (!mem2) {
-		acx_log(LOG_WARNING, L_ANY, "ioremap() #2 FAILED\n");
+		printk(KERN_WARNING "acx: ioremap() #2 FAILED\n");
 		goto fail_ioremap2;
 	}
 
-	acx_log(LOG_INFO, L_ANY, "found %s-based wireless network card at %s, "
-		"irq:%d,  phymem1:0x%lX, phymem2:0x%lX, mem1:0x%p, "
-		"mem1_size:%ld, mem2:0x%p, mem2_size:%ld\n",
-		chip_name, pci_name(pdev), pdev->irq, phymem1, phymem2,
-		mem1, mem_region1_size, mem2, mem_region2_size);
-	//log(L_ANY, "initial debug setting is 0x%04X\n", acx_debug);
+	printk("acx: found %s-based wireless network card at %s, irq:%d, "
+	       "phymem1:0x%lX, phymem2:0x%lX, mem1:0x%p, mem1_size:%ld, "
+	       "mem2:0x%p, mem2_size:%ld\n",
+	       chip_name, pci_name(pdev), pdev->irq, phymem1, phymem2,
+	       mem1, mem_region1_size, mem2, mem_region2_size);
+	log(L_ANY, "initial debug setting is 0x%04X\n", acx_debug);
 	adev->chip_type = chip_type;
 	adev->chip_name = chip_name;
 	adev->io = (CHIPTYPE_ACX100 == chip_type) ? IO_ACX100 : IO_ACX111;
@@ -1616,7 +1627,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 
 	if (0 == pdev->irq) {
-		acx_log(LOG_WARNING, L_ANY, "can't use IRQ 0\n");
+		printk("acx: can't use IRQ 0\n");
 		goto fail_irq;
 	}
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
@@ -1624,13 +1635,11 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* request shared IRQ handler */
 	if (request_irq
 	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
-		acx_log(LOG_WARNING, L_ANY, "%s: request_irq FAILED\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto done;
 	}
-	acx_log(LOG_DEBUG, L_IRQ | L_REALLYVERBOSE,
-		"request_irq %d successful\n", adev->irq);
+	log(L_DEBUG | L_IRQ, "request_irq %d successful\n", adev->irq);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -1686,14 +1695,13 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(adev); */
 
-	acx_log(LOG_INFO, L_ANY, "driver version " ACX_RELEASE
-		": net device %s, driver compiled "
-		"against wireless extensions %d and Linux %s\n",
-		wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+	printk("acx " ACX_RELEASE ": net device %s, driver compiled "
+	       "against wireless extensions %d and Linux %s\n",
+	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
 
-	acx_log(LOG_INFO, L_IRQ | L_INIT, "using IRQ %d\n", pdev->irq);
+	log(L_IRQ | L_INIT, "using IRQ %d\n", pdev->irq);
 
 /** done with board specific setup **/
 
@@ -1704,15 +1712,14 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = acx_setup_modes(adev);
 	if (err) {
-		acx_log(LOG_WARNING, L_ANY, "can't register hwmode\n");
+	printk("can't register hwmode\n");
 		goto fail_register_netdev;
 	}
 
 	acx_init_task_scheduler(adev);
 	err = ieee80211_register_hw(ieee);
 	if (OK != err) {
-		acx_log(LOG_WARNING, L_ANY,
-			"ieee80211_register_hw() FAILED: %d\n", err);
+		printk("acx: ieee80211_register_hw() FAILED: %d\n", err);
 		goto fail_register_netdev;
 	}
 #if CMD_DISCOVERY
@@ -1779,9 +1786,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	FN_ENTER;
 
 	if (!hw) {
-		acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-			"%s: card is unused. Skipping any release code\n",
-			__func__);
+		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
+		    __func__);
 		goto end;
 	}
 
@@ -1802,8 +1808,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 #endif
 		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
-		acx_log(LOG_INFO, L_INIT,
-			"switching off power LED to save power\n");
+		log(L_INIT, "switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
@@ -1814,8 +1819,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		} else {
 			u16 temp;
 			/* halt eCPU */
-			temp = read_reg16(adev, ACX_IO_ECPU_CTRL) | 0x1;
-			write_reg16(adev, ACX_IO_ECPU_CTRL, temp);
+			temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
+			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 			write_flush(adev);
 		}
 		acx_unlock(adev, flags);
@@ -1827,8 +1832,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
 	 */
-	acx_log(LOG_INFO, L_INIT,
-		"removing device %s\n", wiphy_name(adev->ieee->wiphy));
+//	acxpci_e_close(hw);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 
 	/* unregister_netdev ensures that no references to us left.
@@ -1893,72 +1898,72 @@ acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	acx_device_t *adev;
 
 	FN_ENTER;
-	acx_log(LOG_WARNING, L_ANY, "suspend handler is experimental!\n");
-	acx_log(LOG_INFO, L_ANY, "suspend: dev %p\n", hw);
+	printk("acx: suspend handler is experimental!\n");
+	printk("sus: dev %p\n", hw);
 
 /*	if (!netif_running(ndev))
 		goto end;
 */
 	adev = ieee2adev(hw);
-acx_log(LOG_INFO, L_ANY, "suspend: adev %p\n", adev);
+	printk("sus: adev %p\n", adev);
 
-acx_sem_lock(adev);
+	acx_sem_lock(adev);
 
-ieee80211_unregister_hw(hw);	/* this one cannot sleep */
-acxpci_s_down(hw);
-/* down() does not set it to ACX_IRQ_ALL, but here we really want that */
-write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
-write_reg16(adev, ACX_IO_FEMR, 0x0);
-acxpci_s_delete_dma_regions(adev);
-pci_save_state(pdev);
-pci_set_power_state(pdev, PCI_D3hot);
+	ieee80211_unregister_hw(hw);	/* this one cannot sleep */
+	acxpci_s_down(hw);
+	/* down() does not set it to 0xffff, but here we really want that */
+	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	acxpci_s_delete_dma_regions(adev);
+	pci_save_state(pdev);
+	pci_set_power_state(pdev, PCI_D3hot);
 
-acx_sem_unlock(adev);
-FN_EXIT0;
-return OK;
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return OK;
 }
 
 
 static int acxpci_e_resume(struct pci_dev *pdev)
 {
-struct ieee80211_hw *hw = pci_get_drvdata(pdev);
-acx_device_t *adev;
+	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
+	acx_device_t *adev;
 
-FN_ENTER;
+	FN_ENTER;
 
-acx_log(LOG_WARNING, L_ANY, "resume handler is experimental!\n");
-acx_log(LOG_INFO, L_ANY, "resume: got dev %p\n", hw);
+	printk("acx: resume handler is experimental!\n");
+	printk("rsm: got dev %p\n", hw);
 
 
-adev = ieee2adev(hw);
-acx_log(LOG_INFO, L_ANY, "resume: got adev %p\n", adev);
+	adev = ieee2adev(hw);
+	printk("rsm: got adev %p\n", adev);
 
-acx_sem_lock(adev);
+	acx_sem_lock(adev);
 
-pci_set_power_state(pdev, PCI_D0);
-acx_log(LOG_INFO, L_ANY, "resume: power state PCI_D0 set\n");
-pci_restore_state(pdev);
-acx_log(LOG_INFO, L_ANY, "resume: PCI state restored\n");
+	pci_set_power_state(pdev, PCI_D0);
+	printk("rsm: power state PCI_D0 set\n");
+	pci_restore_state(pdev);
+	printk("rsm: PCI state restored\n");
 
-if (OK != acxpci_s_reset_dev(adev))
-	goto end_unlock;
-acx_log(LOG_INFO, L_ANY, "resume: device reset done\n");
-if (OK != acx_s_init_mac(adev))
-	goto end_unlock;
-acx_log(LOG_INFO, L_ANY, "resume: init MAC done\n");
+	if (OK != acxpci_s_reset_dev(adev))
+		goto end_unlock;
+	printk("rsm: device reset done\n");
+	if (OK != acx_s_init_mac(adev))
+		goto end_unlock;
+	printk("rsm: init MAC done\n");
 
-acxpci_s_up(hw);
-acx_log(LOG_INFO, L_ANY, "resume: acx up done\n");
+	acxpci_s_up(hw);
+	printk("rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before suspend,
 	 * and possibly be back in the network again already :-) */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
 		acx_s_update_card_settings(adev);
-		acx_log(LOG_INFO, L_ANY, "resume: settings updated\n");
+		printk("rsm: settings updated\n");
 	}
 	ieee80211_register_hw(hw);
-	acx_log(LOG_INFO, L_ANY, "resume: device attached\n");
+	printk("rsm: device attached\n");
 
       end_unlock:
 	acx_sem_unlock(adev);
@@ -1982,8 +1987,8 @@ acx_log(LOG_INFO, L_ANY, "resume: acx up done\n");
 static void enable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
-	write_reg16(adev, ACX_IO_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, ACX_IO_FEMR, 0x8000);
+	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
+	write_reg16(adev, IO_ACX_FEMR, 0x8000);
 	adev->irqs_active = 1;
 	FN_EXIT0;
 }
@@ -2027,17 +2032,13 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 
 static void disable_acx_irq(acx_device_t * adev)
 {
-	u16 disable_irq_mask = (IS_ACX111(adev)) ?
-		ACX111_DISABLE_ALL_IRQS :
-		ACX100_DISABLE_ALL_IRQS;
-
 	FN_ENTER;
 
-	/* I guess mask is not ACX_IRQ_ALL because acx100 won't signal
+	/* I guess mask is not 0xffff because acx100 won't signal
 	 ** cmd completion then (needed for ifup).
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
-	write_reg16(adev, ACX_IO_IRQ_MASK, disable_irq_mask);
-	write_reg16(adev, ACX_IO_FEMR, 0x0);
+	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	adev->irqs_active = 0;
 
 	FN_EXIT0;
@@ -2176,9 +2177,8 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	if (adev->modes)
 		acx_free_modes(adev);
 	/* disable all IRQs, release shared IRQ handler */
-	write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
-	write_reg16(adev, ACX_IO_FEMR, 0x0);
-	free_irq(adev->irq, adev);
+	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
 
 /* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
@@ -2189,7 +2189,7 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	 */
 	acx_sem_unlock(adev);
 
-	acx_log(LOG_INFO, L_INIT, "closed device\n");
+	log(L_INIT, "closed device\n");
 	FN_EXIT0;
 }
 
@@ -2220,7 +2220,7 @@ static void log_rxbuffer(const acx_device_t * adev)
 	for (i = 0; i < RX_CNT; i++) {
 		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			acx_log(LOG_WARNING, L_ANY, "rx: buf %d full\n", i);
+			printk("rx: buf %d full\n", i);
 		rxhostdesc++;
 	}
 }
@@ -2256,9 +2256,8 @@ static void acxpci_l_process_rxdesc(acx_device_t * adev)
 
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
-		acx_log(LOG_DEBUG, L_BUFR,
-			"rx: tail=%u Ctl_16=%04X Status=%08X\n",
-			tail, hostdesc->Ctl_16, hostdesc->Status);
+		log(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
+		    tail, hostdesc->Ctl_16, hostdesc->Status);
 
 		acx_l_process_rxbuf(adev, hostdesc->data);
 		hostdesc->Status = 0;
@@ -2353,15 +2352,14 @@ static void handle_info_irq(acx_device_t * adev)
 
 	/* inform fw that we have read this info message */
 	acx_writel(info_type | 0x00010000, adev->info_area);
-	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_INFOACK);
+	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(adev);
 
-	acx_log(LOG_DEBUG, L_CTL,
-		"info_type:%04X info_status:%04X\n", info_type, info_status);
+	log(L_CTL, "info_type:%04X info_status:%04X\n", info_type, info_status);
 
-	acx_log(LOG_DEBUG, L_IRQ, "got Info IRQ: status %04X type %04X: %s\n",
-		info_status, info_type,
-		info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
+	log(L_IRQ, "got Info IRQ: status %04X type %04X: %s\n",
+	    info_status, info_type,
+	    info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
 			  0 : info_type]
 	    );
 }
@@ -2375,42 +2373,42 @@ static void log_unusual_irq(u16 irqtype)
 	 */
 
 	printk("acx: got");
-	if (irqtype & ACX_IRQ_RX_DATA) {
+	if (irqtype & HOST_INT_RX_DATA) {
 		printk(" Rx_Data");
 	}
-	/* ACX_IRQ_TX_COMPLETE   */
-	if (irqtype & ACX_IRQ_TX_XFER) {
+	/* HOST_INT_TX_COMPLETE   */
+	if (irqtype & HOST_INT_TX_XFER) {
 		printk(" Tx_Xfer");
 	}
-	/* ACX_IRQ_RX_COMPLETE   */
-	if (irqtype & ACX_IRQ_DTIM) {
+	/* HOST_INT_RX_COMPLETE   */
+	if (irqtype & HOST_INT_DTIM) {
 		printk(" DTIM");
 	}
-	if (irqtype & ACX_IRQ_BEACON) {
+	if (irqtype & HOST_INT_BEACON) {
 		printk(" Beacon");
 	}
-	if (irqtype & ACX_IRQ_TIMER) {
-		printk(" Timer");
+	if (irqtype & HOST_INT_TIMER) {
+		log(L_IRQ, " Timer");
 	}
-	if (irqtype & ACX_IRQ_KEY_NOT_FOUND) {
+	if (irqtype & HOST_INT_KEY_NOT_FOUND) {
 		printk(" Key_Not_Found");
 	}
-	if (irqtype & ACX_IRQ_IV_ICV_FAILURE) {
+	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
 		printk(" IV_ICV_Failure (crypto)");
 	}
-	/* ACX_IRQ_CMD_COMPLETE  */
-	/* ACX_IRQ_INFO          */
-	if (irqtype & ACX_IRQ_OVERFLOW) {
+	/* HOST_INT_CMD_COMPLETE  */
+	/* HOST_INT_INFO          */
+	if (irqtype & HOST_INT_OVERFLOW) {
 		printk(" Overflow");
 	}
-	if (irqtype & ACX_IRQ_PROCESS_ERROR) {
+	if (irqtype & HOST_INT_PROCESS_ERROR) {
 		printk(" Process_Error");
 	}
-	/* ACX_IRQ_SCAN_COMPLETE */
-	if (irqtype & ACX_IRQ_FCS_THRESHOLD) {
+	/* HOST_INT_SCAN_COMPLETE */
+	if (irqtype & HOST_INT_FCS_THRESHOLD) {
 		printk(" FCS_Threshold");
 	}
-	if (irqtype & ACX_IRQ_UNKNOWN) {
+	if (irqtype & HOST_INT_UNKNOWN) {
 		printk(" Unknown");
 	}
 	printk(" IRQ(s)\n");
@@ -2484,12 +2482,12 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		/* ACK all IRQs ASAP */
 
 		/* Handle most important IRQ types first */
-		if (irqtype & ACX_IRQ_RX_COMPLETE) {
-			acx_log(LOG_DEBUG, L_IRQ, "got Rx_Complete IRQ\n");
+		if (irqtype & HOST_INT_RX_COMPLETE) {
+			log(L_IRQ, "got Rx_Complete IRQ\n");
 			acxpci_l_process_rxdesc(adev);
 		}
-		if (irqtype & ACX_IRQ_TX_COMPLETE) {
-			acx_log(LOG_DEBUG, L_IRQ, "got Tx_Complete IRQ\n");
+		if (irqtype & HOST_INT_TX_COMPLETE) {
+			log(L_IRQ, "got Tx_Complete IRQ\n");
 			/* don't clean up on each Tx complete, wait a bit
 			 * unless we're going towards full, in which case
 			 * we do it immediately, too (otherwise we might lockup
@@ -2503,43 +2501,42 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 		/* Less frequent ones */
 		if (irqtype & (0
-			       | ACX_IRQ_CMD_COMPLETE
-			       | ACX_IRQ_INFO | ACX_IRQ_SCAN_COMPLETE)) {
-			if (irqtype & ACX_IRQ_INFO) {
+			       | HOST_INT_CMD_COMPLETE
+			       | HOST_INT_INFO | HOST_INT_SCAN_COMPLETE)) {
+			if (irqtype & HOST_INT_INFO) {
 				handle_info_irq(adev);
 			}
-			if (irqtype & ACX_IRQ_SCAN_COMPLETE) {
-				acx_log(LOG_DEBUG, L_IRQ,
-					"got Scan_Complete IRQ\n");
+			if (irqtype & HOST_INT_SCAN_COMPLETE) {
+				log(L_IRQ, "got Scan_Complete IRQ\n");
 				/* need to do that in process context */
 				/* remember that fw is not scanning anymore */
 				SET_BIT(adev->irq_status,
-					ACX_IRQ_SCAN_COMPLETE);
+					HOST_INT_SCAN_COMPLETE);
 			}
 		}
 
 		/* These we just log, but either they happen rarely
 		 * or we keep them masked out */
-		if (irqtype & (0 | ACX_IRQ_RX_DATA
-				/* | ACX_IRQ_TX_COMPLETE   */
-				| ACX_IRQ_TX_XFER
-		/* | ACX_IRQ_RX_COMPLETE   */
-				| ACX_IRQ_DTIM
-				| ACX_IRQ_BEACON
-				| ACX_IRQ_TIMER
-				| ACX_IRQ_KEY_NOT_FOUND
-				| ACX_IRQ_IV_ICV_FAILURE
-				/* | ACX_IRQ_CMD_COMPLETE  */
-				/* | ACX_IRQ_INFO          */
-				| ACX_IRQ_OVERFLOW
-				| ACX_IRQ_PROCESS_ERROR
-				/* | ACX_IRQ_SCAN_COMPLETE */
-				| ACX_IRQ_FCS_THRESHOLD
-				| ACX_IRQ_UNKNOWN)) {
+		if (irqtype & (0 | HOST_INT_RX_DATA
+				/* | HOST_INT_TX_COMPLETE   */
+				| HOST_INT_TX_XFER
+		/* | HOST_INT_RX_COMPLETE   */
+				| HOST_INT_DTIM
+				| HOST_INT_BEACON
+				| HOST_INT_TIMER
+				| HOST_INT_KEY_NOT_FOUND
+				| HOST_INT_IV_ICV_FAILURE
+				/* | HOST_INT_CMD_COMPLETE  */
+				/* | HOST_INT_INFO          */
+				| HOST_INT_OVERFLOW
+				| HOST_INT_PROCESS_ERROR
+				/* | HOST_INT_SCAN_COMPLETE */
+				| HOST_INT_FCS_THRESHOLD
+				| HOST_INT_UNKNOWN)) {
 			log_unusual_irq(irqtype);
 		}
 #if IRQ_ITERATE
-		unmasked = read_reg16(adev, ACX_IO_IRQ_REASON);
+		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 		irqtype = unmasked & ~adev->irq_mask;
 		/* Bail out if no new IRQ bits or if all are masked out */
 		if (!irqtype)
@@ -2547,10 +2544,10 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 		if (unlikely
 		    (++adev->irq_loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
-			acx_log(LOG_WARNING, L_ANY,
-				"too many interrupts per jiffy!\n");
+			printk(KERN_ERR
+			       "acx: too many interrupts per jiffy!\n");
 			/* Looks like card floods us with IRQs! Try to stop that */
-			write_reg16(adev, ACX_IO_IRQ_MASK, ACX_IRQ_ALL);
+			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 			/* This will short-circuit all future attempts to handle IRQ.
 			 * We cant do much more... */
 			adev->irq_mask = 0;
@@ -2594,13 +2591,13 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	acx_lock(adev, flags);
 
-	unmasked = read_reg16(adev, ACX_IO_IRQ_REASON);
-	if (unlikely(unmasked == ACX_IRQ_ALL)) {
-		/* ACX_IRQ_ALL value hints at missing hardware,
+
+	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
+	if (unlikely(0xffff == unmasked)) {
+		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
-		acx_log(LOG_WARNING, L_IRQ, 
-			"IRQ type:FFFF (ALL) - device removed? IRQ_NONE\n");
+		log(L_IRQ, "IRQ type:FFFF - device removed? IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2608,18 +2605,18 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	irqtype = unmasked & ~adev->irq_mask;
 	if (!irqtype) {
 		/* We are on a shared IRQ line and it wasn't our IRQ */
-		acx_log(LOG_DEBUG, L_IRQ,
-			"IRQ type:%04X, mask:%04X - all are masked, IRQ_NONE\n",
-			unmasked, adev->irq_mask);
+		log(L_IRQ,
+		    "IRQ type:%04X, mask:%04X - all are masked, IRQ_NONE\n",
+		    unmasked, adev->irq_mask);
 		goto none;
 	}
 
 	/* Go ahead and ACK our interrupt */
-	write_reg16(adev, ACX_IO_IRQ_ACK, ACX_IRQ_ALL);
-	if (irqtype & ACX_IRQ_CMD_COMPLETE) {
-		acx_log(LOG_DEBUG, L_IRQ, "got Command_Complete IRQ\n");
+	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
+	if (irqtype & HOST_INT_CMD_COMPLETE) {
+		log(L_IRQ, "got Command_Complete IRQ\n");
 		/* save the state for the running issue_cmd() */
-		SET_BIT(adev->irq_status, ACX_IRQ_CMD_COMPLETE);
+		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	}
 
 	/* Only accept IRQs, if we are initialized properly.
@@ -2633,7 +2630,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 		/* save the reason code and call our bottom half. */
 		adev->irq_reason = irqtype;
 
-		if ((irqtype & ACX_IRQ_RX_COMPLETE) || (irqtype & ACX_IRQ_TX_COMPLETE))
+		if ((irqtype & HOST_INT_RX_COMPLETE) || (irqtype & HOST_INT_TX_COMPLETE))
 			acx_schedule_task(adev, 0);
 	}
 
@@ -2660,15 +2657,14 @@ void acxpci_l_power_led(acx_device_t * adev, int enable)
 	static int rate_limit = 0;
 
 	if (rate_limit++ < 3)
-		acx_log(LOG_INFO, L_IOCTL,
-			"Please report in case toggling the power LED "
-			"doesn't work for your card!\n");
+		log(L_IOCTL, "Please report in case toggling the power "
+		    "LED doesn't work for your card!\n");
 	if (enable)
-		write_reg16(adev, ACX_IO_GPIO_OUT,
-			    read_reg16(adev, ACX_IO_GPIO_OUT) & ~gpio_pled);
+		write_reg16(adev, IO_ACX_GPIO_OUT,
+			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
-		write_reg16(adev, ACX_IO_GPIO_OUT,
-			    read_reg16(adev, ACX_IO_GPIO_OUT) | gpio_pled);
+		write_reg16(adev, IO_ACX_GPIO_OUT,
+			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 
 
@@ -2739,7 +2735,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
-	write_reg16(adev, ACX_IO_HINT_TRIG, ACX_IRQ_BEACON);
+	write_reg16(adev, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
 
 	/* dump Acx111 Mem Configuration */
 	printk("dump mem config:\n"
@@ -2968,32 +2964,29 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
 		 * hardware, since we're tweaking GPIOs here after all!!!
 		 * You've been warned...
 		 * WARNING!!! */
-		acx_log(LOG_INFO, L_ANY,
-			"sorry, setting bias level for non-acx100 "
-			"is not supported yet\n");
+		printk("acx: sorry, setting bias level for non-acx100 "
+		       "is not supported yet\n");
 		return OK;
 	}
 
 	if (*extra > 7) {
-		acx_log(LOG_INFO, L_ANY,
-			"invalid bias parameter, range is 0-7\n");
+		printk("acx: invalid bias parameter, range is 0-7\n");
 		return -EINVAL;
 	}
 
 	acx_sem_lock(adev);
 
-	/* Need to lock accesses to [ACX_IO_GPIO_OUT]:
+	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
 	 * IRQ handler uses it to update LED */
 	acx_lock(adev, flags);
-	gpio_old = read_reg16(adev, ACX_IO_GPIO_OUT);
-	write_reg16(adev, ACX_IO_GPIO_OUT,
+	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
+	write_reg16(adev, IO_ACX_GPIO_OUT,
 		    (gpio_old & 0xf8ff) | ((u16) * extra << 8));
 	acx_unlock(adev, flags);
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "gpio_old: 0x%04X\n", gpio_old);
-	acx_log(LOG_INFO, L_ANY,
-		"%s: PHY power amplifier bias: old:%d, new:%d\n",
-		ndev->name, (gpio_old & 0x0700) >> 8, (unsigned char)*extra);
+	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
+	printk("%s: PHY power amplifier bias: old:%d, new:%d\n",
+	       ndev->name, (gpio_old & 0x0700) >> 8, (unsigned char)*extra);
 
 	acx_sem_unlock(adev);
 
@@ -3018,7 +3011,7 @@ tx_t *acxpci_l_alloc_tx(acx_device_t * adev)
 	FN_ENTER;
 
 	if (unlikely(!adev->tx_free)) {
-		acx_log(LOG_WARNING, L_ANY, "BUG: no free txdesc left\n");
+		printk("acx: BUG: no free txdesc left\n");
 		txdesc = NULL;
 		goto end;
 	}
@@ -3032,8 +3025,8 @@ tx_t *acxpci_l_alloc_tx(acx_device_t * adev)
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
-		acx_log(LOG_WARNING, L_ANY, "BUG: tx_head:%d Ctl8:0x%02X - "
-			"failed to find free txdesc\n", head, ctl8);
+		printk("acx: BUG: tx_head:%d Ctl8:0x%02X - failed to find "
+		       "free txdesc\n", head, ctl8);
 		txdesc = NULL;
 		goto end;
 	}
@@ -3042,13 +3035,11 @@ tx_t *acxpci_l_alloc_tx(acx_device_t * adev)
 	txdesc->Ctl_8 = DESC_CTL_ACXDONE_HOSTOWN;
 
 	adev->tx_free--;
-	acx_log(LOG_DEBUG, L_BUFT, "tx: got desc %u, %u remain\n",
-		head, adev->tx_free);
+	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->tx_free);
 	/* Keep a few free descs between head and tail of tx ring.
 	 ** It is not absolutely needed, just feels safer */
 	if (adev->tx_free < TX_STOP_QUEUE) {
-		acx_log(LOG_DEBUG, L_BUF, "stop queue (%u tx desc left)\n",
-			adev->tx_free);
+		log(L_BUF, "stop queue (%u tx desc left)\n", adev->tx_free);
 		acx_stop_queue(adev->ieee, NULL);
 	}
 
@@ -3120,7 +3111,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 
 	rate_cur = ieeectl->tx_rate;
 	if (unlikely(!rate_cur)) {
-		acx_log(LOG_WARNING, L_ANY, "driver bug! bad ratemask\n");
+		printk("acx: driver bug! bad ratemask\n");
 		goto end;
 	}
 
@@ -3197,7 +3188,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
 
 	/* flush writes before we tell the adapter that it's its turn now */
-	write_reg16(adev, ACX_IO_INT_TRIG, INT_TRIG_TXPRC);
+	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 	write_flush(adev);
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
@@ -3235,7 +3226,7 @@ static void log_txbuffer(acx_device_t * adev)
 	txdesc = adev->txdesc_start;
 	if (unlikely(!txdesc))
 		return;
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "tx: desc->Ctl8's:");
+	printk("tx: desc->Ctl8's:");
 	for (i = 0; i < TX_CNT; i++) {
 		printk(" %02X", txdesc->Ctl_8);
 		txdesc = advance_txdesc(adev, txdesc, 1);
@@ -3300,22 +3291,19 @@ static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
 		 * ok, just do it. */
 		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
 			if (adev->retry_errors_msg_ratelimit <= 20) {
-				acx_log(LOG_WARNING, L_ANY,
-					"%s: several excessive Tx "
-					"retry errors occurred, attempting "
-					"to recalibrate radio\n",
-				 	wiphy_name(adev->ieee->wiphy));
-				acx_log(LOG_WARNING, L_ANY,
-					"Radio drift might be caused by "
-					"increasing card temperature, please "
-					"check the card before it's too late!\n");
+				printk("%s: several excessive Tx "
+				       "retry errors occurred, attempting "
+				       "to recalibrate radio. Radio "
+				       "drift might be caused by increasing "
+				       "card temperature, please check the card "
+				       "before it's too late!\n",
+				       wiphy_name(adev->ieee->wiphy));
 				if (adev->retry_errors_msg_ratelimit == 20)
-					acx_log(LOG_WARNING, L_ANY,
-						"disabling above message\n");
+					printk("disabling above message\n");
 			}
 
 			acx_schedule_task(adev,
-					  ACX_TASKLET_CMD_RADIO_RECALIB);
+					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
 		status->excessive_retries++;
 		break;
@@ -3339,13 +3327,11 @@ static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
 	}
 	adev->stats.tx_errors++;
 	if (adev->stats.tx_errors <= 20)
-		acx_log(LOG_WARNING, L_ANY, 
-			"%s: tx error 0x%02X, buf %02u! (%s)\n",
-			wiphy_name(adev->ieee->wiphy), error, finger, err);
+		printk("%s: tx error 0x%02X, buf %02u! (%s)\n",
+		       wiphy_name(adev->ieee->wiphy), error, finger, err);
 	else
-		acx_log(LOG_WARNING, L_ANY,
-			"%s: tx error 0x%02X, buf %02u!\n",
-			wiphy_name(adev->ieee->wiphy), error, finger);
+		printk("%s: tx error 0x%02X, buf %02u!\n",
+		       wiphy_name(adev->ieee->wiphy), error, finger);
 }
 
 
@@ -3360,11 +3346,10 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 
 	FN_ENTER;
 
-	if (unlikely(acx_debug & L_REALLYVERBOSE))
+	if (unlikely(acx_debug & L_DEBUG))
 		log_txbuffer(adev);
 
-	acx_log(LOG_DEBUG, L_BUFT, "tx: cleaning up bufs from %u\n",
-		adev->tx_tail);
+	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx_tail);
 
 	/* We know first descr which is not free yet. We advance it as far
 	 ** as we see correct bits set in following descs (if next desc
@@ -3386,10 +3371,9 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		if ((txdesc->Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN)
 		    != DESC_CTL_ACXDONE_HOSTOWN) {
 			if (unlikely(!num_cleaned)) {	/* maybe remove completely */
-				acx_log(LOG_DEBUG, L_BUFT,
-					"clean_txdesc: tail isn't free. "
-					"tail:%d head:%d\n",
-					adev->tx_tail, adev->tx_head);
+				log(L_BUFT, "clean_txdesc: tail isn't free. "
+				    "tail:%d head:%d\n",
+				    adev->tx_tail, adev->tx_head);
 			}
 			break;
 		}
@@ -3434,9 +3418,8 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 /*		    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
 		    /*&& (acx_queue_stopped(adev->ieee))*/
 		    ) {
-			acx_log(LOG_DEBUG, L_BUF,
-				"tx: wake queue (avail. Tx desc %u)\n",
-				adev->tx_free);
+			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
+			    adev->tx_free);
 			acx_wake_queue(adev->ieee, NULL);
 		}
 
@@ -3464,15 +3447,13 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			handle_tx_error(adev, error, finger,  &hostdesc->txstatus);
 
 		if (IS_ACX111(adev))
-			acx_log(LOG_DEBUG, L_BUFT, "tx: cleaned %u: !ACK=%u "
-				"!RTS=%u RTS=%u r111=%04X tx_free=%u\n",
-				finger, ack_failures,
-				rts_failures, rts_ok, r111, adev->tx_free);
+			log(L_BUFT,
+			    "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X tx_free=%u\n",
+			    finger, ack_failures, rts_failures, rts_ok, r111, adev->tx_free);
 		else
-			acx_log(LOG_DEBUG, L_BUFT, "tx: cleaned %u: !ACK=%u "
-				"!RTS=%u RTS=%u rate=%u\n",
-				finger, ack_failures,
-				rts_failures, rts_ok, r100);
+			log(L_BUFT,
+			    "tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u rate=%u\n",
+			    finger, ack_failures, rts_failures, rts_ok, r100);
 
 		/* And finally report upstream */
 		if (hostdesc)
@@ -3530,14 +3511,13 @@ static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 	ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
 
 	if (ptr) {
-		acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-			"%s sz=%d adr=0x%p phy=0x%08llx\n",
-			msg, (int)size, ptr, (unsigned long long)*phy);
+		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
+		    msg, (int)size, ptr, (unsigned long long)*phy);
 		memset(ptr, 0, size);
 		return ptr;
 	}
-	acx_log(LOG_WARNING, L_ANY, "%s allocation FAILED (%d bytes)\n",
-		msg, (int)size);
+	printk(KERN_ERR "acx: %s allocation FAILED (%d bytes)\n",
+	       msg, (int)size);
 	return NULL;
 }
 
@@ -3568,8 +3548,8 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 		goto fail;
 	/* check for proper alignment of TX host descriptor pool */
 	if ((long)adev->txhostdesc_start & 3) {
-		acx_log(LOG_WARNING, L_ANY,
-			"driver bug: dma alloc returns unaligned address\n");
+		printk
+		    ("acx: driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
@@ -3657,7 +3637,7 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 	FN_EXIT1(OK);
 	return OK;
       fail:
-	acx_log(LOG_WARNING, L_ANY, "create_tx_host_desc_queue FAILED\n");
+	printk("acx: create_tx_host_desc_queue FAILED\n");
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -3690,8 +3670,8 @@ static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
 		goto fail;
 	/* check for proper alignment of RX host descriptor pool */
 	if ((long)adev->rxhostdesc_start & 3) {
-		acx_log(LOG_WARNING, L_ANY,
-			"driver bug: dma alloc returns unaligned address\n");
+		printk
+		    ("acx: driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
@@ -3727,7 +3707,7 @@ static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
 	FN_EXIT1(OK);
 	return OK;
       fail:
-	acx_log(LOG_WARNING, L_ANY, "create_rx_host_desc_queue FAILED\n");
+	printk("acx: create_rx_host_desc_queue FAILED\n");
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -3769,9 +3749,10 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 
 	adev->txdesc_start = (txdesc_t *) (adev->iobase2 + tx_queue_start);
 
-	acx_log(LOG_DEBUG, L_REALLYVERBOSE, "adev->iobase2=%p\n"
-		"tx_queue_start=%08X\n adev->txdesc_start=%p\n",
-		adev->iobase2, tx_queue_start, adev->txdesc_start);
+	log(L_DEBUG, "adev->iobase2=%p\n"
+	    "tx_queue_start=%08X\n"
+	    "adev->txdesc_start=%p\n",
+	    adev->iobase2, tx_queue_start, adev->txdesc_start);
 
 	adev->tx_free = TX_CNT;
 	/* done by memset: adev->tx_head = 0; */
@@ -3800,9 +3781,8 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
-			acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-				"configure card tx descriptor: 0x%p, "
-				"size: 0x%X\n", txdesc, adev->txdesc_size);
+			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
+			    "size: 0x%X\n", txdesc, adev->txdesc_size);
 
 			/* pointer to hostdesc memory */
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
@@ -3854,8 +3834,7 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 		rxdesc = adev->rxdesc_start;
 		for (i = 0; i < RX_CNT; i++) {
-			acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-				"rx descriptor %d @ 0x%p\n", i, rxdesc);
+			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 			rxdesc = adev->rxdesc_start = (rxdesc_t *)
 			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
 		}
@@ -3874,8 +3853,7 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		rxdesc = adev->rxdesc_start;
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
-			acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-				"rx descriptor @ 0x%p\n", rxdesc);
+			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
 			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 			/* point to next rxdesc */
 			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
@@ -3990,6 +3968,56 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
 
 
 /***********************************************************************
+** Obvious
+*/
+void acxpci_set_interrupt_mask(acx_device_t * adev)
+{
+	if (IS_ACX111(adev)) {
+		adev->irq_mask = (u16) ~ (0
+					  /* | HOST_INT_RX_DATA        */
+					  | HOST_INT_TX_COMPLETE
+					  /* | HOST_INT_TX_XFER        */
+					  | HOST_INT_RX_COMPLETE
+					  /* | HOST_INT_DTIM           */
+					  /* | HOST_INT_BEACON         */
+					  /* | HOST_INT_TIMER          */
+					  /* | HOST_INT_KEY_NOT_FOUND  */
+					  | HOST_INT_IV_ICV_FAILURE
+					  | HOST_INT_CMD_COMPLETE
+					  | HOST_INT_INFO
+					  /* | HOST_INT_OVERFLOW       */
+					  /* | HOST_INT_PROCESS_ERROR  */
+					  | HOST_INT_SCAN_COMPLETE
+					  | HOST_INT_FCS_THRESHOLD
+					  /* | HOST_INT_UNKNOWN        */
+		    );
+		/* Or else acx100 won't signal cmd completion, right? */
+		adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
+	} else {
+		adev->irq_mask = (u16) ~ (0
+					  /* | HOST_INT_RX_DATA        */
+					  | HOST_INT_TX_COMPLETE
+					  /* | HOST_INT_TX_XFER        */
+					  | HOST_INT_RX_COMPLETE
+					  /* | HOST_INT_DTIM           */
+					  /* | HOST_INT_BEACON         */
+					  /* | HOST_INT_TIMER          */
+					  /* | HOST_INT_KEY_NOT_FOUND  */
+					  /* | HOST_INT_IV_ICV_FAILURE */
+					  | HOST_INT_CMD_COMPLETE
+					  | HOST_INT_INFO
+					  /* | HOST_INT_OVERFLOW       */
+					  /* | HOST_INT_PROCESS_ERROR  */
+					  | HOST_INT_SCAN_COMPLETE
+					  /* | HOST_INT_FCS_THRESHOLD  */
+					  /* | HOST_INT_UNKNOWN        */
+		    );
+		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
+	}
+}
+
+
+/***********************************************************************
 */
 int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
@@ -4036,14 +4064,12 @@ int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		table = &dbm2val_rfmd[0];
 		break;
 	default:
-		acx_log(LOG_WARNING, L_ANY, "%s: unknown/unsupported radio type, "
-			"cannot modify tx power level yet!\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk("%s: unknown/unsupported radio type, "
+		       "cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
 		return NOT_OK;
 	}
-	acx_log(LOG_INFO, L_ANY,
-		"%s: changing radio power level to %u dBm (%u)\n",
-		wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
+	printk("%s: changing radio power level to %u dBm (%u)\n",
+	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
 	acxpci_s_write_phy_reg(adev, 0x11, table[level_dbm]);
 	return OK;
 }
@@ -4158,8 +4184,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	addr = (u32)ioremap(vdev->mem_start, 0x1000);
 	if (!addr) {
-		acx_log(LOG_WARNING, L_ANY, "%s: failed to remap io memory\n",
-			vdev->dev.bus_id);
+		printk(KERN_ERR "%s: failed to remap io memory\n",
+		       vdev->dev.bus_id);
 		result = -ENXIO;
 		goto fail;
 	}
@@ -4172,9 +4198,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!ieee) {
-		acx_log(LOG_WARNING, L_ANY,
-			"could not allocate ieee80211 structure %s\n",
-			vdev->dev.bus_id);
+		printk("acx: could not allocate ieee80211 structure %s\n",
+		       vdev->dev.bus_id);
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
@@ -4193,18 +4218,19 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->ieee = ieee;
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
+	adev->dev_type = DEVTYPE_PCI;
 
 /** Finished with private interface **/
 
 	vlynq_set_drvdata(vdev, ieee);
 	if (!request_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start, "acx")) {
-		acx_log(LOG_WARNING, L_ANY, "cannot reserve VLYNQ memory region\n");
+		printk("acx: cannot reserve VLYNQ memory region\n");
 		goto fail_request_mem_region;
 	}
 
 	adev->iobase = ioremap(vdev->mem_start, vdev->mem_end - vdev->mem_start);
 	if (!adev->iobase) {
-		acx_log(LOG_WARNING, L_ANY, "ioremap() FAILED\n");
+		printk("acx: ioremap() FAILED\n");
 		goto fail_ioremap;
 	}
 	adev->iobase2 = adev->iobase + match->rx_mapping[0].size;
@@ -4213,15 +4239,14 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->io = IO_ACX111;
 	adev->irq = vlynq_virq_to_irq(vdev, match->irq);
 
-	acx_log(LOG_INFO, L_ANY, "found %s-based wireless network card at %s, "
-		"irq:%d, phymem:0x%x, mem:0x%p\n",
-		match->name, vdev->dev.bus_id, adev->irq,
-		vdev->mem_start, adev->iobase);
-//	acx_log(LOG_INFO, L_ANY,
-//		"initial debug setting is 0x%04X\n", acx_debug);
+	printk("acx: found %s-based wireless network card at %s, irq:%d, "
+	       "phymem:0x%x, mem:0x%p\n",
+	       match->name, vdev->dev.bus_id, adev->irq,
+	       vdev->mem_start, adev->iobase);
+	log(L_ANY, "initial debug setting is 0x%04X\n", acx_debug);
 
 	if (0 == adev->irq) {
-		acx_log(LOG_WARNING, L_ANY, "can't use IRQ 0\n");
+		printk("acx: can't use IRQ 0\n");
 		goto fail_irq;
 	}
 	SET_IEEE80211_DEV(ieee, &vdev->dev);
@@ -4229,13 +4254,11 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	/* request shared IRQ handler */
 	if (request_irq
 	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
-		acx_log(LOG_WARNING, L_ANY, "%s: request_irq FAILED\n",
-			wiphy_name(adev->ieee->wiphy));
+		printk("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto done;
 	}
-	acx_log(LOG_DEBUG, L_IRQ | L_REALLYVERBOSE,
-		"request_irq %d successful\n", adev->irq);
+	log(L_DEBUG | L_IRQ, "request_irq %d successful\n", adev->irq);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -4278,27 +4301,26 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(adev); */
 
-	acx_log(LOG_INFO, L_ANY, "driver " ACX_RELEASE ", net device %s, "
-		"driver compiled against wireless extensions %d and Linux %s\n",
-		wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+	printk("acx " ACX_RELEASE ": net device %s, driver compiled "
+	       "against wireless extensions %d and Linux %s\n",
+	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
 
-	acx_log(LOG_DEBUG, L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
+	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 
 /** done with board specific setup **/
 
 	result = acx_setup_modes(adev);
 	if (result) {
-	acx_log(LOG_WARNING, L_ANY, "can't register hwmode\n");
+	printk("can't register hwmode\n");
 		goto fail_register_netdev;
 	}
 
 	acx_init_task_scheduler(adev);
 	result = ieee80211_register_hw(adev->ieee);
 	if (OK != result) {
-		acx_log(LOG_WARNING, L_ANY,
-			"acx: ieee80211_register_hw() FAILED: %d\n", result);
+		printk("acx: ieee80211_register_hw() FAILED: %d\n", result);
 		goto fail_register_netdev;
 	}
 #if CMD_DISCOVERY
@@ -4342,9 +4364,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	FN_ENTER;
 
 	if (!hw) {
-		acx_log(LOG_DEBUG, L_REALLYVERBOSE,
-			"%s: card is unused. Skipping any release code\n",
-			__func__);
+		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
+		    __func__);
 		goto end;
 	}
 
@@ -4365,8 +4386,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		}
 		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
-		acx_log(LOG_INFO, L_INIT,
-			"switching off power LED to save power\n");
+		log(L_INIT, "switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
 		/* stop our eCPU */
 		acx_unlock(adev, flags);
@@ -4379,8 +4399,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
 	 */
-	acx_log(LOG_INFO, L_INIT, "removing device %s\n",
-		wiphy_name(adev->ieee->wiphy));
+	acxpci_e_close(hw);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 
 	/* unregister_netdev ensures that no references to us left.
@@ -4487,13 +4507,15 @@ int __init acxpci_e_init_module(void)
 
 	FN_ENTER;
 
+	printk(KERN_EMERG);
+
 #if (ACX_IO_WIDTH==32)
-	acx_log(LOG_INFO, L_ANY, "compiled to use 32bit I/O access. "
-		"I/O timing issues might occur, such as "
-		"non-working firmware upload. Report them\n");
+	log(L_INIT, "acx: compiled to use 32bit I/O access. "
+	       "I/O timing issues might occur, such as "
+	       "non-working firmware upload. Report them\n");
 #else
-	acx_log(LOG_INFO, L_ANY, "compiled to use 16bit I/O access only "
-		"(compatibility mode)\n");
+	log(L_INIT, "acx: compiled to use 16bit I/O access only "
+	       "(compatibility mode)\n");
 #endif
 
 #ifdef __LITTLE_ENDIAN
@@ -4501,9 +4523,10 @@ int __init acxpci_e_init_module(void)
 #else
 #define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
 #endif
-	acx_log(LOG_INFO, L_INIT, ENDIANNESS_STRING);
-	acx_log(LOG_INFO, L_INIT, "PCI/VLYNQ module " ACX_RELEASE
-		" initialized, waiting for cards to probe...\n");
+	log(L_INIT,
+	    "acx: " ENDIANNESS_STRING
+	    "acx: PCI/VLYNQ module " ACX_RELEASE " initialized, "
+	    "waiting for cards to probe...\n");
 
 #ifdef CONFIG_PCI
 	res = pci_register_driver(&acxpci_drv_id);
@@ -4535,7 +4558,7 @@ void __exit acxpci_e_cleanup_module(void)
 #elif CONFIG_VLYNQ
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
-	acx_log(LOG_INFO, L_INIT,
-	    "PCI module " ACX_RELEASE " unloaded\n");
+	log(L_INIT,
+	    "acx: PCI module " ACX_RELEASE " unloaded\n");
 	FN_EXIT0;
 }

@@ -1,31 +1,27 @@
-#ifndef _ACX_MMIO_H_
-#define _ACX_MMIO_H_
-
 /*
- * acx_mmio.h: querying/configuration commands. Differ depending on the
- * chipset and bus type (PCI or USB - it appears that VLYNQ behaves like PCI
- * most of the time - most).
+ * Copyright (C) 2008 The ACX100 Open Source Project 
+ * <acx100-devel@lists.sourceforge.net>
  *
- * Copyright (c) 2003, 2008 ACX100 driver project.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of the
+ * License, or (at your option) any later version.
  *
- * This file is licensed under the GPLv2. See the README file for more
- * information.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  *
- * Part of the original comments can be seen between the dash lines below. I
- * just cannot make sense of the first part right now.
+ * You should have received a copy of the GNU General Public
+ * License along with this program; if not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
  *
- * See also the file README.unknowncommands: it contains other commands gathered
- * from snooping/anyothermeans of unhandled TI chipsets.
- *
- * ----------------------------------------------------------------------------
- * NB: length includes JUST the data part of the IE
- * (does not include size of the (type,len) pair)
- *
- * TODO: seems that acx100, acx100usb, acx111 have some differences,
- * fix code with regard to this!
- * ----------------------------------------------------------------------------
+ * This header contains the definitions of the Information Elements (IE)
  */
 
+#ifndef _ACX_IE_H_
+#define _ACX_IE_H_
 
 /* Information Elements: Network Parameters, Static Configuration Entities */
 /* these are handled by real_cfgtable in firmware "Rev 1.5.0" (FW150) */
@@ -218,64 +214,4 @@
 #define ACX100_IE_DOT11_UNKNOWN_1013		(0x1013)
 #define ACX100_IE_DOT11_UNKNOWN_1013_LEN	(-1)
 
-/*
- * COMMANDS
- */
-
-/* 
- * Original comment:
- *
- * ----------------------------------------------------------------------------
- *  can be found in table cmdTable in firmware "Rev. 1.5.0" (FW150)
- * ----------------------------------------------------------------------------
- *
- */
-#define ACX1xx_CMD_RESET		0x00
-#define ACX1xx_CMD_INTERROGATE		0x01
-#define ACX1xx_CMD_CONFIGURE		0x02
-#define ACX1xx_CMD_ENABLE_RX		0x03
-#define ACX1xx_CMD_ENABLE_TX		0x04
-#define ACX1xx_CMD_DISABLE_RX		0x05
-#define ACX1xx_CMD_DISABLE_TX		0x06
-#define ACX1xx_CMD_FLUSH_QUEUE		0x07
-#define ACX1xx_CMD_SCAN			0x08
-#define ACX1xx_CMD_STOP_SCAN		0x09
-#define ACX1xx_CMD_CONFIG_TIM		0x0a
-#define ACX1xx_CMD_JOIN			0x0b
-#define ACX1xx_CMD_WEP_MGMT		0x0c
-
-/*
- * FIXME: get rid of this? We don't have any old firmware lying around, do we?
- */
-#ifdef OLD_FIRMWARE_VERSIONS
-/* mapped to unknownCMD in FW150 */
-#define ACX100_CMD_HALT			0x0e
-#else
-#define ACX1xx_CMD_MEM_READ		0x0d
-#define ACX1xx_CMD_MEM_WRITE		0x0e
-#endif
-#define ACX1xx_CMD_SLEEP		0x0f
-#define ACX1xx_CMD_WAKE			0x10
-/* mapped to unknownCMD in FW150 */
-#define ACX1xx_CMD_UNKNOWN_11		0x11
-#define ACX100_CMD_INIT_MEMORY		0x12
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_DISABLE_RADIO	0x12
-#define ACX1xx_CMD_CONFIG_BEACON	0x13
-#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE	0x14
-#define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
-#define ACX1xx_CMD_CONFIG_PROBE_REQUEST	0x16
-#define ACX1xx_CMD_FCC_TEST		0x17
-#define ACX1xx_CMD_RADIOINIT		0x18
-#define ACX111_CMD_RADIOCALIB		0x19
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_NOISE_HISTOGRAM	0x1c
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_RX_RESET		0x1d
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_LNA_CONTROL		0x20
-/* new firmware? TNETW1450? */
-#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21
-
-
-#endif /* _ACX_MMIO_H_ */
+#endif /* _ACX_IE_H_ */

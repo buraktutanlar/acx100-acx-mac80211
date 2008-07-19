@@ -6,15 +6,108 @@
 */
 
 #include <linux/version.h>
-#include "acx_debug.h"
-#include "acx_log.h"
-/*
- * FIXME: this file is needed only so that the lock debugging functions have an
- * acx_device_t structure to play with :(
- */
-#include "acx_struct.h"
+#include "acx_commands.h"
+
+/***********************************************************************
+** LOGGING
+**
+** - Avoid SHOUTING needlessly. Avoid excessive verbosity.
+**   Gradually remove messages which are old debugging aids.
+**
+** - Use printk() for messages which are to be always logged.
+**   Supply either 'acx:' or '<devname>:' prefix so that user
+**   can figure out who's speaking among other kernel chatter.
+**   acx: is for general issues (e.g. "acx: no firmware image!")
+**   while <devname>: is related to a particular device
+**   (think about multi-card setup). Double check that message
+**   is not confusing to the average user.
+**
+** - use printk KERN_xxx level only if message is not a WARNING
+**   but is INFO, ERR etc.
+**
+** - Use printk_ratelimited() for messages which may flood
+**   (e.g. "rx DUP pkt!").
+**
+** - Use log() for messages which may be omitted (and they
+**   _will_ be omitted in non-debug builds). Note that
+**   message levels may be disabled at compile-time selectively,
+**   thus select them wisely. Example: L_DEBUG is the lowest
+**   (most likely to be compiled out) -> use for less important stuff.
+**
+** - Do not print important stuff with log(), or else people
+**   will never build non-debug driver.
+**
+** Style:
+** hex: capital letters, zero filled (e.g. 0x02AC)
+** str: dont start from capitals, no trailing periods ("tx: queue is stopped")
+*/
+#if ACX_DEBUG > 1
+
+void log_fn_enter(const char *funcname);
+void log_fn_exit(const char *funcname);
+void log_fn_exit_v(const char *funcname, int v);
+
+void acx_print_mac(const char *head, const u8 *mac, const char *tail);
+
+#define FN_ENTER \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_enter(__func__); \
+		} \
+	} while (0)
+
+#define FN_EXIT1(v) \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_exit_v(__func__, v); \
+		} \
+	} while (0)
+#define FN_EXIT0 \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_exit(__func__); \
+		} \
+	} while (0)
+
+#else
+
+#define FN_ENTER do {} while(0)
+#define FN_EXIT1(v) do {} while(0)
+#define FN_EXIT0 do {} while(0)
+
+#endif /* ACX_DEBUG > 1 */
+
+
+#if ACX_DEBUG
+
+#define log(chan, args...) \
+	do { \
+		if (acx_debug & (chan)) \
+			printk(args); \
+	} while (0)
+#define printk_ratelimited(args...) printk(args)
+
+#else /* Non-debug build: */
+
+#define log(chan, args...)
+/* Standard way of log flood prevention */
+#define printk_ratelimited(args...) \
+do { \
+	if (printk_ratelimit()) \
+		printk(args); \
+} while (0)
+
+#endif /* ACX_DEBUG */
 
 /* Optimized out to nothing in non-debug build */
+static inline void
+acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
+{
+	if (acx_debug & level) {
+		acx_print_mac(head, mac, tail);
+	}
+}
+
 
 /***********************************************************************
 ** MAC address helpers
@@ -75,6 +168,15 @@ mac_is_mcast(const u8 *mac)
 {
 	return (mac[0] & 1) && !mac_is_bcast(mac);
 }
+
+#define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
+#define MAC(bytevector) \
+	((unsigned char *)bytevector)[0], \
+	((unsigned char *)bytevector)[1], \
+	((unsigned char *)bytevector)[2], \
+	((unsigned char *)bytevector)[3], \
+	((unsigned char *)bytevector)[4], \
+	((unsigned char *)bytevector)[5]
 
 
 /***********************************************************************
@@ -230,7 +332,7 @@ acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 */
 	ieee80211_stop_queues(hw);
 	if (msg)
-		acx_log(LOG_DEBUG, L_BUFT, "tx: stop queue %s\n", msg);
+		log(L_BUFT, "tx: stop queue %s\n", msg);
 }
 
 /*static inline int
@@ -253,7 +355,7 @@ acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
 	ieee80211_wake_queues(hw);
 	if (msg)
-		acx_log(LOG_DEBUG, L_BUFT, "tx: wake queue %s\n", msg);
+		log(L_BUFT, "tx: wake queue %s\n", msg);
 }
 /*
 static inline void
