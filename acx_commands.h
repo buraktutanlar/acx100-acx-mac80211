@@ -1,18 +1,26 @@
+/*
+ * Copyright (C) 2003-2008 The ACX100 Open Source Project
+ * <acx100-devel@lists.sourceforge.net>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 #ifndef _ACX_COMMANDS_H_
 #define _ACX_COMMANDS_H_
 
 /*
- * acx_commands.h: querying/configuration commands. Differ depending on the
- * chipset and bus type (PCI or USB - it appears that VLYNQ behaves like PCI
- * most of the time - most).
- *
- * Copyright (c) 2003, 2008 ACX100 driver project.
- *
- * This file is licensed under the GPLv2. See the README file for more
- * information.
- *
- * Part of the original comments can be seen between the dash lines below. I
- * just cannot make sense of the first part right now.
+ * Part of the original comments can be seen between the dash lines below.
  *
  * See also the file README.unknowncommands: it contains other commands gathered
  * from snooping/anyothermeans of unhandled TI chipsets.
@@ -72,7 +80,6 @@
 #define ACX1FF_CMD_RX_RESET		0x001d	/* new firmware? TNETW1450? */
 #define ACX1FF_CMD_LNA_CONTROL		0x0020	/* new firmware? TNETW1450? */
 #define ACX1FF_CMD_CONTROL_DBG_TRACE	0x0021	/* new firmware? TNETW1450? */
-
 
 /* 'After Interrupt' Commands */
 #define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01

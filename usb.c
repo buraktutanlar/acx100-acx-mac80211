@@ -1,19 +1,31 @@
-/**** (legal) claimer in README
-** Copyright (C) 2003  ACX100 Open Source Project
-*/
-
-/***********************************************************************
-** USB support for TI ACX100 based devices. Many parts are taken from
-** the PCI driver.
-**
-** Authors:
-**  Martin Wawro <martin.wawro AT uni-dortmund.de>
-**  Andreas Mohr <andi AT lisas.de>
-**
-** LOCKING
-** callback functions called by USB core are running in interrupt context
-** and thus have names with _i_.
-*/
+/*
+ * Copyright (C) 2003-2008 The ACX100 Open Source Project
+ * <acx100-devel@lists.sourceforge.net>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * USB support for TI ACX100/TNETW1450 based devices. Many parts are taken from
+ * the PCI driver.
+ *
+ * Authors:
+ *  Martin Wawro <martin.wawro AT uni-dortmund.de>
+ *  Andreas Mohr <andi AT lisas.de>
+ *
+ * LOCKING
+ *  callback functions called by USB core are running in interrupt context
+ *  and thus have names with _i_.
+ */
 #define ACX_MAC80211_USB 1
 
 #include <linux/version.h>
