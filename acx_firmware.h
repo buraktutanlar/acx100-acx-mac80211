@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008 The ACX100 Open Source Project
- * <acx100-devel@lists.sourceforge.net>
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008
+ * The ACX100 Open Source Project <acx100-devel@lists.sourceforge.net>
  * Copyright (C) 2008 Francis Galiegue <fgaliegue@gmail.com> for the ACX100
  * driver project.
  *
@@ -17,23 +17,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ * Firmware statistics
  */
 #ifndef _ACX_FIRMWARE_H_
 #define _ACX_FIRMWARE_H_
 
-/*
- * The original comments talk about "firmware statistics". I take it this means
- * that you can read from these structures and gather values.
- */
-
-/* 
- * The original comment defined this constant as "a random 100 bytes more to
- * catch firmware versions which provide a bigger struct".
- *
- * Err, FIXME! Does that mean that this area could actually be written to beyond
- * our knowledge???
- *
- */
+/* Define a random 100 bytes more to catch firmware versions which
+ * provide a bigger struct */
 #define FW_STATS_FUTURE_EXTENSION	100
 
 typedef struct firmware_image {
@@ -131,7 +121,7 @@ typedef struct fw_stats_event {
 	u32	tx_stuck;
 } __attribute__ ((packed)) fw_stats_event_t;
 
-/* mainly for size calculation only */
+/* Mainly for size calculation only */
 typedef struct fw_stats {
 	u16			type;
 	u16			len;
@@ -148,7 +138,6 @@ typedef struct fw_stats {
 } fw_stats_t;
 
 /* Firmware version struct */
-
 typedef struct fw_ver {
 	u16	cmd;
 	u16	size;

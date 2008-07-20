@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2003-2008 The ACX100 Open Source Project
- * <acx100-devel@lists.sourceforge.net>
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008
+ * The ACX100 Open Source Project <acx100-devel@lists.sourceforge.net>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,12 +14,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
  */
 #ifndef _ACX_CONFIG_H_
 #define _ACX_CONFIG_H_
 
-#define ACX_RELEASE "v0.4.0"
+#define ACX_RELEASE "v0.5.0"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
