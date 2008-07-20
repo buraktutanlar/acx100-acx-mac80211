@@ -1,11 +1,7 @@
 #ifndef _ACX_CONFIG_H_
 #define _ACX_CONFIG_H_
 
-/* temporary hack until proper Kconfig integration */
-#define CONFIG_ACX_MAC80211_PCI 1
-//#define CONFIG_ACX_MAC80211_USB 1
-
-#define ACX_RELEASE "v0.3.38-mac80211"
+#define ACX_RELEASE "v0.4.0"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
