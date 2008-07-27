@@ -1,0 +1,145 @@
+1. Introduction
+
+This document describes the steps required to build and install the acx driver
+in a Linux system.
+
+Two alternative methods are described, referred to as in-tree and out-of-tree,
+of which only one of them must be chosen. The recommended way, because of its
+simplicity, is the out-of-tree installation, although it requires an installed
+set of kernel include headers in the system.
+
+The following sections describe each one of these two methods. Notice again
+that you should only pick one of them.
+
+1. Inside the kernel tree 
+
+1.1 Copy the driver sources into the kernel tree
+
+  cd <linux-sources-path>
+  cd drivers/net/wireless/
+  mkdir acx
+  cd acx
+  cp <acx-mac80211-sources-path>/* .
+
+1.2. Kernel build system preparation 
+
+Modify the file drivers/net/wireless/Makefile by adding the following line to
+it:
+
+  obj-$(CONFIG_ACX_MAC80211)      += acx/
+
+Modify the file drivers/net/wireless/Kconfig by adding the following line to
+it:
+
+  source "drivers/net/wireless/acx/Kconfig"
+
+Start the kernel configuration menu as usual:
+
+  make menuconfig
+
+(or any similar method, e.g. with graphical interface)
+
+Now you can simply configure the kernel in the usual way, making sure that the
+CONFIG_ACX_MAC80211 option and at least one of the CONFIG_ACX_MAC80211_PCI or
+CONFIG_ACX_MAC80211_USB options are set in the .config file, as described
+below.
+
+Note: you will have to first select the mac80211 stack in the kernel
+configuration menu:
+
+Networking  --->
+  Wireless  --->
+    {M} Improved wireless configuration API
+    [*]   nl80211 new netlink interface support
+    -*- Wireless extensions
+     Generic IEEE 802.11 Networking Stack (mac80211)
+          Rate control algorithm selection  --->
+    [ ]   Enable mac80211 mesh networking (pre-802.11s) support (NEW)
+    [ ]   Enable packet alignment debugging
+    [ ]   Enable debugging output
+    < > Generic IEEE 802.11 Networking Stack (DEPRECATED)
+
+ACX kernel configuration (select either PCI/USB support or both)
+
+Device Drivers  --->
+  [*] Network device support  --->
+    Wireless LAN  --->
+      [*] Wireless LAN (IEEE 802.11)
+            TI acx100/acx111 802.11b/g wireless chipsets
+         [*]     TI acx100/acx111 802.11b/g PCI
+         [ ]     TI acx100/acx111 802.11b/g USB (NEW)
+
+1.3. Build
+
+Issue a standard 'make' or 'make modules' command on the command line in order
+to start the compilation of the kernel. Depending on the kernel configuration
+you have chosen, this might take some time.
+
+Refer to the kernel documentation for further information.
+
+1.4. Installation
+
+TODO -> description of the standard kernel module installation and the 'make
+modules_install' target. Refer to the kernel documentation for now.
+
+2. Outside the kernel tree
+
+2.1. Quick-start build
+
+Assuming you have a set of installed kernel headers for the kernel against you
+are trying to build -and run- the driver, and you are building the PCI driver,
+you can simply issue the usual make command:
+
+  make
+
+You can now skip to the 'Installation' section below.
+
+2.2. Advanced build
+
+In case you need to specify configuration options other than the default PCI
+build (e.g. you need to build the USB driver, or you want to build against a
+special kernel version), you will first need to have a look at the Makefile in
+order to understand it.
+
+You will see that there is an EXTRA_KCONFIG variable, which you can modify
+directly on the file or define it on the command-line to suit your needs:
+
+   export EXTRA_KCONFIG="CONFIG_ACX_MAC80211=m CONFIG_ACX_MAC80211_USB=y" && make
+
+If you use this method (CLI), do not forget to either unset ('unset
+EXTRA_KCONFIG') or explicitly define EXTRA_KCONFIG for subsequent builds!
+
+You can also define the KERNELDIR variable in order to specify a different
+kernel directory other than that of the the currently running one.
+
+Note that you can also execute make with 'make V=1' in order to get verbose
+information during the build.
+ 
+2.3. Installation
+
+TODO -> check the modules_install target (i.e. 'make modules_install' as root)
+
+If you have got any comments, questions or want to propose some improvement to
+these instructions, please either send an e-mail to the acx driver user's
+mailing list at <acx100-users@list.sourceforge.net> or post a message to the
+project's forum at http://sourceforge.net/forum/forum.php?forum_id=257272.
+
+-----
+
+Copyright (C) 2008 The ACX100 Open Source Project
+<acx100-devel@lists.sourceforge.net>
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <http://www.gnu.org/licenses/>.
+
+Original author:
+	David Planella <david.planella AT gmail.com>

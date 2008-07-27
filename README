@@ -31,6 +31,13 @@
 ** ------------------------------------------------------------------
 */
 
+=============================================================================
+NOTE (2008-07-27): some of the information on this README file is out of date.
+Please stay tuned for updates. In the meantime, you can refer to the INSTALL
+file for installation instructions and the wiki for general information:
+http://acx100.sourceforge.net/wiki/Main_Page
+=============================================================================
+
 This tarball is targeted at 2.6 inclusion only.
 Not designed to work or even compile with 2.4.
 dscape wifi stack is mandatory 
