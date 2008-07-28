@@ -1461,79 +1461,55 @@ void acx_free_modes(acx_device_t * adev)
 	}
 */
 
-static struct ieee80211_rate __acx_rates[] = {
-		{ .rate = 10,
-		  .val = RATE111_1,
-		  .flags = IEEE80211_RATE_CCK },
-		{ .rate = 20,
-		  .val = RATE111_2,
-		  .flags = IEEE80211_RATE_CCK },
-		{ .rate = 55,
-		  .val = RATE111_5,
-		  .flags = IEEE80211_RATE_CCK },
-		{ .rate = 110,
-		  .val = RATE111_11,
-		  .flags = IEEE80211_RATE_CCK },
-		{ .rate = 60,
-		  .val = RATE111_6,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 90,
-		  .val = RATE111_9,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 120,
-		  .val = RATE111_12,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 180,
-		  .val = RATE111_18,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 240,
-		  .val = RATE111_24,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 360,
-		  .val = RATE111_36,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 480,
-		  .val = RATE111_48,
-		  .flags = IEEE80211_RATE_OFDM },
-		{ .rate = 540,
-		  .val = RATE111_54,
-		  .flags = IEEE80211_RATE_OFDM },
+static struct ieee80211_rate acx_rates[] = {
+	{ .bitrate = 10, .hw_value = 0, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 20, .hw_value = 1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 55, .hw_value = 2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 110, .hw_value = 3, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 60, .hw_value = 4, },
+	{ .bitrate = 90, .hw_value = 5, },
+	{ .bitrate = 120, .hw_value = 6, },
+	{ .bitrate = 180, .hw_value = 7, },
+	{ .bitrate = 240, .hw_value = 8, },
+	{ .bitrate = 360, .hw_value = 9, },
+	{ .bitrate = 480, .hw_value = 10, },
+	{ .bitrate = 540, .hw_value = 11, },
 };
 
 static struct ieee80211_channel channels[] = {
-		{ .chan = 1,
-		  .freq = 2412},
-		{ .chan = 2,
-		  .freq = 2417},
-		{ .chan = 3,
-		  .freq = 2422},
-		{ .chan = 4,
-		  .freq = 2427},
-		{ .chan = 5,
-		  .freq = 2432},
-		{ .chan = 6,
-		  .freq = 2437},
-		{ .chan = 7,
-		  .freq = 2442},
-		{ .chan = 8,
-		  .freq = 2447},
-		{ .chan = 9,
-		  .freq = 2452},
-		{ .chan = 10,
-		  .freq = 2457},
-		{ .chan = 11,
-		  .freq = 2462},
-		{ .chan = 12,
-		  .freq = 2467},
-		{ .chan = 13,
-		  .freq = 2472},
-	};
+	{ .center_freq = 2412, .hw_value = 1, },
+	{ .center_freq = 2417, .hw_value = 2, },
+	{ .center_freq = 2422, .hw_value = 3, },
+	{ .center_freq = 2427, .hw_value = 4, },
+	{ .center_freq = 2432, .hw_value = 5, },
+	{ .center_freq = 2437, .hw_value = 6, },
+	{ .center_freq = 2442, .hw_value = 7, },
+	{ .center_freq = 2447, .hw_value = 8, },
+	{ .center_freq = 2452, .hw_value = 9, },
+	{ .center_freq = 2457, .hw_value = 10, },
+	{ .center_freq = 2462, .hw_value = 11, },
+	{ .center_freq = 2467, .hw_value = 12, },
+	{ .center_freq = 2472, .hw_value = 13, },
+	{ .center_freq = 2484, .hw_value = 14, },
+};
+
+static struct ieee80211_supported_band g_band_2GHz = {
+	.channels = channels,
+	.n_channels = ARRAY_SIZE(channels),
+	.bitrates = acx_rates,
+	.n_bitrates = 12,
+};
+
+static struct ieee80211_supported_band b_band_2GHz = {
+	.channels = channels,
+	.n_channels = ARRAY_SIZE(channels),
+	.bitrates = acx_rates,
+	.n_bitrates = 4,
+};
 
 int acx_setup_modes(acx_device_t * adev)
 {
 	struct ieee80211_hw *hw = adev->ieee;
-	struct ieee80211_hw_mode *mode;
-        int err = -ENOMEM;
 
 	FN_ENTER;
 
@@ -1542,46 +1518,19 @@ int acx_setup_modes(acx_device_t * adev)
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
         	err = acx_setup_modes_gphy(adev);
 */
-		mode = &adev->modes[0]; 
-
-/* from the zd1211rw driver: - do we need to do the same? */
-/*
-		memcpy(mode->channels, channels, sizeof(channels));
-		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
-*/
-
-		mode->mode = MODE_IEEE80211G;
-		mode->num_channels = ARRAY_SIZE(channels);
-		mode->num_rates = 12;
-		mode->rates = __acx_rates;
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
 	} else {
 /*
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
 		err = acx_setup_modes_bphy(adev);
 */
-		mode = &adev->modes[1];
-
-/* from the zd1211rw driver: - do we need to do the same? */
-/*
-		memcpy(mode->channels, channels, sizeof(channels));
-		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
-*/
-
-		mode->mode = MODE_IEEE80211B;
-		mode->num_channels = ARRAY_SIZE(channels);
-		mode->num_rates = 4;
-		mode->rates = __acx_rates;
-
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
 	}
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
 
-	mode->channels = channels;
-	err = ieee80211_register_hwmode(hw, mode);
-
-	FN_EXIT1(err);
-        return err; 
-
+	FN_EXIT0;
+	return 0; 
 }
 
 /***********************************************************************
@@ -2491,7 +2440,7 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	 * calculation. */
 
 	/* TODO: only the RSSI seems to be reported */
-	adev->rx_status.ssi = acx_signal_to_winlevel(rxbuf->phy_level);
+	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
 
 	FN_EXIT0;
 }
@@ -2801,18 +2750,18 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 //	memset(&status, 0, sizeof(status));
 
 	status->mactime = rxbuf->time;
-	status->ssi = acx_signal_to_winlevel(rxbuf->phy_level);
+	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 	/* TODO: they do not seem to be reported, at least on the acx111
 	 * (and TNETW1450?), therefore commenting them out 
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 	status->flag = 0;
-	status->rate = rxbuf->phy_plcp_signal;
+	status->rate_idx = rxbuf->phy_plcp_signal;
 	status->antenna = 1;
 	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
-		status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 	} else {
-		status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 	}
 
 	/*
@@ -4327,7 +4276,7 @@ int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 	FN_ENTER;
 
 	acx_sem_lock(adev);
-	adev->rx_status.channel = channel;
+/*	adev->rx_status.channel = channel; */
 	adev->rx_status.freq = freq;
 	
 	adev->channel = channel;
@@ -4361,9 +4310,9 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	}
 	if (conf->beacon_int != adev->beacon_interval)
 		adev->beacon_interval = conf->beacon_int;
-	if (conf->channel != adev->channel) {
+	if (conf->channel->hw_value != adev->channel) {
 		acx_unlock(adev, flags);
-		acx_selectchannel(adev, conf->channel,conf->freq);
+		acx_selectchannel(adev, conf->channel->hw_value, conf->channel->center_freq);
 		acx_lock(adev, flags);
 /*		acx_schedule_task(adev,
 				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
@@ -4416,7 +4365,6 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 **
 */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4443,34 +4391,6 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
-#else
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-			 struct ieee80211_if_conf *conf)
-{
-	acx_device_t *adev = ieee2adev(ieee);
-	unsigned long flags;
-	int err = -ENODEV;
-	FN_ENTER;
-	if (!adev->interface.operating)
-		goto err_out;
-
-	if (adev->initialized)
-		acx_s_select_opmode(adev);
-
-	acx_lock(adev, flags);
-
-	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
-	    && (adev->interface.if_id == if_id)) {
-		if (conf->bssid)
-		{
-			adev->interface.bssid = conf->bssid;
- 	             	MAC_COPY(adev->bssid,conf->bssid);
-		}
-	}
-	if ((conf->type == IEEE80211_IF_TYPE_AP)
-	    && (adev->interface.if_id == if_id)) {
-#endif
-
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
