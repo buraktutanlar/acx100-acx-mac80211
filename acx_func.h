@@ -611,21 +611,26 @@ const char* acx_cmd_status_str(unsigned int state);
 /*** Devicescape functions ***/
 int acx_setup_modes(acx_device_t *adev);
 void acx_free_modes(acx_device_t *adev);
-int acx_i_start_xmit(struct ieee80211_hw* ieee, 
-			struct sk_buff *skb, 
+int acx_i_start_xmit(struct ieee80211_hw* ieee,
+			struct sk_buff *skb,
 			struct ieee80211_tx_control *ctl);
 int acx_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw* ieee);
-int acx_net_set_key(struct ieee80211_hw *hw, 
+int acx_net_set_key(struct ieee80211_hw *hw,
 		enum set_key_cmd cmd,
 		const u8 *local_addr, const u8 *addr,
 		struct ieee80211_key_conf *key);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf);
+#else
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf);
+#endif
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
 int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,

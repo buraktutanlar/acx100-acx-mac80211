@@ -315,7 +315,7 @@ void acx_dump_bytes(const void *data, int num)
 
 /***********************************************************************
 ** acx_s_get_firmware_version
-** 
+**
 ** Obvious
 */
 void acx_s_get_firmware_version(acx_device_t * adev)
@@ -523,7 +523,7 @@ u8 acx_rate111to100(u16 r)
 * or not, only the original value will be used. Something else to take
 * into account is that the OpenBSD driver uses another approach and
 * defines the maximum RSSI value depending on the chip, rather than
-* using a value of 100 for all of them, as it is currently done here. 
+* using a value of 100 for all of them, as it is currently done here.
 */
 #define ACX100_RSSI_CORR 8
 #define ACX111_RSSI_CORR 5
@@ -912,12 +912,12 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	p += sprintf(p, "bssid     " MACSTR "\n", MAC(adev->bssid));
 	p += sprintf(p, "ap_filter " MACSTR "\n", MAC(adev->ap));
 
-	p += sprintf(p, "\n" "** PHY status **\n" 
+	p += sprintf(p, "\n" "** PHY status **\n"
 		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
 		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
-		     "rate_basic 0x%04X, rate_oper 0x%04X\n" 
-		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n" 
-		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n", 
+		     "rate_basic 0x%04X, rate_oper 0x%04X\n"
+		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
+		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
 		     adev->tx_disabled, adev->tx_level_dbm,	/* adev->tx_level_val, adev->tx_level_auto, */
 		     adev->sensitivity, adev->antenna, adev->ed_threshold,
 		     adev->cca, adev->preamble_mode, adev->rate_basic, adev->rate_oper, adev->rts_threshold,
@@ -1461,7 +1461,22 @@ void acx_free_modes(acx_device_t * adev)
 	}
 */
 
-static struct ieee80211_rate acx_rates[] = {
+static struct ieee80211_rate __acx_rates[] = {
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	{ .rate = 10, .val = RATE111_1, .flags = IEEE80211_RATE_CCK },
+	{ .rate = 20, .val = RATE111_2, .flags = IEEE80211_RATE_CCK },
+	{ .rate = 55, .val = RATE111_5, .flags = IEEE80211_RATE_CCK },
+	{ .rate = 110, .val = RATE111_11, .flags = IEEE80211_RATE_CCK },
+	{ .rate = 60, .val = RATE111_6, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 90, .val = RATE111_9, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 120, .val = RATE111_12, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 180, .val = RATE111_18, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 240, .val = RATE111_24, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 360, .val = RATE111_36, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 480, .val = RATE111_48, .flags = IEEE80211_RATE_OFDM },
+	{ .rate = 540, .val = RATE111_54, .flags = IEEE80211_RATE_OFDM },
+
+#else
 	{ .bitrate = 10, .hw_value = 0, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
 	{ .bitrate = 20, .hw_value = 1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
 	{ .bitrate = 55, .hw_value = 2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
@@ -1474,9 +1489,25 @@ static struct ieee80211_rate acx_rates[] = {
 	{ .bitrate = 360, .hw_value = 9, },
 	{ .bitrate = 480, .hw_value = 10, },
 	{ .bitrate = 540, .hw_value = 11, },
+#endif
 };
 
 static struct ieee80211_channel channels[] = {
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	{ .chan = 1, .freq = 2412},
+	{ .chan = 2, .freq = 2417},
+	{ .chan = 3, .freq = 2422},
+	{ .chan = 4, .freq = 2427},
+	{ .chan = 5, .freq = 2432},
+	{ .chan = 6, .freq = 2437},
+	{ .chan = 7, .freq = 2442},
+	{ .chan = 8, .freq = 2447},
+	{ .chan = 9, .freq = 2452},
+	{ .chan = 10, .freq = 2457},
+	{ .chan = 11, .freq = 2462},
+	{ .chan = 12, .freq = 2467},
+	{ .chan = 13, .freq = 2472},
+#else
 	{ .center_freq = 2412, .hw_value = 1, },
 	{ .center_freq = 2417, .hw_value = 2, },
 	{ .center_freq = 2422, .hw_value = 3, },
@@ -1491,8 +1522,10 @@ static struct ieee80211_channel channels[] = {
 	{ .center_freq = 2467, .hw_value = 12, },
 	{ .center_freq = 2472, .hw_value = 13, },
 	{ .center_freq = 2484, .hw_value = 14, },
+#endif
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
 static struct ieee80211_supported_band g_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
@@ -1506,10 +1539,15 @@ static struct ieee80211_supported_band b_band_2GHz = {
 	.bitrates = acx_rates,
 	.n_bitrates = 4,
 };
+#endif
 
 int acx_setup_modes(acx_device_t * adev)
 {
 	struct ieee80211_hw *hw = adev->ieee;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	struct ieee80211_hw_mode *mode;
+        int err = -ENOMEM;
+#endif
 
 	FN_ENTER;
 
@@ -1518,19 +1556,58 @@ int acx_setup_modes(acx_device_t * adev)
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
         	err = acx_setup_modes_gphy(adev);
 */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		mode = &adev->modes[0];
+
+/* from the zd1211rw driver: - do we need to do the same? */
+/*
+		memcpy(mode->channels, channels, sizeof(channels));
+		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
+*/
+
+		mode->mode = MODE_IEEE80211G;
+		mode->num_channels = ARRAY_SIZE(channels);
+		mode->num_rates = 12;
+		mode->rates = __acx_rates;
+#else
 		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
+#endif
 	} else {
 /*
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
 		err = acx_setup_modes_bphy(adev);
 */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		mode = &adev->modes[1];
+
+/* from the zd1211rw driver: - do we need to do the same? */
+/*
+		memcpy(mode->channels, channels, sizeof(channels));
+		memcpy(mode->rates, __acx_rates, sizeof(__acx_rates));
+*/
+
+		mode->mode = MODE_IEEE80211B;
+		mode->num_channels = ARRAY_SIZE(channels);
+		mode->num_rates = 4;
+		mode->rates = __acx_rates;
+
+#else
 		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
+#endif
 	}
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	mode->channels = channels;
+	err = ieee80211_register_hwmode(hw, mode);
+
+	FN_EXIT1(err);
+        return err;
+#else
 	FN_EXIT0;
-	return 0; 
+	return 0;
+#endif
 }
 
 /***********************************************************************
@@ -1538,7 +1615,7 @@ int acx_setup_modes(acx_device_t * adev)
 **
 ** Origin: derived from rt2x00 project
 */
-static int               
+static int
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
                                         struct acx_template_beacon *templ,
                                         struct sk_buff* skb /* in host order! */)
@@ -1692,9 +1769,9 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
 	acx_lock(adev, flags);
 
-	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
+	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL |
 			  FIF_CONTROL | FIF_OTHER_BSS);
-        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL | 
+        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL |
 			 FIF_CONTROL | FIF_OTHER_BSS);
 /*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
                 return; */
@@ -1707,7 +1784,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
         } else {
                 CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
                 SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-                SET_BIT(adev->set_mask, SET_RXCONFIG);              
+                SET_BIT(adev->set_mask, SET_RXCONFIG);
         }
 
         /* cannot update card settings directly here, atomic context */
@@ -1715,7 +1792,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
 
         acx_unlock(adev, flags);
 
-        FN_EXIT0; 
+        FN_EXIT0;
 }
 
 /***********************************************************************
@@ -1738,7 +1815,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 	memset(&feat, 0, sizeof(feat));
 
 	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
-		FN_EXIT1(NOT_OK); 
+		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
 	log(L_DEBUG,
@@ -1750,7 +1827,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 	if (data_flow_options)
 		*data_flow_options = le32_to_cpu(feat.data_flow_options);
 
-	FN_EXIT0; 
+	FN_EXIT0;
 	return OK;
 }
 
@@ -2161,8 +2238,8 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 					   /* | RX_CFG1_FILTER_ALL_MULTI   */
 					   /* | RX_CFG1_FILTER_BSSID       */
 					   /* | RX_CFG1_FILTER_MAC         */
-					    | RX_CFG1_RCV_PROMISCUOUS    
-					   /* | RX_CFG1_INCLUDE_FCS */        
+					    | RX_CFG1_RCV_PROMISCUOUS
+					   /* | RX_CFG1_INCLUDE_FCS */
 					   /* | RX_CFG1_INCLUDE_PHY_HDR   */
 		    );
 		adev->rx_config_2 = (u16) (0
@@ -2440,7 +2517,11 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	 * calculation. */
 
 	/* TODO: only the RSSI seems to be reported */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	adev->rx_status.ssi = acx_signal_to_winlevel(rxbuf->phy_level);
+#else
 	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
+#endif
 
 	FN_EXIT0;
 }
@@ -2560,8 +2641,8 @@ out_unlock:
 
 out:
 	FN_EXIT1(txresult);
-	return txresult; 
-}   
+	return txresult;
+}
 /***********************************************************************
 ** acx_l_update_ratevector
 **
@@ -2714,7 +2795,7 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 **
 ** The end of the Rx path. Pulls data from a rxhostdesc into a socket
 ** buffer and feeds it to the network stack via netif_rx().
-** 
+**
 ** Look to bcm43xx or p54
 */
 static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
@@ -2750,18 +2831,34 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 //	memset(&status, 0, sizeof(status));
 
 	status->mactime = rxbuf->time;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	status->ssi = acx_signal_to_winlevel(rxbuf->phy_level);
+#else
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
+#endif
 	/* TODO: they do not seem to be reported, at least on the acx111
-	 * (and TNETW1450?), therefore commenting them out 
+	 * (and TNETW1450?), therefore commenting them out
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 	status->flag = 0;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	status->rate = rxbuf->phy_plcp_signal;
+#else
 	status->rate_idx = rxbuf->phy_plcp_signal;
+#endif
 	status->antenna = 1;
 	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+#else
 		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+#endif
 	} else {
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+#else
 		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+#endif
 	}
 
 	/*
@@ -3936,7 +4033,7 @@ void acx_e_after_interrupt_task(struct work_struct *work)
 
 	acx_lock(adev, flags);
 
-	if (!adev->after_interrupt_jobs || !adev->initialized) 
+	if (!adev->after_interrupt_jobs || !adev->initialized)
 		goto end;	/* no jobs to do */
 
 	/* we see lotsa tx errors */
@@ -4276,9 +4373,11 @@ int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 	FN_ENTER;
 
 	acx_sem_lock(adev);
-/*	adev->rx_status.channel = channel; */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	adev->rx_status.channel = channel;
+#endif
 	adev->rx_status.freq = freq;
-	
+
 	adev->channel = channel;
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
@@ -4310,9 +4409,17 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	}
 	if (conf->beacon_int != adev->beacon_interval)
 		adev->beacon_interval = conf->beacon_int;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	if (conf->channel != adev->channel) {
+#else
 	if (conf->channel->hw_value != adev->channel) {
+#endif
 		acx_unlock(adev, flags);
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		acx_selectchannel(adev, conf->channel, conf->freq);
+#else
 		acx_selectchannel(adev, conf->channel->hw_value, conf->channel->center_freq);
+#endif
 		acx_lock(adev, flags);
 /*		acx_schedule_task(adev,
 				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
@@ -4320,7 +4427,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	}
 /*
         if (conf->short_slot_time != adev->short_slot) {
-//                assert(phy->type == BCM43xx_PHYTYPE_G);      
+//                assert(phy->type == BCM43xx_PHYTYPE_G);
                 if (conf->short_slot_time)
                         acx_short_slot_timing_enable(adev);
                 else
@@ -4334,7 +4441,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask,GETSET_TXPOWER);
 		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	} 
+	}
 */
 //FIXME: This does not seem to wake up:
 #if 0
@@ -4364,7 +4471,7 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 ** Derived from mac80211 code, p54, bcm43xx_mac80211
 **
 */
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf)
@@ -4386,11 +4493,38 @@ extern int acx_config_interface(struct ieee80211_hw* ieee,
 		if (conf->bssid)
 		{
 			adev->interface.bssid = conf->bssid;
- 	             	MAC_COPY(adev->bssid,conf->bssid);
+			MAC_COPY(adev->bssid,conf->bssid);
 		}
 	}
 	if ((conf->type == IEEE80211_IF_TYPE_AP)
 	    && (adev->vif == vif)) {
+#else
+int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
+			 struct ieee80211_if_conf *conf)
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	unsigned long flags;
+	int err = -ENODEV;
+	FN_ENTER;
+	if (!adev->interface.operating)
+		goto err_out;
+
+	if (adev->initialized)
+		acx_s_select_opmode(adev);
+
+	acx_lock(adev, flags);
+
+	if ((conf->type != IEEE80211_IF_TYPE_MNTR)
+	    && (adev->interface.if_id == if_id)) {
+		if (conf->bssid)
+		{
+			adev->interface.bssid = conf->bssid;
+			MAC_COPY(adev->bssid,conf->bssid);
+		}
+	}
+	if ((conf->type == IEEE80211_IF_TYPE_AP)
+	    && (adev->interface.if_id == if_id)) {
+#endif
 		if ((conf->ssid_len > 0) && conf->ssid)
 		{
 			adev->essid_len = conf->ssid_len;
@@ -4468,8 +4602,8 @@ static void keymac_write(acx_device_t * adev, u16 index, const u32 * addr)
                                     BCM43xx_SHM_HWMAC,
                                     index * 2,
                                     cpu_to_be32(*addr));
-                bcm43xx_shm_write16(bcm,   
-                                    BCM43xx_SHM_HWMAC,   
+                bcm43xx_shm_write16(bcm,
+                                    BCM43xx_SHM_HWMAC,
                                     (index * 2) + 1,
                                     cpu_to_be16(*((u16 *)(addr + 1))));
 */

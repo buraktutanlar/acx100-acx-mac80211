@@ -19,7 +19,7 @@
 
 #include <linux/version.h>
 
-/* Linux 2.6.18+ uses <linux/utsrelease.h> */      
+/* Linux 2.6.18+ uses <linux/utsrelease.h> */
 #ifndef UTS_RELEASE
 #include <linux/utsrelease.h>
 #endif
@@ -106,7 +106,7 @@ static void acxpci_s_down(struct ieee80211_hw *hw);
 /***********************************************************************
 ** Register access
 **
-** 
+**
 */
 
 /* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
@@ -1353,7 +1353,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 
 	acx_s_mwait(100);
 
-	/* NO locking for all parts of acxpci_free_desc_queues because: 
+	/* NO locking for all parts of acxpci_free_desc_queues because:
 	 * while calling dma_free_coherent() interrupts need to be 'free'
 	 * but if you spinlock the whole function (acxpci_free_desc_queues)
 	 * you'll get an error */
@@ -1611,7 +1611,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * We pass 0 as the third argument to pci_iomap(): it will map the full
 	 * region in this case, which is what we want.
 	 */
-	
+
 	mem1 = pci_iomap(pdev, mem_region1, 0);
 	if (!mem1) {
 		printk(KERN_WARNING "acx: ioremap() FAILED\n");
@@ -2104,14 +2104,14 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 }
 /*
 #ifdef CONFIG_NET_POLL_CONTROLLER
-void acxpci_net_poll_controller(struct net_device *net_dev)   
-{     
+void acxpci_net_poll_controller(struct net_device *net_dev)
+{
         acx_device_t *adev = ndev2adev(net_dev);
         unsigned long flags;
 
-        local_irq_save(flags);              
+        local_irq_save(flags);
         acxpci_i_interrupt(adev->irq, adev);
-        local_irq_restore(flags);           
+        local_irq_restore(flags);
 }
 #endif*/ /* CONFIG_NET_POLL_CONTROLLER */
 
@@ -2188,10 +2188,10 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 		acxpci_s_down(hw);
 	}
 
-/*
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
 	if (adev->modes)
 		acx_free_modes(adev);
-*/
+#endif
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
@@ -2585,7 +2585,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 		acx_e_after_interrupt_task(&adev->after_interrupt_task);
 
 	FN_EXIT0;
-	return;			
+	return;
 
 }
 
@@ -3125,7 +3125,11 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	rate_cur = ieeectl->tx_rate;
+#else
 	rate_cur = ieeectl->tx_rate->bitrate;
+#endif
 	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
 		goto end;
@@ -3166,7 +3170,11 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 #endif
 		    hostdesc1->length = cpu_to_le16(len);
 	} else {		/* ACX100 */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+		u8 rate_100 = ieeectl->tx_rate;
+#else
 		u8 rate_100 = ieeectl->tx_rate->bitrate;
+#endif
 		txdesc->u.r1.rate = rate_100;
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {
@@ -3406,7 +3414,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		 * clean the descriptor: we still need valid descr data here */
 		hostdesc = get_txhostdesc(adev, txdesc);
 
-		hostdesc->txstatus.flags |= IEEE80211_TX_STATUS_ACK; 
+		hostdesc->txstatus.flags |= IEEE80211_TX_STATUS_ACK;
 		if (unlikely(0x30 & error)) {
 			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 			 * all other errors mean we screwed up locally */
@@ -3415,7 +3423,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			hdr = (struct ieee80211_hdr_3addr *) hostdesc->data;
 			MAC_COPY(wrqu.addr.sa_data, hdr->addr1);
 */
-			hostdesc->txstatus.flags &= ~IEEE80211_TX_STATUS_ACK; 
+			hostdesc->txstatus.flags &= ~IEEE80211_TX_STATUS_ACK;
 		}
 
 		/* ...and free the desc */

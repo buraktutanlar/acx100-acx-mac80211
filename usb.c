@@ -72,7 +72,7 @@
 #define PRODUCT_ID_WUG2400	0xb21a	/* AboCom WUG2400 or SafeCom SWLUT-54125 */
 #define VENDOR_ID_AVM_GMBH	0x057c
 #define PRODUCT_ID_AVM_WLAN_USB	0x5601
-#define PRODUCT_ID_AVM_WLAN_USB_si	0x6201  /* "self install" named Version: 
+#define PRODUCT_ID_AVM_WLAN_USB_si	0x6201  /* "self install" named Version:
 						 * driver kills kernel on inbound scans from fritz box ??  */
 #define VENDOR_ID_ZCOM		0x0cde
 #define PRODUCT_ID_ZCOM_XG750	0x0017	/* not tested yet */
@@ -742,7 +742,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.stop = acxusb_e_close,
 	.config = acx_net_config,
 	.config_interface = acx_config_interface,
-	.set_key = acx_net_set_key,         
+	.set_key = acx_net_set_key,
 	.get_stats = acx_e_get_stats,
 	.get_tx_stats = acx_net_get_tx_stats,
 };
@@ -838,7 +838,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	adev = ieee2adev(ieee);
 	adev->ieee = ieee;
-	
+
 	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
 	if (is_tnetw1450) {
@@ -1428,9 +1428,9 @@ void acxusb_i_complete_rx(struct urb *urb)
 
 				if (clt && clt->rate_cur == cur) {
 					acx_l_handle_txrate_auto(adev, clt,
-						cur, // intended rate 
-						stat->rate, 0, // actually used rate 
-						stat->mac_status, // error? 
+						cur, // intended rate
+						stat->rate, 0, // actually used rate
+						stat->mac_status, // error?
 						ACX_TX_URB_CNT - adev->tx_free);
 				}
 			}
@@ -1662,9 +1662,17 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
 	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
 	txbuf->queue_index = 1;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	txbuf->rate = ctl->tx_rate; //clt->rate_100;
+#else
 	txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
+#endif
 //		FIXME();	//This used to have | (clt - adev->ap_client)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	txbuf->hostdata = (ctl->tx_rate << 16);
+#else
 	txbuf->hostdata = (ctl->tx_rate->bitrate << 16);
+#endif
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == adev->preamble_cur)
 		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);

@@ -782,7 +782,7 @@ struct txhostdesc {
 /* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
 	struct ieee80211_tx_status txstatus;
-	struct sk_buff *skb;	
+	struct sk_buff *skb;
 
 } ACX_PACKED;
 
@@ -836,7 +836,7 @@ typedef struct usb_txstatus {
 	u8	rts_failures;
 	u8	rts_ok;
 //	struct ieee80211_tx_status txstatus;
-//	struct sk_buff *skb;	
+//	struct sk_buff *skb;
 } ACX_PACKED usb_txstatus_t;
 
 typedef struct usb_tx {
@@ -919,9 +919,13 @@ struct acx_device {
 //	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
 	struct ieee80211_hw	*ieee;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+	struct ieee80211_hw_mode	modes[2];
+#endif
 	struct ieee80211_rx_status rx_status;
-
-	struct ieee80211_vif 	*vif;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
+	struct ieee80211_vif	*vif;
+#endif
 
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
@@ -1109,7 +1113,7 @@ struct acx_device {
 	unsigned int	tx_free;
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
-	
+
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
@@ -1721,7 +1725,7 @@ typedef struct acx_ie_generic {
 } ACX_PACKED acx_ie_generic_t;
 
 #define ACX_SEC_KEYSIZE                     16
-/* Security algorithms. */                
+/* Security algorithms. */
 enum {
         ACX_SEC_ALG,
         ACX_SEC_ALGO_NONE = 0, /* unencrypted, as of TX header. */
