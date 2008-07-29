@@ -919,7 +919,7 @@ struct acx_device {
 //	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
 	struct ieee80211_hw	*ieee;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	struct ieee80211_hw_mode	modes[2];
 #endif
 	struct ieee80211_rx_status rx_status;

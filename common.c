@@ -1462,7 +1462,7 @@ void acx_free_modes(acx_device_t * adev)
 */
 
 static struct ieee80211_rate __acx_rates[] = {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	{ .rate = 10, .val = RATE111_1, .flags = IEEE80211_RATE_CCK },
 	{ .rate = 20, .val = RATE111_2, .flags = IEEE80211_RATE_CCK },
 	{ .rate = 55, .val = RATE111_5, .flags = IEEE80211_RATE_CCK },
@@ -1493,7 +1493,7 @@ static struct ieee80211_rate __acx_rates[] = {
 };
 
 static struct ieee80211_channel channels[] = {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	{ .chan = 1, .freq = 2412},
 	{ .chan = 2, .freq = 2417},
 	{ .chan = 3, .freq = 2422},
@@ -1529,14 +1529,14 @@ static struct ieee80211_channel channels[] = {
 static struct ieee80211_supported_band g_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = acx_rates,
+	.bitrates = __acx_rates,
 	.n_bitrates = 12,
 };
 
 static struct ieee80211_supported_band b_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = acx_rates,
+	.bitrates = __acx_rates,
 	.n_bitrates = 4,
 };
 #endif
@@ -1544,7 +1544,7 @@ static struct ieee80211_supported_band b_band_2GHz = {
 int acx_setup_modes(acx_device_t * adev)
 {
 	struct ieee80211_hw *hw = adev->ieee;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	struct ieee80211_hw_mode *mode;
         int err = -ENOMEM;
 #endif
@@ -1556,7 +1556,7 @@ int acx_setup_modes(acx_device_t * adev)
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
         	err = acx_setup_modes_gphy(adev);
 */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		mode = &adev->modes[0];
 
 /* from the zd1211rw driver: - do we need to do the same? */
@@ -1577,7 +1577,7 @@ int acx_setup_modes(acx_device_t * adev)
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
 		err = acx_setup_modes_bphy(adev);
 */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		mode = &adev->modes[1];
 
 /* from the zd1211rw driver: - do we need to do the same? */
@@ -1598,7 +1598,7 @@ int acx_setup_modes(acx_device_t * adev)
 /*	if (err && adev->modes)
 		kfree(adev->modes);*/
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	mode->channels = channels;
 	err = ieee80211_register_hwmode(hw, mode);
 
@@ -2841,20 +2841,20 @@ static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf)
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 	status->flag = 0;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	status->rate = rxbuf->phy_plcp_signal;
 #else
 	status->rate_idx = rxbuf->phy_plcp_signal;
 #endif
 	status->antenna = 1;
 	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		status->rate = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 #else
 		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 #endif
 	} else {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		status->rate = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 #else
 		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
@@ -4409,13 +4409,13 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	}
 	if (conf->beacon_int != adev->beacon_interval)
 		adev->beacon_interval = conf->beacon_int;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	if (conf->channel != adev->channel) {
 #else
 	if (conf->channel->hw_value != adev->channel) {
 #endif
 		acx_unlock(adev, flags);
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		acx_selectchannel(adev, conf->channel, conf->freq);
 #else
 		acx_selectchannel(adev, conf->channel->hw_value, conf->channel->center_freq);

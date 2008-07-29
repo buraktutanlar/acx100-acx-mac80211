@@ -3125,7 +3125,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 	rate_cur = ieeectl->tx_rate;
 #else
 	rate_cur = ieeectl->tx_rate->bitrate;
@@ -3170,7 +3170,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 #endif
 		    hostdesc1->length = cpu_to_le16(len);
 	} else {		/* ACX100 */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		u8 rate_100 = ieeectl->tx_rate;
 #else
 		u8 rate_100 = ieeectl->tx_rate->bitrate;
