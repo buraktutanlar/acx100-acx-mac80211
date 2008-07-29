@@ -2188,8 +2188,10 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 		acxpci_s_down(hw);
 	}
 
+/*
 	if (adev->modes)
 		acx_free_modes(adev);
+*/
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
@@ -3123,7 +3125,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-	rate_cur = ieeectl->tx_rate;
+	rate_cur = ieeectl->tx_rate->bitrate;
 	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
 		goto end;
@@ -3164,7 +3166,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 #endif
 		    hostdesc1->length = cpu_to_le16(len);
 	} else {		/* ACX100 */
-		u8 rate_100 = ieeectl->tx_rate;
+		u8 rate_100 = ieeectl->tx_rate->bitrate;
 		txdesc->u.r1.rate = rate_100;
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {

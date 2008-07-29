@@ -1662,9 +1662,9 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
 	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
 	txbuf->queue_index = 1;
-	txbuf->rate = ctl->tx_rate; //clt->rate_100;
+	txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
 //		FIXME();	//This used to have | (clt - adev->ap_client)
-	txbuf->hostdata = (ctl->tx_rate << 16);
+	txbuf->hostdata = (ctl->tx_rate->bitrate << 16);
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == adev->preamble_cur)
 		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
