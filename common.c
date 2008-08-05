@@ -37,6 +37,14 @@
 
 #include "acx.h"
 
+#define DEBUG_TSC 0
+#if DEBUG_TSC && defined(CONFIG_X86)
+#define TIMESTAMP(d) unsigned long d; rdtscl(d)
+#else
+#define TIMESTAMP(d) unsigned long d = jiffies
+#endif
+
+
 
 /***********************************************************************
 */
@@ -130,6 +138,7 @@ static inline const char *sanitize_str(const char *s)
 void acx_lock_debug(acx_device_t * adev, const char *where)
 {
 	unsigned int count = 100 * 1000 * 1000;
+	TIMESTAMP(lock_start);
 	where = sanitize_str(where);
 	while (--count) {
 		if (!spin_is_locked(&adev->spinlock))
@@ -142,7 +151,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 		BUG();
 	}
 	adev->last_lock = where;
-	rdtscl(adev->lock_time);
+	adev->lock_time = lock_start;
 }
 
 void acx_unlock_debug(acx_device_t * adev, const char *where)
@@ -155,8 +164,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 	}
 #endif
 	if (acx_debug & L_LOCK) {
-		unsigned long diff;
-		rdtscl(diff);
+		TIMESTAMP(diff);
 		diff -= adev->lock_time;
 		if (diff > max_lock_time) {
 			where = sanitize_str(where);
@@ -174,14 +182,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #if ACX_DEBUG > 1
 
 static int acx_debug_func_indent;
-#define DEBUG_TSC 0
 #define FUNC_INDENT_INCREMENT 2
-
-#if DEBUG_TSC
-#define TIMESTAMP(d) unsigned long d; rdtscl(d)
-#else
-#define TIMESTAMP(d) unsigned long d = jiffies
-#endif
 
 static const char spaces[] = "          " "          ";	/* Nx10 spaces */
 
