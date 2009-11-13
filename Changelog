@@ -1,3 +1,13 @@
+2009-11-13,4 Oliver Winker <oli1417@hallo.ms>
+
+	* Part4) Proc-FS fixes
+	
+	Proc-Fs fixes and improvements. Uses now seq_file for output. 
+	Avoids buffer overflows. 
+
+	=> This is the last commit of this series. This gives the new baseline
+	for the git repo with this branch.
+
 2009-11-13,3 Oliver Winker <oli1417@hallo.ms>
 
 	* Part3) mac80211 SW crypto support for WPA(2)

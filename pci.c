@@ -1704,7 +1704,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * firmware operations happening in parallel or uninitialized data */
 
 
-	acx_proc_register_entries(ieee);
+	acx_proc_register_entries(ieee, 0);
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
@@ -1863,7 +1863,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	}
 
-	acx_proc_unregister_entries(adev->ieee);
+	acx_proc_unregister_entries(adev->ieee, 0);
 
 	if (IS_ACX100(adev)) {
 		mem_region1 = PCI_ACX100_REGION1;
@@ -3921,7 +3921,7 @@ acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 /***************************************************************
 ** acxpci_s_proc_diag_output
 */
-char *acxpci_s_proc_diag_output(char *p, acx_device_t * adev)
+int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;
 	rxhostdesc_t *rxhostdesc;
@@ -3930,7 +3930,7 @@ char *acxpci_s_proc_diag_output(char *p, acx_device_t * adev)
 
 	FN_ENTER;
 
-	p += sprintf(p, "** Rx buf **\n");
+	seq_printf(file, "** Rx buf **\n");
 	rxhostdesc = adev->rxhostdesc_start;
 	if (rxhostdesc)
 		for (i = 0; i < RX_CNT; i++) {
@@ -3938,12 +3938,12 @@ char *acxpci_s_proc_diag_output(char *p, acx_device_t * adev)
 			if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 			    && (rxhostdesc->
 				Status & cpu_to_le32(DESC_STATUS_FULL)))
-				p += sprintf(p, "%02u FULL%s\n", i, rtl);
+				seq_printf(file, "%02u FULL%s\n", i, rtl);
 			else
-				p += sprintf(p, "%02u empty%s\n", i, rtl);
+				seq_printf(file, "%02u empty%s\n", i, rtl);
 			rxhostdesc++;
 		}
-/*	p += sprintf(p, "** Tx buf (free %d, Linux netqueue %s) **\n",
+/*	seq_printf(file, "** Tx buf (free %d, Linux netqueue %s) **\n",
 		     adev->tx_free,
 		     acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");*/
 	txdesc = adev->txdesc_start;
@@ -3952,14 +3952,14 @@ char *acxpci_s_proc_diag_output(char *p, acx_device_t * adev)
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx_tail) ? " [tail]" : "";
 			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
-				p += sprintf(p, "%02u free (%02X)%s%s\n", i,
+				seq_printf(file, "%02u free (%02X)%s%s\n", i,
 					     txdesc->Ctl_8, thd, ttl);
 			else
-				p += sprintf(p, "%02u tx   (%02X)%s%s\n", i,
+				seq_printf(file, "%02u tx   (%02X)%s%s\n", i,
 					     txdesc->Ctl_8, thd, ttl);
 			txdesc = advance_txdesc(adev, txdesc, 1);
 		}
-	p += sprintf(p,
+	seq_printf(file,
 		     "\n"
 		     "** PCI data **\n"
 		     "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
@@ -3980,7 +3980,7 @@ char *acxpci_s_proc_diag_output(char *p, acx_device_t * adev)
 		     (unsigned long long)adev->rxbuf_startphy);
 
 	FN_EXIT0;
-	return p;
+	return 0;
 }
 
 

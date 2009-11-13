@@ -484,8 +484,8 @@ acx100pci_ioctl_set_phy_amp_bias(
 ** /proc
 */
 #ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(struct ieee80211_hw *ieee);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
+int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
 #else
 static inline int
 acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
@@ -623,7 +623,7 @@ void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
 int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
 void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 void acxpci_free_desc_queues(acx_device_t *adev);
-char* acxpci_s_proc_diag_output(char *p, acx_device_t *adev);
+int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
 void acxpci_set_interrupt_mask(acx_device_t *adev);
 int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);

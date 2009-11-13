@@ -828,51 +828,14 @@ void great_inquisitor(acx_device_t * adev)
 
 
 #ifdef CONFIG_PROC_FS
-/***********************************************************************
-** /proc files
-*/
-/***********************************************************************
-** acx_l_proc_output
-** Generate content for our /proc entry
-**
-** Arguments:
-**	buf is a pointer to write output to
-**	adev is the usual pointer to our private struct acx_device
-** Returns:
-**	number of bytes actually written to buf
-** Side effects:
-**	none
-*/
-static int acx_l_proc_output(char *buf, acx_device_t * adev)
+/*
+ * Procfs
+ */
+
+static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 {
-	char *p = buf;
+	acx_device_t *adev = (acx_device_t *) file->private;
 
-	FN_ENTER;
-
-	p += sprintf(p,
-		     "acx driver version:\t\t" ACX_RELEASE "\n"
-		     "Wireless extension version:\t" STRING(WIRELESS_EXT) "\n"
-		     "chip name:\t\t\t%s (0x%08X)\n"
-		     "radio type:\t\t\t0x%02X\n"
-		     "form factor:\t\t\t0x%02X\n"
-		     "EEPROM version:\t\t\t0x%02X\n"
-		     "firmware version:\t\t%s (0x%08X)\n",
-		     adev->chip_name, adev->firmware_id,
-		     adev->radio_type,
-		     adev->form_factor,
-		     adev->eeprom_version,
-		     adev->firmware_version, adev->firmware_numver);
-
-	FN_EXIT1(p - buf);
-	return p - buf;
-}
-
-
-/***********************************************************************
-*/
-static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
-{
-	char *p = buf;
 	unsigned long flags;
 	ssize_t len = 0, partlen;
 	u32 temp1, temp2;
@@ -892,14 +855,15 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	fw_stats_aes_t *aes = NULL;
 	fw_stats_event_t *evt = NULL;
 
-	FN_ENTER;
-
+	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
 	if (IS_PCI(adev))
-		p = acxpci_s_proc_diag_output(p, adev);
+		acxpci_s_proc_diag_output(file, adev);
+	else if (IS_MEM(adev))
+		acxmem_s_proc_diag_output(file, adev);
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "\n"
 		     "** network status **\n"
 		     "dev_state_mask 0x%04X\n"
@@ -908,7 +872,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 		     adev->dev_state_mask,
 		     adev->mode, adev->channel,
 		     adev->reg_dom_id, adev->reg_dom_chanmask);
-	p += sprintf(p,
+	seq_printf(file,
 		     "ESSID \"%s\", essid_active %d, essid_len %d, "
 		     "essid_for_assoc \"%s\", nick \"%s\"\n"
 		     "WEP ena %d, restricted %d, idx %d\n",
@@ -916,11 +880,11 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 		     adev->essid_for_assoc, adev->nick,
 		     adev->wep_enabled, adev->wep_restricted,
 		     adev->wep_current_index);
-	p += sprintf(p, "dev_addr  " MACSTR "\n", MAC(adev->dev_addr));
-	p += sprintf(p, "bssid     " MACSTR "\n", MAC(adev->bssid));
-	p += sprintf(p, "ap_filter " MACSTR "\n", MAC(adev->ap));
+	seq_printf(file, "dev_addr  " MACSTR "\n", MAC(adev->dev_addr));
+	seq_printf(file, "bssid     " MACSTR "\n", MAC(adev->bssid));
+	seq_printf(file, "ap_filter " MACSTR "\n", MAC(adev->ap));
 
-	p += sprintf(p, "\n" "** PHY status **\n"
+	seq_printf(file, "\n" "** PHY status **\n"
 		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
 		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
 		     "rate_basic 0x%04X, rate_oper 0x%04X\n"
@@ -935,7 +899,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 
 	acx_unlock(adev, flags);
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "\n"
 		     "** Firmware **\n"
 		     "NOTE: version dependent statistics layout, "
@@ -962,11 +926,11 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	len = *(u16 *) st;
 
 	if (len > sizeof(*fw_stats)) {
-		p += sprintf(p,
+		seq_printf(file,
 			     "firmware version with bigger fw_stats struct detected\n"
 			     "(%zu vs. %zu), please report\n", len, sizeof(fw_stats_t));
 		if (len > sizeof(*fw_stats)) {
-			p += sprintf(p, "struct size exceeded allocation!\n");
+			seq_printf(file, "struct size exceeded allocation!\n");
 			len = sizeof(*fw_stats);
 		}
 	}
@@ -1013,7 +977,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 		temp2 = rx->rx_aci_resets;
 	}
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  tx_desc_overfl %u\n"
 		     "  rx_OutOfMem %u, rx_hdr_overfl %u, rx_hw_stuck %u\n"
@@ -1039,7 +1003,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  rx_dma_req %u, rx_dma_err %u, tx_dma_req %u, tx_dma_err %u\n",
 		     part_str,
@@ -1058,7 +1022,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  cmd_cplt %u, fiq %u\n"
 		     "  rx_hdrs %u, rx_cmplt %u, rx_mem_overfl %u, rx_rdys %u\n"
@@ -1108,7 +1072,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 		temp2 = wep->wep_decrypt_irqs;
 	}
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  wep_key_count %u, wep_default_key_count %u, dot11_def_key_mib %u\n"
 		     "  wep_key_not_found %u, wep_decrypt_fail %u\n"
@@ -1132,7 +1096,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  tx_start_ctr %u, no_ps_tx_too_short %u\n"
 		     "  rx_start_ctr %u, no_ps_rx_too_short %u\n"
@@ -1159,7 +1123,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  mic_rx_pkts %u, mic_calc_fail %u\n",
 		     part_str, mic->mic_rx_pkts, mic->mic_calc_fail);
@@ -1176,7 +1140,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  aes_enc_fail %u, aes_dec_fail %u\n"
 		     "  aes_enc_pkts %u, aes_dec_pkts %u\n"
@@ -1199,7 +1163,7 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 	if (st > st_end)
 		goto fw_stats_fail;
 
-	p += sprintf(p,
+	seq_printf(file,
 		     "%s:\n"
 		     "  heartbeat %u, calibration %u\n"
 		     "  rx_mismatch %u, rx_mem_empty %u, rx_pool %u\n"
@@ -1218,54 +1182,24 @@ static int acx_s_proc_diag_output(char *buf, acx_device_t * adev)
 
 	goto fw_stats_end;
 
-      fw_stats_fail:
+	fw_stats_fail:
 	st -= partlen;
-	p += sprintf(p,
-		     "failed at %s part (size %zu), offset %zu (struct size %zu), "
-		     "please report\n", part_str, partlen,
-		     ((void *)st - (void *)fw_stats), len);
+	seq_printf(file,
+			"failed at %s part (size %zu), offset %zu (struct size %zu), "
+				"please report\n", part_str, partlen, ((void *) st
+					- (void *) fw_stats), len);
 
-      fw_stats_bigger:
+	fw_stats_bigger:
 	for (; st < st_end; st += 4)
-		p += sprintf(p,
-			     "UNKN%3d: %u\n",
-			     (int)((void *)st - (void *)fw_stats), *(u32 *) st);
+		seq_printf(file, "UNKN%3d: %u\n", (int) ((void *) st
+				- (void *) fw_stats), *(u32 *) st);
 
-      fw_stats_end:
+	fw_stats_end:
 	kfree(fw_stats);
 
-	FN_EXIT1(p - buf);
-	return p - buf;
-}
-
-
-/***********************************************************************
-*/
-static int acx_s_proc_phy_output(char *buf, acx_device_t * adev)
-{
-	char *p = buf;
-	int i;
-
-	FN_ENTER;
-
-	/*
-	   if (RADIO_RFMD_11 != adev->radio_type) {
-	   printk("acx: sorry, not yet adapted for radio types "
-	   "other than RFMD, please verify "
-	   "PHY size etc. first!\n");
-	   goto end;
-	   }
-	 */
-
-	/* The PHY area is only 0x80 bytes long; further pages after that
-	 * only have some page number registers with altered value,
-	 * all other registers remain the same. */
-	for (i = 0; i < 0x80; i++) {
-		acx_s_read_phy_reg(adev, i, p++);
-	}
-
-	FN_EXIT1(p - buf);
-	return p - buf;
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
 }
 
 
@@ -1280,172 +1214,240 @@ static int acx_s_proc_phy_output(char *buf, acx_device_t * adev)
 ** Side effects:
 **	none
 */
-static int
-acx_e_read_proc(char *buf, char **start, off_t offset, int count,
-		int *eof, void *data)
+static int acx_e_proc_show_acx(struct seq_file *file, void *v)
 {
-	acx_device_t *adev = (acx_device_t *) data;
-	unsigned long flags;
-	int length;
+	acx_device_t *adev = (acx_device_t*) file->private;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
-	acx_lock(adev, flags);
-	/* fill buf */
-	length = acx_l_proc_output(buf, adev);
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
 
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT1(length);
-	return length;
+	seq_printf(file,
+		     "acx driver version:\t\t" ACX_RELEASE "\n"
+		     "Wireless extension version:\t" STRING(WIRELESS_EXT) "\n"
+		     "chip name:\t\t\t%s (0x%08X)\n"
+		     "radio type:\t\t\t0x%02X\n"
+		     "form factor:\t\t\t0x%02X\n"
+		     "EEPROM version:\t\t\t0x%02X\n"
+		     "firmware version:\t\t%s (0x%08X)\n",
+		     adev->chip_name, adev->firmware_id,
+		     adev->radio_type,
+		     adev->form_factor,
+		     adev->eeprom_version,
+		     adev->firmware_version, adev->firmware_numver);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
 }
 
-static int
-acx_e_read_proc_diag(char *buf, char **start, off_t offset, int count,
-		     int *eof, void *data)
+static int acx_e_proc_show_eeprom(struct seq_file *file, void *v)
 {
-	acx_device_t *adev = (acx_device_t *) data;
+	acx_device_t *adev = (acx_device_t *) file->private;
+
 	int length;
+	char *buf, *buf2;
+	// OW Hopefully enough
+	const int buf_size = 1024*64;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
-	/* fill buf */
-	length = acx_s_proc_diag_output(buf, adev);
-	acx_sem_unlock(adev);
 
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT1(length);
-	return length;
-}
-
-static int
-acx_e_read_proc_eeprom(char *buf, char **start, off_t offset, int count,
-		       int *eof, void *data)
-{
-	acx_device_t *adev = (acx_device_t *) data;
-	int length;
-
-	FN_ENTER;
+	buf = kmalloc(buf_size, GFP_KERNEL);
 
 	/* fill buf */
 	length = 0;
-	if (IS_PCI(adev)) {
-		acx_sem_lock(adev);
+	if (IS_PCI(adev))
 		length = acxpci_proc_eeprom_output(buf, adev);
-		acx_sem_unlock(adev);
-	}
+	else if (IS_MEM(adev))
+		length = acxmem_proc_eeprom_output(buf, adev);
+	else
+		goto out;
 
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT1(length);
-	return length;
+	for (buf2 = buf; buf2 < buf + length; seq_putc(file, *(buf2++)))
+		;
+
+	out:
+	kfree(buf);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
+
 }
 
-static int
-acx_e_read_proc_phy(char *buf, char **start, off_t offset, int count,
-		    int *eof, void *data)
+static int acx_e_proc_show_phy(struct seq_file *file, void *v)
 {
-	acx_device_t *adev = (acx_device_t *) data;
-	int length;
+	acx_device_t *adev = (acx_device_t *) file->private;
+
+	int i;
+	char *buf, *p;
+	// OW Hopefully enough
+	const int buf_size = 1024*64;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
-	/* fill buf */
-	length = acx_s_proc_phy_output(buf, adev);
-	acx_sem_unlock(adev);
 
-	/* housekeeping */
-	if (length <= offset + count)
-		*eof = 1;
-	*start = buf + offset;
-	length -= offset;
-	if (length > count)
-		length = count;
-	if (length < 0)
-		length = 0;
-	FN_EXIT1(length);
-	return length;
+	buf = kmalloc(buf_size, GFP_KERNEL);
+	/*
+	   if (RADIO_RFMD_11 != adev->radio_type) {
+	   printk("acx: sorry, not yet adapted for radio types "
+	   "other than RFMD, please verify "
+	   "PHY size etc. first!\n");
+	   goto end;
+	   }
+	 */
+
+	/* The PHY area is only 0x80 bytes long; further pages after that
+	 * only have some page number registers with altered value,
+	 * all other registers remain the same. */
+	p = buf;
+	for (i = 0; i < 0x80; i++) {
+		acx_s_read_phy_reg(adev, i, p++);
+		seq_putc(file, *p);
+	}
+
+	kfree(buf);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+
+	return 0;
 }
 
+static int acx_e_proc_show_debug(struct seq_file *file, void *v)
+{
+	seq_printf(file, "acx_debug: %u\n", acx_debug);
+	return 0;
+}
 
-/***********************************************************************
-** /proc files registration
-*/
+static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned long val = simple_strtoul(buf, &after, 10);
+	size_t size = after - buf + 1;
+
+	log(L_DEBUG, "acx_e_proc_debug_write: val=%lu\n", val);
+
+	if (count == size) {
+		ret = count;
+		acx_debug = val;
+	}
+
+	return ret;
+
+}
+
+/*
+ * proc files registration
+ */
 static const char *const
- proc_files[] = { "", "_diag", "_eeprom", "_phy" };
+ proc_files[] = { "acx", "acx_diag", "acx_eeprom", "acx_phy", "acx_debug" };
 
-static read_proc_t *const
- proc_funcs[] = {
-	acx_e_read_proc,
-	acx_e_read_proc_diag,
-	acx_e_read_proc_eeprom,
-	acx_e_read_proc_phy
+typedef int acx_proc_show_t(struct seq_file *file, void *v);
+typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
+
+static acx_proc_show_t *const
+ acx_proc_show_funcs[] = {
+	acx_e_proc_show_acx,
+	acx_e_proc_show_diag,
+	acx_e_proc_show_eeprom,
+	acx_e_proc_show_phy,
+	acx_e_proc_show_debug,
 };
 
-static int manage_proc_entries(struct ieee80211_hw *hw, int remove)
+static acx_proc_write_t *const
+ acx_proc_write_funcs[] = {
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	acx_e_proc_write_debug,
+};
+
+static struct file_operations acx_e_proc_ops[5] ;
+
+static int acx_e_proc_open(struct inode *inode, struct file *file)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+		if (strcmp(proc_files[i], file->f_path.dentry->d_name.name) == 0) break;
+	}
+	// log(L_ANY, "%s: proc filename=%s\n", __func__, proc_files[i]);
+
+	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
+}
+
+static int manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	char procbuf[80];
+	char procbuf2[80];
 	int i;
+	struct proc_dir_entry *pe;
+	struct proc_dir_entry *ppe;
 
 	FN_ENTER;
 
-	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-		snprintf(procbuf, sizeof(procbuf),
-			 "driver/acx%s", proc_files[i]);
-		log(L_INIT, "acx: %sing /proc entry %s\n",
-		    remove ? "remov" : "creat", procbuf);
-		if (!remove) {
-			if (!create_proc_read_entry
-			    (procbuf, 0, NULL, proc_funcs[i], adev)) {
-				printk("acx: cannot register /proc entry %s\n",
-				       procbuf);
-	FN_EXIT1(NOT_OK);
+	// Create a subdir for this acx instance
+	snprintf(procbuf2, sizeof(procbuf), "driver/acx%i", num);
+
+	if (!remove) {
+
+		ppe = proc_mkdir(procbuf2, NULL);
+
+		for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+			snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
+			log(L_INIT, "acx: %sing /proc entry %s\n",
+					remove ? "remov" : "creat", procbuf);
+
+			acx_e_proc_ops[i].owner = THIS_MODULE;
+			acx_e_proc_ops[i].open = acx_e_proc_open;
+			acx_e_proc_ops[i].read = seq_read;
+			acx_e_proc_ops[i].llseek = seq_lseek;
+			acx_e_proc_ops[i].release = single_release;
+			acx_e_proc_ops[i].write = acx_proc_write_funcs[i];
+
+			// Read-only
+			if (acx_proc_write_funcs[i] == NULL)
+				pe = proc_create(procbuf, 0444, NULL, &acx_e_proc_ops[i]);
+			// Read-Write
+			else
+				pe = proc_create(procbuf, 0644, NULL, &acx_e_proc_ops[i]);
+
+			if (!pe) {
+				printk("acx: cannot register /proc entry %s\n", procbuf);
 				return NOT_OK;
 			}
-		} else {
+			pe->data = adev;
+
+		}
+
+	} else {
+
+		for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+			snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
 			remove_proc_entry(procbuf, NULL);
 		}
+		remove_proc_entry(procbuf2, NULL);
+
 	}
+
 	FN_EXIT0;
 	return OK;
 }
 
-int acx_proc_register_entries(struct ieee80211_hw *ieee)
+int acx_proc_register_entries(struct ieee80211_hw *ieee, int num)
 {
-	return manage_proc_entries(ieee, 0);
+	return manage_proc_entries(ieee, num, 0);
 }
 
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee)
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 {
-	return manage_proc_entries(ieee, 1);
+	return manage_proc_entries(ieee, num, 1);
 }
 #endif /* CONFIG_PROC_FS */
 
