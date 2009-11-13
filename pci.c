@@ -17,6 +17,8 @@
  */
 #define ACX_MAC80211_PCI 1
 
+#define CONFIG_PCI 1
+
 #include <linux/version.h>
 
 /* Linux 2.6.18+ uses <linux/utsrelease.h> */
@@ -1527,7 +1529,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * that only the RSSI is supported. In conclusion, the max_signal and
 	 * max_noise values will not be initialised by now, as they do not
 	 * seem to be supported or how to acquire them is still unknown. */
-	ieee->max_rssi = 100;
+
+	// OW ieee->max_rssi = 100;
+	ieee->max_signal = 100;
 
 	adev = ieee2adev(ieee);
 
@@ -2149,7 +2153,9 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 	 * dev->tbusy==0.  Our rx path knows to pass up received/
 	 * frames because of dev->flags&IFF_UP is true.
 	 */
-	ieee80211_start_queues(adev->ieee);
+	// OW ieee80211_start_queues(adev->ieee);
+	// A guess
+	ieee80211_wake_queues(adev->ieee);
 
 	adev->initialized = 1;
 	acx_sem_unlock(adev);
@@ -3087,8 +3093,8 @@ void *acxpci_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 ** CTL_xxx flags according to fragment number.
 */
 void
-acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
-		 struct ieee80211_tx_control *ieeectl,struct sk_buff* skb)
+acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+		 struct ieee80211_tx_info *ieeectl,struct sk_buff *skb)
 {
 	txdesc_t *txdesc = (txdesc_t *) tx_opaque;
 	struct ieee80211_hdr *wireless_header;
@@ -3120,15 +3126,17 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
-	if (ieeectl->flags & IEEE80211_TXCTL_USE_RTS_CTS)
+	if (ieeectl->flags & IEEE80211_TX_CTL_USE_RTS_CTS)
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
+	//OW TODO Make Obselete
 	rate_cur = ieeectl->tx_rate;
 #else
-	rate_cur = ieeectl->tx_rate->bitrate;
+	//OW rate_cur = ieeectl->tx_rate->bitrate;
+	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 #endif
 	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
@@ -3139,7 +3147,8 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 /*	put_txcr(adev, txdesc, clt, rate_cur);  deprecated by mac80211 */
 
 	txdesc->total_length = cpu_to_le16(len);
-	wlhdr_len = ieee80211_get_hdrlen(le16_to_cpu(wireless_header->frame_control));
+	// OW wlhdr_len = ieee80211_get_hdrlen(le16_to_cpu(wireless_header->frame_control));
+	wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
 	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
 /*
 	if (!ieeectl->do_not_encrypt && ieeectl->key_idx>= 0)
@@ -3173,7 +3182,8 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
 		u8 rate_100 = ieeectl->tx_rate;
 #else
-		u8 rate_100 = ieeectl->tx_rate->bitrate;
+		//OW u8 rate_100 = ieeectl->tx_rate->bitrate;
+		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 #endif
 		txdesc->u.r1.rate = rate_100;
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
@@ -3217,7 +3227,7 @@ acxpci_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int len,
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
 	 * Do separate logs for acx100/111 to have human-readable rates */
-        memcpy(&(hostdesc1->txstatus.control),ieeectl,sizeof(struct ieee80211_tx_control));
+        memcpy(&(hostdesc1->txstatus),ieeectl,sizeof(struct ieee80211_tx_info));
         hostdesc1->skb = skb;
       end:
 	FN_EXIT0;
@@ -3259,9 +3269,9 @@ static void log_txbuffer(acx_device_t * adev)
 }
 #endif
 
-
-static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
-		struct ieee80211_tx_status *status)
+// OW
+static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
+		struct ieee80211_tx_info *info)
 {
 	const char *err = "unknown error";
 
@@ -3329,7 +3339,7 @@ static void handle_tx_error(acx_device_t * adev, u8 error, unsigned int finger,
 			acx_schedule_task(adev,
 					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
-		status->excessive_retries++;
+		info->status.excessive_retries++;
 		break;
 	case 0x40:
 		err = "Tx buffer overflow";
@@ -3414,7 +3424,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		 * clean the descriptor: we still need valid descr data here */
 		hostdesc = get_txhostdesc(adev, txdesc);
 
-		hostdesc->txstatus.flags |= IEEE80211_TX_STATUS_ACK;
+		hostdesc->txstatus.flags |= IEEE80211_TX_STAT_ACK;
 		if (unlikely(0x30 & error)) {
 			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 			 * all other errors mean we screwed up locally */
@@ -3423,7 +3433,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			hdr = (struct ieee80211_hdr_3addr *) hostdesc->data;
 			MAC_COPY(wrqu.addr.sa_data, hdr->addr1);
 */
-			hostdesc->txstatus.flags &= ~IEEE80211_TX_STATUS_ACK;
+			hostdesc->txstatus.flags &= ~IEEE80211_TX_STAT_ACK;
 		}
 
 		/* ...and free the desc */
@@ -3482,10 +3492,11 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		/* And finally report upstream */
 		if (hostdesc)
 		{
-			hostdesc->txstatus.excessive_retries = rts_failures ;
-			hostdesc->txstatus.retry_count = ack_failures;
-			ieee80211_tx_status(adev->ieee,hostdesc->skb,&hostdesc->txstatus);
-			memset(&hostdesc->txstatus, 0, sizeof(struct ieee80211_tx_status));
+			hostdesc->txstatus.status.excessive_retries = rts_failures ;
+			hostdesc->txstatus.status.retry_count = ack_failures;
+			ieee80211_tx_status(adev->ieee, hostdesc->skb);
+			//OW ieee80211_tx_status(adev->ieee,hostdesc->skb, &hostdesc->txstatus);
+			memset(&hostdesc->txstatus, 0, sizeof(struct ieee80211_tx_info));
 		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;

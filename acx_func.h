@@ -340,22 +340,19 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 ** Review carefully all callsites */
 static inline void
 acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
-{/*
-	if (netif_queue_stopped(ndev))
-		return;
-*/
+{
 	ieee80211_stop_queues(hw);
 	if (msg)
 		log(L_BUFT, "acx: tx: stop queue %s\n", msg);
 }
 
-/*static inline int
+static inline int
 acx_queue_stopped(struct ieee80211_hw *ieee)
 {
-	return netif_queue_stopped(ieee);
+	return ieee80211_queue_stopped(ieee, 0);
 }
 
-
+/*
 static inline void
 acx_start_queue(struct ieee80211_hw *hw, const char *msg)
 {
@@ -593,14 +590,14 @@ acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 }
 
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-                        struct ieee80211_tx_control *ieeectl, struct sk_buff *skb);
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_control *ieeectl,
+                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl,
 			struct sk_buff *skb);
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 static inline void
 acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-                        struct ieee80211_tx_control *ieeectl, struct sk_buff *skb)
+                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
 {
 	if (IS_PCI(adev))
 		return acxpci_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
@@ -618,6 +615,7 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
+
 void acxpci_l_power_led(acx_device_t *adev, int enable);
 int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
@@ -679,41 +677,35 @@ u8 acx_rate111to100(u16);
 void acx_s_set_defaults(acx_device_t *adev);
 
 #if !ACX_DEBUG
-static inline const char* acx_get_packet_type_string(u16 fc) { return ""; }
+static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
 #else
-const char* acx_get_packet_type_string(u16 fc);
+const char *acx_get_packet_type_string(u16 fc);
 #endif
-const char* acx_cmd_status_str(unsigned int state);
+const char *acx_cmd_status_str(unsigned int state);
 
-/*** Devicescape functions ***/
+/*** mac80211 functions ***/
 int acx_setup_modes(acx_device_t *adev);
 void acx_free_modes(acx_device_t *adev);
-int acx_i_start_xmit(struct ieee80211_hw* ieee,
-			struct sk_buff *skb,
-			struct ieee80211_tx_control *ctl);
+int acx_i_start_xmit(struct ieee80211_hw *ieee,	struct sk_buff *skb);
 int acx_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
-int acx_net_reset(struct ieee80211_hw* ieee);
+int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_net_set_key(struct ieee80211_hw *hw,
 		enum set_key_cmd cmd,
 		const u8 *local_addr, const u8 *addr,
 		struct ieee80211_key_conf *key);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 extern int acx_config_interface(struct ieee80211_hw* ieee,
 				struct ieee80211_vif *vif,
 				struct ieee80211_if_conf *conf);
-#else
-int acx_config_interface(struct ieee80211_hw* ieee, int if_id,
-			 struct ieee80211_if_conf *conf);
-#endif
 int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
-int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
+int acx_net_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 //int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
 //static void acx_netdev_init(struct net_device *ndev);
+
 int acxpci_s_reset_dev(acx_device_t *adev);
 int acxmem_s_reset_dev(acx_device_t *adev);
 
@@ -722,7 +714,7 @@ void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned int *total_flags,
                             int mc_count, struct dev_addr_list *mc_list);
 
-/*** End DeviceScape Functions **/
+/*** End mac80211 Functions **/
 
 void great_inquisitor(acx_device_t *adev);
 
@@ -732,7 +724,11 @@ void acx_display_hardware_details(acx_device_t *adev);
 int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu);
 int acx_e_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
-void acx_interrupt_tasklet(struct work_struct *work);
+
+// OW TODO void acx_interrupt_tasklet(struct work_struct *work);
+void acx_interrupt_tasklet(acx_device_t *adev);
+// OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
+void acx_e_after_interrupt_task(acx_device_t *adev);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);

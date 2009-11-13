@@ -23,7 +23,25 @@
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
 /* set to 2 if you want extensive debug log */
+
 #define ACX_DEBUG 2
+
+//	L_LOCK|		/* locking debug log */
+//	L_INIT|		/* special card initialization logging */
+//	L_IRQ|		/* interrupt stuff */
+//	L_ASSOC|	/* assocation (network join) and station log */
+//	L_FUNC|		/* logging of function enter / leave */
+//	L_XFER|		/* logging of transfers and mgmt */
+//	L_DATA|		/* logging of transfer data */
+//	L_DEBUG|	/* log of debug info */
+//	L_IOCTL|	/* log ioctl calls */
+//	L_CTL|		/* log of low-level ctl commands */
+//	L_BUFR|		/* debug rx buffer mgmt (ring buffer etc.) */
+//	L_XFER_BEACON|		/* also log beacon packets */
+//	L_BUFT|			/* debug tx buffer mgmt (ring buffer etc.) */
+//	L_USBRXTX|		/* debug USB rx/tx operations */
+//	L_BUF|		    /* L_BUFR + L_BUFT */
+//	L_ANY
 #define ACX_DEFAULT_MSG (L_ASSOC|L_INIT)
 
 /* assume 32bit I/O width

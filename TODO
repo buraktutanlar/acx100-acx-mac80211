@@ -1,3 +1,8 @@
+TODO: OW, 20091029
+---
+
+---
+
 TODO:
 e100.c: pci_dma_sync_single_for_cpu(nic->pdev, rx->dma_addr, sizeof(struct rfd), PCI_DMA_FROMDEVICE);
 do we need to do something like above for rxhostdescs/rxbufs?

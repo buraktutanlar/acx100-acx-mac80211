@@ -455,7 +455,6 @@ typedef struct rxbuffer {
 #define FW_STATS_FUTURE_EXTENSION	100
 #define FW_ID_SIZE 20
 
-
 /*--- WEP stuff --------------------------------------------------------------*/
 #define DOT11_MAX_DEFAULT_WEP_KEYS	4
 
@@ -522,7 +521,6 @@ struct client {
 /* FIXME: this one is too damn big */
 	char	challenge_text[128]; /*WLAN_CHALLENGE_LEN*/
 };
-
 
 
 /* Config Option structs */
@@ -593,6 +591,14 @@ typedef struct acx111_ie_configoption {
 	co_manuf_t		manufacturer;
 	u8			_padding[4];
 } __attribute__ ((packed)) acx111_ie_configoption_t;
+
+// Misc
+
+typedef struct shared_queueindicator {
+        u32     indicator;
+        u16     host_lock;
+        u16     fw_lock;
+} ACX_PACKED queueindicator_t;
 
 /***********************************************************************
 ** Hardware structures
@@ -795,7 +801,9 @@ struct txhostdesc {
 	u32	Status;			/* 0x14, unused on Tx */
 /* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
-	struct ieee80211_tx_status txstatus;
+
+	// OW ieee80211_tx_status not really required here
+	// struct ieee80211_tx_status txstatus;
 	struct sk_buff *skb;
 
 } ACX_PACKED;
@@ -911,8 +919,11 @@ struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
 	/*** Locking ***/
+	// OW mutex is used to coordinates access from userspace
 	struct mutex		mutex;
+	// OW spinlock is used to protect acx_device adev structure
 	spinlock_t		spinlock;
+
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
 	const char		*last_lock;
@@ -998,7 +1009,10 @@ struct acx_device {
 	int		irq_savedstate;
 	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
-	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
+
+	// OW FIXME Interrupt handling
+	// OW struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
+	struct tasklet_struct interrupt_tasklet;
 
 	unsigned int	irq;
 
@@ -1183,9 +1197,6 @@ struct acx_device {
 
 	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */
 
-#ifdef CONFIG_PCI
-	struct pci_dev	*pdev;
-#endif
 #ifdef CONFIG_VLYNQ
 	struct vlynq_device	*vdev;
 #endif
@@ -1207,6 +1218,7 @@ struct acx_device {
 	volatile u32	*membase;
 #endif
 	unsigned long	membase2;
+#ifdef ACX_MAC80211_PCI
 	void __iomem	*iobase;
 #endif
 #ifdef ACX_MAC80211_MEM
@@ -1214,6 +1226,7 @@ struct acx_device {
 #endif
 
 	void __iomem	*iobase2;
+
 	/* command interface */
 	u8 __iomem	*cmd_area;
 	u8 __iomem	*info_area;
@@ -1654,6 +1667,7 @@ typedef struct acx_template_nullframe {
 **
 ** as opposed to acx100, acx111 dtim interval is AFTER rates_basic111.
 ** NOTE: took me about an hour to get !@#$%^& packing right --> struct packing is eeeeevil... */
+
 typedef struct acx_joinbss {
 	u8	bssid[ETH_ALEN];
 	u16	beacon_interval;

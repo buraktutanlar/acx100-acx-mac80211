@@ -1,3 +1,25 @@
+2009-11-13,2 Oliver Winker <oli1417@hallo.ms>
+
+	* Part2) Miscellaneous changes (common.c ...)
+	
+	- mac80211 API changes
+
+	- Start/stop queue handling
+
+	- Removed #ifdef of older kernel versions
+
+	- pci.c, usb.c: TODO 
+
+	- Misc, smaller changes:
+		. struct ieee80211_tx_info *ctl = IEEE80211_SKB_CB(skb);
+		. Included free irq in e_remove. Avoids crash when modules is removed.
+		. ieee80211_get_tx_rate(adev->ieee, ieeectl)->hw_value changed to 
+			ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate
+		. acx_key_write: Fix on default key 
+		. Fixed productid, etc. in acx_s_parse_configoption
+		. Removed ieee80211_tx_info, since contained in sk_buff *skb
+		. Added ieee80211 queue status to diag output 
+
 2009-11-13,1 Oliver Winker <oli1417@hallo.ms>
 	* First part of a series of commits. These commits roughly group together 
 	changes	in different areas of the acx code. The grouping is done to have 
