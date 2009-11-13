@@ -3022,6 +3022,19 @@ static int acx100_s_init_wep(acx_device_t * adev)
 		goto fail;
 	}
 
+/* OW: This disables WEP by not configuring the WEP cache and leaving
+ * WEPCacheStart=WEPCacheEnd.
+ *
+ * When doing the crypto by mac80211 it is required, that the acx is not doing
+ * any WEP crypto himself. Otherwise TX "WEP key not found" errors occure.
+ *
+ * By disabling WEP using WEPCacheStart=WEPCacheStart the acx not trying any
+ * own crypto anymore. All crypto (including WEP) is pushed to mac80211 for the
+ * moment.
+ *
+ */
+#if 0
+
 	/* let's choose maximum setting: 4 default keys, plus 10 other keys: */
 	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
 	options.WEPOption = 0x00;
@@ -3059,6 +3072,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
+#endif
+
 	/* ...and tell it to start allocating templates at that location */
 	/* (no endianness conversion needed) */
 	pt.PacketTemplateStart = pt.WEPCacheEnd;
@@ -4808,68 +4823,110 @@ int acx_key_write(acx_device_t *adev,
 **
 */
 
-int acx_net_set_key(struct ieee80211_hw *ieee,
-		    enum set_key_cmd cmd, const u8 *local_addr,
-		    const u8 * addr, struct ieee80211_key_conf *key)
-{
-//      return 0;
+int acx_net_set_key(struct ieee80211_hw *ieee, enum set_key_cmd cmd,
+		const u8 *local_addr, const u8 * addr, struct ieee80211_key_conf *key) {
 	struct acx_device *adev = ieee2adev(ieee);
 	unsigned long flags;
 	u8 algorithm;
 	u16 index;
 	int err = -EINVAL;
+
 	FN_ENTER;
-//	TODO();
+
+	/* OW Mac80211 SW crypto support:
+	 *
+	 * For the moment we do all crypto in sw with mac80211.
+	 * Cpu cycles are cheap, and acx100 can do only WEP in hw anyway.
+	 * TODO WEP hw support can still be added later, if required.
+	 */
+
 	switch (key->alg) {
-	default:
-/*	case ALG_NONE:
-	case ALG_NULL:
-		algorithm = ACX_SEC_ALGO_NONE;
-		break;
-*/	case ALG_WEP:
-		if (key->keylen == 5)
+	case ALG_WEP:
+		if (key->keylen == 5) {
 			algorithm = ACX_SEC_ALGO_WEP;
-		else
+			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
+		} else {
 			algorithm = ACX_SEC_ALGO_WEP104;
-		break;
+			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
+		}
+		// OW Let's try WEP in mac80211 sw
+		err = -EOPNOTSUPP;
+		return err;
+
 	case ALG_TKIP:
 		algorithm = ACX_SEC_ALGO_TKIP;
+		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
+		err = -EOPNOTSUPP;
+		return err;
+
 		break;
 	case ALG_CCMP:
 		algorithm = ACX_SEC_ALGO_AES;
+		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_AES");
+		err = -EOPNOTSUPP;
+		return err;
 		break;
+
+	default:
+		FIXME();
+		algorithm = ACX_SEC_ALGO_NONE;
+		err = -EOPNOTSUPP;
+		return err;
 	}
 
+	// OW Everything below this lines, doesn't matter anymore for the moment.
+#if 0
 	index = (u8) (key->keyidx);
 	if (index >= ARRAY_SIZE(adev->key))
 		goto out;
+
 	acx_lock(adev, flags);
+
 	switch (cmd) {
 	case SET_KEY:
+
 		err = acx_key_write(adev, index, algorithm, key, addr);
-		if (err)
+		if (err != -EINPROGRESS)
 			goto out_unlock;
+
 		key->hw_key_idx = index;
-/*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
-/*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
-			adev->default_key_idx = index;*/
-                SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
+
+		/*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
+		/*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
+		 adev->default_key_idx = index;*/
+
+		SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
 		adev->key[index].enabled = 1;
+		err = 0;
+
 		break;
+
 	case DISABLE_KEY:
 		adev->key[index].enabled = 0;
 		err = 0;
 		break;
-    /* case ENABLE_COMPRESSION:
-	case DISABLE_COMPRESSION:
-		err = 0;
-		break; */
+		/* case ENABLE_COMPRESSION:
+		 case DISABLE_COMPRESSION:
+		 err = 0;
+		 break; */
 	}
-      out_unlock:
-	acx_unlock(adev, flags);
-      out:
+
+	out_unlock:
+			acx_unlock(adev, flags);
+
+	if (adev->wep_enabled) {
+			SET_BIT(adev->set_mask, GETSET_WEP);
+			acx_s_update_card_settings(adev);
+			//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	}
+
+	out:
+
 	FN_EXIT0;
+
 	return err;
+#endif
+
 }
 
 

@@ -1,3 +1,23 @@
+2009-11-13,3 Oliver Winker <oli1417@hallo.ms>
+
+	* Part3) mac80211 SW crypto support for WPA(2)
+
+	Doing the crypto by mac80211 requires that the acx is not doing any 
+	WEP crypto himself. Otherwise TX "WEP key not found" errors occur.
+
+	This change disables the WEP crypto by not configuring the WEP cache and 
+	leaving	WEPCacheStart=WEPCacheEnd.
+ 
+	By disabling WEP using WEPCacheStart=WEPCacheStart the is acx not trying any
+	own crypto anymore. All crypto (including WEP) is pushed to mac80211 for the
+	moment.
+
+	=> This allows successful WPA(2) association and data transfers (Tx,Rx) on
+	the hx4700 using the slave-mem interface (mem.c).
+	
+	TODO: Under load condition with slave-mem on hx4700 Rx path still stalls 
+	after some time.
+
 2009-11-13,2 Oliver Winker <oli1417@hallo.ms>
 
 	* Part2) Miscellaneous changes (common.c ...)
