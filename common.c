@@ -34,6 +34,7 @@
 //#include <net/iw_handler.h>
 #include <linux/ethtool.h>
 //#include <linux/utsrelease.h>
+#include <linux/ctype.h>
 
 #include "acx.h"
 
@@ -44,6 +45,9 @@
 #define TIMESTAMP(d) unsigned long d = jiffies
 #endif
 
+// OW Debugging
+#include "wlan_compat.h"
+#include "wlan_hdr.h"
 
 
 /***********************************************************************
@@ -1954,7 +1958,19 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 		log(L_DEBUG, "acx: pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 		    acx2cpu(MemoryConfigOption.pRxHostDesc),
 		    (long)adev->rxhostdesc_startphy);
-	} else {
+	}
+	else if(IS_MEM(adev)) {
+		/*
+		 * ACX ignores DMA_config for generic slave mode.
+		 */
+		MemoryConfigOption.DMA_config = 0;
+		/* Declare start of the Rx host pool */
+		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
+		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
+			acx2cpu(MemoryConfigOption.pRxHostDesc),
+			(long)adev->rxhostdesc_startphy);
+	}
+	else {
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
 	}
 
@@ -1997,6 +2013,17 @@ acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	if (OK != acx_s_issue_cmd(adev, ACX100_CMD_INIT_MEMORY, NULL, 0)) {
 		goto bad;
 	}
+
+#ifdef CONFIG_ACX_MAC80211_MEM
+	/*
+	 * slave memory interface has to manage the transmit pools for the ACX,
+	 * so it needs to know what we chose here.
+	 */
+	adev->acx_txbuf_start = MemoryConfigOption.tx_mem;
+	adev->acx_txbuf_numblocks = MemoryConfigOption.TxBlockNum;
+#endif
+
+
 	FN_EXIT1(OK);
 	return OK;
       bad:
@@ -2065,6 +2092,15 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 			goto fail;
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
+	else if (IS_MEM(adev)) {
+		/* sets the beginning of the rx descriptor queue, after the tx descrs */
+		adev->acx_queue_indicator = (queueindicator_t *) le32_to_cpu (queueconf.QueueEnd);
+
+		if (OK != acxmem_s_create_hostdesc_queues(adev))
+			goto fail;
+
+		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+	}
 
 	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
@@ -2088,6 +2124,8 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 	acx_s_mwait(1000);	/* ? */
 	if (IS_PCI(adev))
 		acxpci_free_desc_queues(adev);
+	else if (IS_MEM(adev))
+		acxmem_free_desc_queues(adev);
       end:
 	FN_EXIT1(res);
 	return res;
@@ -2115,6 +2153,10 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 	/* Set up our host descriptor pool + data pool */
 	if (IS_PCI(adev)) {
 		if (OK != acxpci_s_create_hostdesc_queues(adev))
+			goto fail;
+	}
+	else if (IS_MEM(adev)) {
+		if (OK != acxmem_s_create_hostdesc_queues(adev))
 			goto fail;
 	}
 
@@ -2146,6 +2188,11 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 		memconf.rx_queue1_host_rx_start =
 		    cpu2acx(adev->rxhostdesc_startphy);
 	}
+	else if (IS_MEM(adev))
+	{
+		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rxhostdesc_startphy);
+	}
+
 	/* Tx descriptor queue config */
 	memconf.tx_queue1_count_descs = TX_CNT;
 	/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
@@ -2178,12 +2225,16 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 
 	if (IS_PCI(adev))
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+	else if (IS_MEM(adev))
+		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 
 	FN_EXIT1(OK);
 	return OK;
       fail:
 	if (IS_PCI(adev))
 		acxpci_free_desc_queues(adev);
+	else if (IS_MEM(adev))
+		acxmem_free_desc_queues(adev);
 
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -2320,6 +2371,9 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 	if (IS_PCI(adev)) {
 		return acx100pci_s_set_tx_level(adev, level_dbm);
 	}
+	if (IS_MEM(adev)) {
+		return acx100mem_s_set_tx_level(adev, level_dbm);
+	}
 
 	return OK;
 }
@@ -2358,6 +2412,8 @@ void acx_s_set_defaults(acx_device_t * adev)
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
 		acxpci_set_interrupt_mask(adev);
+	else if (IS_MEM(adev))
+		acxmem_set_interrupt_mask(adev);
 
 	adev->led_power = 1;	/* LED is active on startup */
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
@@ -2378,6 +2434,9 @@ void acx_s_set_defaults(acx_device_t * adev)
 	strncpy(adev->nick, "acx " ACX_RELEASE, IW_ESSID_MAX_SIZE);
 
 	if (IS_PCI(adev)) {	/* FIXME: this should be made to apply to USB, too! */
+		/* first regulatory domain entry in EEPROM == default reg. domain */
+		adev->reg_dom_id = adev->cfgopt_domains.list[0];
+	} else if(IS_MEM(adev)){
 		/* first regulatory domain entry in EEPROM == default reg. domain */
 		adev->reg_dom_id = adev->cfgopt_domains.list[0];
 	}
@@ -3312,7 +3371,15 @@ int acx_s_init_mac(acx_device_t * adev)
 		 * chips have at least some firmware versions making use of an
 		 * external radio module */
 		acxpci_s_upload_radio(adev);
-	} else {
+	}
+	else if (IS_MEM(adev)){
+		adev->memblocksize = 256; /* 256 is default */
+		/* try to load radio for both ACX100 and ACX111, since both
+		 * chips have at least some firmware versions making use of an
+		 * external radio module */
+		acxmem_s_upload_radio(adev);
+	}
+	else {
 		adev->memblocksize = 128;
 	}
 
@@ -3494,8 +3561,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	FN_ENTER;
 
-	log(L_INIT, "acx: get_mask 0x%08X, set_mask 0x%08X\n",
-	    adev->get_mask, adev->set_mask);
+	log(L_DEBUG, "acx: %s: get_mask 0x%08X, set_mask 0x%08X\n",
+	    __func__, adev->get_mask, adev->set_mask);
 
 	/* Track dependencies betweed various settings */
 
@@ -3722,6 +3789,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
 		if (IS_PCI(adev))
 			acxpci_l_power_led(adev, adev->led_power);
+		else if (IS_MEM(adev))
+			acxmem_l_power_led(adev, adev->led_power);
+
 		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
 		acx_unlock(adev, flags);
 	}
@@ -4356,6 +4426,8 @@ int acx_net_reset(struct ieee80211_hw *ieee)
 	FN_ENTER;
 	if (IS_PCI(adev))
 		acxpci_s_reset_dev(adev);
+	if (IS_MEM(adev))
+		acxmem_s_reset_dev(adev);
 	else
 		TODO();
 
@@ -4918,6 +4990,20 @@ acx_s_parse_configoption(acx_device_t * adev,
 
 	pEle++;			/* skip table_count (6) */
 
+	if (IS_MEM(adev) && IS_ACX100(adev))
+	{
+	/*
+	 * For iPaq hx4700 Generic Slave F/W 1.10.7.K.  I'm not sure if these
+	 * 4 extra bytes are before the dot11 things above or after, so I'm just
+	 * going to guess after.  If someone sees these aren't reasonable numbers,
+	 * please fix this.
+	 * The area from which the dot11 values above are read contains:
+	 * 04 01 01 01 00 05 01 06 00 02 01 02
+	 * the 8 dot11 reads above take care of 8 of them, but which 8...
+	 */
+		pEle += 4;
+	}
+
 	adev->cfgopt_antennas.type = pEle[0];
 	adev->cfgopt_antennas.len = pEle[1];
 	printk("acx: AntennaID:%02X Len:%02X Data:",
@@ -4954,6 +5040,19 @@ acx_s_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] + 2;
 	adev->cfgopt_domains.type = pEle[0];
 	adev->cfgopt_domains.len = pEle[1];
+
+	if (IS_MEM(adev) && IS_ACX100(adev))
+	{
+	/*
+	   * For iPaq hx4700 Generic Slave F/W 1.10.7.K.
+	 * There's an extra byte between this structure and the next
+	 * that is not accounted for with this structure's length.  It's
+	 * most likely a bug in the firmware, but we can fix it here
+	 * by bumping the length of this field by 1.
+	 */
+		adev->cfgopt_domains.len++;
+	}
+
 	printk("acx: DomainID:%02X Len:%02X Data:",
 	       adev->cfgopt_domains.type, adev->cfgopt_domains.len);
 	for (i = 0; i < pEle[1]; i++) {
@@ -4998,7 +5097,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 */
 static int __init acx_e_init_module(void)
 {
-	int r1, r2;
+	int r1, r2, r3;
 
 	acx_struct_size_check();
 
@@ -5012,13 +5111,25 @@ static int __init acx_e_init_module(void)
 #else
 	r1 = -EINVAL;
 #endif
+
 #if defined(CONFIG_ACX_MAC80211_USB)
 	r2 = acxusb_e_init_module();
 #else
 	r2 = -EINVAL;
 #endif
-	if (r2 && r1)		/* both failed! */
-		return r2 ? r2 : r1;
+
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	r3 = acxmem_e_init_module();
+#else
+	r3 = -EINVAL;
+#endif
+
+	if (r3 && r2 && r1)		/* all three failed! */
+	{
+		printk ("acx: r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
+		return -EINVAL;
+	}
+
 	/* return success if at least one succeeded */
 	return 0;
 }
@@ -5028,9 +5139,15 @@ static void __exit acx_e_cleanup_module(void)
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_e_cleanup_module();
 #endif
+
 #if defined(CONFIG_ACX_MAC80211_USB)
 	acxusb_e_cleanup_module();
 #endif
+
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	acxmem_e_cleanup_module();
+#endif
+
 }
 
 module_init(acx_e_init_module)

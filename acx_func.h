@@ -402,12 +402,19 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 /* We want to log cmd names */
 int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 static inline int
 acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr)
 {
 	if (IS_PCI(adev))
 		return acxpci_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
-	return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+	if (IS_USB(adev))
+		return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+	if (IS_MEM(adev))
+		return acxmem_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NOT_OK);
 }
 #define acx_s_issue_cmd(adev,cmd,param,len) \
 	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
@@ -424,19 +431,32 @@ int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char*
 
 int acxpci_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
 int acxusb_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
+int acxmem_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
 static inline int
 acx_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd,	void *param, unsigned len, unsigned timeout)
 {
 	if (IS_PCI(adev))
 		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
-	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
+	if (IS_USB(adev))
+		return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
+	if (IS_MEM(adev))
+		return acxmem_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NOT_OK);
 }
 static inline int
 acx_s_issue_cmd(acx_device_t *adev, unsigned cmd, void *param, unsigned len)
 {
 	if (IS_PCI(adev))
 		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
-	return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
+	if (IS_USB(adev))
+		return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
+	if (IS_MEM(adev))
+		return acxmem_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NOT_OK);
 }
 int acx_s_configure(acx_device_t *adev, void *pdr, int type);
 int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
@@ -481,6 +501,7 @@ acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
 */
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
 int acxpci_s_upload_radio(acx_device_t *adev);
+int acxmem_s_upload_radio(acx_device_t *adev);
 
 
 /***********************************************************************
@@ -488,64 +509,108 @@ int acxpci_s_upload_radio(acx_device_t *adev);
 */
 int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 static inline int
 acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
 	if (IS_PCI(adev))
 		return acxpci_s_read_phy_reg(adev, reg, charbuf);
-	return acxusb_s_read_phy_reg(adev, reg, charbuf);
+	if (IS_USB(adev))
+		return acxusb_s_read_phy_reg(adev, reg, charbuf);
+	if (IS_MEM(adev))
+		return acxmem_s_read_phy_reg(adev, reg, charbuf);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NOT_OK);
 }
 
 int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static inline int
 acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 {
 	if (IS_PCI(adev))
 		return acxpci_s_write_phy_reg(adev, reg, value);
-	return acxusb_s_write_phy_reg(adev, reg, value);
+	if (IS_USB(adev))
+		return acxusb_s_write_phy_reg(adev, reg, value);
+	if (IS_MEM(adev))
+		return acxmem_s_write_phy_reg(adev, reg, value);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NOT_OK);
 }
 
 tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
 tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
+
+// OW TODO Included skb->len to check required blocks upfront in acx_l_alloc_tx
+// This should perhaps also go into pci and usb ?!
+tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
 static inline tx_t*
-acx_l_alloc_tx(acx_device_t *adev)
+acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
 {
 	if (IS_PCI(adev))
 		return acxpci_l_alloc_tx(adev);
-	return acxusb_l_alloc_tx(adev);
+	if (IS_USB(adev))
+		return acxusb_l_alloc_tx(adev);
+	if (IS_MEM(adev))
+		return acxmem_l_alloc_tx(adev, len);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NULL);
 }
 
 void acxusb_l_dealloc_tx(tx_t *tx_opaque);
+void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static inline void
 acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_USB(adev))
 		acxusb_l_dealloc_tx(tx_opaque);
+	if (IS_MEM(adev))
+		acxmem_l_dealloc_tx (adev, tx_opaque);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return;
 }
 
 void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-static inline void*
+void* acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+static inline void *
 acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_PCI(adev))
 		return acxpci_l_get_txbuf(adev, tx_opaque);
-	return acxusb_l_get_txbuf(adev, tx_opaque);
+	if (IS_USB(adev))
+		return acxusb_l_get_txbuf(adev, tx_opaque);
+	if (IS_MEM(adev))
+		return acxmem_l_get_txbuf(adev, tx_opaque);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NULL);
 }
 
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_control *ieeectl, struct sk_buff *skb);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_control *ieeectl,
 			struct sk_buff *skb);
+void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 static inline void
 acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_control *ieeectl, struct sk_buff *skb)
 {
 	if (IS_PCI(adev))
-		acxpci_l_tx_data(adev, tx_opaque, len, ieeectl,skb);
-	else
-		acxusb_l_tx_data(adev, tx_opaque, len, ieeectl,skb);
+		return acxpci_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
+	if (IS_USB(adev))
+		return acxusb_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
+	if (IS_MEM(adev))
+		return acxmem_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return;
 }
 
 static inline struct ieee80211_hdr *
@@ -564,6 +629,18 @@ char* acxpci_s_proc_diag_output(char *p, acx_device_t *adev);
 int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
 void acxpci_set_interrupt_mask(acx_device_t *adev);
 int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+
+void acxmem_l_power_led(acx_device_t *adev, int enable);
+int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
+int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxmem_free_desc_queues(acx_device_t *adev);
+int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_proc_eeprom_output(char *p, acx_device_t *adev);
+void acxmem_set_interrupt_mask(acx_device_t *adev);
+int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 void acx_s_mwait(int ms);
 int acx_s_init_mac(acx_device_t *adev);
@@ -638,7 +715,8 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, int queue,
 //int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
 //static void acx_netdev_init(struct net_device *ndev);
 int acxpci_s_reset_dev(acx_device_t *adev);
-void acx_e_after_interrupt_task(struct work_struct* work);
+int acxmem_s_reset_dev(acx_device_t *adev);
+
 void acx_i_set_multicast_list(struct ieee80211_hw *hw,
                             unsigned int changed_flags,
                             unsigned int *total_flags,
@@ -658,7 +736,9 @@ void acx_interrupt_tasklet(struct work_struct *work);
 
 int __init acxpci_e_init_module(void);
 int __init acxusb_e_init_module(void);
+int __init acxmem_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 void __exit acxusb_e_cleanup_module(void);
+void __exit acxmem_e_cleanup_module(void);
 
 #endif /* _ACX_FUNC_H_ */

@@ -61,3 +61,11 @@ config ACX_MAC80211_USB
 
 	Firmware files are not covered by GPL and are not distributed
 	with this driver for legal reasons.
+
+config ACX_MAC80211_MEM
+	bool "TI acx100/acx111 802.11b/g MEM"
+	depends on ACX_MAC80211
+	---help---
+	Include MEM slave memory support in acx.
+	
+		

@@ -1,3 +1,36 @@
+2009-11-13,1 Oliver Winker <oli1417@hallo.ms>
+	* First part of a series of commits. These commits roughly group together 
+	changes	in different areas of the acx code. The grouping is done to have 
+	at least some basic split of the changes. Each single commit however is not 
+	working	stand-alone. 
+	
+	=> The end of this series will define a new baseline, from where single 
+	commits	should be well outlined and workable. 
+	
+	* Part1) Add slave memory support (mem.c)
+	
+		- Add mem.c from linux-handhelds-2.6-2.6.21-hh20-r16
+		
+		- Port diffs from pci.c to mem.c 
+		
+		- Interrupt handling is currently basic. Need to put back the workqueue.
+	
+		- acxmem_l_alloc_tx: Make a detailed check of required tx_buf block, to 
+		avoid a 'out of tx_buf' situation. The empty tx_buf and reuse trick in 
+		acxmem_l_tx_data didn't work so well. If not enough, we stop the queues 
+		and report to max80211 NOT_OK (which seems to work, although we 
+		shouldn't ...)
+		  
+		- Include for debugging: #include "wlan_compat.h", #include "wlan_hdr.h"
+	
+		- acxmem_l_alloc_tx(acx_device_t *adev): 
+		Fix if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_HOSTOWN)))
+	
+		- Uncoupled code dependency between hx4700_acx.c (hx4700_acx.ko) and 
+		mem.c (acx_mac80211.ko) via "struct acx_hardware_data" (start_hw, 
+		stop_hw). Start/stop of HW done using module functions called in 
+		corresponding sequence.
+		
 2008-02-10 Matteo Croce <rootkit85@users.sf.net>
 	* Makefile: add support for out-of-kernel module compilation.
 	* Dropped support for kernel versions older than 2.6.19.
@@ -33,7 +66,7 @@
     (supported ones, that is: >= 2.6.10), then please yell immediately!
     Those people *REALLY* want me to concentrate on getting this stuff ready for
     mainline, it seems...
-  - MAC address change fix (contributed by Carlos Martín Nieto/Luis Padilla)
+  - MAC address change fix (contributed by Carlos Martï¿½n Nieto/Luis Padilla)
   - fix iwlist wlan0 scan output (updated wrong pointer variable --> only one
     single rate value listed, doh!)
   - fix buggy hidden ESSID handling (didn't cover all variants in all places)

@@ -68,6 +68,8 @@ enum { acx_debug = 0 };
 */
 #define ACX_PACKED __attribute__ ((packed))
 
+#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
+
 /***********************************************************************
 ** Constants
 */
@@ -84,13 +86,14 @@ enum { acx_debug = 0 };
 /* Supported interfaces */
 #define DEVTYPE_PCI		0
 #define DEVTYPE_USB		1
+#define DEVTYPE_MEM		2
 
-#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
-#error Driver must include PCI and/or USB support. You selected neither.
+#if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB) || defined(CONFIG_ACX_MAC80211_MEM))
+#error Driver must include PCI and/or USB, MEM support. You selected neither.
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
- #if !defined(CONFIG_ACX_MAC80211_USB)
+ #if !(defined(CONFIG_ACX_MAC80211_USB) || defined(CONFIG_ACX_MAC80211_MEM))
   #define IS_PCI(adev)	1
  #else
   #define IS_PCI(adev)	((adev)->dev_type == DEVTYPE_PCI)
@@ -100,7 +103,7 @@ enum { acx_debug = 0 };
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_USB)
- #if !defined(CONFIG_ACX_MAC80211_PCI)
+ #if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
   #define IS_USB(adev)	1
  #else
   #define IS_USB(adev)	((adev)->dev_type == DEVTYPE_USB)
@@ -108,6 +111,17 @@ enum { acx_debug = 0 };
 #else
  #define IS_USB(adev)	0
 #endif
+
+#if defined(CONFIG_ACX_MAC80211_MEM)
+ #if !(defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_USB))
+  #define IS_MEM(adev)	1
+ #else
+  #define IS_MEM(adev)	((adev)->dev_type == DEVTYPE_MEM)
+ #endif
+#else
+ #define IS_MEM(adev)	0
+#endif
+
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
@@ -700,7 +714,7 @@ typedef struct acx111_ie_configoption {
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */
-#ifdef ACX_MAC80211_PCI
+#if defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM)
 
 /* Register I/O offsets */
 #define ACX100_EEPROM_ID_OFFSET	0x380
@@ -904,6 +918,11 @@ struct acx_device {
 	const char		*last_lock;
 	unsigned long		sem_time;
 	unsigned long		lock_time;
+#endif
+
+// OW TODO Used in mem.c. Maybe not really required.
+#if defined(CONFIG_ACX_MAC80211_MEM)
+        spinlock_t              txbuf_lock;
 #endif
 
 	/*** Linux network device ***/
@@ -1114,6 +1133,15 @@ struct acx_device {
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
 
+#ifdef CONFIG_ACX_MAC80211_MEM
+	u32 acx_txbuf_start;
+	int acx_txbuf_numblocks;
+	u32 acx_txbuf_free; /* addr of head of free list          */
+	int acx_txbuf_blocks_free; /* how many are still open            */
+	queueindicator_t *acx_queue_indicator;
+#endif
+
+
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
@@ -1122,7 +1150,7 @@ struct acx_device {
 	dma_addr_t	rxhostdesc_startphy;
 
 	/*** PCI stuff ***/
-#ifdef ACX_MAC80211_PCI
+#if (defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM))
 	/* pointers to tx buffers, tx host descriptors (in host memory)
 	** and tx descs in device memory */
 	unsigned int	tx_tail;
@@ -1162,9 +1190,29 @@ struct acx_device {
 	struct vlynq_device	*vdev;
 #endif
 	struct device *bus_dev;
+
+// OW FIXME Type and ifdef mess ..
+#ifdef ACX_MAC80211_PCI
+	struct pci_dev	*pdev;
+#endif
+#ifdef ACX_MAC80211_MEM
+	struct platform_device	*pdev;
+#endif
+
+// OW FIXME Type and ifdef mess ..
+#ifdef ACX_MAC80211_PCI
 	unsigned long	membase;
+#endif
+#ifdef ACX_MAC80211_MEM
+	volatile u32	*membase;
+#endif
 	unsigned long	membase2;
 	void __iomem	*iobase;
+#endif
+#ifdef ACX_MAC80211_MEM
+	volatile u32	*iobase;
+#endif
+
 	void __iomem	*iobase2;
 	/* command interface */
 	u8 __iomem	*cmd_area;
