@@ -35,7 +35,7 @@ struct acx_interface {
         /* MAC address. */
         u8 *mac_addr;
         /* Current BSSID (if any). */
-        u8 *bssid;
+        const u8 *bssid;
 
         /* Interface type. (IEEE80211_IF_TYPE_XXX) */
         int type;

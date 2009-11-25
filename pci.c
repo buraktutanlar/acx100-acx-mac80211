@@ -51,6 +51,8 @@
 #endif
 
 #include "acx.h"
+#include "wlan_compat.h"
+#include "wlan_hdr.h"
 
 /***********************************************************************
 */
@@ -98,7 +100,7 @@
 
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 
-static void disable_acx_irq(acx_device_t * adev);
+static void acxpci_disable_acx_irq(acx_device_t * adev);
 
 static int acxpci_e_open(struct ieee80211_hw *hw);
 static void acxpci_e_close(struct ieee80211_hw *hw);
@@ -174,7 +176,7 @@ INLINE_IO void write_flush(acx_device_t * adev)
 	readb(adev->iobase);
 }
 
-INLINE_IO int adev_present(acx_device_t * adev)
+INLINE_IO int adev_present(acx_device_t *adev)
 {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
@@ -1110,6 +1112,10 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 	/* now write the actual command type */
 	acxpci_write_cmd_type_status(adev, cmd, 0);
+
+	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
+	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
+
 	/* execute command */
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_CMD);
 	write_flush(adev);
@@ -1122,11 +1128,12 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	cmd_timeout = (cmd_timeout - 1) | 1;
 	if (unlikely(cmd_timeout > 1199))
 		cmd_timeout = 1199;
-	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
-	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
+	
 	/* we schedule away sometimes (timeout can be large) */
 	counter = cmd_timeout;
-	timeout = jiffies + HZ;
+	timeout = jiffies + cmd_timeout * HZ / 1000;
+
+	
 	do {
 		if (!adev->irqs_active) {	/* IRQ disabled: poll */
 			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
@@ -1142,8 +1149,9 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		}
 
 		if (counter % 8 == 0) {
+			// Timeout
 			if (time_after(jiffies, timeout)) {
-				counter = 0;
+				counter = -1;
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
@@ -1157,7 +1165,8 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
-	if ((cmd_timeout - counter) == 0) {		/* timed out! */
+	/* timed out! */
+	if (counter == -1) {
 		printk("acx: %s: " FUNC "(): timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
@@ -1165,11 +1174,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 		printk("acx: hack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
-	} else if (counter == 0) {	/* maybe timed out! */
-		log(L_CTL | L_DEBUG, "acx: " FUNC "(): %s for CMD_COMPLETE %dms. "
-		    "count:%d. Please report\n",
-		    (adev->irqs_active) ? "waited" : "polled",
-		    cmd_timeout - counter, counter);
+
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, "acx: " FUNC "(): %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
@@ -1213,7 +1218,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 #else
 	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
 #endif
-	dump_stack();
+	// dump_stack();
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
@@ -1324,7 +1329,8 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 		       adev->txhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
 		       adev->txbuf_startphy);
-
+	
+	// OW FIXME Review locking
 	acx_lock(adev, flags);
 	adev->txdesc_start = NULL;
 	acx_unlock(adev, flags);
@@ -1471,7 +1477,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.configure_filter = acx_i_set_multicast_list,
 	.stop = acxpci_e_close,
 	.config = acx_net_config,
-	.config_interface = acx_config_interface,
+	.bss_info_changed = acx_net_bss_info_changed,
 	.set_key = acx_net_set_key,
 	.get_stats = acx_e_get_stats,
 	.get_tx_stats = acx_net_get_tx_stats,
@@ -1504,15 +1510,23 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!ieee) {
 		printk("acx: could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
-		goto fail_alloc_netdev;
+		goto fail_ieee80211_alloc_hw;
 	}
+
+	/* Initialize driver private data */
+	SET_IEEE80211_DEV(ieee, &pdev->dev);
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
 			/* TODO: mainline doesn't support the following flags yet */
 			/*
 			  ~IEEE80211_HW_MONITOR_DURING_OPER &
 			  ~IEEE80211_HW_WEP_INCLUDE_IV;
 			*/
+
+	ieee->wiphy->interface_modes =
+		BIT(NL80211_IFTYPE_STATION) |
+		BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
+	// OW TODO Check if RTS/CTS threshold can be included here
 
 	/* TODO: although in the original driver the maximum value was 100,
 	 * the OpenBSD driver assigns maximum values depending on the type of
@@ -1619,13 +1633,13 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem1 = pci_iomap(pdev, mem_region1, 0);
 	if (!mem1) {
 		printk(KERN_WARNING "acx: ioremap() FAILED\n");
-		goto fail_ioremap1;
+		goto fail_iomap1;
 	}
 
 	mem2 = pci_iomap(pdev, mem_region2, 0);
 	if (!mem2) {
 		printk(KERN_WARNING "acx: ioremap() #2 FAILED\n");
-		goto fail_ioremap2;
+		goto fail_iomap2;
 	}
 
 	printk("acx: found an %s-based wireless network card at %s, irq:%d, "
@@ -1643,19 +1657,18 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	adev->iobase2 = mem2;
 	adev->irq = pdev->irq;
 
-
-	if (0 == pdev->irq) {
+	if (adev->irq == 0) {
 		printk("acx: can't use IRQ 0\n");
-		goto fail_irq;
+		goto fail_no_irq;
 	}
-	SET_IEEE80211_DEV(ieee, &pdev->dev);
+	// OW TODO Cleanup SET_IEEE80211_DEV(ieee, &pdev->dev);
 
 	/* request shared IRQ handler */
-	if (request_irq
-	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
+	if (request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME,
+			adev)) {
 		printk("acx: %s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
-		goto done;
+		goto fail_request_irq;
 	}
 	log(L_DEBUG | L_IRQ, "acx: request_irq %d successful\n", adev->irq);
 
@@ -1676,7 +1689,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
 	if (OK != acxpci_s_reset_dev(adev))
-		goto fail_reset;
+		goto fail_reset_dev;
 
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly after reset */
@@ -1690,9 +1703,10 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		/* ACX111: configopt struct needs to be queried after full init */
 		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
-/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+
+	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		goto fail_read_eeprom_version;
+		goto fail_read_eeprom_byte;
 
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev);
@@ -1703,8 +1717,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 
-
-	acx_proc_register_entries(ieee, 0);
+	if (acx_proc_register_entries(ieee, 0) != OK)
+		goto fail_proc_register_entries;
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
@@ -1728,17 +1742,18 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_save_state(pdev);
 #endif
 
+
 	err = acx_setup_modes(adev);
 	if (err) {
-	printk("acx: can't register hwmode\n");
-		goto fail_register_netdev;
+	printk("acx: can't setup hwmode\n");
+		goto fail_setup_modes;
 	}
 
 	acx_init_task_scheduler(adev);
 	err = ieee80211_register_hw(ieee);
 	if (OK != err) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", err);
-		goto fail_register_netdev;
+		goto fail_ieee80211_register_hw;
 	}
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
@@ -1749,41 +1764,67 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* error paths: undo everything in reverse order... */
 
+	// err = ieee80211_register_hw(ieee);
+	fail_ieee80211_register_hw:
+		ieee80211_unregister_hw(ieee);
 
-	acxpci_s_delete_dma_regions(adev);
-	pci_set_drvdata(pdev, NULL);
+	// err = acx_setup_modes(adev)
+	fail_setup_modes:
 
-fail_init_mac:
-fail_read_eeprom_version:
-fail_reset:
+	// acx_proc_register_entries(ieee, 0)
+	fail_proc_register_entries:
+		acx_proc_unregister_entries(ieee, 0);
 
-fail_alloc_netdev:
-fail_irq:
-	pci_iounmap(pdev, mem2);
+	// acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version)
+	fail_read_eeprom_byte:
 
-fail_ioremap2:
-	pci_iounmap(pdev, mem1);
+	// acx_s_init_mac(adev)
+	fail_init_mac:
 
-fail_ioremap1:
-	pci_release_region(pdev, mem_region2);
+	// acxpci_s_reset_dev(adev)
+	fail_reset_dev:
 
-fail_request_mem_region2:
-	pci_release_region(pdev, mem_region1);
+	// request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME,
+	fail_request_irq:
+		free_irq(adev->irq, adev);
 
-fail_request_mem_region1:
-fail_unknown_chiptype:
-	pci_disable_device(pdev);
+	fail_no_irq:
 
-fail_pci_enable_device:
+	// pci_iomap(pdev, mem_region2, 0)
+	fail_iomap2:
+		pci_iounmap(pdev, mem2);
+
+	// pci_iomap(pdev, mem_region1, 0)
+	fail_iomap1:
+		pci_iounmap(pdev, mem1);
+
+	// 	err = pci_request_region(pdev, mem_region2, "acx_2");
+	fail_request_mem_region2:
+		pci_release_region(pdev, mem_region2);
+
+	// err = pci_request_region(pdev, mem_region1, "acx_1");
+	fail_request_mem_region1:
+		pci_release_region(pdev, mem_region1);
+
+	fail_unknown_chiptype:
+
+	// pci_enable_device(pdev)
+	fail_pci_enable_device:
+		pci_disable_device(pdev);
+		pci_set_drvdata(pdev, NULL);
+
+	// OW TODO Check if OK for PM
 #ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
-fail_register_netdev:
-	ieee80211_free_hw(ieee);
-done:
-	FN_EXIT1(result);
-	return result;
+	// ieee80211_alloc_hw
+	fail_ieee80211_alloc_hw:
+		ieee80211_free_hw(ieee);
+
+	done:
+		FN_EXIT1(result);
+		return result;
 }
 
 
@@ -1809,6 +1850,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		goto end;
 	}
 
+	acx_sem_lock(adev);
+
 	/* If device wasn't hot unplugged... */
 	if (adev_present(adev)) {
 
@@ -1818,6 +1861,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 			adev->initialized = 0;
 		}
+
 #ifdef REDUNDANT
 		/* put the eCPU to sleep to save power
 		 * Halting is not possible currently,
@@ -1850,21 +1894,25 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
 	 */
-//	acxpci_e_close(hw);
+	//	acxpci_e_close(hw);
 	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 
 	/* unregister_netdev ensures that no references to us left.
 	 * For paranoid reasons we continue to follow the rules */
-	acx_sem_lock(adev);
 
 	if (adev->dev_state_mask & ACX_STATE_IFACE_UP) {
 		acxpci_s_down(hw);
 		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	}
 
+	// Proc
 	acx_proc_unregister_entries(adev->ieee, 0);
 
+	// IRQ
+	free_irq(adev->irq, adev);
+
+	// Mem regions
 	if (IS_ACX100(adev)) {
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region2 = PCI_ACX100_REGION2;
@@ -1888,8 +1936,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	/* remove dev registration */
 	pci_set_drvdata(pdev, NULL);
 
-	acx_sem_unlock(adev);
-
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
 	 * by a netdev timeout handler execution
@@ -1900,7 +1946,10 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 #ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
-      end:
+
+	acx_sem_unlock(adev);
+
+	end:
 	FN_EXIT0;
 }
 
@@ -2002,7 +2051,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 ** - calls acx_s_start
 */
 
-static void enable_acx_irq(acx_device_t * adev)
+static void acxpci_enable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -2019,7 +2068,7 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 	FN_ENTER;
 
 	acx_lock(adev, flags);
-	enable_acx_irq(adev);
+	acxpci_enable_acx_irq(adev);
 	acx_unlock(adev, flags);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
@@ -2048,7 +2097,8 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 ** sets status == STOPPED
 */
 
-static void disable_acx_irq(acx_device_t * adev)
+// OW TODO Rename to acxpci_disable_irq
+static void acxpci_disable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
 
@@ -2057,6 +2107,8 @@ static void disable_acx_irq(acx_device_t * adev)
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_flush(adev);
+
 	adev->irqs_active = 0;
 
 	FN_EXIT0;
@@ -2065,13 +2117,17 @@ static void disable_acx_irq(acx_device_t * adev)
 static void acxpci_s_down(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
 
 	FN_ENTER;
 
 	/* Disable IRQs first, so that IRQs cannot race with us */
 	/* then wait until interrupts have finished executing on other CPUs */
-	disable_acx_irq(adev); /* NO sem-locking here? */
+
+	acx_lock(adev, flags);
+	acxpci_disable_acx_irq(adev);
 	synchronize_irq(adev->irq);
+	acx_unlock(adev, flags);
 
 	/* we really don't want to have an asynchronous tasklet disturb us
 	 ** after something vital for its job has been shut down, so
@@ -2088,15 +2144,25 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
 	 ** Work around that by temporary sem unlock.
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
-	acx_sem_unlock(adev);
-	flush_scheduled_work();
-	acx_sem_lock(adev);
+
+	//acx_sem_unlock(adev);
+
+	// OW TODO I'm not sure if explicit flushing is still required or done
+	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
+	// hang upon .remove_interface and .close and .stop
+
+	// OW flush_scheduled_work();
+	//acx_sem_lock(adev);
 
 	/* This is possible:
 	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
 	 ** -> set_status(ASSOCIATED) -> wake_queue()
 	 ** That's why we stop queue _after_ flush_scheduled_work
 	 ** lock/unlock is just paranoia, maybe not needed */
+
+	acx_lock(adev, flags);
+	acx_stop_queue(adev->ieee, "on ifdown");
+	acx_unlock(adev, flags);
 
 	/* kernel/timer.c says it's illegal to del_timer_sync()
 	 ** a timer which restarts itself. We guarantee this cannot
@@ -2183,32 +2249,33 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 static void acxpci_e_close(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
 
 	FN_ENTER;
 
 	acx_sem_lock(adev);
 
 	/* ifdown device */
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	if (adev->initialized) {
 		acxpci_s_down(hw);
 	}
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
-	if (adev->modes)
-		acx_free_modes(adev);
-#endif
 	/* disable all IRQs, release shared IRQ handler */
+	acx_lock(adev, flags);
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_flush(adev);
+	acx_unlock(adev, flags);
 
-/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
 	/* We currently don't have to do anything else.
 	 * Higher layers know we're not ready from dev->start==0 and
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
+	adev->initialized = 0;
 	acx_sem_unlock(adev);
 
 	log(L_INIT, "acx: closed device\n");
@@ -2472,9 +2539,10 @@ void acx_interrupt_tasklet(struct work_struct *work)
 #else
 # define acxirq_handled(irq)    do { /* nothing */ } while (0)
 #endif /* CONFIG_ACX_MAC80211_DEBUG */
-	acx_device_t *adev = container_of(work,struct acx_device, after_interrupt_task);
+	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
 //	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	int irqtype;
+	unsigned long flags;
 
 #define IRQ_ITERATE 0
 #if IRQ_ITERATE
@@ -2486,7 +2554,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
 	 * I am paranoid */
-	acx_sem_lock(adev);
+	acx_lock(adev, flags);
 
 	irqtype = adev->irq_reason;
 	adev->irq_reason = 0;
@@ -2516,9 +2584,9 @@ void acx_interrupt_tasklet(struct work_struct *work)
 			 * with a full Tx buffer if we go into
 			 * acxpci_l_clean_txdesc() at a time when we won't wakeup
 			 * the net queue in there for some reason...) */
-//			if (adev->tx_free <= TX_START_CLEAN) {
+			if (adev->tx_free <= TX_START_CLEAN) {
 				acxpci_l_clean_txdesc(adev);
-//			}
+			}
 		}
 
 		/* Less frequent ones */
@@ -2539,10 +2607,11 @@ void acx_interrupt_tasklet(struct work_struct *work)
 
 		/* These we just log, but either they happen rarely
 		 * or we keep them masked out */
-		if (irqtype & (0 | HOST_INT_RX_DATA
-				/* | HOST_INT_TX_COMPLETE   */
+		if (irqtype & (0
+				| HOST_INT_RX_DATA
+				/* | HOST_INT_TX_COMPLETE  */
 				| HOST_INT_TX_XFER
-		/* | HOST_INT_RX_COMPLETE   */
+				/* | HOST_INT_RX_COMPLETE */
 				| HOST_INT_DTIM
 				| HOST_INT_BEACON
 				| HOST_INT_TIMER
@@ -2557,6 +2626,7 @@ void acx_interrupt_tasklet(struct work_struct *work)
 				| HOST_INT_UNKNOWN)) {
 			log_unusual_irq(irqtype);
 		}
+
 #if IRQ_ITERATE
 		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 		irqtype = unmasked & ~adev->irq_mask;
@@ -2584,11 +2654,12 @@ void acx_interrupt_tasklet(struct work_struct *work)
 	*/
 
 	/* write_flush(adev); - not needed, last op was read anyway */
-	acx_sem_unlock(adev);
+	acx_unlock(adev, flags);
 
-/* handled: */
-	if (adev->after_interrupt_jobs)
-		acx_e_after_interrupt_task(&adev->after_interrupt_task);
+	/* handled: */
+	// OW TODO Check
+	//	if (adev->after_interrupt_jobs)
+	//		acx_e_after_interrupt_task(adev);
 
 	FN_EXIT0;
 	return;
@@ -2613,13 +2684,12 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	acx_lock(adev, flags);
 
-
 	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 	if (unlikely(0xffff == unmasked)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "acx: IRQ type:FFFF - device removed? IRQ_NONE\n");
+		log(L_IRQ, "acx: unmasked:FFFF: Device removed? IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2628,8 +2698,8 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	if (!irqtype) {
 		/* We are on a shared IRQ line and it wasn't our IRQ */
 		log(L_IRQ,
-		    "acx: IRQ type:%04X, mask:%04X - all are masked, IRQ_NONE\n",
-		    unmasked, adev->irq_mask);
+				"acx: irqtype=%04X, unmasked=%04X, mask=%04X: All are masked, IRQ_NONE\n",
+				irqtype, unmasked, adev->irq_mask);
 		goto none;
 	}
 
@@ -2640,6 +2710,9 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 		/* save the state for the running issue_cmd() */
 		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	}
+	log(L_IRQ,
+			"acx: irqtype=%04X, unmasked=%04X, mask=%04X: will IRQ_HANDLED\n",
+			irqtype, unmasked, adev->irq_mask);
 
 	/* Only accept IRQs, if we are initialized properly.
 	 * This avoids an RX race while initializing.
@@ -2659,10 +2732,11 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	acx_unlock(adev, flags);
 	FN_EXIT0;
 	return IRQ_HANDLED;
-      none:
-	acx_unlock(adev, flags);
-	FN_EXIT0;
-	return IRQ_NONE;
+
+	none:
+		acx_unlock(adev, flags);
+		FN_EXIT0;
+		return IRQ_NONE;
 
 }
 
@@ -3044,6 +3118,8 @@ tx_t *acxpci_l_alloc_tx(acx_device_t * adev)
 
 	/* 2005-10-11: there were several bug reports on this happening
 	 ** but now cause seems to be understood & fixed */
+
+	// TODO OW Check if this is correct
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
@@ -3106,11 +3182,17 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_ENTER;
 
 	/* fw doesn't tx such packets anyhow */
-/*	if (unlikely(len < WLAN_HDR_A3_LEN))
+	/*	if (unlikely(len < WLAN_HDR_A3_LEN))
 		goto end;
-*/
+	 */
+
 	hostdesc1 = get_txhostdesc(adev, txdesc);
 	wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
+
+	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
+	// OW TODO Check. Fix in mem.c if working
+	wlhdr_len = WLAN_HDR_A3_LEN;
+
 	/* modify flag status in separate variable to be able to write it back
 	 * in one big swoop later (also in order to have less device memory
 	 * accesses) */
@@ -3126,42 +3208,24 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
-	if (ieeectl->flags & IEEE80211_TX_CTL_USE_RTS_CTS)
+	if (ieeectl->flags & IEEE80211_TX_RC_USE_RTS_CTS)
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
-	//OW TODO Make Obselete
-	rate_cur = ieeectl->tx_rate;
-#else
-	//OW rate_cur = ieeectl->tx_rate->bitrate;
 	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-#endif
+
 	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
 		goto end;
 	}
 
 	/* used in tx cleanup routine for auto rate and accounting: */
-/*	put_txcr(adev, txdesc, clt, rate_cur);  deprecated by mac80211 */
+	/*	put_txcr(adev, txdesc, clt, rate_cur);  deprecated by mac80211 */
 
 	txdesc->total_length = cpu_to_le16(len);
-	// OW wlhdr_len = ieee80211_get_hdrlen(le16_to_cpu(wireless_header->frame_control));
-	wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
 	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
-/*
-	if (!ieeectl->do_not_encrypt && ieeectl->key_idx>= 0)
-	{
-		u16 key_idx = (u16)(ieeectl->key_idx);
-		struct acx_key* key = &(adev->key[key_idx]);
-		int wlhdr_len;
-		if (key->enabled)
-		{
-			memcpy(ieeehdr->wep_iv, ((u8*)wireless_header) + wlhdr_len, 4);
-		}
-	}
-*/
+
 	if (IS_ACX111(adev)) {
 		/* note that if !txdesc->do_auto, txrate->cur
 		 ** has only one nonzero bit */
@@ -3173,19 +3237,18 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 						    ** Disabled for now --vda */
 						   /*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
 		    );
+
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		/* should add this to rate111 above as necessary */
 		|(clt->pbcc511 ? RATE111_PBCC511 : 0)
 #endif
 		    hostdesc1->length = cpu_to_le16(len);
-	} else {		/* ACX100 */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
-		u8 rate_100 = ieeectl->tx_rate;
-#else
-		//OW u8 rate_100 = ieeectl->tx_rate->bitrate;
+	}
+	/* ACX100 */
+	else {
 		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-#endif
 		txdesc->u.r1.rate = rate_100;
+
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {
 			if (n == RATE100_5 || n == RATE100_11)
@@ -3195,13 +3258,16 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		if (clt->shortpre && (clt->cur != RATE111_1))
 			SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE);	/* set Short Preamble */
 #endif
+
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(Ctl_8,
 			DESC_CTL_AUTODMA | DESC_CTL_RECLAIM |
 			DESC_CTL_FIRSTFRAG);
+
 #if ACX_FRAGMENTATION
 		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
 #endif
+
 		hostdesc1->length = cpu_to_le16(wlhdr_len);
 	}
 	/* don't need to clean ack/rts statistics here, already
@@ -3224,26 +3290,37 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/* flush writes before we tell the adapter that it's its turn now */
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 	write_flush(adev);
+
+	hostdesc1->skb = skb;
+
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
 	 * Do separate logs for acx100/111 to have human-readable rates */
-        memcpy(&(hostdesc1->txstatus),ieeectl,sizeof(struct ieee80211_tx_info));
-        hostdesc1->skb = skb;
-      end:
+
+	end:
+      	
+	// Debugging
+	if (unlikely(acx_debug & (L_XFER|L_DATA))) {
+		u16 fc = ((struct ieee80211_hdr *) hostdesc1->data)->frame_control;
+		if (IS_ACX111(adev))
+			printk("acx: tx: pkt (%s): len %d "
+				"rate %04X%s status %u\n", acx_get_packet_type_string(
+					le16_to_cpu(fc)), len, le16_to_cpu(txdesc->u.r2.rate111), (le16_to_cpu(txdesc->u.r2.rate111)& RATE111_SHORTPRE) ? "(SPr)" : "",
+					adev->status);
+		else
+			printk("acx: tx: pkt (%s): len %d rate %03u%s status %u\n",
+					acx_get_packet_type_string(fc), len, txdesc->u.r1.rate, (Ctl_8
+							& DESC_CTL_SHORT_PREAMBLE) ? "(SPr)" : "",
+					adev->status);
+
+		if (0 && acx_debug & L_DATA) {
+			printk("acx: tx: 802.11 [%d]: ", len);
+			acx_dump_bytes(hostdesc1->data, len);
+		}
+	}
+      	
 	FN_EXIT0;
 }
-
-
-/***********************************************************************
-** acxpci_l_clean_txdesc
-**
-** This function resets the txdescs' status when the ACX100
-** signals the TX done IRQ (txdescs have been processed), starting with
-** the pool index of the descriptor which we would use next,
-** in order to make sure that we can be as fast as possible
-** in filling new txdescs.
-** Everytime we get called we know where the next packet to be cleaned is.
-*/
 
 #if !ACX_DEBUG
 static inline void log_txbuffer(const acx_device_t * adev)
@@ -3339,7 +3416,8 @@ static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 			acx_schedule_task(adev,
 					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 		}
-		info->status.excessive_retries++;
+		// OW TODO Check what to do with excessive_retries in mac80211, 2.6.31
+		// info->status.excessive_retries++;
 		break;
 	case 0x40:
 		err = "Tx buffer overflow";
@@ -3368,6 +3446,16 @@ static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 		       wiphy_name(adev->ieee->wiphy), error, finger);
 }
 
+/***********************************************************************
+** acxpci_l_clean_txdesc
+**
+** This function resets the txdescs' status when the ACX100
+** signals the TX done IRQ (txdescs have been processed), starting with
+** the pool index of the descriptor which we would use next,
+** in order to make sure that we can be as fast as possible
+** in filling new txdescs.
+** Everytime we get called we know where the next packet to be cleaned is.
+*/
 
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 {
@@ -3377,6 +3465,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 	int num_cleaned;
 	u16 r111;
 	u8 error, ack_failures, rts_failures, rts_ok, r100;
+	struct ieee80211_tx_info *txstatus;
 
 	FN_ENTER;
 
@@ -3420,20 +3509,17 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		r100 = txdesc->u.r1.rate;
 		r111 = le16_to_cpu(txdesc->u.r2.rate111);
 
+		// OW TODO 20091116 Compare mem.c
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
 		hostdesc = get_txhostdesc(adev, txdesc);
+		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
+		txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-		hostdesc->txstatus.flags |= IEEE80211_TX_STAT_ACK;
 		if (unlikely(0x30 & error)) {
 			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
 			 * all other errors mean we screwed up locally */
-/*			union iwreq_data wrqu;
-			struct ieee80211_hdr_3addr *hdr;
-			hdr = (struct ieee80211_hdr_3addr *) hostdesc->data;
-			MAC_COPY(wrqu.addr.sa_data, hdr->addr1);
-*/
-			hostdesc->txstatus.flags &= ~IEEE80211_TX_STAT_ACK;
+			txstatus->flags &= ~IEEE80211_TX_STAT_ACK;
 		}
 
 		/* ...and free the desc */
@@ -3449,6 +3535,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		num_cleaned++;
 
 		if ((adev->tx_free >= TX_START_QUEUE)
+				 &&	acx_queue_stopped(adev->ieee)
 /*		    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
 		    /*&& (acx_queue_stopped(adev->ieee))*/
 		    ) {
@@ -3478,7 +3565,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		}
 */
 		if (unlikely(error))
-			handle_tx_error(adev, error, finger,  &hostdesc->txstatus);
+			handle_tx_error(adev, error, finger,  txstatus);
 
 		if (IS_ACX111(adev))
 			log(L_BUFT,
@@ -3492,11 +3579,13 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		/* And finally report upstream */
 		if (hostdesc)
 		{
-			hostdesc->txstatus.status.excessive_retries = rts_failures ;
-			hostdesc->txstatus.status.retry_count = ack_failures;
-			ieee80211_tx_status(adev->ieee, hostdesc->skb);
-			//OW ieee80211_tx_status(adev->ieee,hostdesc->skb, &hostdesc->txstatus);
-			memset(&hostdesc->txstatus, 0, sizeof(struct ieee80211_tx_info));
+			// TODO OW Does below still exists in mac80211 ??
+			// OW txstatus.status.excessive_retries = rts_failures;
+			// OW txstatus.status.retry_count = ack_failures;
+
+			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
+
+			memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
 		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
@@ -3684,6 +3773,8 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 */
 /* the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end */
+
+// OW FIXME Put this as const into function
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 
 static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)

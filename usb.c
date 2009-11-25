@@ -1789,6 +1789,7 @@ void __exit acxusb_e_cleanup_module(void)
 /***********************************************************************
 ** DEBUG STUFF
 */
+// OW TODO Could perhaps go into the proc-debug info for usb ?
 #if ACX_DEBUG
 
 #ifdef UNUSED

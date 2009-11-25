@@ -1,3 +1,15 @@
+2009-11-25 Oliver Winker <oli1417@hallo.ms>
+
+	* 2.6.31 fixes and pci.c WPA working basically
+	
+	- pci.c: 
+	. WPA assoc and data transfer working basically, tested on 
+	  DWL-650+, Acx100
+	. Load condition not stable yet
+	
+	- mem.c: update 2.6.31 TODO
+	- usb.c: TODO
+
 2009-11-13,4 Oliver Winker <oli1417@hallo.ms>
 
 	* Part4) Proc-FS fixes

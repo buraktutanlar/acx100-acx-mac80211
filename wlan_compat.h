@@ -217,13 +217,6 @@
 /*=============================================================*/
 #define WLAN_PACKED	__attribute__ ((packed))
 
-/* Interrupt handler backwards compatibility stuff */
-#ifndef IRQ_NONE
-#define IRQ_NONE
-#define IRQ_HANDLED
-typedef void irqreturn_t;
-#endif
-
 #ifndef ARPHRD_IEEE80211_PRISM
 #define ARPHRD_IEEE80211_PRISM 802
 #endif

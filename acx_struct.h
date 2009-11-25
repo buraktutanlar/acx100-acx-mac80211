@@ -949,13 +949,8 @@ struct acx_device {
 //	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
 	struct ieee80211_hw	*ieee;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,25)
-	struct ieee80211_hw_mode	modes[2];
-#endif
 	struct ieee80211_rx_status rx_status;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,25)
 	struct ieee80211_vif	*vif;
-#endif
 
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
@@ -1011,8 +1006,8 @@ struct acx_device {
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
 
 	// OW FIXME Interrupt handling
-	// OW struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
-	struct tasklet_struct interrupt_tasklet;
+	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
+	// struct tasklet_struct interrupt_tasklet;
 
 	unsigned int	irq;
 
@@ -1256,7 +1251,7 @@ struct acx_device {
 
 
 static inline
-acx_device_t * ieee2adev(struct ieee80211_hw *hw)
+acx_device_t* ieee2adev(struct ieee80211_hw *hw)
 {
         return hw->priv;
 }

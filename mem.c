@@ -1885,7 +1885,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 		if (counter % 8 == 0) {
 			if (time_after(jiffies, timeout)) {
-				counter = 0;
+				counter = -1;
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
@@ -1900,6 +1900,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* put the card in IDLE state */
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
+	// TODO Compare pci.c
 	/* timed out! */
 	if (!counter) {
 
@@ -2424,6 +2425,7 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 		printk("acx: can't use IRQ 0\n");
 		goto fail_irq;
 	}
+	// OW FIXME Move up. See pci.c
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
 
 	/* request shared IRQ handler */
@@ -2527,6 +2529,8 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 
 	/* error paths: undo everything in reverse order... */
 
+	// OW TODO Review and insure systematic cleanup. See pci.c
+
 	fail_register_netdev:
 
 	fail_reset:
@@ -2583,6 +2587,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	/* If device wasn't hot unplugged... */
 	if (adev_present(adev)) {
 
+		// FIXME Locking. Sem is lock/unlocked several times. Compare pci.c
 		acx_sem_lock(adev);
 
 		/* disable both Tx and Rx to shut radio down properly */
@@ -2634,7 +2639,6 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	 * thus we shouldn't call it under sem! */
 	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
-
 
 	/* unregister_netdev ensures that no references to us left.
 	 * For paranoid reasons we continue to follow the rules */
@@ -2888,6 +2892,7 @@ static void acxmem_s_down(struct ieee80211_hw *hw) {
 	 ** This will fail miserably if we'll be hit by concurrent
 	 ** iwconfig or something in between. TODO! */
 
+	// OW FIXME Fix Locking ...
 	acx_sem_unlock(adev);
 	flush_scheduled_work();
 	acx_sem_lock(adev);
@@ -2898,10 +2903,8 @@ static void acxmem_s_down(struct ieee80211_hw *hw) {
 	 ** That's why we stop queue _after_ flush_scheduled_work
 	 ** lock/unlock is just paranoia, maybe not needed */
 
-	// OW FIXME Check acx_set_status?
 	acx_lock(adev, flags);
 	acx_stop_queue(adev->ieee, "on ifdown");
-	// OW acx_set_status(adev, ACX_STATUS_0_STOPPED);
 	acx_unlock(adev, flags);
 
 	/* kernel/timer.c says it's illegal to del_timer_sync()
@@ -2970,6 +2973,7 @@ static int acxmem_e_open(struct ieee80211_hw *hw) {
  */
 static void acxmem_e_close(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
 
 	FN_ENTER;
 
@@ -2980,7 +2984,6 @@ static void acxmem_e_close(struct ieee80211_hw *hw) {
 	if (adev->initialized) {
 		acxmem_s_down(hw);
 	}
-
 
 	/* disable all IRQs, release shared IRQ handler */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
@@ -3210,6 +3213,7 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 
 		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 
+		// TODO OW Compare with pci.c
 		/* if next descriptor is empty, then bail out */
 		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))
 			break;
@@ -3430,6 +3434,10 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 				unmasked, adev->irq_mask, irqtype);
 
 		/* Handle most important IRQ types first */
+
+		// OW 20091123 FIXME Rx path stops under load problem:
+		// Maybe the RX rings fills up to fast, we are missing an irq and
+		// then we are then not getting rx irqs anymore
 		if (irqtype & HOST_INT_RX_DATA) {
 			log(L_IRQ, "got Rx_Data IRQ\n");
 			acxmem_l_process_rxdesc(adev);
@@ -3816,6 +3824,8 @@ void acxmem_l_power_led(acx_device_t *adev, int enable) {
 
 /***********************************************************************
  */
+// OW TODO Not used in pci either !?
+#if 0
 int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra) {
 #if ACX_DEBUG > 1
@@ -4143,6 +4153,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 
 	return OK;
 }
+#endif
 
 /***************************************************************
  ** acxmem_l_alloc_tx
@@ -4238,6 +4249,8 @@ tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
 	 * transmit buffer space on the ACX. In that case, HOSTOWN and
 	 * ACXDONE will both be set.
 	 */
+	 
+	// OW TODO Compare with pci.c
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
@@ -4305,7 +4318,8 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	adev->tx_head = index;
 }
 
-/***********************************************************************
+/*
+ * acxmem_l_get_txbuf
  */
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
 	return get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
@@ -4397,6 +4411,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	FN_ENTER;
 
+	// OW FIXME Check: Should be after wireless_header assignment
 	wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
 
 	/* fw doesn't tx such packets anyhow */
@@ -4408,6 +4423,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	hostdesc1 = get_txhostdesc(adev, txdesc);
 	wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
+
 	/* modify flag status in separate variable to be able to write it back
 	 * in one big swoop later (also in order to have less device memory
 	 * accesses) */
@@ -4423,12 +4439,13 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
+	// TODO Compare pci.c
 	if (len > adev->rts_threshold)
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-// OW FIXME Cleanup?
+// OW FIXME Cleanup. See pci.c not present there
 // ---
 #if 0
 	switch (adev->mode) {
@@ -4490,12 +4507,17 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 				 ** Disabled for now --vda */
 				/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
 		);
+
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		/* should add this to rate111 above as necessary */
 		| (clt->pbcc511 ? RATE111_PBCC511 : 0)
 #endif
 		hostdesc1->length = cpu_to_le16(len);
-	} else { /* ACX100 */
+		// OW FIXME I suppose for acx111 with mem.c there is something missing here.
+		// Probably no acx111 was yet used with the mem.c
+	}
+	/* ACX100 */
+	else {
 		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), rate_100);
 
@@ -4508,6 +4530,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		if (clt->shortpre && (clt->cur != RATE111_1))
 		SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE); /* set Short Preamble */
 #endif
+
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG);
 
@@ -4515,7 +4538,6 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
 #endif
 
-		// OW hostdesc1->length = cpu_to_le16(WLAN_HDR_A3_LEN);
 		hostdesc1->length = cpu_to_le16(wlhdr_len);
 
 		/*
@@ -4788,7 +4810,8 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 
 		/* stop if not marked as "tx finished" and "host owned" */
 		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-		// OW FIXME Check
+
+		// OW FIXME Check against pci.c
 		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
 			//if (unlikely(!num_cleaned)) { /* maybe remove completely */
 			log(L_BUFT, "acx: clean_txdesc: tail isn't free. "

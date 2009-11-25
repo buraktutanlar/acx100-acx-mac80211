@@ -241,7 +241,6 @@ void log_fn_exit_v(const char *funcname, int v)
 void acx_s_mwait(int ms)
 {
 	FN_ENTER;
-	// OW msleep(ms);
 	mdelay(ms);
 	FN_EXIT0;
 }
@@ -1326,7 +1325,7 @@ static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 
 	ssize_t ret = -EINVAL;
 	char *after;
-	unsigned long val = simple_strtoul(buf, &after, 10);
+	unsigned long val = simple_strtoul(buf, &after, 0);
 	size_t size = after - buf + 1;
 
 	log(L_DEBUG, "acx_e_proc_debug_write: val=%lu\n", val);
@@ -1517,7 +1516,7 @@ static struct ieee80211_supported_band b_band_2GHz = {
 	.n_bitrates = 4,
 };
 
-int acx_setup_modes(acx_device_t * adev)
+int acx_setup_modes(acx_device_t *adev)
 {
 	struct ieee80211_hw *hw = adev->ieee;
 
@@ -1530,6 +1529,7 @@ int acx_setup_modes(acx_device_t * adev)
 */
 		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
 	}
+	// OX FIXME This is probably not very logic ?!
 	else
 	{
 /*
@@ -2039,6 +2039,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 			goto fail;
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
+#ifdef CONFIG_ACX_MAC80211_MEM
 	else if (IS_MEM(adev)) {
 		/* sets the beginning of the rx descriptor queue, after the tx descrs */
 		adev->acx_queue_indicator = (queueindicator_t *) le32_to_cpu (queueconf.QueueEnd);
@@ -2048,6 +2049,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 
 		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
+#endif
 
 	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
@@ -3810,6 +3812,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_RX) {
+		// OW TODO Add Disable Rx
 		/* Enable Rx */
 		log(L_INIT, "acx: updating: enable Rx on channel: %u\n",
 		    adev->channel);
@@ -3852,6 +3855,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		acx_s_set_sane_reg_domain(adev, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
 	}
+
 	if (adev->set_mask & GETSET_MODE ) {
 		acx111_s_feature_on(adev, 0,
 				    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
@@ -3873,6 +3877,11 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			//		    FEATURE2_NO_TXCRYPT |
 			//		    FEATURE2_SNIFFER);
 			break;
+		case ACX_MODE_OFF:
+			/* disable both Tx and Rx to shut radio down properly */
+			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+
 		default:
 			break;
 		}
@@ -3903,13 +3912,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_RESCAN) {
-/*		switch (adev->mode) {
-		case ACX_MODE_0_ADHOC:
-		case ACX_MODE_2_STA:
-			start_scan = 1;
-			break;
-		}
-*/ CLEAR_BIT(adev->set_mask, GETSET_RESCAN);
+		/*		switch (adev->mode) {
+		 case ACX_MODE_0_ADHOC:
+		 case ACX_MODE_2_STA:
+		 start_scan = 1;
+		 break;
+		 }
+		 */
+		CLEAR_BIT(adev->set_mask, GETSET_RESCAN);
 	}
 
 	if (adev->set_mask & GETSET_WEP) {
@@ -4182,7 +4192,9 @@ void acx_schedule_task(acx_device_t *adev, unsigned int set_flag)
 
 		// OW TODO Interrupt handling ...
 		// schedule_work(&adev->after_interrupt_task);
-		tasklet_schedule(&adev->interrupt_tasklet);
+
+		// OW Use mac80211 workqueue
+		queue_work(adev->ieee->workqueue, &adev->after_interrupt_task);
 	}
 }
 
@@ -4194,9 +4206,9 @@ void acx_init_task_scheduler(acx_device_t *adev)
 	// OW TODO Interrupt handling ...
 
 	/* configure task scheduler */
-	// OW INIT_WORK(&adev->after_interrupt_task, acx_interrupt_tasklet);
+	INIT_WORK(&adev->after_interrupt_task, acx_interrupt_tasklet);
 
-	/* OW 20090722
+	/* OW In case of of tasklet ... but workqueues seem to be prefered
 	tasklet_init(&adev->interrupt_tasklet,
 			(void(*)(unsigned long)) acx_interrupt_tasklet,
 			(unsigned long) adev);
@@ -4267,66 +4279,57 @@ void acx_update_capabilities(acx_device_t * adev)
 ** Derived from mac80211 code, p54, bcm43xx_mac80211
 **
 */
-static void acx_s_select_opmode(acx_device_t * adev)
+static void acx_s_select_opmode(acx_device_t *adev)
 {
 	int changed = 0;
 	FN_ENTER;
 
 	if (adev->interface.operating) {
 		switch (adev->interface.type) {
-			case NL80211_IFTYPE_AP:
-				if (adev->mode != ACX_MODE_3_AP)
-				{
-					adev->mode = ACX_MODE_3_AP;
-					changed = 1;
-				}
-				break;
-			case NL80211_IFTYPE_ADHOC:
-				if (adev->mode != ACX_MODE_0_ADHOC)
-				{
-					adev->mode = ACX_MODE_0_ADHOC;
-					changed = 1;
-				}
-				break;
-			case NL80211_IFTYPE_STATION:
-				if (adev->mode != ACX_MODE_2_STA)
-				{
-					adev->mode = ACX_MODE_2_STA;
-					changed = 1;
-				}
-				break;
-			case NL80211_IFTYPE_WDS:
-			default:
-				if (adev->mode != ACX_MODE_OFF)
-				{
-					adev->mode = ACX_MODE_OFF;
-					changed = 1;
-				}
+		case NL80211_IFTYPE_AP:
+			if (adev->mode != ACX_MODE_3_AP) {
+				adev->mode = ACX_MODE_3_AP;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_ADHOC:
+			if (adev->mode != ACX_MODE_0_ADHOC) {
+				adev->mode = ACX_MODE_0_ADHOC;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_STATION:
+			if (adev->mode != ACX_MODE_2_STA) {
+				adev->mode = ACX_MODE_2_STA;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_WDS:
+		default:
+			if (adev->mode != ACX_MODE_OFF) {
+				adev->mode = ACX_MODE_OFF;
+				changed = 1;
+			}
 			break;
 		}
 	} else {
-		if (adev->interface.type == NL80211_IFTYPE_MONITOR)
-		{
-			if (adev->mode != ACX_MODE_MONITOR)
-			{
+		if (adev->interface.type == NL80211_IFTYPE_MONITOR) {
+			if (adev->mode != ACX_MODE_MONITOR) {
 				adev->mode = ACX_MODE_MONITOR;
 				changed = 1;
 			}
-		}
-		else
-		{
-			if (adev->mode != ACX_MODE_OFF)
-			{
+		} else {
+			if (adev->mode != ACX_MODE_OFF) {
 				adev->mode = ACX_MODE_OFF;
 				changed = 1;
 			}
 		}
 	}
-	if (changed)
-	{
+
+	if (changed) {
 		SET_BIT(adev->set_mask, GETSET_MODE);
 		acx_s_update_card_settings(adev);
-//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
 	FN_EXIT0;
@@ -4407,7 +4410,12 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
-	flush_scheduled_work();
+
+	// OW TODO I'm not sure if explicit flushing is still required or done
+	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
+	// hang upon .remove_interface and .close and .stop
+
+	// OW flush_scheduled_work();
 
 	printk(KERN_INFO "acx: Virtual interface removed "
 	       "(type: 0x%08X, MAC: %s)\n",
@@ -4435,11 +4443,7 @@ int acx_net_reset(struct ieee80211_hw *ieee)
 	return 0;
 }
 
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
+int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 {
 	int result;
 
@@ -4461,62 +4465,65 @@ int acx_selectchannel(acx_device_t * adev, u8 channel, int freq)
 	return result;
 }
 
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
-{
+int acx_net_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
+	struct ieee80211_conf *conf = &hw->conf;
 	unsigned long flags;
 
 	FN_ENTER;
 
 	acx_lock(adev, flags);
-//FIXME();
+	//FIXME();
 	if (!adev->initialized) {
 		acx_unlock(adev, flags);
 		return 0;
 	}
-	if (conf->beacon_int != adev->beacon_interval)
-		adev->beacon_interval = conf->beacon_int;
 
 	if (conf->channel->hw_value != adev->channel) {
 
 		acx_unlock(adev, flags);
-		acx_selectchannel(adev, conf->channel->hw_value, conf->channel->center_freq);
+		acx_selectchannel(adev, conf->channel->hw_value,
+				conf->channel->center_freq);
 		acx_lock(adev, flags);
 
 		/*		acx_schedule_task(adev,
-				  ACX_AFTER_IRQ_UPDATE_CARD_CFG
-*/				  /*+ ACX_AFTER_IRQ_RESTART_SCAN */ /*);*/
+		 ACX_AFTER_IRQ_UPDATE_CARD_CFG
+		 *//*+ ACX_AFTER_IRQ_RESTART_SCAN *//*);*/
+
 	}
-/*
-        if (conf->short_slot_time != adev->short_slot) {
-//                assert(phy->type == BCM43xx_PHYTYPE_G);
-                if (conf->short_slot_time)
-                        acx_short_slot_timing_enable(adev);
-                else
-                        acx_short_slot_timing_disable(adev);
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-        }
-*/
-	adev->tx_disabled = !conf->radio_enabled;
-/*	if (conf->power_level != 0){
-		adev->tx_level_dbm = conf->power_level;
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
-		SET_BIT(adev->set_mask,GETSET_TXPOWER);
-		//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	}
-*/
-//FIXME: This does not seem to wake up:
+	/*
+	 if (conf->short_slot_time != adev->short_slot) {
+	 //                assert(phy->type == BCM43xx_PHYTYPE_G);
+	 if (conf->short_slot_time)
+	 acx_short_slot_timing_enable(adev);
+	 else
+	 acx_short_slot_timing_disable(adev);
+	 acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	 }
+	 */
+
+	// OW FIXME mac80211 depreciates radio_enabled. Perhaps related to rfkill changes ?
+	//adev->tx_disabled = !conf->radio_enabled;
+	adev->tx_disabled = 0;
+
+	/*	if (conf->power_level != 0){
+	 adev->tx_level_dbm = conf->power_level;
+	 acx_s_set_tx_level(adev, adev->tx_level_dbm);
+	 SET_BIT(adev->set_mask,GETSET_TXPOWER);
+	 //acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	 }
+	 */
+	//FIXME: This does not seem to wake up:
 #if 0
-	if (conf->power_level == 0) {
+	if (conf->power_level == 0)
+	{
 		if (radio->enabled)
-			bcm43xx_radio_turn_off(bcm);
-	} else {
+		bcm43xx_radio_turn_off(bcm);
+	}
+	else
+	{
 		if (!radio->enabled)
-			bcm43xx_radio_turn_on(bcm);
+		bcm43xx_radio_turn_on(bcm);
 	}
 #endif
 
@@ -4533,15 +4540,10 @@ int acx_net_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	return 0;
 }
 
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-extern int acx_config_interface(struct ieee80211_hw *ieee,
-				struct ieee80211_vif *vif,
-				struct ieee80211_if_conf *conf)
-{
-	acx_device_t *adev = ieee2adev(ieee);
+extern void acx_net_bss_info_changed(struct ieee80211_hw *hw,
+		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
+	acx_device_t *adev = ieee2adev(hw);
+
 	unsigned long flags;
 	int err = -ENODEV;
 
@@ -4556,29 +4558,25 @@ extern int acx_config_interface(struct ieee80211_hw *ieee,
 
 	acx_lock(adev, flags);
 
-	if ((vif->type != NL80211_IFTYPE_MONITOR)
-	    && (adev->vif == vif)) {
-		if (conf->bssid)
-		{
-			adev->interface.bssid = conf->bssid;
-			MAC_COPY(adev->bssid,conf->bssid);
+	if ((vif->type != NL80211_IFTYPE_MONITOR) && (adev->vif == vif)) {
+		if (info->bssid) {
+			adev->interface.bssid = info->bssid;
+			MAC_COPY(adev->bssid, info->bssid);
 		}
 	}
-	if ((vif->type == NL80211_IFTYPE_AP)
-	    && (adev->vif == vif)) {
+	if ((vif->type == NL80211_IFTYPE_AP) && (adev->vif == vif)) {
 
-		if ((conf->ssid_len > 0) && conf->ssid)
-		{
-			adev->essid_len = conf->ssid_len;
-			memcpy(adev->essid, conf->ssid, conf->ssid_len);
+		if (info->bssid && (strlen(info->bssid) > 0)) {
+			adev->essid_len = strlen(info->bssid);
+			memcpy(adev->essid, info->bssid, strlen(info->bssid));
 			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
 	}
 
 	// OW: Beacon update condition, as seen in b43/main.c
-	if (conf->changed & IEEE80211_IFCC_BEACON) {
+	if (info->enable_beacon) {
 
-		skb_tmp = ieee80211_beacon_get(ieee, vif);
+		skb_tmp = ieee80211_beacon_get(hw, vif);
 		if (skb_tmp != 0) {
 			adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
 			// OW adev->beacon_cache = conf->beacon;
@@ -4586,25 +4584,23 @@ extern int acx_config_interface(struct ieee80211_hw *ieee,
 			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
 
+		if (info->beacon_int != adev->beacon_interval)
+			adev->beacon_interval = info->beacon_int;
+
 	}
 
 	acx_unlock(adev, flags);
 
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
-//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-		err = 0;
+	//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	err = 0;
 
 	err_out:
-		FN_EXIT1(err);
+	FN_EXIT1(err);
 
-	return err;
+	return;
 }
-
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
 
 int acx_net_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
@@ -4820,17 +4816,14 @@ int acx_key_write(acx_device_t *adev,
 
 }
 
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
+int acx_net_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+			       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+			       struct ieee80211_key_conf *key) {
 
-int acx_net_set_key(struct ieee80211_hw *ieee, enum set_key_cmd cmd,
-		const u8 *local_addr, const u8 * addr, struct ieee80211_key_conf *key) {
-	struct acx_device *adev = ieee2adev(ieee);
-	unsigned long flags;
+	// struct acx_device *adev = ieee2adev(hw);
+	// unsigned long flags;
 	u8 algorithm;
-	u16 index;
+	// u16 index;
 	int err = -EINVAL;
 
 	FN_ENTER;
@@ -4853,28 +4846,29 @@ int acx_net_set_key(struct ieee80211_hw *ieee, enum set_key_cmd cmd,
 		}
 		// OW Let's try WEP in mac80211 sw
 		err = -EOPNOTSUPP;
-		return err;
+		break;
 
 	case ALG_TKIP:
 		algorithm = ACX_SEC_ALGO_TKIP;
 		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
 		err = -EOPNOTSUPP;
-		return err;
+		break;
 
 		break;
 	case ALG_CCMP:
 		algorithm = ACX_SEC_ALGO_AES;
 		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_AES");
 		err = -EOPNOTSUPP;
-		return err;
 		break;
 
 	default:
 		FIXME();
 		algorithm = ACX_SEC_ALGO_NONE;
 		err = -EOPNOTSUPP;
-		return err;
 	}
+
+	FN_EXIT0;
+	return err;
 
 	// OW Everything below this lines, doesn't matter anymore for the moment.
 #if 0

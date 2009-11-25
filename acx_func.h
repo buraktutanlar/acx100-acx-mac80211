@@ -692,14 +692,12 @@ int acx_add_interface(struct ieee80211_hw* ieee,
 void acx_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw *ieee);
-int acx_net_set_key(struct ieee80211_hw *hw,
-		enum set_key_cmd cmd,
-		const u8 *local_addr, const u8 *addr,
+int acx_net_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		struct ieee80211_key_conf *key);
-extern int acx_config_interface(struct ieee80211_hw* ieee,
-				struct ieee80211_vif *vif,
-				struct ieee80211_if_conf *conf);
-int acx_net_config(struct ieee80211_hw* ieee, struct ieee80211_conf *conf);
+int acx_net_config(struct ieee80211_hw *hw, u32 changed);
+void acx_net_bss_info_changed(struct ieee80211_hw *hw,
+		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
 int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
 int acx_net_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
@@ -725,8 +723,8 @@ int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu);
 int acx_e_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
 
-// OW TODO void acx_interrupt_tasklet(struct work_struct *work);
-void acx_interrupt_tasklet(acx_device_t *adev);
+void acx_interrupt_tasklet(struct work_struct *work);
+// void acx_interrupt_tasklet(acx_device_t *adev);
 // OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_e_after_interrupt_task(acx_device_t *adev);
 
