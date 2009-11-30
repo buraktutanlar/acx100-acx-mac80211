@@ -241,7 +241,7 @@ void log_fn_exit_v(const char *funcname, int v)
 void acx_s_mwait(int ms)
 {
 	FN_ENTER;
-	mdelay(ms);
+	msleep(ms);
 	FN_EXIT0;
 }
 
@@ -478,14 +478,21 @@ void acx_display_hardware_details(acx_device_t * adev)
 ** acx_e_get_stats, acx_e_get_wireless_stats
 */
 int
-acx_e_get_stats(struct ieee80211_hw *hw,
+acx_e_op_get_stats(struct ieee80211_hw *hw,
 		struct ieee80211_low_level_stats *stats)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
 	acx_lock(adev, flags);
 	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
 	acx_unlock(adev, flags);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
 	return 0;
 }
 
@@ -714,8 +721,6 @@ static const u16 acx111_ie_len_dot11[] = {
 };
 
 
-#undef FUNC
-#define FUNC "configure"
 #if !ACX_DEBUG
 int acx_s_configure(acx_device_t * adev, void *pdr, int type)
 {
@@ -728,12 +733,15 @@ acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 	u16 len;
 	int res;
 
+	FN_ENTER;
+
 	if (type < 0x1000)
 		len = adev->ie_len[type];
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	log(L_CTL, "acx: " FUNC ": begin: (type:0x%04X:%s,len:%u)\n", type, typestr, len);
+	// OW TODO Handle ACX_DEBUG again
+	log(L_CTL, "acx: %s: begin: (type:0x%04X:%s,len:%u)\n", __func__, type, typestr, len);
 
 	if (unlikely(!len)) {
 		log(L_DEBUG, "acx: zero-length type %s?!\n", typestr);
@@ -743,20 +751,19 @@ acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 	if (unlikely(OK != res)) {
-#if ACX_DEBUG
-		printk("acx: %s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
-		       typestr);
-#else
-		printk("acx: %s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
-		       type);
-#endif
-		/* dump_stack() is already done in issue_cmd() */
+		// OW TODO Use log
+		printk("acx: %s: %s: type=0x%X, typestr=%s: FAILED\n", __func__,
+				wiphy_name(adev->ieee->wiphy), type, typestr);
 	}
 
-	log(L_CTL, "acx: " FUNC ": end: (type:0x%04X:%s,len:%u)\n", type, typestr, len);
+	// OW TODO Handle ACX_DEBUG again
+	log(L_CTL, "acx: %s: end: (type:0x%04X:%s,len:%u)\n", __func__, type, typestr, len);
+
+	FN_EXIT0;
 	return res;
 }
 
+// OW TODO Replace the FUNC #defs by __func__ in logging
 #undef FUNC
 #define FUNC "interrogate"
 #if !ACX_DEBUG
@@ -854,6 +861,7 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 	fw_stats_aes_t *aes = NULL;
 	fw_stats_event_t *evt = NULL;
 
+	FN_ENTER;
 	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
@@ -1315,18 +1323,26 @@ static int acx_e_proc_show_phy(struct seq_file *file, void *v)
 
 static int acx_e_proc_show_debug(struct seq_file *file, void *v)
 {
+	FN_ENTER;
+	// No sem locking required, since debug is global for all devices
+
 	seq_printf(file, "acx_debug: %u\n", acx_debug);
+
+	FN_EXIT0;
+
 	return 0;
 }
 
 static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
-
 	ssize_t ret = -EINVAL;
 	char *after;
 	unsigned long val = simple_strtoul(buf, &after, 0);
 	size_t size = after - buf + 1;
+
+	FN_ENTER;
+	// No sem locking required, since debug is global for all devices
 
 	log(L_DEBUG, "acx_e_proc_debug_write: val=%lu\n", val);
 
@@ -1335,6 +1351,7 @@ static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 		acx_debug = val;
 	}
 
+	FN_EXIT0;
 	return ret;
 
 }
@@ -1380,7 +1397,7 @@ static int acx_e_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
 }
 
-static int manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
+static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	char procbuf[80];
@@ -1441,12 +1458,12 @@ static int manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
 
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num)
 {
-	return manage_proc_entries(ieee, num, 0);
+	return acx_manage_proc_entries(ieee, num, 0);
 }
 
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 {
-	return manage_proc_entries(ieee, num, 1);
+	return acx_manage_proc_entries(ieee, num, 1);
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -1694,43 +1711,44 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 ** FIXME: most likely needs refinement
 */
 
-void acx_i_set_multicast_list(struct ieee80211_hw *hw,
-				unsigned int changed_flags,
-				unsigned int *total_flags,
-				int mc_count, struct dev_addr_list *mc_list)
-{
-        acx_device_t *adev = ieee2adev(hw);
-        unsigned long flags;
+void acx_i_op_configure_filter(struct ieee80211_hw *hw,
+		unsigned int changed_flags, unsigned int *total_flags, int mc_count,
+		struct dev_addr_list *mc_list) {
 
-        FN_ENTER;
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
 
 	acx_lock(adev, flags);
 
-	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL |
-			  FIF_CONTROL | FIF_OTHER_BSS);
-        *total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL |
-			 FIF_CONTROL | FIF_OTHER_BSS);
-/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-                return; */
+	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+	 return; */
 
 	if (*total_flags) {
-                SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-                CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-                SET_BIT(adev->set_mask, SET_RXCONFIG);
-                /* let kernel know in case *we* needed to set promiscuous */
-        } else {
-                CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-                SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-                SET_BIT(adev->set_mask, SET_RXCONFIG);
-        }
+		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+		/* let kernel know in case *we* needed to set promiscuous */
+	} else {
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+	}
 
-        /* cannot update card settings directly here, atomic context */
-        // OW FIXME acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	/* cannot update card settings directly here, atomic context */
+	// TODO This is one point to check for better cmd and interrupt handling
+	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 
-        acx_unlock(adev, flags);
-		acx_s_update_card_settings(adev);
+	acx_unlock(adev, flags);
 
-        FN_EXIT0;
+	//acx_s_update_card_settings(adev);
+
+	FN_EXIT0;
 }
 
 /***********************************************************************
@@ -2202,6 +2220,7 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 		u16 rx_cfg1;
 		u16 rx_cfg2;
 	} ACX_PACKED cfg;
+
 	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
 		adev->rx_config_1 = (u16) (0
@@ -2607,7 +2626,7 @@ static u16 rate100to111(u8 r)
 
 */
 
-int acx_i_start_xmit(struct ieee80211_hw *hw, struct sk_buff *skb) {
+int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
 	acx_device_t *adev = ieee2adev(hw);
 	tx_t *tx;
 	void *txbuf;
@@ -4099,13 +4118,14 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	FN_ENTER;
 
 	if (!adev->after_interrupt_jobs || !adev->initialized)
-		goto END_NO_LOCK;	/* no jobs to do */
+		goto end_no_lock;	/* no jobs to do */
 
 	acx_lock(adev, flags);
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-		printk("acx: too many TX errors??\n");
+		printk("acx: too many TX errors?\n");
+		printk("acx: %s: TODO: ACX_AFTER_IRQ_CMD_RADIO_RECALIB\n", __func__);
 //		acx_s_after_interrupt_recalib(adev);
 	}
 
@@ -4124,6 +4144,9 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	 ** 2) we found too many STAs */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
 		log(L_IRQ, "acx: sending a stop scan cmd...\n");
+
+		// OW Scanning is done by mac80211
+#if 0
 		acx_unlock(adev, flags);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
 		acx_lock(adev, flags);
@@ -4131,6 +4154,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
 		 * since _we_, not a fw, have stopped the scan */
 		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+#endif
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
 	}
@@ -4164,15 +4188,16 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
 	}
 
+	/* others */
 	if(adev->after_interrupt_jobs)
 	{
-		printk("acx: Jobs still to be run: %x\n",adev->after_interrupt_jobs);
+		printk("acx: %s: Jobs still to be run: %x\n",__func__, adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
 	acx_unlock(adev, flags);
 	//      acx_sem_unlock(adev);
 
-	END_NO_LOCK:
+	end_no_lock:
 
 	FN_EXIT0;
 }
@@ -4184,35 +4209,55 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 ** Schedule the call of the after_interrupt method after leaving
 ** the interrupt context.
 */
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag)
-{
-	if (!adev->after_interrupt_jobs)
-	{
-		SET_BIT(adev->after_interrupt_jobs, set_flag);
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
+	//	if (!adev->after_interrupt_jobs)
+	//	{
 
-		// OW TODO Interrupt handling ...
-		// schedule_work(&adev->after_interrupt_task);
+	// OW TODO This has currently no effect
+	// OW TODO Interrupt handling ...
 
-		// OW Use mac80211 workqueue
-		queue_work(adev->ieee->workqueue, &adev->after_interrupt_task);
-	}
+	SET_BIT(adev->after_interrupt_jobs, set_flag);
+
+	// OW Use mac80211 workqueue
+	queue_work(adev->ieee->workqueue, &adev->after_interrupt_task);
+	//	}
 }
 
 
 /***********************************************************************
 */
-void acx_init_task_scheduler(acx_device_t *adev)
-{
-	// OW TODO Interrupt handling ...
+void acx_init_task_scheduler(acx_device_t *adev) {
 
 	/* configure task scheduler */
-	INIT_WORK(&adev->after_interrupt_task, acx_interrupt_tasklet);
+#if defined(CONFIG_ACX_MAC80211_PCI)
+	if (IS_PCI(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxpci_interrupt_tasklet);
+		return;
+	}
+#endif
+#if defined(CONFIG_ACX_MAC80211_USB)
+	if (IS_USB(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxusb_interrupt_tasklet);
+		return;
+	}
+#endif
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	if (IS_MEM(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxmem_interrupt_tasklet);
+		return;
+	}
+#endif
 
+	logf0(L_ANY, "Unhandled adev device type!\n");
+	BUG();
+
+	// OW TODO Interrupt handling ...
 	/* OW In case of of tasklet ... but workqueues seem to be prefered
-	tasklet_init(&adev->interrupt_tasklet,
-			(void(*)(unsigned long)) acx_interrupt_tasklet,
-			(unsigned long) adev);
-	*/
+	 tasklet_init(&adev->interrupt_tasklet,
+	 (void(*)(unsigned long)) acx_interrupt_tasklet,
+	 (unsigned long) adev);
+	 */
+
 }
 
 
@@ -4335,12 +4380,7 @@ static void acx_s_select_opmode(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-
-int acx_add_interface(struct ieee80211_hw *ieee,
+int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_if_init_conf *conf)
 {
 	acx_device_t *adev = ieee2adev(ieee);
@@ -4350,6 +4390,7 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	DECLARE_MAC_BUF(mac);
 
 	FN_ENTER;
+	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
 	if (conf->type == NL80211_IFTYPE_MONITOR) {
@@ -4377,18 +4418,15 @@ int acx_add_interface(struct ieee80211_hw *ieee,
 	       conf->type,
 	       print_mac(mac, conf->mac_addr));
 
-      out_unlock:
+    out_unlock:
 	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
 
 	FN_EXIT0;
 	return err;
 }
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
 
-void acx_remove_interface(struct ieee80211_hw *hw,
+void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -4396,8 +4434,8 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	DECLARE_MAC_BUF(mac);
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
+
 	if (conf->type == NL80211_IFTYPE_MONITOR) {
 		adev->interface.monitor--;
 //                assert(bcm->interface.monitor >= 0);
@@ -4406,10 +4444,11 @@ void acx_remove_interface(struct ieee80211_hw *hw,
 	}
 
 	printk("acx: Removing interface: %d %d\n", adev->interface.operating, conf->type);
-	acx_sem_unlock(adev);
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
+
+	acx_sem_unlock(adev);
 
 	// OW TODO I'm not sure if explicit flushing is still required or done
 	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
@@ -4449,7 +4488,6 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 
 	FN_ENTER;
 
-	acx_sem_lock(adev);
 	adev->rx_status.freq = freq;
 	adev->rx_status.band = IEEE80211_BAND_2GHZ;
 
@@ -4460,24 +4498,23 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 	SET_BIT(adev->set_mask, GETSET_CHANNEL);
 	result = -EINPROGRESS;	/* need to call commit handler */
 
-	acx_sem_unlock(adev);
 	FN_EXIT1(result);
 	return result;
 }
 
-int acx_net_config(struct ieee80211_hw *hw, u32 changed) {
+int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
 	struct ieee80211_conf *conf = &hw->conf;
 	unsigned long flags;
 
 	FN_ENTER;
+	acx_sem_lock(adev);
+
+	//FIXME();
+	if (!adev->initialized)
+		goto end_sem_unlock;
 
 	acx_lock(adev, flags);
-	//FIXME();
-	if (!adev->initialized) {
-		acx_unlock(adev, flags);
-		return 0;
-	}
 
 	if (conf->channel->hw_value != adev->channel) {
 
@@ -4529,18 +4566,21 @@ int acx_net_config(struct ieee80211_hw *hw, u32 changed) {
 
 	//TODO: phymode
 	//TODO: antennas
-	if (adev->set_mask > 0) {
-		acx_unlock(adev, flags);
-		acx_s_update_card_settings(adev);
-		acx_lock(adev, flags);
-	}
 	acx_unlock(adev, flags);
 
+	if (adev->set_mask > 0) {
+		acx_s_update_card_settings(adev);
+	}
+
+	end_sem_unlock:
+
+	acx_sem_unlock(adev);
 	FN_EXIT0;
+
 	return 0;
 }
 
-extern void acx_net_bss_info_changed(struct ieee80211_hw *hw,
+extern void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -4550,8 +4590,10 @@ extern void acx_net_bss_info_changed(struct ieee80211_hw *hw,
 	struct sk_buff *skb_tmp;
 
 	FN_ENTER;
+	acx_sem_lock(adev);
+
 	if (!adev->interface.operating)
-		goto err_out;
+		goto end_sem_unlock;
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
@@ -4596,38 +4638,40 @@ extern void acx_net_bss_info_changed(struct ieee80211_hw *hw,
 	//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	err = 0;
 
-	err_out:
+	end_sem_unlock:
+
+	acx_sem_unlock(adev);
 	FN_EXIT1(err);
 
 	return;
 }
 
-int acx_net_get_tx_stats(struct ieee80211_hw *hw,
+int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
 {
+	acx_device_t *adev = ieee2adev(hw);
 	int err = -ENODEV;
 
 	FN_ENTER;
+	acx_sem_lock(adev);
 
-//        acx_lock(adev, flags);
 	stats->len = 0;
 	stats->limit = TX_CNT;
 	stats->count = 0;
-//        acx_unlock(adev, flags);
 
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return err;
 }
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
 
-int acx_net_conf_tx(struct ieee80211_hw *hw,
+int acx_e_conf_tx(struct ieee80211_hw *hw,
 		u16 queue, const struct ieee80211_tx_queue_params *params)
 {
+	acx_device_t *adev = ieee2adev(hw);
 	FN_ENTER;
-      TODO();
+	acx_sem_lock(adev);
+    TODO();
+  	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
 }
@@ -4816,17 +4860,18 @@ int acx_key_write(acx_device_t *adev,
 
 }
 
-int acx_net_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+int acx_e_op_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 			       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 			       struct ieee80211_key_conf *key) {
 
-	// struct acx_device *adev = ieee2adev(hw);
+	struct acx_device *adev = ieee2adev(hw);
 	// unsigned long flags;
 	u8 algorithm;
 	// u16 index;
 	int err = -EINVAL;
 
 	FN_ENTER;
+	acx_sem_lock(adev);
 
 	/* OW Mac80211 SW crypto support:
 	 *
@@ -4867,6 +4912,7 @@ int acx_net_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		err = -EOPNOTSUPP;
 	}
 
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return err;
 

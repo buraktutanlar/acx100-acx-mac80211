@@ -2284,18 +2284,18 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 
 // OW FIXME Put this in the beginning of the file, when reordering code
 static const struct ieee80211_ops acxmem_hw_ops = {
-		.tx = acx_i_start_xmit,
-		.conf_tx = acx_net_conf_tx,
-		.add_interface = acx_add_interface,
-		.remove_interface = acx_remove_interface,
+		.tx = acx_i_op_tx,
+		.conf_tx = acx_e_conf_tx,
+		.add_interface = acx_e_op_add_interface,
+		.remove_interface = acx_e_op_remove_interface,
 		.start = acxmem_e_open,
-		.configure_filter = acx_i_set_multicast_list,
+		.configure_filter = acx_i_op_configure_filter,
 		.stop = acxmem_e_close,
-		.config = acx_net_config,
+		.config = acx_e_op_config,
 		.config_interface = acx_config_interface,
-		.set_key = acx_net_set_key,
-		.get_stats = acx_e_get_stats,
-		.get_tx_stats = acx_net_get_tx_stats,
+		.set_key = acx_e_op_set_key,
+		.get_stats = acx_e_op_get_stats,
+		.get_tx_stats = acx_e_op_get_tx_stats,
 		};
 
 
@@ -2331,7 +2331,10 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	 ~IEEE80211_HW_MONITOR_DURING_OPER &
 	 ~IEEE80211_HW_WEP_INCLUDE_IV;
 	 */
+	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+			| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
+	// OW TODO Check if RTS/CTS threshold can be included here
 
 	/* TODO: although in the original driver the maximum value was 100,
 	 * the OpenBSD driver assigns maximum values depending on the type of
@@ -3522,6 +3525,14 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 	}
 #endif
 
+	// OW 20091129 TODO Currently breaks mem.c ...
+	// If sleeping is required like for update card settings, this is usefull
+	// For now I replaced sleeping for command handling by mdelays.
+	if (adev->after_interrupt_jobs){
+		acx_e_after_interrupt_task(adev);
+	}
+
+
 // OW TODO
 #if 0
 	/* Routine to perform blink with range */
@@ -3550,16 +3561,9 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 /* Interrupt handler bottom-half */
 
 // OW void acx_interrupt_tasklet(struct work_struct *work) {
-void acx_interrupt_tasklet(acx_device_t *adev) {
-
-#ifdef CONFIG_ACX_MAC80211_DEBUG
-	u32 _handled = 0x00000000;
-# define acxirq_handled(irq)    do { _handled |= (irq); } while (0)
-#else
-# define acxirq_handled(irq)    do { /* nothing */ } while (0)
-#endif /* CONFIG_ACX_MAC80211_DEBUG */
-
-	// OW acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
+void acxmem_interrupt_tasklet(struct work_struct *work)
+{
+	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
 	int irqtype;
 	unsigned long flags;
 

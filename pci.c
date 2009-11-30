@@ -102,8 +102,8 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 
 static void acxpci_disable_acx_irq(acx_device_t * adev);
 
-static int acxpci_e_open(struct ieee80211_hw *hw);
-static void acxpci_e_close(struct ieee80211_hw *hw);
+static int acxpci_e_op_open(struct ieee80211_hw *hw);
+static void acxpci_e_op_close(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 
@@ -1469,18 +1469,18 @@ static const u16 IO_ACX111[] = {
 };
 
 static const struct ieee80211_ops acxpci_hw_ops = {
-	.tx = acx_i_start_xmit,
-	.conf_tx = acx_net_conf_tx,
-	.add_interface = acx_add_interface,
-	.remove_interface = acx_remove_interface,
-	.start = acxpci_e_open,
-	.configure_filter = acx_i_set_multicast_list,
-	.stop = acxpci_e_close,
-	.config = acx_net_config,
-	.bss_info_changed = acx_net_bss_info_changed,
-	.set_key = acx_net_set_key,
-	.get_stats = acx_e_get_stats,
-	.get_tx_stats = acx_net_get_tx_stats,
+	.tx = acx_i_op_tx,
+	.conf_tx = acx_e_conf_tx,
+	.add_interface = acx_e_op_add_interface,
+	.remove_interface = acx_e_op_remove_interface,
+	.start = acxpci_e_op_open,
+	.configure_filter = acx_i_op_configure_filter,
+	.stop = acxpci_e_op_close,
+	.config = acx_e_op_config,
+	.bss_info_changed = acx_e_op_bss_info_changed,
+	.set_key = acx_e_op_set_key,
+	.get_stats = acx_e_op_get_stats,
+	.get_tx_stats = acx_e_op_get_tx_stats,
 };
 
 
@@ -1515,16 +1515,15 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Initialize driver private data */
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
-	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
-			/* TODO: mainline doesn't support the following flags yet */
-			/*
-			  ~IEEE80211_HW_MONITOR_DURING_OPER &
-			  ~IEEE80211_HW_WEP_INCLUDE_IV;
-			*/
+	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	/* TODO: mainline doesn't support the following flags yet */
+	/*
+	 ~IEEE80211_HW_MONITOR_DURING_OPER &
+	 ~IEEE80211_HW_WEP_INCLUDE_IV;
+	 */
 
-	ieee->wiphy->interface_modes =
-		BIT(NL80211_IFTYPE_STATION) |
-		BIT(NL80211_IFTYPE_ADHOC);
+	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+			| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
 
@@ -1847,7 +1846,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	if (!hw) {
 		log(L_DEBUG, "acx: %s: card is unused. Skipping any release code\n",
 		    __func__);
-		goto end;
+		goto end_no_lock;
 	}
 
 	acx_sem_lock(adev);
@@ -1936,6 +1935,9 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	/* remove dev registration */
 	pci_set_drvdata(pdev, NULL);
 
+	// Sem better to be freed before ieee80211_free_hw
+	acx_sem_unlock(adev);
+
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
 	 * by a netdev timeout handler execution
@@ -1947,9 +1949,8 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
-	acx_sem_unlock(adev);
 
-	end:
+	end_no_lock:
 	FN_EXIT0;
 }
 
@@ -2196,13 +2197,12 @@ void acxpci_net_poll_controller(struct net_device *net_dev)
 **	>0	f/w reported error
 **	<0	driver reported error
 */
-static int acxpci_e_open(struct ieee80211_hw *hw)
+static int acxpci_e_op_open(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	int result = OK;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
 
 	adev->initialized = 0;
@@ -2224,8 +2224,8 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 	ieee80211_wake_queues(adev->ieee);
 
 	adev->initialized = 1;
-	acx_sem_unlock(adev);
 
+	acx_sem_unlock(adev);
 	FN_EXIT1(result);
 	return result;
 }
@@ -2246,13 +2246,12 @@ static int acxpci_e_open(struct ieee80211_hw *hw)
 **	>0	f/w reported error
 **	<0	driver reported error
 */
-static void acxpci_e_close(struct ieee80211_hw *hw)
+static void acxpci_e_op_close(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
 
 	/* ifdown device */
@@ -2276,9 +2275,9 @@ static void acxpci_e_close(struct ieee80211_hw *hw)
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
 	adev->initialized = 0;
-	acx_sem_unlock(adev);
-
 	log(L_INIT, "acx: closed device\n");
+
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 }
 
@@ -2530,15 +2529,8 @@ static void update_link_quality_led(acx_device_t * adev)
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)	/* a la orinoco.c */
 
 /* Interrupt handler bottom-half */
-void acx_interrupt_tasklet(struct work_struct *work)
+void acxpci_interrupt_tasklet(struct work_struct *work)
 {
-
-#ifdef CONFIG_ACX_MAC80211_DEBUG
-	u32 _handled = 0x00000000;
-# define acxirq_handled(irq)    do { _handled |= (irq); } while (0)
-#else
-# define acxirq_handled(irq)    do { /* nothing */ } while (0)
-#endif /* CONFIG_ACX_MAC80211_DEBUG */
 	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
 //	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	int irqtype;
@@ -2656,10 +2648,10 @@ void acx_interrupt_tasklet(struct work_struct *work)
 	/* write_flush(adev); - not needed, last op was read anyway */
 	acx_unlock(adev, flags);
 
-	/* handled: */
-	// OW TODO Check
-	//	if (adev->after_interrupt_jobs)
-	//		acx_e_after_interrupt_task(adev);
+	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
+	if (adev->after_interrupt_jobs){
+		acx_e_after_interrupt_task(adev);
+	}
 
 	FN_EXIT0;
 	return;
@@ -2725,6 +2717,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 		/* save the reason code and call our bottom half. */
 		adev->irq_reason = irqtype;
 
+		// OW TODO Logging and handling of other irq not done this way ...
 		if ((irqtype & HOST_INT_RX_COMPLETE) || (irqtype & HOST_INT_TX_COMPLETE))
 			acx_schedule_task(adev, 0);
 	}
@@ -4525,7 +4518,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * NB: this will cause acxpci_e_close() to be called,
 	 * thus we shouldn't call it under sem!
 	 */
-	acxpci_e_close(hw);
+	acxpci_e_op_close(hw);
 	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 

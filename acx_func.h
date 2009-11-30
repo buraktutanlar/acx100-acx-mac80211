@@ -113,6 +113,12 @@ do { \
 
 #endif /* ACX_DEBUG */
 
+/* Log with prefix "acx: __func__ */
+#define logf0(chan, msg) \
+		log(chan, "acx: %s: " msg, __func__);
+#define logf1(chan, msg, args...) \
+		log(chan, "acx: %s: " msg, __func__, args);
+
 /* Optimized out to nothing in non-debug build */
 static inline void
 acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
@@ -341,9 +347,11 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 static inline void
 acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 {
+	FN_ENTER;
 	ieee80211_stop_queues(hw);
 	if (msg)
 		log(L_BUFT, "acx: tx: stop queue %s\n", msg);
+	FN_EXIT0;
 }
 
 static inline int
@@ -364,9 +372,11 @@ acx_start_queue(struct ieee80211_hw *hw, const char *msg)
 static inline void
 acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
+	FN_ENTER;
 	ieee80211_wake_queues(hw);
 	if (msg)
 		log(L_BUFT, "acx: tx: wake queue %s\n", msg);
+	FN_EXIT0;
 }
 /*
 static inline void
@@ -394,6 +404,8 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 #define CMD_TIMEOUT_MS(n)	(n)
 #define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
 
+// OW TODO Review for cleanup. Is special _debug #defs for logging required ?
+// We can just log all in case of errors.
 #if ACX_DEBUG
 
 /* We want to log cmd names */
@@ -590,9 +602,9 @@ acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 }
 
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl,
-			struct sk_buff *skb);
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 static inline void
@@ -686,20 +698,20 @@ const char *acx_cmd_status_str(unsigned int state);
 /*** mac80211 functions ***/
 int acx_setup_modes(acx_device_t *adev);
 void acx_free_modes(acx_device_t *adev);
-int acx_i_start_xmit(struct ieee80211_hw *ieee,	struct sk_buff *skb);
-int acx_add_interface(struct ieee80211_hw* ieee,
+int acx_i_op_tx(struct ieee80211_hw *ieee,	struct sk_buff *skb);
+int acx_e_op_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
-void acx_remove_interface(struct ieee80211_hw* ieee,
+void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 int acx_net_reset(struct ieee80211_hw *ieee);
-int acx_net_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		struct ieee80211_key_conf *key);
-int acx_net_config(struct ieee80211_hw *hw, u32 changed);
-void acx_net_bss_info_changed(struct ieee80211_hw *hw,
+int acx_e_op_config(struct ieee80211_hw *hw, u32 changed);
+void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
-int acx_net_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
-int acx_net_conf_tx(struct ieee80211_hw* ieee, u16 queue,
+int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
+int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 //int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
 //static void acx_netdev_init(struct net_device *ndev);
@@ -707,7 +719,7 @@ int acx_net_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 int acxpci_s_reset_dev(acx_device_t *adev);
 int acxmem_s_reset_dev(acx_device_t *adev);
 
-void acx_i_set_multicast_list(struct ieee80211_hw *hw,
+void acx_i_op_configure_filter(struct ieee80211_hw *hw,
                             unsigned int changed_flags,
                             unsigned int *total_flags,
                             int mc_count, struct dev_addr_list *mc_list);
@@ -720,10 +732,13 @@ void acx_s_get_firmware_version(acx_device_t *adev);
 void acx_display_hardware_details(acx_device_t *adev);
 
 int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu);
-int acx_e_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+int acx_e_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
 
-void acx_interrupt_tasklet(struct work_struct *work);
+void acxpci_interrupt_tasklet(struct work_struct *work);
+void acxusb_interrupt_tasklet(struct work_struct *work);
+void acxmem_interrupt_tasklet(struct work_struct *work);
+
 // void acx_interrupt_tasklet(acx_device_t *adev);
 // OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_e_after_interrupt_task(acx_device_t *adev);
