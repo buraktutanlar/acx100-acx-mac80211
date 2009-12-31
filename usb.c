@@ -67,6 +67,14 @@
 #define ACX100_PRODUCT_ID_UNBOOTED 0x3B01
 #define ACX100_PRODUCT_ID_BOOTED 0x3B00
 
+/* OW, 20091205, TODO, Info on TNETW1450 support:
+ * Firmware loads, device shows activity, however RX and TX paths are broken.
+ * The RX path problem possibly related to urb,rxbuffer handling (in acxusb_i_complete_rx).
+ *
+ * Observed as followed: (Too) big packet to mac80211 and subsequent machine crash (e.g. double faults, etc.)
+ * acx: rx: CTL/UNKNOWN time:620888198 len:65528 signal:20 SNR:100 macstat:AB phystat:44 phyrate:134 status:0
+ */
+
 /* TNETW1450 USB devices */
 #define VENDOR_ID_DLINK		0x07b8	/* D-Link Corp. */
 #define PRODUCT_ID_WUG2400	0xb21a	/* AboCom WUG2400 or SafeCom SWLUT-54125 */
@@ -202,7 +210,7 @@ int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 
 	FN_ENTER;
 
-	printk("%s doesn't seem to work yet, disabled.\n", __func__);
+	printk("acxusb: %s doesn't seem to work yet, disabled.\n", __func__);
 
 	/*
 	   mem.addr = cpu_to_le16(reg);
@@ -401,19 +409,24 @@ read 4 bytes <==== MUST BE 12!!
 		log(L_CTL, "acx: response frame: cmd=0x%04X status=%d\n",
 		    le16_to_cpu(loc->cmd), cmd_status);
 	}
-      good:
+  
+  good:
 	kfree(loc);
 	FN_EXIT1(OK);
 	return OK;
-      bad:
+
+  bad:
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
+	 
+// OW TODO Use logf1 (for def or undef ACX_DEBUG) 
+// OW TODO Improve cmdstr handling
 #if ACX_DEBUG
 	printk("acx: %s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
 #else
 	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
 #endif
-	dump_stack();
+	//dump_stack();
 	kfree(loc);
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -733,18 +746,18 @@ static int acxusb_s_fill_configoption(acx_device_t * adev)
 }
 
 static const struct ieee80211_ops acxusb_hw_ops = {
-	.tx = acx_i_start_xmit,
-	.conf_tx = acx_net_conf_tx,
-	.add_interface = acx_add_interface,
-	.remove_interface = acx_remove_interface,
+	.tx = acx_i_op_tx,
+	.conf_tx = acx_e_conf_tx,
+	.add_interface = acx_e_op_add_interface,
+	.remove_interface = acx_e_op_remove_interface,
 	.start = acxusb_e_open,
-	.configure_filter = acx_i_set_multicast_list,
+	.configure_filter = acx_i_op_configure_filter,
 	.stop = acxusb_e_close,
-	.config = acx_net_config,
-	.config_interface = acx_config_interface,
-	.set_key = acx_net_set_key,
-	.get_stats = acx_e_get_stats,
-	.get_tx_stats = acx_net_get_tx_stats,
+	.config = acx_e_op_config,
+	.bss_info_changed = acx_e_op_bss_info_changed,
+	.set_key = acx_e_op_set_key,
+	.get_stats = acx_e_op_get_stats,
+	.get_tx_stats = acx_e_op_get_tx_stats,
 };
 
 /***********************************************************************
@@ -823,16 +836,18 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 
 
-	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
-			/* TODO: mainline doesn't support the following flags yet */
-			/*
-			  ~IEEE80211_HW_MONITOR_DURING_OPER &
-			  ~IEEE80211_HW_WEP_INCLUDE_IV;
-			*/
-        ieee->queues = 1;
+	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	/* TODO: mainline doesn't support the following flags yet */
+	/*
+	 ~IEEE80211_HW_MONITOR_DURING_OPER &
+	 ~IEEE80211_HW_WEP_INCLUDE_IV;
+	 */
+	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+			| BIT(NL80211_IFTYPE_ADHOC);
+	ieee->queues = 1;
+	// OW TODO Check if RTS/CTS threshold can be included here
 
 	/* Register the callbacks for the network device functions */
-
 
 	/* Setup private driver context */
 
@@ -994,7 +1009,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	result = OK;
 	goto end;
 
-      end_nomem:
+  end_nomem:
 	printk(msg, result);
 
 	if (ieee) {
@@ -1014,11 +1029,11 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	result = -ENOMEM;
 	goto end;
 
-      end_nodev:
+  end_nodev:
 	/* no device we could handle, return error. */
 	result = -EIO;
 
-      end:
+  end:
 	FN_EXIT1(result);
 	return result;
 }
@@ -1098,8 +1113,9 @@ int acxusb_e_open(struct ieee80211_hw *hw)
 	int i;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
+
+	adev->initialized = 0;
 
 	/* put the ACX100 out of sleep mode */
 //	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -1118,12 +1134,13 @@ int acxusb_e_open(struct ieee80211_hw *hw)
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		adev->usb_rx[i].urb->status = 0;
 	}
-
 	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
 
-	ieee80211_start_queues(adev->ieee);
-	acx_unlock(adev, flags);
+	acx_wake_queue(adev->ieee, NULL);
 
+	adev->initialized = 1;
+
+	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
@@ -1147,8 +1164,8 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 	int i;
 
 	FN_ENTER;
+	acx_sem_lock(adev);
 
-	    acx_sem_lock(adev);
 	if (adev->dev_state_mask & ACX_STATE_IFACE_UP)
 	{
 //		acxusb_e_down(adev);
@@ -1157,7 +1174,7 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 
 /* Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them? */
 
-        acx_free_modes(adev);
+    acx_free_modes(adev);
 
 	/* Make sure we don't get any more rx requests */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -1167,9 +1184,11 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 	 * We must do FLUSH *without* holding sem to avoid a deadlock.
 	 * See pci.c:acxpci_s_down() for deails.
 	 */
-	acx_sem_unlock(adev);
-	flush_scheduled_work();
-	acx_sem_lock(adev);
+	 
+	// OW Maybe not required anymore. Mac80211 flushes queue
+	//	acx_sem_unlock(adev);
+	//	flush_scheduled_work();
+	//	acx_sem_lock(adev);
 
 	/* Power down the device */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
@@ -1192,6 +1211,9 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 
 	/* Must do this outside of lock */
 	del_timer_sync(&adev->mgmt_timer);
+
+	adev->initialized = 0;
+	log(L_INIT, "acxusb: closed device\n");
 
 	acx_sem_unlock(adev);
 
@@ -1339,19 +1361,13 @@ void acxusb_i_complete_rx(struct urb *urb)
 		int tail_size;
 		ptr = &adev->rxtruncbuf;
 		packetsize = RXBUF_BYTES_USED(ptr);
-		log(L_ANY,
-			"acx: handling truncated frame (truncsize=%d size=%d "
-			"packetsize(from trunc)=%d)\n",
-			adev->rxtruncsize, size, packetsize);
 
-		ptr = &adev->rxtruncbuf;
-		packetsize = RXBUF_BYTES_USED(ptr);
-		if (acx_debug & L_USBRXTX) {
-			printk("acx: handling truncated frame (truncsize=%d size=%d "
+		if (acx_debug & (L_USBRXTX)) {
+			printk("acx: handling truncated frame (truncsize=%d, size=%d, "
 			       "packetsize(from trunc)=%d)\n",
 			       adev->rxtruncsize, size, packetsize);
-			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 			acx_dump_bytes(inbuf, RXBUF_HDRSIZE);
+			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 		}
 
 		/* bytes needed for rxtruncbuf completion: */
@@ -1377,18 +1393,17 @@ void acxusb_i_complete_rx(struct urb *urb)
 			memcpy(((char *)ptr) + adev->rxtruncsize, inbuf,
 			       tail_size);
 
-			if (acx_debug & L_USBRXTX) {
-				printk("acx: full trailing packet + 12 bytes:\n");
-				acx_dump_bytes(inbuf,
-					       tail_size + RXBUF_HDRSIZE);
+			if (acx_debug & (L_USBRXTX)) {
+				printk("acxusb: full trailing packet + 12 bytes:\n");
+				acx_dump_bytes(inbuf, tail_size + RXBUF_HDRSIZE);
 			}
 			acx_l_process_rxbuf(adev, ptr);
 			adev->rxtruncsize = 0;
 			ptr = (rxbuffer_t *) (((char *)inbuf) + tail_size);
 			remsize -= tail_size;
 		}
-		printk("acx: post-merge size=%d remsize=%d\n",
-			size, remsize);
+		if (acx_debug & (L_USBRXTX))
+				printk("acxusb: post-merge size=%d remsize=%d\n", size, remsize);
 	}
 
 	/* size = USB data block size
@@ -1396,8 +1411,9 @@ void acxusb_i_complete_rx(struct urb *urb)
 	 ** ptr = current pos in USB data block
 	 */
 	while (remsize) {
+
 		if (remsize < RXBUF_HDRSIZE) {
-			printk("acx: truncated rx header (%d bytes)!\n",
+			printk("acxusb: truncated rx header (%d bytes)!\n",
 			       remsize);
 			if (ACX_DEBUG)
 				acx_dump_bytes(ptr, remsize);
@@ -1406,10 +1422,12 @@ void acxusb_i_complete_rx(struct urb *urb)
 
 		packetsize = RXBUF_BYTES_USED(ptr);
 		log(L_USBRXTX,
-			"acx: packet with packetsize=%d\n", packetsize);
+			"acxusb: packet with packetsize=%d\n", packetsize);
 
 		if (RXBUF_IS_TXSTAT(ptr)) {
+
 			/* do rate handling */
+			// OW TODO rate handling done by mac80211
 			usb_txstatus_t *stat = (void *)ptr;
 
 			log(L_USBRXTX,
@@ -1434,14 +1452,15 @@ void acxusb_i_complete_rx(struct urb *urb)
 						ACX_TX_URB_CNT - adev->tx_free);
 				}
 			}
-*/ goto next;
+*/
+			goto next;
 		}
 
 		if (packetsize > sizeof(rxbuffer_t)) {
-			printk("acx: packet exceeds max wlan "
+			printk("acxusb: packet exceeds max wlan "
 			       "frame size (%d > %d). size=%d\n",
 			       packetsize, (int)sizeof(rxbuffer_t), size);
-			if (ACX_DEBUG)
+			if (ACX_DEBUG& (L_USBRXTX))
 				acx_dump_bytes(ptr, 16);
 			/* FIXME: put some real error-handling in here! */
 			break;
@@ -1449,8 +1468,8 @@ void acxusb_i_complete_rx(struct urb *urb)
 
 		if (packetsize > remsize) {
 			/* frame truncation handling */
-			if (acx_debug & L_USBRXTX) {
-				printk("acx: need to truncate packet, "
+			if (acx_debug & (L_USBRXTX)) {
+				printk("acxusb: need to truncate packet, "
 				       "packetsize=%d remsize=%d "
 				       "size=%d bytes:",
 				       packetsize, remsize, size);
@@ -1464,19 +1483,22 @@ void acxusb_i_complete_rx(struct urb *urb)
 		/* packetsize <= remsize */
 		/* now handle the received data */
 		acx_l_process_rxbuf(adev, ptr);
-	      next:
+
+		next:
 		ptr = (rxbuffer_t *) (((char *)ptr) + packetsize);
 		remsize -= packetsize;
-		if ((acx_debug & L_USBRXTX) && remsize) {
+		if ((acx_debug & (L_USBRXTX)) && remsize) {
 			printk("acx: more than one packet in buffer, "
 			       "second packet hdr:");
 			acx_dump_bytes(ptr, RXBUF_HDRSIZE);
 		}
+
 	}
 
-      end_unlock:
+    end_unlock:
 	acx_unlock(adev, flags);
-/* end: */
+
+	/* end: */
 	FN_EXIT0;
 }
 
@@ -1539,11 +1561,12 @@ void acxusb_i_complete_tx(struct urb *urb)
 	tx->busy = 0;
 	adev->tx_free++;
 	if ((adev->tx_free >= TX_START_QUEUE)
-	    && (adev->status == ACX_STATUS_4_ASSOCIATED)
-/*	    && (acx_queue_stopped(adev->ndev)*/) {
+/*	    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
+/*	    && (acx_queue_stopped(adev->ndev)*/
+	   ){
 		log(L_BUF,
 			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
-/*		acx_wake_queue(adev->ndev, NULL); */
+		acx_wake_queue(adev->ieee, NULL);
 	}
 
       end_unlock:
@@ -1557,7 +1580,7 @@ void acxusb_i_complete_tx(struct urb *urb)
 ** acxusb_l_alloc_tx
 ** Actually returns a usb_tx_t* ptr
 */
-tx_t *acxusb_l_alloc_tx(acx_device_t * adev)
+tx_t *acxusb_l_alloc_tx(acx_device_t *adev)
 {
 	usb_tx_t *tx;
 	unsigned head;
@@ -1578,7 +1601,7 @@ tx_t *acxusb_l_alloc_tx(acx_device_t * adev)
 			if (adev->tx_free < TX_STOP_QUEUE) {
 				log(L_BUF, "acx: tx: stop queue "
 					"(%u free txbufs)\n", adev->tx_free);
-/*				acx_stop_queue(adev->ndev, NULL); */
+				acx_stop_queue(adev->ieee, NULL);
 			}
 			goto end;
 		}
@@ -1617,17 +1640,17 @@ void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 ** Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
 ** Can be called from acx_i_start_xmit (data frames from net core).
 */
-void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, struct ieee80211_tx_control *ctl,
-				struct sk_buff* skb)
-{
+void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff* skb) {
 	struct usb_device *usbdev;
 	struct urb *txurb;
 	usb_tx_t *tx;
 	usb_txbuffer_t *txbuf;
-//	client_t *clt;
+	//	client_t *clt;
 	struct ieee80211_hdr *whdr;
 	unsigned int outpipe;
 	int ucode, txnum;
+	u8 rate_100;
 
 	FN_ENTER;
 
@@ -1662,17 +1685,14 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len, st
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
 	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
 	txbuf->queue_index = 1;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
-	txbuf->rate = ctl->tx_rate; //clt->rate_100;
-#else
-	txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
-#endif
-//		FIXME();	//This used to have | (clt - adev->ap_client)
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,24)
-	txbuf->hostdata = (ctl->tx_rate << 16);
-#else
-	txbuf->hostdata = (ctl->tx_rate->bitrate << 16);
-#endif
+
+	// OW txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
+	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+	txbuf->rate = rate_100 ;
+
+	//	FIXME();	//This used to have | (clt - adev->ap_client)
+	txbuf->hostdata = (rate_100 << 16);
+
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == adev->preamble_cur)
 		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
@@ -1754,6 +1774,19 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 }
 */
 #endif
+
+
+/*
+ * For acx_e_after_interrupt_task
+ */
+void acxusb_interrupt_tasklet(struct work_struct *work)
+{
+	acx_device_t *adev =
+			container_of(work, struct acx_device, after_interrupt_task);
+
+	if (adev->after_interrupt_jobs)
+		acx_e_after_interrupt_task(adev);
+}
 
 
 /***********************************************************************

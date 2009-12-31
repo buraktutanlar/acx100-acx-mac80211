@@ -1,3 +1,27 @@
+2009-12-31 Oliver Winker <oli1417@hallo.ms>
+
+	This wraps up current usb.c updates: mac80211 API updates for 2.6.31, compiles. Limited device support.
+	
+	* Mac80211 API updates for 2.6.31, compiles. 
+	
+	* Device support:
+	
+	- ACX100 (TNETW1100): 
+	. Possibly working, but couldn't be tested. Required test device: D-Link DWL-120+
+	
+	- TNETW1450 support:
+	. Test device: Fritz! WLAN Stick, SI version, PRODUCT_ID 0x6201
+	. Firmware loads, device shows activity, however RX and TX paths are broken. 
+	. The RX path problem possibly related to urb,rxbuffer handling 
+	(in acxusb_i_complete_rx). Observed as followed: 
+	---
+	(Too) big packet to mac80211 and subsequent machine crash (e.g. double faults, etc.)
+	acx: rx: CTL/UNKNOWN time:620888198 len:65528 signal:20 SNR:100 macstat:AB phystat:44 phyrate:134 status:0
+	---
+	
+	* Logging changes
+	* Old kernel support #ifdefs removed
+
 2009-11-25 Oliver Winker <oli1417@hallo.ms>
 
 	* 2.6.31 fixes and pci.c WPA working basically
