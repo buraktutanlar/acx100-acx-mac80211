@@ -61,7 +61,8 @@ void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
 void log_fn_exit_v(const char *funcname, int v);
 
-void acx_print_mac(const char *head, const u8 *mac, const char *tail);
+char* acx_print_mac(char *buf, const u8 *mac);
+void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 
 #define FN_ENTER \
 	do { \
@@ -124,7 +125,7 @@ static inline void
 acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
 {
 	if (acx_debug & level) {
-		acx_print_mac(head, mac, tail);
+		acx_print_mac2(head, mac, tail);
 	}
 }
 
@@ -402,7 +403,7 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 ** Communication with firmware
 */
 #define CMD_TIMEOUT_MS(n)	(n)
-#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
+#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(100)
 
 // OW TODO Review for cleanup. Is special _debug #defs for logging required ?
 // We can just log all in case of errors.
@@ -720,9 +721,7 @@ int acxpci_s_reset_dev(acx_device_t *adev);
 int acxmem_s_reset_dev(acx_device_t *adev);
 
 void acx_i_op_configure_filter(struct ieee80211_hw *hw,
-                            unsigned int changed_flags,
-                            unsigned int *total_flags,
-                            int mc_count, struct dev_addr_list *mc_list);
+		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 
 /*** End mac80211 Functions **/
 

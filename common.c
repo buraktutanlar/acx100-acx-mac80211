@@ -248,7 +248,13 @@ void acx_s_mwait(int ms)
 /***********************************************************************
 ** Not inlined: it's larger than it seems
 */
-void acx_print_mac(const char *head, const u8 * mac, const char *tail)
+char* acx_print_mac(char *buf, const u8 *mac)
+{
+	sprintf(buf, MACSTR, MAC(mac));
+	return(buf);
+}
+
+void acx_print_mac2(const char *head, const u8 *mac, const char *tail)
 {
 	printk("acx: %s" MACSTR "%s", head, MAC(mac), tail);
 }
@@ -1712,8 +1718,7 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 */
 
 void acx_i_op_configure_filter(struct ieee80211_hw *hw,
-		unsigned int changed_flags, unsigned int *total_flags, int mc_count,
-		struct dev_addr_list *mc_list) {
+		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
 
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -1764,7 +1769,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 
 	FN_ENTER;
 
-	// OW Enable this for acx100, however I don't know if this is/will work
+	// OW Enabled this for acx100, however I don't know if this is/will work
 	/*
 	if (!IS_ACX111(adev)) {
 		return NOT_OK;
@@ -1803,7 +1808,7 @@ acx111_s_set_feature_config(acx_device_t * adev,
 
 	FN_ENTER;
 
-	// OW Enable this for acx100, however I don't know if this is/will work
+	// OW Enabled this for acx100, however I don't know if this is/will work
 	/*
 	if (!IS_ACX111(adev)) {
 		FN_EXIT1(NOT_OK);
@@ -2846,10 +2851,10 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 ** FIXME Remove documentation references to bcm43xx and p54 ...
 */
 
-static void acx_l_rx(acx_device_t *adev, rxbuffer_t * rxbuf)
+static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 {
 
-	struct ieee80211_rx_status status;
+	struct ieee80211_rx_status *status;
 
 	struct ieee80211_hdr *w_hdr;
 	struct sk_buff *skb;
@@ -2877,33 +2882,34 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t * rxbuf)
 	skb_put(skb, buflen);
 	memcpy(skb->data, w_hdr, buflen);
 
-	memset(&status, 0, sizeof(status));
+	status=IEEE80211_SKB_RXCB(skb);
+	memset(status, 0, sizeof(*status));
 
-	status.mactime = rxbuf->time;
-	status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
+	status->mactime = rxbuf->time;
+	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 
 	/* TODO: they do not seem to be reported, at least on the acx111
 	 * (and TNETW1450?), therefore commenting them out
 	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 
-	status.flag = 0;
+	status->flag = 0;
 
-	status.freq = adev->rx_status.freq;
-	status.band = adev->rx_status.band;
+	status->freq = adev->rx_status.freq;
+	status->band = adev->rx_status.band;
 
-	status.antenna = 1;
+	status->antenna = 1;
 	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
-		status.rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 	}
 	else {
-		status.rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 	}
 
 	/*
 	 * FIXME: should it really be done here??
 	 */
-	ieee80211_rx_irqsafe(adev->ieee, skb, &status);
+	ieee80211_rx_irqsafe(adev->ieee, skb);
 	adev->stats.rx_packets++;
 	adev->stats.rx_bytes += skb->len;
 
@@ -4219,7 +4225,7 @@ void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
 	SET_BIT(adev->after_interrupt_jobs, set_flag);
 
 	// OW Use mac80211 workqueue
-	queue_work(adev->ieee->workqueue, &adev->after_interrupt_task);
+	ieee80211_queue_work(adev->ieee, &adev->after_interrupt_task);
 	//	}
 }
 
@@ -4387,7 +4393,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	unsigned long flags;
 	int err = -EOPNOTSUPP;
 
-	DECLARE_MAC_BUF(mac);
+	char mac[] = MACSTR; // approximate max length
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -4416,7 +4422,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	printk(KERN_INFO "acx: Virtual interface added "
 	       "(type: 0x%08X, MAC: %s)\n",
 	       conf->type,
-	       print_mac(mac, conf->mac_addr));
+	       acx_print_mac(mac, conf->mac_addr));
 
     out_unlock:
 	acx_unlock(adev, flags);
@@ -4431,7 +4437,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	DECLARE_MAC_BUF(mac);
+	char mac[] = MACSTR; // approximate max length
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -4458,7 +4464,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 
 	printk(KERN_INFO "acx: Virtual interface removed "
 	       "(type: 0x%08X, MAC: %s)\n",
-	       conf->type, print_mac(mac, conf->mac_addr));
+	       conf->type, acx_print_mac(mac, conf->mac_addr));
 
 	FN_EXIT0;
 }
