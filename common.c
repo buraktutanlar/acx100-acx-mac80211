@@ -1326,7 +1326,7 @@ static int acx_e_proc_show_debug(struct seq_file *file, void *v)
 	FN_ENTER;
 	// No sem locking required, since debug is global for all devices
 
-	seq_printf(file, "acx_debug: %u\n", acx_debug);
+	seq_printf(file, "acx_debug: %04x\n", acx_debug);
 
 	FN_EXIT0;
 
@@ -2287,7 +2287,7 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 	else
 		adev->phy_header_len = 0;
 
-	log(L_INIT, "acx: setting RXconfig to %04X:%04X\n",
+	log(L_DEBUG, "acx: setting RXconfig to %04X:%04X\n",
 	    adev->rx_config_1, adev->rx_config_2);
 	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
 	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
@@ -3025,8 +3025,8 @@ static void acx_s_set_wepkey(acx_device_t * adev)
 */
 static int acx100_s_init_wep(acx_device_t * adev)
 {
-	acx100_ie_wep_options_t options;
-	ie_dot11WEPDefaultKeyID_t dk;
+	// acx100_ie_wep_options_t options;
+	// ie_dot11WEPDefaultKeyID_t dk;
 	acx_ie_memmap_t pt;
 	int res = NOT_OK;
 
@@ -3812,7 +3812,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_TX) {
 		/* set Tx */
-		log(L_INIT, "acx: updating TX: %s\n",
+		log(L_DEBUG, "acx: updating TX: %s\n",
 		    adev->tx_disabled ? "disable" : "enable");
 		if (adev->tx_disabled)
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
@@ -3833,7 +3833,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	if (adev->set_mask & GETSET_RX) {
 		// OW TODO Add Disable Rx
 		/* Enable Rx */
-		log(L_INIT, "acx: updating: enable Rx on channel: %u\n",
+		log(L_DEBUG, "acx: updating: enable Rx on channel: %u\n",
 		    adev->channel);
 		acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_RX);
@@ -4670,7 +4670,7 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 	acx_device_t *adev = ieee2adev(hw);
 	FN_ENTER;
 	acx_sem_lock(adev);
-    TODO();
+    // TODO
   	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
