@@ -841,7 +841,7 @@ acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 **
 ** Origin: Common linux implementation
 */
-static u32 acxpci_read_cmd_type_status(acx_device_t * adev)
+static u32 acxpci_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
 
@@ -1165,15 +1165,15 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
-	/* timed out! */
+	/* Timed out! */
 	if (counter == -1) {
-		printk("acx: %s: " FUNC "(): timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "acx: %s: " FUNC "(): timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
 		       devname, (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		printk("acx: hack: don't do: 'goto bad;'\ncounter: %d cmd_timeout: %d cmd_timeout-counter: %d\n",counter, cmd_timeout, cmd_timeout - counter);
+		log(L_ANY, "acx: timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",counter, cmd_timeout, cmd_timeout - counter);
 
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, "acx: " FUNC "(): %s for CMD_COMPLETE %dms. "
@@ -1183,7 +1183,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
-		printk("acx: %s: " FUNC "(): cmd_status is not SUCCESS: %d (%s). "
+		printk("acx: %s: " FUNC "(): ERROR: cmd_status is not SUCCESS: %d (%s). "
 		       "Took %dms of %d\n",
 		       devname, cmd_status, acx_cmd_status_str(cmd_status),
 		       cmd_timeout - counter, cmd_timeout);
@@ -1204,7 +1204,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			acx_dump_bytes(buffer, buflen);
 		}
 	}
-/* ok: */
+	/* ok: */
 	log(L_CTL, "acx: " FUNC "(%s): took %ld jiffies to complete\n",
 	    cmdstr, jiffies - start);
 	FN_EXIT1(OK);
@@ -1660,7 +1660,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("acx: can't use IRQ 0\n");
 		goto fail_no_irq;
 	}
-	// OW TODO Cleanup SET_IEEE80211_DEV(ieee, &pdev->dev);
 
 	/* request shared IRQ handler */
 	if (request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME,
@@ -1670,6 +1669,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_request_irq;
 	}
 	log(L_DEBUG | L_IRQ, "acx: request_irq %d successful\n", adev->irq);
+	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	acxpci_disable_acx_irq(adev);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -2098,7 +2099,6 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 ** sets status == STOPPED
 */
 
-// OW TODO Rename to acxpci_disable_irq
 static void acxpci_disable_acx_irq(acx_device_t * adev)
 {
 	FN_ENTER;
@@ -2108,8 +2108,7 @@ static void acxpci_disable_acx_irq(acx_device_t * adev)
 	 ** I can't ifconfig up after ifconfig down'ing on my acx100 */
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	write_flush(adev);
-
+	//write_flush(adev);
 	adev->irqs_active = 0;
 
 	FN_EXIT0;
@@ -2275,7 +2274,7 @@ static void acxpci_e_op_close(struct ieee80211_hw *hw)
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
 	adev->initialized = 0;
-	log(L_INIT, "acx: closed device\n");
+	log(L_INIT, "acxpci: closed device\n");
 
 	acx_sem_unlock(adev);
 	FN_EXIT0;
@@ -4111,7 +4110,12 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 					  /* | HOST_INT_UNKNOWN        */
 		    );
 		/* Or else acx100 won't signal cmd completion, right? */
-		adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
+		// adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
+
+		// OW 20100101 Also HOST_INT_CMD_COMPLETE should be off.
+		// Otherwise it interfers with possible polling, e.g. in initial issue_cmd
+		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
+
 	} else {
 		adev->irq_mask = (u16) ~ (0
 					  /* | HOST_INT_RX_DATA        */

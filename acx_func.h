@@ -403,7 +403,7 @@ acx_carrier_on(struct net_device *ndev, const char *msg)
 ** Communication with firmware
 */
 #define CMD_TIMEOUT_MS(n)	(n)
-#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(100)
+#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
 
 // OW TODO Review for cleanup. Is special _debug #defs for logging required ?
 // We can just log all in case of errors.
