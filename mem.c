@@ -2335,6 +2335,7 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 			| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
+	SET_IEEE80211_DEV(ieee, &pdev->dev);
 
 	/* TODO: although in the original driver the maximum value was 100,
 	 * the OpenBSD driver assigns maximum values depending on the type of
@@ -2428,9 +2429,8 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 		printk("acx: can't use IRQ 0\n");
 		goto fail_irq;
 	}
-	// OW FIXME Move up. See pci.c
-	SET_IEEE80211_DEV(ieee, &pdev->dev);
 
+	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
 	/* request shared IRQ handler */
 	if (request_irq(adev->irq, acxmem_i_interrupt,
 			IRQF_SHARED,
@@ -2442,6 +2442,8 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	}
 	set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 	log(L_ANY, "acx: request_irq %d successful\n", adev->irq);
+	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	acxmem_disable_acx_irq(adev);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -2500,8 +2502,6 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	WIRELESS_EXT,	UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
-
-	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
 
 	/** done with board specific setup **/
 
@@ -5477,8 +5477,15 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 		| HOST_INT_SCAN_COMPLETE
 		| HOST_INT_FCS_THRESHOLD
 		| HOST_INT_UNKNOWN);
+
 		/* Or else acx100 won't signal cmd completion, right? */
-		adev->irq_mask_off = (u16) ~(HOST_INT_CMD_COMPLETE); /* 0xfdff */
+		//adev->irq_mask_off = (u16) ~(HOST_INT_CMD_COMPLETE); /* 0xfdff */
+
+		// OW 20100101 Also HOST_INT_CMD_COMPLETE should be off.
+		// Otherwise it interfers with possible polling, e.g. in initial issue_cmd
+		// adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
+		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
+
 	} else {
 		adev->irq_mask = (u16) ~(0
 		| HOST_INT_RX_DATA
