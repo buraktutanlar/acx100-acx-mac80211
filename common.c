@@ -1769,12 +1769,9 @@ acx111_s_get_feature_config(acx_device_t * adev,
 
 	FN_ENTER;
 
-	// OW Enabled this for acx100, however I don't know if this is/will work
-	/*
 	if (!IS_ACX111(adev)) {
 		return NOT_OK;
 	}
-	*/
 
 	memset(&feat, 0, sizeof(feat));
 
@@ -1808,13 +1805,10 @@ acx111_s_set_feature_config(acx_device_t * adev,
 
 	FN_ENTER;
 
-	// OW Enabled this for acx100, however I don't know if this is/will work
-	/*
 	if (!IS_ACX111(adev)) {
 		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
-	*/
 
 	if ((mode < 0) || (mode > 2)) {
 		FN_EXIT1(NOT_OK);
@@ -3825,12 +3819,16 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		else {
 			acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
 					&adev->channel, 1);
-			// OW FIXME 20090815, 20090922
-			// Is this still required with the "disable WEP by WEPCacheStart=WEPCacheStart" solution ?
-			// TODO TBC
-			acx111_s_feature_on(adev, 0,
-					    FEATURE2_NO_TXCRYPT |
-					    FEATURE2_SNIFFER);
+
+			/* OW 20091231:
+			 * For the acx111 encryption needs to be turned off
+			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
+			 * Maybe redundant with GETSET_MODE below.
+			 */
+			if (IS_ACX111(adev)) {
+				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+			}
+
 			acx_wake_queue(adev->ieee, NULL);
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_TX);
@@ -3882,8 +3880,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_MODE ) {
-		acx111_s_feature_on(adev, 0,
-				    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+
 		switch (adev->mode) {
 		case ACX_MODE_3_AP:
 			adev->aid = 0;
@@ -3897,10 +3894,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			break;
 		case ACX_MODE_0_ADHOC:
 		case ACX_MODE_2_STA:
-			// OW FIXME If feature config still required, see above in GETSET TX, should it perhaps better be done here ?
-			// acx111_s_feature_on(adev, 0,
-			//		    FEATURE2_NO_TXCRYPT |
-			//		    FEATURE2_SNIFFER);
+
+			/* OW 20091231:
+			 * For the acx111 encryption needs to be turned off
+			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
+			 */
+			if (IS_ACX111(adev)) {
+				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+			}
 			break;
 		case ACX_MODE_OFF:
 			/* disable both Tx and Rx to shut radio down properly */
@@ -4126,6 +4127,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	if (!adev->after_interrupt_jobs || !adev->initialized)
 		goto end_no_lock;	/* no jobs to do */
 
+	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
 	/* we see lotsa tx errors */
@@ -4197,11 +4199,12 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	/* others */
 	if(adev->after_interrupt_jobs)
 	{
-		printk("acx: %s: Jobs still to be run: %x\n",__func__, adev->after_interrupt_jobs);
+		printk("acx: %s: Jobs still to be run: 0x%02X\n",__func__, adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
+
 	acx_unlock(adev, flags);
-	//      acx_sem_unlock(adev);
+	acx_sem_unlock(adev);
 
 	end_no_lock:
 
@@ -4444,7 +4447,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 
 	if (conf->type == NL80211_IFTYPE_MONITOR) {
 		adev->interface.monitor--;
-//                assert(bcm->interface.monitor >= 0);
+//      assert(bcm->interface.monitor >= 0);
 	} else {
 		adev->interface.operating = 0;
 	}
@@ -4468,10 +4471,6 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 
 	FN_EXIT0;
 }
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
 
 int acx_net_reset(struct ieee80211_hw *ieee)
 {
