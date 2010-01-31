@@ -1669,7 +1669,8 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
-	log(L_DEBUG | L_IRQ, "acx: request_irq %d successful\n", adev->irq);
+	log(L_IRQ | L_INIT, "acx: using IRQ %d: OK\n", pdev->irq);
+
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
 	acxpci_disable_acx_irq(adev);
 
@@ -1710,7 +1711,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_read_eeprom_byte;
 
 	acx_s_parse_configoption(adev, &co);
-	acx_s_set_defaults(adev);
+	acx_s_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
 	acx_s_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
@@ -1733,8 +1734,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
-
-	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", pdev->irq);
 
 /** done with board specific setup **/
 
