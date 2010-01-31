@@ -736,7 +736,7 @@ struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
 
 void acxpci_interrupt_tasklet(struct work_struct *work);
 void acxusb_interrupt_tasklet(struct work_struct *work);
-void acxmem_interrupt_tasklet(struct work_struct *work);
+void acxmem_i_interrupt_tasklet(struct work_struct *work);
 
 // void acx_interrupt_tasklet(acx_device_t *adev);
 // OW TODO void acx_e_after_interrupt_task(struct work_struct* work);

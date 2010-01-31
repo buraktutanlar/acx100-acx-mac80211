@@ -4252,7 +4252,7 @@ void acx_init_task_scheduler(acx_device_t *adev) {
 #endif
 #if defined(CONFIG_ACX_MAC80211_MEM)
 	if (IS_MEM(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxmem_interrupt_tasklet);
+		INIT_WORK(&adev->after_interrupt_task, acxmem_i_interrupt_tasklet);
 		return;
 	}
 #endif
