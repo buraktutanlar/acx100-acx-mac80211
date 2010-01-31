@@ -742,6 +742,7 @@ acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 #endif
 	u16 len;
 	int res;
+	char msgbuf[255];
 
 	FN_ENTER;
 
@@ -750,24 +751,22 @@ acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	// OW TODO Handle ACX_DEBUG again
-	log(L_CTL, "acx: %s: begin: (type:0x%04X:%s,len:%u)\n", __func__, type, typestr, len);
-
 	if (unlikely(!len)) {
-		log(L_DEBUG, "acx: zero-length type %s?!\n", typestr);
+		log(L_DEBUG, "acx: %s: zero-length type %s?!\n",
+				__func__, typestr);
 	}
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
-	if (unlikely(OK != res)) {
-		// OW TODO Use log
-		printk("acx: %s: %s: type=0x%X, typestr=%s: FAILED\n", __func__,
-				wiphy_name(adev->ieee->wiphy), type, typestr);
-	}
 
-	// OW TODO Handle ACX_DEBUG again
-	log(L_CTL, "acx: %s: end: (type:0x%04X:%s,len:%u)\n", __func__, type, typestr, len);
+	sprintf(msgbuf, "acx: %s: %s: type=0x%04X, typestr=%s, len=%u",
+			__func__, wiphy_name(adev->ieee->wiphy),
+			type, typestr, len);
+	if (likely(res == OK))
+		log(L_CTL,  "%s: OK\n", msgbuf);
+	 else
+		log(L_ANY,  "%s: FAILED\n", msgbuf);
 
 	FN_EXIT0;
 	return res;
@@ -2662,8 +2661,7 @@ int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
 	tx = acx_l_alloc_tx(adev, skb->len);
 
 	if (unlikely(!tx)) {
-		// OW TODO Fix logging
-		printk_ratelimited("acx: %s: start_xmit: txdesc ring is full, " "dropping tx\n", wiphy_name(adev->ieee->wiphy));
+		log(L_BUFT, "acx: %s: start_xmit: txdesc ring is full, " "dropping tx\n", wiphy_name(adev->ieee->wiphy));
 		txresult = NOT_OK;
 		goto out_unlock;
 	}
@@ -4456,22 +4454,21 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 		adev->interface.operating = 0;
 	}
 
-	printk("acx: Removing interface: %d %d\n", adev->interface.operating, conf->type);
+	log(L_DEBUG, "acx: %s: interface.operating=%d, conf->type=%d\n",
+			__func__,
+			adev->interface.operating, conf->type);
 
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
 
+	log(L_ANY, "acx: Virtual interface removed: "
+	       "type=%d, MAC=%s\n",
+	       conf->type, acx_print_mac(mac, conf->mac_addr));
+
 	acx_sem_unlock(adev);
 
-	// OW TODO I'm not sure if explicit flushing is still required or done
-	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
-	// hang upon .remove_interface and .close and .stop
-
-	// OW flush_scheduled_work();
-
-	printk(KERN_INFO "acx: Virtual interface removed "
-	       "(type: 0x%08X, MAC: %s)\n",
-	       conf->type, acx_print_mac(mac, conf->mac_addr));
+	// OW 20100131 Flush of mac80211 normally done by mac80211
+	// flush_scheduled_work();
 
 	FN_EXIT0;
 }
@@ -5102,7 +5099,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_power_levels.list[i] =
 		    le16_to_cpu(*(u16 *) & pEle[i * 2 + 2]);
-		printk("acx: %04X ", adev->cfgopt_power_levels.list[i]);
+		printk("%04X ", adev->cfgopt_power_levels.list[i]);
 	}
 	printk("\n");
 
