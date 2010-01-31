@@ -3182,7 +3182,6 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
 
 	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
-	// OW TODO Check. Fix in mem.c if working
 	wlhdr_len = WLAN_HDR_A3_LEN;
 
 	/* modify flag status in separate variable to be able to write it back
@@ -3526,10 +3525,8 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		adev->tx_free++;
 		num_cleaned++;
 
-		if ((adev->tx_free >= TX_START_QUEUE)
-				 &&	acx_queue_stopped(adev->ieee)
-/*		    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
-		    /*&& (acx_queue_stopped(adev->ieee))*/
+		if ((adev->tx_free >= TX_START_QUEUE) &&
+				acx_queue_stopped(adev->ieee)
 		    ) {
 			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
 			    adev->tx_free);
