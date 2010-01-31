@@ -1335,7 +1335,7 @@ static int acx_e_proc_show_debug(struct seq_file *file, void *v)
 	FN_ENTER;
 	// No sem locking required, since debug is global for all devices
 
-	seq_printf(file, "acx_debug: %04x\n", acx_debug);
+	seq_printf(file, "acx_debug: 0x%04x\n", acx_debug);
 
 	FN_EXIT0;
 
@@ -1353,12 +1353,12 @@ static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 	FN_ENTER;
 	// No sem locking required, since debug is global for all devices
 
-	log(L_DEBUG, "acx_e_proc_debug_write: val=%lu\n", val);
-
 	if (count == size) {
 		ret = count;
 		acx_debug = val;
 	}
+
+	log(L_ANY, "%s: acx_debug=0x%04x\n", __func__, acx_debug);
 
 	FN_EXIT0;
 	return ret;
