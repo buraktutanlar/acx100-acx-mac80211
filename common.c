@@ -208,7 +208,11 @@ void log_fn_exit(const char *funcname)
 	int indent;
 	TIMESTAMP(d);
 
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	// OW Handle underflow
+	if (acx_debug_func_indent >= FUNC_INDENT_INCREMENT)
+		acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	else
+		acx_debug_func_indent = 0;
 
 	indent = acx_debug_func_indent;
 	if (indent >= sizeof(spaces))
