@@ -4019,9 +4019,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 }
 
 #if 0
-/***********************************************************************
-** acx_e_after_interrupt_task
-*/
+/*
+ *
+ */
 static int acx_s_recalib_radio(acx_device_t * adev)
 {
 	if (IS_ACX111(adev)) {
@@ -4221,16 +4221,17 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 ** the interrupt context.
 */
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
-	//	if (!adev->after_interrupt_jobs)
-	//	{
 
 	// OW TODO This has currently no effect
 	// OW TODO Interrupt handling ...
 
+	//	if (!adev->after_interrupt_jobs)
+	//	{
 	SET_BIT(adev->after_interrupt_jobs, set_flag);
 
 	// OW Use mac80211 workqueue
 	ieee80211_queue_work(adev->ieee, &adev->after_interrupt_task);
+
 	//	}
 }
 
