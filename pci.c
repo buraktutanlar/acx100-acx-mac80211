@@ -1173,7 +1173,8 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       devname, (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		log(L_ANY, "acx: timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",counter, cmd_timeout, cmd_timeout - counter);
+		log(L_ANY, "acx: timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
+				counter, cmd_timeout, cmd_timeout - counter);
 
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG, "acx: " FUNC "(): %s for CMD_COMPLETE %dms. "
@@ -1183,7 +1184,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
-		printk("acx: %s: " FUNC "(): ERROR: cmd_status is not SUCCESS: %d (%s). "
+		log(L_ANY, "acx: %s: " FUNC "(): ERROR: cmd_status is not SUCCESS: %d (%s). "
 		       "Took %dms of %d\n",
 		       devname, cmd_status, acx_cmd_status_str(cmd_status),
 		       cmd_timeout - counter, cmd_timeout);
