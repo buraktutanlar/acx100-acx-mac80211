@@ -2531,7 +2531,6 @@ static void update_link_quality_led(acx_device_t * adev)
 void acxpci_interrupt_tasklet(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
-//	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
 	int irqtype;
 	unsigned long flags;
 
@@ -2543,8 +2542,6 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 
 	FN_ENTER;
 
-	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
-	 * I am paranoid */
 	acx_lock(adev, flags);
 
 	irqtype = adev->irq_reason;
@@ -2560,7 +2557,6 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
  * in case no IRQ type occurred */
 	while (likely(--irqcount)) {
 #endif
-		/* ACK all IRQs ASAP */
 
 		/* Handle most important IRQ types first */
 		if (irqtype & HOST_INT_RX_COMPLETE) {
@@ -2583,10 +2579,13 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 		/* Less frequent ones */
 		if (irqtype & (0
 			       | HOST_INT_CMD_COMPLETE
-			       | HOST_INT_INFO | HOST_INT_SCAN_COMPLETE)) {
+			       | HOST_INT_INFO 
+			       | HOST_INT_SCAN_COMPLETE)) {
+			       	
 			if (irqtype & HOST_INT_INFO) {
 				handle_info_irq(adev);
 			}
+			
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
 				log(L_IRQ, "acx: got Scan_Complete IRQ\n");
 				/* need to do that in process context */
@@ -2600,9 +2599,9 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 		 * or we keep them masked out */
 		if (irqtype & (0
 				| HOST_INT_RX_DATA
+				/* | HOST_INT_RX_COMPLETE */
 				/* | HOST_INT_TX_COMPLETE  */
 				| HOST_INT_TX_XFER
-				/* | HOST_INT_RX_COMPLETE */
 				| HOST_INT_DTIM
 				| HOST_INT_BEACON
 				| HOST_INT_TIMER
@@ -2621,6 +2620,11 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 #if IRQ_ITERATE
 		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
 		irqtype = unmasked & ~adev->irq_mask;
+		
+		/* ACK all IRQs ASAP */
+		write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
+		log(L_IRQ, "IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
+				unmasked, adev->irq_mask, irqtype);
 		/* Bail out if no new IRQ bits or if all are masked out */
 		if (!irqtype)
 			break;
@@ -2670,17 +2674,16 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	if (!adev)
 		return IRQ_NONE;
 
-	/* LOCKING: can just spin_lock() since IRQs are disabled anyway.
-	 * I am paranoid */
-
 	acx_lock(adev, flags);
 
 	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
+	log(L_IRQ, "acxpci: unmasked=%04X\n", unmasked);
+
 	if (unlikely(0xffff == unmasked)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "acx: unmasked:FFFF: Device removed? IRQ_NONE\n");
+		log(L_IRQ, "acxpci: unmasked:FFFF: Device removed? IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2688,22 +2691,22 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	irqtype = unmasked & ~adev->irq_mask;
 	if (!irqtype) {
 		/* We are on a shared IRQ line and it wasn't our IRQ */
-		log(L_IRQ,
-				"acx: irqtype=%04X, unmasked=%04X, mask=%04X: All are masked, IRQ_NONE\n",
-				irqtype, unmasked, adev->irq_mask);
+		log(L_IRQ, "acxpci: irqtype=%04X, unmasked=%04X, mask=%04X: All are masked, IRQ_NONE\n",
+			irqtype, unmasked, adev->irq_mask);
 		goto none;
 	}
 
 	/* Go ahead and ACK our interrupt */
 	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
+	
+	// HOST_INT_CMD_COMPLETE handling
 	if (irqtype & HOST_INT_CMD_COMPLETE) {
 		log(L_IRQ, "acx: got Command_Complete IRQ\n");
 		/* save the state for the running issue_cmd() */
 		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	}
-	log(L_IRQ,
-			"acx: irqtype=%04X, unmasked=%04X, mask=%04X: will IRQ_HANDLED\n",
-			irqtype, unmasked, adev->irq_mask);
+	log(L_IRQ,"acx: irqtype=%04X, unmasked=%04X, mask=%04X: will IRQ_HANDLED\n",
+		irqtype, unmasked, adev->irq_mask);
 
 	/* Only accept IRQs, if we are initialized properly.
 	 * This avoids an RX race while initializing.
@@ -2712,8 +2715,9 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	 * is best to stay with this cheap workaround for now... .
 	 */
 	if (likely(adev->initialized)) {
-		/* disable all IRQs. They are enabled again in the bottom half. */
+
 		/* save the reason code and call our bottom half. */
+		// TODO Should perhaps be: adev->irq_reason |= irqtype;
 		adev->irq_reason = irqtype;
 
 		// OW TODO Logging and handling of other irq not done this way ...
