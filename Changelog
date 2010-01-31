@@ -1,3 +1,11 @@
+2009-01-31 Oliver Winker <oliver@oli1170.net>
+	* Slave memory interface updates:
+
+	- Update to 2.6.32 mac80211
+	- Workqueue tasklet for Rx, Tx processing
+	- Load stability improvements
+	- Various other bits and pieces
+    
 2009-01-03 Oliver Winker <oli1417@hallo.ms>
 	* Mac80211 2.6.32 API changes
 	* acx111 support with for mac80211 (WPA, WPA2)
