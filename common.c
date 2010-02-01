@@ -427,28 +427,36 @@ void acx_display_hardware_details(acx_device_t * adev)
 	FN_ENTER;
 
 	switch (adev->radio_type) {
-	case RADIO_MAXIM_0D:
-		radio_str = "Maxim";
+	case RADIO_0D_MAXIM_MAX2820:
+		/* DWL-650+ B1: MAXIM MAX2820 EGM 236 A7NOCH */
+		/* USB DWL-120+ flip-antenna version:
+		   MAXIM MAX2820 EGM 243 A7NO10
+		   (large G logo) W22 B003A P01
+		   (reference: W22-P01-B003A) */
+		radio_str = "Maxim (MAX2820)";
 		break;
-	case RADIO_RFMD_11:
+	case RADIO_11_RFMD:
 		radio_str = "RFMD";
 		break;
-	case RADIO_RALINK_15:
+	case RADIO_15_RALINK:
 		radio_str = "Ralink";
 		break;
-	case RADIO_RADIA_16:
-		radio_str = "Radia";
+	case RADIO_16_RADIA_RC2422:
+		/* WL311v2 indicates that it's a Radia,
+                   semi-recognizable label: RC2422(?) */
+		radio_str = "Radia (RC2422?)";
 		break;
-	case RADIO_UNKNOWN_17:
+	case RADIO_17_UNKNOWN:
 		/* TI seems to have a radio which is
 		 * additionally 802.11a capable, too */
 		radio_str = "802.11a/b/g radio?! Please report";
 		break;
-	case RADIO_UNKNOWN_19:
+	case RADIO_19_UNKNOWN:
 		radio_str = "A radio used by Safecom cards?! Please report";
 		break;
-	case RADIO_UNKNOWN_1B:
-		radio_str = "An unknown radio used by TNETW1450 USB adapters";
+	case RADIO_1B_TI_TNETW3422:
+		/* ex-Radia (consumed by TI), i.e. likely a RC2422 successor */
+		radio_str = "TI (TNETW3422)";
 		break;
 	default:
 		radio_str = "UNKNOWN, please report radio type name!";
@@ -1305,7 +1313,7 @@ static int acx_e_proc_show_phy(struct seq_file *file, void *v)
 
 	buf = kmalloc(buf_size, GFP_KERNEL);
 	/*
-	   if (RADIO_RFMD_11 != adev->radio_type) {
+	   if (RADIO_11_RFMD != adev->radio_type) {
 	   printk("acx: sorry, not yet adapted for radio types "
 	   "other than RFMD, please verify "
 	   "PHY size etc. first!\n");
@@ -3613,9 +3621,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->get_mask & GETSET_SENSITIVITY) {
-		if ((RADIO_RFMD_11 == adev->radio_type)
-		    || (RADIO_MAXIM_0D == adev->radio_type)
-		    || (RADIO_RALINK_15 == adev->radio_type)) {
+		if ((RADIO_11_RFMD == adev->radio_type)
+		    || (RADIO_0D_MAXIM_MAX2820 == adev->radio_type)
+		    || (RADIO_15_RALINK == adev->radio_type)) {
 			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
 		} else {
 			log(L_INIT, "acx: don't know how to get sensitivity "
@@ -3725,13 +3733,14 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		log(L_INIT, "acx: updating sensitivity value: %u\n",
 		    adev->sensitivity);
 		switch (adev->radio_type) {
-		case RADIO_RFMD_11:
-		case RADIO_MAXIM_0D:
-		case RADIO_RALINK_15:
+		case RADIO_0D_MAXIM_MAX2820:
+		case RADIO_11_RFMD:
+		case RADIO_15_RALINK:
 			acx_s_write_phy_reg(adev, 0x30, adev->sensitivity);
 			break;
-		case RADIO_RADIA_16:
-		case RADIO_UNKNOWN_17:
+		case RADIO_16_RADIA_RC2422:
+		case RADIO_17_UNKNOWN:
+		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
 			acx111_s_sens_radio_16_17(adev);
 			break;
 		default:

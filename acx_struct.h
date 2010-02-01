@@ -137,16 +137,19 @@ enum { acx_debug = 0 };
 
 /* Support Constants */
 /* Radio type names, found in Win98 driver's TIACXLN.INF */
-#define RADIO_MAXIM_0D		0x0d
-#define RADIO_RFMD_11		0x11
-#define RADIO_RALINK_15		0x15
-/* used in ACX111 cards (WG311v2, WL-121, ...): */
-#define RADIO_RADIA_16		0x16
+/* 0D: used in DWL-120+ USB cards (side-antenna and flip-antenna versions) */
+#define RADIO_0D_MAXIM_MAX2820	0x0d
+#define RADIO_11_RFMD		0x11
+#define RADIO_15_RALINK		0x15
+/* 16: Radia RC2422, used in ACX111 cards (WG311v2, WL-121, ...): */
+#define RADIO_16_RADIA_RC2422	0x16
 /* most likely *sometimes* used in ACX111 cards: */
-#define RADIO_UNKNOWN_17	0x17
+#define RADIO_17_UNKNOWN	0x17
 /* FwRad19.bin was found in a Safecom driver; must be an ACX111 radio: */
-#define RADIO_UNKNOWN_19	0x19
-#define RADIO_UNKNOWN_1B	0x1b    /* radio in SafeCom SWLUT-54125 USB adapter; entirely unknown!! */
+#define RADIO_19_UNKNOWN	0x19
+/* 1B: radio in SafeCom SWLUT-54125 TNETW1450 USB adapter,
+   label: G3 55ZCT27 TNETW3422 */
+#define RADIO_1B_TI_TNETW3422	0x1b
 
 
 /***********************************************************************

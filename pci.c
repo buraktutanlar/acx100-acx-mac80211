@@ -4180,11 +4180,11 @@ int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	const u8 *table;
 
 	switch (adev->radio_type) {
-	case RADIO_MAXIM_0D:
+	case RADIO_0D_MAXIM_MAX2820:
 		table = &dbm2val_maxim[0];
 		break;
-	case RADIO_RFMD_11:
-	case RADIO_RALINK_15:
+	case RADIO_11_RFMD:
+	case RADIO_15_RALINK:
 		table = &dbm2val_rfmd[0];
 		break;
 	default:

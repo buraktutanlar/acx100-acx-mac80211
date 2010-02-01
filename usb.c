@@ -510,7 +510,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		inpipe = usb_rcvctrlpipe(usbdev, 0);
 
 		/* FIXME: shouldn't be hardcoded */
-		*radio_type = RADIO_MAXIM_0D;
+		*radio_type = RADIO_0D_MAXIM_MAX2820;
 	}
 
 	snprintf(filename, sizeof(filename), "tiacx1%02dusbc%02X",
