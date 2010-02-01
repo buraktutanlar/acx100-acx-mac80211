@@ -785,7 +785,14 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int result = OK;
 	int i;
 	int err;
-	int radio_type;
+	/* yes indeed, the radio_type variable shouldn't be static, but OTOH
+	   we read the radio type upon booting (1st .probe()) only, whereas
+	   assignment to adev->radio_type can be done on 2nd .probe() only...
+	   Ideally we would figure out how to do a USB request to get
+	   the radio type of ACX100 cards and query this on second .probe().
+	*/
+	   
+	static int radio_type;
 	/* this one needs to be more precise in case there appears
 	 * a TNETW1450 from the same vendor */
 	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
