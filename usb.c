@@ -1545,8 +1545,8 @@ void acxusb_i_complete_tx(struct urb *urb)
 		goto end_unlock;
 	}
 
-	printk("acx: RETURN TX (%d): status=%d size=%d\n",
-		txnum, urb->status, urb->actual_length);
+//	printk("acx: RETURN TX (%d): status=%d size=%d\n",
+//		txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
 	switch (urb->status) {
@@ -1567,6 +1567,8 @@ void acxusb_i_complete_tx(struct urb *urb)
 	/* free the URB and check for more data */
 	tx->busy = 0;
 	adev->tx_free++;
+	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
+
 	if ((adev->tx_free >= TX_START_QUEUE)
 /*	    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
 /*	    && (acx_queue_stopped(adev->ndev)*/
@@ -1575,6 +1577,7 @@ void acxusb_i_complete_tx(struct urb *urb)
 			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
 		acx_wake_queue(adev->ieee, NULL);
 	}
+
 
       end_unlock:
 	acx_unlock(adev, flags);
@@ -1647,8 +1650,8 @@ void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 ** Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
 ** Can be called from acx_i_start_xmit (data frames from net core).
 */
-void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff* skb) {
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
 	struct usb_device *usbdev;
 	struct urb *txurb;
 	usb_tx_t *tx;
@@ -1662,6 +1665,9 @@ void acxusb_l_tx_data(acx_device_t * adev, tx_t * tx_opaque, int wlanpkt_len,
 	FN_ENTER;
 
 	tx = ((usb_tx_t *) tx_opaque);
+
+	tx->skb = skb;
+
 	txurb = tx->urb;
 	txbuf = &tx->bulkout;
 	whdr = (struct ieee80211_hdr *) txbuf->data;

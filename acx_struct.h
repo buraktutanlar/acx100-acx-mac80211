@@ -860,14 +860,13 @@ typedef struct usb_txstatus {
 	u8	ack_failures;
 	u8	rts_failures;
 	u8	rts_ok;
-//	struct ieee80211_tx_status txstatus;
-//	struct sk_buff *skb;
 } ACX_PACKED usb_txstatus_t;
 
 typedef struct usb_tx {
 	unsigned	busy:1;
 	struct urb	*urb;
 	acx_device_t	*adev;
+	struct sk_buff *skb;
 	/* actual USB bulk output data block is here: */
 	usb_txbuffer_t	bulkout;
 } usb_tx_t;
