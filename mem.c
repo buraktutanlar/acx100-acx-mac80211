@@ -56,8 +56,9 @@
 
 #include <linux/version.h>
 
-/* Linux 2.6.18+ uses <linux/utsrelease.h> */
-#ifndef UTS_RELEASE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 33)
+#include <generated/utsrelease.h>
+#else
 #include <linux/utsrelease.h>
 #endif
 

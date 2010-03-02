@@ -100,7 +100,10 @@ void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 		if (acx_debug & (chan)) \
 			printk(args); \
 	} while (0)
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
 #define printk_ratelimited(args...) printk(args)
+#endif
 
 #else /* Non-debug build: */
 
