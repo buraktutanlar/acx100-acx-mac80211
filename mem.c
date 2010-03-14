@@ -4857,6 +4857,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		adev->tx_free++;
 		num_cleaned++;
 
+		// OW 20100207 TODO Perhaps it's better to do this ater reporting skb status to mac80211?
 		if ((adev->tx_free >= TX_START_QUEUE) &&
 			acx_queue_stopped(adev->ieee)
 		) {
