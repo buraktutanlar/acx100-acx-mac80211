@@ -4027,12 +4027,12 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-#if 0
+#if 1
 /*
  *
  */
-static int acx_s_recalib_radio(acx_device_t * adev)
-{
+static int acx_s_recalib_radio(acx_device_t *adev) {
+
 	if (IS_ACX111(adev)) {
 		acx111_cmd_radiocalib_t cal;
 
@@ -4042,25 +4042,25 @@ static int acx_s_recalib_radio(acx_device_t * adev)
 		 * I wonder what the firmware default here is? */
 		cal.interval = cpu_to_le32(58594);
 		return acx_s_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
-					     &cal, sizeof(cal),
-					     CMD_TIMEOUT_MS(100));
+				&cal, sizeof(cal),
+				CMD_TIMEOUT_MS(100));
 	} else {
 		/* On ACX100, we need to recalibrate the radio
 		 * by issuing a GETSET_TX|GETSET_RX */
-		if (		/* (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
-				   (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
-			   (OK ==
-			    acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
-					    &adev->channel, 1))
-			   && (OK ==
-			       acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX,
-					       &adev->channel, 1)))
+		if (
+		/* (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
+		 (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
+		(acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1) == OK)
+				&& (acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1)
+						== OK))
 			return OK;
+
 		return NOT_OK;
 	}
 }
 #endif // if 0
-#if 0
+
+#if 1
 static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 {
 	int res;
@@ -4081,13 +4081,13 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 	    && time_before(jiffies, adev->recalib_time_last_success
 			   + RECALIB_PAUSE * 60 * HZ)) {
 		if (adev->recalib_msg_ratelimit <= 4) {
-			printk("acx: %s: less than " STRING(RECALIB_PAUSE)
+			logf1(L_ANY, "%s: less than " STRING(RECALIB_PAUSE)
 			       " minutes since last radio recalibration, "
 			       "not recalibrating (maybe the card is too hot?)\n",
 			       wiphy_name(adev->ieee->wiphy));
 			adev->recalib_msg_ratelimit++;
 			if (adev->recalib_msg_ratelimit == 5)
-				printk("acx: disabling the above message until next recalib\n");
+				logf0(L_ANY, "disabling the above message until next recalib\n");
 		}
 		return;
 	}
@@ -4125,7 +4125,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 		}
 	}
 }
-#endif // if 0
+#endif
 
 void acx_e_after_interrupt_task(acx_device_t *adev)
 {
@@ -4143,9 +4143,10 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-		printk("acx: too many TX errors?\n");
-		printk("acx: %s: TODO: ACX_AFTER_IRQ_CMD_RADIO_RECALIB\n", __func__);
-//		acx_s_after_interrupt_recalib(adev);
+		logf0(L_ANY, "Performing CMD_RADIO_RECALIB\n");
+		acx_unlock(adev, flags);
+		acx_s_after_interrupt_recalib(adev);
+		acx_lock(adev, flags);
 	}
 
 	/* a poor interrupt code wanted to do update_card_settings() */

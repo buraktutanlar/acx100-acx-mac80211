@@ -4719,14 +4719,14 @@ static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 		 * ok, just do it. */
 		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
 			if (adev->retry_errors_msg_ratelimit <= 20) {
-				printk("acx: %s: several excessive Tx "
+				logf1(L_ANY, "%s: several excessive Tx "
 					"retry errors occurred, attempting "
 					"to recalibrate radio. Radio "
 					"drift might be caused by increasing "
 					"card temperature, please check the card "
 					"before it's too late!\n", wiphy_name(adev->ieee->wiphy));
 				if (adev->retry_errors_msg_ratelimit == 20)
-					printk("acx: disabling above message\n");
+					logf0(L_ANY, "disabling above message\n");
 			}
 
 			acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
