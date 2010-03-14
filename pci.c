@@ -4312,7 +4312,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	addr = (u32)ioremap(vdev->mem_start, 0x1000);
 	if (!addr) {
 		printk(KERN_ERR "acx: %s: failed to remap io memory\n",
-		       vdev->dev.bus_id);
+		       dev_name(&vdev->dev));
 		result = -ENXIO;
 		goto fail;
 	}
@@ -4326,7 +4326,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!ieee) {
 		printk("acx: could not allocate ieee80211 structure %s\n",
-		       vdev->dev.bus_id);
+		       dev_name(&vdev->dev));
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
@@ -4368,7 +4368,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	printk("acx: found %s-based wireless network card at %s, irq:%d, "
 	       "phymem:0x%x, mem:0x%p\n",
-	       match->name, vdev->dev.bus_id, adev->irq,
+	       match->name, dev_name(&vdev->dev), adev->irq,
 	       vdev->mem_start, adev->iobase);
 	log(L_ANY, "acx: the initial debug setting is 0x%04X\n", acx_debug);
 
@@ -4419,7 +4419,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * firmware operations happening in parallel or uninitialized data */
 
 
-	acx_proc_register_entries(ieee);
+	acx_proc_register_entries(ieee, 0);
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
@@ -4539,7 +4539,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	}
 
-	acx_proc_unregister_entries(adev->ieee);
+	acx_proc_unregister_entries(adev->ieee, 0);
 
 	/* finally, clean up PCI bus state */
 	acxpci_s_delete_dma_regions(adev);
