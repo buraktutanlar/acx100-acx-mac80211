@@ -703,10 +703,19 @@ const char *acx_cmd_status_str(unsigned int state);
 int acx_setup_modes(acx_device_t *adev);
 void acx_free_modes(acx_device_t *adev);
 int acx_i_op_tx(struct ieee80211_hw *ieee,	struct sk_buff *skb);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
+#else
+int acx_e_op_add_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_vif *vif);
+void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_vif *vif);
+#endif
+
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
@@ -714,7 +723,9 @@ int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 int acx_e_op_config(struct ieee80211_hw *hw, u32 changed);
 void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
+#endif
 int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 //int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
