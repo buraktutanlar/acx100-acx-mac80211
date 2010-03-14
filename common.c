@@ -1350,6 +1350,50 @@ static int acx_e_proc_show_debug(struct seq_file *file, void *v)
 	return 0;
 }
 
+/*
+ * A write on acx_diag executes different operations for debugging
+ */
+static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
+	acx_device_t *adev = (acx_device_t *) pde->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned int val;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = (unsigned int) simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count == size) {
+		ret = count;
+		acx_debug = val;
+	} else {
+		goto exit_unlock;
+	}
+
+	logf1(L_ANY, "acx_diag: 0x%04x\n", val);
+
+	// Execute operation
+	if (val & ACX_DIAG_OP_RECALIB) {
+		logf0(L_ANY, "Scheduling immediate radio recalib\n");
+		adev->recalib_time_last_success =- RECALIB_PAUSE * 60 * HZ;
+		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+	}
+
+	exit_unlock:
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return ret;
+
+}
+
+
 static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
@@ -1394,7 +1438,7 @@ static acx_proc_show_t *const
 static acx_proc_write_t *const
  acx_proc_write_funcs[] = {
 	NULL,
-	NULL,
+	acx_e_proc_write_diag,
 	NULL,
 	NULL,
 	acx_e_proc_write_debug,

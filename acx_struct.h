@@ -62,6 +62,12 @@ extern unsigned int acx_debug;
 enum { acx_debug = 0 };
 #endif
 
+/*
+ * Operations by writing to acx_diag
+ */
+enum {
+	ACX_DIAG_OP_RECALIB = 0x0001
+};
 
 /***********************************************************************
 ** Random helpers
