@@ -101,7 +101,7 @@ void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 			printk(args); \
 	} while (0)
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 #define printk_ratelimited(args...) printk(args)
 #endif
 
