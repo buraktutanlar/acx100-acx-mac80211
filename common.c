@@ -31,33 +31,19 @@
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
-//#include <net/iw_handler.h>
 #include <linux/ethtool.h>
-//#include <linux/utsrelease.h>
 #include <linux/ctype.h>
 
 #include "acx.h"
-
-#define DEBUG_TSC 0
-#if DEBUG_TSC && defined(CONFIG_X86)
-#define TIMESTAMP(d) unsigned long d; rdtscl(d)
-#else
-#define TIMESTAMP(d) unsigned long d = jiffies
-#endif
-
-// OW Debugging
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
 
-/***********************************************************************
-*/
 
-static void acx_l_rx(acx_device_t * adev, rxbuffer_t * rxbuf);
+/*
+ * Module
+ * ==================================================
+ */
 
-
-
-/***********************************************************************
-*/
 #if ACX_DEBUG
 unsigned int acx_debug /* will add __read_mostly later */  = ACX_DEFAULT_MSG;
 /* parameter is 'debug', corresponding var is acx_debug */
@@ -75,17 +61,18 @@ MODULE_DESCRIPTION
 
 MODULE_VERSION(ACX_RELEASE);
 
-/***********************************************************************
-*/
+/*
+ * Prototypes, Defines, etc ...
+ * ==================================================
+ */
+static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
+
 /* Probably a number of acx's intermediate buffers for USB transfers,
-** not to be confused with number of descriptors in tx/rx rings
-** (which are not directly accessible to host in USB devices) */
+ * not to be confused with number of descriptors in tx/rx rings
+ * (which are not directly accessible to host in USB devices)
+ */
 #define USB_RX_CNT 10
 #define USB_TX_CNT 10
-
-
-/***********************************************************************
-*/
 
 /* minutes to wait until next radio recalibration: */
 #define RECALIB_PAUSE	5
@@ -95,11 +82,12 @@ const u8 acx_reg_domain_ids[acx_reg_domain_ids_len] =
     { 0x10, 0x20, 0x30, 0x31, 0x32, 0x40, 0x41, 0x51 };
 static const u16 reg_domain_channel_masks[acx_reg_domain_ids_len] =
     { 0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x01fc };
+
 const char *const
  acx_reg_domain_strings[] = {
 	/* 0 */ " 1-11 FCC (USA)",
 	/* 1 */ " 1-11 DOC/IC (Canada)",
-/* BTW: WLAN use in ETSI is regulated by ETSI standard EN 300 328-2 V1.1.2 */
+	/* BTW: WLAN use in ETSI is regulated by ETSI standard EN 300 328-2 V1.1.2 */
 	/* 2 */ " 1-13 ETSI (Europe)",
 	/* 3 */ "10-11 Spain",
 	/* 4 */ "10-13 France",
@@ -109,11 +97,17 @@ const char *const
 	NULL			/* needs to remain as last entry */
 };
 
+/*
+ * Locking
+ * ==================================================
+ */
+#define DEBUG_TSC 0
+#if DEBUG_TSC && defined(CONFIG_X86)
+#define TIMESTAMP(d) unsigned long d; rdtscl(d)
+#else
+#define TIMESTAMP(d) unsigned long d = jiffies
+#endif
 
-
-/***********************************************************************
-** Debugging support
-*/
 #ifdef PARANOID_LOCKING
 static unsigned max_lock_time;
 static unsigned max_sem_time;
