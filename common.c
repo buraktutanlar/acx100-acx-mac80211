@@ -45,7 +45,10 @@
  */
 
 #if ACX_DEBUG
-unsigned int acx_debug /* will add __read_mostly later */  = ACX_DEFAULT_MSG;
+
+/* will add __read_mostly later */
+unsigned int acx_debug = ACX_DEFAULT_MSG;
+
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
@@ -62,10 +65,14 @@ MODULE_DESCRIPTION
 MODULE_VERSION(ACX_RELEASE);
 
 /*
- * Prototypes, Defines, etc ...
+ * Static prototypes, defines, etc ...
  * ==================================================
  */
+
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
+
+
+// -----
 
 /* Probably a number of acx's intermediate buffers for USB transfers,
  * not to be confused with number of descriptors in tx/rx rings
@@ -124,7 +131,7 @@ void acx_sem_unhold()
 	max_sem_time = 0;
 }
 
-static inline const char *sanitize_str(const char *s)
+static inline const char *acx_sanitize_str(const char *s)
 {
 	const char *t = strrchr(s, '/');
 	if (t)
@@ -136,7 +143,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 {
 	unsigned int count = 100 * 1000 * 1000;
 	TIMESTAMP(lock_start);
-	where = sanitize_str(where);
+	where = acx_sanitize_str(where);
 	while (--count) {
 		if (!spin_is_locked(&adev->spinlock))
 			break;
@@ -155,7 +162,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 {
 #ifdef SMP
 	if (!spin_is_locked(&adev->spinlock)) {
-		where = sanitize_str(where);
+		where = acx_sanitize_str(where);
 		printk(KERN_EMERG "acx: STRAY UNLOCK at %s!\n", where);
 		BUG();
 	}
@@ -164,7 +171,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 		TIMESTAMP(diff);
 		diff -= adev->lock_time;
 		if (diff > max_lock_time) {
-			where = sanitize_str(where);
+			where = acx_sanitize_str(where);
 			printk("acx: max lock hold time %ld CPU ticks from %s "
 			       "to %s\n", diff, adev->last_lock, where);
 			max_lock_time = diff;
@@ -179,9 +186,8 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #if ACX_DEBUG > 1
 
 static int acx_debug_func_indent;
-#define FUNC_INDENT_INCREMENT 2
-
-static const char spaces[] = "          " "          ";	/* Nx10 spaces */
+#define ACX_DEBUG_FUNC_INDENT_INCREMENT 2
+static const char acx_debug_spaces[] = "          " "          ";	/* Nx10 spaces */
 
 void log_fn_enter(const char *funcname)
 {
@@ -189,13 +195,13 @@ void log_fn_enter(const char *funcname)
 	TIMESTAMP(d);
 
 	indent = acx_debug_func_indent;
-	if (indent >= sizeof(spaces))
-		indent = sizeof(spaces) - 1;
+	if (indent >= sizeof(acx_debug_spaces))
+		indent = sizeof(acx_debug_spaces) - 1;
 
 	printk("%08ld %s==> %s\n",
-	       d % 100000000, spaces + (sizeof(spaces) - 1) - indent, funcname);
+	       d % 100000000, acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname);
 
-	acx_debug_func_indent += FUNC_INDENT_INCREMENT;
+	acx_debug_func_indent += ACX_DEBUG_FUNC_INDENT_INCREMENT;
 }
 void log_fn_exit(const char *funcname)
 {
@@ -203,34 +209,37 @@ void log_fn_exit(const char *funcname)
 	TIMESTAMP(d);
 
 	// OW Handle underflow
-	if (acx_debug_func_indent >= FUNC_INDENT_INCREMENT)
-		acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	if (acx_debug_func_indent >= ACX_DEBUG_FUNC_INDENT_INCREMENT)
+		acx_debug_func_indent -= ACX_DEBUG_FUNC_INDENT_INCREMENT;
 	else
 		acx_debug_func_indent = 0;
 
 	indent = acx_debug_func_indent;
-	if (indent >= sizeof(spaces))
-		indent = sizeof(spaces) - 1;
+	if (indent >= sizeof(acx_debug_spaces))
+		indent = sizeof(acx_debug_spaces) - 1;
 
 	printk("%08ld %s<== %s\n",
-	       d % 100000000, spaces + (sizeof(spaces) - 1) - indent, funcname);
+	       d % 100000000, acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname);
 }
 void log_fn_exit_v(const char *funcname, int v)
 {
 	int indent;
 	TIMESTAMP(d);
 
-	acx_debug_func_indent -= FUNC_INDENT_INCREMENT;
+	acx_debug_func_indent -= ACX_DEBUG_FUNC_INDENT_INCREMENT;
 
 	indent = acx_debug_func_indent;
-	if (indent >= sizeof(spaces))
-		indent = sizeof(spaces) - 1;
+	if (indent >= sizeof(acx_debug_spaces))
+		indent = sizeof(acx_debug_spaces) - 1;
 
 	printk("%08ld %s<== %s: %08X\n",
 	       d % 100000000,
-	       spaces + (sizeof(spaces) - 1) - indent, funcname, v);
+	       acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname, v);
 }
 #endif /* ACX_DEBUG > 1 */
+
+
+// OW Cleanup ======================================================
 
 
 /***********************************************************************
