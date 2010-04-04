@@ -69,10 +69,16 @@ MODULE_VERSION(ACX_RELEASE);
  * ==================================================
  */
 
+
+// Data Access
+static int acx100_s_init_memory_pools(acx_device_t *adev, const acx_ie_memmap_t *mmt);
+static int acx100_s_create_dma_regions(acx_device_t *adev);
+static int acx111_s_create_dma_regions(acx_device_t *adev);
+
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
-
 // -----
+#define ACX111_PERCENT(percent) ((percent)/5)
 
 /* Probably a number of acx's intermediate buffers for USB transfers,
  * not to be confused with number of descriptors in tx/rx rings
@@ -255,10 +261,342 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
 }
 
 /*
- * Data access
+ * Data Access
  * ==================================================
  */
 
+static int
+acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
+{
+	acx100_ie_memblocksize_t MemoryBlockSize;
+	acx100_ie_memconfigoption_t MemoryConfigOption;
+	int TotalMemoryBlocks;
+	int RxBlockNum;
+	int TotalRxBlockSize;
+	int TxBlockNum;
+	int TotalTxBlockSize;
+
+	FN_ENTER;
+
+	/* Let's see if we can follow this:
+	   first we select our memory block size (which I think is
+	   completely arbitrary) */
+	MemoryBlockSize.size = cpu_to_le16(adev->memblocksize);
+
+	/* Then we alert the card to our decision of block size */
+	if (OK != acx_s_configure(adev, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) {
+		goto bad;
+	}
+
+	/* We figure out how many total blocks we can create, using
+	   the block size we chose, and the beginning and ending
+	   memory pointers, i.e.: end-start/size */
+	TotalMemoryBlocks =
+	    (le32_to_cpu(mmt->PoolEnd) -
+	     le32_to_cpu(mmt->PoolStart)) / adev->memblocksize;
+
+	log(L_ANY, "acx: TotalMemoryBlocks=%u (%u bytes)\n",
+	    TotalMemoryBlocks, TotalMemoryBlocks * adev->memblocksize);
+
+	/* MemoryConfigOption.DMA_config bitmask:
+	   access to ACX memory is to be done:
+	   0x00080000   using PCI conf space?!
+	   0x00040000   using IO instructions?
+	   0x00000000   using memory access instructions
+	   0x00020000   using local memory block linked list (else what?)
+	   0x00010000   using host indirect descriptors (else host must access ACX memory?)
+	 */
+	if (IS_PCI(adev)) {
+		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
+		/* Declare start of the Rx host pool */
+		MemoryConfigOption.pRxHostDesc =
+		    cpu2acx(adev->rxhostdesc_startphy);
+		log(L_DEBUG, "acx: pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
+		    acx2cpu(MemoryConfigOption.pRxHostDesc),
+		    (long)adev->rxhostdesc_startphy);
+	}
+	else if(IS_MEM(adev)) {
+		/*
+		 * ACX ignores DMA_config for generic slave mode.
+		 */
+		MemoryConfigOption.DMA_config = 0;
+		/* Declare start of the Rx host pool */
+		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
+		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
+			acx2cpu(MemoryConfigOption.pRxHostDesc),
+			(long)adev->rxhostdesc_startphy);
+	}
+	else {
+		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
+	}
+
+	/* 50% of the allotment of memory blocks go to tx descriptors */
+	TxBlockNum = TotalMemoryBlocks / 2;
+	MemoryConfigOption.TxBlockNum = cpu_to_le16(TxBlockNum);
+
+	/* and 50% go to the rx descriptors */
+	RxBlockNum = TotalMemoryBlocks - TxBlockNum;
+	MemoryConfigOption.RxBlockNum = cpu_to_le16(RxBlockNum);
+
+	/* size of the tx and rx descriptor queues */
+	TotalTxBlockSize = TxBlockNum * adev->memblocksize;
+	TotalRxBlockSize = RxBlockNum * adev->memblocksize;
+	log(L_DEBUG, "acx: TxBlockNum %u RxBlockNum %u TotalTxBlockSize %u "
+	    "TotalTxBlockSize %u\n", TxBlockNum, RxBlockNum,
+	    TotalTxBlockSize, TotalRxBlockSize);
+
+
+	/* align the tx descriptor queue to an alignment of 0x20 (32 bytes) */
+	MemoryConfigOption.rx_mem =
+	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + 0x1f) & ~0x1f);
+
+	/* align the rx descriptor queue to units of 0x20
+	 * and offset it by the tx descriptor queue */
+	MemoryConfigOption.tx_mem =
+	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + TotalRxBlockSize +
+			 0x1f) & ~0x1f);
+	log(L_DEBUG, "acx: rx_mem %08X rx_mem %08X\n", MemoryConfigOption.tx_mem,
+	    MemoryConfigOption.rx_mem);
+
+	/* alert the device to our decision */
+	if (OK !=
+	    acx_s_configure(adev, &MemoryConfigOption,
+			    ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
+		goto bad;
+	}
+
+	/* and tell the device to kick it into gear */
+	if (OK != acx_s_issue_cmd(adev, ACX100_CMD_INIT_MEMORY, NULL, 0)) {
+		goto bad;
+	}
+
+#ifdef CONFIG_ACX_MAC80211_MEM
+	/*
+	 * slave memory interface has to manage the transmit pools for the ACX,
+	 * so it needs to know what we chose here.
+	 */
+	adev->acx_txbuf_start = MemoryConfigOption.tx_mem;
+	adev->acx_txbuf_numblocks = MemoryConfigOption.TxBlockNum;
+#endif
+
+
+	FN_EXIT1(OK);
+	return OK;
+      bad:
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
+
+/*
+ * acx100_s_create_dma_regions
+ *
+ * Note that this fn messes up heavily with hardware, but we cannot
+ * lock it (we need to sleep). Not a problem since IRQs can't happen
+ */
+/* OLD CODE? - let's rewrite it! */
+static int acx100_s_create_dma_regions(acx_device_t * adev)
+{
+	acx100_ie_queueconfig_t queueconf;
+	acx_ie_memmap_t memmap;
+	int res = NOT_OK;
+	u32 tx_queue_start, rx_queue_start;
+
+	FN_ENTER;
+
+	/* read out the acx100 physical start address for the queues */
+	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
+		goto fail;
+	}
+
+	tx_queue_start = le32_to_cpu(memmap.QueueStart);
+	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
+
+	log(L_DEBUG, "acx: initializing Queue Indicator\n");
+
+	memset(&queueconf, 0, sizeof(queueconf));
+
+	/* Not needed for PCI, so we can avoid setting them altogether */
+	if (IS_USB(adev)) {
+		queueconf.NumTxDesc = USB_TX_CNT;
+		queueconf.NumRxDesc = USB_RX_CNT;
+	}
+
+	/* calculate size of queues */
+	queueconf.AreaSize = cpu_to_le32(TX_CNT * sizeof(txdesc_t) +
+					 RX_CNT * sizeof(rxdesc_t) + 8);
+	queueconf.NumTxQueues = 1;	/* number of tx queues */
+	/* sets the beginning of the tx descriptor queue */
+	queueconf.TxQueueStart = memmap.QueueStart;
+	/* done by memset: queueconf.TxQueuePri = 0; */
+	queueconf.RxQueueStart = cpu_to_le32(rx_queue_start);
+	queueconf.QueueOptions = 1;	/* auto reset descriptor */
+	/* sets the end of the rx descriptor queue */
+	queueconf.QueueEnd =
+	    cpu_to_le32(rx_queue_start + RX_CNT * sizeof(rxdesc_t)
+	    );
+	/* sets the beginning of the next queue */
+	queueconf.HostQueueEnd =
+	    cpu_to_le32(le32_to_cpu(queueconf.QueueEnd) + 8);
+	if (OK != acx_s_configure(adev, &queueconf, ACX1xx_IE_QUEUE_CONFIG)) {
+		goto fail;
+	}
+
+	if (IS_PCI(adev)) {
+		/* sets the beginning of the rx descriptor queue, after the tx descrs */
+		if (OK != acxpci_s_create_hostdesc_queues(adev))
+			goto fail;
+		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+	}
+#ifdef CONFIG_ACX_MAC80211_MEM
+	else if (IS_MEM(adev)) {
+		/* sets the beginning of the rx descriptor queue, after the tx descrs */
+		adev->acx_queue_indicator = (queueindicator_t *) le32_to_cpu (queueconf.QueueEnd);
+
+		if (OK != acxmem_s_create_hostdesc_queues(adev))
+			goto fail;
+
+		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+	}
+#endif
+
+	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
+		goto fail;
+	}
+
+	memmap.PoolStart = cpu_to_le32((le32_to_cpu(memmap.QueueEnd) + 4 +
+					0x1f) & ~0x1f);
+
+	if (OK != acx_s_configure(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
+		goto fail;
+	}
+
+	if (OK != acx100_s_init_memory_pools(adev, &memmap)) {
+		goto fail;
+	}
+
+	res = OK;
+	goto end;
+
+      fail:
+	acx_s_mwait(1000);	/* ? */
+	if (IS_PCI(adev))
+		acxpci_free_desc_queues(adev);
+	else if (IS_MEM(adev))
+		acxmem_free_desc_queues(adev);
+      end:
+	FN_EXIT1(res);
+	return res;
+}
+
+
+/*
+ * acx111_s_create_dma_regions
+ *
+ * Note that this fn messes heavily with hardware, but we cannot
+ * lock it (we need to sleep). Not a problem since IRQs can't happen
+ */
+static int acx111_s_create_dma_regions(acx_device_t * adev)
+{
+	struct acx111_ie_memoryconfig memconf;
+	struct acx111_ie_queueconfig queueconf;
+	u32 tx_queue_start, rx_queue_start;
+
+	FN_ENTER;
+
+	/* Calculate memory positions and queue sizes */
+
+	/* Set up our host descriptor pool + data pool */
+	if (IS_PCI(adev)) {
+		if (OK != acxpci_s_create_hostdesc_queues(adev))
+			goto fail;
+	}
+	else if (IS_MEM(adev)) {
+		if (OK != acxmem_s_create_hostdesc_queues(adev))
+			goto fail;
+	}
+
+
+	memset(&memconf, 0, sizeof(memconf));
+	/* the number of STAs (STA contexts) to support
+	 ** NB: was set to 1 and everything seemed to work nevertheless... */
+	memconf.no_of_stations = 1;	//cpu_to_le16(VEC_SIZE(adev->sta_list));
+	/* specify the memory block size. Default is 256 */
+	memconf.memory_block_size = cpu_to_le16(adev->memblocksize);
+	/* let's use 50%/50% for tx/rx (specify percentage, units of 5%) */
+	memconf.tx_rx_memory_block_allocation = ACX111_PERCENT(50);
+	/* set the count of our queues
+	 ** NB: struct acx111_ie_memoryconfig shall be modified
+	 ** if we ever will switch to more than one rx and/or tx queue */
+	memconf.count_rx_queues = 1;
+	memconf.count_tx_queues = 1;
+	/* 0 == Busmaster Indirect Memory Organization, which is what we want
+	 * (using linked host descs with their allocated mem).
+	 * 2 == Generic Bus Slave */
+	/* done by memset: memconf.options = 0; */
+	/* let's use 25% for fragmentations and 75% for frame transfers
+	 * (specified in units of 5%) */
+	memconf.fragmentation = ACX111_PERCENT(75);
+	/* Rx descriptor queue config */
+	memconf.rx_queue1_count_descs = RX_CNT;
+	memconf.rx_queue1_type = 7;	/* must be set to 7 */
+	/* done by memset: memconf.rx_queue1_prio = 0; low prio */
+	if (IS_PCI(adev)) {
+		memconf.rx_queue1_host_rx_start =
+		    cpu2acx(adev->rxhostdesc_startphy);
+	}
+	else if (IS_MEM(adev))
+	{
+		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rxhostdesc_startphy);
+	}
+
+	/* Tx descriptor queue config */
+	memconf.tx_queue1_count_descs = TX_CNT;
+	/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
+
+	/* NB1: this looks wrong: (memconf,ACX1xx_IE_QUEUE_CONFIG),
+	 ** (queueconf,ACX1xx_IE_MEMORY_CONFIG_OPTIONS) look swapped, eh?
+	 ** But it is actually correct wrt IE numbers.
+	 ** NB2: sizeof(memconf) == 28 == 0x1c but configure(ACX1xx_IE_QUEUE_CONFIG)
+	 ** writes 0x20 bytes (because same IE for acx100 uses struct acx100_ie_queueconfig
+	 ** which is 4 bytes larger. what a mess. TODO: clean it up) */
+	if (OK != acx_s_configure(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG)) {
+		goto fail;
+	}
+
+	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+
+	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
+	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
+
+	log(L_INIT, "acx: dump queue head (from card):\n"
+	    "acx: len: %u\n"
+	    "acx: tx_memory_block_address: %X\n"
+	    "acx: rx_memory_block_address: %X\n"
+	    "acx: tx1_queue address: %X\n"
+	    "acx: rx1_queue address: %X\n",
+	    le16_to_cpu(queueconf.len),
+	    le32_to_cpu(queueconf.tx_memory_block_address),
+	    le32_to_cpu(queueconf.rx_memory_block_address),
+	    tx_queue_start, rx_queue_start);
+
+	if (IS_PCI(adev))
+		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+	else if (IS_MEM(adev))
+		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+
+	FN_EXIT1(OK);
+	return OK;
+
+      fail:
+	if (IS_PCI(adev))
+		acxpci_free_desc_queues(adev);
+	else if (IS_MEM(adev))
+		acxmem_free_desc_queues(adev);
+
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
 
 
 // OW Cleanup ======================================================
@@ -1937,343 +2275,6 @@ static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
 }
 
 
-/***********************************************************************
-** acx100_s_init_memory_pools
-*/
-static int
-acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
-{
-	acx100_ie_memblocksize_t MemoryBlockSize;
-	acx100_ie_memconfigoption_t MemoryConfigOption;
-	int TotalMemoryBlocks;
-	int RxBlockNum;
-	int TotalRxBlockSize;
-	int TxBlockNum;
-	int TotalTxBlockSize;
-
-	FN_ENTER;
-
-	/* Let's see if we can follow this:
-	   first we select our memory block size (which I think is
-	   completely arbitrary) */
-	MemoryBlockSize.size = cpu_to_le16(adev->memblocksize);
-
-	/* Then we alert the card to our decision of block size */
-	if (OK != acx_s_configure(adev, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) {
-		goto bad;
-	}
-
-	/* We figure out how many total blocks we can create, using
-	   the block size we chose, and the beginning and ending
-	   memory pointers, i.e.: end-start/size */
-	TotalMemoryBlocks =
-	    (le32_to_cpu(mmt->PoolEnd) -
-	     le32_to_cpu(mmt->PoolStart)) / adev->memblocksize;
-
-	log(L_ANY, "acx: TotalMemoryBlocks=%u (%u bytes)\n",
-	    TotalMemoryBlocks, TotalMemoryBlocks * adev->memblocksize);
-
-	/* MemoryConfigOption.DMA_config bitmask:
-	   access to ACX memory is to be done:
-	   0x00080000   using PCI conf space?!
-	   0x00040000   using IO instructions?
-	   0x00000000   using memory access instructions
-	   0x00020000   using local memory block linked list (else what?)
-	   0x00010000   using host indirect descriptors (else host must access ACX memory?)
-	 */
-	if (IS_PCI(adev)) {
-		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
-		/* Declare start of the Rx host pool */
-		MemoryConfigOption.pRxHostDesc =
-		    cpu2acx(adev->rxhostdesc_startphy);
-		log(L_DEBUG, "acx: pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
-		    acx2cpu(MemoryConfigOption.pRxHostDesc),
-		    (long)adev->rxhostdesc_startphy);
-	}
-	else if(IS_MEM(adev)) {
-		/*
-		 * ACX ignores DMA_config for generic slave mode.
-		 */
-		MemoryConfigOption.DMA_config = 0;
-		/* Declare start of the Rx host pool */
-		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
-		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
-			acx2cpu(MemoryConfigOption.pRxHostDesc),
-			(long)adev->rxhostdesc_startphy);
-	}
-	else {
-		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
-	}
-
-	/* 50% of the allotment of memory blocks go to tx descriptors */
-	TxBlockNum = TotalMemoryBlocks / 2;
-	MemoryConfigOption.TxBlockNum = cpu_to_le16(TxBlockNum);
-
-	/* and 50% go to the rx descriptors */
-	RxBlockNum = TotalMemoryBlocks - TxBlockNum;
-	MemoryConfigOption.RxBlockNum = cpu_to_le16(RxBlockNum);
-
-	/* size of the tx and rx descriptor queues */
-	TotalTxBlockSize = TxBlockNum * adev->memblocksize;
-	TotalRxBlockSize = RxBlockNum * adev->memblocksize;
-	log(L_DEBUG, "acx: TxBlockNum %u RxBlockNum %u TotalTxBlockSize %u "
-	    "TotalTxBlockSize %u\n", TxBlockNum, RxBlockNum,
-	    TotalTxBlockSize, TotalRxBlockSize);
-
-
-	/* align the tx descriptor queue to an alignment of 0x20 (32 bytes) */
-	MemoryConfigOption.rx_mem =
-	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + 0x1f) & ~0x1f);
-
-	/* align the rx descriptor queue to units of 0x20
-	 * and offset it by the tx descriptor queue */
-	MemoryConfigOption.tx_mem =
-	    cpu_to_le32((le32_to_cpu(mmt->PoolStart) + TotalRxBlockSize +
-			 0x1f) & ~0x1f);
-	log(L_DEBUG, "acx: rx_mem %08X rx_mem %08X\n", MemoryConfigOption.tx_mem,
-	    MemoryConfigOption.rx_mem);
-
-	/* alert the device to our decision */
-	if (OK !=
-	    acx_s_configure(adev, &MemoryConfigOption,
-			    ACX1xx_IE_MEMORY_CONFIG_OPTIONS)) {
-		goto bad;
-	}
-
-	/* and tell the device to kick it into gear */
-	if (OK != acx_s_issue_cmd(adev, ACX100_CMD_INIT_MEMORY, NULL, 0)) {
-		goto bad;
-	}
-
-#ifdef CONFIG_ACX_MAC80211_MEM
-	/*
-	 * slave memory interface has to manage the transmit pools for the ACX,
-	 * so it needs to know what we chose here.
-	 */
-	adev->acx_txbuf_start = MemoryConfigOption.tx_mem;
-	adev->acx_txbuf_numblocks = MemoryConfigOption.TxBlockNum;
-#endif
-
-
-	FN_EXIT1(OK);
-	return OK;
-      bad:
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
-
-
-/***********************************************************************
-** acx100_s_create_dma_regions
-**
-** Note that this fn messes up heavily with hardware, but we cannot
-** lock it (we need to sleep). Not a problem since IRQs can't happen
-*/
-/* OLD CODE? - let's rewrite it! */
-static int acx100_s_create_dma_regions(acx_device_t * adev)
-{
-	acx100_ie_queueconfig_t queueconf;
-	acx_ie_memmap_t memmap;
-	int res = NOT_OK;
-	u32 tx_queue_start, rx_queue_start;
-
-	FN_ENTER;
-
-	/* read out the acx100 physical start address for the queues */
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-
-	tx_queue_start = le32_to_cpu(memmap.QueueStart);
-	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
-
-	log(L_DEBUG, "acx: initializing Queue Indicator\n");
-
-	memset(&queueconf, 0, sizeof(queueconf));
-
-	/* Not needed for PCI, so we can avoid setting them altogether */
-	if (IS_USB(adev)) {
-		queueconf.NumTxDesc = USB_TX_CNT;
-		queueconf.NumRxDesc = USB_RX_CNT;
-	}
-
-	/* calculate size of queues */
-	queueconf.AreaSize = cpu_to_le32(TX_CNT * sizeof(txdesc_t) +
-					 RX_CNT * sizeof(rxdesc_t) + 8);
-	queueconf.NumTxQueues = 1;	/* number of tx queues */
-	/* sets the beginning of the tx descriptor queue */
-	queueconf.TxQueueStart = memmap.QueueStart;
-	/* done by memset: queueconf.TxQueuePri = 0; */
-	queueconf.RxQueueStart = cpu_to_le32(rx_queue_start);
-	queueconf.QueueOptions = 1;	/* auto reset descriptor */
-	/* sets the end of the rx descriptor queue */
-	queueconf.QueueEnd =
-	    cpu_to_le32(rx_queue_start + RX_CNT * sizeof(rxdesc_t)
-	    );
-	/* sets the beginning of the next queue */
-	queueconf.HostQueueEnd =
-	    cpu_to_le32(le32_to_cpu(queueconf.QueueEnd) + 8);
-	if (OK != acx_s_configure(adev, &queueconf, ACX1xx_IE_QUEUE_CONFIG)) {
-		goto fail;
-	}
-
-	if (IS_PCI(adev)) {
-		/* sets the beginning of the rx descriptor queue, after the tx descrs */
-		if (OK != acxpci_s_create_hostdesc_queues(adev))
-			goto fail;
-		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
-	}
-#ifdef CONFIG_ACX_MAC80211_MEM
-	else if (IS_MEM(adev)) {
-		/* sets the beginning of the rx descriptor queue, after the tx descrs */
-		adev->acx_queue_indicator = (queueindicator_t *) le32_to_cpu (queueconf.QueueEnd);
-
-		if (OK != acxmem_s_create_hostdesc_queues(adev))
-			goto fail;
-
-		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
-	}
-#endif
-
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-
-	memmap.PoolStart = cpu_to_le32((le32_to_cpu(memmap.QueueEnd) + 4 +
-					0x1f) & ~0x1f);
-
-	if (OK != acx_s_configure(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-
-	if (OK != acx100_s_init_memory_pools(adev, &memmap)) {
-		goto fail;
-	}
-
-	res = OK;
-	goto end;
-
-      fail:
-	acx_s_mwait(1000);	/* ? */
-	if (IS_PCI(adev))
-		acxpci_free_desc_queues(adev);
-	else if (IS_MEM(adev))
-		acxmem_free_desc_queues(adev);
-      end:
-	FN_EXIT1(res);
-	return res;
-}
-
-
-/***********************************************************************
-** acx111_s_create_dma_regions
-**
-** Note that this fn messes heavily with hardware, but we cannot
-** lock it (we need to sleep). Not a problem since IRQs can't happen
-*/
-#define ACX111_PERCENT(percent) ((percent)/5)
-
-static int acx111_s_create_dma_regions(acx_device_t * adev)
-{
-	struct acx111_ie_memoryconfig memconf;
-	struct acx111_ie_queueconfig queueconf;
-	u32 tx_queue_start, rx_queue_start;
-
-	FN_ENTER;
-
-	/* Calculate memory positions and queue sizes */
-
-	/* Set up our host descriptor pool + data pool */
-	if (IS_PCI(adev)) {
-		if (OK != acxpci_s_create_hostdesc_queues(adev))
-			goto fail;
-	}
-	else if (IS_MEM(adev)) {
-		if (OK != acxmem_s_create_hostdesc_queues(adev))
-			goto fail;
-	}
-
-
-	memset(&memconf, 0, sizeof(memconf));
-	/* the number of STAs (STA contexts) to support
-	 ** NB: was set to 1 and everything seemed to work nevertheless... */
-	memconf.no_of_stations = 1;	//cpu_to_le16(VEC_SIZE(adev->sta_list));
-	/* specify the memory block size. Default is 256 */
-	memconf.memory_block_size = cpu_to_le16(adev->memblocksize);
-	/* let's use 50%/50% for tx/rx (specify percentage, units of 5%) */
-	memconf.tx_rx_memory_block_allocation = ACX111_PERCENT(50);
-	/* set the count of our queues
-	 ** NB: struct acx111_ie_memoryconfig shall be modified
-	 ** if we ever will switch to more than one rx and/or tx queue */
-	memconf.count_rx_queues = 1;
-	memconf.count_tx_queues = 1;
-	/* 0 == Busmaster Indirect Memory Organization, which is what we want
-	 * (using linked host descs with their allocated mem).
-	 * 2 == Generic Bus Slave */
-	/* done by memset: memconf.options = 0; */
-	/* let's use 25% for fragmentations and 75% for frame transfers
-	 * (specified in units of 5%) */
-	memconf.fragmentation = ACX111_PERCENT(75);
-	/* Rx descriptor queue config */
-	memconf.rx_queue1_count_descs = RX_CNT;
-	memconf.rx_queue1_type = 7;	/* must be set to 7 */
-	/* done by memset: memconf.rx_queue1_prio = 0; low prio */
-	if (IS_PCI(adev)) {
-		memconf.rx_queue1_host_rx_start =
-		    cpu2acx(adev->rxhostdesc_startphy);
-	}
-	else if (IS_MEM(adev))
-	{
-		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rxhostdesc_startphy);
-	}
-
-	/* Tx descriptor queue config */
-	memconf.tx_queue1_count_descs = TX_CNT;
-	/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
-
-	/* NB1: this looks wrong: (memconf,ACX1xx_IE_QUEUE_CONFIG),
-	 ** (queueconf,ACX1xx_IE_MEMORY_CONFIG_OPTIONS) look swapped, eh?
-	 ** But it is actually correct wrt IE numbers.
-	 ** NB2: sizeof(memconf) == 28 == 0x1c but configure(ACX1xx_IE_QUEUE_CONFIG)
-	 ** writes 0x20 bytes (because same IE for acx100 uses struct acx100_ie_queueconfig
-	 ** which is 4 bytes larger. what a mess. TODO: clean it up) */
-	if (OK != acx_s_configure(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG)) {
-		goto fail;
-	}
-
-	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
-
-	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
-	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
-
-	log(L_INIT, "acx: dump queue head (from card):\n"
-	    "acx: len: %u\n"
-	    "acx: tx_memory_block_address: %X\n"
-	    "acx: rx_memory_block_address: %X\n"
-	    "acx: tx1_queue address: %X\n"
-	    "acx: rx1_queue address: %X\n",
-	    le16_to_cpu(queueconf.len),
-	    le32_to_cpu(queueconf.tx_memory_block_address),
-	    le32_to_cpu(queueconf.rx_memory_block_address),
-	    tx_queue_start, rx_queue_start);
-
-	if (IS_PCI(adev))
-		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
-	else if (IS_MEM(adev))
-		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
-
-	FN_EXIT1(OK);
-	return OK;
-
-      fail:
-	if (IS_PCI(adev))
-		acxpci_free_desc_queues(adev);
-	else if (IS_MEM(adev))
-		acxmem_free_desc_queues(adev);
-
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
 
 
 /***********************************************************************
