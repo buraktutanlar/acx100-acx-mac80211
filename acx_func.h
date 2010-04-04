@@ -123,14 +123,7 @@ do { \
 #define logf1(chan, msg, args...) \
 		log(chan, "acx: %s: " msg, __func__, args);
 
-/* Optimized out to nothing in non-debug build */
-static inline void
-acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
-{
-	if (acx_debug & level) {
-		acx_print_mac2(head, mac, tail);
-	}
-}
+void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 
 /***********************************************************************

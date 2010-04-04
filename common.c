@@ -180,9 +180,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 }
 #endif /* PARANOID_LOCKING */
 
-
-/***********************************************************************
-*/
+// -----
 #if ACX_DEBUG > 1
 
 static int acx_debug_func_indent;
@@ -238,6 +236,30 @@ void log_fn_exit_v(const char *funcname, int v)
 }
 #endif /* ACX_DEBUG > 1 */
 
+char* acx_print_mac(char *buf, const u8 *mac)
+{
+	sprintf(buf, MACSTR, MAC(mac));
+	return(buf);
+}
+
+void acx_print_mac2(const char *head, const u8 *mac, const char *tail)
+{
+	printk("acx: %s" MACSTR "%s", head, MAC(mac), tail);
+}
+
+void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
+{
+	if (acx_debug & level) {
+		acx_print_mac2(head, mac, tail);
+	}
+}
+
+/*
+ * Data access
+ * ==================================================
+ */
+
+
 
 // OW Cleanup ======================================================
 
@@ -252,19 +274,6 @@ void acx_s_mwait(int ms)
 	FN_EXIT0;
 }
 
-/***********************************************************************
-** Not inlined: it's larger than it seems
-*/
-char* acx_print_mac(char *buf, const u8 *mac)
-{
-	sprintf(buf, MACSTR, MAC(mac));
-	return(buf);
-}
-
-void acx_print_mac2(const char *head, const u8 *mac, const char *tail)
-{
-	printk("acx: %s" MACSTR "%s", head, MAC(mac), tail);
-}
 
 /***********************************************************************
 ** acx_cmd_status_str
