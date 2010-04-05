@@ -65,18 +65,27 @@ MODULE_DESCRIPTION
 MODULE_VERSION(ACX_RELEASE);
 
 /*
- * Static prototypes, defines, etc ...
+ * Static prototypes, Defines, etc ...
  * ==================================================
  */
 
+
+// Locking
+
+// Logging
 
 // Data Access
 static int acx100_s_init_memory_pools(acx_device_t *adev, const acx_ie_memmap_t *mmt);
 static int acx100_s_create_dma_regions(acx_device_t *adev);
 static int acx111_s_create_dma_regions(acx_device_t *adev);
 
+// Firmware, EEPROM, Phy
+
+
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
+
+// Defines, etc.
 // -----
 #define ACX111_PERCENT(percent) ((percent)/5)
 
@@ -599,89 +608,11 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 }
 
 
-// OW Cleanup ======================================================
+/*
+ * Firmware, EEPROM, Phy
+ * ==================================================
+ */
 
-
-/***********************************************************************
-** Basically a mdelay/msleep with logging
-*/
-void acx_s_mwait(int ms)
-{
-	FN_ENTER;
-	msleep(ms);
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acx_cmd_status_str
-*/
-const char *acx_cmd_status_str(unsigned int state)
-{
-	static const char *const cmd_error_strings[] = {
-		"Idle",
-		"Success",
-		"Unknown Command",
-		"Invalid Information Element",
-		"Channel rejected",
-		"Channel invalid in current regulatory domain",
-		"MAC invalid",
-		"Command rejected (read-only information element)",
-		"Command rejected",
-		"Already asleep",
-		"TX in progress",
-		"Already awake",
-		"Write only",
-		"RX in progress",
-		"Invalid parameter",
-		"Scan in progress",
-		"Failed"
-	};
-	return state < ARRAY_SIZE(cmd_error_strings) ?
-	    cmd_error_strings[state] : "?";
-}
-
-/***********************************************************************
-*/
-#if ACX_DEBUG
-void acx_dump_bytes(const void *data, int num)
-{
-	const u8 *ptr = (const u8 *)data;
-
-	FN_ENTER;
-
-	if (num <= 0) {
-		printk("\n");
-		return;
-	}
-
-	while (num >= 16) {
-		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
-		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
-		       ptr[0], ptr[1], ptr[2], ptr[3],
-		       ptr[4], ptr[5], ptr[6], ptr[7],
-		       ptr[8], ptr[9], ptr[10], ptr[11],
-		       ptr[12], ptr[13], ptr[14], ptr[15]);
-		num -= 16;
-		ptr += 16;
-	}
-	if (num > 0) {
-		while (--num > 0)
-			printk("%02X ", *ptr++);
-		printk("%02X\n", *ptr);
-	}
-
-	FN_EXIT0;
-
-}
-#endif
-
-
-/***********************************************************************
-** acx_s_get_firmware_version
-**
-** Obvious
-*/
 void acx_s_get_firmware_version(acx_device_t * adev)
 {
 	fw_ver_t fw;
@@ -762,14 +693,11 @@ void acx_s_get_firmware_version(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-
-/***********************************************************************
-** acx_display_hardware_details
-**
-** Displays hw/fw version, radio type etc...
-**
-** Obvious
-*/
+/*
+ * acx_display_hardware_details
+ *
+ * Displays hw/fw version, radio type etc...
+ */
 void acx_display_hardware_details(acx_device_t * adev)
 {
 	const char *radio_str, *form_str;
@@ -841,10 +769,51 @@ void acx_display_hardware_details(acx_device_t * adev)
 	FN_EXIT0;
 }
 
+/*
+ * acx_s_read_fw
+ *
+ * Loads a firmware image
+ * Returns:
+ *  0: 						unable to load file
+ *  pointer to firmware:	success
+ */
+firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
+				u32 * size)
+{
+	firmware_image_t *res;
+	const struct firmware *fw_entry;
 
-/***********************************************************************
-** acx_e_get_stats, acx_e_get_wireless_stats
-*/
+	res = NULL;
+	log(L_INIT, "acx: requesting firmware image '%s'\n", file);
+	if (!request_firmware(&fw_entry, file, dev)) {
+		*size = 8;
+		if (fw_entry->size >= 8)
+			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
+		if (fw_entry->size != *size) {
+			printk("acx: firmware size does not match "
+			       "firmware header: %d != %d, "
+			       "aborting fw upload\n",
+			       (int)fw_entry->size, (int)*size);
+			goto release_ret;
+		}
+		res = vmalloc(*size);
+		if (!res) {
+			printk("acx: no memory for firmware "
+			       "(%u bytes)\n", *size);
+			goto release_ret;
+		}
+		memcpy(res, fw_entry->data, fw_entry->size);
+	      release_ret:
+		release_firmware(fw_entry);
+		return res;
+	}
+	printk("acx: firmware image '%s' was not provided. "
+	       "Check your hotplug scripts\n", file);
+
+	/* checksum will be verified in write_fw, so don't bother here */
+	return res;
+}
+
 int
 acx_e_op_get_stats(struct ieee80211_hw *hw,
 		struct ieee80211_low_level_stats *stats)
@@ -863,6 +832,278 @@ acx_e_op_get_stats(struct ieee80211_hw *hw,
 	FN_EXIT0;
 	return 0;
 }
+
+/*
+ * Common function to parse ALL configoption struct formats
+ * (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
+ *
+ * FIXME: logging should be removed here and added to a /proc file instead
+ */
+void
+acx_s_parse_configoption(acx_device_t * adev,
+			 const acx111_ie_configoption_t * pcfg)
+{
+	const u8 *pEle;
+	int i;
+	int is_acx111 = IS_ACX111(adev);
+
+	if (acx_debug & L_DEBUG) {
+		printk("acx: configoption struct content:\n");
+		acx_dump_bytes(pcfg, sizeof(*pcfg));
+	}
+
+	if ((is_acx111 && (adev->eeprom_version == 5))
+	    || (!is_acx111 && (adev->eeprom_version == 4))
+	    || (!is_acx111 && (adev->eeprom_version == 5))) {
+		/* these versions are known to be supported */
+	} else {
+		printk("acx: unknown chip and EEPROM version combination (%s, v%d), "
+		       "don't know how to parse config options yet. "
+		       "Please report\n", is_acx111 ? "ACX111" : "ACX100",
+		       adev->eeprom_version);
+		return;
+	}
+
+	/* first custom-parse the first part which has chip-specific layout */
+
+	pEle = (const u8 *)pcfg;
+
+	pEle += 4;		/* skip (type,len) header */
+
+	memcpy(adev->cfgopt_NVSv, pEle, sizeof(adev->cfgopt_NVSv));
+	pEle += sizeof(adev->cfgopt_NVSv);
+
+	if (is_acx111) {
+		adev->cfgopt_NVS_vendor_offs = le16_to_cpu(*(u16 *) pEle);
+		pEle += sizeof(adev->cfgopt_NVS_vendor_offs);
+
+		adev->cfgopt_probe_delay = 200;	/* good default value? */
+		pEle += 2;	/* FIXME: unknown, value 0x0001 */
+	} else {
+		memcpy(adev->cfgopt_MAC, pEle, sizeof(adev->cfgopt_MAC));
+		pEle += sizeof(adev->cfgopt_MAC);
+
+		adev->cfgopt_probe_delay = le16_to_cpu(*(u16 *) pEle);
+		pEle += sizeof(adev->cfgopt_probe_delay);
+		if ((adev->cfgopt_probe_delay < 100)
+		    || (adev->cfgopt_probe_delay > 500)) {
+			printk("acx: strange probe_delay value %d, "
+			       "tweaking to 200\n", adev->cfgopt_probe_delay);
+			adev->cfgopt_probe_delay = 200;
+		}
+	}
+
+	adev->cfgopt_eof_memory = le32_to_cpu(*(u32 *) pEle);
+	pEle += sizeof(adev->cfgopt_eof_memory);
+
+	printk("acx: NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
+	       adev->cfgopt_NVS_vendor_offs,
+	       adev->cfgopt_probe_delay, adev->cfgopt_eof_memory);
+
+	adev->cfgopt_dot11CCAModes = *pEle++;
+	adev->cfgopt_dot11Diversity = *pEle++;
+	adev->cfgopt_dot11ShortPreambleOption = *pEle++;
+	adev->cfgopt_dot11PBCCOption = *pEle++;
+	adev->cfgopt_dot11ChannelAgility = *pEle++;
+	adev->cfgopt_dot11PhyType = *pEle++;
+	adev->cfgopt_dot11TempType = *pEle++;
+	printk("acx: CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
+	       "PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
+	       adev->cfgopt_dot11CCAModes,
+	       adev->cfgopt_dot11Diversity,
+	       adev->cfgopt_dot11ShortPreambleOption,
+	       adev->cfgopt_dot11PBCCOption,
+	       adev->cfgopt_dot11ChannelAgility,
+	       adev->cfgopt_dot11PhyType, adev->cfgopt_dot11TempType);
+
+	/* then use common parsing for next part which has common layout */
+
+	pEle++;			/* skip table_count (6) */
+
+	if (IS_MEM(adev) && IS_ACX100(adev))
+	{
+	/*
+	 * For iPaq hx4700 Generic Slave F/W 1.10.7.K.  I'm not sure if these
+	 * 4 extra bytes are before the dot11 things above or after, so I'm just
+	 * going to guess after.  If someone sees these aren't reasonable numbers,
+	 * please fix this.
+	 * The area from which the dot11 values above are read contains:
+	 * 04 01 01 01 00 05 01 06 00 02 01 02
+	 * the 8 dot11 reads above take care of 8 of them, but which 8...
+	 */
+		pEle += 4;
+	}
+
+	adev->cfgopt_antennas.type = pEle[0];
+	adev->cfgopt_antennas.len = pEle[1];
+	printk("acx: AntennaID:%02X Len:%02X Data:",
+	       adev->cfgopt_antennas.type, adev->cfgopt_antennas.len);
+	for (i = 0; i < pEle[1]; i++) {
+		adev->cfgopt_antennas.list[i] = pEle[i + 2];
+		printk("%02X ", pEle[i + 2]);
+	}
+	printk("\n");
+
+	pEle += pEle[1] + 2;
+	adev->cfgopt_power_levels.type = pEle[0];
+	adev->cfgopt_power_levels.len = pEle[1];
+	printk("acx: PowerLevelID:%02X Len:%02X Data:",
+	       adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
+	for (i = 0; i < pEle[1]; i++) {
+		adev->cfgopt_power_levels.list[i] =
+		    le16_to_cpu(*(u16 *) & pEle[i * 2 + 2]);
+		printk("%04X ", adev->cfgopt_power_levels.list[i]);
+	}
+	printk("\n");
+
+	pEle += pEle[1] * 2 + 2;
+	adev->cfgopt_data_rates.type = pEle[0];
+	adev->cfgopt_data_rates.len = pEle[1];
+	printk("acx: DataRatesID:%02X Len:%02X Data:",
+	       adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
+	for (i = 0; i < pEle[1]; i++) {
+		adev->cfgopt_data_rates.list[i] = pEle[i + 2];
+		printk("%02X ", pEle[i + 2]);
+	}
+	printk("\n");
+
+	pEle += pEle[1] + 2;
+	adev->cfgopt_domains.type = pEle[0];
+	adev->cfgopt_domains.len = pEle[1];
+
+	if (IS_MEM(adev) && IS_ACX100(adev))
+	{
+	/*
+	   * For iPaq hx4700 Generic Slave F/W 1.10.7.K.
+	 * There's an extra byte between this structure and the next
+	 * that is not accounted for with this structure's length.  It's
+	 * most likely a bug in the firmware, but we can fix it here
+	 * by bumping the length of this field by 1.
+	 */
+		adev->cfgopt_domains.len++;
+	}
+
+	printk("acx: DomainID:%02X Len:%02X Data:",
+	       adev->cfgopt_domains.type, adev->cfgopt_domains.len);
+	for (i = 0; i < adev->cfgopt_domains.len; i++) {
+		adev->cfgopt_domains.list[i] = pEle[i + 2];
+		printk("%02X ", pEle[i + 2]);
+	}
+	printk("\n");
+
+	pEle += adev->cfgopt_domains.len + 2;
+	adev->cfgopt_product_id.type = pEle[0];
+	adev->cfgopt_product_id.len = pEle[1];
+	for (i = 0; i < pEle[1]; i++) {
+		adev->cfgopt_product_id.list[i] = pEle[i + 2];
+	}
+	printk("acx: ProductID:%02X Len:%02X Data:%.*s\n",
+	       adev->cfgopt_product_id.type, adev->cfgopt_product_id.len,
+	       adev->cfgopt_product_id.len,
+	       (char *)adev->cfgopt_product_id.list);
+
+	pEle += pEle[1] + 2;
+	adev->cfgopt_manufacturer.type = pEle[0];
+	adev->cfgopt_manufacturer.len = pEle[1];
+	for (i = 0; i < pEle[1]; i++) {
+		adev->cfgopt_manufacturer.list[i] = pEle[i + 2];
+	}
+	printk("acx: ManufacturerID:%02X Len:%02X Data:%.*s\n",
+	       adev->cfgopt_manufacturer.type, adev->cfgopt_manufacturer.len,
+	       adev->cfgopt_manufacturer.len,
+	       (char *)adev->cfgopt_manufacturer.list);
+/*
+	printk("acx: EEPROM part:\n");
+	for (i=0; i<58; i++) {
+		printk("%02X =======>  0x%02X\n",
+			i, (u8 *)adev->cfgopt_NVSv[i-2]);
+	}
+*/
+}
+
+
+// OW Cleanup ======================================================
+
+
+/***********************************************************************
+** Basically a mdelay/msleep with logging
+*/
+void acx_s_mwait(int ms)
+{
+	FN_ENTER;
+	msleep(ms);
+	FN_EXIT0;
+}
+
+
+/***********************************************************************
+** acx_cmd_status_str
+*/
+const char *acx_cmd_status_str(unsigned int state)
+{
+	static const char *const cmd_error_strings[] = {
+		"Idle",
+		"Success",
+		"Unknown Command",
+		"Invalid Information Element",
+		"Channel rejected",
+		"Channel invalid in current regulatory domain",
+		"MAC invalid",
+		"Command rejected (read-only information element)",
+		"Command rejected",
+		"Already asleep",
+		"TX in progress",
+		"Already awake",
+		"Write only",
+		"RX in progress",
+		"Invalid parameter",
+		"Scan in progress",
+		"Failed"
+	};
+	return state < ARRAY_SIZE(cmd_error_strings) ?
+	    cmd_error_strings[state] : "?";
+}
+
+/***********************************************************************
+*/
+#if ACX_DEBUG
+void acx_dump_bytes(const void *data, int num)
+{
+	const u8 *ptr = (const u8 *)data;
+
+	FN_ENTER;
+
+	if (num <= 0) {
+		printk("\n");
+		return;
+	}
+
+	while (num >= 16) {
+		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
+		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+		       ptr[0], ptr[1], ptr[2], ptr[3],
+		       ptr[4], ptr[5], ptr[6], ptr[7],
+		       ptr[8], ptr[9], ptr[10], ptr[11],
+		       ptr[12], ptr[13], ptr[14], ptr[15]);
+		num -= 16;
+		ptr += 16;
+	}
+	if (num > 0) {
+		while (--num > 0)
+			printk("%02X ", *ptr++);
+		printk("%02X\n", *ptr);
+	}
+
+	FN_EXIT0;
+
+}
+#endif
+
+
+
+
+
+
 
 
 /***********************************************************************
@@ -2980,51 +3221,6 @@ out:
 
 
 
-/***********************************************************************
-** acx_s_read_fw
-**
-** Loads a firmware image
-**
-** Returns:
-**  0				unable to load file
-**  pointer to firmware		success
-*/
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
-				u32 * size)
-{
-	firmware_image_t *res;
-	const struct firmware *fw_entry;
-
-	res = NULL;
-	log(L_INIT, "acx: requesting firmware image '%s'\n", file);
-	if (!request_firmware(&fw_entry, file, dev)) {
-		*size = 8;
-		if (fw_entry->size >= 8)
-			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
-		if (fw_entry->size != *size) {
-			printk("acx: firmware size does not match "
-			       "firmware header: %d != %d, "
-			       "aborting fw upload\n",
-			       (int)fw_entry->size, (int)*size);
-			goto release_ret;
-		}
-		res = vmalloc(*size);
-		if (!res) {
-			printk("acx: no memory for firmware "
-			       "(%u bytes)\n", *size);
-			goto release_ret;
-		}
-		memcpy(res, fw_entry->data, fw_entry->size);
-	      release_ret:
-		release_firmware(fw_entry);
-		return res;
-	}
-	printk("acx: firmware image '%s' was not provided. "
-	       "Check your hotplug scripts\n", file);
-
-	/* checksum will be verified in write_fw, so don't bother here */
-	return res;
-}
 
 
 /***********************************************************************
@@ -5089,194 +5285,6 @@ int acx_e_op_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 
 
-/***********************************************************************
-** Common function to parse ALL configoption struct formats
-** (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
-** FIXME: logging should be removed here and added to a /proc file instead
-**
-** Look into bcm43xx
-*/
-void
-acx_s_parse_configoption(acx_device_t * adev,
-			 const acx111_ie_configoption_t * pcfg)
-{
-	const u8 *pEle;
-	int i;
-	int is_acx111 = IS_ACX111(adev);
-
-	if (acx_debug & L_DEBUG) {
-		printk("acx: configoption struct content:\n");
-		acx_dump_bytes(pcfg, sizeof(*pcfg));
-	}
-
-	if ((is_acx111 && (adev->eeprom_version == 5))
-	    || (!is_acx111 && (adev->eeprom_version == 4))
-	    || (!is_acx111 && (adev->eeprom_version == 5))) {
-		/* these versions are known to be supported */
-	} else {
-		printk("acx: unknown chip and EEPROM version combination (%s, v%d), "
-		       "don't know how to parse config options yet. "
-		       "Please report\n", is_acx111 ? "ACX111" : "ACX100",
-		       adev->eeprom_version);
-		return;
-	}
-
-	/* first custom-parse the first part which has chip-specific layout */
-
-	pEle = (const u8 *)pcfg;
-
-	pEle += 4;		/* skip (type,len) header */
-
-	memcpy(adev->cfgopt_NVSv, pEle, sizeof(adev->cfgopt_NVSv));
-	pEle += sizeof(adev->cfgopt_NVSv);
-
-	if (is_acx111) {
-		adev->cfgopt_NVS_vendor_offs = le16_to_cpu(*(u16 *) pEle);
-		pEle += sizeof(adev->cfgopt_NVS_vendor_offs);
-
-		adev->cfgopt_probe_delay = 200;	/* good default value? */
-		pEle += 2;	/* FIXME: unknown, value 0x0001 */
-	} else {
-		memcpy(adev->cfgopt_MAC, pEle, sizeof(adev->cfgopt_MAC));
-		pEle += sizeof(adev->cfgopt_MAC);
-
-		adev->cfgopt_probe_delay = le16_to_cpu(*(u16 *) pEle);
-		pEle += sizeof(adev->cfgopt_probe_delay);
-		if ((adev->cfgopt_probe_delay < 100)
-		    || (adev->cfgopt_probe_delay > 500)) {
-			printk("acx: strange probe_delay value %d, "
-			       "tweaking to 200\n", adev->cfgopt_probe_delay);
-			adev->cfgopt_probe_delay = 200;
-		}
-	}
-
-	adev->cfgopt_eof_memory = le32_to_cpu(*(u32 *) pEle);
-	pEle += sizeof(adev->cfgopt_eof_memory);
-
-	printk("acx: NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
-	       adev->cfgopt_NVS_vendor_offs,
-	       adev->cfgopt_probe_delay, adev->cfgopt_eof_memory);
-
-	adev->cfgopt_dot11CCAModes = *pEle++;
-	adev->cfgopt_dot11Diversity = *pEle++;
-	adev->cfgopt_dot11ShortPreambleOption = *pEle++;
-	adev->cfgopt_dot11PBCCOption = *pEle++;
-	adev->cfgopt_dot11ChannelAgility = *pEle++;
-	adev->cfgopt_dot11PhyType = *pEle++;
-	adev->cfgopt_dot11TempType = *pEle++;
-	printk("acx: CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
-	       "PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
-	       adev->cfgopt_dot11CCAModes,
-	       adev->cfgopt_dot11Diversity,
-	       adev->cfgopt_dot11ShortPreambleOption,
-	       adev->cfgopt_dot11PBCCOption,
-	       adev->cfgopt_dot11ChannelAgility,
-	       adev->cfgopt_dot11PhyType, adev->cfgopt_dot11TempType);
-
-	/* then use common parsing for next part which has common layout */
-
-	pEle++;			/* skip table_count (6) */
-
-	if (IS_MEM(adev) && IS_ACX100(adev))
-	{
-	/*
-	 * For iPaq hx4700 Generic Slave F/W 1.10.7.K.  I'm not sure if these
-	 * 4 extra bytes are before the dot11 things above or after, so I'm just
-	 * going to guess after.  If someone sees these aren't reasonable numbers,
-	 * please fix this.
-	 * The area from which the dot11 values above are read contains:
-	 * 04 01 01 01 00 05 01 06 00 02 01 02
-	 * the 8 dot11 reads above take care of 8 of them, but which 8...
-	 */
-		pEle += 4;
-	}
-
-	adev->cfgopt_antennas.type = pEle[0];
-	adev->cfgopt_antennas.len = pEle[1];
-	printk("acx: AntennaID:%02X Len:%02X Data:",
-	       adev->cfgopt_antennas.type, adev->cfgopt_antennas.len);
-	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt_antennas.list[i] = pEle[i + 2];
-		printk("%02X ", pEle[i + 2]);
-	}
-	printk("\n");
-
-	pEle += pEle[1] + 2;
-	adev->cfgopt_power_levels.type = pEle[0];
-	adev->cfgopt_power_levels.len = pEle[1];
-	printk("acx: PowerLevelID:%02X Len:%02X Data:",
-	       adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
-	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt_power_levels.list[i] =
-		    le16_to_cpu(*(u16 *) & pEle[i * 2 + 2]);
-		printk("%04X ", adev->cfgopt_power_levels.list[i]);
-	}
-	printk("\n");
-
-	pEle += pEle[1] * 2 + 2;
-	adev->cfgopt_data_rates.type = pEle[0];
-	adev->cfgopt_data_rates.len = pEle[1];
-	printk("acx: DataRatesID:%02X Len:%02X Data:",
-	       adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
-	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt_data_rates.list[i] = pEle[i + 2];
-		printk("%02X ", pEle[i + 2]);
-	}
-	printk("\n");
-
-	pEle += pEle[1] + 2;
-	adev->cfgopt_domains.type = pEle[0];
-	adev->cfgopt_domains.len = pEle[1];
-
-	if (IS_MEM(adev) && IS_ACX100(adev))
-	{
-	/*
-	   * For iPaq hx4700 Generic Slave F/W 1.10.7.K.
-	 * There's an extra byte between this structure and the next
-	 * that is not accounted for with this structure's length.  It's
-	 * most likely a bug in the firmware, but we can fix it here
-	 * by bumping the length of this field by 1.
-	 */
-		adev->cfgopt_domains.len++;
-	}
-
-	printk("acx: DomainID:%02X Len:%02X Data:",
-	       adev->cfgopt_domains.type, adev->cfgopt_domains.len);
-	for (i = 0; i < adev->cfgopt_domains.len; i++) {
-		adev->cfgopt_domains.list[i] = pEle[i + 2];
-		printk("%02X ", pEle[i + 2]);
-	}
-	printk("\n");
-
-	pEle += adev->cfgopt_domains.len + 2;
-	adev->cfgopt_product_id.type = pEle[0];
-	adev->cfgopt_product_id.len = pEle[1];
-	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt_product_id.list[i] = pEle[i + 2];
-	}
-	printk("acx: ProductID:%02X Len:%02X Data:%.*s\n",
-	       adev->cfgopt_product_id.type, adev->cfgopt_product_id.len,
-	       adev->cfgopt_product_id.len,
-	       (char *)adev->cfgopt_product_id.list);
-
-	pEle += pEle[1] + 2;
-	adev->cfgopt_manufacturer.type = pEle[0];
-	adev->cfgopt_manufacturer.len = pEle[1];
-	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt_manufacturer.list[i] = pEle[i + 2];
-	}
-	printk("acx: ManufacturerID:%02X Len:%02X Data:%.*s\n",
-	       adev->cfgopt_manufacturer.type, adev->cfgopt_manufacturer.len,
-	       adev->cfgopt_manufacturer.len,
-	       (char *)adev->cfgopt_manufacturer.list);
-/*
-	printk("acx: EEPROM part:\n");
-	for (i=0; i<58; i++) {
-		printk("%02X =======>  0x%02X\n",
-			i, (u8 *)adev->cfgopt_NVSv[i-2]);
-	}
-*/
-}
 
 /*
  * OW Debugging
