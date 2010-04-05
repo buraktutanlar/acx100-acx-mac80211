@@ -113,6 +113,7 @@ static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
 #if POWER_SAVE_80211
 static int acx_s_set_null_data_template(acx_device_t * adev);
+static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 #endif
 
 static u8 acx_plcp_get_bitrate_cck(u8 plcp);
@@ -2943,9 +2944,6 @@ static inline int acx_s_init_max_probe_request_template(acx_device_t * adev)
 }
 
 #if POWER_SAVE_80211
-/***********************************************************************
-** acx_s_set_null_data_template
-*/
 static int acx_s_set_null_data_template(acx_device_t * adev)
 {
 	struct acx_template_nullframe b;
@@ -2968,6 +2966,65 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 
 	FN_EXIT1(result);
 	return result;
+}
+#endif
+
+#if POWER_SAVE_80211
+static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
+{
+	/* merge both structs in a union to be able to have common code */
+	union {
+		acx111_ie_powersave_t acx111;
+		acx100_ie_powersave_t acx100;
+	} pm;
+
+	/* change 802.11 power save mode settings */
+	log(L_INIT, "acx: updating 802.11 power save mode settings: "
+	    "wakeup_cfg 0x%02X, listen interval %u, "
+	    "options 0x%02X, hangover period %u, "
+	    "enhanced_ps_transition_time %u\n",
+	    adev->ps_wakeup_cfg, adev->ps_listen_interval,
+	    adev->ps_options, adev->ps_hangover_period,
+	    adev->ps_enhanced_transition_time);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "acx: Previous PS mode settings: wakeup_cfg 0x%02X, "
+	    "listen interval %u, options 0x%02X, "
+	    "hangover period %u, "
+	    "enhanced_ps_transition_time %u, beacon_rx_time %u\n",
+	    pm.acx111.wakeup_cfg,
+	    pm.acx111.listen_interval,
+	    pm.acx111.options,
+	    pm.acx111.hangover_period,
+	    IS_ACX111(adev) ?
+	    pm.acx111.enhanced_ps_transition_time
+	    : pm.acx100.enhanced_ps_transition_time,
+	    IS_ACX111(adev) ? pm.acx111.beacon_rx_time : (u32) - 1);
+	pm.acx111.wakeup_cfg = adev->ps_wakeup_cfg;
+	pm.acx111.listen_interval = adev->ps_listen_interval;
+	pm.acx111.options = adev->ps_options;
+	pm.acx111.hangover_period = adev->ps_hangover_period;
+	if (IS_ACX111(adev)) {
+		pm.acx111.beacon_rx_time = cpu_to_le32(adev->ps_beacon_rx_time);
+		pm.acx111.enhanced_ps_transition_time =
+		    cpu_to_le32(adev->ps_enhanced_transition_time);
+	} else {
+		pm.acx100.enhanced_ps_transition_time =
+		    cpu_to_le16(adev->ps_enhanced_transition_time);
+	}
+	acx_s_configure(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
+	acx_s_mwait(40);
+	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
+	log(L_INIT, "acx: power save mode change %s\n",
+	    (pm.acx111.
+	     wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
+	/* FIXME: maybe verify via PS_CFG_PENDING bit here
+	 * that power save mode change was successful. */
+	/* FIXME: we shouldn't trigger a scan immediately after
+	 * fiddling with power save mode (since the firmware is sending
+	 * a NULL frame then). */
 }
 #endif
 
@@ -5235,67 +5292,6 @@ module_exit(acx_e_cleanup_module)
 // BOM Cleanup ======================================================
 
 
-
-
-
-#if POWER_SAVE_80211
-static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
-{
-	/* merge both structs in a union to be able to have common code */
-	union {
-		acx111_ie_powersave_t acx111;
-		acx100_ie_powersave_t acx100;
-	} pm;
-
-	/* change 802.11 power save mode settings */
-	log(L_INIT, "acx: updating 802.11 power save mode settings: "
-	    "wakeup_cfg 0x%02X, listen interval %u, "
-	    "options 0x%02X, hangover period %u, "
-	    "enhanced_ps_transition_time %u\n",
-	    adev->ps_wakeup_cfg, adev->ps_listen_interval,
-	    adev->ps_options, adev->ps_hangover_period,
-	    adev->ps_enhanced_transition_time);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
-	log(L_INIT, "acx: Previous PS mode settings: wakeup_cfg 0x%02X, "
-	    "listen interval %u, options 0x%02X, "
-	    "hangover period %u, "
-	    "enhanced_ps_transition_time %u, beacon_rx_time %u\n",
-	    pm.acx111.wakeup_cfg,
-	    pm.acx111.listen_interval,
-	    pm.acx111.options,
-	    pm.acx111.hangover_period,
-	    IS_ACX111(adev) ?
-	    pm.acx111.enhanced_ps_transition_time
-	    : pm.acx100.enhanced_ps_transition_time,
-	    IS_ACX111(adev) ? pm.acx111.beacon_rx_time : (u32) - 1);
-	pm.acx111.wakeup_cfg = adev->ps_wakeup_cfg;
-	pm.acx111.listen_interval = adev->ps_listen_interval;
-	pm.acx111.options = adev->ps_options;
-	pm.acx111.hangover_period = adev->ps_hangover_period;
-	if (IS_ACX111(adev)) {
-		pm.acx111.beacon_rx_time = cpu_to_le32(adev->ps_beacon_rx_time);
-		pm.acx111.enhanced_ps_transition_time =
-		    cpu_to_le32(adev->ps_enhanced_transition_time);
-	} else {
-		pm.acx100.enhanced_ps_transition_time =
-		    cpu_to_le16(adev->ps_enhanced_transition_time);
-	}
-	acx_s_configure(adev, &pm, ACX1xx_IE_POWER_MGMT);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
-	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
-	acx_s_mwait(40);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
-	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
-	log(L_INIT, "acx: power save mode change %s\n",
-	    (pm.acx111.
-	     wakeup_cfg & PS_CFG_PENDING) ? "FAILED" : "was successful");
-	/* FIXME: maybe verify via PS_CFG_PENDING bit here
-	 * that power save mode change was successful. */
-	/* FIXME: we shouldn't trigger a scan immediately after
-	 * fiddling with power save mode (since the firmware is sending
-	 * a NULL frame then). */
-}
-#endif
 
 
 
