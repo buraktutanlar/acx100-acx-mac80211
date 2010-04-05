@@ -71,21 +71,48 @@ MODULE_VERSION(ACX_RELEASE);
 
 
 // Locking
+//-----
 
 // Logging
+//-----
 
 // Data Access
+//-----
 static int acx100_s_init_memory_pools(acx_device_t *adev, const acx_ie_memmap_t *mmt);
 static int acx100_s_create_dma_regions(acx_device_t *adev);
 static int acx111_s_create_dma_regions(acx_device_t *adev);
 
 // Firmware, EEPROM, Phy
+//-----
 
+// Control Path (CMD handling, init, reset)
+//-----
 
+// CMDs
+static int acx111_s_get_feature_config(acx_device_t *adev, u32 *feature_options, u32 *data_flow_options);
+static int acx111_s_set_feature_config(acx_device_t *adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
+static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
+static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
+static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
+
+// Configure
+static void acx_s_select_opmode(acx_device_t *adev);
+static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+
+// ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
+static void acx_s_initialize_rx_config(acx_device_t * adev);
+static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
+static void acx111_s_sens_radio_16_17(acx_device_t * adev);
+static int acx_s_set_tim_template(acx_device_t * adev);
+static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
+static void acx_s_set_wepkey(acx_device_t * adev);
+static int acx_s_init_packet_templates(acx_device_t * adev);
+static int acx100_s_init_wep(acx_device_t * adev);
+static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 
-
-// Defines, etc.
+// Defines, Static data, etc.
 // -----
 #define ACX111_PERCENT(percent) ((percent)/5)
 
@@ -118,6 +145,225 @@ const char *const
 	/* 7 */ "  3-9 Israel (not all firmware versions)",
 	NULL			/* needs to remain as last entry */
 };
+
+/* FIXME: the lengths given here probably aren't always correct.
+ * They should be gradually replaced by proper "sizeof(acx1XX_ie_XXXX)-4",
+ * unless the firmware actually expects a different length than the struct length */
+static const u16 acx100_ie_len[] = {
+	0,
+	ACX100_IE_ACX_TIMER_LEN,
+	sizeof(acx100_ie_powersave_t) - 4,	/* is that 6 or 8??? */
+	ACX1xx_IE_QUEUE_CONFIG_LEN,
+	ACX100_IE_BLOCK_SIZE_LEN,
+	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_RATE_FALLBACK_LEN,
+	ACX100_IE_WEP_OPTIONS_LEN,
+	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
+	0,
+	ACX1xx_IE_ASSOC_ID_LEN,
+	0,
+	ACX111_IE_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_FWREV_LEN,
+	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
+	ACX1xx_IE_MEDIUM_USAGE_LEN,
+	ACX1xx_IE_RXCONFIG_LEN,
+	0,
+	0,
+	sizeof(fw_stats_t) - 4,
+	0,
+	ACX1xx_IE_FEATURE_CONFIG_LEN,
+	ACX111_IE_KEY_CHOOSE_LEN,
+	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
+	ACX1FF_IE_WONE_CONFIG_LEN,
+	0,
+	ACX1FF_IE_TID_CONFIG_LEN,
+	0,
+	0,
+	0,
+	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
+	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
+	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
+	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
+	0,
+	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
+	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
+	ACX1FF_IE_CCA_THRESHOLD_LEN,
+	ACX1FF_IE_EVENT_MASK_LEN,
+	ACX1FF_IE_DTIM_PERIOD_LEN,
+	0,
+	ACX1FF_IE_ACI_CONFIG_SET_LEN,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	ACX1FF_IE_EEPROM_VER_LEN,
+};
+
+static const u16 acx100_ie_len_dot11[] = {
+	0,
+	ACX1xx_IE_DOT11_STATION_ID_LEN,
+	0,
+	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
+	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
+	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
+	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
+	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
+	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
+	0,
+	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
+	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
+	0,
+	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
+	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
+	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
+	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
+	0,
+	0,
+	0,
+};
+
+static const u16 acx111_ie_len[] = {
+	0,
+	ACX100_IE_ACX_TIMER_LEN,
+	sizeof(acx111_ie_powersave_t) - 4,
+	ACX1xx_IE_QUEUE_CONFIG_LEN,
+	ACX100_IE_BLOCK_SIZE_LEN,
+	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_RATE_FALLBACK_LEN,
+	ACX100_IE_WEP_OPTIONS_LEN,
+	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
+	0,
+	ACX1xx_IE_ASSOC_ID_LEN,
+	0,
+	ACX111_IE_CONFIG_OPTIONS_LEN,
+	ACX1xx_IE_FWREV_LEN,
+	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
+	ACX1xx_IE_MEDIUM_USAGE_LEN,
+	ACX1xx_IE_RXCONFIG_LEN,
+	0,
+	0,
+	sizeof(fw_stats_t) - 4,
+	0,
+	ACX1xx_IE_FEATURE_CONFIG_LEN,
+	ACX111_IE_KEY_CHOOSE_LEN,
+	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
+	ACX1FF_IE_WONE_CONFIG_LEN,
+	0,
+	ACX1FF_IE_TID_CONFIG_LEN,
+	0,
+	0,
+	0,
+	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
+	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
+	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
+	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
+	0,
+	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
+	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
+	ACX1FF_IE_CCA_THRESHOLD_LEN,
+	ACX1FF_IE_EVENT_MASK_LEN,
+	ACX1FF_IE_DTIM_PERIOD_LEN,
+	0,
+	ACX1FF_IE_ACI_CONFIG_SET_LEN,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	ACX1FF_IE_EEPROM_VER_LEN,
+};
+
+static const u16 acx111_ie_len_dot11[] = {
+	0,
+	ACX1xx_IE_DOT11_STATION_ID_LEN,
+	0,
+	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
+	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
+	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
+	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
+	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
+	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
+	0,
+	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
+	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
+	0,
+	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
+	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
+	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
+	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
+	0,
+	0,
+	0,
+};
+
+static struct ieee80211_rate __acx_rates[] = {
+	{ .bitrate = 10, .hw_value = 0, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 20, .hw_value = 1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 55, .hw_value = 2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 110, .hw_value = 3, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+	{ .bitrate = 60, .hw_value = 4, },
+	{ .bitrate = 90, .hw_value = 5, },
+	{ .bitrate = 120, .hw_value = 6, },
+	{ .bitrate = 180, .hw_value = 7, },
+	{ .bitrate = 240, .hw_value = 8, },
+	{ .bitrate = 360, .hw_value = 9, },
+	{ .bitrate = 480, .hw_value = 10, },
+	{ .bitrate = 540, .hw_value = 11, },
+};
+
+static struct ieee80211_channel channels[] = {
+	{ .center_freq = 2412, .hw_value = 1, },
+	{ .center_freq = 2417, .hw_value = 2, },
+	{ .center_freq = 2422, .hw_value = 3, },
+	{ .center_freq = 2427, .hw_value = 4, },
+	{ .center_freq = 2432, .hw_value = 5, },
+	{ .center_freq = 2437, .hw_value = 6, },
+	{ .center_freq = 2442, .hw_value = 7, },
+	{ .center_freq = 2447, .hw_value = 8, },
+	{ .center_freq = 2452, .hw_value = 9, },
+	{ .center_freq = 2457, .hw_value = 10, },
+	{ .center_freq = 2462, .hw_value = 11, },
+	{ .center_freq = 2467, .hw_value = 12, },
+	{ .center_freq = 2472, .hw_value = 13, },
+	{ .center_freq = 2484, .hw_value = 14, },
+};
+
+static struct ieee80211_supported_band g_band_2GHz = {
+	.channels = channels,
+	.n_channels = ARRAY_SIZE(channels),
+	.bitrates = __acx_rates,
+	.n_bitrates = 12,
+};
+
+static struct ieee80211_supported_band b_band_2GHz = {
+	.channels = channels,
+	.n_channels = ARRAY_SIZE(channels),
+	.bitrates = __acx_rates,
+	.n_bitrates = 4,
+};
+
+static const u8 bitpos2genframe_txrate[] = {
+	10,			/*  0.  1 Mbit/s */
+	20,			/*  1.  2 Mbit/s */
+	55,			/*  2.  5.5 Mbit/s */
+	0x0B,			/*  3.  6 Mbit/s */
+	0x0F,			/*  4.  9 Mbit/s */
+	110,			/*  5. 11 Mbit/s */
+	0x0A,			/*  6. 12 Mbit/s */
+	0x0E,			/*  7. 18 Mbit/s */
+	220,			/*  8. 22 Mbit/s */
+	0x09,			/*  9. 24 Mbit/s */
+	0x0D,			/* 10. 36 Mbit/s */
+	0x08,			/* 11. 48 Mbit/s */
+	0x0C,			/* 12. 54 Mbit/s */
+	10,			/* 13.  1 Mbit/s, should never happen */
+	10,			/* 14.  1 Mbit/s, should never happen */
+	10,			/* 15.  1 Mbit/s, should never happen */
+};
+
 
 /*
  * Locking
@@ -195,6 +441,11 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 }
 #endif /* PARANOID_LOCKING */
 
+/*
+ * Logging
+ * ==================================================
+ */
+
 // -----
 #if ACX_DEBUG > 1
 
@@ -268,6 +519,39 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
 		acx_print_mac2(head, mac, tail);
 	}
 }
+
+#if ACX_DEBUG
+void acx_dump_bytes(const void *data, int num)
+{
+	const u8 *ptr = (const u8 *)data;
+
+	FN_ENTER;
+
+	if (num <= 0) {
+		printk("\n");
+		return;
+	}
+
+	while (num >= 16) {
+		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
+		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+		       ptr[0], ptr[1], ptr[2], ptr[3],
+		       ptr[4], ptr[5], ptr[6], ptr[7],
+		       ptr[8], ptr[9], ptr[10], ptr[11],
+		       ptr[12], ptr[13], ptr[14], ptr[15]);
+		num -= 16;
+		ptr += 16;
+	}
+	if (num > 0) {
+		while (--num > 0)
+			printk("%02X ", *ptr++);
+		printk("%02X\n", *ptr);
+	}
+
+	FN_EXIT0;
+
+}
+#endif
 
 /*
  * Data Access
@@ -1021,6 +1305,1260 @@ acx_s_parse_configoption(acx_device_t * adev,
 */
 }
 
+/*
+ * Control Path (CMD handling, init, reset)
+ * ==================================================
+ */
+
+// CMDs (Control Path)
+// -------------------
+#if !ACX_DEBUG
+int acx_s_configure(acx_device_t * adev, void *pdr, int type)
+{
+#else
+int
+acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
+		      const char *typestr)
+{
+#endif
+	u16 len;
+	int res;
+	char msgbuf[255];
+
+	FN_ENTER;
+
+	if (type < 0x1000)
+		len = adev->ie_len[type];
+	else
+		len = adev->ie_len_dot11[type - 0x1000];
+
+	if (unlikely(!len)) {
+		log(L_DEBUG, "acx: %s: zero-length type %s?!\n",
+				__func__, typestr);
+	}
+
+	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
+	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
+	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
+
+	sprintf(msgbuf, "acx: %s: %s: type=0x%04X, typestr=%s, len=%u",
+			__func__, wiphy_name(adev->ieee->wiphy),
+			type, typestr, len);
+	if (likely(res == OK))
+		log(L_CTL,  "%s: OK\n", msgbuf);
+	 else
+		log(L_ANY,  "%s: FAILED\n", msgbuf);
+
+	FN_EXIT0;
+	return res;
+}
+
+void acx_i_op_configure_filter(struct ieee80211_hw *hw,
+		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
+
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+
+	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+	 return; */
+
+	if (*total_flags) {
+		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+		/* let kernel know in case *we* needed to set promiscuous */
+	} else {
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+	}
+
+	/* cannot update card settings directly here, atomic context */
+	// TODO This is one point to check for better cmd and interrupt handling
+	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+
+	acx_unlock(adev, flags);
+
+	//acx_s_update_card_settings(adev);
+
+	FN_EXIT0;
+}
+
+static int
+acx111_s_get_feature_config(acx_device_t * adev,
+			    u32 * feature_options, u32 * data_flow_options)
+{
+	struct acx111_ie_feature_config feat;
+
+	FN_ENTER;
+
+	if (!IS_ACX111(adev)) {
+		return NOT_OK;
+	}
+
+	memset(&feat, 0, sizeof(feat));
+
+	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+	log(L_DEBUG,
+	    "acx: got Feature option:0x%X, DataFlow option: 0x%X\n",
+	    feat.feature_options, feat.data_flow_options);
+
+	if (feature_options)
+		*feature_options = le32_to_cpu(feat.feature_options);
+	if (data_flow_options)
+		*data_flow_options = le32_to_cpu(feat.data_flow_options);
+
+	FN_EXIT0;
+	return OK;
+}
+
+
+static int
+acx111_s_set_feature_config(acx_device_t * adev,
+			    u32 feature_options, u32 data_flow_options,
+			    unsigned int mode
+			    /* 0 == remove, 1 == add, 2 == set */ )
+{
+	struct acx111_ie_feature_config feat;
+
+	int i;
+
+	FN_ENTER;
+
+	if (!IS_ACX111(adev)) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+
+	if ((mode < 0) || (mode > 2)) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+
+	if (mode != 2)	{
+		/* need to modify old data */
+		i = acx111_s_get_feature_config(adev, &feat.feature_options,
+				&feat.data_flow_options);
+		if (i != OK)
+		{
+			printk("%s: acx111_s_get_feature_config: NOT_OK\n", __FUNCTION__);
+			return i;
+		}
+	}
+	else {
+		/* need to set a completely new value */
+		feat.feature_options = 0;
+		feat.data_flow_options = 0;
+	}
+
+	if (mode == 0) {	/* remove */
+		CLEAR_BIT(feat.feature_options, cpu_to_le32(feature_options));
+		CLEAR_BIT(feat.data_flow_options,
+			  cpu_to_le32(data_flow_options));
+	} else {		/* add or set */
+		SET_BIT(feat.feature_options, cpu_to_le32(feature_options));
+		SET_BIT(feat.data_flow_options, cpu_to_le32(data_flow_options));
+	}
+
+	log(L_DEBUG,
+	    "acx: old: feature 0x%08X dataflow 0x%08X. mode: %u\n"
+	    "acx: new: feature 0x%08X dataflow 0x%08X\n",
+	    feature_options, data_flow_options, mode,
+	    le32_to_cpu(feat.feature_options),
+	    le32_to_cpu(feat.data_flow_options));
+
+	if (OK != acx_s_configure(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+
+	FN_EXIT0;
+	return OK;
+}
+
+static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d)
+{
+	return acx111_s_set_feature_config(adev, f, d, 0);
+}
+static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d)
+{
+	return acx111_s_set_feature_config(adev, f, d, 1);
+}
+static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
+{
+	return acx111_s_set_feature_config(adev, f, d, 2);
+}
+
+// OW TODO Replace the FUNC #defs by __func__ in logging
+#undef FUNC
+#define FUNC "interrogate"
+#if !ACX_DEBUG
+int acx_s_interrogate(acx_device_t * adev, void *pdr, int type)
+{
+#else
+int
+acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
+			const char *typestr)
+{
+#endif
+	u16 len;
+	int res;
+
+	FN_ENTER;
+
+	/* FIXME: no check whether this exceeds the array yet.
+	 * We should probably remember the number of entries... */
+	if (type < 0x1000)
+		len = adev->ie_len[type];
+	else
+		len = adev->ie_len_dot11[type - 0x1000];
+
+	log(L_CTL, "acx: " FUNC "(type:%s,len:%u)\n", typestr, len);
+
+	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
+	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
+	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
+	if (unlikely(OK != res)) {
+#if ACX_DEBUG
+		printk("acx: %s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       typestr);
+#else
+		printk("acx: %s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		       type);
+#endif
+		/* dump_stack() is already done in issue_cmd() */
+	}
+
+	FN_EXIT1(res);
+	return res;
+}
+
+// OW TODO Helper for acx_s_cmd_join_bssid below
+/* Looks scary, eh?
+** Actually, each one compiled into one AND and one SHIFT,
+** 31 bytes in x86 asm (more if uints are replaced by u16/u8) */
+static inline unsigned int acx_rate111to5bits(unsigned int rate)
+{
+	return (rate & 0x7)
+	    | ((rate & RATE111_11) / (RATE111_11 / JOINBSS_RATES_11))
+	    | ((rate & RATE111_22) / (RATE111_22 / JOINBSS_RATES_22));
+}
+
+/*
+ * acx_cmd_join_bssid
+ *
+ * Common code for both acx100 and acx111.
+ */
+/* NB: does NOT match RATE100_nn but matches ACX[111]_SCAN_RATE_n */
+void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
+{
+        acx_joinbss_t tmp;
+        int dtim_interval;
+        int i;
+
+        if (mac_is_zero(bssid))
+                return;
+
+        FN_ENTER;
+
+        dtim_interval = (ACX_MODE_0_ADHOC == adev->mode) ?
+                        1 : adev->dtim_interval;
+
+        memset(&tmp, 0, sizeof(tmp));
+
+        for (i = 0; i < ETH_ALEN; i++) {
+                tmp.bssid[i] = bssid[ETH_ALEN-1 - i];
+        }
+
+        tmp.beacon_interval = cpu_to_le16(adev->beacon_interval);
+
+        /* Basic rate set. Control frame responses (such as ACK or CTS frames)
+        ** are sent with one of these rates */
+        if (IS_ACX111(adev)) {
+                /* It was experimentally determined that rates_basic
+                ** can take 11g rates as well, not only rates
+                ** defined with JOINBSS_RATES_BASIC111_nnn.
+                ** Just use RATE111_nnn constants... */
+                tmp.u.acx111.dtim_interval = dtim_interval;
+                tmp.u.acx111.rates_basic = cpu_to_le16(adev->rate_basic);
+                log(L_ASSOC, "acx: rates_basic:%04X, rates_supported:%04X\n",
+                        adev->rate_basic, adev->rate_oper);
+        } else {
+                tmp.u.acx100.dtim_interval = dtim_interval;
+                tmp.u.acx100.rates_basic = acx_rate111to5bits(adev->rate_basic);
+                tmp.u.acx100.rates_supported = acx_rate111to5bits(adev->rate_oper);
+                log(L_ASSOC, "acx: rates_basic:%04X->%02X, "
+                        "rates_supported:%04X->%02X\n",
+                        adev->rate_basic, tmp.u.acx100.rates_basic,
+                        adev->rate_oper, tmp.u.acx100.rates_supported);
+        }
+
+        /* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
+        ** will be sent (rate/modulation/preamble) */
+        tmp.genfrm_txrate = bitpos2genframe_txrate[lowest_bit(adev->rate_basic)];
+        tmp.genfrm_mod_pre = 0; /* FIXME: was = adev->capab_short (which was always 0); */
+        /* we can use short pre *if* all peers can understand it */
+        /* FIXME #2: we need to correctly set PBCC/OFDM bits here too */
+
+        /* we switch fw to STA mode in MONITOR mode, it seems to be
+        ** the only mode where fw does not emit beacons by itself
+        ** but allows us to send anything (we really want to retain
+        ** ability to tx arbitrary frames in MONITOR mode)
+        */
+        tmp.macmode = (adev->mode != ACX_MODE_MONITOR ? adev->mode : ACX_MODE_2_STA);
+        tmp.channel = adev->channel;
+        tmp.essid_len = adev->essid_len;
+
+        memcpy(tmp.essid, adev->essid, tmp.essid_len);
+        acx_s_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
+
+        log(L_ASSOC|L_DEBUG, "acx: BSS_Type = %u\n", tmp.macmode);
+        acxlog_mac(L_ASSOC|L_DEBUG, "acx: JoinBSSID MAC:", adev->bssid, "\n");
+
+/*        acx_update_capabilities(adev); */
+        FN_EXIT0;
+}
+
+// Configure (Control path)
+// ------------------------
+void acx_s_set_defaults(acx_device_t * adev)
+{
+	struct ieee80211_conf *conf = &adev->ieee->conf;
+	unsigned long flags;
+
+	FN_ENTER;
+
+	// OW FIXME - review locking
+	acx_lock(adev, flags);
+
+	/* do it before getting settings, prevent bogus channel 0 warning */
+	adev->channel = 1;
+
+	/* query some settings from the card.
+	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
+	 * query is REQUIRED, otherwise the card won't work correctly! */
+	adev->get_mask =
+	    GETSET_ANTENNA | GETSET_SENSITIVITY | GETSET_STATION_ID |
+	    GETSET_REG_DOMAIN;
+	/* Only ACX100 supports ED and CCA */
+	if (IS_ACX100(adev))
+		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
+
+	// OW FIXME - review locking
+	acx_unlock(adev, flags);
+	acx_s_update_card_settings(adev);
+	acx_lock(adev, flags);
+
+	/* set our global interrupt mask */
+	if (IS_PCI(adev))
+		acxpci_set_interrupt_mask(adev);
+	else if (IS_MEM(adev))
+		acxmem_set_interrupt_mask(adev);
+
+	adev->led_power = 1;	/* LED is active on startup */
+	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
+	adev->brange_time_last_state_change = jiffies;
+
+	/* copy the MAC address we just got from the card
+	 * into our MAC address used during current 802.11 session */
+	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+	MAC_BCAST(adev->ap);
+
+	adev->essid_len =
+	    snprintf(adev->essid, sizeof(adev->essid), "STA%02X%02X%02X",
+		     adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
+	adev->essid_active = 1;
+
+	/* we have a nick field to waste, so why not abuse it
+	 * to announce the driver version? ;-) */
+	strncpy(adev->nick, "acx " ACX_RELEASE, IW_ESSID_MAX_SIZE);
+
+	if (IS_PCI(adev)) {	/* FIXME: this should be made to apply to USB, too! */
+		/* first regulatory domain entry in EEPROM == default reg. domain */
+		adev->reg_dom_id = adev->cfgopt_domains.list[0];
+	} else if(IS_MEM(adev)){
+		/* first regulatory domain entry in EEPROM == default reg. domain */
+		adev->reg_dom_id = adev->cfgopt_domains.list[0];
+	}
+
+	/* 0xffff would be better, but then we won't get a "scan complete"
+	 * interrupt, so our current infrastructure will fail: */
+	adev->scan_count = 1;
+	adev->scan_mode = ACX_SCAN_OPT_ACTIVE;
+	adev->scan_duration = 100;
+	adev->scan_probe_delay = 200;
+	/* reported to break scanning: adev->scan_probe_delay = adev->cfgopt_probe_delay; */
+	adev->scan_rate = ACX_SCAN_RATE_1;
+
+
+	adev->mode = ACX_MODE_2_STA;
+	adev->listen_interval = 100;
+	adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
+	adev->dtim_interval = DEFAULT_DTIM_INTERVAL;
+
+	adev->msdu_lifetime = DEFAULT_MSDU_LIFETIME;
+
+	adev->rts_threshold = DEFAULT_RTS_THRESHOLD;
+	adev->frag_threshold = 2346;
+
+	/* use standard default values for retry limits */
+	adev->short_retry = 7;	/* max. retries for (short) non-RTS packets */
+	adev->long_retry = 4;	/* max. retries for long (RTS) packets */
+
+	adev->preamble_mode = 2;	/* auto */
+	adev->fallback_threshold = 3;
+	adev->stepup_threshold = 10;
+	adev->rate_bcast = RATE111_1;
+	adev->rate_bcast100 = RATE100_1;
+	adev->rate_basic = RATE111_1 | RATE111_2;
+	adev->rate_auto = 1;
+	if (IS_ACX111(adev)) {
+		adev->rate_oper = RATE111_ALL;
+	} else {
+		adev->rate_oper = RATE111_ACX100_COMPAT;
+	}
+
+	/* Supported Rates element - the rates here are given in units of
+	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
+	acx_l_update_ratevector(adev);
+
+	/* set some more defaults */
+	if (IS_ACX111(adev)) {
+		/* 30mW (15dBm) is default, at least in my acx111 card: */
+		adev->tx_level_dbm = 15;
+		conf->power_level = adev->tx_level_dbm;
+		acx_unlock(adev, flags);
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		SET_BIT(adev->set_mask, GETSET_TXPOWER);
+		acx_lock(adev, flags);
+	} else {
+		/* don't use max. level, since it might be dangerous
+		 * (e.g. WRT54G people experience
+		 * excessive Tx power damage!) */
+		adev->tx_level_dbm = 18;
+		conf->power_level = adev->tx_level_dbm;
+		acx_unlock(adev, flags);
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		SET_BIT(adev->set_mask, GETSET_TXPOWER);
+		acx_lock(adev, flags);
+	}
+
+	/* adev->tx_level_auto = 1; */
+	if (IS_ACX111(adev)) {
+		/* start with sensitivity level 1 out of 3: */
+		adev->sensitivity = 1;
+	}
+
+/* #define ENABLE_POWER_SAVE */
+#ifdef ENABLE_POWER_SAVE
+	adev->ps_wakeup_cfg = PS_CFG_ENABLE | PS_CFG_WAKEUP_ALL_BEAC;
+	adev->ps_listen_interval = 1;
+	adev->ps_options =
+	    PS_OPT_ENA_ENHANCED_PS | PS_OPT_TX_PSPOLL | PS_OPT_STILL_RCV_BCASTS;
+	adev->ps_hangover_period = 30;
+	adev->ps_enhanced_transition_time = 0;
+#else
+	adev->ps_wakeup_cfg = 0;
+	adev->ps_listen_interval = 0;
+	adev->ps_options = 0;
+	adev->ps_hangover_period = 0;
+	adev->ps_enhanced_transition_time = 0;
+#endif
+
+	/* These settings will be set in fw on ifup */
+	adev->set_mask = 0 | GETSET_RETRY | SET_MSDU_LIFETIME
+	    /* configure card to do rate fallback when in auto rate mode */
+	    | SET_RATE_FALLBACK | SET_RXCONFIG | GETSET_TXPOWER
+	    /* better re-init the antenna value we got above */
+	    | GETSET_ANTENNA
+#if POWER_SAVE_80211
+	    | GETSET_POWER_80211
+#endif
+	    ;
+
+	acx_unlock(adev, flags);
+	acx_lock_unhold();	/* hold time 844814 CPU ticks @2GHz */
+
+	acx_s_initialize_rx_config(adev);
+
+	FN_EXIT0;
+}
+
+
+void acx_s_update_card_settings(acx_device_t *adev)
+{
+	unsigned long flags;
+	unsigned int start_scan = 0;
+	int i;
+
+	FN_ENTER;
+
+	log(L_DEBUG, "acx: %s: get_mask 0x%08X, set_mask 0x%08X\n",
+	    __func__, adev->get_mask, adev->set_mask);
+
+	/* Track dependencies between various settings */
+
+	if (adev->set_mask & (GETSET_MODE | GETSET_RESCAN | GETSET_WEP)) {
+		log(L_INIT, "acx: an important setting has been changed. "
+		    "The packet templates must also be updated\n");
+		SET_BIT(adev->set_mask, SET_TEMPLATES);
+	}
+
+	if (adev->set_mask & GETSET_CHANNEL) {
+		/* This will actually tune RX/TX to the channel */
+		SET_BIT(adev->set_mask, GETSET_RX | GETSET_TX);
+		switch (adev->mode) {
+		case ACX_MODE_0_ADHOC:
+		case ACX_MODE_3_AP:
+			/* Beacons contain channel# - update them */
+			SET_BIT(adev->set_mask, SET_TEMPLATES);
+		}
+
+		switch (adev->mode) {
+		case ACX_MODE_0_ADHOC:
+		case ACX_MODE_2_STA:
+			start_scan = 1;
+		}
+	}
+
+	/* Apply settings */
+
+	if (adev->get_mask & GETSET_STATION_ID) {
+		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+		const u8 *paddr;
+
+		acx_s_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+		paddr = &stationID[4];
+//		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
+		for (i = 0; i < ETH_ALEN; i++) {
+			/* we copy the MAC address (reversed in
+			 * the card) to the netdevice's MAC
+			 * address, and on ifup it will be
+			 * copied into iwadev->dev_addr */
+			adev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
+		}
+		SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
+		CLEAR_BIT(adev->get_mask, GETSET_STATION_ID);
+	}
+
+	if (adev->get_mask & GETSET_SENSITIVITY) {
+		if ((RADIO_11_RFMD == adev->radio_type)
+		    || (RADIO_0D_MAXIM_MAX2820 == adev->radio_type)
+		    || (RADIO_15_RALINK == adev->radio_type)) {
+			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
+		} else {
+			log(L_INIT, "acx: don't know how to get sensitivity "
+			    "for radio type 0x%02X\n", adev->radio_type);
+			adev->sensitivity = 0;
+		}
+		log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
+
+		CLEAR_BIT(adev->get_mask, GETSET_SENSITIVITY);
+	}
+
+	if (adev->get_mask & GETSET_ANTENNA) {
+		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+
+		memset(antenna, 0, sizeof(antenna));
+		acx_s_interrogate(adev, antenna,
+				  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
+		adev->antenna = antenna[4];
+		log(L_INIT, "acx: got antenna value 0x%02X\n", adev->antenna);
+		CLEAR_BIT(adev->get_mask, GETSET_ANTENNA);
+	}
+
+	if (adev->get_mask & GETSET_ED_THRESH) {
+		if (IS_ACX100(adev)) {
+			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+
+			memset(ed_threshold, 0, sizeof(ed_threshold));
+			acx_s_interrogate(adev, ed_threshold,
+					  ACX100_IE_DOT11_ED_THRESHOLD);
+			adev->ed_threshold = ed_threshold[4];
+		} else {
+			log(L_INIT, "acx: acx111 doesn't support ED\n");
+			adev->ed_threshold = 0;
+		}
+		log(L_INIT, "acx: got Energy Detect (ED) threshold %u\n",
+		    adev->ed_threshold);
+		CLEAR_BIT(adev->get_mask, GETSET_ED_THRESH);
+	}
+
+	if (adev->get_mask & GETSET_CCA) {
+		if (IS_ACX100(adev)) {
+			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+
+			memset(cca, 0, sizeof(adev->cca));
+			acx_s_interrogate(adev, cca,
+					  ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+			adev->cca = cca[4];
+		} else {
+			log(L_INIT, "acx: acx111 doesn't support CCA\n");
+			adev->cca = 0;
+		}
+		log(L_INIT, "acx: got Channel Clear Assessment (CCA) value %u\n",
+		    adev->cca);
+		CLEAR_BIT(adev->get_mask, GETSET_CCA);
+	}
+
+	if (adev->get_mask & GETSET_REG_DOMAIN) {
+		acx_ie_generic_t dom;
+
+		acx_s_interrogate(adev, &dom,
+				  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
+		adev->reg_dom_id = dom.m.bytes[0];
+		acx_s_set_sane_reg_domain(adev, 0);
+		log(L_INIT, "acx: got regulatory domain 0x%02X\n", adev->reg_dom_id);
+		CLEAR_BIT(adev->get_mask, GETSET_REG_DOMAIN);
+	}
+
+	if (adev->set_mask & GETSET_STATION_ID) {
+		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+		u8 *paddr;
+
+		paddr = &stationID[4];
+		MAC_COPY(adev->dev_addr, adev->ieee->wiphy->perm_addr);
+		for (i = 0; i < ETH_ALEN; i++) {
+			/* copy the MAC address we obtained when we noticed
+			 * that the ethernet iface's MAC changed
+			 * to the card (reversed in
+			 * the card!) */
+			paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
+		}
+		acx_s_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+		CLEAR_BIT(adev->set_mask, GETSET_STATION_ID);
+	}
+
+	if (adev->set_mask & SET_STA_LIST) {
+		CLEAR_BIT(adev->set_mask, SET_STA_LIST);
+	}
+	if (adev->set_mask & SET_RATE_FALLBACK) {
+		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
+
+		/* configure to not do fallbacks when not in auto rate mode */
+		rate[4] =
+		    (adev->
+		     rate_auto) ? /* adev->txrate_fallback_retries */ 1 : 0;
+		log(L_INIT, "acx: updating Tx fallback to %u retries\n", rate[4]);
+		acx_s_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
+		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
+	}
+	if (adev->set_mask & GETSET_TXPOWER) {
+		log(L_INIT, "acx: updating the transmit power: %u dBm\n",
+		    adev->tx_level_dbm);
+		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
+	}
+
+	if (adev->set_mask & GETSET_SENSITIVITY) {
+		log(L_INIT, "acx: updating sensitivity value: %u\n",
+		    adev->sensitivity);
+		switch (adev->radio_type) {
+		case RADIO_0D_MAXIM_MAX2820:
+		case RADIO_11_RFMD:
+		case RADIO_15_RALINK:
+			acx_s_write_phy_reg(adev, 0x30, adev->sensitivity);
+			break;
+		case RADIO_16_RADIA_RC2422:
+		case RADIO_17_UNKNOWN:
+		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
+			acx111_s_sens_radio_16_17(adev);
+			break;
+		default:
+			log(L_INIT, "acx: don't know how to modify the sensitivity "
+			    "for radio type 0x%02X\n", adev->radio_type);
+		}
+		CLEAR_BIT(adev->set_mask, GETSET_SENSITIVITY);
+	}
+
+	if (adev->set_mask & GETSET_ANTENNA) {
+		/* antenna */
+		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+
+		memset(antenna, 0, sizeof(antenna));
+		antenna[4] = adev->antenna;
+		log(L_INIT, "acx: updating antenna value: 0x%02X\n", adev->antenna);
+		acx_s_configure(adev, &antenna,
+				ACX1xx_IE_DOT11_CURRENT_ANTENNA);
+		CLEAR_BIT(adev->set_mask, GETSET_ANTENNA);
+	}
+
+	if (adev->set_mask & GETSET_ED_THRESH) {
+		/* ed_threshold */
+		log(L_INIT, "acx: pdating the Energy Detect (ED) threshold: %u\n",
+		    adev->ed_threshold);
+		if (IS_ACX100(adev)) {
+			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+
+			memset(ed_threshold, 0, sizeof(ed_threshold));
+			ed_threshold[4] = adev->ed_threshold;
+			acx_s_configure(adev, &ed_threshold,
+					ACX100_IE_DOT11_ED_THRESHOLD);
+		} else
+			log(L_INIT, "acx: acx111 doesn't support ED\n");
+		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
+	}
+
+	if (adev->set_mask & GETSET_CCA) {
+		/* CCA value */
+		log(L_INIT, "acx: updating the Channel Clear Assessment "
+		    "(CCA) value: 0x%02X\n", adev->cca);
+		if (IS_ACX100(adev)) {
+			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+
+			memset(cca, 0, sizeof(cca));
+			cca[4] = adev->cca;
+			acx_s_configure(adev, &cca,
+					ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+		} else
+			log(L_INIT, "acx: acx111 doesn't support CCA\n");
+		CLEAR_BIT(adev->set_mask, GETSET_CCA);
+	}
+
+	if (adev->set_mask & GETSET_LED_POWER) {
+		/* Enable Tx */
+		log(L_INIT, "acx: updating the power LED status: %u\n", adev->led_power);
+
+		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
+		if (IS_PCI(adev))
+			acxpci_l_power_led(adev, adev->led_power);
+		else if (IS_MEM(adev))
+			acxmem_l_power_led(adev, adev->led_power);
+
+		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
+		acx_unlock(adev, flags);
+	}
+
+	if (adev->set_mask & GETSET_POWER_80211) {
+#if POWER_SAVE_80211
+		acx_s_update_80211_powersave_mode(adev);
+#endif
+		CLEAR_BIT(adev->set_mask, GETSET_POWER_80211);
+	}
+
+	if (adev->set_mask & GETSET_CHANNEL) {
+		/* channel */
+		log(L_INIT, "acx: updating channel to: %u\n", adev->channel);
+		CLEAR_BIT(adev->set_mask, GETSET_CHANNEL);
+	}
+
+	if (adev->set_mask & GETSET_TX) {
+		/* set Tx */
+		log(L_DEBUG, "acx: updating TX: %s\n",
+		    adev->tx_disabled ? "disable" : "enable");
+		if (adev->tx_disabled)
+			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+		else {
+			acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
+					&adev->channel, 1);
+
+			/* OW 20091231:
+			 * For the acx111 encryption needs to be turned off
+			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
+			 * Maybe redundant with GETSET_MODE below.
+			 */
+			if (IS_ACX111(adev)) {
+				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+			}
+
+			acx_wake_queue(adev->ieee, NULL);
+		}
+		CLEAR_BIT(adev->set_mask, GETSET_TX);
+	}
+
+	if (adev->set_mask & GETSET_RX) {
+		// OW TODO Add Disable Rx
+		/* Enable Rx */
+		log(L_DEBUG, "acx: updating: enable Rx on channel: %u\n",
+		    adev->channel);
+		acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
+		CLEAR_BIT(adev->set_mask, GETSET_RX);
+	}
+
+	if (adev->set_mask & GETSET_RETRY) {
+		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
+		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
+
+		log(L_INIT,
+		    "acx: updating the short retry limit: %u, long retry limit: %u\n",
+		    adev->short_retry, adev->long_retry);
+		short_retry[0x4] = adev->short_retry;
+		long_retry[0x4] = adev->long_retry;
+		acx_s_configure(adev, &short_retry,
+				ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT);
+		acx_s_configure(adev, &long_retry,
+				ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
+		CLEAR_BIT(adev->set_mask, GETSET_RETRY);
+	}
+
+	if (adev->set_mask & SET_MSDU_LIFETIME) {
+		u8 xmt_msdu_lifetime[4 +
+				     ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
+
+		log(L_INIT, "acx: updating the tx MSDU lifetime: %u\n",
+		    adev->msdu_lifetime);
+		*(u32 *) & xmt_msdu_lifetime[4] =
+		    cpu_to_le32((u32) adev->msdu_lifetime);
+		acx_s_configure(adev, &xmt_msdu_lifetime,
+				ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
+		CLEAR_BIT(adev->set_mask, SET_MSDU_LIFETIME);
+	}
+
+	if (adev->set_mask & GETSET_REG_DOMAIN) {
+		log(L_INIT, "acx: updating the regulatory domain: 0x%02X\n",
+		    adev->reg_dom_id);
+		acx_s_set_sane_reg_domain(adev, 1);
+		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
+	}
+
+	if (adev->set_mask & GETSET_MODE ) {
+
+		switch (adev->mode) {
+		case ACX_MODE_3_AP:
+			adev->aid = 0;
+			//acx111_s_feature_off(adev, 0,
+			//	    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+			MAC_COPY(adev->bssid, adev->dev_addr);
+			acx_s_cmd_join_bssid(adev, adev->dev_addr);
+			break;
+		case ACX_MODE_MONITOR:
+			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
+			break;
+		case ACX_MODE_0_ADHOC:
+		case ACX_MODE_2_STA:
+
+			/* OW 20091231:
+			 * For the acx111 encryption needs to be turned off
+			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
+			 */
+			if (IS_ACX111(adev)) {
+				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+			}
+			break;
+		case ACX_MODE_OFF:
+			/* disable both Tx and Rx to shut radio down properly */
+			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+
+		default:
+			break;
+		}
+		CLEAR_BIT(adev->set_mask, GETSET_MODE);
+	}
+
+	if (adev->set_mask & SET_TEMPLATES) {
+		switch (adev->mode)
+		{
+			case ACX_MODE_3_AP:
+				acx_s_set_tim_template(adev);
+				break;
+			default:
+				break;
+		}
+		if (adev->beacon_cache)
+		{
+			acx_s_set_beacon_template(adev, adev->beacon_cache);
+			dev_kfree_skb(adev->beacon_cache);
+			adev->beacon_cache = NULL;
+		}
+		CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
+	}
+
+	if (adev->set_mask & SET_RXCONFIG) {
+		acx_s_initialize_rx_config(adev);
+		CLEAR_BIT(adev->set_mask, SET_RXCONFIG);
+	}
+
+	if (adev->set_mask & GETSET_RESCAN) {
+		/*		switch (adev->mode) {
+		 case ACX_MODE_0_ADHOC:
+		 case ACX_MODE_2_STA:
+		 start_scan = 1;
+		 break;
+		 }
+		 */
+		CLEAR_BIT(adev->set_mask, GETSET_RESCAN);
+	}
+
+	if (adev->set_mask & GETSET_WEP) {
+		/* encode */
+
+		ie_dot11WEPDefaultKeyID_t dkey;
+#ifdef DEBUG_WEP
+		struct {
+			u16 type;
+			u16 len;
+			u8 val;
+		} ACX_PACKED keyindic;
+#endif
+		log(L_INIT, "acx: updating WEP key settings\n");
+
+		acx_s_set_wepkey(adev);
+		if (adev->wep_enabled) {
+			dkey.KeyID = adev->wep_current_index;
+			log(L_INIT, "acx: setting WEP key %u as default\n",
+			    dkey.KeyID);
+			acx_s_configure(adev, &dkey,
+					ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
+#ifdef DEBUG_WEP
+			keyindic.val = 3;
+			acx_s_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
+#endif
+		}
+
+//		start_scan = 1;
+		CLEAR_BIT(adev->set_mask, GETSET_WEP);
+	}
+
+	if (adev->set_mask & SET_WEP_OPTIONS) {
+		acx100_ie_wep_options_t options;
+
+		if (IS_ACX111(adev)) {
+			log(L_DEBUG,
+			    "acx: setting WEP Options for acx111 is not supported\n");
+		} else {
+			log(L_INIT, "acx: setting WEP Options\n");
+
+			/* let's choose maximum setting: 4 default keys,
+			 * plus 10 other keys: */
+			options.NumKeys =
+			    cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
+			/* don't decrypt default key only,
+			 * don't override decryption: */
+			options.WEPOption = 0;
+			if (adev->mode == ACX_MODE_3_AP) {
+				/* don't decrypt default key only,
+				 * override decryption mechanism: */
+				options.WEPOption = 2;
+			}
+
+			acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
+		}
+		CLEAR_BIT(adev->set_mask, SET_WEP_OPTIONS);
+	}
+
+
+	/* debug, rate, and nick don't need any handling */
+	/* what about sniffing mode?? */
+
+/*	log(L_INIT, "acx: get_mask 0x%08X, set_mask 0x%08X - after update\n",
+	    adev->get_mask, adev->set_mask);
+*/
+/* end: */
+	FN_EXIT0;
+}
+
+
+void acx_s_start(acx_device_t * adev)
+{
+	FN_ENTER;
+
+	/*
+	 * Ok, now we do everything that can possibly be done with ioctl
+	 * calls to make sure that when it was called before the card
+	 * was up we get the changes asked for
+	 */
+
+	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP
+		| GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
+		GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
+		GETSET_TX | GETSET_RX | GETSET_STATION_ID);
+
+	log(L_INIT, "acx: updating initial settings on iface activation\n");
+	acx_s_update_card_settings(adev);
+
+	FN_EXIT0;
+}
+
+
+int acx_net_reset(struct ieee80211_hw *ieee)
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	FN_ENTER;
+	if (IS_PCI(adev))
+		acxpci_s_reset_dev(adev);
+	if (IS_MEM(adev))
+		acxmem_s_reset_dev(adev);
+	else
+		TODO();
+
+	FN_EXIT0;
+	return 0;
+}
+
+int acx_s_init_mac(acx_device_t * adev)
+{
+	int result = NOT_OK;
+
+	FN_ENTER;
+
+	if (IS_ACX111(adev)) {
+		adev->ie_len = acx111_ie_len;
+		adev->ie_len_dot11 = acx111_ie_len_dot11;
+	} else {
+		adev->ie_len = acx100_ie_len;
+		adev->ie_len_dot11 = acx100_ie_len_dot11;
+	}
+
+	if (IS_PCI(adev)) {
+		adev->memblocksize = 256;	/* 256 is default */
+		/* try to load radio for both ACX100 and ACX111, since both
+		 * chips have at least some firmware versions making use of an
+		 * external radio module */
+		acxpci_s_upload_radio(adev);
+	}
+	else if (IS_MEM(adev)){
+		adev->memblocksize = 256; /* 256 is default */
+		/* try to load radio for both ACX100 and ACX111, since both
+		 * chips have at least some firmware versions making use of an
+		 * external radio module */
+		acxmem_s_upload_radio(adev);
+	}
+	else {
+		adev->memblocksize = 128;
+	}
+
+	if (IS_ACX111(adev)) {
+		/* for ACX111, the order is different from ACX100
+		   1. init packet templates
+		   2. create station context and create dma regions
+		   3. init wep default keys
+		 */
+		if (OK != acx_s_init_packet_templates(adev))
+			goto fail;
+		if (OK != acx111_s_create_dma_regions(adev)) {
+			printk("acx: %s: acx111_create_dma_regions FAILED\n",
+			       wiphy_name(adev->ieee->wiphy));
+			goto fail;
+		}
+	} else {
+		if (OK != acx100_s_init_wep(adev))
+			goto fail;
+		if (OK != acx_s_init_packet_templates(adev))
+			goto fail;
+		if (OK != acx100_s_create_dma_regions(adev)) {
+			printk("acx: %s: acx100_create_dma_regions FAILED\n",
+			       wiphy_name(adev->ieee->wiphy));
+			goto fail;
+		}
+	}
+
+	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+	result = OK;
+
+      fail:
+	if (result)
+		printk("acx: init_mac() FAILED\n");
+	FN_EXIT1(result);
+	return result;
+}
+
+
+void acx_free_modes(acx_device_t * adev)
+{
+//        kfree(adev->modes);
+//        adev->modes = NULL;
+}
+
+int acx_setup_modes(acx_device_t *adev)
+{
+	struct ieee80211_hw *hw = adev->ieee;
+
+	FN_ENTER;
+
+	if (IS_ACX111(adev) || IS_ACX100(adev)) {
+/*
+		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
+        	err = acx_setup_modes_gphy(adev);
+*/
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
+	}
+	// OX FIXME This is probably not very logic ?!
+	else
+	{
+/*
+		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
+		err = acx_setup_modes_bphy(adev);
+*/
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
+	}
+/*	if (err && adev->modes)
+		kfree(adev->modes);*/
+
+	FN_EXIT0;
+	return 0;
+
+}
+
+static void acx_s_select_opmode(acx_device_t *adev)
+{
+	int changed = 0;
+	FN_ENTER;
+
+	if (adev->interface.operating) {
+		switch (adev->interface.type) {
+		case NL80211_IFTYPE_AP:
+			if (adev->mode != ACX_MODE_3_AP) {
+				adev->mode = ACX_MODE_3_AP;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_ADHOC:
+			if (adev->mode != ACX_MODE_0_ADHOC) {
+				adev->mode = ACX_MODE_0_ADHOC;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_STATION:
+			if (adev->mode != ACX_MODE_2_STA) {
+				adev->mode = ACX_MODE_2_STA;
+				changed = 1;
+			}
+			break;
+		case NL80211_IFTYPE_WDS:
+		default:
+			if (adev->mode != ACX_MODE_OFF) {
+				adev->mode = ACX_MODE_OFF;
+				changed = 1;
+			}
+			break;
+		}
+	} else {
+		if (adev->interface.type == NL80211_IFTYPE_MONITOR) {
+			if (adev->mode != ACX_MODE_MONITOR) {
+				adev->mode = ACX_MODE_MONITOR;
+				changed = 1;
+			}
+		} else {
+			if (adev->mode != ACX_MODE_OFF) {
+				adev->mode = ACX_MODE_OFF;
+				changed = 1;
+			}
+		}
+	}
+
+	if (changed) {
+		SET_BIT(adev->set_mask, GETSET_MODE);
+		acx_s_update_card_settings(adev);
+		//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	}
+
+	FN_EXIT0;
+}
+
+int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
+{
+	int result;
+
+	FN_ENTER;
+
+	adev->rx_status.freq = freq;
+	adev->rx_status.band = IEEE80211_BAND_2GHZ;
+
+	adev->channel = channel;
+	/* hmm, the following code part is strange, but this is how
+	 * it was being done before... */
+	log(L_IOCTL, "acx: Changing to channel %d\n", channel);
+	SET_BIT(adev->set_mask, GETSET_CHANNEL);
+	result = -EINPROGRESS;	/* need to call commit handler */
+
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * FIXME: this should be solved in a general way for all radio types
+ * by decoding the radio firmware module,
+ * since it probably has some standard structure describing how to
+ * set the power level of the radio module which it controls.
+ * Or maybe not, since the radio module probably has a function interface
+ * instead which then manages Tx level programming :-\
+ */
+static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
+{
+	struct acx111_ie_tx_level tx_level;
+
+	/* my acx111 card has two power levels in its configoptions (== EEPROM):
+	 * 1 (30mW) [15dBm]
+	 * 2 (10mW) [10dBm]
+	 * For now, just assume all other acx111 cards have the same.
+	 * FIXME: Ideally we would query it here, but we first need a
+	 * standard way to query individual configoptions easily.
+	 * Well, now we have proper cfgopt txpower variables, but this still
+	 * hasn't been done yet, since it also requires dBm <-> mW conversion here... */
+	if (level_dbm <= 12) {
+		tx_level.level = 2;	/* 10 dBm */
+		adev->tx_level_dbm = 10;
+	} else {
+		tx_level.level = 1;	/* 15 dBm */
+		adev->tx_level_dbm = 15;
+	}
+	if (level_dbm != adev->tx_level_dbm)
+		log(L_INIT, "acx: only predefined transmission "
+		    "power levels are supported at this time: "
+		    "adjusted %d dBm to %d dBm\n", level_dbm,
+		    adev->tx_level_dbm);
+
+	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
+}
+
+static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
+{
+	if (IS_ACX111(adev)) {
+		return acx111_s_set_tx_level(adev, level_dbm);
+	}
+	if (IS_PCI(adev)) {
+		return acx100pci_s_set_tx_level(adev, level_dbm);
+	}
+	if (IS_MEM(adev)) {
+		return acx100mem_s_set_tx_level(adev, level_dbm);
+	}
+
+	return OK;
+}
+
+int acx_e_conf_tx(struct ieee80211_hw *hw,
+		u16 queue, const struct ieee80211_tx_queue_params *params)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	FN_ENTER;
+	acx_sem_lock(adev);
+    // TODO
+  	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
+}
+
+// Other (Control Path)
+// --------------------
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
+static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
+
+static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
+static int acx_s_set_tim_template(acx_device_t *adev);
+static int acx_s_init_packet_templates(acx_device_t *adev);
+
+static u8 acx_plcp_get_bitrate_cck(u8 plcp);
+static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
+
+void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
+static void acx111_s_sens_radio_16_17(acx_device_t *adev);
+
+void acx_l_update_ratevector(acx_device_t *adev);
+u8 acx_rate111to100(u16 r);
+
+
 
 // OW Cleanup ======================================================
 
@@ -1066,38 +2604,6 @@ const char *acx_cmd_status_str(unsigned int state)
 
 /***********************************************************************
 */
-#if ACX_DEBUG
-void acx_dump_bytes(const void *data, int num)
-{
-	const u8 *ptr = (const u8 *)data;
-
-	FN_ENTER;
-
-	if (num <= 0) {
-		printk("\n");
-		return;
-	}
-
-	while (num >= 16) {
-		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
-		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
-		       ptr[0], ptr[1], ptr[2], ptr[3],
-		       ptr[4], ptr[5], ptr[6], ptr[7],
-		       ptr[8], ptr[9], ptr[10], ptr[11],
-		       ptr[12], ptr[13], ptr[14], ptr[15]);
-		num -= 16;
-		ptr += 16;
-	}
-	if (num > 0) {
-		while (--num > 0)
-			printk("%02X ", *ptr++);
-		printk("%02X\n", *ptr);
-	}
-
-	FN_EXIT0;
-
-}
-#endif
 
 
 
@@ -1176,244 +2682,6 @@ u8 acx_signal_determine_quality(u8 signal, u8 noise)
 ** Interrogate/configure commands
 */
 
-/* FIXME: the lengths given here probably aren't always correct.
- * They should be gradually replaced by proper "sizeof(acx1XX_ie_XXXX)-4",
- * unless the firmware actually expects a different length than the struct length */
-static const u16 acx100_ie_len[] = {
-	0,
-	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx100_ie_powersave_t) - 4,	/* is that 6 or 8??? */
-	ACX1xx_IE_QUEUE_CONFIG_LEN,
-	ACX100_IE_BLOCK_SIZE_LEN,
-	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_RATE_FALLBACK_LEN,
-	ACX100_IE_WEP_OPTIONS_LEN,
-	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
-	0,
-	ACX1xx_IE_ASSOC_ID_LEN,
-	0,
-	ACX111_IE_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_FWREV_LEN,
-	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
-	ACX1xx_IE_MEDIUM_USAGE_LEN,
-	ACX1xx_IE_RXCONFIG_LEN,
-	0,
-	0,
-	sizeof(fw_stats_t) - 4,
-	0,
-	ACX1xx_IE_FEATURE_CONFIG_LEN,
-	ACX111_IE_KEY_CHOOSE_LEN,
-	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
-	ACX1FF_IE_WONE_CONFIG_LEN,
-	0,
-	ACX1FF_IE_TID_CONFIG_LEN,
-	0,
-	0,
-	0,
-	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
-	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
-	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
-	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
-	0,
-	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
-	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
-	ACX1FF_IE_CCA_THRESHOLD_LEN,
-	ACX1FF_IE_EVENT_MASK_LEN,
-	ACX1FF_IE_DTIM_PERIOD_LEN,
-	0,
-	ACX1FF_IE_ACI_CONFIG_SET_LEN,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	ACX1FF_IE_EEPROM_VER_LEN,
-};
-
-static const u16 acx100_ie_len_dot11[] = {
-	0,
-	ACX1xx_IE_DOT11_STATION_ID_LEN,
-	0,
-	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
-	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
-	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
-	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
-	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
-	0,
-	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
-	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
-	0,
-	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
-	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
-	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
-	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
-	0,
-	0,
-	0,
-};
-
-static const u16 acx111_ie_len[] = {
-	0,
-	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx111_ie_powersave_t) - 4,
-	ACX1xx_IE_QUEUE_CONFIG_LEN,
-	ACX100_IE_BLOCK_SIZE_LEN,
-	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_RATE_FALLBACK_LEN,
-	ACX100_IE_WEP_OPTIONS_LEN,
-	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
-	0,
-	ACX1xx_IE_ASSOC_ID_LEN,
-	0,
-	ACX111_IE_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_FWREV_LEN,
-	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
-	ACX1xx_IE_MEDIUM_USAGE_LEN,
-	ACX1xx_IE_RXCONFIG_LEN,
-	0,
-	0,
-	sizeof(fw_stats_t) - 4,
-	0,
-	ACX1xx_IE_FEATURE_CONFIG_LEN,
-	ACX111_IE_KEY_CHOOSE_LEN,
-	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
-	ACX1FF_IE_WONE_CONFIG_LEN,
-	0,
-	ACX1FF_IE_TID_CONFIG_LEN,
-	0,
-	0,
-	0,
-	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
-	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
-	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
-	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
-	0,
-	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
-	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
-	ACX1FF_IE_CCA_THRESHOLD_LEN,
-	ACX1FF_IE_EVENT_MASK_LEN,
-	ACX1FF_IE_DTIM_PERIOD_LEN,
-	0,
-	ACX1FF_IE_ACI_CONFIG_SET_LEN,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	ACX1FF_IE_EEPROM_VER_LEN,
-};
-
-static const u16 acx111_ie_len_dot11[] = {
-	0,
-	ACX1xx_IE_DOT11_STATION_ID_LEN,
-	0,
-	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
-	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
-	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
-	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
-	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
-	0,
-	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
-	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
-	0,
-	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
-	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
-	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
-	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
-	0,
-	0,
-	0,
-};
-
-
-#if !ACX_DEBUG
-int acx_s_configure(acx_device_t * adev, void *pdr, int type)
-{
-#else
-int
-acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
-		      const char *typestr)
-{
-#endif
-	u16 len;
-	int res;
-	char msgbuf[255];
-
-	FN_ENTER;
-
-	if (type < 0x1000)
-		len = adev->ie_len[type];
-	else
-		len = adev->ie_len_dot11[type - 0x1000];
-
-	if (unlikely(!len)) {
-		log(L_DEBUG, "acx: %s: zero-length type %s?!\n",
-				__func__, typestr);
-	}
-
-	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
-	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
-
-	sprintf(msgbuf, "acx: %s: %s: type=0x%04X, typestr=%s, len=%u",
-			__func__, wiphy_name(adev->ieee->wiphy),
-			type, typestr, len);
-	if (likely(res == OK))
-		log(L_CTL,  "%s: OK\n", msgbuf);
-	 else
-		log(L_ANY,  "%s: FAILED\n", msgbuf);
-
-	FN_EXIT0;
-	return res;
-}
-
-// OW TODO Replace the FUNC #defs by __func__ in logging
-#undef FUNC
-#define FUNC "interrogate"
-#if !ACX_DEBUG
-int acx_s_interrogate(acx_device_t * adev, void *pdr, int type)
-{
-#else
-int
-acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
-			const char *typestr)
-{
-#endif
-	u16 len;
-	int res;
-
-	FN_ENTER;
-
-	/* FIXME: no check whether this exceeds the array yet.
-	 * We should probably remember the number of entries... */
-	if (type < 0x1000)
-		len = adev->ie_len[type];
-	else
-		len = adev->ie_len_dot11[type - 0x1000];
-
-	log(L_CTL, "acx: " FUNC "(type:%s,len:%u)\n", typestr, len);
-
-	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
-	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
-	if (unlikely(OK != res)) {
-#if ACX_DEBUG
-		printk("acx: %s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
-		       typestr);
-#else
-		printk("acx: %s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
-		       type);
-#endif
-		/* dump_stack() is already done in issue_cmd() */
-	}
-
-	FN_EXIT1(res);
-	return res;
-}
 
 #if CMD_DISCOVERY
 void great_inquisitor(acx_device_t * adev)
@@ -2119,101 +3387,8 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 }
 #endif /* CONFIG_PROC_FS */
 
-/****
-** Gathered From rt2x00 and bcm43xx_mac80211 projects
-**/
-void acx_free_modes(acx_device_t * adev)
-{
 
-//        kfree(adev->modes);
-//        adev->modes = NULL;
-}
 
-/*
-#define RATETAB_ENT(_rate, _rateid, _flags) \
-	{							\
-		.rate	= (_rate),				\
-		.val	= (_rateid),				\
-		.val2   = (_rateid),				\
-		.flags  = (_flags),				\
-	}
-*/
-
-static struct ieee80211_rate __acx_rates[] = {
-	{ .bitrate = 10, .hw_value = 0, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 20, .hw_value = 1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 55, .hw_value = 2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 110, .hw_value = 3, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 60, .hw_value = 4, },
-	{ .bitrate = 90, .hw_value = 5, },
-	{ .bitrate = 120, .hw_value = 6, },
-	{ .bitrate = 180, .hw_value = 7, },
-	{ .bitrate = 240, .hw_value = 8, },
-	{ .bitrate = 360, .hw_value = 9, },
-	{ .bitrate = 480, .hw_value = 10, },
-	{ .bitrate = 540, .hw_value = 11, },
-};
-
-static struct ieee80211_channel channels[] = {
-	{ .center_freq = 2412, .hw_value = 1, },
-	{ .center_freq = 2417, .hw_value = 2, },
-	{ .center_freq = 2422, .hw_value = 3, },
-	{ .center_freq = 2427, .hw_value = 4, },
-	{ .center_freq = 2432, .hw_value = 5, },
-	{ .center_freq = 2437, .hw_value = 6, },
-	{ .center_freq = 2442, .hw_value = 7, },
-	{ .center_freq = 2447, .hw_value = 8, },
-	{ .center_freq = 2452, .hw_value = 9, },
-	{ .center_freq = 2457, .hw_value = 10, },
-	{ .center_freq = 2462, .hw_value = 11, },
-	{ .center_freq = 2467, .hw_value = 12, },
-	{ .center_freq = 2472, .hw_value = 13, },
-	{ .center_freq = 2484, .hw_value = 14, },
-};
-
-static struct ieee80211_supported_band g_band_2GHz = {
-	.channels = channels,
-	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = __acx_rates,
-	.n_bitrates = 12,
-};
-
-static struct ieee80211_supported_band b_band_2GHz = {
-	.channels = channels,
-	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = __acx_rates,
-	.n_bitrates = 4,
-};
-
-int acx_setup_modes(acx_device_t *adev)
-{
-	struct ieee80211_hw *hw = adev->ieee;
-
-	FN_ENTER;
-
-	if (IS_ACX111(adev) || IS_ACX100(adev)) {
-/*
-		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
-        	err = acx_setup_modes_gphy(adev);
-*/
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
-	}
-	// OX FIXME This is probably not very logic ?!
-	else
-	{
-/*
-		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
-		err = acx_setup_modes_bphy(adev);
-*/
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
-	}
-/*	if (err && adev->modes)
-		kfree(adev->modes);*/
-
-	FN_EXIT0;
-	return 0;
-
-}
 
 /***********************************************************************
 ** acx_fill_beacon_or_proberesp_template
@@ -2252,268 +3427,11 @@ acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
         return result;
 }
 
-/***********************************************************************
-** acx_cmd_join_bssid
-**
-** Common code for both acx100 and acx111.
-*/
-/* NB: does NOT match RATE100_nn but matches ACX[111]_SCAN_RATE_n */
-static const u8 bitpos2genframe_txrate[] = {
-	10,			/*  0.  1 Mbit/s */
-	20,			/*  1.  2 Mbit/s */
-	55,			/*  2.  5.5 Mbit/s */
-	0x0B,			/*  3.  6 Mbit/s */
-	0x0F,			/*  4.  9 Mbit/s */
-	110,			/*  5. 11 Mbit/s */
-	0x0A,			/*  6. 12 Mbit/s */
-	0x0E,			/*  7. 18 Mbit/s */
-	220,			/*  8. 22 Mbit/s */
-	0x09,			/*  9. 24 Mbit/s */
-	0x0D,			/* 10. 36 Mbit/s */
-	0x08,			/* 11. 48 Mbit/s */
-	0x0C,			/* 12. 54 Mbit/s */
-	10,			/* 13.  1 Mbit/s, should never happen */
-	10,			/* 14.  1 Mbit/s, should never happen */
-	10,			/* 15.  1 Mbit/s, should never happen */
-};
-
-/* Looks scary, eh?
-** Actually, each one compiled into one AND and one SHIFT,
-** 31 bytes in x86 asm (more if uints are replaced by u16/u8) */
-static inline unsigned int rate111to5bits(unsigned int rate)
-{
-	return (rate & 0x7)
-	    | ((rate & RATE111_11) / (RATE111_11 / JOINBSS_RATES_11))
-	    | ((rate & RATE111_22) / (RATE111_22 / JOINBSS_RATES_22));
-}
 
 
-void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
-{
-        acx_joinbss_t tmp;
-        int dtim_interval;
-        int i;
-
-        if (mac_is_zero(bssid))
-                return;
-
-        FN_ENTER;
-
-        dtim_interval = (ACX_MODE_0_ADHOC == adev->mode) ?
-                        1 : adev->dtim_interval;
-
-        memset(&tmp, 0, sizeof(tmp));
-
-        for (i = 0; i < ETH_ALEN; i++) {
-                tmp.bssid[i] = bssid[ETH_ALEN-1 - i];
-        }
-
-        tmp.beacon_interval = cpu_to_le16(adev->beacon_interval);
-
-        /* Basic rate set. Control frame responses (such as ACK or CTS frames)
-        ** are sent with one of these rates */
-        if (IS_ACX111(adev)) {
-                /* It was experimentally determined that rates_basic
-                ** can take 11g rates as well, not only rates
-                ** defined with JOINBSS_RATES_BASIC111_nnn.
-                ** Just use RATE111_nnn constants... */
-                tmp.u.acx111.dtim_interval = dtim_interval;
-                tmp.u.acx111.rates_basic = cpu_to_le16(adev->rate_basic);
-                log(L_ASSOC, "acx: rates_basic:%04X, rates_supported:%04X\n",
-                        adev->rate_basic, adev->rate_oper);
-        } else {
-                tmp.u.acx100.dtim_interval = dtim_interval;
-                tmp.u.acx100.rates_basic = rate111to5bits(adev->rate_basic);
-                tmp.u.acx100.rates_supported = rate111to5bits(adev->rate_oper);
-                log(L_ASSOC, "acx: rates_basic:%04X->%02X, "
-                        "rates_supported:%04X->%02X\n",
-                        adev->rate_basic, tmp.u.acx100.rates_basic,
-                        adev->rate_oper, tmp.u.acx100.rates_supported);
-        }
-
-        /* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
-        ** will be sent (rate/modulation/preamble) */
-        tmp.genfrm_txrate = bitpos2genframe_txrate[lowest_bit(adev->rate_basic)];
-        tmp.genfrm_mod_pre = 0; /* FIXME: was = adev->capab_short (which was always 0); */
-        /* we can use short pre *if* all peers can understand it */
-        /* FIXME #2: we need to correctly set PBCC/OFDM bits here too */
-
-        /* we switch fw to STA mode in MONITOR mode, it seems to be
-        ** the only mode where fw does not emit beacons by itself
-        ** but allows us to send anything (we really want to retain
-        ** ability to tx arbitrary frames in MONITOR mode)
-        */
-        tmp.macmode = (adev->mode != ACX_MODE_MONITOR ? adev->mode : ACX_MODE_2_STA);
-        tmp.channel = adev->channel;
-        tmp.essid_len = adev->essid_len;
-
-        memcpy(tmp.essid, adev->essid, tmp.essid_len);
-        acx_s_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
-
-        log(L_ASSOC|L_DEBUG, "acx: BSS_Type = %u\n", tmp.macmode);
-        acxlog_mac(L_ASSOC|L_DEBUG, "acx: JoinBSSID MAC:", adev->bssid, "\n");
-
-/*        acx_update_capabilities(adev); */
-        FN_EXIT0;
-}
-
-/***********************************************************************
-** acxpci_i_set_multicast_list
-** **
-** FIXME: most likely needs refinement
-*/
-
-void acx_i_op_configure_filter(struct ieee80211_hw *hw,
-		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
-
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-
-	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
-			| FIF_CONTROL | FIF_OTHER_BSS);
-	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
-			| FIF_CONTROL | FIF_OTHER_BSS);
-	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-	 return; */
-
-	if (*total_flags) {
-		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-		/* let kernel know in case *we* needed to set promiscuous */
-	} else {
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-	}
-
-	/* cannot update card settings directly here, atomic context */
-	// TODO This is one point to check for better cmd and interrupt handling
-	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-
-	acx_unlock(adev, flags);
-
-	//acx_s_update_card_settings(adev);
-
-	FN_EXIT0;
-}
-
-/***********************************************************************
-** acx111 feature config
-**
-** Obvious
-*/
-static int
-acx111_s_get_feature_config(acx_device_t * adev,
-			    u32 * feature_options, u32 * data_flow_options)
-{
-	struct acx111_ie_feature_config feat;
-
-	FN_ENTER;
-
-	if (!IS_ACX111(adev)) {
-		return NOT_OK;
-	}
-
-	memset(&feat, 0, sizeof(feat));
-
-	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
-		FN_EXIT1(NOT_OK);
-		return NOT_OK;
-	}
-	log(L_DEBUG,
-	    "acx: got Feature option:0x%X, DataFlow option: 0x%X\n",
-	    feat.feature_options, feat.data_flow_options);
-
-	if (feature_options)
-		*feature_options = le32_to_cpu(feat.feature_options);
-	if (data_flow_options)
-		*data_flow_options = le32_to_cpu(feat.data_flow_options);
-
-	FN_EXIT0;
-	return OK;
-}
 
 
-static int
-acx111_s_set_feature_config(acx_device_t * adev,
-			    u32 feature_options, u32 data_flow_options,
-			    unsigned int mode
-			    /* 0 == remove, 1 == add, 2 == set */ )
-{
-	struct acx111_ie_feature_config feat;
 
-	int i;
-
-	FN_ENTER;
-
-	if (!IS_ACX111(adev)) {
-		FN_EXIT1(NOT_OK);
-		return NOT_OK;
-	}
-
-	if ((mode < 0) || (mode > 2)) {
-		FN_EXIT1(NOT_OK);
-		return NOT_OK;
-	}
-
-	if (mode != 2)	{
-		/* need to modify old data */
-		i = acx111_s_get_feature_config(adev, &feat.feature_options,
-				&feat.data_flow_options);
-		if (i != OK)
-		{
-			printk("%s: acx111_s_get_feature_config: NOT_OK\n", __FUNCTION__);
-			return i;
-		}
-	}
-	else {
-		/* need to set a completely new value */
-		feat.feature_options = 0;
-		feat.data_flow_options = 0;
-	}
-
-	if (mode == 0) {	/* remove */
-		CLEAR_BIT(feat.feature_options, cpu_to_le32(feature_options));
-		CLEAR_BIT(feat.data_flow_options,
-			  cpu_to_le32(data_flow_options));
-	} else {		/* add or set */
-		SET_BIT(feat.feature_options, cpu_to_le32(feature_options));
-		SET_BIT(feat.data_flow_options, cpu_to_le32(data_flow_options));
-	}
-
-	log(L_DEBUG,
-	    "acx: old: feature 0x%08X dataflow 0x%08X. mode: %u\n"
-	    "acx: new: feature 0x%08X dataflow 0x%08X\n",
-	    feature_options, data_flow_options, mode,
-	    le32_to_cpu(feat.feature_options),
-	    le32_to_cpu(feat.data_flow_options));
-
-	if (OK != acx_s_configure(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
-		FN_EXIT1(NOT_OK);
-		return NOT_OK;
-	}
-
-	FN_EXIT0;
-	return OK;
-}
-
-static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d)
-{
-	return acx111_s_set_feature_config(adev, f, d, 0);
-}
-static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d)
-{
-	return acx111_s_set_feature_config(adev, f, d, 1);
-}
-static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
-{
-	return acx111_s_set_feature_config(adev, f, d, 2);
-}
 
 
 
@@ -2603,225 +3521,8 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 }
 
 
-/***********************************************************************
-** FIXME: this should be solved in a general way for all radio types
-** by decoding the radio firmware module,
-** since it probably has some standard structure describing how to
-** set the power level of the radio module which it controls.
-** Or maybe not, since the radio module probably has a function interface
-** instead which then manages Tx level programming :-\
-**
-** Obvious
-*/
-static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
-{
-	struct acx111_ie_tx_level tx_level;
-
-	/* my acx111 card has two power levels in its configoptions (== EEPROM):
-	 * 1 (30mW) [15dBm]
-	 * 2 (10mW) [10dBm]
-	 * For now, just assume all other acx111 cards have the same.
-	 * FIXME: Ideally we would query it here, but we first need a
-	 * standard way to query individual configoptions easily.
-	 * Well, now we have proper cfgopt txpower variables, but this still
-	 * hasn't been done yet, since it also requires dBm <-> mW conversion here... */
-	if (level_dbm <= 12) {
-		tx_level.level = 2;	/* 10 dBm */
-		adev->tx_level_dbm = 10;
-	} else {
-		tx_level.level = 1;	/* 15 dBm */
-		adev->tx_level_dbm = 15;
-	}
-	if (level_dbm != adev->tx_level_dbm)
-		log(L_INIT, "acx: only predefined transmission "
-		    "power levels are supported at this time: "
-		    "adjusted %d dBm to %d dBm\n", level_dbm,
-		    adev->tx_level_dbm);
-
-	return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
-}
-
-static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
-{
-	if (IS_ACX111(adev)) {
-		return acx111_s_set_tx_level(adev, level_dbm);
-	}
-	if (IS_PCI(adev)) {
-		return acx100pci_s_set_tx_level(adev, level_dbm);
-	}
-	if (IS_MEM(adev)) {
-		return acx100mem_s_set_tx_level(adev, level_dbm);
-	}
-
-	return OK;
-}
 
 
-/***********************************************************************
-** acx_s_set_defaults
-*/
-void acx_s_set_defaults(acx_device_t * adev)
-{
-	struct ieee80211_conf *conf = &adev->ieee->conf;
-	unsigned long flags;
-
-	FN_ENTER;
-
-	// OW FIXME - review locking
-	acx_lock(adev, flags);
-
-	/* do it before getting settings, prevent bogus channel 0 warning */
-	adev->channel = 1;
-
-	/* query some settings from the card.
-	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
-	 * query is REQUIRED, otherwise the card won't work correctly! */
-	adev->get_mask =
-	    GETSET_ANTENNA | GETSET_SENSITIVITY | GETSET_STATION_ID |
-	    GETSET_REG_DOMAIN;
-	/* Only ACX100 supports ED and CCA */
-	if (IS_ACX100(adev))
-		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
-
-	// OW FIXME - review locking
-	acx_unlock(adev, flags);
-	acx_s_update_card_settings(adev);
-	acx_lock(adev, flags);
-
-	/* set our global interrupt mask */
-	if (IS_PCI(adev))
-		acxpci_set_interrupt_mask(adev);
-	else if (IS_MEM(adev))
-		acxmem_set_interrupt_mask(adev);
-
-	adev->led_power = 1;	/* LED is active on startup */
-	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
-	adev->brange_time_last_state_change = jiffies;
-
-	/* copy the MAC address we just got from the card
-	 * into our MAC address used during current 802.11 session */
-	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
-	MAC_BCAST(adev->ap);
-
-	adev->essid_len =
-	    snprintf(adev->essid, sizeof(adev->essid), "STA%02X%02X%02X",
-		     adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
-	adev->essid_active = 1;
-
-	/* we have a nick field to waste, so why not abuse it
-	 * to announce the driver version? ;-) */
-	strncpy(adev->nick, "acx " ACX_RELEASE, IW_ESSID_MAX_SIZE);
-
-	if (IS_PCI(adev)) {	/* FIXME: this should be made to apply to USB, too! */
-		/* first regulatory domain entry in EEPROM == default reg. domain */
-		adev->reg_dom_id = adev->cfgopt_domains.list[0];
-	} else if(IS_MEM(adev)){
-		/* first regulatory domain entry in EEPROM == default reg. domain */
-		adev->reg_dom_id = adev->cfgopt_domains.list[0];
-	}
-
-	/* 0xffff would be better, but then we won't get a "scan complete"
-	 * interrupt, so our current infrastructure will fail: */
-	adev->scan_count = 1;
-	adev->scan_mode = ACX_SCAN_OPT_ACTIVE;
-	adev->scan_duration = 100;
-	adev->scan_probe_delay = 200;
-	/* reported to break scanning: adev->scan_probe_delay = adev->cfgopt_probe_delay; */
-	adev->scan_rate = ACX_SCAN_RATE_1;
-
-
-	adev->mode = ACX_MODE_2_STA;
-	adev->listen_interval = 100;
-	adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
-	adev->dtim_interval = DEFAULT_DTIM_INTERVAL;
-
-	adev->msdu_lifetime = DEFAULT_MSDU_LIFETIME;
-
-	adev->rts_threshold = DEFAULT_RTS_THRESHOLD;
-	adev->frag_threshold = 2346;
-
-	/* use standard default values for retry limits */
-	adev->short_retry = 7;	/* max. retries for (short) non-RTS packets */
-	adev->long_retry = 4;	/* max. retries for long (RTS) packets */
-
-	adev->preamble_mode = 2;	/* auto */
-	adev->fallback_threshold = 3;
-	adev->stepup_threshold = 10;
-	adev->rate_bcast = RATE111_1;
-	adev->rate_bcast100 = RATE100_1;
-	adev->rate_basic = RATE111_1 | RATE111_2;
-	adev->rate_auto = 1;
-	if (IS_ACX111(adev)) {
-		adev->rate_oper = RATE111_ALL;
-	} else {
-		adev->rate_oper = RATE111_ACX100_COMPAT;
-	}
-
-	/* Supported Rates element - the rates here are given in units of
-	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
-	acx_l_update_ratevector(adev);
-
-	/* set some more defaults */
-	if (IS_ACX111(adev)) {
-		/* 30mW (15dBm) is default, at least in my acx111 card: */
-		adev->tx_level_dbm = 15;
-		conf->power_level = adev->tx_level_dbm;
-		acx_unlock(adev, flags);
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
-		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-		acx_lock(adev, flags);
-	} else {
-		/* don't use max. level, since it might be dangerous
-		 * (e.g. WRT54G people experience
-		 * excessive Tx power damage!) */
-		adev->tx_level_dbm = 18;
-		conf->power_level = adev->tx_level_dbm;
-		acx_unlock(adev, flags);
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
-		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-		acx_lock(adev, flags);
-	}
-
-	/* adev->tx_level_auto = 1; */
-	if (IS_ACX111(adev)) {
-		/* start with sensitivity level 1 out of 3: */
-		adev->sensitivity = 1;
-	}
-
-/* #define ENABLE_POWER_SAVE */
-#ifdef ENABLE_POWER_SAVE
-	adev->ps_wakeup_cfg = PS_CFG_ENABLE | PS_CFG_WAKEUP_ALL_BEAC;
-	adev->ps_listen_interval = 1;
-	adev->ps_options =
-	    PS_OPT_ENA_ENHANCED_PS | PS_OPT_TX_PSPOLL | PS_OPT_STILL_RCV_BCASTS;
-	adev->ps_hangover_period = 30;
-	adev->ps_enhanced_transition_time = 0;
-#else
-	adev->ps_wakeup_cfg = 0;
-	adev->ps_listen_interval = 0;
-	adev->ps_options = 0;
-	adev->ps_hangover_period = 0;
-	adev->ps_enhanced_transition_time = 0;
-#endif
-
-	/* These settings will be set in fw on ifup */
-	adev->set_mask = 0 | GETSET_RETRY | SET_MSDU_LIFETIME
-	    /* configure card to do rate fallback when in auto rate mode */
-	    | SET_RATE_FALLBACK | SET_RXCONFIG | GETSET_TXPOWER
-	    /* better re-init the antenna value we got above */
-	    | GETSET_ANTENNA
-#if POWER_SAVE_80211
-	    | GETSET_POWER_80211
-#endif
-	    ;
-
-	acx_unlock(adev, flags);
-	acx_lock_unhold();	/* hold time 844814 CPU ticks @2GHz */
-
-	acx_s_initialize_rx_config(adev);
-
-	FN_EXIT0;
-}
 
 
 /***********************************************************************
@@ -3612,75 +4313,6 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 
 
 
-/***********************************************************************
-** acx_s_init_mac
-*/
-int acx_s_init_mac(acx_device_t * adev)
-{
-	int result = NOT_OK;
-
-	FN_ENTER;
-
-	if (IS_ACX111(adev)) {
-		adev->ie_len = acx111_ie_len;
-		adev->ie_len_dot11 = acx111_ie_len_dot11;
-	} else {
-		adev->ie_len = acx100_ie_len;
-		adev->ie_len_dot11 = acx100_ie_len_dot11;
-	}
-
-	if (IS_PCI(adev)) {
-		adev->memblocksize = 256;	/* 256 is default */
-		/* try to load radio for both ACX100 and ACX111, since both
-		 * chips have at least some firmware versions making use of an
-		 * external radio module */
-		acxpci_s_upload_radio(adev);
-	}
-	else if (IS_MEM(adev)){
-		adev->memblocksize = 256; /* 256 is default */
-		/* try to load radio for both ACX100 and ACX111, since both
-		 * chips have at least some firmware versions making use of an
-		 * external radio module */
-		acxmem_s_upload_radio(adev);
-	}
-	else {
-		adev->memblocksize = 128;
-	}
-
-	if (IS_ACX111(adev)) {
-		/* for ACX111, the order is different from ACX100
-		   1. init packet templates
-		   2. create station context and create dma regions
-		   3. init wep default keys
-		 */
-		if (OK != acx_s_init_packet_templates(adev))
-			goto fail;
-		if (OK != acx111_s_create_dma_regions(adev)) {
-			printk("acx: %s: acx111_create_dma_regions FAILED\n",
-			       wiphy_name(adev->ieee->wiphy));
-			goto fail;
-		}
-	} else {
-		if (OK != acx100_s_init_wep(adev))
-			goto fail;
-		if (OK != acx_s_init_packet_templates(adev))
-			goto fail;
-		if (OK != acx100_s_create_dma_regions(adev)) {
-			printk("acx: %s: acx100_create_dma_regions FAILED\n",
-			       wiphy_name(adev->ieee->wiphy));
-			goto fail;
-		}
-	}
-
-	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
-	result = OK;
-
-      fail:
-	if (result)
-		printk("acx: init_mac() FAILED\n");
-	FN_EXIT1(result);
-	return result;
-}
 
 
 
@@ -3751,7 +4383,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 ** Called by ioctl commit handler, acx_start, acx_set_defaults,
 ** acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
 */
-void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
+static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
 	unsigned mask;
 
@@ -3817,468 +4449,6 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 }
 
 
-void acx_s_update_card_settings(acx_device_t *adev)
-{
-	unsigned long flags;
-	unsigned int start_scan = 0;
-	int i;
-
-	FN_ENTER;
-
-	log(L_DEBUG, "acx: %s: get_mask 0x%08X, set_mask 0x%08X\n",
-	    __func__, adev->get_mask, adev->set_mask);
-
-	/* Track dependencies between various settings */
-
-	if (adev->set_mask & (GETSET_MODE | GETSET_RESCAN | GETSET_WEP)) {
-		log(L_INIT, "acx: an important setting has been changed. "
-		    "The packet templates must also be updated\n");
-		SET_BIT(adev->set_mask, SET_TEMPLATES);
-	}
-
-	if (adev->set_mask & GETSET_CHANNEL) {
-		/* This will actually tune RX/TX to the channel */
-		SET_BIT(adev->set_mask, GETSET_RX | GETSET_TX);
-		switch (adev->mode) {
-		case ACX_MODE_0_ADHOC:
-		case ACX_MODE_3_AP:
-			/* Beacons contain channel# - update them */
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
-		}
-
-		switch (adev->mode) {
-		case ACX_MODE_0_ADHOC:
-		case ACX_MODE_2_STA:
-			start_scan = 1;
-		}
-	}
-
-	/* Apply settings */
-
-	if (adev->get_mask & GETSET_STATION_ID) {
-		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
-		const u8 *paddr;
-
-		acx_s_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
-		paddr = &stationID[4];
-//		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
-		for (i = 0; i < ETH_ALEN; i++) {
-			/* we copy the MAC address (reversed in
-			 * the card) to the netdevice's MAC
-			 * address, and on ifup it will be
-			 * copied into iwadev->dev_addr */
-			adev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
-		}
-		SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
-		CLEAR_BIT(adev->get_mask, GETSET_STATION_ID);
-	}
-
-	if (adev->get_mask & GETSET_SENSITIVITY) {
-		if ((RADIO_11_RFMD == adev->radio_type)
-		    || (RADIO_0D_MAXIM_MAX2820 == adev->radio_type)
-		    || (RADIO_15_RALINK == adev->radio_type)) {
-			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
-		} else {
-			log(L_INIT, "acx: don't know how to get sensitivity "
-			    "for radio type 0x%02X\n", adev->radio_type);
-			adev->sensitivity = 0;
-		}
-		log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
-
-		CLEAR_BIT(adev->get_mask, GETSET_SENSITIVITY);
-	}
-
-	if (adev->get_mask & GETSET_ANTENNA) {
-		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
-
-		memset(antenna, 0, sizeof(antenna));
-		acx_s_interrogate(adev, antenna,
-				  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
-		adev->antenna = antenna[4];
-		log(L_INIT, "acx: got antenna value 0x%02X\n", adev->antenna);
-		CLEAR_BIT(adev->get_mask, GETSET_ANTENNA);
-	}
-
-	if (adev->get_mask & GETSET_ED_THRESH) {
-		if (IS_ACX100(adev)) {
-			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
-
-			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_s_interrogate(adev, ed_threshold,
-					  ACX100_IE_DOT11_ED_THRESHOLD);
-			adev->ed_threshold = ed_threshold[4];
-		} else {
-			log(L_INIT, "acx: acx111 doesn't support ED\n");
-			adev->ed_threshold = 0;
-		}
-		log(L_INIT, "acx: got Energy Detect (ED) threshold %u\n",
-		    adev->ed_threshold);
-		CLEAR_BIT(adev->get_mask, GETSET_ED_THRESH);
-	}
-
-	if (adev->get_mask & GETSET_CCA) {
-		if (IS_ACX100(adev)) {
-			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
-
-			memset(cca, 0, sizeof(adev->cca));
-			acx_s_interrogate(adev, cca,
-					  ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
-			adev->cca = cca[4];
-		} else {
-			log(L_INIT, "acx: acx111 doesn't support CCA\n");
-			adev->cca = 0;
-		}
-		log(L_INIT, "acx: got Channel Clear Assessment (CCA) value %u\n",
-		    adev->cca);
-		CLEAR_BIT(adev->get_mask, GETSET_CCA);
-	}
-
-	if (adev->get_mask & GETSET_REG_DOMAIN) {
-		acx_ie_generic_t dom;
-
-		acx_s_interrogate(adev, &dom,
-				  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
-		adev->reg_dom_id = dom.m.bytes[0];
-		acx_s_set_sane_reg_domain(adev, 0);
-		log(L_INIT, "acx: got regulatory domain 0x%02X\n", adev->reg_dom_id);
-		CLEAR_BIT(adev->get_mask, GETSET_REG_DOMAIN);
-	}
-
-	if (adev->set_mask & GETSET_STATION_ID) {
-		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
-		u8 *paddr;
-
-		paddr = &stationID[4];
-		MAC_COPY(adev->dev_addr, adev->ieee->wiphy->perm_addr);
-		for (i = 0; i < ETH_ALEN; i++) {
-			/* copy the MAC address we obtained when we noticed
-			 * that the ethernet iface's MAC changed
-			 * to the card (reversed in
-			 * the card!) */
-			paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
-		}
-		acx_s_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
-		CLEAR_BIT(adev->set_mask, GETSET_STATION_ID);
-	}
-
-	if (adev->set_mask & SET_STA_LIST) {
-		CLEAR_BIT(adev->set_mask, SET_STA_LIST);
-	}
-	if (adev->set_mask & SET_RATE_FALLBACK) {
-		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
-
-		/* configure to not do fallbacks when not in auto rate mode */
-		rate[4] =
-		    (adev->
-		     rate_auto) ? /* adev->txrate_fallback_retries */ 1 : 0;
-		log(L_INIT, "acx: updating Tx fallback to %u retries\n", rate[4]);
-		acx_s_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
-		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
-	}
-	if (adev->set_mask & GETSET_TXPOWER) {
-		log(L_INIT, "acx: updating the transmit power: %u dBm\n",
-		    adev->tx_level_dbm);
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
-		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
-	}
-
-	if (adev->set_mask & GETSET_SENSITIVITY) {
-		log(L_INIT, "acx: updating sensitivity value: %u\n",
-		    adev->sensitivity);
-		switch (adev->radio_type) {
-		case RADIO_0D_MAXIM_MAX2820:
-		case RADIO_11_RFMD:
-		case RADIO_15_RALINK:
-			acx_s_write_phy_reg(adev, 0x30, adev->sensitivity);
-			break;
-		case RADIO_16_RADIA_RC2422:
-		case RADIO_17_UNKNOWN:
-		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
-			acx111_s_sens_radio_16_17(adev);
-			break;
-		default:
-			log(L_INIT, "acx: don't know how to modify the sensitivity "
-			    "for radio type 0x%02X\n", adev->radio_type);
-		}
-		CLEAR_BIT(adev->set_mask, GETSET_SENSITIVITY);
-	}
-
-	if (adev->set_mask & GETSET_ANTENNA) {
-		/* antenna */
-		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
-
-		memset(antenna, 0, sizeof(antenna));
-		antenna[4] = adev->antenna;
-		log(L_INIT, "acx: updating antenna value: 0x%02X\n", adev->antenna);
-		acx_s_configure(adev, &antenna,
-				ACX1xx_IE_DOT11_CURRENT_ANTENNA);
-		CLEAR_BIT(adev->set_mask, GETSET_ANTENNA);
-	}
-
-	if (adev->set_mask & GETSET_ED_THRESH) {
-		/* ed_threshold */
-		log(L_INIT, "acx: pdating the Energy Detect (ED) threshold: %u\n",
-		    adev->ed_threshold);
-		if (IS_ACX100(adev)) {
-			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
-
-			memset(ed_threshold, 0, sizeof(ed_threshold));
-			ed_threshold[4] = adev->ed_threshold;
-			acx_s_configure(adev, &ed_threshold,
-					ACX100_IE_DOT11_ED_THRESHOLD);
-		} else
-			log(L_INIT, "acx: acx111 doesn't support ED\n");
-		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
-	}
-
-	if (adev->set_mask & GETSET_CCA) {
-		/* CCA value */
-		log(L_INIT, "acx: updating the Channel Clear Assessment "
-		    "(CCA) value: 0x%02X\n", adev->cca);
-		if (IS_ACX100(adev)) {
-			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
-
-			memset(cca, 0, sizeof(cca));
-			cca[4] = adev->cca;
-			acx_s_configure(adev, &cca,
-					ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
-		} else
-			log(L_INIT, "acx: acx111 doesn't support CCA\n");
-		CLEAR_BIT(adev->set_mask, GETSET_CCA);
-	}
-
-	if (adev->set_mask & GETSET_LED_POWER) {
-		/* Enable Tx */
-		log(L_INIT, "acx: updating the power LED status: %u\n", adev->led_power);
-
-		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
-		if (IS_PCI(adev))
-			acxpci_l_power_led(adev, adev->led_power);
-		else if (IS_MEM(adev))
-			acxmem_l_power_led(adev, adev->led_power);
-
-		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
-		acx_unlock(adev, flags);
-	}
-
-	if (adev->set_mask & GETSET_POWER_80211) {
-#if POWER_SAVE_80211
-		acx_s_update_80211_powersave_mode(adev);
-#endif
-		CLEAR_BIT(adev->set_mask, GETSET_POWER_80211);
-	}
-
-	if (adev->set_mask & GETSET_CHANNEL) {
-		/* channel */
-		log(L_INIT, "acx: updating channel to: %u\n", adev->channel);
-		CLEAR_BIT(adev->set_mask, GETSET_CHANNEL);
-	}
-
-	if (adev->set_mask & GETSET_TX) {
-		/* set Tx */
-		log(L_DEBUG, "acx: updating TX: %s\n",
-		    adev->tx_disabled ? "disable" : "enable");
-		if (adev->tx_disabled)
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-		else {
-			acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
-					&adev->channel, 1);
-
-			/* OW 20091231:
-			 * For the acx111 encryption needs to be turned off
-			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
-			 * Maybe redundant with GETSET_MODE below.
-			 */
-			if (IS_ACX111(adev)) {
-				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-			}
-
-			acx_wake_queue(adev->ieee, NULL);
-		}
-		CLEAR_BIT(adev->set_mask, GETSET_TX);
-	}
-
-	if (adev->set_mask & GETSET_RX) {
-		// OW TODO Add Disable Rx
-		/* Enable Rx */
-		log(L_DEBUG, "acx: updating: enable Rx on channel: %u\n",
-		    adev->channel);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
-		CLEAR_BIT(adev->set_mask, GETSET_RX);
-	}
-
-	if (adev->set_mask & GETSET_RETRY) {
-		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
-		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
-
-		log(L_INIT,
-		    "acx: updating the short retry limit: %u, long retry limit: %u\n",
-		    adev->short_retry, adev->long_retry);
-		short_retry[0x4] = adev->short_retry;
-		long_retry[0x4] = adev->long_retry;
-		acx_s_configure(adev, &short_retry,
-				ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT);
-		acx_s_configure(adev, &long_retry,
-				ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
-		CLEAR_BIT(adev->set_mask, GETSET_RETRY);
-	}
-
-	if (adev->set_mask & SET_MSDU_LIFETIME) {
-		u8 xmt_msdu_lifetime[4 +
-				     ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
-
-		log(L_INIT, "acx: updating the tx MSDU lifetime: %u\n",
-		    adev->msdu_lifetime);
-		*(u32 *) & xmt_msdu_lifetime[4] =
-		    cpu_to_le32((u32) adev->msdu_lifetime);
-		acx_s_configure(adev, &xmt_msdu_lifetime,
-				ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
-		CLEAR_BIT(adev->set_mask, SET_MSDU_LIFETIME);
-	}
-
-	if (adev->set_mask & GETSET_REG_DOMAIN) {
-		log(L_INIT, "acx: updating the regulatory domain: 0x%02X\n",
-		    adev->reg_dom_id);
-		acx_s_set_sane_reg_domain(adev, 1);
-		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
-	}
-
-	if (adev->set_mask & GETSET_MODE ) {
-
-		switch (adev->mode) {
-		case ACX_MODE_3_AP:
-			adev->aid = 0;
-			//acx111_s_feature_off(adev, 0,
-			//	    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-			MAC_COPY(adev->bssid, adev->dev_addr);
-			acx_s_cmd_join_bssid(adev, adev->dev_addr);
-			break;
-		case ACX_MODE_MONITOR:
-			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
-			break;
-		case ACX_MODE_0_ADHOC:
-		case ACX_MODE_2_STA:
-
-			/* OW 20091231:
-			 * For the acx111 encryption needs to be turned off
-			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
-			 */
-			if (IS_ACX111(adev)) {
-				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-			}
-			break;
-		case ACX_MODE_OFF:
-			/* disable both Tx and Rx to shut radio down properly */
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-
-		default:
-			break;
-		}
-		CLEAR_BIT(adev->set_mask, GETSET_MODE);
-	}
-
-	if (adev->set_mask & SET_TEMPLATES) {
-		switch (adev->mode)
-		{
-			case ACX_MODE_3_AP:
-				acx_s_set_tim_template(adev);
-				break;
-			default:
-				break;
-		}
-		if (adev->beacon_cache)
-		{
-			acx_s_set_beacon_template(adev, adev->beacon_cache);
-			dev_kfree_skb(adev->beacon_cache);
-			adev->beacon_cache = NULL;
-		}
-		CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
-	}
-
-	if (adev->set_mask & SET_RXCONFIG) {
-		acx_s_initialize_rx_config(adev);
-		CLEAR_BIT(adev->set_mask, SET_RXCONFIG);
-	}
-
-	if (adev->set_mask & GETSET_RESCAN) {
-		/*		switch (adev->mode) {
-		 case ACX_MODE_0_ADHOC:
-		 case ACX_MODE_2_STA:
-		 start_scan = 1;
-		 break;
-		 }
-		 */
-		CLEAR_BIT(adev->set_mask, GETSET_RESCAN);
-	}
-
-	if (adev->set_mask & GETSET_WEP) {
-		/* encode */
-
-		ie_dot11WEPDefaultKeyID_t dkey;
-#ifdef DEBUG_WEP
-		struct {
-			u16 type;
-			u16 len;
-			u8 val;
-		} ACX_PACKED keyindic;
-#endif
-		log(L_INIT, "acx: updating WEP key settings\n");
-
-		acx_s_set_wepkey(adev);
-		if (adev->wep_enabled) {
-			dkey.KeyID = adev->wep_current_index;
-			log(L_INIT, "acx: setting WEP key %u as default\n",
-			    dkey.KeyID);
-			acx_s_configure(adev, &dkey,
-					ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
-#ifdef DEBUG_WEP
-			keyindic.val = 3;
-			acx_s_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
-#endif
-		}
-
-//		start_scan = 1;
-		CLEAR_BIT(adev->set_mask, GETSET_WEP);
-	}
-
-	if (adev->set_mask & SET_WEP_OPTIONS) {
-		acx100_ie_wep_options_t options;
-
-		if (IS_ACX111(adev)) {
-			log(L_DEBUG,
-			    "acx: setting WEP Options for acx111 is not supported\n");
-		} else {
-			log(L_INIT, "acx: setting WEP Options\n");
-
-			/* let's choose maximum setting: 4 default keys,
-			 * plus 10 other keys: */
-			options.NumKeys =
-			    cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
-			/* don't decrypt default key only,
-			 * don't override decryption: */
-			options.WEPOption = 0;
-			if (adev->mode == ACX_MODE_3_AP) {
-				/* don't decrypt default key only,
-				 * override decryption mechanism: */
-				options.WEPOption = 2;
-			}
-
-			acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
-		}
-		CLEAR_BIT(adev->set_mask, SET_WEP_OPTIONS);
-	}
-
-
-	/* debug, rate, and nick don't need any handling */
-	/* what about sniffing mode?? */
-
-/*	log(L_INIT, "acx: get_mask 0x%08X, set_mask 0x%08X - after update\n",
-	    adev->get_mask, adev->set_mask);
-*/
-/* end: */
-	FN_EXIT0;
-}
 
 #if 1
 /*
@@ -4536,29 +4706,6 @@ void acx_init_task_scheduler(acx_device_t *adev) {
 }
 
 
-/***********************************************************************
-** acx_s_start
-*/
-void acx_s_start(acx_device_t * adev)
-{
-	FN_ENTER;
-
-	/*
-	 * Ok, now we do everything that can possibly be done with ioctl
-	 * calls to make sure that when it was called before the card
-	 * was up we get the changes asked for
-	 */
-
-	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP
-		| GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
-		GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
-		GETSET_TX | GETSET_RX | GETSET_STATION_ID);
-
-	log(L_INIT, "acx: updating initial settings on iface activation\n");
-	acx_s_update_card_settings(adev);
-
-	FN_EXIT0;
-}
 
 
 /***********************************************************************
@@ -4595,65 +4742,6 @@ void acx_update_capabilities(acx_device_t * adev)
 	adev->capabilities = cap;
 }
 */
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-static void acx_s_select_opmode(acx_device_t *adev)
-{
-	int changed = 0;
-	FN_ENTER;
-
-	if (adev->interface.operating) {
-		switch (adev->interface.type) {
-		case NL80211_IFTYPE_AP:
-			if (adev->mode != ACX_MODE_3_AP) {
-				adev->mode = ACX_MODE_3_AP;
-				changed = 1;
-			}
-			break;
-		case NL80211_IFTYPE_ADHOC:
-			if (adev->mode != ACX_MODE_0_ADHOC) {
-				adev->mode = ACX_MODE_0_ADHOC;
-				changed = 1;
-			}
-			break;
-		case NL80211_IFTYPE_STATION:
-			if (adev->mode != ACX_MODE_2_STA) {
-				adev->mode = ACX_MODE_2_STA;
-				changed = 1;
-			}
-			break;
-		case NL80211_IFTYPE_WDS:
-		default:
-			if (adev->mode != ACX_MODE_OFF) {
-				adev->mode = ACX_MODE_OFF;
-				changed = 1;
-			}
-			break;
-		}
-	} else {
-		if (adev->interface.type == NL80211_IFTYPE_MONITOR) {
-			if (adev->mode != ACX_MODE_MONITOR) {
-				adev->mode = ACX_MODE_MONITOR;
-				changed = 1;
-			}
-		} else {
-			if (adev->mode != ACX_MODE_OFF) {
-				adev->mode = ACX_MODE_OFF;
-				changed = 1;
-			}
-		}
-	}
-
-	if (changed) {
-		SET_BIT(adev->set_mask, GETSET_MODE);
-		acx_s_update_card_settings(adev);
-		//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	}
-
-	FN_EXIT0;
-}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_add_interface(struct ieee80211_hw *ieee,
@@ -4777,40 +4865,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 	FN_EXIT0;
 }
 
-int acx_net_reset(struct ieee80211_hw *ieee)
-{
-	acx_device_t *adev = ieee2adev(ieee);
-	FN_ENTER;
-	if (IS_PCI(adev))
-		acxpci_s_reset_dev(adev);
-	if (IS_MEM(adev))
-		acxmem_s_reset_dev(adev);
-	else
-		TODO();
 
-	FN_EXIT0;
-	return 0;
-}
-
-int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
-{
-	int result;
-
-	FN_ENTER;
-
-	adev->rx_status.freq = freq;
-	adev->rx_status.band = IEEE80211_BAND_2GHZ;
-
-	adev->channel = channel;
-	/* hmm, the following code part is strange, but this is how
-	 * it was being done before... */
-	log(L_IOCTL, "acx: Changing to channel %d\n", channel);
-	SET_BIT(adev->set_mask, GETSET_CHANNEL);
-	result = -EINPROGRESS;	/* need to call commit handler */
-
-	FN_EXIT1(result);
-	return result;
-}
 
 int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
@@ -4976,17 +5031,6 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 }
 #endif
 
-int acx_e_conf_tx(struct ieee80211_hw *hw,
-		u16 queue, const struct ieee80211_tx_queue_params *params)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
-	acx_sem_lock(adev);
-    // TODO
-  	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return 0;
-}
 
 // OW TODO Refactor to "acx_"keymac_write, even if not used currently
 // Or it could actually go out, since crypto and keys are handeled by mac80211
