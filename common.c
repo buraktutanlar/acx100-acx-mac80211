@@ -116,6 +116,22 @@ static void acx111_s_sens_radio_16_17(acx_device_t *adev);
 static void acx_l_update_ratevector(acx_device_t *adev);
 //static u8 acx_rate111to100(u16 r);
 
+// Proc, Debug
+// -----
+#ifdef CONFIG_PROC_FS
+static int acx_e_proc_show_diag(struct seq_file *file, void *v);
+static int acx_e_proc_show_acx(struct seq_file *file, void *v);
+static int acx_e_proc_show_eeprom(struct seq_file *file, void *v);
+static int acx_e_proc_show_phy(struct seq_file *file, void *v);
+static int acx_e_proc_show_debug(struct seq_file *file, void *v);
+static ssize_t acx_e_proc_write_debug(struct file *file, const char *buf, size_t count, loff_t *ppos);
+static int acx_e_proc_open(struct inode *inode, struct file *file);
+static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove);
+static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos);
+#endif
+
+
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 static void acx_s_initialize_rx_config(acx_device_t * adev);
@@ -136,7 +152,7 @@ static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
 
 /*
- * BOM Defines, Static data, etc.
+ * BOM Defines, static vars, etc.
  * ==================================================
  */
 #define ACX111_PERCENT(percent) ((percent)/5)
@@ -423,6 +439,37 @@ const u8 acx_bitpos2rate100[] = {
 	RATE100_2,		/* 14, should not happen */
 	RATE100_2,		/* 15, should not happen */
 };
+
+// Proc
+#ifdef CONFIG_PROC_FS
+
+static const char *const
+ proc_files[] = { "acx", "acx_diag", "acx_eeprom", "acx_phy", "acx_debug" };
+
+typedef int acx_proc_show_t(struct seq_file *file, void *v);
+typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
+
+static acx_proc_show_t *const
+ acx_proc_show_funcs[] = {
+	acx_e_proc_show_acx,
+	acx_e_proc_show_diag,
+	acx_e_proc_show_eeprom,
+	acx_e_proc_show_phy,
+	acx_e_proc_show_debug,
+};
+
+static acx_proc_write_t *const
+ acx_proc_write_funcs[] = {
+	NULL,
+	acx_e_proc_write_diag,
+	NULL,
+	NULL,
+	acx_e_proc_write_debug,
+};
+
+static struct file_operations acx_e_proc_ops[5] ;
+#endif
+// -----
 
 /*
  * BOM Locking
@@ -2933,133 +2980,11 @@ static u8 acx_rate111to100(u16 r)
 }
 */
 
-// BOM Cleanup ======================================================
-
-
-/***********************************************************************
-** Basically a mdelay/msleep with logging
-*/
-void acx_s_mwait(int ms)
-{
-	FN_ENTER;
-	msleep(ms);
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acx_cmd_status_str
-*/
-const char *acx_cmd_status_str(unsigned int state)
-{
-	static const char *const cmd_error_strings[] = {
-		"Idle",
-		"Success",
-		"Unknown Command",
-		"Invalid Information Element",
-		"Channel rejected",
-		"Channel invalid in current regulatory domain",
-		"MAC invalid",
-		"Command rejected (read-only information element)",
-		"Command rejected",
-		"Already asleep",
-		"TX in progress",
-		"Already awake",
-		"Write only",
-		"RX in progress",
-		"Invalid parameter",
-		"Scan in progress",
-		"Failed"
-	};
-	return state < ARRAY_SIZE(cmd_error_strings) ?
-	    cmd_error_strings[state] : "?";
-}
-
-/***********************************************************************
-*/
-
-
-
-
-
-
-
-
-
-
-/***********************************************************************
-** Calculate level like the feb 2003 windows driver seems to do
-*
-* Note: the FreeBSD and DragonFlyBSD drivers seems to use different
-* so-called correction constants depending on the chip. They will be
-* defined for now, but as it is still unknown whether they are correct
-* or not, only the original value will be used. Something else to take
-* into account is that the OpenBSD driver uses another approach and
-* defines the maximum RSSI value depending on the chip, rather than
-* using a value of 100 for all of them, as it is currently done here.
-*/
-#define ACX100_RSSI_CORR 8
-#define ACX111_RSSI_CORR 5
-static u8 acx_signal_to_winlevel(u8 rawlevel)
-{
-	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
-	u8 winlevel = (((ACX100_RSSI_CORR / 2) + (rawlevel * 5)) /
-			ACX100_RSSI_CORR);
-
-	if (winlevel > 100)
-		winlevel = 100;
-	return winlevel;
-}
-
-u8 acx_signal_determine_quality(u8 signal, u8 noise)
-{
-	int qual;
-
-	qual = (((signal - 30) * 100 / 70) + (100 - noise * 4)) / 2;
-
-	if (qual > 100)
-		return 100;
-	if (qual < 0)
-		return 0;
-	return qual;
-}
-
-
-/***********************************************************************
-** Interrogate/configure commands
-*/
-
-
-#if CMD_DISCOVERY
-void great_inquisitor(acx_device_t * adev)
-{
-	static struct {
-		u16 type;
-		u16 len;
-		/* 0x200 was too large here: */
-		u8 data[0x100 - 4];
-	} ACX_PACKED ie;
-	u16 type;
-
-	FN_ENTER;
-
-	/* 0..0x20, 0x1000..0x1020 */
-	for (type = 0; type <= 0x1020; type++) {
-		if (type == 0x21)
-			type = 0x1000;
-		ie.type = cpu_to_le16(type);
-		ie.len = cpu_to_le16(sizeof(ie) - 4);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
-	}
-	FN_EXIT0;
-}
-#endif
-
-
-#ifdef CONFIG_PROC_FS
 /*
- * Procfs
+ * BOM Proc, Debug
+ * ==================================================
  */
+#ifdef CONFIG_PROC_FS
 
 static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 {
@@ -3432,18 +3357,17 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 	return 0;
 }
 
-
-/***********************************************************************
-** acx_e_read_proc_XXXX
-** Handle our /proc entry
-**
-** Arguments:
-**	standard kernel read_proc interface
-** Returns:
-**	number of bytes written to buf
-** Side effects:
-**	none
-*/
+/*
+ * acx_e_read_proc_XXXX
+ * Handle our /proc entry
+ *
+ * Arguments:
+ *	standard kernel read_proc interface
+ * Returns:
+ *	number of bytes written to buf
+ * Side effects:
+ *	none
+ */
 static int acx_e_proc_show_acx(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t*) file->private;
@@ -3556,50 +3480,6 @@ static int acx_e_proc_show_debug(struct seq_file *file, void *v)
 	return 0;
 }
 
-/*
- * A write on acx_diag executes different operations for debugging
- */
-static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
-				   size_t count, loff_t *ppos)
-{
-	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
-	acx_device_t *adev = (acx_device_t *) pde->data;
-
-	ssize_t ret = -EINVAL;
-	char *after;
-	unsigned int val;
-	size_t size;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	val = (unsigned int) simple_strtoul(buf, &after, 0);
-	size = after - buf + 1;
-
-	if (count == size) {
-		ret = count;
-		acx_debug = val;
-	} else {
-		goto exit_unlock;
-	}
-
-	logf1(L_ANY, "acx_diag: 0x%04x\n", val);
-
-	// Execute operation
-	if (val & ACX_DIAG_OP_RECALIB) {
-		logf0(L_ANY, "Scheduling immediate radio recalib\n");
-		adev->recalib_time_last_success =- RECALIB_PAUSE * 60 * HZ;
-		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-	}
-
-	exit_unlock:
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return ret;
-
-}
-
-
 static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
@@ -3622,35 +3502,6 @@ static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
 	return ret;
 
 }
-
-/*
- * proc files registration
- */
-static const char *const
- proc_files[] = { "acx", "acx_diag", "acx_eeprom", "acx_phy", "acx_debug" };
-
-typedef int acx_proc_show_t(struct seq_file *file, void *v);
-typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
-
-static acx_proc_show_t *const
- acx_proc_show_funcs[] = {
-	acx_e_proc_show_acx,
-	acx_e_proc_show_diag,
-	acx_e_proc_show_eeprom,
-	acx_e_proc_show_phy,
-	acx_e_proc_show_debug,
-};
-
-static acx_proc_write_t *const
- acx_proc_write_funcs[] = {
-	NULL,
-	acx_e_proc_write_diag,
-	NULL,
-	NULL,
-	acx_e_proc_write_debug,
-};
-
-static struct file_operations acx_e_proc_ops[5] ;
 
 static int acx_e_proc_open(struct inode *inode, struct file *file)
 {
@@ -3732,7 +3583,182 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 {
 	return acx_manage_proc_entries(ieee, num, 1);
 }
+
+/*
+ * A write on acx_diag executes different operations for debugging
+ */
+static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
+	acx_device_t *adev = (acx_device_t *) pde->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned int val;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = (unsigned int) simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count == size) {
+		ret = count;
+		acx_debug = val;
+	} else {
+		goto exit_unlock;
+	}
+
+	logf1(L_ANY, "acx_diag: 0x%04x\n", val);
+
+	// Execute operation
+	if (val & ACX_DIAG_OP_RECALIB) {
+		logf0(L_ANY, "Scheduling immediate radio recalib\n");
+		adev->recalib_time_last_success =- RECALIB_PAUSE * 60 * HZ;
+		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+	}
+
+	exit_unlock:
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return ret;
+
+}
+
 #endif /* CONFIG_PROC_FS */
+
+// BOM Cleanup ======================================================
+
+
+/***********************************************************************
+** Basically a mdelay/msleep with logging
+*/
+void acx_s_mwait(int ms)
+{
+	FN_ENTER;
+	msleep(ms);
+	FN_EXIT0;
+}
+
+
+/***********************************************************************
+** acx_cmd_status_str
+*/
+const char *acx_cmd_status_str(unsigned int state)
+{
+	static const char *const cmd_error_strings[] = {
+		"Idle",
+		"Success",
+		"Unknown Command",
+		"Invalid Information Element",
+		"Channel rejected",
+		"Channel invalid in current regulatory domain",
+		"MAC invalid",
+		"Command rejected (read-only information element)",
+		"Command rejected",
+		"Already asleep",
+		"TX in progress",
+		"Already awake",
+		"Write only",
+		"RX in progress",
+		"Invalid parameter",
+		"Scan in progress",
+		"Failed"
+	};
+	return state < ARRAY_SIZE(cmd_error_strings) ?
+	    cmd_error_strings[state] : "?";
+}
+
+/***********************************************************************
+*/
+
+
+
+
+
+
+
+
+
+
+/***********************************************************************
+** Calculate level like the feb 2003 windows driver seems to do
+*
+* Note: the FreeBSD and DragonFlyBSD drivers seems to use different
+* so-called correction constants depending on the chip. They will be
+* defined for now, but as it is still unknown whether they are correct
+* or not, only the original value will be used. Something else to take
+* into account is that the OpenBSD driver uses another approach and
+* defines the maximum RSSI value depending on the chip, rather than
+* using a value of 100 for all of them, as it is currently done here.
+*/
+#define ACX100_RSSI_CORR 8
+#define ACX111_RSSI_CORR 5
+static u8 acx_signal_to_winlevel(u8 rawlevel)
+{
+	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
+	u8 winlevel = (((ACX100_RSSI_CORR / 2) + (rawlevel * 5)) /
+			ACX100_RSSI_CORR);
+
+	if (winlevel > 100)
+		winlevel = 100;
+	return winlevel;
+}
+
+u8 acx_signal_determine_quality(u8 signal, u8 noise)
+{
+	int qual;
+
+	qual = (((signal - 30) * 100 / 70) + (100 - noise * 4)) / 2;
+
+	if (qual > 100)
+		return 100;
+	if (qual < 0)
+		return 0;
+	return qual;
+}
+
+
+/***********************************************************************
+** Interrogate/configure commands
+*/
+
+
+#if CMD_DISCOVERY
+void great_inquisitor(acx_device_t * adev)
+{
+	static struct {
+		u16 type;
+		u16 len;
+		/* 0x200 was too large here: */
+		u8 data[0x100 - 4];
+	} ACX_PACKED ie;
+	u16 type;
+
+	FN_ENTER;
+
+	/* 0..0x20, 0x1000..0x1020 */
+	for (type = 0; type <= 0x1020; type++) {
+		if (type == 0x21)
+			type = 0x1000;
+		ie.type = cpu_to_le16(type);
+		ie.len = cpu_to_le16(sizeof(ie) - 4);
+		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
+	}
+	FN_EXIT0;
+}
+#endif
+
+
+
+
+
+
+
+
+
 
 
 
