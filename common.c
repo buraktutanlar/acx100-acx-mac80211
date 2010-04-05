@@ -106,6 +106,14 @@ static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t *adev);
 static int acx_s_init_packet_templates(acx_device_t *adev);
+static inline int acx_s_init_max_null_data_template(acx_device_t * adev);
+static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
+static inline int acx_s_init_max_tim_template(acx_device_t * adev);
+static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
+static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
+#if POWER_SAVE_80211
+static int acx_s_set_null_data_template(acx_device_t * adev);
+#endif
 
 static u8 acx_plcp_get_bitrate_cck(u8 plcp);
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
@@ -2894,6 +2902,76 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	return result;
 }
 
+static inline int acx_s_init_max_null_data_template(acx_device_t * adev)
+{
+	/* OW
+	 * hh version:       issue_cmd(cmd:cmd,buflen:26,timeout:50ms,type:0x0018)
+	 * mac80211 version: issue_cmd: begin: (cmd:cmd,buflen:32,timeout:50ms,type:0x001E)
+	 *
+	 * diff with hh is struct ieee80211_hdr included in acx_template_nullframe_t,
+	 * which is bigger, thus size if bigger
+	 */
+	return acx_s_init_max_template_generic(adev,
+			sizeof(acx_template_nullframe_t), ACX1xx_CMD_CONFIG_NULL_DATA);
+}
+
+static inline int acx_s_init_max_beacon_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_beacon_t),
+					       ACX1xx_CMD_CONFIG_BEACON);
+}
+
+static inline int acx_s_init_max_tim_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev, sizeof(acx_template_tim_t),
+					       ACX1xx_CMD_CONFIG_TIM);
+}
+
+static inline int acx_s_init_max_probe_response_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_proberesp_t),
+					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
+}
+
+static inline int acx_s_init_max_probe_request_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_probereq_t),
+					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
+}
+
+#if POWER_SAVE_80211
+/***********************************************************************
+** acx_s_set_null_data_template
+*/
+static int acx_s_set_null_data_template(acx_device_t * adev)
+{
+	struct acx_template_nullframe b;
+	int result;
+
+	FN_ENTER;
+
+	/* memset(&b, 0, sizeof(b)); not needed, setting all members */
+
+	b.size = cpu_to_le16(sizeof(b) - 2);
+	b.hdr.fc = WF_FTYPE_MGMTi | WF_FSTYPE_NULLi;
+	b.hdr.dur = 0;
+	MAC_BCAST(b.hdr.a1);
+	MAC_COPY(b.hdr.a2, adev->dev_addr);
+	MAC_COPY(b.hdr.a3, adev->bssid);
+	b.hdr.seq = 0;
+
+	result =
+	    acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
+
+	FN_EXIT1(result);
+	return result;
+}
+#endif
+
+
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
@@ -5160,106 +5238,6 @@ module_exit(acx_e_cleanup_module)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-static inline int acx_s_init_max_null_data_template(acx_device_t * adev)
-{
-	/* OW
-	 * hh version:       issue_cmd(cmd:cmd,buflen:26,timeout:50ms,type:0x0018)
-	 * mac80211 version: issue_cmd: begin: (cmd:cmd,buflen:32,timeout:50ms,type:0x001E)
-	 *
-	 * diff with hh is struct ieee80211_hdr included in acx_template_nullframe_t,
-	 * which is bigger, thus size if bigger
-	 */
-	return acx_s_init_max_template_generic(adev,
-			sizeof(acx_template_nullframe_t), ACX1xx_CMD_CONFIG_NULL_DATA);
-}
-
-static inline int acx_s_init_max_beacon_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_beacon_t),
-					       ACX1xx_CMD_CONFIG_BEACON);
-}
-
-static inline int acx_s_init_max_tim_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev, sizeof(acx_template_tim_t),
-					       ACX1xx_CMD_CONFIG_TIM);
-}
-
-static inline int acx_s_init_max_probe_response_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_proberesp_t),
-					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
-}
-
-static inline int acx_s_init_max_probe_request_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_probereq_t),
-					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
-}
-
-
-
-
-
-
-#if POWER_SAVE_80211
-/***********************************************************************
-** acx_s_set_null_data_template
-*/
-static int acx_s_set_null_data_template(acx_device_t * adev)
-{
-	struct acx_template_nullframe b;
-	int result;
-
-	FN_ENTER;
-
-	/* memset(&b, 0, sizeof(b)); not needed, setting all members */
-
-	b.size = cpu_to_le16(sizeof(b) - 2);
-	b.hdr.fc = WF_FTYPE_MGMTi | WF_FSTYPE_NULLi;
-	b.hdr.dur = 0;
-	MAC_BCAST(b.hdr.a1);
-	MAC_COPY(b.hdr.a2, adev->dev_addr);
-	MAC_COPY(b.hdr.a3, adev->bssid);
-	b.hdr.seq = 0;
-
-	result =
-	    acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
-
-	FN_EXIT1(result);
-	return result;
-}
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 {
@@ -5423,13 +5401,6 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 #endif
 
 
-
-
-
-
-
-
-
 /***********************************************************************
 ** acx_update_capabilities
 *//*
@@ -5464,15 +5435,4 @@ void acx_update_capabilities(acx_device_t * adev)
 	adev->capabilities = cap;
 }
 */
-
-
-
-
-
-
-
-/*
- * OW Debugging
- */
-
 
