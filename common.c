@@ -2444,7 +2444,6 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-
 void acx_s_start(acx_device_t * adev)
 {
 	FN_ENTER;
@@ -2724,6 +2723,39 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 	FN_EXIT0;
 	return 0;
 }
+
+/*
+void acx_update_capabilities(acx_device_t * adev)
+{
+	u16 cap = 0;
+
+	switch (adev->mode) {
+	case ACX_MODE_3_AP:
+		SET_BIT(cap, WF_MGMT_CAP_ESS);
+		break;
+	case ACX_MODE_0_ADHOC:
+		SET_BIT(cap, WF_MGMT_CAP_IBSS);
+		break;
+*/		/* other types of stations do not emit beacons */
+/*	}
+
+	if (adev->wep_restricted) {
+		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
+	}
+	if (adev->cfgopt_dot11ShortPreambleOption) {
+		SET_BIT(cap, WF_MGMT_CAP_SHORT);
+	}
+	if (adev->cfgopt_dot11PBCCOption) {
+		SET_BIT(cap, WF_MGMT_CAP_PBCC);
+	}
+	if (adev->cfgopt_dot11ChannelAgility) {
+		SET_BIT(cap, WF_MGMT_CAP_AGILITY);
+	}
+	log(L_DEBUG, "acx: caps updated from 0x%04X to 0x%04X\n",
+	    adev->capabilities, cap);
+	adev->capabilities = cap;
+}
+*/
 
 // BOM Template (Control path)
 // --------------------
@@ -5394,49 +5426,3 @@ static void __exit acx_e_cleanup_module(void)
 
 module_init(acx_e_init_module)
 module_exit(acx_e_cleanup_module)
-
-
-// BOM Cleanup ======================================================
-
-
-
-
-
-
-
-
-/***********************************************************************
-** acx_update_capabilities
-*//*
-void acx_update_capabilities(acx_device_t * adev)
-{
-	u16 cap = 0;
-
-	switch (adev->mode) {
-	case ACX_MODE_3_AP:
-		SET_BIT(cap, WF_MGMT_CAP_ESS);
-		break;
-	case ACX_MODE_0_ADHOC:
-		SET_BIT(cap, WF_MGMT_CAP_IBSS);
-		break;
-*/		/* other types of stations do not emit beacons */
-/*	}
-
-	if (adev->wep_restricted) {
-		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
-	}
-	if (adev->cfgopt_dot11ShortPreambleOption) {
-		SET_BIT(cap, WF_MGMT_CAP_SHORT);
-	}
-	if (adev->cfgopt_dot11PBCCOption) {
-		SET_BIT(cap, WF_MGMT_CAP_PBCC);
-	}
-	if (adev->cfgopt_dot11ChannelAgility) {
-		SET_BIT(cap, WF_MGMT_CAP_AGILITY);
-	}
-	log(L_DEBUG, "acx: caps updated from 0x%04X to 0x%04X\n",
-	    adev->capabilities, cap);
-	adev->capabilities = cap;
-}
-*/
-
