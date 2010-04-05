@@ -153,6 +153,10 @@ static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr);
 // Mac80211 Ops
 // -----
 
+// Helpers
+// -----
+static u8 acx_signal_to_winlevel(u8 rawlevel);
+
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -4870,19 +4874,112 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 }
 #endif
 
+/*
+ * BOM Helpers
+ * ==================================================
+ */
 
-// BOM Cleanup ======================================================
-
-
-/***********************************************************************
-** Basically a mdelay/msleep with logging
-*/
+/*
+ * Basically a mdelay/msleep with logging
+ */
 void acx_s_mwait(int ms)
 {
 	FN_ENTER;
 	msleep(ms);
 	FN_EXIT0;
 }
+
+static u8 acx_signal_to_winlevel(u8 rawlevel);
+/*
+ * Calculate level like the feb 2003 windows driver seems to do
+ *
+ * Note: the FreeBSD and DragonFlyBSD drivers seems to use different
+ * so-called correction constants depending on the chip. They will be
+ * defined for now, but as it is still unknown whether they are correct
+ * or not, only the original value will be used. Something else to take
+ * into account is that the OpenBSD driver uses another approach and
+ * defines the maximum RSSI value depending on the chip, rather than
+ * using a value of 100 for all of them, as it is currently done here.
+ */
+#define ACX100_RSSI_CORR 8
+#define ACX111_RSSI_CORR 5
+static u8 acx_signal_to_winlevel(u8 rawlevel)
+{
+	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
+	u8 winlevel = (((ACX100_RSSI_CORR / 2) + (rawlevel * 5)) /
+			ACX100_RSSI_CORR);
+
+	if (winlevel > 100)
+		winlevel = 100;
+	return winlevel;
+}
+
+u8 acx_signal_determine_quality(u8 signal, u8 noise)
+{
+	int qual;
+
+	qual = (((signal - 30) * 100 / 70) + (100 - noise * 4)) / 2;
+
+	if (qual > 100)
+		return 100;
+	if (qual < 0)
+		return 0;
+	return qual;
+}
+
+const char* acx_get_packet_type_string(u16 fc)
+{
+	static const char * const mgmt_arr[] = {
+		"MGMT/AssocReq", "MGMT/AssocResp", "MGMT/ReassocReq",
+		"MGMT/ReassocResp", "MGMT/ProbeReq", "MGMT/ProbeResp",
+		"MGMT/UNKNOWN", "MGMT/UNKNOWN", "MGMT/Beacon", "MGMT/ATIM",
+		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen"
+	};
+	static const char * const ctl_arr[] = {
+		"CTL/PSPoll", "CTL/RTS", "CTL/CTS", "CTL/Ack", "CTL/CFEnd",
+		"CTL/CFEndCFAck"
+	};
+	static const char * const data_arr[] = {
+		"DATA/DataOnly", "DATA/Data CFAck", "DATA/Data CFPoll",
+		"DATA/Data CFAck/CFPoll", "DATA/Null", "DATA/CFAck",
+		"DATA/CFPoll", "DATA/CFAck/CFPoll"
+	};
+	const char *str;
+	u8 fstype = (WF_FC_FSTYPE & fc) >> 4;
+	u8 ctl;
+
+	switch (WF_FC_FTYPE & fc) {
+	case WF_FTYPE_MGMT:
+		if (fstype < VEC_SIZE(mgmt_arr))
+			str = mgmt_arr[fstype];
+		else
+			str = "MGMT/UNKNOWN";
+		break;
+	case WF_FTYPE_CTL:
+		ctl = fstype - 0x0a;
+		if (ctl < VEC_SIZE(ctl_arr))
+			str = ctl_arr[ctl];
+		else
+			str = "CTL/UNKNOWN";
+		break;
+	case WF_FTYPE_DATA:
+		if (fstype < VEC_SIZE(data_arr))
+			str = data_arr[fstype];
+		else
+			str = "DATA/UNKNOWN";
+		break;
+	default:
+		str = "UNKNOWN";
+		break;
+	}
+	return str;
+}
+
+
+// BOM Cleanup ======================================================
+
+
+
 
 
 /***********************************************************************
@@ -4925,42 +5022,8 @@ const char *acx_cmd_status_str(unsigned int state)
 
 
 
-/***********************************************************************
-** Calculate level like the feb 2003 windows driver seems to do
-*
-* Note: the FreeBSD and DragonFlyBSD drivers seems to use different
-* so-called correction constants depending on the chip. They will be
-* defined for now, but as it is still unknown whether they are correct
-* or not, only the original value will be used. Something else to take
-* into account is that the OpenBSD driver uses another approach and
-* defines the maximum RSSI value depending on the chip, rather than
-* using a value of 100 for all of them, as it is currently done here.
-*/
-#define ACX100_RSSI_CORR 8
-#define ACX111_RSSI_CORR 5
-static u8 acx_signal_to_winlevel(u8 rawlevel)
-{
-	/* u8 winlevel = (u8) (0.5 + 0.625 * rawlevel); */
-	u8 winlevel = (((ACX100_RSSI_CORR / 2) + (rawlevel * 5)) /
-			ACX100_RSSI_CORR);
 
-	if (winlevel > 100)
-		winlevel = 100;
-	return winlevel;
-}
 
-u8 acx_signal_determine_quality(u8 signal, u8 noise)
-{
-	int qual;
-
-	qual = (((signal - 30) * 100 / 70) + (100 - noise * 4)) / 2;
-
-	if (qual > 100)
-		return 100;
-	if (qual < 0)
-		return 0;
-	return qual;
-}
 
 
 /***********************************************************************
@@ -5404,56 +5467,6 @@ void acx_update_capabilities(acx_device_t * adev)
  * OW Debugging
  */
 
-/***********************************************************************
-** acx_get_packet_type_string
-*/
-const char* acx_get_packet_type_string(u16 fc)
-{
-	static const char * const mgmt_arr[] = {
-		"MGMT/AssocReq", "MGMT/AssocResp", "MGMT/ReassocReq",
-		"MGMT/ReassocResp", "MGMT/ProbeReq", "MGMT/ProbeResp",
-		"MGMT/UNKNOWN", "MGMT/UNKNOWN", "MGMT/Beacon", "MGMT/ATIM",
-		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen"
-	};
-	static const char * const ctl_arr[] = {
-		"CTL/PSPoll", "CTL/RTS", "CTL/CTS", "CTL/Ack", "CTL/CFEnd",
-		"CTL/CFEndCFAck"
-	};
-	static const char * const data_arr[] = {
-		"DATA/DataOnly", "DATA/Data CFAck", "DATA/Data CFPoll",
-		"DATA/Data CFAck/CFPoll", "DATA/Null", "DATA/CFAck",
-		"DATA/CFPoll", "DATA/CFAck/CFPoll"
-	};
-	const char *str;
-	u8 fstype = (WF_FC_FSTYPE & fc) >> 4;
-	u8 ctl;
-
-	switch (WF_FC_FTYPE & fc) {
-	case WF_FTYPE_MGMT:
-		if (fstype < VEC_SIZE(mgmt_arr))
-			str = mgmt_arr[fstype];
-		else
-			str = "MGMT/UNKNOWN";
-		break;
-	case WF_FTYPE_CTL:
-		ctl = fstype - 0x0a;
-		if (ctl < VEC_SIZE(ctl_arr))
-			str = ctl_arr[ctl];
-		else
-			str = "CTL/UNKNOWN";
-		break;
-	case WF_FTYPE_DATA:
-		if (fstype < VEC_SIZE(data_arr))
-			str = data_arr[fstype];
-		else
-			str = "DATA/UNKNOWN";
-		break;
-	default:
-		str = "UNKNOWN";
-		break;
-	}
-	return str;
-}
 
 
 /***********************************************************************
