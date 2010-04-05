@@ -65,10 +65,9 @@ MODULE_DESCRIPTION
 MODULE_VERSION(ACX_RELEASE);
 
 /*
- * Static prototypes, Defines, etc ...
+ * BOM Static prototypes
  * ==================================================
  */
-
 
 // Locking
 //-----
@@ -100,6 +99,9 @@ static void acx_s_select_opmode(acx_device_t *adev);
 static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
+// Other (Control Path)
+
+
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 static void acx_s_initialize_rx_config(acx_device_t * adev);
@@ -112,8 +114,17 @@ static int acx_s_init_packet_templates(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
 static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 
-// Defines, Static data, etc.
-// -----
+static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
+static inline int acx_s_init_max_null_data_template(acx_device_t * adev);
+static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
+static inline int acx_s_init_max_tim_template(acx_device_t * adev);
+static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
+static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
+
+/*
+ * BOM Defines, Static data, etc.
+ * ==================================================
+ */
 #define ACX111_PERCENT(percent) ((percent)/5)
 
 /* Probably a number of acx's intermediate buffers for USB transfers,
@@ -364,9 +375,43 @@ static const u8 bitpos2genframe_txrate[] = {
 	10,			/* 15.  1 Mbit/s, should never happen */
 };
 
+const u8 acx_bitpos2ratebyte[] = {
+	DOT11RATEBYTE_1,
+	DOT11RATEBYTE_2,
+	DOT11RATEBYTE_5_5,
+	DOT11RATEBYTE_6_G,
+	DOT11RATEBYTE_9_G,
+	DOT11RATEBYTE_11,
+	DOT11RATEBYTE_12_G,
+	DOT11RATEBYTE_18_G,
+	DOT11RATEBYTE_22,
+	DOT11RATEBYTE_24_G,
+	DOT11RATEBYTE_36_G,
+	DOT11RATEBYTE_48_G,
+	DOT11RATEBYTE_54_G,
+};
+
+const u8 acx_bitpos2rate100[] = {
+	RATE100_1,		/* 0 */
+	RATE100_2,		/* 1 */
+	RATE100_5,		/* 2 */
+	RATE100_2,		/* 3, should not happen */
+	RATE100_2,		/* 4, should not happen */
+	RATE100_11,		/* 5 */
+	RATE100_2,		/* 6, should not happen */
+	RATE100_2,		/* 7, should not happen */
+	RATE100_22,		/* 8 */
+	RATE100_2,		/* 9, should not happen */
+	RATE100_2,		/* 10, should not happen */
+	RATE100_2,		/* 11, should not happen */
+	RATE100_2,		/* 12, should not happen */
+	RATE100_2,		/* 13, should not happen */
+	RATE100_2,		/* 14, should not happen */
+	RATE100_2,		/* 15, should not happen */
+};
 
 /*
- * Locking
+ * BOM Locking
  * ==================================================
  */
 #define DEBUG_TSC 0
@@ -442,7 +487,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #endif /* PARANOID_LOCKING */
 
 /*
- * Logging
+ * BOM Logging
  * ==================================================
  */
 
@@ -554,7 +599,7 @@ void acx_dump_bytes(const void *data, int num)
 #endif
 
 /*
- * Data Access
+ * BOM Data Access
  * ==================================================
  */
 
@@ -893,7 +938,7 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 
 
 /*
- * Firmware, EEPROM, Phy
+ * BOM Firmware, EEPROM, Phy
  * ==================================================
  */
 
@@ -1306,11 +1351,11 @@ acx_s_parse_configoption(acx_device_t * adev,
 }
 
 /*
- * Control Path (CMD handling, init, reset)
+ * BOM Control Path (CMD handling, init, reset)
  * ==================================================
  */
 
-// CMDs (Control Path)
+// BOM CMDs (Control Path)
 // -------------------
 #if !ACX_DEBUG
 int acx_s_configure(acx_device_t * adev, void *pdr, int type)
@@ -1630,7 +1675,7 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         FN_EXIT0;
 }
 
-// Configure (Control path)
+// BOM Configure (Control path)
 // ------------------------
 void acx_s_set_defaults(acx_device_t * adev)
 {
@@ -2540,27 +2585,352 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 	return 0;
 }
 
-// Other (Control Path)
+// BOM Other (Control path)
 // --------------------
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
+static int
+acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
+                                        struct acx_template_beacon *templ,
+                                        struct sk_buff* skb /* in host order! */)
+{
+        FN_ENTER;
+
+        memcpy(templ,skb->data, skb->len);
+        FN_EXIT1(skb->len);
+        return skb->len;
+}
+
 static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
+static int
+acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
+{
+        struct acx_template_beacon bcn;
+        int len, result;
+
+        FN_ENTER;
+	printk("acx: Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
+        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
+        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
+
+        FN_EXIT1(result);
+        return result;
+}
 
 static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
+static int
+acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
+				unsigned int cmd)
+{
+	int res;
+	union {
+		acx_template_nullframe_t null;
+		acx_template_beacon_t b;
+		acx_template_tim_t tim;
+		acx_template_probereq_t preq;
+		acx_template_proberesp_t presp;
+	} templ;
+
+	memset(&templ, 0, len);
+	templ.null.size = cpu_to_le16(len - 2);
+	res = acx_s_issue_cmd(adev, cmd, &templ, len);
+	return res;
+}
+
 static int acx_s_set_tim_template(acx_device_t *adev);
+/*
+ * acx_s_set_tim_template
+ *
+ * FIXME: In full blown driver we will regularly update partial virtual bitmap
+ * by calling this function
+ * (it can be done by irq handler on each DTIM irq or by timer...)
+
+[802.11 7.3.2.6] TIM information element:
+- 1 EID
+- 1 Length
+1 1 DTIM Count
+    indicates how many beacons (including this) appear before next DTIM
+    (0=this one is a DTIM)
+2 1 DTIM Period
+    number of beacons between successive DTIMs
+    (0=reserved, 1=all TIMs are DTIMs, 2=every other, etc)
+3 1 Bitmap Control
+    bit0: Traffic Indicator bit associated with Assoc ID 0 (Bcast AID?)
+    set to 1 in TIM elements with a value of 0 in the DTIM Count field
+    when one or more broadcast or multicast frames are buffered at the AP.
+    bit1-7: Bitmap Offset (logically Bitmap_Offset = Bitmap_Control & 0xFE).
+4 n Partial Virtual Bitmap
+    Visible part of traffic-indication bitmap.
+    Full bitmap consists of 2008 bits (251 octets) such that bit number N
+    (0<=N<=2007) in the bitmap corresponds to bit number (N mod 8)
+    in octet number N/8 where the low-order bit of each octet is bit0,
+    and the high order bit is bit7.
+    Each set bit in virtual bitmap corresponds to traffic buffered by AP
+    for a specific station (with corresponding AID?).
+    Partial Virtual Bitmap shows a part of bitmap which has non-zero.
+    Bitmap Offset is a number of skipped zero octets (see above).
+    'Missing' octets at the tail are also assumed to be zero.
+    Example: Length=6, Bitmap_Offset=2, Partial_Virtual_Bitmap=55 55 55
+    This means that traffic-indication bitmap is:
+    00000000 00000000 01010101 01010101 01010101 00000000 00000000...
+    (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
+*/
+static int acx_s_set_tim_template(acx_device_t * adev)
+{
+/* For now, configure smallish test bitmap, all zero ("no pending data") */
+	enum { bitmap_size = 5 };
+
+	acx_template_tim_t t;
+	int result;
+
+	FN_ENTER;
+
+	memset(&t, 0, sizeof(t));
+	t.size = 5 + bitmap_size;	/* eid+len+count+period+bmap_ctrl + bmap */
+	t.tim_eid = WLAN_EID_TIM;
+	t.len = 3 + bitmap_size;	/* count+period+bmap_ctrl + bmap */
+	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(t));
+	FN_EXIT1(result);
+	return result;
+}
+
 static int acx_s_init_packet_templates(acx_device_t *adev);
+/*
+ * acx_s_init_packet_templates()
+ *
+ * NOTE: order is very important here, to have a correct memory layout!
+ * init templates: max Probe Request (station mode), max NULL data,
+ * max Beacon, max TIM, max Probe Response.
+ */
+static int acx_s_init_packet_templates(acx_device_t * adev)
+{
+	acx_ie_memmap_t mm;	/* ACX100 only */
+	int result = NOT_OK;
+
+	FN_ENTER;
+
+	log(L_DEBUG | L_INIT, "acx: initializing max packet templates\n");
+
+	if (OK != acx_s_init_max_probe_request_template(adev))
+		goto failed;
+
+	if (OK != acx_s_init_max_null_data_template(adev))
+		goto failed;
+
+	if (OK != acx_s_init_max_beacon_template(adev))
+		goto failed;
+
+	if (OK != acx_s_init_max_tim_template(adev))
+		goto failed;
+
+	if (OK != acx_s_init_max_probe_response_template(adev))
+		goto failed;
+
+	if (IS_ACX111(adev)) {
+		/* ACX111 doesn't need the memory map magic below,
+		 * and the other templates will be set later (acx_start) */
+		result = OK;
+		goto success;
+	}
+
+	/* ACX100 will have its TIM template set,
+	 * and we also need to update the memory map */
+
+	if (OK != acx_s_set_tim_template(adev))
+		goto failed_acx100;
+
+	log(L_DEBUG, "acx: sizeof(memmap) = %d bytes\n", (int)sizeof(mm));
+
+	if (OK != acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP))
+		goto failed_acx100;
+
+	mm.QueueStart = cpu_to_le32(le32_to_cpu(mm.PacketTemplateEnd) + 4);
+	if (OK != acx_s_configure(adev, &mm, ACX1xx_IE_MEMORY_MAP))
+		goto failed_acx100;
+
+	result = OK;
+	goto success;
+
+      failed_acx100:
+	log(L_DEBUG | L_INIT,
+	    /* "cb=0x%X\n" */
+	    "acx: ACXMemoryMap:\n"
+	    "acx: .CodeStart=0x%X\n"
+	    "acx: .CodeEnd=0x%X\n"
+	    "acx: .WEPCacheStart=0x%X\n"
+	    "acx: .WEPCacheEnd=0x%X\n"
+	    "acx: .PacketTemplateStart=0x%X\n" ".PacketTemplateEnd=0x%X\n",
+	    /* len, */
+	    le32_to_cpu(mm.CodeStart),
+	    le32_to_cpu(mm.CodeEnd),
+	    le32_to_cpu(mm.WEPCacheStart),
+	    le32_to_cpu(mm.WEPCacheEnd),
+	    le32_to_cpu(mm.PacketTemplateStart),
+	    le32_to_cpu(mm.PacketTemplateEnd));
+
+      failed:
+	printk("acx: %s: %s() FAILED\n", wiphy_name(adev->ieee->wiphy), __func__);
+
+      success:
+	FN_EXIT1(result);
+	return result;
+}
 
 static u8 acx_plcp_get_bitrate_cck(u8 plcp);
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
 
+static u8 acx_plcp_get_bitrate_cck(u8 plcp)
+{
+        switch (plcp) {
+        case 0x0A:
+                return ACX_CCK_RATE_1MB;
+        case 0x14:
+                return ACX_CCK_RATE_2MB;
+        case 0x37:
+                return ACX_CCK_RATE_5MB;
+        case 0x6E:
+                return ACX_CCK_RATE_11MB;
+        }
+        return 0;
+}
+
+/* Extract the bitrate out of an OFDM PLCP header. */
+static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
+{
+        switch (plcp & 0xF) {
+        case 0xB:
+                return ACX_OFDM_RATE_6MB;
+        case 0xF:
+                return ACX_OFDM_RATE_9MB;
+        case 0xA:
+                return ACX_OFDM_RATE_12MB;
+        case 0xE:
+                return ACX_OFDM_RATE_18MB;
+        case 0x9:
+                return ACX_OFDM_RATE_24MB;
+        case 0xD:
+                return ACX_OFDM_RATE_36MB;
+        case 0x8:
+                return ACX_OFDM_RATE_48MB;
+        case 0xC:
+                return ACX_OFDM_RATE_54MB;
+        }
+        return 0;
+}
+
+
 void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
+static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
+{
+	unsigned mask;
+
+	unsigned int i;
+
+	for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
+		if (acx_reg_domain_ids[i] == adev->reg_dom_id)
+			break;
+
+	if (sizeof(acx_reg_domain_ids) == i) {
+		log(L_INIT, "acx: Invalid or unsupported regulatory domain"
+			       " 0x%02X specified, falling back to FCC (USA)!"
+			       " Please report if this sounds fishy!\n",
+				adev->reg_dom_id);
+		i = 0;
+		adev->reg_dom_id = acx_reg_domain_ids[i];
+
+		/* since there was a mismatch, we need to force updating */
+		do_set = 1;
+	}
+
+	if (do_set) {
+		acx_ie_generic_t dom;
+		dom.m.bytes[0] = adev->reg_dom_id;
+		acx_s_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
+	}
+
+	adev->reg_dom_chanmask = reg_domain_channel_masks[i];
+
+	mask = (1 << (adev->channel - 1));
+	if (!(adev->reg_dom_chanmask & mask)) {
+	/* hmm, need to adjust our channel to reside within domain */
+		mask = 1;
+		for (i = 1; i <= 14; i++) {
+			if (adev->reg_dom_chanmask & mask) {
+				printk("acx: %s: adjusting the selected channel from %d "
+					"to %d due to the new regulatory domain\n",
+					wiphy_name(adev->ieee->wiphy), adev->channel, i);
+				adev->channel = i;
+				break;
+			}
+			mask <<= 1;
+		}
+	}
+}
+
 static void acx111_s_sens_radio_16_17(acx_device_t *adev);
+static void acx111_s_sens_radio_16_17(acx_device_t * adev)
+{
+	u32 feature1, feature2;
+
+	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
+		printk("acx: %s: invalid sensitivity setting (1..3), "
+		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
+		adev->sensitivity = 1;
+	}
+	acx111_s_get_feature_config(adev, &feature1, &feature2);
+	CLEAR_BIT(feature1, FEATURE1_LOW_RX | FEATURE1_EXTRA_LOW_RX);
+	if (adev->sensitivity > 1)
+		SET_BIT(feature1, FEATURE1_LOW_RX);
+	if (adev->sensitivity > 2)
+		SET_BIT(feature1, FEATURE1_EXTRA_LOW_RX);
+	acx111_s_feature_set(adev, feature1, feature2);
+}
 
 void acx_l_update_ratevector(acx_device_t *adev);
+/*
+ * acx_l_update_ratevector
+ *
+ * Updates adev->rate_supported[_len] according to rate_{basic,oper}
+ */
+void acx_l_update_ratevector(acx_device_t * adev)
+{
+	u16 bcfg = adev->rate_basic;
+	u16 ocfg = adev->rate_oper;
+	u8 *supp = adev->rate_supported;
+	const u8 *dot11 = acx_bitpos2ratebyte;
+
+	FN_ENTER;
+
+	while (ocfg) {
+		if (ocfg & 1) {
+			*supp = *dot11;
+			if (bcfg & 1) {
+				*supp |= 0x80;
+			}
+			supp++;
+		}
+		dot11++;
+		ocfg >>= 1;
+		bcfg >>= 1;
+	}
+	adev->rate_supported_len = supp - adev->rate_supported;
+	if (acx_debug & L_ASSOC) {
+		printk("acx: new ratevector: ");
+		acx_dump_bytes(adev->rate_supported, adev->rate_supported_len);
+	}
+	FN_EXIT0;
+}
+
 u8 acx_rate111to100(u16 r);
+/*
+ * maps acx111 tx descr rate field to acx100 one
+ */
+u8 acx_rate111to100(u16 r)
+{
+	return acx_bitpos2rate100[highest_bit(r)];
+}
 
 
-
-// OW Cleanup ======================================================
+// BOM Cleanup ======================================================
 
 
 /***********************************************************************
@@ -2612,32 +2982,6 @@ const char *acx_cmd_status_str(unsigned int state)
 
 
 
-/***********************************************************************
-** maps acx111 tx descr rate field to acx100 one
-*/
-const u8 acx_bitpos2rate100[] = {
-	RATE100_1,		/* 0 */
-	RATE100_2,		/* 1 */
-	RATE100_5,		/* 2 */
-	RATE100_2,		/* 3, should not happen */
-	RATE100_2,		/* 4, should not happen */
-	RATE100_11,		/* 5 */
-	RATE100_2,		/* 6, should not happen */
-	RATE100_2,		/* 7, should not happen */
-	RATE100_22,		/* 8 */
-	RATE100_2,		/* 9, should not happen */
-	RATE100_2,		/* 10, should not happen */
-	RATE100_2,		/* 11, should not happen */
-	RATE100_2,		/* 12, should not happen */
-	RATE100_2,		/* 13, should not happen */
-	RATE100_2,		/* 14, should not happen */
-	RATE100_2,		/* 15, should not happen */
-};
-
-u8 acx_rate111to100(u16 r)
-{
-	return acx_bitpos2rate100[highest_bit(r)];
-}
 
 
 /***********************************************************************
@@ -3390,42 +3734,8 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 
 
 
-/***********************************************************************
-** acx_fill_beacon_or_proberesp_template
-**
-** Origin: derived from rt2x00 project
-*/
-static int
-acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
-                                        struct acx_template_beacon *templ,
-                                        struct sk_buff* skb /* in host order! */)
-{
-        FN_ENTER;
 
-        memcpy(templ,skb->data, skb->len);
-        FN_EXIT1(skb->len);
-        return skb->len;
-}
 
-/***********************************************************************
-** acx_s_set_beacon_template
-**
-**
-*/
-static int
-acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
-{
-        struct acx_template_beacon bcn;
-        int len, result;
-
-        FN_ENTER;
-	printk("acx: Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
-        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
-        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
-
-        FN_EXIT1(result);
-        return result;
-}
 
 
 
@@ -3697,55 +4007,6 @@ out:
 	FN_EXIT1(txresult);
 	return txresult;
 }
-/***********************************************************************
-** acx_l_update_ratevector
-**
-** Updates adev->rate_supported[_len] according to rate_{basic,oper}
-*/
-const u8 acx_bitpos2ratebyte[] = {
-	DOT11RATEBYTE_1,
-	DOT11RATEBYTE_2,
-	DOT11RATEBYTE_5_5,
-	DOT11RATEBYTE_6_G,
-	DOT11RATEBYTE_9_G,
-	DOT11RATEBYTE_11,
-	DOT11RATEBYTE_12_G,
-	DOT11RATEBYTE_18_G,
-	DOT11RATEBYTE_22,
-	DOT11RATEBYTE_24_G,
-	DOT11RATEBYTE_36_G,
-	DOT11RATEBYTE_48_G,
-	DOT11RATEBYTE_54_G,
-};
-
-void acx_l_update_ratevector(acx_device_t * adev)
-{
-	u16 bcfg = adev->rate_basic;
-	u16 ocfg = adev->rate_oper;
-	u8 *supp = adev->rate_supported;
-	const u8 *dot11 = acx_bitpos2ratebyte;
-
-	FN_ENTER;
-
-	while (ocfg) {
-		if (ocfg & 1) {
-			*supp = *dot11;
-			if (bcfg & 1) {
-				*supp |= 0x80;
-			}
-			supp++;
-		}
-		dot11++;
-		ocfg >>= 1;
-		bcfg >>= 1;
-	}
-	adev->rate_supported_len = supp - adev->rate_supported;
-	if (acx_debug & L_ASSOC) {
-		printk("acx: new ratevector: ");
-		acx_dump_bytes(adev->rate_supported, adev->rate_supported_len);
-	}
-	FN_EXIT0;
-}
 
 /***********************************************************************
 ** acx_i_timer
@@ -3799,49 +4060,6 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 	FN_EXIT0;
 }
 
-/** acx_plcp_get_bitrate_cck
- **
- ** Obvious
-*/
-static u8 acx_plcp_get_bitrate_cck(u8 plcp)
-{
-        switch (plcp) {
-        case 0x0A:
-                return ACX_CCK_RATE_1MB;
-        case 0x14:
-                return ACX_CCK_RATE_2MB;
-        case 0x37:
-                return ACX_CCK_RATE_5MB;
-        case 0x6E:
-                return ACX_CCK_RATE_11MB;
-        }
-        return 0;
-}
-
-/* Extract the bitrate out of an OFDM PLCP header. */
-/** Obvious **/
-static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
-{
-        switch (plcp & 0xF) {
-        case 0xB:
-                return ACX_OFDM_RATE_6MB;
-        case 0xF:
-                return ACX_OFDM_RATE_9MB;
-        case 0xA:
-                return ACX_OFDM_RATE_12MB;
-        case 0xE:
-                return ACX_OFDM_RATE_18MB;
-        case 0x9:
-                return ACX_OFDM_RATE_24MB;
-        case 0xD:
-                return ACX_OFDM_RATE_36MB;
-        case 0x8:
-                return ACX_OFDM_RATE_48MB;
-        case 0xC:
-                return ACX_OFDM_RATE_54MB;
-        }
-        return 0;
-}
 
 
 /***********************************************************************
@@ -4078,24 +4296,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 }
 
 
-static int
-acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
-				unsigned int cmd)
-{
-	int res;
-	union {
-		acx_template_nullframe_t null;
-		acx_template_beacon_t b;
-		acx_template_tim_t tim;
-		acx_template_probereq_t preq;
-		acx_template_proberesp_t presp;
-	} templ;
 
-	memset(&templ, 0, len);
-	templ.null.size = cpu_to_le16(len - 2);
-	res = acx_s_issue_cmd(adev, cmd, &templ, len);
-	return res;
-}
 
 static inline int acx_s_init_max_null_data_template(acx_device_t * adev)
 {
@@ -4137,61 +4338,7 @@ static inline int acx_s_init_max_probe_request_template(acx_device_t * adev)
 					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
 }
 
-/***********************************************************************
-** acx_s_set_tim_template
-**
-** FIXME: In full blown driver we will regularly update partial virtual bitmap
-** by calling this function
-** (it can be done by irq handler on each DTIM irq or by timer...)
 
-[802.11 7.3.2.6] TIM information element:
-- 1 EID
-- 1 Length
-1 1 DTIM Count
-    indicates how many beacons (including this) appear before next DTIM
-    (0=this one is a DTIM)
-2 1 DTIM Period
-    number of beacons between successive DTIMs
-    (0=reserved, 1=all TIMs are DTIMs, 2=every other, etc)
-3 1 Bitmap Control
-    bit0: Traffic Indicator bit associated with Assoc ID 0 (Bcast AID?)
-    set to 1 in TIM elements with a value of 0 in the DTIM Count field
-    when one or more broadcast or multicast frames are buffered at the AP.
-    bit1-7: Bitmap Offset (logically Bitmap_Offset = Bitmap_Control & 0xFE).
-4 n Partial Virtual Bitmap
-    Visible part of traffic-indication bitmap.
-    Full bitmap consists of 2008 bits (251 octets) such that bit number N
-    (0<=N<=2007) in the bitmap corresponds to bit number (N mod 8)
-    in octet number N/8 where the low-order bit of each octet is bit0,
-    and the high order bit is bit7.
-    Each set bit in virtual bitmap corresponds to traffic buffered by AP
-    for a specific station (with corresponding AID?).
-    Partial Virtual Bitmap shows a part of bitmap which has non-zero.
-    Bitmap Offset is a number of skipped zero octets (see above).
-    'Missing' octets at the tail are also assumed to be zero.
-    Example: Length=6, Bitmap_Offset=2, Partial_Virtual_Bitmap=55 55 55
-    This means that traffic-indication bitmap is:
-    00000000 00000000 01010101 01010101 01010101 00000000 00000000...
-    (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
-*/
-static int acx_s_set_tim_template(acx_device_t * adev)
-{
-/* For now, configure smallish test bitmap, all zero ("no pending data") */
-	enum { bitmap_size = 5 };
-
-	acx_template_tim_t t;
-	int result;
-
-	FN_ENTER;
-
-	memset(&t, 0, sizeof(t));
-	t.size = 5 + bitmap_size;	/* eid+len+count+period+bmap_ctrl + bmap */
-	t.tim_eid = WLAN_EID_TIM;
-	t.len = 3 + bitmap_size;	/* count+period+bmap_ctrl + bmap */
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(t));
-	FN_EXIT1(result);
-	return result;
-}
 
 
 
@@ -4230,86 +4377,6 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 
 
 
-/***********************************************************************
-** acx_s_init_packet_templates()
-**
-** NOTE: order is very important here, to have a correct memory layout!
-** init templates: max Probe Request (station mode), max NULL data,
-** max Beacon, max TIM, max Probe Response.
-*/
-static int acx_s_init_packet_templates(acx_device_t * adev)
-{
-	acx_ie_memmap_t mm;	/* ACX100 only */
-	int result = NOT_OK;
-
-	FN_ENTER;
-
-	log(L_DEBUG | L_INIT, "acx: initializing max packet templates\n");
-
-	if (OK != acx_s_init_max_probe_request_template(adev))
-		goto failed;
-
-	if (OK != acx_s_init_max_null_data_template(adev))
-		goto failed;
-
-	if (OK != acx_s_init_max_beacon_template(adev))
-		goto failed;
-
-	if (OK != acx_s_init_max_tim_template(adev))
-		goto failed;
-
-	if (OK != acx_s_init_max_probe_response_template(adev))
-		goto failed;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111 doesn't need the memory map magic below,
-		 * and the other templates will be set later (acx_start) */
-		result = OK;
-		goto success;
-	}
-
-	/* ACX100 will have its TIM template set,
-	 * and we also need to update the memory map */
-
-	if (OK != acx_s_set_tim_template(adev))
-		goto failed_acx100;
-
-	log(L_DEBUG, "acx: sizeof(memmap) = %d bytes\n", (int)sizeof(mm));
-
-	if (OK != acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP))
-		goto failed_acx100;
-
-	mm.QueueStart = cpu_to_le32(le32_to_cpu(mm.PacketTemplateEnd) + 4);
-	if (OK != acx_s_configure(adev, &mm, ACX1xx_IE_MEMORY_MAP))
-		goto failed_acx100;
-
-	result = OK;
-	goto success;
-
-      failed_acx100:
-	log(L_DEBUG | L_INIT,
-	    /* "cb=0x%X\n" */
-	    "acx: ACXMemoryMap:\n"
-	    "acx: .CodeStart=0x%X\n"
-	    "acx: .CodeEnd=0x%X\n"
-	    "acx: .WEPCacheStart=0x%X\n"
-	    "acx: .WEPCacheEnd=0x%X\n"
-	    "acx: .PacketTemplateStart=0x%X\n" ".PacketTemplateEnd=0x%X\n",
-	    /* len, */
-	    le32_to_cpu(mm.CodeStart),
-	    le32_to_cpu(mm.CodeEnd),
-	    le32_to_cpu(mm.WEPCacheStart),
-	    le32_to_cpu(mm.WEPCacheEnd),
-	    le32_to_cpu(mm.PacketTemplateStart),
-	    le32_to_cpu(mm.PacketTemplateEnd));
-
-      failed:
-	printk("acx: %s: %s() FAILED\n", wiphy_name(adev->ieee->wiphy), __func__);
-
-      success:
-	FN_EXIT1(result);
-	return result;
-}
 
 
 
@@ -4383,70 +4450,8 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 ** Called by ioctl commit handler, acx_start, acx_set_defaults,
 ** acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
 */
-static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
-{
-	unsigned mask;
 
-	unsigned int i;
 
-	for (i = 0; i < sizeof(acx_reg_domain_ids); i++)
-		if (acx_reg_domain_ids[i] == adev->reg_dom_id)
-			break;
-
-	if (sizeof(acx_reg_domain_ids) == i) {
-		log(L_INIT, "acx: Invalid or unsupported regulatory domain"
-			       " 0x%02X specified, falling back to FCC (USA)!"
-			       " Please report if this sounds fishy!\n",
-				adev->reg_dom_id);
-		i = 0;
-		adev->reg_dom_id = acx_reg_domain_ids[i];
-
-		/* since there was a mismatch, we need to force updating */
-		do_set = 1;
-	}
-
-	if (do_set) {
-		acx_ie_generic_t dom;
-		dom.m.bytes[0] = adev->reg_dom_id;
-		acx_s_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
-	}
-
-	adev->reg_dom_chanmask = reg_domain_channel_masks[i];
-
-	mask = (1 << (adev->channel - 1));
-	if (!(adev->reg_dom_chanmask & mask)) {
-	/* hmm, need to adjust our channel to reside within domain */
-		mask = 1;
-		for (i = 1; i <= 14; i++) {
-			if (adev->reg_dom_chanmask & mask) {
-				printk("acx: %s: adjusting the selected channel from %d "
-					"to %d due to the new regulatory domain\n",
-					wiphy_name(adev->ieee->wiphy), adev->channel, i);
-				adev->channel = i;
-				break;
-			}
-			mask <<= 1;
-		}
-	}
-}
-
-static void acx111_s_sens_radio_16_17(acx_device_t * adev)
-{
-	u32 feature1, feature2;
-
-	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
-		printk("acx: %s: invalid sensitivity setting (1..3), "
-		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
-		adev->sensitivity = 1;
-	}
-	acx111_s_get_feature_config(adev, &feature1, &feature2);
-	CLEAR_BIT(feature1, FEATURE1_LOW_RX | FEATURE1_EXTRA_LOW_RX);
-	if (adev->sensitivity > 1)
-		SET_BIT(feature1, FEATURE1_LOW_RX);
-	if (adev->sensitivity > 2)
-		SET_BIT(feature1, FEATURE1_EXTRA_LOW_RX);
-	acx111_s_feature_set(adev, feature1, feature2);
-}
 
 
 
