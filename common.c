@@ -82,19 +82,19 @@ static int acx111_s_create_dma_regions(acx_device_t *adev);
 // Control Path (CMD handling, init, reset)
 //-----
 
-// CMDs
+// CMDs (Control Path)
 static int acx111_s_get_feature_config(acx_device_t *adev, u32 *feature_options, u32 *data_flow_options);
 static int acx111_s_set_feature_config(acx_device_t *adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
 
-// Configure
+// Configure (Control Path)
 static void acx_s_select_opmode(acx_device_t *adev);
 static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
-// Template (Control path)
+// Template (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
 static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
@@ -172,29 +172,6 @@ static u8 acx_signal_to_winlevel(u8 rawlevel);
 // -----
 static int acx_e_init_module(void);
 static void acx_e_cleanup_module(void);
-
-// ---
-static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
-static void acx_s_initialize_rx_config(acx_device_t * adev);
-static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
-static void acx111_s_sens_radio_16_17(acx_device_t * adev);
-static int acx_s_set_tim_template(acx_device_t * adev);
-static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
-static void acx_s_set_wepkey(acx_device_t * adev);
-static int acx_s_init_packet_templates(acx_device_t * adev);
-static int acx100_s_init_wep(acx_device_t * adev);
-
-static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
-static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
-static inline int acx_s_init_max_null_data_template(acx_device_t * adev);
-static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
-static inline int acx_s_init_max_tim_template(acx_device_t * adev);
-static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
-static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
-
-static u8 acx_signal_to_winlevel(u8 rawlevel);
-
-static void acx_s_after_interrupt_recalib(acx_device_t * adev);
 
 /*
  * BOM Defines, static vars, etc.
@@ -1485,7 +1462,8 @@ acx_s_parse_configoption(acx_device_t * adev,
  */
 
 // BOM CMDs (Control Path)
-// -------------------
+// --------------------
+
 #if !ACX_DEBUG
 int acx_s_configure(acx_device_t * adev, void *pdr, int type)
 {
@@ -1804,8 +1782,8 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         FN_EXIT0;
 }
 
-// BOM Configure (Control path)
-// ------------------------
+// BOM Configure (Control Path)
+// --------------------
 void acx_s_set_defaults(acx_device_t * adev)
 {
 	struct ieee80211_conf *conf = &adev->ieee->conf;
@@ -2752,7 +2730,7 @@ void acx_update_capabilities(acx_device_t * adev)
 }
 */
 
-// BOM Template (Control path)
+// BOM Template (Control Path)
 // --------------------
 static int
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
@@ -3003,8 +2981,8 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 }
 #endif
 
-// BOM Recalibration (Control path)
-// --------------------------------
+// BOM Recalibration (Control Path)
+// --------------------
 static int acx_s_recalib_radio(acx_device_t *adev) {
 
 	if (IS_ACX111(adev)) {
@@ -3099,7 +3077,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 }
 
 
-// BOM Other (Control path)
+// BOM Other (Control Path)
 // --------------------
 
 #if POWER_SAVE_80211
