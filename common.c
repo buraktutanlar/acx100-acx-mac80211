@@ -99,10 +99,9 @@ static void acx_s_select_opmode(acx_device_t *adev);
 static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
-// Other (Control Path)
+// Template (Control path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
 static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
-
 static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t *adev);
 static int acx_s_init_packet_templates(acx_device_t *adev);
@@ -113,6 +112,14 @@ static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
 #if POWER_SAVE_80211
 static int acx_s_set_null_data_template(acx_device_t * adev);
+#endif
+
+// Recalibration (Control Path)
+static int acx_s_recalib_radio(acx_device_t *adev);
+static void acx_s_after_interrupt_recalib(acx_device_t * adev);
+
+// Other (Control Path)
+#if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 #endif
 
@@ -181,8 +188,8 @@ static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static void acx_s_set_wepkey(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
-static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 
+static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
 static inline int acx_s_init_max_null_data_template(acx_device_t * adev);
 static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
@@ -2718,7 +2725,7 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 	return 0;
 }
 
-// BOM Other (Control path)
+// BOM Template (Control path)
 // --------------------
 static int
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
@@ -2969,6 +2976,105 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 }
 #endif
 
+// BOM Recalibration (Control path)
+// --------------------------------
+static int acx_s_recalib_radio(acx_device_t *adev) {
+
+	if (IS_ACX111(adev)) {
+		acx111_cmd_radiocalib_t cal;
+
+		/* automatic recalibration, choose all methods: */
+		cal.methods = cpu_to_le32(0x8000000f);
+		/* automatic recalibration every 60 seconds (value in TUs)
+		 * I wonder what the firmware default here is? */
+		cal.interval = cpu_to_le32(58594);
+		return acx_s_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
+				&cal, sizeof(cal),
+				CMD_TIMEOUT_MS(100));
+	} else {
+		/* On ACX100, we need to recalibrate the radio
+		 * by issuing a GETSET_TX|GETSET_RX */
+		if (
+		/* (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
+		 (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
+		(acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1) == OK)
+				&& (acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1)
+						== OK))
+			return OK;
+
+		return NOT_OK;
+	}
+}
+
+static void acx_s_after_interrupt_recalib(acx_device_t * adev)
+{
+	int res;
+
+	/* this helps with ACX100 at least;
+	 * hopefully ACX111 also does a
+	 * recalibration here */
+
+	/* clear flag beforehand, since we want to make sure
+	 * it's cleared; then only set it again on specific circumstances */
+	CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+
+	/* better wait a bit between recalibrations to
+	 * prevent overheating due to torturing the card
+	 * into working too long despite high temperature
+	 * (just a safety measure) */
+	if (adev->recalib_time_last_success
+	    && time_before(jiffies, adev->recalib_time_last_success
+			   + RECALIB_PAUSE * 60 * HZ)) {
+		if (adev->recalib_msg_ratelimit <= 4) {
+			logf1(L_ANY, "%s: less than " STRING(RECALIB_PAUSE)
+			       " minutes since last radio recalibration, "
+			       "not recalibrating (maybe the card is too hot?)\n",
+			       wiphy_name(adev->ieee->wiphy));
+			adev->recalib_msg_ratelimit++;
+			if (adev->recalib_msg_ratelimit == 5)
+				logf0(L_ANY, "disabling the above message until next recalib\n");
+		}
+		return;
+	}
+
+	adev->recalib_msg_ratelimit = 0;
+
+	/* note that commands sometimes fail (card busy),
+	 * so only clear flag if we were fully successful */
+	res = acx_s_recalib_radio(adev);
+	if (res == OK) {
+		printk("acx: %s: successfully recalibrated radio\n",
+		       wiphy_name(adev->ieee->wiphy));
+		adev->recalib_time_last_success = jiffies;
+		adev->recalib_failure_count = 0;
+	} else {
+		/* failed: resubmit, but only limited
+		 * amount of times within some time range
+		 * to prevent endless loop */
+
+		adev->recalib_time_last_success = 0;	/* we failed */
+
+		/* if some time passed between last
+		 * attempts, then reset failure retry counter
+		 * to be able to do next recalib attempt */
+		if (time_after
+		    (jiffies, adev->recalib_time_last_attempt + 5 * HZ))
+			adev->recalib_failure_count = 0;
+
+		if (adev->recalib_failure_count < 5) {
+			/* increment inside only, for speedup of outside path */
+			adev->recalib_failure_count++;
+			adev->recalib_time_last_attempt = jiffies;
+			acx_schedule_task(adev,
+					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+		}
+	}
+}
+
+
+// BOM Other (Control path)
+// --------------------
+
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 {
@@ -3027,6 +3133,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	 * a NULL frame then). */
 }
 #endif
+
 
 
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
@@ -5296,105 +5403,6 @@ module_exit(acx_e_cleanup_module)
 
 
 
-#if 1
-/*
- *
- */
-static int acx_s_recalib_radio(acx_device_t *adev) {
-
-	if (IS_ACX111(adev)) {
-		acx111_cmd_radiocalib_t cal;
-
-		/* automatic recalibration, choose all methods: */
-		cal.methods = cpu_to_le32(0x8000000f);
-		/* automatic recalibration every 60 seconds (value in TUs)
-		 * I wonder what the firmware default here is? */
-		cal.interval = cpu_to_le32(58594);
-		return acx_s_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
-				&cal, sizeof(cal),
-				CMD_TIMEOUT_MS(100));
-	} else {
-		/* On ACX100, we need to recalibrate the radio
-		 * by issuing a GETSET_TX|GETSET_RX */
-		if (
-		/* (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
-		 (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
-		(acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1) == OK)
-				&& (acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1)
-						== OK))
-			return OK;
-
-		return NOT_OK;
-	}
-}
-#endif // if 0
-
-#if 1
-static void acx_s_after_interrupt_recalib(acx_device_t * adev)
-{
-	int res;
-
-	/* this helps with ACX100 at least;
-	 * hopefully ACX111 also does a
-	 * recalibration here */
-
-	/* clear flag beforehand, since we want to make sure
-	 * it's cleared; then only set it again on specific circumstances */
-	CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-
-	/* better wait a bit between recalibrations to
-	 * prevent overheating due to torturing the card
-	 * into working too long despite high temperature
-	 * (just a safety measure) */
-	if (adev->recalib_time_last_success
-	    && time_before(jiffies, adev->recalib_time_last_success
-			   + RECALIB_PAUSE * 60 * HZ)) {
-		if (adev->recalib_msg_ratelimit <= 4) {
-			logf1(L_ANY, "%s: less than " STRING(RECALIB_PAUSE)
-			       " minutes since last radio recalibration, "
-			       "not recalibrating (maybe the card is too hot?)\n",
-			       wiphy_name(adev->ieee->wiphy));
-			adev->recalib_msg_ratelimit++;
-			if (adev->recalib_msg_ratelimit == 5)
-				logf0(L_ANY, "disabling the above message until next recalib\n");
-		}
-		return;
-	}
-
-	adev->recalib_msg_ratelimit = 0;
-
-	/* note that commands sometimes fail (card busy),
-	 * so only clear flag if we were fully successful */
-	res = acx_s_recalib_radio(adev);
-	if (res == OK) {
-		printk("acx: %s: successfully recalibrated radio\n",
-		       wiphy_name(adev->ieee->wiphy));
-		adev->recalib_time_last_success = jiffies;
-		adev->recalib_failure_count = 0;
-	} else {
-		/* failed: resubmit, but only limited
-		 * amount of times within some time range
-		 * to prevent endless loop */
-
-		adev->recalib_time_last_success = 0;	/* we failed */
-
-		/* if some time passed between last
-		 * attempts, then reset failure retry counter
-		 * to be able to do next recalib attempt */
-		if (time_after
-		    (jiffies, adev->recalib_time_last_attempt + 5 * HZ))
-			adev->recalib_failure_count = 0;
-
-		if (adev->recalib_failure_count < 5) {
-			/* increment inside only, for speedup of outside path */
-			adev->recalib_failure_count++;
-			adev->recalib_time_last_attempt = jiffies;
-			acx_schedule_task(adev,
-					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-		}
-	}
-}
-#endif
 
 
 /***********************************************************************
