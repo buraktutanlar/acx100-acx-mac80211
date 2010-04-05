@@ -23,21 +23,16 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
-#include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/ethtool.h>
-#include <linux/ctype.h>
 
 #include "acx.h"
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
-
 
 /*
  * Module
