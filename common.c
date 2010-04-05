@@ -1958,7 +1958,13 @@ void acx_s_set_defaults(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-
+/*
+ * acx_s_update_card_settings
+ *
+ * Applies accumulated changes in various adev->xxxx members
+ * Called by ioctl commit handler, acx_start, acx_set_defaults,
+ * acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
+ */
 void acx_s_update_card_settings(acx_device_t *adev)
 {
 	unsigned long flags;
@@ -5312,16 +5318,6 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	 * a NULL frame then). */
 }
 #endif
-
-
-/***********************************************************************
-** acx_s_update_card_settings
-**
-** Applies accumulated changes in various adev->xxxx members
-** Called by ioctl commit handler, acx_start, acx_set_defaults,
-** acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
-*/
-
 
 
 
