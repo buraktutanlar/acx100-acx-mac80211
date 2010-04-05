@@ -132,11 +132,20 @@ static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
 #endif
 
 // Rx Path
+// -----
 static void acx_s_initialize_rx_config(acx_device_t *adev);
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
+// -----
 
+// Crypto
+// -----
+static void acx100_s_set_wepkey(acx_device_t *adev);
+static void acx111_s_set_wepkey(acx_device_t *adev);
+static void acx_s_set_wepkey(acx_device_t *adev);
+static int acx100_s_init_wep(acx_device_t *adev);
+static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr);
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -3919,6 +3928,443 @@ out:
 	return txresult;
 }
 
+/*
+ * BOM Crypto
+ * ==================================================
+ */
+static void acx100_s_set_wepkey(acx_device_t * adev)
+{
+	ie_dot11WEPDefaultKey_t dk;
+	int i;
+
+	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
+		if (adev->wep_keys[i].size != 0) {
+			log(L_INIT, "acx: setting WEP key: %d with "
+			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
+			dk.action = 1;
+			dk.keySize = adev->wep_keys[i].size;
+			dk.defaultKeyNum = i;
+			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
+			acx_s_configure(adev, &dk,
+					ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
+		}
+	}
+}
+
+static void acx111_s_set_wepkey(acx_device_t * adev)
+{
+	acx111WEPDefaultKey_t dk;
+	int i;
+
+	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
+		if (adev->wep_keys[i].size != 0) {
+			log(L_INIT, "acx: setting WEP key: %d with "
+			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
+			memset(&dk, 0, sizeof(dk));
+			dk.action = cpu_to_le16(1);	/* "add key"; yes, that's a 16bit value */
+			dk.keySize = adev->wep_keys[i].size;
+
+			/* are these two lines necessary? */
+			dk.type = 0;	/* default WEP key */
+			dk.index = 0;	/* ignored when setting default key */
+
+			dk.defaultKeyNum = i;
+			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
+			acx_s_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk,
+					sizeof(dk));
+		}
+	}
+}
+
+static void acx_s_set_wepkey(acx_device_t * adev)
+{
+	if (IS_ACX111(adev))
+		acx111_s_set_wepkey(adev);
+	else
+		acx100_s_set_wepkey(adev);
+}
+
+/*
+ * acx100_s_init_wep
+ *
+ * FIXME: this should probably be moved into the new card settings
+ * management, but since we're also modifying the memory map layout here
+ * due to the WEP key space we want, we should take care...
+ */
+static int acx100_s_init_wep(acx_device_t * adev)
+{
+	// acx100_ie_wep_options_t options;
+	// ie_dot11WEPDefaultKeyID_t dk;
+	acx_ie_memmap_t pt;
+	int res = NOT_OK;
+
+	FN_ENTER;
+
+	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		goto fail;
+	}
+
+	log(L_DEBUG, "acx: CodeEnd:%X\n", pt.CodeEnd);
+
+	pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
+	pt.WEPCacheEnd = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
+
+	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		goto fail;
+	}
+
+/* OW: This disables WEP by not configuring the WEP cache and leaving
+ * WEPCacheStart=WEPCacheEnd.
+ *
+ * When doing the crypto by mac80211 it is required, that the acx is not doing
+ * any WEP crypto himself. Otherwise TX "WEP key not found" errors occure.
+ *
+ * By disabling WEP using WEPCacheStart=WEPCacheStart the acx not trying any
+ * own crypto anymore. All crypto (including WEP) is pushed to mac80211 for the
+ * moment.
+ *
+ */
+#if 0
+
+	/* let's choose maximum setting: 4 default keys, plus 10 other keys: */
+	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
+	options.WEPOption = 0x00;
+
+	log(L_ASSOC, "acx: writing WEP options\n");
+	acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
+
+	acx100_s_set_wepkey(adev);
+
+	if (adev->wep_keys[adev->wep_current_index].size != 0) {
+		log(L_ASSOC, "acx: setting active default WEP key number: %d\n",
+		    adev->wep_current_index);
+		dk.KeyID = adev->wep_current_index;
+		acx_s_configure(adev, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);	/* 0x1010 */
+	}
+	/* FIXME!!! wep_key_struct is filled nowhere! But adev
+	 * is initialized to 0, and we don't REALLY need those keys either */
+/*		for (i = 0; i < 10; i++) {
+		if (adev->wep_key_struct[i].len != 0) {
+			MAC_COPY(wep_mgmt.MacAddr, adev->wep_key_struct[i].addr);
+			wep_mgmt.KeySize = cpu_to_le16(adev->wep_key_struct[i].len);
+			memcpy(&wep_mgmt.Key, adev->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
+			wep_mgmt.Action = cpu_to_le16(1);
+			log(L_ASSOC, "acx: writing WEP key %d (len %d)\n", i, le16_to_cpu(wep_mgmt.KeySize));
+			if (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt))) {
+				adev->wep_key_struct[i].index = i;
+			}
+		}
+	}
+*/
+
+	/* now retrieve the updated WEPCacheEnd pointer... */
+	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		printk("acx: %s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
+		       wiphy_name(adev->ieee->wiphy));
+		goto fail;
+	}
+#endif
+
+	/* ...and tell it to start allocating templates at that location */
+	/* (no endianness conversion needed) */
+	pt.PacketTemplateStart = pt.WEPCacheEnd;
+
+	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+		printk("acx: %s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
+		       wiphy_name(adev->ieee->wiphy));
+		goto fail;
+	}
+	res = OK;
+
+      fail:
+	FN_EXIT1(res);
+	return res;
+}
+
+
+static void acx_keymac_write(acx_device_t * adev, u16 index, const u32 * addr)
+{
+	/* for keys 0-3 there is no associated mac address */
+	if (index < 4)
+		return;
+
+	index -= 4;
+	if (1) {
+		TODO();
+/*
+                bcm43xx_shm_write32(bcm,
+                                    BCM43xx_SHM_HWMAC,
+                                    index * 2,
+                                    cpu_to_be32(*addr));
+                bcm43xx_shm_write16(bcm,
+                                    BCM43xx_SHM_HWMAC,
+                                    (index * 2) + 1,
+                                    cpu_to_be16(*((u16 *)(addr + 1))));
+*/
+	} else {
+		if (index < 8) {
+			TODO();	/* Put them in the macaddress filter */
+		} else {
+			TODO();
+			/* Put them BCM43xx_SHM_SHARED, stating index 0x0120.
+			   Keep in mind to update the count of keymacs in 0x003 */
+		}
+	}
+}
+
+int acx_clear_keys(acx_device_t * adev)
+{
+	static const u32 zero_mac[2] = { 0 };
+	unsigned int i, j, nr_keys = 54;
+	u16 offset;
+
+	/* FixMe:Check for Number of Keys available */
+
+//        assert(nr_keys <= ARRAY_SIZE(adev->key));
+
+	for (i = 0; i < nr_keys; i++) {
+		adev->key[i].enabled = 0;
+		/* returns for i < 4 immediately */
+		acx_keymac_write(adev, i, zero_mac);
+/*
+                bcm43xx_shm_write16(adev, BCM43xx_SHM_SHARED,
+                                    0x100 + (i * 2), 0x0000);
+*/
+		for (j = 0; j < 8; j++) {
+			offset =
+			    adev->security_offset + (j * 4) +
+			    (i * ACX_SEC_KEYSIZE);
+/*
+                        bcm43xx_shm_write16(bcm, BCM43xx_SHM_SHARED,
+                                            offset, 0x0000);
+*/
+		}
+	}
+	return 1;
+}
+
+int acx_key_write(acx_device_t *adev,
+		  u16 index, u8 algorithm,
+		  const struct ieee80211_key_conf *key, const u8 *mac_addr)
+{
+	int result;
+
+	FN_ENTER;
+
+//       log(L_IOCTL, "acx: set encoding flags=0x%04X, size=%d, key: %s\n",
+//                       dwrq->flags, dwrq->length, extra ? "set" : "No key");
+
+//	acx_sem_lock(adev);
+
+	// index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
+	if (key->keylen > 0) {
+
+		/* if index is 0 or invalid, use default key */
+		if (index > 3)
+			index = (int) adev->wep_current_index;
+
+		if ((algorithm == ACX_SEC_ALGO_WEP) ||
+			  (algorithm == ACX_SEC_ALGO_WEP104)) {
+
+			switch (key->keylen) {
+			case 40 / 8:
+				/* WEP 40-bit =
+				 40-bit  entered key + 24 bit IV = 64-bit */
+				//adev->wep_keys[index].size = 13;
+
+				adev->wep_keys[index].size = 5;
+				break;
+
+			case 104 / 8:
+				/* WEP 104-bit =
+				 104-bit entered key + 24-bit IV = 128-bit */
+				// adev->wep_keys[index].size = 29;
+				adev->wep_keys[index].size = 13;
+				break;
+
+			case 128 / 8:
+				/* WEP 128-bit =
+				 128-bit entered key + 24 bit IV = 152-bit */
+				adev->wep_keys[index].size = 29;
+				break;
+
+			default:
+				adev->wep_keys[index].size = 0;
+				return -EINVAL; /* shouldn't happen */
+			}
+
+			memset(adev->wep_keys[index].key, 0,
+					sizeof(adev->wep_keys[index].key));
+			memcpy(adev->wep_keys[index].key, key->key, key->keylen);
+
+			adev->wep_current_index = index;
+
+		} else {
+			/* set transmit key */
+			if (index <= 3)
+				adev->wep_current_index = index;
+		}
+
+	}
+
+	adev->wep_enabled = ((algorithm == ACX_SEC_ALGO_WEP) ||	(algorithm == ACX_SEC_ALGO_WEP104));
+
+/*
+        adev->wep_enabled = !(dwrq->flags & IW_ENCODE_DISABLED);
+
+        if (algorithm & IW_ENCODE_OPEN) {
+                adev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
+                adev->wep_restricted = 0;
+
+        } else if (algorithm & IW_ENCODE_RESTRICTED) {
+                adev->auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
+                adev->wep_restricted = 1;
+        }
+*/
+//	adev->auth_alg = algorithm;
+	/* set flag to make sure the card WEP settings get updated */
+
+	/* OW
+	 if (adev->wep_enabled) {
+		SET_BIT(adev->set_mask, GETSET_WEP);
+		acx_s_update_card_settings(adev);
+		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	 }
+  */
+
+	/*
+        log(L_IOCTL, "acx: len=%d, key at 0x%p, flags=0x%X\n",
+                dwrq->length, extra, dwrq->flags);
+        for (index = 0; index <= 3; index++) {
+                if (adev->wep_keys[index].size) {
+                        log(L_IOCTL,    "acx: index=%d, size=%d, key at 0x%p\n",
+                                adev->wep_keys[index].index,
+                                (int) adev->wep_keys[index].size,
+                                adev->wep_keys[index].key);
+                }
+        }
+*/
+
+	result = -EINPROGRESS;
+//	acx_sem_unlock(adev);
+
+	FN_EXIT1(result);
+	return result;
+
+
+}
+
+int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+		struct ieee80211_key_conf *key) {
+
+	struct acx_device *adev = ieee2adev(hw);
+	// unsigned long flags;
+	u8 algorithm;
+	// u16 index;
+	int err = -EINVAL;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	/* OW Mac80211 SW crypto support:
+	 *
+	 * For the moment we do all crypto in sw with mac80211.
+	 * Cpu cycles are cheap, and acx100 can do only WEP in hw anyway.
+	 * TODO WEP hw support can still be added later, if required.
+	 */
+
+	switch (key->alg) {
+	case ALG_WEP:
+		if (key->keylen == 5) {
+			algorithm = ACX_SEC_ALGO_WEP;
+			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
+		} else {
+			algorithm = ACX_SEC_ALGO_WEP104;
+			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
+		}
+		// OW Let's try WEP in mac80211 sw
+		err = -EOPNOTSUPP;
+		break;
+
+	case ALG_TKIP:
+		algorithm = ACX_SEC_ALGO_TKIP;
+		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
+		err = -EOPNOTSUPP;
+		break;
+
+		break;
+	case ALG_CCMP:
+		algorithm = ACX_SEC_ALGO_AES;
+		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_AES");
+		err = -EOPNOTSUPP;
+		break;
+
+	default:
+		FIXME();
+		algorithm = ACX_SEC_ALGO_NONE;
+		err = -EOPNOTSUPP;
+	}
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return err;
+
+	// OW Everything below this lines, doesn't matter anymore for the moment.
+#if 0
+	index = (u8) (key->keyidx);
+	if (index >= ARRAY_SIZE(adev->key))
+		goto out;
+
+	acx_lock(adev, flags);
+
+	switch (cmd) {
+	case SET_KEY:
+
+		err = acx_key_write(adev, index, algorithm, key, addr);
+		if (err != -EINPROGRESS)
+			goto out_unlock;
+
+		key->hw_key_idx = index;
+
+		/*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
+		/*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
+		 adev->default_key_idx = index;*/
+
+		SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
+		adev->key[index].enabled = 1;
+		err = 0;
+
+		break;
+
+	case DISABLE_KEY:
+		adev->key[index].enabled = 0;
+		err = 0;
+		break;
+		/* case ENABLE_COMPRESSION:
+		 case DISABLE_COMPRESSION:
+		 err = 0;
+		 break; */
+	}
+
+	out_unlock:
+			acx_unlock(adev, flags);
+
+	if (adev->wep_enabled) {
+			SET_BIT(adev->set_mask, GETSET_WEP);
+			acx_s_update_card_settings(adev);
+			//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	}
+
+	out:
+
+	FN_EXIT0;
+
+	return err;
+#endif
+
+}
+
 
 
 // BOM Cleanup ======================================================
@@ -4187,158 +4633,8 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 
 
 
-/***********************************************************************
-** acx_s_set_wepkey
-*/
-static void acx100_s_set_wepkey(acx_device_t * adev)
-{
-	ie_dot11WEPDefaultKey_t dk;
-	int i;
-
-	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
-		if (adev->wep_keys[i].size != 0) {
-			log(L_INIT, "acx: setting WEP key: %d with "
-			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
-			dk.action = 1;
-			dk.keySize = adev->wep_keys[i].size;
-			dk.defaultKeyNum = i;
-			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
-			acx_s_configure(adev, &dk,
-					ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
-		}
-	}
-}
-
-static void acx111_s_set_wepkey(acx_device_t * adev)
-{
-	acx111WEPDefaultKey_t dk;
-	int i;
-
-	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
-		if (adev->wep_keys[i].size != 0) {
-			log(L_INIT, "acx: setting WEP key: %d with "
-			    "total size: %d\n", i, (int)adev->wep_keys[i].size);
-			memset(&dk, 0, sizeof(dk));
-			dk.action = cpu_to_le16(1);	/* "add key"; yes, that's a 16bit value */
-			dk.keySize = adev->wep_keys[i].size;
-
-			/* are these two lines necessary? */
-			dk.type = 0;	/* default WEP key */
-			dk.index = 0;	/* ignored when setting default key */
-
-			dk.defaultKeyNum = i;
-			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk,
-					sizeof(dk));
-		}
-	}
-}
-/* Obvious */
-static void acx_s_set_wepkey(acx_device_t * adev)
-{
-	if (IS_ACX111(adev))
-		acx111_s_set_wepkey(adev);
-	else
-		acx100_s_set_wepkey(adev);
-}
 
 
-/***********************************************************************
-** acx100_s_init_wep
-**
-** FIXME: this should probably be moved into the new card settings
-** management, but since we're also modifying the memory map layout here
-** due to the WEP key space we want, we should take care...
-*/
-static int acx100_s_init_wep(acx_device_t * adev)
-{
-	// acx100_ie_wep_options_t options;
-	// ie_dot11WEPDefaultKeyID_t dk;
-	acx_ie_memmap_t pt;
-	int res = NOT_OK;
-
-	FN_ENTER;
-
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-
-	log(L_DEBUG, "acx: CodeEnd:%X\n", pt.CodeEnd);
-
-	pt.WEPCacheStart = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
-	pt.WEPCacheEnd = cpu_to_le32(le32_to_cpu(pt.CodeEnd) + 0x4);
-
-	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		goto fail;
-	}
-
-/* OW: This disables WEP by not configuring the WEP cache and leaving
- * WEPCacheStart=WEPCacheEnd.
- *
- * When doing the crypto by mac80211 it is required, that the acx is not doing
- * any WEP crypto himself. Otherwise TX "WEP key not found" errors occure.
- *
- * By disabling WEP using WEPCacheStart=WEPCacheStart the acx not trying any
- * own crypto anymore. All crypto (including WEP) is pushed to mac80211 for the
- * moment.
- *
- */
-#if 0
-
-	/* let's choose maximum setting: 4 default keys, plus 10 other keys: */
-	options.NumKeys = cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
-	options.WEPOption = 0x00;
-
-	log(L_ASSOC, "acx: writing WEP options\n");
-	acx_s_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
-
-	acx100_s_set_wepkey(adev);
-
-	if (adev->wep_keys[adev->wep_current_index].size != 0) {
-		log(L_ASSOC, "acx: setting active default WEP key number: %d\n",
-		    adev->wep_current_index);
-		dk.KeyID = adev->wep_current_index;
-		acx_s_configure(adev, &dk, ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);	/* 0x1010 */
-	}
-	/* FIXME!!! wep_key_struct is filled nowhere! But adev
-	 * is initialized to 0, and we don't REALLY need those keys either */
-/*		for (i = 0; i < 10; i++) {
-		if (adev->wep_key_struct[i].len != 0) {
-			MAC_COPY(wep_mgmt.MacAddr, adev->wep_key_struct[i].addr);
-			wep_mgmt.KeySize = cpu_to_le16(adev->wep_key_struct[i].len);
-			memcpy(&wep_mgmt.Key, adev->wep_key_struct[i].key, le16_to_cpu(wep_mgmt.KeySize));
-			wep_mgmt.Action = cpu_to_le16(1);
-			log(L_ASSOC, "acx: writing WEP key %d (len %d)\n", i, le16_to_cpu(wep_mgmt.KeySize));
-			if (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &wep_mgmt, sizeof(wep_mgmt))) {
-				adev->wep_key_struct[i].index = i;
-			}
-		}
-	}
-*/
-
-	/* now retrieve the updated WEPCacheEnd pointer... */
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		printk("acx: %s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
-		       wiphy_name(adev->ieee->wiphy));
-		goto fail;
-	}
-#endif
-
-	/* ...and tell it to start allocating templates at that location */
-	/* (no endianness conversion needed) */
-	pt.PacketTemplateStart = pt.WEPCacheEnd;
-
-	if (OK != acx_s_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		printk("acx: %s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
-		       wiphy_name(adev->ieee->wiphy));
-		goto fail;
-	}
-	res = OK;
-
-      fail:
-	FN_EXIT1(res);
-	return res;
-}
 
 
 
@@ -5082,300 +5378,9 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 #endif
 
 
-// OW TODO Refactor to "acx_"keymac_write, even if not used currently
-// Or it could actually go out, since crypto and keys are handeled by mac80211
-static void keymac_write(acx_device_t * adev, u16 index, const u32 * addr)
-{
-	/* for keys 0-3 there is no associated mac address */
-	if (index < 4)
-		return;
-
-	index -= 4;
-	if (1) {
-		TODO();
-/*
-                bcm43xx_shm_write32(bcm,
-                                    BCM43xx_SHM_HWMAC,
-                                    index * 2,
-                                    cpu_to_be32(*addr));
-                bcm43xx_shm_write16(bcm,
-                                    BCM43xx_SHM_HWMAC,
-                                    (index * 2) + 1,
-                                    cpu_to_be16(*((u16 *)(addr + 1))));
-*/
-	} else {
-		if (index < 8) {
-			TODO();	/* Put them in the macaddress filter */
-		} else {
-			TODO();
-			/* Put them BCM43xx_SHM_SHARED, stating index 0x0120.
-			   Keep in mind to update the count of keymacs in 0x003 */
-		}
-	}
-}
-
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-
-int acx_clear_keys(acx_device_t * adev)
-{
-	static const u32 zero_mac[2] = { 0 };
-	unsigned int i, j, nr_keys = 54;
-	u16 offset;
-
-	/* FixMe:Check for Number of Keys available */
-
-//        assert(nr_keys <= ARRAY_SIZE(adev->key));
-
-	for (i = 0; i < nr_keys; i++) {
-		adev->key[i].enabled = 0;
-		/* returns for i < 4 immediately */
-		keymac_write(adev, i, zero_mac);
-/*
-                bcm43xx_shm_write16(adev, BCM43xx_SHM_SHARED,
-                                    0x100 + (i * 2), 0x0000);
-*/
-		for (j = 0; j < 8; j++) {
-			offset =
-			    adev->security_offset + (j * 4) +
-			    (i * ACX_SEC_KEYSIZE);
-/*
-                        bcm43xx_shm_write16(bcm, BCM43xx_SHM_SHARED,
-                                            offset, 0x0000);
-*/
-		}
-	}
-	return 1;
-}
-
-/**
-** Derived from mac80211 code, p54, bcm43xx_mac80211
-**
-*/
-
-int acx_key_write(acx_device_t *adev,
-		  u16 index, u8 algorithm,
-		  const struct ieee80211_key_conf *key, const u8 *mac_addr)
-{
-	int result;
-
-	FN_ENTER;
-
-//       log(L_IOCTL, "acx: set encoding flags=0x%04X, size=%d, key: %s\n",
-//                       dwrq->flags, dwrq->length, extra ? "set" : "No key");
-
-//	acx_sem_lock(adev);
-
-	// index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
-	if (key->keylen > 0) {
-
-		/* if index is 0 or invalid, use default key */
-		if (index > 3)
-			index = (int) adev->wep_current_index;
-
-		if ((algorithm == ACX_SEC_ALGO_WEP) ||
-			  (algorithm == ACX_SEC_ALGO_WEP104)) {
-
-			switch (key->keylen) {
-			case 40 / 8:
-				/* WEP 40-bit =
-				 40-bit  entered key + 24 bit IV = 64-bit */
-				//adev->wep_keys[index].size = 13;
-
-				adev->wep_keys[index].size = 5;
-				break;
-
-			case 104 / 8:
-				/* WEP 104-bit =
-				 104-bit entered key + 24-bit IV = 128-bit */
-				// adev->wep_keys[index].size = 29;
-				adev->wep_keys[index].size = 13;
-				break;
-
-			case 128 / 8:
-				/* WEP 128-bit =
-				 128-bit entered key + 24 bit IV = 152-bit */
-				adev->wep_keys[index].size = 29;
-				break;
-
-			default:
-				adev->wep_keys[index].size = 0;
-				return -EINVAL; /* shouldn't happen */
-			}
-
-			memset(adev->wep_keys[index].key, 0,
-					sizeof(adev->wep_keys[index].key));
-			memcpy(adev->wep_keys[index].key, key->key, key->keylen);
-
-			adev->wep_current_index = index;
-
-		} else {
-			/* set transmit key */
-			if (index <= 3)
-				adev->wep_current_index = index;
-		}
-
-	}
-
-	adev->wep_enabled = ((algorithm == ACX_SEC_ALGO_WEP) ||	(algorithm == ACX_SEC_ALGO_WEP104));
-
-/*
-        adev->wep_enabled = !(dwrq->flags & IW_ENCODE_DISABLED);
-
-        if (algorithm & IW_ENCODE_OPEN) {
-                adev->auth_alg = WLAN_AUTH_ALG_OPENSYSTEM;
-                adev->wep_restricted = 0;
-
-        } else if (algorithm & IW_ENCODE_RESTRICTED) {
-                adev->auth_alg = WLAN_AUTH_ALG_SHAREDKEY;
-                adev->wep_restricted = 1;
-        }
-*/
-//	adev->auth_alg = algorithm;
-	/* set flag to make sure the card WEP settings get updated */
-
-	/* OW
-	 if (adev->wep_enabled) {
-		SET_BIT(adev->set_mask, GETSET_WEP);
-		acx_s_update_card_settings(adev);
-		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	 }
-  */
-
-	/*
-        log(L_IOCTL, "acx: len=%d, key at 0x%p, flags=0x%X\n",
-                dwrq->length, extra, dwrq->flags);
-        for (index = 0; index <= 3; index++) {
-                if (adev->wep_keys[index].size) {
-                        log(L_IOCTL,    "acx: index=%d, size=%d, key at 0x%p\n",
-                                adev->wep_keys[index].index,
-                                (int) adev->wep_keys[index].size,
-                                adev->wep_keys[index].key);
-                }
-        }
-*/
-
-	result = -EINPROGRESS;
-//	acx_sem_unlock(adev);
-
-	FN_EXIT1(result);
-	return result;
 
 
-}
 
-int acx_e_op_set_key	(struct ieee80211_hw *hw, enum set_key_cmd cmd,
-			       struct ieee80211_vif *vif, struct ieee80211_sta *sta,
-			       struct ieee80211_key_conf *key) {
-
-	struct acx_device *adev = ieee2adev(hw);
-	// unsigned long flags;
-	u8 algorithm;
-	// u16 index;
-	int err = -EINVAL;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	/* OW Mac80211 SW crypto support:
-	 *
-	 * For the moment we do all crypto in sw with mac80211.
-	 * Cpu cycles are cheap, and acx100 can do only WEP in hw anyway.
-	 * TODO WEP hw support can still be added later, if required.
-	 */
-
-	switch (key->alg) {
-	case ALG_WEP:
-		if (key->keylen == 5) {
-			algorithm = ACX_SEC_ALGO_WEP;
-			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
-		} else {
-			algorithm = ACX_SEC_ALGO_WEP104;
-			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
-		}
-		// OW Let's try WEP in mac80211 sw
-		err = -EOPNOTSUPP;
-		break;
-
-	case ALG_TKIP:
-		algorithm = ACX_SEC_ALGO_TKIP;
-		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
-		err = -EOPNOTSUPP;
-		break;
-
-		break;
-	case ALG_CCMP:
-		algorithm = ACX_SEC_ALGO_AES;
-		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_AES");
-		err = -EOPNOTSUPP;
-		break;
-
-	default:
-		FIXME();
-		algorithm = ACX_SEC_ALGO_NONE;
-		err = -EOPNOTSUPP;
-	}
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return err;
-
-	// OW Everything below this lines, doesn't matter anymore for the moment.
-#if 0
-	index = (u8) (key->keyidx);
-	if (index >= ARRAY_SIZE(adev->key))
-		goto out;
-
-	acx_lock(adev, flags);
-
-	switch (cmd) {
-	case SET_KEY:
-
-		err = acx_key_write(adev, index, algorithm, key, addr);
-		if (err != -EINPROGRESS)
-			goto out_unlock;
-
-		key->hw_key_idx = index;
-
-		/*		CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT);*/
-		/*		if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
-		 adev->default_key_idx = index;*/
-
-		SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
-		adev->key[index].enabled = 1;
-		err = 0;
-
-		break;
-
-	case DISABLE_KEY:
-		adev->key[index].enabled = 0;
-		err = 0;
-		break;
-		/* case ENABLE_COMPRESSION:
-		 case DISABLE_COMPRESSION:
-		 err = 0;
-		 break; */
-	}
-
-	out_unlock:
-			acx_unlock(adev, flags);
-
-	if (adev->wep_enabled) {
-			SET_BIT(adev->set_mask, GETSET_WEP);
-			acx_s_update_card_settings(adev);
-			//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	}
-
-	out:
-
-	FN_EXIT0;
-
-	return err;
-#endif
-
-}
 
 
 
