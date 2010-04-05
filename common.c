@@ -157,6 +157,10 @@ static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr);
 // -----
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 
+// Driver, Module
+// -----
+static int acx_e_init_module(void);
+static void acx_e_cleanup_module(void);
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -4975,16 +4979,74 @@ const char* acx_get_packet_type_string(u16 fc)
 	return str;
 }
 
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
+
+static int __init acx_e_init_module(void)
+{
+	int r1, r2, r3;
+
+	acx_struct_size_check();
+
+	printk("acx: this driver is still EXPERIMENTAL\n"
+	       "acx: please read the README file and/or "
+	       "go to http://acx100.sourceforge.net/wiki for "
+	       "further information\n");
+
+#if defined(CONFIG_ACX_MAC80211_PCI)
+	r1 = acxpci_e_init_module();
+#else
+	r1 = -EINVAL;
+#endif
+
+#if defined(CONFIG_ACX_MAC80211_USB)
+	r2 = acxusb_e_init_module();
+#else
+	r2 = -EINVAL;
+#endif
+
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	r3 = acxmem_e_init_module();
+#else
+	r3 = -EINVAL;
+#endif
+
+	if (r3 && r2 && r1)		/* all three failed! */
+	{
+		printk ("acx: r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
+		return -EINVAL;
+	}
+
+	/* return success if at least one succeeded */
+	return 0;
+}
+
+static void __exit acx_e_cleanup_module(void)
+{
+#if defined(CONFIG_ACX_MAC80211_PCI)
+	acxpci_e_cleanup_module();
+#endif
+
+#if defined(CONFIG_ACX_MAC80211_USB)
+	acxusb_e_cleanup_module();
+#endif
+
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	acxmem_e_cleanup_module();
+#endif
+
+}
+
+module_init(acx_e_init_module)
+module_exit(acx_e_cleanup_module)
+
 
 // BOM Cleanup ======================================================
 
 
 
-
-
-/***********************************************************************
-** acx_cmd_status_str
-*/
 const char *acx_cmd_status_str(unsigned int state)
 {
 	static const char *const cmd_error_strings[] = {
@@ -5468,64 +5530,3 @@ void acx_update_capabilities(acx_device_t * adev)
  */
 
 
-
-/***********************************************************************
-** Linux Kernel Specific
-*/
-static int __init acx_e_init_module(void)
-{
-	int r1, r2, r3;
-
-	acx_struct_size_check();
-
-	printk("acx: this driver is still EXPERIMENTAL\n"
-	       "acx: please read the README file and/or "
-	       "go to http://acx100.sourceforge.net/wiki for "
-	       "further information\n");
-
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	r1 = acxpci_e_init_module();
-#else
-	r1 = -EINVAL;
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
-	r2 = acxusb_e_init_module();
-#else
-	r2 = -EINVAL;
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	r3 = acxmem_e_init_module();
-#else
-	r3 = -EINVAL;
-#endif
-
-	if (r3 && r2 && r1)		/* all three failed! */
-	{
-		printk ("acx: r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
-		return -EINVAL;
-	}
-
-	/* return success if at least one succeeded */
-	return 0;
-}
-
-static void __exit acx_e_cleanup_module(void)
-{
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	acxpci_e_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
-	acxusb_e_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	acxmem_e_cleanup_module();
-#endif
-
-}
-
-module_init(acx_e_init_module)
-    module_exit(acx_e_cleanup_module)
