@@ -147,6 +147,10 @@ static void acx_s_set_wepkey(acx_device_t *adev);
 static int acx100_s_init_wep(acx_device_t *adev);
 static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr);
 
+// Irq Handling, Timer
+// -----
+
+
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 static void acx_s_initialize_rx_config(acx_device_t * adev);
@@ -167,6 +171,8 @@ static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
 
 static u8 acx_signal_to_winlevel(u8 rawlevel);
+
+static void acx_s_after_interrupt_recalib(acx_device_t * adev);
 
 /*
  * BOM Defines, static vars, etc.
@@ -4365,6 +4371,208 @@ int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 }
 
+/*
+ * BOM Irq Handling, Timer
+ * ==================================================
+ */
+void acx_init_task_scheduler(acx_device_t *adev) {
+
+	/* configure task scheduler */
+#if defined(CONFIG_ACX_MAC80211_PCI)
+	if (IS_PCI(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxpci_interrupt_tasklet);
+		return;
+	}
+#endif
+#if defined(CONFIG_ACX_MAC80211_USB)
+	if (IS_USB(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxusb_interrupt_tasklet);
+		return;
+	}
+#endif
+#if defined(CONFIG_ACX_MAC80211_MEM)
+	if (IS_MEM(adev)) {
+		INIT_WORK(&adev->after_interrupt_task, acxmem_i_interrupt_tasklet);
+		return;
+	}
+#endif
+
+	logf0(L_ANY, "Unhandled adev device type!\n");
+	BUG();
+
+	// OW TODO Interrupt handling ...
+	/* OW In case of of tasklet ... but workqueues seem to be prefered
+	 tasklet_init(&adev->interrupt_tasklet,
+	 (void(*)(unsigned long)) acx_interrupt_tasklet,
+	 (unsigned long) adev);
+	 */
+
+}
+
+void acx_e_after_interrupt_task(acx_device_t *adev)
+{
+	unsigned long flags;
+
+	// OW 20090722 TODO Is all the locking required ???
+
+	FN_ENTER;
+
+	if (!adev->after_interrupt_jobs || !adev->initialized)
+		goto end_no_lock;	/* no jobs to do */
+
+	acx_sem_lock(adev);
+	acx_lock(adev, flags);
+
+	/* we see lotsa tx errors */
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
+		logf0(L_ANY, "Performing CMD_RADIO_RECALIB\n");
+		acx_unlock(adev, flags);
+		acx_s_after_interrupt_recalib(adev);
+		acx_lock(adev, flags);
+	}
+
+	/* a poor interrupt code wanted to do update_card_settings() */
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
+		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
+			acx_unlock(adev, flags);
+			acx_s_update_card_settings(adev);
+			acx_lock(adev, flags);
+		}
+		CLEAR_BIT(adev->after_interrupt_jobs,
+			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	}
+
+	/* 1) we detected that no Scan_Complete IRQ came from fw, or
+	 ** 2) we found too many STAs */
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
+		log(L_IRQ, "acx: sending a stop scan cmd...\n");
+
+		// OW Scanning is done by mac80211
+#if 0
+		acx_unlock(adev, flags);
+		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
+		acx_lock(adev, flags);
+		/* HACK: set the IRQ bit, since we won't get a
+		 * scan complete IRQ any more on ACX111 (works on ACX100!),
+		 * since _we_, not a fw, have stopped the scan */
+		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+#endif
+		CLEAR_BIT(adev->after_interrupt_jobs,
+			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
+	}
+
+	/* either fw sent Scan_Complete or we detected that
+	 ** no Scan_Complete IRQ came from fw. Finish scanning,
+	 ** pick join partner if any */
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_COMPLETE_SCAN) {
+		/* + scan kills current join status - restore it
+		 **   (do we need it for STA?) */
+		/* + does it happen only with active scans?
+		 **   active and passive scans? ALL scans including
+		 **   background one? */
+		/* + was not verified that everything is restored
+		 **   (but at least we start to emit beacons again) */
+		CLEAR_BIT(adev->after_interrupt_jobs,
+			  ACX_AFTER_IRQ_COMPLETE_SCAN);
+	}
+
+	/* STA auth or assoc timed out, start over again */
+
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
+		log(L_IRQ, "acx: sending a start_scan cmd...\n");
+		CLEAR_BIT(adev->after_interrupt_jobs,
+			  ACX_AFTER_IRQ_RESTART_SCAN);
+	}
+
+	/* whee, we got positive assoc response! 8) */
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
+		CLEAR_BIT(adev->after_interrupt_jobs,
+			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
+	}
+
+	/* others */
+	if(adev->after_interrupt_jobs)
+	{
+		printk("acx: %s: Jobs still to be run: 0x%02X\n",__func__, adev->after_interrupt_jobs);
+		adev->after_interrupt_jobs = 0;
+	}
+
+	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
+
+	end_no_lock:
+
+	FN_EXIT0;
+}
+
+/*
+ * acx_schedule_task
+ *
+ * Schedule the call of the after_interrupt method after leaving
+ * the interrupt context.
+ */
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
+
+	// OW TODO This has currently no effect
+	// OW TODO Interrupt handling ...
+
+	//	if (!adev->after_interrupt_jobs)
+	//	{
+	SET_BIT(adev->after_interrupt_jobs, set_flag);
+
+	// OW Use mac80211 workqueue
+	ieee80211_queue_work(adev->ieee, &adev->after_interrupt_task);
+
+	//	}
+}
+
+/*
+* acx_i_timer
+*
+* Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
+*/
+void acx_i_timer(unsigned long address)
+{
+	unsigned long flags;
+	acx_device_t *adev = (acx_device_t *) address;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+
+	FIXME();
+	/* We need calibration and stats gather tasks to perform here */
+
+	acx_unlock(adev, flags);
+
+	FN_EXIT0;
+}
+
+/*
+ * acx_set_timer
+ *
+ * Sets the 802.11 state management timer's timeout.
+ *
+ */
+void acx_set_timer(acx_device_t * adev, int timeout_us)
+{
+	FN_ENTER;
+
+	log(L_DEBUG | L_IRQ, "acx: %s(%u ms)\n", __func__, timeout_us / 1000);
+	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
+		printk("acx: attempt to set the timer "
+		       "when the card interface is not up!\n");
+		goto end;
+	}
+
+	/* first check if the timer was already initialized, THEN modify it */
+	if (adev->mgmt_timer.function) {
+		mod_timer(&adev->mgmt_timer,
+			  jiffies + (timeout_us * HZ / 1000000));
+	}
+      end:
+	FN_EXIT0;
+}
 
 
 // BOM Cleanup ======================================================
@@ -4574,57 +4782,8 @@ static u16 rate100to111(u8 r)
 */
 
 
-/***********************************************************************
-** acx_i_timer
-**
-** Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
-**
-** Obvious
-*/
-void acx_i_timer(unsigned long address)
-{
-	unsigned long flags;
-	acx_device_t *adev = (acx_device_t *) address;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-
-	FIXME();
-	/* We need calibration and stats gather tasks to perform here */
-
-	acx_unlock(adev, flags);
-
-	FN_EXIT0;
-}
 
 
-/***********************************************************************
-** acx_set_timer
-**
-** Sets the 802.11 state management timer's timeout.
-**
-** Linux derived
-*/
-void acx_set_timer(acx_device_t * adev, int timeout_us)
-{
-	FN_ENTER;
-
-	log(L_DEBUG | L_IRQ, "acx: %s(%u ms)\n", __func__, timeout_us / 1000);
-	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		printk("acx: attempt to set the timer "
-		       "when the card interface is not up!\n");
-		goto end;
-	}
-
-	/* first check if the timer was already initialized, THEN modify it */
-	if (adev->mgmt_timer.function) {
-		mod_timer(&adev->mgmt_timer,
-			  jiffies + (timeout_us * HZ / 1000000));
-	}
-      end:
-	FN_EXIT0;
-}
 
 
 
@@ -4896,160 +5055,10 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 }
 #endif
 
-void acx_e_after_interrupt_task(acx_device_t *adev)
-{
-	unsigned long flags;
-
-	// OW 20090722 TODO Is all the locking required ???
-
-	FN_ENTER;
-
-	if (!adev->after_interrupt_jobs || !adev->initialized)
-		goto end_no_lock;	/* no jobs to do */
-
-	acx_sem_lock(adev);
-	acx_lock(adev, flags);
-
-	/* we see lotsa tx errors */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-		logf0(L_ANY, "Performing CMD_RADIO_RECALIB\n");
-		acx_unlock(adev, flags);
-		acx_s_after_interrupt_recalib(adev);
-		acx_lock(adev, flags);
-	}
-
-	/* a poor interrupt code wanted to do update_card_settings() */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
-		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
-			acx_unlock(adev, flags);
-			acx_s_update_card_settings(adev);
-			acx_lock(adev, flags);
-		}
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	}
-
-	/* 1) we detected that no Scan_Complete IRQ came from fw, or
-	 ** 2) we found too many STAs */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
-		log(L_IRQ, "acx: sending a stop scan cmd...\n");
-
-		// OW Scanning is done by mac80211
-#if 0
-		acx_unlock(adev, flags);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
-		acx_lock(adev, flags);
-		/* HACK: set the IRQ bit, since we won't get a
-		 * scan complete IRQ any more on ACX111 (works on ACX100!),
-		 * since _we_, not a fw, have stopped the scan */
-		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
-#endif
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
-	}
-
-	/* either fw sent Scan_Complete or we detected that
-	 ** no Scan_Complete IRQ came from fw. Finish scanning,
-	 ** pick join partner if any */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_COMPLETE_SCAN) {
-		/* + scan kills current join status - restore it
-		 **   (do we need it for STA?) */
-		/* + does it happen only with active scans?
-		 **   active and passive scans? ALL scans including
-		 **   background one? */
-		/* + was not verified that everything is restored
-		 **   (but at least we start to emit beacons again) */
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_COMPLETE_SCAN);
-	}
-
-	/* STA auth or assoc timed out, start over again */
-
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
-		log(L_IRQ, "acx: sending a start_scan cmd...\n");
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_RESTART_SCAN);
-	}
-
-	/* whee, we got positive assoc response! 8) */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
-	}
-
-	/* others */
-	if(adev->after_interrupt_jobs)
-	{
-		printk("acx: %s: Jobs still to be run: 0x%02X\n",__func__, adev->after_interrupt_jobs);
-		adev->after_interrupt_jobs = 0;
-	}
-
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
-
-	end_no_lock:
-
-	FN_EXIT0;
-}
 
 
-/***********************************************************************
-** acx_schedule_task
-**
-** Schedule the call of the after_interrupt method after leaving
-** the interrupt context.
-*/
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
-
-	// OW TODO This has currently no effect
-	// OW TODO Interrupt handling ...
-
-	//	if (!adev->after_interrupt_jobs)
-	//	{
-	SET_BIT(adev->after_interrupt_jobs, set_flag);
-
-	// OW Use mac80211 workqueue
-	ieee80211_queue_work(adev->ieee, &adev->after_interrupt_task);
-
-	//	}
-}
 
 
-/***********************************************************************
-*/
-void acx_init_task_scheduler(acx_device_t *adev) {
-
-	/* configure task scheduler */
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	if (IS_PCI(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxpci_interrupt_tasklet);
-		return;
-	}
-#endif
-#if defined(CONFIG_ACX_MAC80211_USB)
-	if (IS_USB(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxusb_interrupt_tasklet);
-		return;
-	}
-#endif
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	if (IS_MEM(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxmem_i_interrupt_tasklet);
-		return;
-	}
-#endif
-
-	logf0(L_ANY, "Unhandled adev device type!\n");
-	BUG();
-
-	// OW TODO Interrupt handling ...
-	/* OW In case of of tasklet ... but workqueues seem to be prefered
-	 tasklet_init(&adev->interrupt_tasklet,
-	 (void(*)(unsigned long)) acx_interrupt_tasklet,
-	 (unsigned long) adev);
-	 */
-
-}
 
 
 
