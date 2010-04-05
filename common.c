@@ -3968,6 +3968,62 @@ out:
 	return txresult;
 }
 
+
+/*
+ * OW 20100405 This comment somehow lost it's function (wasn't me though!)
+ *
+ * acx_l_handle_txrate_auto
+ *
+ * Theory of operation:
+ * client->rate_cap is a bitmask of rates client is capable of.
+ * client->rate_cfg is a bitmask of allowed (configured) rates.
+ * It is set as a result of iwconfig rate N [auto]
+ * or iwpriv set_rates "N,N,N N,N,N" commands.
+ * It can be fixed (e.g. 0x0080 == 18Mbit only),
+ * auto (0x00ff == 18Mbit or any lower value),
+ * and code handles any bitmask (0x1081 == try 54Mbit,18Mbit,1Mbit _only_).
+ *
+ * client->rate_cur is a value for rate111 field in tx descriptor.
+ * It is always set to txrate_cfg sans zero or more most significant
+ * bits. This routine handles selection of new rate_cur value depending on
+ * outcome of last tx event.
+ *
+ * client->rate_100 is a precalculated rate value for acx100
+ * (we can do without it, but will need to calculate it on each tx).
+ *
+ * You cannot configure mixed usage of 5.5 and/or 11Mbit rate
+ * with PBCC and CCK modulation. Either both at CCK or both at PBCC.
+ * In theory you can implement it, but so far it is considered not worth doing.
+ *
+ * 22Mbit, of course, is PBCC always.
+ */
+
+/* maps acx100 tx descr rate field to acx111 one */
+/*
+static u16 rate100to111(u8 r)
+{
+	switch (r) {
+	case RATE100_1:
+		return RATE111_1;
+	case RATE100_2:
+		return RATE111_2;
+	case RATE100_5:
+	case (RATE100_5 | RATE100_PBCC511):
+		return RATE111_5;
+	case RATE100_11:
+	case (RATE100_11 | RATE100_PBCC511):
+		return RATE111_11;
+	case RATE100_22:
+		return RATE111_22;
+	default:
+		printk("acx: unexpected acx100 txrate: %u! "
+		       "Please report\n", r);
+		return RATE111_1;
+	}
+}
+*/
+
+
 /*
  * BOM Crypto
  * ==================================================
@@ -5095,58 +5151,6 @@ module_exit(acx_e_cleanup_module)
 // BOM Cleanup ======================================================
 
 
-
-/***********************************************************************
-** acx_l_handle_txrate_auto
-**
-** Theory of operation:
-** client->rate_cap is a bitmask of rates client is capable of.
-** client->rate_cfg is a bitmask of allowed (configured) rates.
-** It is set as a result of iwconfig rate N [auto]
-** or iwpriv set_rates "N,N,N N,N,N" commands.
-** It can be fixed (e.g. 0x0080 == 18Mbit only),
-** auto (0x00ff == 18Mbit or any lower value),
-** and code handles any bitmask (0x1081 == try 54Mbit,18Mbit,1Mbit _only_).
-**
-** client->rate_cur is a value for rate111 field in tx descriptor.
-** It is always set to txrate_cfg sans zero or more most significant
-** bits. This routine handles selection of new rate_cur value depending on
-** outcome of last tx event.
-**
-** client->rate_100 is a precalculated rate value for acx100
-** (we can do without it, but will need to calculate it on each tx).
-**
-** You cannot configure mixed usage of 5.5 and/or 11Mbit rate
-** with PBCC and CCK modulation. Either both at CCK or both at PBCC.
-** In theory you can implement it, but so far it is considered not worth doing.
-**
-** 22Mbit, of course, is PBCC always. */
-
-/* maps acx100 tx descr rate field to acx111 one */
-/*
-static u16 rate100to111(u8 r)
-{
-	switch (r) {
-	case RATE100_1:
-		return RATE111_1;
-	case RATE100_2:
-		return RATE111_2;
-	case RATE100_5:
-	case (RATE100_5 | RATE100_PBCC511):
-		return RATE111_5;
-	case RATE100_11:
-	case (RATE100_11 | RATE100_PBCC511):
-		return RATE111_11;
-	case RATE100_22:
-		return RATE111_22;
-	default:
-		printk("acx: unexpected acx100 txrate: %u! "
-		       "Please report\n", r);
-		return RATE111_1;
-	}
-}
-
-*/
 
 
 
