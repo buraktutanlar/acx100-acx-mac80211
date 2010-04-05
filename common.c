@@ -131,6 +131,12 @@ static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos);
 #endif
 
+// Rx Path
+static void acx_s_initialize_rx_config(acx_device_t *adev);
+static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
+
+// Tx Path
+
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -150,6 +156,8 @@ static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
 static inline int acx_s_init_max_tim_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
+
+static u8 acx_signal_to_winlevel(u8 rawlevel);
 
 /*
  * BOM Defines, static vars, etc.
@@ -3629,6 +3637,290 @@ static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
 
 #endif /* CONFIG_PROC_FS */
 
+/*
+ * BOM Rx Path
+ * ==================================================
+ */
+static void acx_s_initialize_rx_config(acx_device_t * adev)
+{
+	struct {
+		u16 id;
+		u16 len;
+		u16 rx_cfg1;
+		u16 rx_cfg2;
+	} ACX_PACKED cfg;
+
+	switch (adev->mode) {
+	case ACX_MODE_MONITOR:
+		adev->rx_config_1 = (u16) (0
+					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
+					   /* | RX_CFG1_FILTER_SSID        */
+					   /* | RX_CFG1_FILTER_BCAST       */
+					   /* | RX_CFG1_RCV_MC_ADDR1       */
+					   /* | RX_CFG1_RCV_MC_ADDR0       */
+					   /* | RX_CFG1_FILTER_ALL_MULTI   */
+					   /* | RX_CFG1_FILTER_BSSID       */
+					   /* | RX_CFG1_FILTER_MAC         */
+					   | RX_CFG1_RCV_PROMISCUOUS
+					   | RX_CFG1_INCLUDE_FCS
+					   /* | RX_CFG1_INCLUDE_PHY_HDR    */
+		    );
+		adev->rx_config_2 = (u16) (0
+					   | RX_CFG2_RCV_ASSOC_REQ
+					   | RX_CFG2_RCV_AUTH_FRAMES
+					   | RX_CFG2_RCV_BEACON_FRAMES
+					   | RX_CFG2_RCV_CONTENTION_FREE
+					   | RX_CFG2_RCV_CTRL_FRAMES
+					   | RX_CFG2_RCV_DATA_FRAMES
+					   | RX_CFG2_RCV_BROKEN_FRAMES
+					   | RX_CFG2_RCV_MGMT_FRAMES
+					   | RX_CFG2_RCV_PROBE_REQ
+					   | RX_CFG2_RCV_PROBE_RESP
+					   | RX_CFG2_RCV_ACK_FRAMES
+					   | RX_CFG2_RCV_OTHER);
+		break;
+	default:
+		adev->rx_config_1 = (u16) (0
+					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
+					   /* | RX_CFG1_FILTER_SSID        */
+					   /* | RX_CFG1_FILTER_BCAST       */
+					   /* | RX_CFG1_RCV_MC_ADDR1       */
+					   /* | RX_CFG1_RCV_MC_ADDR0       */
+					   /* | RX_CFG1_FILTER_ALL_MULTI   */
+					   /* | RX_CFG1_FILTER_BSSID       */
+					   /* | RX_CFG1_FILTER_MAC         */
+					    | RX_CFG1_RCV_PROMISCUOUS
+					   /* | RX_CFG1_INCLUDE_FCS */
+					   /* | RX_CFG1_INCLUDE_PHY_HDR   */
+		    );
+		adev->rx_config_2 = (u16) (0
+					   | RX_CFG2_RCV_ASSOC_REQ
+					   | RX_CFG2_RCV_AUTH_FRAMES
+					   | RX_CFG2_RCV_BEACON_FRAMES
+					   | RX_CFG2_RCV_CONTENTION_FREE
+					   | RX_CFG2_RCV_CTRL_FRAMES
+					   | RX_CFG2_RCV_DATA_FRAMES
+					   /*| RX_CFG2_RCV_BROKEN_FRAMES   */
+					   | RX_CFG2_RCV_MGMT_FRAMES
+					   | RX_CFG2_RCV_PROBE_REQ
+					   | RX_CFG2_RCV_PROBE_RESP
+					   | RX_CFG2_RCV_ACK_FRAMES
+					   | RX_CFG2_RCV_OTHER);
+		break;
+	}
+	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
+
+	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR)
+	    || (adev->firmware_numver >= 0x02000000))
+		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
+	else
+		adev->phy_header_len = 0;
+
+	log(L_DEBUG, "acx: setting RXconfig to %04X:%04X\n",
+	    adev->rx_config_1, adev->rx_config_2);
+	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
+	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
+	acx_s_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
+}
+
+/*
+ * acx_l_process_rxbuf
+ *
+ * NB: used by USB code also
+ */
+void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
+{
+	struct ieee80211_hdr *hdr;
+	u16 fc, buf_len;
+
+	FN_ENTER;
+
+	hdr = acx_get_wlan_hdr(adev, rxbuf);
+	fc = le16_to_cpu(hdr->frame_control);
+	/* length of frame from control field to first byte of FCS */
+	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
+
+	// For debugging
+	if (
+			((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
+			(acx_debug & (L_XFER|L_DATA))
+	){
+		printk(	"acx: rx: %s "
+				"time:%u len:%u signal:%u SNR:%u macstat:%02X "
+				"phystat:%02X phyrate:%u status:%u\n",
+				acx_get_packet_type_string(fc),
+
+				le32_to_cpu(rxbuf->time),
+				buf_len,
+				acx_signal_to_winlevel(rxbuf->phy_level),
+				acx_signal_to_winlevel(rxbuf->phy_snr),
+				rxbuf->mac_status,
+
+				rxbuf->phy_stat_baseband,
+				rxbuf->phy_plcp_signal,
+				adev->status);
+	}
+
+	if (unlikely(acx_debug & L_DATA)) {
+		printk("acx: rx: 802.11 buf[%u]: \n", buf_len);
+		acx_dump_bytes(hdr, buf_len);
+	}
+
+	acx_l_rx(adev, rxbuf);
+	/* Now check Rx quality level, AFTER processing packet.
+	 * I tried to figure out how to map these levels to dBm
+	 * values, but for the life of me I really didn't
+	 * manage to get it. Either these values are not meant to
+	 * be expressed in dBm, or it's some pretty complicated
+	 * calculation. */
+
+	/* TODO: only the RSSI seems to be reported */
+	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
+
+	FN_EXIT0;
+}
+
+/*
+ * acx_l_rx
+ *
+ * The end of the Rx path. Pulls data from a rxhostdesc into a socket
+ * buffer and feeds it to the network stack via netif_rx().
+ */
+static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
+{
+
+	struct ieee80211_rx_status *status;
+
+	struct ieee80211_hdr *w_hdr;
+	struct sk_buff *skb;
+	int buflen;
+	FN_ENTER;
+
+	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		printk("acx: asked to receive a packet but the interface is down??\n");
+		goto out;
+	}
+
+	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
+	buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
+
+	/*
+	 * Allocate our skb
+	 */
+	skb = dev_alloc_skb(buflen + 2);
+	if (!skb) {
+		printk("acx: skb allocation FAILED\n");
+		goto out;
+	}
+
+	skb_reserve(skb, 2);
+	skb_put(skb, buflen);
+	memcpy(skb->data, w_hdr, buflen);
+
+	status=IEEE80211_SKB_RXCB(skb);
+	memset(status, 0, sizeof(*status));
+
+	status->mactime = rxbuf->time;
+	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
+
+	/* TODO: they do not seem to be reported, at least on the acx111
+	 * (and TNETW1450?), therefore commenting them out
+	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
+	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
+
+	status->flag = 0;
+
+	status->freq = adev->rx_status.freq;
+	status->band = adev->rx_status.band;
+
+	status->antenna = 1;
+	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
+		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
+	}
+	else {
+		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
+	}
+
+	/*
+	 * FIXME: should it really be done here??
+	 */
+	ieee80211_rx_irqsafe(adev->ieee, skb);
+	adev->stats.rx_packets++;
+	adev->stats.rx_bytes += skb->len;
+
+out:
+	FN_EXIT0;
+}
+
+/*
+ * BOM Tx Path
+ * ==================================================
+ */
+int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
+	acx_device_t *adev = ieee2adev(hw);
+	tx_t *tx;
+	void *txbuf;
+	unsigned long flags;
+
+	struct ieee80211_tx_info *ctl = IEEE80211_SKB_CB(skb);
+	int txresult = NOT_OK;
+
+	FN_ENTER;
+
+	if (unlikely(!skb)) {
+		/* indicate success */
+		txresult = OK;
+		goto out;
+	}
+
+	if (unlikely(!adev)) {
+		goto out;
+	}
+
+	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		goto out;
+	}
+	if (unlikely(!adev->initialized)) {
+		goto out;
+	}
+
+	acx_lock(adev, flags);
+
+	tx = acx_l_alloc_tx(adev, skb->len);
+
+	if (unlikely(!tx)) {
+		log(L_BUFT, "acx: %s: start_xmit: txdesc ring is full, " "dropping tx\n", wiphy_name(adev->ieee->wiphy));
+		txresult = NOT_OK;
+		goto out_unlock;
+	}
+
+	txbuf = acx_l_get_txbuf(adev, tx);
+
+	if (unlikely(!txbuf)) {
+		/* Card was removed */
+		txresult = NOT_OK;
+		// OW only USB implemented
+		acx_l_dealloc_tx(adev, tx);
+		goto out_unlock;
+	}
+	memcpy(txbuf, skb->data, skb->len);
+
+	acx_l_tx_data(adev, tx, skb->len, ctl, skb);
+
+	txresult = OK;
+	adev->stats.tx_packets++;
+	adev->stats.tx_bytes += skb->len;
+
+out_unlock:
+	acx_unlock(adev, flags);
+
+out:
+	FN_EXIT1(txresult);
+	return txresult;
+}
+
+
+
 // BOM Cleanup ======================================================
 
 
@@ -3775,151 +4067,12 @@ void great_inquisitor(acx_device_t * adev)
 
 
 
-/***********************************************************************
-*/
-static void acx_s_initialize_rx_config(acx_device_t * adev)
-{
-	struct {
-		u16 id;
-		u16 len;
-		u16 rx_cfg1;
-		u16 rx_cfg2;
-	} ACX_PACKED cfg;
-
-	switch (adev->mode) {
-	case ACX_MODE_MONITOR:
-		adev->rx_config_1 = (u16) (0
-					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
-					   /* | RX_CFG1_FILTER_SSID        */
-					   /* | RX_CFG1_FILTER_BCAST       */
-					   /* | RX_CFG1_RCV_MC_ADDR1       */
-					   /* | RX_CFG1_RCV_MC_ADDR0       */
-					   /* | RX_CFG1_FILTER_ALL_MULTI   */
-					   /* | RX_CFG1_FILTER_BSSID       */
-					   /* | RX_CFG1_FILTER_MAC         */
-					   | RX_CFG1_RCV_PROMISCUOUS
-					   | RX_CFG1_INCLUDE_FCS
-					   /* | RX_CFG1_INCLUDE_PHY_HDR    */
-		    );
-		adev->rx_config_2 = (u16) (0
-					   | RX_CFG2_RCV_ASSOC_REQ
-					   | RX_CFG2_RCV_AUTH_FRAMES
-					   | RX_CFG2_RCV_BEACON_FRAMES
-					   | RX_CFG2_RCV_CONTENTION_FREE
-					   | RX_CFG2_RCV_CTRL_FRAMES
-					   | RX_CFG2_RCV_DATA_FRAMES
-					   | RX_CFG2_RCV_BROKEN_FRAMES
-					   | RX_CFG2_RCV_MGMT_FRAMES
-					   | RX_CFG2_RCV_PROBE_REQ
-					   | RX_CFG2_RCV_PROBE_RESP
-					   | RX_CFG2_RCV_ACK_FRAMES
-					   | RX_CFG2_RCV_OTHER);
-		break;
-	default:
-		adev->rx_config_1 = (u16) (0
-					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
-					   /* | RX_CFG1_FILTER_SSID        */
-					   /* | RX_CFG1_FILTER_BCAST       */
-					   /* | RX_CFG1_RCV_MC_ADDR1       */
-					   /* | RX_CFG1_RCV_MC_ADDR0       */
-					   /* | RX_CFG1_FILTER_ALL_MULTI   */
-					   /* | RX_CFG1_FILTER_BSSID       */
-					   /* | RX_CFG1_FILTER_MAC         */
-					    | RX_CFG1_RCV_PROMISCUOUS
-					   /* | RX_CFG1_INCLUDE_FCS */
-					   /* | RX_CFG1_INCLUDE_PHY_HDR   */
-		    );
-		adev->rx_config_2 = (u16) (0
-					   | RX_CFG2_RCV_ASSOC_REQ
-					   | RX_CFG2_RCV_AUTH_FRAMES
-					   | RX_CFG2_RCV_BEACON_FRAMES
-					   | RX_CFG2_RCV_CONTENTION_FREE
-					   | RX_CFG2_RCV_CTRL_FRAMES
-					   | RX_CFG2_RCV_DATA_FRAMES
-					   /*| RX_CFG2_RCV_BROKEN_FRAMES   */
-					   | RX_CFG2_RCV_MGMT_FRAMES
-					   | RX_CFG2_RCV_PROBE_REQ
-					   | RX_CFG2_RCV_PROBE_RESP
-					   | RX_CFG2_RCV_ACK_FRAMES
-					   | RX_CFG2_RCV_OTHER);
-		break;
-	}
-	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
-
-	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR)
-	    || (adev->firmware_numver >= 0x02000000))
-		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
-	else
-		adev->phy_header_len = 0;
-
-	log(L_DEBUG, "acx: setting RXconfig to %04X:%04X\n",
-	    adev->rx_config_1, adev->rx_config_2);
-	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
-	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
-	acx_s_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
-}
 
 
 
 
 
 
-/***********************************************************************
-** acx_l_process_rxbuf
-**
-** NB: used by USB code also
-*/
-void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
-{
-	struct ieee80211_hdr *hdr;
-	u16 fc, buf_len;
-
-	FN_ENTER;
-
-	hdr = acx_get_wlan_hdr(adev, rxbuf);
-	fc = le16_to_cpu(hdr->frame_control);
-	/* length of frame from control field to first byte of FCS */
-	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
-
-	// For debugging
-	if (
-			((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
-			(acx_debug & (L_XFER|L_DATA))
-	){
-		printk(	"acx: rx: %s "
-				"time:%u len:%u signal:%u SNR:%u macstat:%02X "
-				"phystat:%02X phyrate:%u status:%u\n",
-				acx_get_packet_type_string(fc),
-
-				le32_to_cpu(rxbuf->time),
-				buf_len,
-				acx_signal_to_winlevel(rxbuf->phy_level),
-				acx_signal_to_winlevel(rxbuf->phy_snr),
-				rxbuf->mac_status,
-
-				rxbuf->phy_stat_baseband,
-				rxbuf->phy_plcp_signal,
-				adev->status);
-	}
-
-	if (unlikely(acx_debug & L_DATA)) {
-		printk("acx: rx: 802.11 buf[%u]: \n", buf_len);
-		acx_dump_bytes(hdr, buf_len);
-	}
-
-	acx_l_rx(adev, rxbuf);
-	/* Now check Rx quality level, AFTER processing packet.
-	 * I tried to figure out how to map these levels to dBm
-	 * values, but for the life of me I really didn't
-	 * manage to get it. Either these values are not meant to
-	 * be expressed in dBm, or it's some pretty complicated
-	 * calculation. */
-
-	/* TODO: only the RSSI seems to be reported */
-	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
-
-	FN_EXIT0;
-}
 
 
 /***********************************************************************
@@ -3974,68 +4127,6 @@ static u16 rate100to111(u8 r)
 
 */
 
-int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
-	acx_device_t *adev = ieee2adev(hw);
-	tx_t *tx;
-	void *txbuf;
-	unsigned long flags;
-
-	struct ieee80211_tx_info *ctl = IEEE80211_SKB_CB(skb);
-	int txresult = NOT_OK;
-
-	FN_ENTER;
-
-	if (unlikely(!skb)) {
-		/* indicate success */
-		txresult = OK;
-		goto out;
-	}
-
-	if (unlikely(!adev)) {
-		goto out;
-	}
-
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		goto out;
-	}
-	if (unlikely(!adev->initialized)) {
-		goto out;
-	}
-
-	acx_lock(adev, flags);
-
-	tx = acx_l_alloc_tx(adev, skb->len);
-
-	if (unlikely(!tx)) {
-		log(L_BUFT, "acx: %s: start_xmit: txdesc ring is full, " "dropping tx\n", wiphy_name(adev->ieee->wiphy));
-		txresult = NOT_OK;
-		goto out_unlock;
-	}
-
-	txbuf = acx_l_get_txbuf(adev, tx);
-
-	if (unlikely(!txbuf)) {
-		/* Card was removed */
-		txresult = NOT_OK;
-		// OW only USB implemented
-		acx_l_dealloc_tx(adev, tx);
-		goto out_unlock;
-	}
-	memcpy(txbuf, skb->data, skb->len);
-
-	acx_l_tx_data(adev, tx, skb->len, ctl, skb);
-
-	txresult = OK;
-	adev->stats.tx_packets++;
-	adev->stats.tx_bytes += skb->len;
-
-out_unlock:
-	acx_unlock(adev, flags);
-
-out:
-	FN_EXIT1(txresult);
-	return txresult;
-}
 
 /***********************************************************************
 ** acx_i_timer
@@ -4091,81 +4182,6 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 
 
 
-/***********************************************************************
-** acx_l_rx
-**
-** The end of the Rx path. Pulls data from a rxhostdesc into a socket
-** buffer and feeds it to the network stack via netif_rx().
-**
-** Look to bcm43xx or p54
-** FIXME Remove documentation references to bcm43xx and p54 ...
-*/
-
-static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
-{
-
-	struct ieee80211_rx_status *status;
-
-	struct ieee80211_hdr *w_hdr;
-	struct sk_buff *skb;
-	int buflen;
-	FN_ENTER;
-
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		printk("acx: asked to receive a packet but the interface is down??\n");
-		goto out;
-	}
-
-	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
-	buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
-
-	/*
-	 * Allocate our skb
-	 */
-	skb = dev_alloc_skb(buflen + 2);
-	if (!skb) {
-		printk("acx: skb allocation FAILED\n");
-		goto out;
-	}
-
-	skb_reserve(skb, 2);
-	skb_put(skb, buflen);
-	memcpy(skb->data, w_hdr, buflen);
-
-	status=IEEE80211_SKB_RXCB(skb);
-	memset(status, 0, sizeof(*status));
-
-	status->mactime = rxbuf->time;
-	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
-
-	/* TODO: they do not seem to be reported, at least on the acx111
-	 * (and TNETW1450?), therefore commenting them out
-	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
-	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
-
-	status->flag = 0;
-
-	status->freq = adev->rx_status.freq;
-	status->band = adev->rx_status.band;
-
-	status->antenna = 1;
-	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
-		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
-	}
-	else {
-		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
-	}
-
-	/*
-	 * FIXME: should it really be done here??
-	 */
-	ieee80211_rx_irqsafe(adev->ieee, skb);
-	adev->stats.rx_packets++;
-	adev->stats.rx_bytes += skb->len;
-
-out:
-	FN_EXIT0;
-}
 
 
 
