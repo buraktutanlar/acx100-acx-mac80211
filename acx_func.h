@@ -657,7 +657,6 @@ void acx_s_start(acx_device_t *adev);
 
 void acx_s_update_card_settings(acx_device_t *adev);
 void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
-void acx_l_update_ratevector(acx_device_t *adev);
 
 void acx_init_task_scheduler(acx_device_t *adev);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
@@ -680,8 +679,6 @@ void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
 			int pkts_to_ignore);
 
 void acx_dump_bytes(const void *, int);
-
-u8 acx_rate111to100(u16);
 
 void acx_s_set_defaults(acx_device_t *adev);
 

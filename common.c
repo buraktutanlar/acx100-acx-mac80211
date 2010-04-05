@@ -100,7 +100,21 @@ static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Other (Control Path)
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
+static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 
+static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
+static int acx_s_set_tim_template(acx_device_t *adev);
+static int acx_s_init_packet_templates(acx_device_t *adev);
+
+static u8 acx_plcp_get_bitrate_cck(u8 plcp);
+static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
+
+static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
+static void acx111_s_sens_radio_16_17(acx_device_t *adev);
+
+static void acx_l_update_ratevector(acx_device_t *adev);
+//static u8 acx_rate111to100(u16 r);
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -2587,7 +2601,6 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 
 // BOM Other (Control path)
 // --------------------
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
 static int
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
                                         struct acx_template_beacon *templ,
@@ -2600,7 +2613,6 @@ acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
         return skb->len;
 }
 
-static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static int
 acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
 {
@@ -2616,7 +2628,6 @@ acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
         return result;
 }
 
-static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
 static int
 acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
 				unsigned int cmd)
@@ -2636,7 +2647,6 @@ acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
 	return res;
 }
 
-static int acx_s_set_tim_template(acx_device_t *adev);
 /*
  * acx_s_set_tim_template
  *
@@ -2693,7 +2703,6 @@ static int acx_s_set_tim_template(acx_device_t * adev)
 	return result;
 }
 
-static int acx_s_init_packet_templates(acx_device_t *adev);
 /*
  * acx_s_init_packet_templates()
  *
@@ -2775,9 +2784,6 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	return result;
 }
 
-static u8 acx_plcp_get_bitrate_cck(u8 plcp);
-static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
-
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
@@ -2818,7 +2824,6 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 }
 
 
-void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
 static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
 	unsigned mask;
@@ -2866,7 +2871,6 @@ static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 	}
 }
 
-static void acx111_s_sens_radio_16_17(acx_device_t *adev);
 static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 {
 	u32 feature1, feature2;
@@ -2885,13 +2889,12 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 	acx111_s_feature_set(adev, feature1, feature2);
 }
 
-void acx_l_update_ratevector(acx_device_t *adev);
 /*
  * acx_l_update_ratevector
  *
  * Updates adev->rate_supported[_len] according to rate_{basic,oper}
  */
-void acx_l_update_ratevector(acx_device_t * adev)
+static void acx_l_update_ratevector(acx_device_t * adev)
 {
 	u16 bcfg = adev->rate_basic;
 	u16 ocfg = adev->rate_oper;
@@ -2920,15 +2923,15 @@ void acx_l_update_ratevector(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-u8 acx_rate111to100(u16 r);
 /*
  * maps acx111 tx descr rate field to acx100 one
  */
-u8 acx_rate111to100(u16 r)
+/*
+static u8 acx_rate111to100(u16 r)
 {
 	return acx_bitpos2rate100[highest_bit(r)];
 }
-
+*/
 
 // BOM Cleanup ======================================================
 
