@@ -660,7 +660,6 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
 	}
 }
 
-#if ACX_DEBUG
 void acx_dump_bytes(const void *data, int num)
 {
 	const u8 *ptr = (const u8 *)data;
@@ -691,7 +690,31 @@ void acx_dump_bytes(const void *data, int num)
 	FN_EXIT0;
 
 }
-#endif
+
+const char *acx_cmd_status_str(unsigned int state)
+{
+	static const char *const cmd_error_strings[] = {
+		"Idle",
+		"Success",
+		"Unknown Command",
+		"Invalid Information Element",
+		"Channel rejected",
+		"Channel invalid in current regulatory domain",
+		"MAC invalid",
+		"Command rejected (read-only information element)",
+		"Command rejected",
+		"Already asleep",
+		"TX in progress",
+		"Already awake",
+		"Write only",
+		"RX in progress",
+		"Invalid parameter",
+		"Scan in progress",
+		"Failed"
+	};
+	return state < ARRAY_SIZE(cmd_error_strings) ?
+	    cmd_error_strings[state] : "?";
+}
 
 /*
  * BOM Data Access
@@ -5047,50 +5070,6 @@ module_exit(acx_e_cleanup_module)
 
 
 
-const char *acx_cmd_status_str(unsigned int state)
-{
-	static const char *const cmd_error_strings[] = {
-		"Idle",
-		"Success",
-		"Unknown Command",
-		"Invalid Information Element",
-		"Channel rejected",
-		"Channel invalid in current regulatory domain",
-		"MAC invalid",
-		"Command rejected (read-only information element)",
-		"Command rejected",
-		"Already asleep",
-		"TX in progress",
-		"Already awake",
-		"Write only",
-		"RX in progress",
-		"Invalid parameter",
-		"Scan in progress",
-		"Failed"
-	};
-	return state < ARRAY_SIZE(cmd_error_strings) ?
-	    cmd_error_strings[state] : "?";
-}
-
-/***********************************************************************
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/***********************************************************************
-** Interrogate/configure commands
-*/
 
 
 #if CMD_DISCOVERY
