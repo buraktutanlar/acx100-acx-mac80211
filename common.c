@@ -150,6 +150,9 @@ static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr);
 // Irq Handling, Timer
 // -----
 
+// Mac80211 Ops
+// -----
+
 
 // ---
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -4574,6 +4577,299 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 	FN_EXIT0;
 }
 
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+int acx_e_op_add_interface(struct ieee80211_hw *ieee,
+		      struct ieee80211_if_init_conf *conf)
+#else
+int acx_e_op_add_interface(struct ieee80211_hw *ieee,
+		      struct ieee80211_vif *vif)
+#endif
+{
+	acx_device_t *adev = ieee2adev(ieee);
+	unsigned long flags;
+	int err = -EOPNOTSUPP;
+
+	char mac[] = MACSTR; // approximate max length
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+	acx_lock(adev, flags);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	if (conf->type == NL80211_IFTYPE_MONITOR) {
+#else
+	if (vif->type == NL80211_IFTYPE_MONITOR) {
+#endif
+		adev->interface.monitor++;
+	} else {
+		if (adev->interface.operating)
+			goto out_unlock;
+		adev->interface.operating = 1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+		adev->interface.mac_addr = conf->mac_addr;
+		adev->interface.type = conf->type;
+#else
+		adev->interface.mac_addr = vif->addr;
+		adev->interface.type = vif->type;
+#endif
+	}
+//	adev->mode = conf->type;
+
+	acx_unlock(adev, flags);
+
+	if (adev->initialized)
+		acx_s_select_opmode(adev);
+
+	acx_lock(adev, flags);
+
+	err = 0;
+
+	printk(KERN_INFO "acx: Virtual interface added "
+	       "(type: 0x%08X, MAC: %s)\n",
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	       conf->type,
+	       acx_print_mac(mac, conf->mac_addr)
+#else
+	       vif->type,
+	       acx_print_mac(mac, vif->addr)
+#endif
+	);
+
+    out_unlock:
+	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return err;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+void acx_e_op_remove_interface(struct ieee80211_hw *hw,
+			  struct ieee80211_if_init_conf *conf)
+#else
+void acx_e_op_remove_interface(struct ieee80211_hw *hw,
+			  struct ieee80211_vif *vif)
+#endif
+{
+	acx_device_t *adev = ieee2adev(hw);
+
+	char mac[] = MACSTR; // approximate max length
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	if (conf->type == NL80211_IFTYPE_MONITOR) {
+#else
+	if (vif->type == NL80211_IFTYPE_MONITOR) {
+#endif
+		adev->interface.monitor--;
+//      assert(bcm->interface.monitor >= 0);
+	} else {
+		adev->interface.operating = 0;
+	}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	log(L_DEBUG, "acx: %s: interface.operating=%d, conf->type=%d\n",
+			__func__,
+			adev->interface.operating, conf->type);
+#else
+	log(L_DEBUG, "acx: %s: interface.operating=%d, vif->type=%d\n",
+			__func__,
+			adev->interface.operating, vif->type);
+#endif
+
+	if (adev->initialized)
+		acx_s_select_opmode(adev);
+
+	log(L_ANY, "acx: Virtual interface removed: "
+	       "type=%d, MAC=%s\n",
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	       conf->type, acx_print_mac(mac, conf->mac_addr)
+#else
+	       vif->type, acx_print_mac(mac, vif->addr)
+#endif
+	       );
+
+	acx_sem_unlock(adev);
+
+	// OW 20100131 Flush of mac80211 normally done by mac80211
+	// flush_scheduled_work();
+
+	FN_EXIT0;
+}
+
+
+
+int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
+	acx_device_t *adev = ieee2adev(hw);
+	struct ieee80211_conf *conf = &hw->conf;
+	unsigned long flags;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	//FIXME();
+	if (!adev->initialized)
+		goto end_sem_unlock;
+
+	acx_lock(adev, flags);
+
+	if (conf->channel->hw_value != adev->channel) {
+
+		acx_unlock(adev, flags);
+		acx_selectchannel(adev, conf->channel->hw_value,
+				conf->channel->center_freq);
+		acx_lock(adev, flags);
+
+		/*		acx_schedule_task(adev,
+		 ACX_AFTER_IRQ_UPDATE_CARD_CFG
+		 *//*+ ACX_AFTER_IRQ_RESTART_SCAN *//*);*/
+
+	}
+	/*
+	 if (conf->short_slot_time != adev->short_slot) {
+	 //                assert(phy->type == BCM43xx_PHYTYPE_G);
+	 if (conf->short_slot_time)
+	 acx_short_slot_timing_enable(adev);
+	 else
+	 acx_short_slot_timing_disable(adev);
+	 acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	 }
+	 */
+
+	// OW FIXME mac80211 depreciates radio_enabled. Perhaps related to rfkill changes ?
+	//adev->tx_disabled = !conf->radio_enabled;
+	adev->tx_disabled = 0;
+
+	/*	if (conf->power_level != 0){
+	 adev->tx_level_dbm = conf->power_level;
+	 acx_s_set_tx_level(adev, adev->tx_level_dbm);
+	 SET_BIT(adev->set_mask,GETSET_TXPOWER);
+	 //acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	 }
+	 */
+	//FIXME: This does not seem to wake up:
+#if 0
+	if (conf->power_level == 0)
+	{
+		if (radio->enabled)
+		bcm43xx_radio_turn_off(bcm);
+	}
+	else
+	{
+		if (!radio->enabled)
+		bcm43xx_radio_turn_on(bcm);
+	}
+#endif
+
+	//TODO: phymode
+	//TODO: antennas
+	acx_unlock(adev, flags);
+
+	if (adev->set_mask > 0) {
+		acx_s_update_card_settings(adev);
+	}
+
+	end_sem_unlock:
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+
+	return 0;
+}
+
+void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
+		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
+	acx_device_t *adev = ieee2adev(hw);
+
+	unsigned long flags;
+	int err = -ENODEV;
+
+	struct sk_buff *skb_tmp;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	if (!adev->interface.operating)
+		goto end_sem_unlock;
+
+	if (adev->initialized)
+		acx_s_select_opmode(adev);
+
+	acx_lock(adev, flags);
+
+	if ((vif->type != NL80211_IFTYPE_MONITOR) && (adev->vif == vif)) {
+		if (info->bssid) {
+			adev->interface.bssid = info->bssid;
+			MAC_COPY(adev->bssid, info->bssid);
+		}
+	}
+	if ((vif->type == NL80211_IFTYPE_AP) && (adev->vif == vif)) {
+
+		if (info->bssid && (strlen(info->bssid) > 0)) {
+			adev->essid_len = strlen(info->bssid);
+			memcpy(adev->essid, info->bssid, strlen(info->bssid));
+			SET_BIT(adev->set_mask, SET_TEMPLATES);
+		}
+	}
+
+	// OW: Beacon update condition, as seen in b43/main.c
+	if (info->enable_beacon) {
+
+		skb_tmp = ieee80211_beacon_get(hw, vif);
+		if (skb_tmp != 0) {
+			adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
+			// OW adev->beacon_cache = conf->beacon;
+			adev->beacon_cache = skb_tmp;
+			SET_BIT(adev->set_mask, SET_TEMPLATES);
+		}
+
+		if (info->beacon_int != adev->beacon_interval)
+			adev->beacon_interval = info->beacon_int;
+
+	}
+
+	acx_unlock(adev, flags);
+
+	if (adev->set_mask != 0)
+		acx_s_update_card_settings(adev);
+	//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+	err = 0;
+
+	end_sem_unlock:
+
+	acx_sem_unlock(adev);
+	FN_EXIT1(err);
+
+	return;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
+			 struct ieee80211_tx_queue_stats *stats)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	int err = -ENODEV;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	stats->len = 0;
+	stats->limit = TX_CNT;
+	stats->count = 0;
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return err;
+}
+#endif
+
 
 // BOM Cleanup ======================================================
 
@@ -5097,296 +5393,6 @@ void acx_update_capabilities(acx_device_t * adev)
 	adev->capabilities = cap;
 }
 */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_add_interface(struct ieee80211_hw *ieee,
-		      struct ieee80211_if_init_conf *conf)
-#else
-int acx_e_op_add_interface(struct ieee80211_hw *ieee,
-		      struct ieee80211_vif *vif)
-#endif
-{
-	acx_device_t *adev = ieee2adev(ieee);
-	unsigned long flags;
-	int err = -EOPNOTSUPP;
-
-	char mac[] = MACSTR; // approximate max length
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-	acx_lock(adev, flags);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	if (conf->type == NL80211_IFTYPE_MONITOR) {
-#else
-	if (vif->type == NL80211_IFTYPE_MONITOR) {
-#endif
-		adev->interface.monitor++;
-	} else {
-		if (adev->interface.operating)
-			goto out_unlock;
-		adev->interface.operating = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-		adev->interface.mac_addr = conf->mac_addr;
-		adev->interface.type = conf->type;
-#else
-		adev->interface.mac_addr = vif->addr;
-		adev->interface.type = vif->type;
-#endif
-	}
-//	adev->mode = conf->type;
-
-	acx_unlock(adev, flags);
-
-	if (adev->initialized)
-		acx_s_select_opmode(adev);
-
-	acx_lock(adev, flags);
-
-	err = 0;
-
-	printk(KERN_INFO "acx: Virtual interface added "
-	       "(type: 0x%08X, MAC: %s)\n",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	       conf->type,
-	       acx_print_mac(mac, conf->mac_addr)
-#else
-	       vif->type,
-	       acx_print_mac(mac, vif->addr)
-#endif
-	);
-
-    out_unlock:
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
-
-	FN_EXIT0;
-	return err;
-}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-void acx_e_op_remove_interface(struct ieee80211_hw *hw,
-			  struct ieee80211_if_init_conf *conf)
-#else
-void acx_e_op_remove_interface(struct ieee80211_hw *hw,
-			  struct ieee80211_vif *vif)
-#endif
-{
-	acx_device_t *adev = ieee2adev(hw);
-
-	char mac[] = MACSTR; // approximate max length
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	if (conf->type == NL80211_IFTYPE_MONITOR) {
-#else
-	if (vif->type == NL80211_IFTYPE_MONITOR) {
-#endif
-		adev->interface.monitor--;
-//      assert(bcm->interface.monitor >= 0);
-	} else {
-		adev->interface.operating = 0;
-	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	log(L_DEBUG, "acx: %s: interface.operating=%d, conf->type=%d\n",
-			__func__,
-			adev->interface.operating, conf->type);
-#else
-	log(L_DEBUG, "acx: %s: interface.operating=%d, vif->type=%d\n",
-			__func__,
-			adev->interface.operating, vif->type);
-#endif
-
-	if (adev->initialized)
-		acx_s_select_opmode(adev);
-
-	log(L_ANY, "acx: Virtual interface removed: "
-	       "type=%d, MAC=%s\n",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	       conf->type, acx_print_mac(mac, conf->mac_addr)
-#else
-	       vif->type, acx_print_mac(mac, vif->addr)
-#endif
-	       );
-
-	acx_sem_unlock(adev);
-
-	// OW 20100131 Flush of mac80211 normally done by mac80211
-	// flush_scheduled_work();
-
-	FN_EXIT0;
-}
-
-
-
-int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
-	acx_device_t *adev = ieee2adev(hw);
-	struct ieee80211_conf *conf = &hw->conf;
-	unsigned long flags;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	//FIXME();
-	if (!adev->initialized)
-		goto end_sem_unlock;
-
-	acx_lock(adev, flags);
-
-	if (conf->channel->hw_value != adev->channel) {
-
-		acx_unlock(adev, flags);
-		acx_selectchannel(adev, conf->channel->hw_value,
-				conf->channel->center_freq);
-		acx_lock(adev, flags);
-
-		/*		acx_schedule_task(adev,
-		 ACX_AFTER_IRQ_UPDATE_CARD_CFG
-		 *//*+ ACX_AFTER_IRQ_RESTART_SCAN *//*);*/
-
-	}
-	/*
-	 if (conf->short_slot_time != adev->short_slot) {
-	 //                assert(phy->type == BCM43xx_PHYTYPE_G);
-	 if (conf->short_slot_time)
-	 acx_short_slot_timing_enable(adev);
-	 else
-	 acx_short_slot_timing_disable(adev);
-	 acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	 }
-	 */
-
-	// OW FIXME mac80211 depreciates radio_enabled. Perhaps related to rfkill changes ?
-	//adev->tx_disabled = !conf->radio_enabled;
-	adev->tx_disabled = 0;
-
-	/*	if (conf->power_level != 0){
-	 adev->tx_level_dbm = conf->power_level;
-	 acx_s_set_tx_level(adev, adev->tx_level_dbm);
-	 SET_BIT(adev->set_mask,GETSET_TXPOWER);
-	 //acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	 }
-	 */
-	//FIXME: This does not seem to wake up:
-#if 0
-	if (conf->power_level == 0)
-	{
-		if (radio->enabled)
-		bcm43xx_radio_turn_off(bcm);
-	}
-	else
-	{
-		if (!radio->enabled)
-		bcm43xx_radio_turn_on(bcm);
-	}
-#endif
-
-	//TODO: phymode
-	//TODO: antennas
-	acx_unlock(adev, flags);
-
-	if (adev->set_mask > 0) {
-		acx_s_update_card_settings(adev);
-	}
-
-	end_sem_unlock:
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-
-	return 0;
-}
-
-extern void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
-		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
-	acx_device_t *adev = ieee2adev(hw);
-
-	unsigned long flags;
-	int err = -ENODEV;
-
-	struct sk_buff *skb_tmp;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	if (!adev->interface.operating)
-		goto end_sem_unlock;
-
-	if (adev->initialized)
-		acx_s_select_opmode(adev);
-
-	acx_lock(adev, flags);
-
-	if ((vif->type != NL80211_IFTYPE_MONITOR) && (adev->vif == vif)) {
-		if (info->bssid) {
-			adev->interface.bssid = info->bssid;
-			MAC_COPY(adev->bssid, info->bssid);
-		}
-	}
-	if ((vif->type == NL80211_IFTYPE_AP) && (adev->vif == vif)) {
-
-		if (info->bssid && (strlen(info->bssid) > 0)) {
-			adev->essid_len = strlen(info->bssid);
-			memcpy(adev->essid, info->bssid, strlen(info->bssid));
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
-		}
-	}
-
-	// OW: Beacon update condition, as seen in b43/main.c
-	if (info->enable_beacon) {
-
-		skb_tmp = ieee80211_beacon_get(hw, vif);
-		if (skb_tmp != 0) {
-			adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
-			// OW adev->beacon_cache = conf->beacon;
-			adev->beacon_cache = skb_tmp;
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
-		}
-
-		if (info->beacon_int != adev->beacon_interval)
-			adev->beacon_interval = info->beacon_int;
-
-	}
-
-	acx_unlock(adev, flags);
-
-	if (adev->set_mask != 0)
-		acx_s_update_card_settings(adev);
-	//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	err = 0;
-
-	end_sem_unlock:
-
-	acx_sem_unlock(adev);
-	FN_EXIT1(err);
-
-	return;
-}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
-			 struct ieee80211_tx_queue_stats *stats)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	int err = -ENODEV;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	stats->len = 0;
-	stats->limit = TX_CNT;
-	stats->count = 0;
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return err;
-}
-#endif
-
-
 
 
 
