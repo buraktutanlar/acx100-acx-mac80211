@@ -5002,6 +5002,32 @@ const char* acx_get_packet_type_string(u16 fc)
 	return str;
 }
 
+#if CMD_DISCOVERY
+void great_inquisitor(acx_device_t * adev)
+{
+	static struct {
+		u16 type;
+		u16 len;
+		/* 0x200 was too large here: */
+		u8 data[0x100 - 4];
+	} ACX_PACKED ie;
+	u16 type;
+
+	FN_ENTER;
+
+	/* 0..0x20, 0x1000..0x1020 */
+	for (type = 0; type <= 0x1020; type++) {
+		if (type == 0x21)
+			type = 0x1000;
+		ie.type = cpu_to_le16(type);
+		ie.len = cpu_to_le16(sizeof(ie) - 4);
+		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
+	}
+	FN_EXIT0;
+}
+#endif
+
+
 /*
  * BOM Driver, Module
  * ==================================================
@@ -5067,65 +5093,6 @@ module_exit(acx_e_cleanup_module)
 
 
 // BOM Cleanup ======================================================
-
-
-
-
-
-#if CMD_DISCOVERY
-void great_inquisitor(acx_device_t * adev)
-{
-	static struct {
-		u16 type;
-		u16 len;
-		/* 0x200 was too large here: */
-		u8 data[0x100 - 4];
-	} ACX_PACKED ie;
-	u16 type;
-
-	FN_ENTER;
-
-	/* 0..0x20, 0x1000..0x1020 */
-	for (type = 0; type <= 0x1020; type++) {
-		if (type == 0x21)
-			type = 0x1000;
-		ie.type = cpu_to_le16(type);
-		ie.len = cpu_to_le16(sizeof(ie) - 4);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
-	}
-	FN_EXIT0;
-}
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
