@@ -306,6 +306,7 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
 // -----
 
 // MAC address helpers
+// ---
 static inline void
 MAC_COPY(u8 *mac, const u8 *src)
 {
@@ -374,6 +375,7 @@ mac_is_mcast(const u8 *mac)
 
 
 // Random helpers
+// ---
 #define TO_STRING(x)	#x
 #define STRING(x)	TO_STRING(x)
 
@@ -416,6 +418,14 @@ is_hidden_essid(char *essid)
 		((' ' == essid[0]) && ('\0' == essid[1])));
 }
 
+// ---
+static inline struct ieee80211_hdr*
+acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
+{
+	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
+}
+
+
 // BOM Driver, Module (Common)
 // -----
 
@@ -426,12 +436,6 @@ is_hidden_essid(char *essid)
 */
 
 
-
-static inline struct ieee80211_hdr *
-acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
-{
-	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
-}
 
 
 void acx_s_mwait(int ms);
