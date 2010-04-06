@@ -253,6 +253,15 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 // BOM Proc, Debug (Common)
 // -----
+#ifdef CONFIG_PROC_FS
+int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
+#else
+static inline int
+acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
+static inline int
+acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
+#endif
 
 // BOM Rx Path (Common)
 // -----
@@ -471,18 +480,6 @@ int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
 void acx_s_cmd_start_scan(acx_device_t *adev);
 
 
-/***********************************************************************
-** /proc
-*/
-#ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
-#else
-static inline int
-acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
-static inline int
-acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
-#endif
 
 
 /***********************************************************************
