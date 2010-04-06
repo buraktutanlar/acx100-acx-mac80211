@@ -4270,6 +4270,23 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 	FN_EXIT0;
 }
 
+/*
+ * OW Included skb->len to check required blocks upfront in acx_l_alloc_tx
+ * This should perhaps also go into pci and usb ?
+ */ 
+tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
+{
+	if (IS_PCI(adev))
+		return acxpci_l_alloc_tx(adev);
+	if (IS_USB(adev))
+		return acxusb_l_alloc_tx(adev);
+	if (IS_MEM(adev))
+		return acxmem_l_alloc_tx(adev, len);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NULL);
+}
+
 
 /*
  * OW 20100405 This comment somehow lost it's function (wasn't me though!)

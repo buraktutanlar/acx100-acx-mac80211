@@ -274,6 +274,7 @@ acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
+tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
 
 
 // BOM Crypto (Common)
@@ -488,25 +489,7 @@ void acx_s_cmd_start_scan(acx_device_t *adev);
 ** Unsorted yet :)
 */
 
-tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
-tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
 
-// OW TODO Included skb->len to check required blocks upfront in acx_l_alloc_tx
-// This should perhaps also go into pci and usb ?!
-tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
-static inline tx_t*
-acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
-{
-	if (IS_PCI(adev))
-		return acxpci_l_alloc_tx(adev);
-	if (IS_USB(adev))
-		return acxusb_l_alloc_tx(adev);
-	if (IS_MEM(adev))
-		return acxmem_l_alloc_tx(adev, len);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NULL);
-}
 
 void acxusb_l_dealloc_tx(tx_t *tx_opaque);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
@@ -701,6 +684,7 @@ int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Rx Path (PCI)
 
 // Tx Path (PCI)
+tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
 
 // Crypto (PCI)
 
@@ -761,6 +745,7 @@ int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Rx Path (USB)
 
 // Tx Path (USB)
+tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
 
 // Crypto (USB)
 
@@ -810,6 +795,7 @@ int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Rx Path (Mem)
 
 // Tx Path (Mem)
+tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
 
 // Crypto (Mem)
 
