@@ -4020,20 +4020,28 @@ int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 				seq_printf(file, "%02u empty%s\n", i, rtl);
 			rxhostdesc++;
 		}
-/*	seq_printf(file, "** Tx buf (free %d, Linux netqueue %s) **\n",
-		     adev->tx_free,
-		     acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");*/
+
+	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
+			adev->tx_free,
+			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
+
 	txdesc = adev->txdesc_start;
 	if (txdesc)
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx_tail) ? " [tail]" : "";
+
 			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u free (%02X)%s%s\n", i,
-					     txdesc->Ctl_8, thd, ttl);
+				seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
+			else if (txdesc->Ctl_8 & DESC_CTL_HOSTOWN)
+				seq_printf(file, "%02u Available     (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
 			else
-				seq_printf(file, "%02u tx   (%02X)%s%s\n", i,
-					     txdesc->Ctl_8, thd, ttl);
+				seq_printf(file, "%02u Busy          (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
+			seq_printf(file, "\n");
+
 			txdesc = advance_txdesc(adev, txdesc, 1);
 		}
 	seq_printf(file,
