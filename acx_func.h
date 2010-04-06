@@ -321,6 +321,7 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
 void acx_init_task_scheduler(acx_device_t *adev);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 void acx_i_timer(unsigned long a);
+void acx_e_after_interrupt_task(acx_device_t *adev);
 
 // BOM Mac80211 Ops (Common)
 // -----
@@ -491,26 +492,6 @@ const char *acx_get_packet_type_string(u16 fc);
 // -----
 
 
-// BOM Unsorted yet :) =================================================
-
-
-
-
-
-
-
-struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
-
-void acxpci_interrupt_tasklet(struct work_struct *work);
-void acxusb_interrupt_tasklet(struct work_struct *work);
-void acxmem_i_interrupt_tasklet(struct work_struct *work);
-
-// void acx_interrupt_tasklet(acx_device_t *adev);
-// OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
-void acx_e_after_interrupt_task(acx_device_t *adev);
-
-
-
 /*
  * BOM PCI prototypes
  * ==================================================
@@ -554,6 +535,7 @@ void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 // Crypto (PCI)
 
 // Irq Handling, Timer (PCI)
+void acxpci_interrupt_tasklet(struct work_struct *work);
 
 // Mac80211 Ops (PCI)
 
@@ -620,6 +602,7 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 // Crypto (USB)
 
 // Irq Handling, Timer (USB)
+void acxusb_interrupt_tasklet(struct work_struct *work);
 
 // Mac80211 Ops (USB)
 
@@ -676,6 +659,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 // Crypto (Mem)
 
 // Irq Handling, Timer (Mem)
+void acxmem_i_interrupt_tasklet(struct work_struct *work);
 
 // Mac80211 Ops (Mem)
 
