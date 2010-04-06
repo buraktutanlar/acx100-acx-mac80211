@@ -27,10 +27,10 @@
  */
 
 // BOM Locking (Common)
-//-----
+// -----
 
 // BOM Logging (Common)
-//-----
+// -----
 
 /*
  * LOGGING
@@ -135,28 +135,28 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 
 // BOM Data Access (Common)
-//-----
+// -----
 
 // BOM Firmware, EEPROM, Phy (Common)
-//-----
+// -----
 
 // BOM Control Path (CMD handling, init, reset) (Common)
-//-----
+// -----
 
 // BOM CMDs (Common:Control Path)
-//-----
+// -----
 
 // BOM Configure (Common:Control Path)
-//-----
+// -----
 
 // BOM Template (Common:Control Path)
-//-----
+// -----
 
 // BOM Recalibration (Common:Control Path)
-//-----
+// -----
 
 // BOM Other (Common:Control Path)
-//-----
+// -----
 
 // BOM Proc, Debug (Common)
 // -----
