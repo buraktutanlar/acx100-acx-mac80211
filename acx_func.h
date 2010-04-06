@@ -21,39 +21,99 @@
 #include <linux/version.h>
 #include "acx_commands.h"
 
-/***********************************************************************
-** LOGGING
-**
-** - Avoid SHOUTING needlessly. Avoid excessive verbosity.
-**   Gradually remove messages which are old debugging aids.
-**
-** - Use printk() for messages which are to be always logged.
-**   Supply either 'acx:' or '<devname>:' prefix so that user
-**   can figure out who's speaking among other kernel chatter.
-**   acx: is for general issues (e.g. "acx: no firmware image!")
-**   while <devname>: is related to a particular device
-**   (think about multi-card setup). Double check that message
-**   is not confusing to the average user.
-**
-** - use printk KERN_xxx level only if message is not a WARNING
-**   but is INFO, ERR etc.
-**
-** - Use printk_ratelimited() for messages which may flood
-**   (e.g. "rx DUP pkt!").
-**
-** - Use log() for messages which may be omitted (and they
-**   _will_ be omitted in non-debug builds). Note that
-**   message levels may be disabled at compile-time selectively,
-**   thus select them wisely. Example: L_DEBUG is the lowest
-**   (most likely to be compiled out) -> use for less important stuff.
-**
-** - Do not print important stuff with log(), or else people
-**   will never build non-debug driver.
-**
-** Style:
-** hex: capital letters, zero filled (e.g. 0x02AC)
-** str: dont start from capitals, no trailing periods ("tx: queue is stopped")
-*/
+/*
+ * BOM Common prototypes
+ * ==================================================
+ */
+
+// BOM Locking (Common)
+//-----
+
+// BOM Logging (Common)
+//-----
+
+// BOM Data Access (Common)
+//-----
+
+// BOM Firmware, EEPROM, Phy (Common)
+//-----
+
+// BOM Control Path (CMD handling, init, reset) (Common)
+//-----
+
+// BOM CMDs (Common:Control Path)
+//-----
+
+// BOM Configure (Common:Control Path)
+//-----
+
+// BOM Template (Common:Control Path)
+//-----
+
+// BOM Recalibration (Common:Control Path)
+//-----
+
+// BOM Other (Common:Control Path)
+//-----
+
+// BOM Proc, Debug (Common)
+// -----
+
+// BOM Rx Path (Common)
+// -----
+
+// BOM Tx Path (Common)
+// -----
+
+// BOM Crypto (Common)
+// -----
+
+// BOM Irq Handling, Timer (Common)
+// -----
+
+// BOM Mac80211 Ops (Common)
+// -----
+
+// BOM Helpers (Common)
+// -----
+
+// BOM Driver, Module (Common)
+// -----
+
+
+/*
+ * LOGGING
+ *
+ * - Avoid SHOUTING needlessly. Avoid excessive verbosity.
+ *   Gradually remove messages which are old debugging aids.
+ *
+ * - Use printk() for messages which are to be always logged.
+ *   Supply either 'acx:' or '<devname>:' prefix so that user
+ *   can figure out who's speaking among other kernel chatter.
+ *   acx: is for general issues (e.g. "acx: no firmware image!")
+ *   while <devname>: is related to a particular device
+ *   (think about multi-card setup). Double check that message
+ *   is not confusing to the average user.
+ *
+ * - use printk KERN_xxx level only if message is not a WARNING
+ *   but is INFO, ERR etc.
+ *
+ * - Use printk_ratelimited() for messages which may flood
+ *   (e.g. "rx DUP pkt!").
+ *
+ * - Use log() for messages which may be omitted (and they
+ *   _will_ be omitted in non-debug builds). Note that
+ *   message levels may be disabled at compile-time selectively,
+ *   thus select them wisely. Example: L_DEBUG is the lowest
+ *   (most likely to be compiled out) -> use for less important stuff.
+ *
+ * - Do not print important stuff with log(), or else people
+ *   will never build non-debug driver.
+ *
+ * Style:
+ * hex: capital letters, zero filled (e.g. 0x02AC)
+ * str: dont start from capitals, no trailing periods ("tx: queue is stopped")
+ */
 
 #if ACX_DEBUG > 1
 
@@ -241,46 +301,48 @@ is_hidden_essid(char *essid)
 		((' ' == essid[0]) && ('\0' == essid[1])));
 }
 
-/***********************************************************************
-** LOCKING
-** We have adev->sem and adev->spinlock.
-**
-** We employ following naming convention in order to get locking right:
-**
-** acx_e_xxxx - external entry points called from process context.
-**	It is okay to sleep. adev->sem is to be taken on entry.
-** acx_i_xxxx - external entry points possibly called from atomic context.
-**	Sleeping is not allowed (and thus down(sem) is not legal!)
-** acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
-** acx_l_xxxx - functions which expect lock to be already taken.
-** rest       - non-sleeping functions which do not require locking
-**		but may be run under lock
-**
-** A small number of local helpers do not have acx_[eisl]_ prefix.
-** They are always close to caller and are to be reviewed locally.
-**
-** Theory of operation:
-**
-** All process-context entry points (_e_ functions) take sem
-** immediately. IRQ handler and other 'atomic-context' entry points
-** (_i_ functions) take lock immediately on entry, but dont take sem
-** because that might sleep.
-**
-** Thus *all* code is either protected by sem or lock, or both.
-**
-** Code which must not run concurrently with IRQ takes lock.
-** Such code is marked with _l_.
-**
-** This results in the following rules of thumb useful in code review:
-**
-** + If a function calls _s_ fn, it must be an _s_ itself.
-** + You can call _l_ fn only (a) from another _l_ fn
-**   or (b) from _s_, _e_ or _i_ fn by taking lock, calling _l_,
-**   and dropping lock.
-** + All IRQ code runs under lock.
-** + Any _s_ fn is running under sem.
-** + Code under sem can race only with IRQ code.
-** + Code under sem+lock cannot race with anything.
+/*
+* LOCKING
+* We have adev->sem and adev->spinlock.
+*
+* We employ following naming convention in order to get locking right:
+*
+* acx_e_xxxx - external entry points called from process context.
+*	It is okay to sleep. adev->sem is to be taken on entry.
+* acx_i_xxxx - external entry points possibly called from atomic context.
+*	Sleeping is not allowed (and thus down(sem) is not legal!)
+* acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
+* acx_l_xxxx - functions which expect lock to be already taken.
+* rest       - non-sleeping functions which do not require locking
+*		but may be run under lock
+*
+* A small number of local helpers do not have acx_[eisl]_ prefix.
+* They are always close to caller and are to be reviewed locally.
+*
+* Theory of operation:
+*
+* All process-context entry points (_e_ functions) take sem
+* immediately. IRQ handler and other 'atomic-context' entry points
+* (_i_ functions) take lock immediately on entry, but dont take sem
+* because that might sleep.
+*
+* Thus *all* code is either protected by sem or lock, or both.
+*
+* Code which must not run concurrently with IRQ takes lock.
+* Such code is marked with _l_.
+*
+* This results in the following rules of thumb useful in code review:
+*
+* + If a function calls _s_ fn, it must be an _s_ itself.
+* + You can call _l_ fn only (a) from another _l_ fn
+*   or (b) from _s_, _e_ or _i_ fn by taking lock, calling _l_,
+*   and dropping lock.
+* + All IRQ code runs under lock.
+* + Any _s_ fn is running under sem.
+* + Code under sem can race only with IRQ code.
+* + Code under sem+lock cannot race with anything.
+* 
+* OW TODO: Explain semantics of the acx_lock and sem
 */
 
 /* These functions *must* be inline or they will break horribly on SPARC, due
@@ -625,29 +687,6 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
 
-void acxpci_l_power_led(acx_device_t *adev, int enable);
-int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
-unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
-void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
-int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
-void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxpci_free_desc_queues(acx_device_t *adev);
-int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
-void acxpci_set_interrupt_mask(acx_device_t *adev);
-int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
-
-void acxmem_l_power_led(acx_device_t *adev, int enable);
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
-void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxmem_free_desc_queues(acx_device_t *adev);
-int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxmem_proc_eeprom_output(char *p, acx_device_t *adev);
-void acxmem_set_interrupt_mask(acx_device_t *adev);
-int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 void acx_s_mwait(int ms);
 int acx_s_init_mac(acx_device_t *adev);
@@ -746,11 +785,169 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work);
 // OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_e_after_interrupt_task(acx_device_t *adev);
 
+
+
+
+
+/*
+ * BOM PCI prototypes
+ * ==================================================
+ */
+
+// Locking (PCI)
+
+// Logging (PCI)
+
+// Data Access (PCI)
+
+// Firmware, EEPROM, Phy (PCI)
+
+// Control Path (CMD handling, init, reset) (PCI)
+
+// CMDs (PCI:Control Path)
+
+// Configure (PCI:Control Path)
+
+// Template (PCI:Control Path)
+
+// Recalibration (PCI:Control Path)
+
+// Other (PCI:Control Path)
+
+// Proc, Debug (PCI)
+
+// Rx Path (PCI)
+
+// Tx Path (PCI)
+
+// Crypto (PCI)
+
+// Irq Handling, Timer (PCI)
+
+// Mac80211 Ops (PCI)
+
+// Helpers (PCI)
+
+// Driver, Module (PCI)
+
+
+void acxpci_l_power_led(acx_device_t *adev, int enable);
+int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
+void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
+int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
+void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxpci_free_desc_queues(acx_device_t *adev);
+int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
+void acxpci_set_interrupt_mask(acx_device_t *adev);
+int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+
 int __init acxpci_e_init_module(void);
-int __init acxusb_e_init_module(void);
-int __init acxmem_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
+
+
+/*
+ * BOM USB prototypes
+ * ==================================================
+ */
+
+// Locking (USB)
+
+// Logging (USB)
+
+// Data Access (USB)
+
+// Firmware, EEPROM, Phy (USB)
+
+// Control Path (CMD handling, init, reset) (USB)
+
+// CMDs (USB:Control Path)
+
+// Configure (USB:Control Path)
+
+// Template (USB:Control Path)
+
+// Recalibration (USB:Control Path)
+
+// Other (USB:Control Path)
+
+// Proc, Debug (USB)
+
+// Rx Path (USB)
+
+// Tx Path (USB)
+
+// Crypto (USB)
+
+// Irq Handling, Timer (USB)
+
+// Mac80211 Ops (USB)
+
+// Helpers (USB)
+
+// Driver, Module (USB)
+
+
+
+int __init acxusb_e_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
+
+/*
+ * BOM Mem prototypes
+ * ==================================================
+ */
+
+// Locking (Mem)
+
+// Logging (Mem)
+
+// Data Access (Mem)
+
+// Firmware, EEPROM, Phy (Mem)
+
+// Control Path (CMD handling, init, reset) (Mem)
+
+// CMDs (Mem:Control Path)
+
+// Configure (Mem:Control Path)
+
+// Template (Mem:Control Path)
+
+// Recalibration (Mem:Control Path)
+
+// Other (Mem:Control Path)
+
+// Proc, Debug (Mem)
+
+// Rx Path (Mem)
+
+// Tx Path (Mem)
+
+// Crypto (Mem)
+
+// Irq Handling, Timer (Mem)
+
+// Mac80211 Ops (Mem)
+
+// Helpers (Mem)
+
+// Driver, Module (Mem)
+
+
+void acxmem_l_power_led(acx_device_t *adev, int enable);
+int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
+int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxmem_free_desc_queues(acx_device_t *adev);
+int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_proc_eeprom_output(char *p, acx_device_t *adev);
+void acxmem_set_interrupt_mask(acx_device_t *adev);
+int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+
+int __init acxmem_e_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
 
 #endif /* _ACX_FUNC_H_ */
