@@ -5508,6 +5508,8 @@ static int __init acx_e_init_module(void)
 
 static void __exit acx_e_cleanup_module(void)
 {
+	// TODO Check, that interface isn't still up
+
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_e_cleanup_module();
 #endif
