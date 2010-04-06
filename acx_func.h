@@ -606,9 +606,6 @@ void acxusb_interrupt_tasklet(struct work_struct *work);
 // Helpers (USB)
 
 // Driver, Module (USB)
-
-
-
 int __init acxusb_e_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
 
@@ -622,11 +619,15 @@ void __exit acxusb_e_cleanup_module(void);
 // Logging (Mem)
 
 // Data Access (Mem)
+int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxmem_free_desc_queues(acx_device_t *adev);
 
 // Firmware, EEPROM, Phy (Mem)
 int acxmem_s_upload_radio(acx_device_t *adev);
 int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 
 // Control Path (CMD handling, init, reset) (Mem)
 
@@ -643,6 +644,8 @@ int acxmem_s_reset_dev(acx_device_t *adev);
 // Other (Mem:Control Path)
 
 // Proc, Debug (Mem)
+int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_proc_eeprom_output(char *p, acx_device_t *adev);
 
 // Rx Path (Mem)
 
@@ -652,32 +655,24 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 void* acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
+int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Crypto (Mem)
 
 // Irq Handling, Timer (Mem)
 void acxmem_i_interrupt_tasklet(struct work_struct *work);
+void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops (Mem)
 
 // Helpers (Mem)
+void acxmem_l_power_led(acx_device_t *adev, int enable);
 
 // Driver, Module (Mem)
-
-
-void acxmem_l_power_led(acx_device_t *adev, int enable);
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
-void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxmem_free_desc_queues(acx_device_t *adev);
-int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxmem_proc_eeprom_output(char *p, acx_device_t *adev);
-void acxmem_set_interrupt_mask(acx_device_t *adev);
-int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
-
 int __init acxmem_e_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
+
 
 #endif /* _ACX_FUNC_H_ */
