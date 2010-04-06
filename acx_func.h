@@ -472,23 +472,6 @@ void acx_s_cmd_start_scan(acx_device_t *adev);
 
 
 /***********************************************************************
-** Ioctls
-*/
-/*int
-acx111pci_ioctl_info(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	struct iw_param *vwrq,
-	char *extra);
-int
-acx100pci_ioctl_set_phy_amp_bias(
-	struct net_device *ndev,
-	struct iw_request_info *info,
-	struct iw_param *vwrq,
-	char *extra);
-*/
-
-/***********************************************************************
 ** /proc
 */
 #ifdef CONFIG_PROC_FS
