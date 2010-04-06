@@ -179,15 +179,7 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 // BOM Helpers (Common)
 // -----
 
-// BOM Driver, Module (Common)
-// -----
-
-
-
-
-/***********************************************************************
-** MAC address helpers
-*/
+// MAC address helpers
 static inline void
 MAC_COPY(u8 *mac, const u8 *src)
 {
@@ -255,9 +247,7 @@ mac_is_mcast(const u8 *mac)
 	((unsigned char *)bytevector)[5]
 
 
-/***********************************************************************
-** Random helpers
-*/
+// Random helpers
 #define TO_STRING(x)	#x
 #define STRING(x)	TO_STRING(x)
 
@@ -299,6 +289,12 @@ is_hidden_essid(char *essid)
 	return (('\0' == essid[0]) ||
 		((' ' == essid[0]) && ('\0' == essid[1])));
 }
+
+// BOM Driver, Module (Common)
+// -----
+
+
+
 
 /*
 * LOCKING
