@@ -150,6 +150,7 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 // Tx Path
 // -----
 static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
+static void* acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 
 // Crypto
 // -----
@@ -4312,6 +4313,19 @@ static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return;
+}
+
+static void* acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
+{
+	if (IS_PCI(adev))
+		return acxpci_l_get_txbuf(adev, tx_opaque);
+	if (IS_USB(adev))
+		return acxusb_l_get_txbuf(adev, tx_opaque);
+	if (IS_MEM(adev))
+		return acxmem_l_get_txbuf(adev, tx_opaque);
+
+	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
+	return (NULL);
 }
 
 

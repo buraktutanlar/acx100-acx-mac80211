@@ -428,22 +428,6 @@ is_hidden_essid(char *essid)
 
 
 
-void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-void* acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-static inline void *
-acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
-{
-	if (IS_PCI(adev))
-		return acxpci_l_get_txbuf(adev, tx_opaque);
-	if (IS_USB(adev))
-		return acxusb_l_get_txbuf(adev, tx_opaque);
-	if (IS_MEM(adev))
-		return acxmem_l_get_txbuf(adev, tx_opaque);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NULL);
-}
 
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
@@ -609,6 +593,7 @@ int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 
 // Tx Path (PCI)
 tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
+void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 
 // Crypto (PCI)
 
@@ -672,6 +657,7 @@ int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 // Tx Path (USB)
 tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
 void acxusb_l_dealloc_tx(tx_t *tx_opaque);
+void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 
 // Crypto (USB)
 
@@ -724,6 +710,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 // Tx Path (Mem)
 tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
+void* acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 
 // Crypto (Mem)
 
