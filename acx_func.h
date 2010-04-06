@@ -427,29 +427,6 @@ is_hidden_essid(char *essid)
 
 
 
-
-
-void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static inline void
-acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-                        struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
-{
-	if (IS_PCI(adev))
-		return acxpci_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
-	if (IS_USB(adev))
-		return acxusb_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
-	if (IS_MEM(adev))
-		return acxmem_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return;
-}
-
 static inline struct ieee80211_hdr *
 acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
@@ -594,6 +571,8 @@ int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 // Tx Path (PCI)
 tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
 void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Crypto (PCI)
 
@@ -658,6 +637,8 @@ int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
 void acxusb_l_dealloc_tx(tx_t *tx_opaque);
 void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Crypto (USB)
 
@@ -711,6 +692,8 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 void* acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Crypto (Mem)
 
