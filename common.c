@@ -1550,44 +1550,6 @@ acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 	return res;
 }
 
-void acx_i_op_configure_filter(struct ieee80211_hw *hw,
-		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
-
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-
-	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
-			| FIF_CONTROL | FIF_OTHER_BSS);
-	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
-			| FIF_CONTROL | FIF_OTHER_BSS);
-	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-	 return; */
-
-	if (*total_flags) {
-		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-		/* let kernel know in case *we* needed to set promiscuous */
-	} else {
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-	}
-
-	/* cannot update card settings directly here, atomic context */
-	// TODO This is one point to check for better cmd and interrupt handling
-	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-
-	acx_unlock(adev, flags);
-
-	//acx_s_update_card_settings(adev);
-
-	FN_EXIT0;
-}
 
 static int
 acx111_s_get_feature_config(acx_device_t * adev,
@@ -2730,17 +2692,6 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 	return OK;
 }
 
-int acx_e_conf_tx(struct ieee80211_hw *hw,
-		u16 queue, const struct ieee80211_tx_queue_params *params)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
-	acx_sem_lock(adev);
-    // TODO
-  	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return 0;
-}
 
 /*
 void acx_update_capabilities(acx_device_t * adev)
@@ -5313,6 +5264,56 @@ int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 }
 
+void acx_i_op_configure_filter(struct ieee80211_hw *hw,
+		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
+
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+
+	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+			| FIF_CONTROL | FIF_OTHER_BSS);
+	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
+	 return; */
+
+	if (*total_flags) {
+		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+		/* let kernel know in case *we* needed to set promiscuous */
+	} else {
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+	}
+
+	/* cannot update card settings directly here, atomic context */
+	// TODO This is one point to check for better cmd and interrupt handling
+	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+
+	acx_unlock(adev, flags);
+
+	//acx_s_update_card_settings(adev);
+
+	FN_EXIT0;
+}
+
+int acx_e_conf_tx(struct ieee80211_hw *hw,
+		u16 queue, const struct ieee80211_tx_queue_params *params)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	FN_ENTER;
+	acx_sem_lock(adev);
+    // TODO
+  	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
+}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,

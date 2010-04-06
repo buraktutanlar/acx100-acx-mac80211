@@ -342,13 +342,15 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed);
 void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
-#endif
+void acx_i_op_configure_filter(struct ieee80211_hw *hw,
+		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 
 int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
+#endif
 
 // BOM Helpers (Common)
 // -----
@@ -489,15 +491,6 @@ const char *acx_get_packet_type_string(u16 fc);
 // BOM Unsorted yet :) =================================================
 
 
-
-
-
-int acxpci_s_reset_dev(acx_device_t *adev);
-int acxmem_s_reset_dev(acx_device_t *adev);
-
-void acx_i_op_configure_filter(struct ieee80211_hw *hw,
-		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
-
 /*** End mac80211 Functions **/
 
 void great_inquisitor(acx_device_t *adev);
@@ -541,6 +534,7 @@ int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
 // Configure (PCI:Control Path)
+int acxpci_s_reset_dev(acx_device_t *adev);
 
 // Template (PCI:Control Path)
 
@@ -661,6 +655,7 @@ int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
 // Configure (Mem:Control Path)
+int acxmem_s_reset_dev(acx_device_t *adev);
 
 // Template (Mem:Control Path)
 
