@@ -259,6 +259,10 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 // BOM Tx Path (Common)
 // -----
+void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
+int acx_queue_stopped(struct ieee80211_hw *ieee);
+void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
+
 
 // BOM Crypto (Common)
 // -----
@@ -388,69 +392,6 @@ is_hidden_essid(char *essid)
 
 
 
-
-
-
-/***********************************************************************
-*/
-
-/* Can race with rx path (which is not protected by sem):
-** rx -> process_[re]assocresp() -> set_status(ASSOCIATED) -> wake_queue()
-** Can race with tx_complete IRQ:
-** IRQ -> acxpci_l_clean_txdesc -> acx_wake_queue
-** Review carefully all callsites */
-static inline void
-acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
-{
-	FN_ENTER;
-	ieee80211_stop_queues(hw);
-	if (msg)
-		log(L_BUFT, "acx: tx: stop queue %s\n", msg);
-	FN_EXIT0;
-}
-
-static inline int
-acx_queue_stopped(struct ieee80211_hw *ieee)
-{
-	return ieee80211_queue_stopped(ieee, 0);
-}
-
-/*
-static inline void
-acx_start_queue(struct ieee80211_hw *hw, const char *msg)
-{
-	ieee80211_start_queues(hw);
-	if (msg)
-		log(L_BUFT, "acx: tx: start queue %s\n", msg);
-}
-*/
-static inline void
-acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
-{
-	FN_ENTER;
-	ieee80211_wake_queues(hw);
-	if (msg)
-		log(L_BUFT, "acx: tx: wake queue %s\n", msg);
-	FN_EXIT0;
-}
-/*
-static inline void
-acx_carrier_off(struct net_device *ndev, const char *msg)
-{
-	netif_carrier_off(ndev);
-	if (msg)
-		log(L_BUFT, "acx: tx: carrier off %s\n", msg);
-}
-
-static inline void
-acx_carrier_on(struct net_device *ndev, const char *msg)
-{
-	netif_carrier_on(ndev);
-	if (msg)
-		log(L_BUFT, "acx: tx: carrier on %s\n", msg);
-}
-
-*/
 
 
 /***********************************************************************

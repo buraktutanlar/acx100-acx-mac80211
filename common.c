@@ -4221,6 +4221,29 @@ out:
 	return txresult;
 }
 
+void acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
+{
+	FN_ENTER;
+	ieee80211_stop_queues(hw);
+	if (msg)
+		log(L_BUFT, "acx: tx: stop queue %s\n", msg);
+	FN_EXIT0;
+}
+
+int acx_queue_stopped(struct ieee80211_hw *ieee)
+{
+	return ieee80211_queue_stopped(ieee, 0);
+}
+
+void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
+{
+	FN_ENTER;
+	ieee80211_wake_queues(hw);
+	if (msg)
+		log(L_BUFT, "acx: tx: wake queue %s\n", msg);
+	FN_EXIT0;
+}
+
 
 /*
  * OW 20100405 This comment somehow lost it's function (wasn't me though!)
