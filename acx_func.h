@@ -32,6 +32,108 @@
 // BOM Logging (Common)
 //-----
 
+/*
+ * LOGGING
+ *
+ * - Avoid SHOUTING needlessly. Avoid excessive verbosity.
+ *   Gradually remove messages which are old debugging aids.
+ *
+ * - Use printk() for messages which are to be always logged.
+ *   Supply either 'acx:' or '<devname>:' prefix so that user
+ *   can figure out who's speaking among other kernel chatter.
+ *   acx: is for general issues (e.g. "acx: no firmware image!")
+ *   while <devname>: is related to a particular device
+ *   (think about multi-card setup). Double check that message
+ *   is not confusing to the average user.
+ *
+ * - use printk KERN_xxx level only if message is not a WARNING
+ *   but is INFO, ERR etc.
+ *
+ * - Use printk_ratelimited() for messages which may flood
+ *   (e.g. "rx DUP pkt!").
+ *
+ * - Use log() for messages which may be omitted (and they
+ *   _will_ be omitted in non-debug builds). Note that
+ *   message levels may be disabled at compile-time selectively,
+ *   thus select them wisely. Example: L_DEBUG is the lowest
+ *   (most likely to be compiled out) -> use for less important stuff.
+ *
+ * - Do not print important stuff with log(), or else people
+ *   will never build non-debug driver.
+ *
+ * Style:
+ * hex: capital letters, zero filled (e.g. 0x02AC)
+ * str: dont start from capitals, no trailing periods ("tx: queue is stopped")
+ */
+
+// Debug build
+#if ACX_DEBUG
+
+void log_fn_enter(const char *funcname);
+void log_fn_exit(const char *funcname);
+void log_fn_exit_v(const char *funcname, int v);
+
+char* acx_print_mac(char *buf, const u8 *mac);
+void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
+
+#define FN_ENTER \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_enter(__func__); \
+		} \
+	} while (0)
+
+#define FN_EXIT1(v) \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_exit_v(__func__, v); \
+		} \
+	} while (0)
+#define FN_EXIT0 \
+	do { \
+		if (unlikely(acx_debug & L_FUNC)) { \
+			log_fn_exit(__func__); \
+		} \
+	} while (0)
+
+#define log(chan, args...) \
+	do { \
+		if (acx_debug & (chan)) \
+			printk(args); \
+	} while (0)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+#define printk_ratelimited(args...) printk(args)
+#endif
+
+// Log with prefix "acx: __func__ 
+#define logf0(chan, msg) \
+		log(chan, "acx: %s: " msg, __func__);
+#define logf1(chan, msg, args...) \
+		log(chan, "acx: %s: " msg, __func__, args);
+
+// None-Debug build
+// OW 20100405: An none-debug build is currently probably broken
+#else
+
+#define FN_ENTER do {} while(0)
+#define FN_EXIT1(v) do {} while(0)
+#define FN_EXIT0 do {} while(0)
+
+#define log(chan, args...)
+/* Standard way of log flood prevention */
+#define printk_ratelimited(args...) \
+do { \
+	if (printk_ratelimit()) \
+		printk(args); \
+} while (0)
+
+#endif 
+//---
+
+void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
+
+
 // BOM Data Access (Common)
 //-----
 
@@ -81,109 +183,6 @@
 // -----
 
 
-/*
- * LOGGING
- *
- * - Avoid SHOUTING needlessly. Avoid excessive verbosity.
- *   Gradually remove messages which are old debugging aids.
- *
- * - Use printk() for messages which are to be always logged.
- *   Supply either 'acx:' or '<devname>:' prefix so that user
- *   can figure out who's speaking among other kernel chatter.
- *   acx: is for general issues (e.g. "acx: no firmware image!")
- *   while <devname>: is related to a particular device
- *   (think about multi-card setup). Double check that message
- *   is not confusing to the average user.
- *
- * - use printk KERN_xxx level only if message is not a WARNING
- *   but is INFO, ERR etc.
- *
- * - Use printk_ratelimited() for messages which may flood
- *   (e.g. "rx DUP pkt!").
- *
- * - Use log() for messages which may be omitted (and they
- *   _will_ be omitted in non-debug builds). Note that
- *   message levels may be disabled at compile-time selectively,
- *   thus select them wisely. Example: L_DEBUG is the lowest
- *   (most likely to be compiled out) -> use for less important stuff.
- *
- * - Do not print important stuff with log(), or else people
- *   will never build non-debug driver.
- *
- * Style:
- * hex: capital letters, zero filled (e.g. 0x02AC)
- * str: dont start from capitals, no trailing periods ("tx: queue is stopped")
- */
-
-#if ACX_DEBUG > 1
-
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
-
-char* acx_print_mac(char *buf, const u8 *mac);
-void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
-
-#define FN_ENTER \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_enter(__func__); \
-		} \
-	} while (0)
-
-#define FN_EXIT1(v) \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit_v(__func__, v); \
-		} \
-	} while (0)
-#define FN_EXIT0 \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit(__func__); \
-		} \
-	} while (0)
-
-#else
-
-#define FN_ENTER do {} while(0)
-#define FN_EXIT1(v) do {} while(0)
-#define FN_EXIT0 do {} while(0)
-
-#endif /* ACX_DEBUG > 1 */
-
-
-#if ACX_DEBUG
-
-#define log(chan, args...) \
-	do { \
-		if (acx_debug & (chan)) \
-			printk(args); \
-	} while (0)
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
-#define printk_ratelimited(args...) printk(args)
-#endif
-
-#else /* Non-debug build: */
-
-#define log(chan, args...)
-/* Standard way of log flood prevention */
-#define printk_ratelimited(args...) \
-do { \
-	if (printk_ratelimit()) \
-		printk(args); \
-} while (0)
-
-#endif /* ACX_DEBUG */
-
-/* Log with prefix "acx: __func__ */
-#define logf0(chan, msg) \
-		log(chan, "acx: %s: " msg, __func__);
-#define logf1(chan, msg, args...) \
-		log(chan, "acx: %s: " msg, __func__, args);
-
-void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 
 /***********************************************************************
