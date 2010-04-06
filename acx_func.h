@@ -238,6 +238,8 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size)
 int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
+void acx_s_get_firmware_version(acx_device_t *adev);
+void acx_display_hardware_details(acx_device_t *adev);
 
 // BOM Control Path (CMD handling, init, reset) (Common)
 // -----
@@ -344,9 +346,9 @@ void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 
 void acx_i_op_configure_filter(struct ieee80211_hw *hw,
 		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
-
 int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
+int acx_e_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
@@ -356,6 +358,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_s
 // -----
 void acx_s_mwait(int ms);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
+// void great_inquisitor(acx_device_t *adev);
 
 // MAC address helpers
 // ---
@@ -491,15 +494,11 @@ const char *acx_get_packet_type_string(u16 fc);
 // BOM Unsorted yet :) =================================================
 
 
-/*** End mac80211 Functions **/
 
-void great_inquisitor(acx_device_t *adev);
 
-void acx_s_get_firmware_version(acx_device_t *adev);
-void acx_display_hardware_details(acx_device_t *adev);
 
-int acx_e_change_mtu(struct ieee80211_hw *hw, int mtu);
-int acx_e_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+
+
 struct iw_statistics* acx_e_get_wireless_stats(struct ieee80211_hw *hw);
 
 void acxpci_interrupt_tasklet(struct work_struct *work);

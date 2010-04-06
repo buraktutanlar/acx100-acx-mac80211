@@ -1253,25 +1253,6 @@ firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
 	return res;
 }
 
-int
-acx_e_op_get_stats(struct ieee80211_hw *hw,
-		struct ieee80211_low_level_stats *stats)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	acx_lock(adev, flags);
-	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
-	acx_unlock(adev, flags);
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return 0;
-}
-
 /*
  * Common function to parse ALL configoption struct formats
  * (ACX100 and ACX111; FIXME: how to make it work with ACX100 USB!?!?).
@@ -5311,6 +5292,25 @@ int acx_e_conf_tx(struct ieee80211_hw *hw,
 	acx_sem_lock(adev);
     // TODO
   	acx_sem_unlock(adev);
+	FN_EXIT0;
+	return 0;
+}
+
+int
+acx_e_op_get_stats(struct ieee80211_hw *hw,
+		struct ieee80211_low_level_stats *stats)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx_lock(adev, flags);
+	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
+	acx_unlock(adev, flags);
+
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
 }
