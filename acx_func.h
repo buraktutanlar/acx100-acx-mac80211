@@ -427,19 +427,6 @@ is_hidden_essid(char *essid)
 
 
 
-void acxusb_l_dealloc_tx(tx_t *tx_opaque);
-void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
-static inline void
-acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
-{
-	if (IS_USB(adev))
-		acxusb_l_dealloc_tx(tx_opaque);
-	if (IS_MEM(adev))
-		acxmem_l_dealloc_tx (adev, tx_opaque);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return;
-}
 
 void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
@@ -684,6 +671,7 @@ int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 
 // Tx Path (USB)
 tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
+void acxusb_l_dealloc_tx(tx_t *tx_opaque);
 
 // Crypto (USB)
 
@@ -735,6 +723,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param
 
 // Tx Path (Mem)
 tx_t* acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
+void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 // Crypto (Mem)
 
