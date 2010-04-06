@@ -502,11 +502,15 @@ const char *acx_get_packet_type_string(u16 fc);
 // Logging (PCI)
 
 // Data Access (PCI)
+int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
+void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+void acxpci_free_desc_queues(acx_device_t *adev);
 
 // Firmware, EEPROM, Phy (PCI)
 int acxpci_s_upload_radio(acx_device_t *adev);
 int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 
 // Control Path (CMD handling, init, reset) (PCI)
 
@@ -523,6 +527,8 @@ int acxpci_s_reset_dev(acx_device_t *adev);
 // Other (PCI:Control Path)
 
 // Proc, Debug (PCI)
+int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
 
 // Rx Path (PCI)
 
@@ -531,31 +537,22 @@ tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
 void* acxpci_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
+void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
+int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Crypto (PCI)
 
 // Irq Handling, Timer (PCI)
 void acxpci_interrupt_tasklet(struct work_struct *work);
+void acxpci_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops (PCI)
 
 // Helpers (PCI)
+void acxpci_l_power_led(acx_device_t *adev, int enable);
 
 // Driver, Module (PCI)
-
-
-void acxpci_l_power_led(acx_device_t *adev, int enable);
-int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
-unsigned int acxpci_l_clean_txdesc(acx_device_t *adev);
-void acxpci_l_clean_txdesc_emergency(acx_device_t *adev);
-int acxpci_s_create_hostdesc_queues(acx_device_t *adev);
-void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxpci_free_desc_queues(acx_device_t *adev);
-int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxpci_proc_eeprom_output(char *p, acx_device_t *adev);
-void acxpci_set_interrupt_mask(acx_device_t *adev);
-int acx100pci_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
-
 int __init acxpci_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 
