@@ -232,6 +232,9 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 
 // BOM Firmware, EEPROM, Phy (Common)
 // -----
+firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
+int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // BOM Control Path (CMD handling, init, reset) (Common)
 // -----
@@ -481,50 +484,9 @@ void acx_s_cmd_start_scan(acx_device_t *adev);
 
 
 
-
-/***********************************************************************
-*/
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
-int acxpci_s_upload_radio(acx_device_t *adev);
-int acxmem_s_upload_radio(acx_device_t *adev);
-
-
 /***********************************************************************
 ** Unsorted yet :)
 */
-int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-static inline int
-acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
-{
-	if (IS_PCI(adev))
-		return acxpci_s_read_phy_reg(adev, reg, charbuf);
-	if (IS_USB(adev))
-		return acxusb_s_read_phy_reg(adev, reg, charbuf);
-	if (IS_MEM(adev))
-		return acxmem_s_read_phy_reg(adev, reg, charbuf);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NOT_OK);
-}
-
-int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-static inline int
-acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
-{
-	if (IS_PCI(adev))
-		return acxpci_s_write_phy_reg(adev, reg, value);
-	if (IS_USB(adev))
-		return acxusb_s_write_phy_reg(adev, reg, value);
-	if (IS_MEM(adev))
-		return acxmem_s_write_phy_reg(adev, reg, value);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NOT_OK);
-}
 
 tx_t* acxpci_l_alloc_tx(acx_device_t *adev);
 tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
@@ -718,6 +680,9 @@ void acx_e_after_interrupt_task(acx_device_t *adev);
 // Data Access (PCI)
 
 // Firmware, EEPROM, Phy (PCI)
+int acxpci_s_upload_radio(acx_device_t *adev);
+int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // Control Path (CMD handling, init, reset) (PCI)
 
@@ -776,6 +741,8 @@ void __exit acxpci_e_cleanup_module(void);
 // Data Access (USB)
 
 // Firmware, EEPROM, Phy (USB)
+int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // Control Path (CMD handling, init, reset) (USB)
 
@@ -822,6 +789,9 @@ void __exit acxusb_e_cleanup_module(void);
 // Data Access (Mem)
 
 // Firmware, EEPROM, Phy (Mem)
+int acxmem_s_upload_radio(acx_device_t *adev);
+int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // Control Path (CMD handling, init, reset) (Mem)
 
