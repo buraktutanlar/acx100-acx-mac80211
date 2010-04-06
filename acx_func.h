@@ -225,6 +225,8 @@ do { \
 //---
 
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
+void acx_dump_bytes(const void *, int);
+const char *acx_cmd_status_str(unsigned int state);
 
 
 // BOM Data Access (Common)
@@ -259,12 +261,16 @@ int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char*
 #define acx_s_interrogate(adev,pdr,type) \
 	acx_s_interrogate_debug(adev,pdr,type,#type)
 
-// BOM Configure (Common:Control Path)
+// BOM Configuration (Common:Control Path)
 // -----
+void acx_s_set_defaults(acx_device_t *adev);
 int acx_s_init_mac(acx_device_t *adev);
 // void acx_update_capabilities(acx_device_t *adev);
 void acx_s_start(acx_device_t *adev);
 void acx_s_update_card_settings(acx_device_t *adev);
+int acx_setup_modes(acx_device_t *adev);
+void acx_free_modes(acx_device_t *adev);
+int acx_net_reset(struct ieee80211_hw *ieee);
 
 // BOM Template (Common:Control Path)
 // -----
@@ -289,13 +295,20 @@ acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
 
 // BOM Rx Path (Common)
 // -----
+void acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
+
 
 // BOM Tx Path (Common)
 // -----
+int acx_i_op_tx(struct ieee80211_hw *ieee,	struct sk_buff *skb);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
+
+//void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
+//		u16 intended_rate, u8 rate100, u16 rate111, u8 error,
+//		int pkts_to_ignore);
 
 
 // BOM Crypto (Common)
@@ -310,9 +323,37 @@ void acx_i_timer(unsigned long a);
 // BOM Mac80211 Ops (Common)
 // -----
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+int acx_e_op_add_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_if_init_conf *conf);
+void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_if_init_conf *conf);
+#else
+int acx_e_op_add_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_vif *vif);
+void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
+		struct ieee80211_vif *vif);
+#endif
+
+int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+		struct ieee80211_key_conf *key);
+int acx_e_op_config(struct ieee80211_hw *hw, u32 changed);
+void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
+		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
+#endif
+
+int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
+		const struct ieee80211_tx_queue_params *params);
+
+
 // BOM Helpers (Common)
 // -----
 void acx_s_mwait(int ms);
+u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
 // MAC address helpers
 // ---
@@ -427,6 +468,7 @@ is_hidden_essid(char *essid)
 		((' ' == essid[0]) && ('\0' == essid[1])));
 }
 
+// More random helpers
 // ---
 static inline struct ieee80211_hdr*
 acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
@@ -434,6 +476,11 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
 
+#if !ACX_DEBUG
+static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
+#else
+const char *acx_get_packet_type_string(u16 fc);
+#endif
 
 // BOM Driver, Module (Common)
 // -----
@@ -441,55 +488,9 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 
 // BOM Unsorted yet :) =================================================
 
-u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
-void acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
-void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
-			u16 intended_rate, u8 rate100, u16 rate111, u8 error,
-			int pkts_to_ignore);
 
-void acx_dump_bytes(const void *, int);
 
-void acx_s_set_defaults(acx_device_t *adev);
-
-#if !ACX_DEBUG
-static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
-#else
-const char *acx_get_packet_type_string(u16 fc);
-#endif
-const char *acx_cmd_status_str(unsigned int state);
-
-/*** mac80211 functions ***/
-int acx_setup_modes(acx_device_t *adev);
-void acx_free_modes(acx_device_t *adev);
-int acx_i_op_tx(struct ieee80211_hw *ieee,	struct sk_buff *skb);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_add_interface(struct ieee80211_hw* ieee,
-		struct ieee80211_if_init_conf *conf);
-void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
-		struct ieee80211_if_init_conf *conf);
-#else
-int acx_e_op_add_interface(struct ieee80211_hw* ieee,
-		struct ieee80211_vif *vif);
-void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
-		struct ieee80211_vif *vif);
-#endif
-
-int acx_net_reset(struct ieee80211_hw *ieee);
-int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
-		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
-		struct ieee80211_key_conf *key);
-int acx_e_op_config(struct ieee80211_hw *hw, u32 changed);
-void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
-		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
-#endif
-int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
-		const struct ieee80211_tx_queue_params *params);
-//int acx_passive_scan(struct net_device *net_dev, int state, struct ieee80211_scan_conf *conf);
-//static void acx_netdev_init(struct net_device *ndev);
 
 int acxpci_s_reset_dev(acx_device_t *adev);
 int acxmem_s_reset_dev(acx_device_t *adev);
@@ -515,8 +516,6 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work);
 // void acx_interrupt_tasklet(acx_device_t *adev);
 // OW TODO void acx_e_after_interrupt_task(struct work_struct* work);
 void acx_e_after_interrupt_task(acx_device_t *adev);
-
-
 
 
 
