@@ -29,6 +29,99 @@
 // BOM Locking (Common)
 // -----
 
+/*
+ * LOCKING
+ * We have adev->sem and adev->spinlock.
+ *
+ * We employ following naming convention in order to get locking right:
+ *
+ * acx_e_xxxx - external entry points called from process context.
+ *	It is okay to sleep. adev->sem is to be taken on entry.
+ * acx_i_xxxx - external entry points possibly called from atomic context.
+ *	Sleeping is not allowed (and thus down(sem) is not legal!)
+ * acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
+ * acx_l_xxxx - functions which expect lock to be already taken.
+ * rest       - non-sleeping functions which do not require locking
+ *		but may be run under lock
+ *
+ * A small number of local helpers do not have acx_[eisl]_ prefix.
+ * They are always close to caller and are to be reviewed locally.
+ *
+ * Theory of operation:
+ *
+ * All process-context entry points (_e_ functions) take sem
+ * immediately. IRQ handler and other 'atomic-context' entry points
+ * (_i_ functions) take lock immediately on entry, but dont take sem
+ * because that might sleep.
+ *
+ * Thus *all* code is either protected by sem or lock, or both.
+ *
+ * Code which must not run concurrently with IRQ takes lock.
+ * Such code is marked with _l_.
+ *
+ * This results in the following rules of thumb useful in code review:
+ *
+ * + If a function calls _s_ fn, it must be an _s_ itself.
+ * + You can call _l_ fn only (a) from another _l_ fn
+ *   or (b) from _s_, _e_ or _i_ fn by taking lock, calling _l_,
+ *   and dropping lock.
+ * + All IRQ code runs under lock.
+ * + Any _s_ fn is running under sem.
+ * + Code under sem can race only with IRQ code.
+ * + Code under sem+lock cannot race with anything.
+ * 
+ * OW TODO: Explain semantics of the acx_lock and sem
+ */
+
+/* These functions *must* be inline or they will break horribly on SPARC, due
+ * to its weird semantics for save/restore flags */
+
+#if defined(PARANOID_LOCKING) /* Lock debugging */
+
+void acx_lock_debug(acx_device_t *adev, const char* where);
+void acx_unlock_debug(acx_device_t *adev, const char* where);
+void acx_down_debug(acx_device_t *adev, const char* where);
+void acx_up_debug(acx_device_t *adev, const char* where);
+void acx_lock_unhold(void);
+void acx_sem_unhold(void);
+
+static inline void
+acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
+{
+	acx_lock_debug(adev, where);
+	spin_lock_irqsave(&adev->spinlock, *fp);
+}
+static inline void
+acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
+{
+	acx_unlock_debug(adev, where);
+	spin_unlock_irqrestore(&adev->spinlock, *fp);
+}
+#define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
+#define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
+#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
+#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
+
+#elif defined(DO_LOCKING)
+
+#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
+#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
+#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
+#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
+#define acx_lock_unhold()	((void)0)
+#define acx_sem_unhold()	((void)0)
+
+#else /* no locking! :( */
+
+#define acx_lock(adev, flags)	((void)0)
+#define acx_unlock(adev, flags)	((void)0)
+#define acx_sem_lock(adev)	((void)0)
+#define acx_sem_unlock(adev)	((void)0)
+#define acx_lock_unhold()	((void)0)
+#define acx_sem_unhold()	((void)0)
+
+#endif
+
 // BOM Logging (Common)
 // -----
 
@@ -296,98 +389,6 @@ is_hidden_essid(char *essid)
 
 
 
-/*
-* LOCKING
-* We have adev->sem and adev->spinlock.
-*
-* We employ following naming convention in order to get locking right:
-*
-* acx_e_xxxx - external entry points called from process context.
-*	It is okay to sleep. adev->sem is to be taken on entry.
-* acx_i_xxxx - external entry points possibly called from atomic context.
-*	Sleeping is not allowed (and thus down(sem) is not legal!)
-* acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
-* acx_l_xxxx - functions which expect lock to be already taken.
-* rest       - non-sleeping functions which do not require locking
-*		but may be run under lock
-*
-* A small number of local helpers do not have acx_[eisl]_ prefix.
-* They are always close to caller and are to be reviewed locally.
-*
-* Theory of operation:
-*
-* All process-context entry points (_e_ functions) take sem
-* immediately. IRQ handler and other 'atomic-context' entry points
-* (_i_ functions) take lock immediately on entry, but dont take sem
-* because that might sleep.
-*
-* Thus *all* code is either protected by sem or lock, or both.
-*
-* Code which must not run concurrently with IRQ takes lock.
-* Such code is marked with _l_.
-*
-* This results in the following rules of thumb useful in code review:
-*
-* + If a function calls _s_ fn, it must be an _s_ itself.
-* + You can call _l_ fn only (a) from another _l_ fn
-*   or (b) from _s_, _e_ or _i_ fn by taking lock, calling _l_,
-*   and dropping lock.
-* + All IRQ code runs under lock.
-* + Any _s_ fn is running under sem.
-* + Code under sem can race only with IRQ code.
-* + Code under sem+lock cannot race with anything.
-* 
-* OW TODO: Explain semantics of the acx_lock and sem
-*/
-
-/* These functions *must* be inline or they will break horribly on SPARC, due
- * to its weird semantics for save/restore flags */
-
-#if defined(PARANOID_LOCKING) /* Lock debugging */
-
-void acx_lock_debug(acx_device_t *adev, const char* where);
-void acx_unlock_debug(acx_device_t *adev, const char* where);
-void acx_down_debug(acx_device_t *adev, const char* where);
-void acx_up_debug(acx_device_t *adev, const char* where);
-void acx_lock_unhold(void);
-void acx_sem_unhold(void);
-
-static inline void
-acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
-{
-	acx_lock_debug(adev, where);
-	spin_lock_irqsave(&adev->spinlock, *fp);
-}
-static inline void
-acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
-{
-	acx_unlock_debug(adev, where);
-	spin_unlock_irqrestore(&adev->spinlock, *fp);
-}
-#define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
-#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
-
-#elif defined(DO_LOCKING)
-
-#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
-#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
-#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
-#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
-#define acx_lock_unhold()	((void)0)
-#define acx_sem_unhold()	((void)0)
-
-#else /* no locking! :( */
-
-#define acx_lock(adev, flags)	((void)0)
-#define acx_unlock(adev, flags)	((void)0)
-#define acx_sem_lock(adev)	((void)0)
-#define acx_sem_unlock(adev)	((void)0)
-#define acx_lock_unhold()	((void)0)
-#define acx_sem_unhold()	((void)0)
-
-#endif
 
 
 /***********************************************************************
