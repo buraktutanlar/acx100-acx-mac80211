@@ -1757,20 +1757,9 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
  ** 2) go to waitqueue based approach: wait, not poll!
  */
 
-#if !ACX_DEBUG
-int
-acxmem_s_issue_cmd_timeo(
-		acx_device_t *adev,
-		unsigned int cmd,
-		void *buffer,
-		unsigned buflen,
-		unsigned cmd_timeout)
-{
-#else
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
 	unsigned long start = jiffies;
-#endif
 	const char *devname;
 	unsigned counter;
 	u16 irqtype;

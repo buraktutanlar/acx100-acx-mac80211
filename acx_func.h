@@ -241,6 +241,22 @@ int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // BOM CMDs (Common:Control Path)
 // -----
+#define CMD_TIMEOUT_MS(n)	(n)
+#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
+
+int acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+#define acx_s_issue_cmd(adev,cmd,param,len) \
+	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
+#define acx_s_issue_cmd_timeo(adev,cmd,param,len,timeo) \
+	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
+
+int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_configure(adev,pdr,type) \
+	acx_s_configure_debug(adev,pdr,type,#type)
+
+int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_s_interrogate(adev,pdr,type) \
+	acx_s_interrogate_debug(adev,pdr,type,#type)
 
 // BOM Configure (Common:Control Path)
 // -----
@@ -402,86 +418,6 @@ is_hidden_essid(char *essid)
 
 // BOM Driver, Module (Common)
 // -----
-
-
-
-
-
-/***********************************************************************
-** Communication with firmware
-*/
-#define CMD_TIMEOUT_MS(n)	(n)
-#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
-
-// OW TODO Review for cleanup. Is special _debug #defs for logging required ?
-// We can just log all in case of errors.
-#if ACX_DEBUG
-
-/* We want to log cmd names */
-int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-static inline int
-acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr)
-{
-	if (IS_PCI(adev))
-		return acxpci_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
-	if (IS_USB(adev))
-		return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
-	if (IS_MEM(adev))
-		return acxmem_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NOT_OK);
-}
-#define acx_s_issue_cmd(adev,cmd,param,len) \
-	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
-#define acx_s_issue_cmd_timeo(adev,cmd,param,len,timeo) \
-	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
-int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_configure(adev,pdr,type) \
-	acx_s_configure_debug(adev,pdr,type,#type)
-int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_interrogate(adev,pdr,type) \
-	acx_s_interrogate_debug(adev,pdr,type,#type)
-
-#else
-
-int acxpci_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
-int acxusb_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
-int acxmem_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout);
-static inline int
-acx_s_issue_cmd_timeo(acx_device_t *adev, unsigned cmd,	void *param, unsigned len, unsigned timeout)
-{
-	if (IS_PCI(adev))
-		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
-	if (IS_USB(adev))
-		return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
-	if (IS_MEM(adev))
-		return acxmem_s_issue_cmd_timeo(adev, cmd, param, len, timeout);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NOT_OK);
-}
-static inline int
-acx_s_issue_cmd(acx_device_t *adev, unsigned cmd, void *param, unsigned len)
-{
-	if (IS_PCI(adev))
-		return acxpci_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
-	if (IS_USB(adev))
-		return acxusb_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
-	if (IS_MEM(adev))
-		return acxmem_s_issue_cmd_timeo(adev, cmd, param, len, ACX_CMD_TIMEOUT_DEFAULT);
-
-	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
-	return (NOT_OK);
-}
-int acx_s_configure(acx_device_t *adev, void *pdr, int type);
-int acx_s_interrogate(acx_device_t *adev, void *pdr, int type);
-
-#endif
-
-void acx_s_cmd_start_scan(acx_device_t *adev);
 
 
 
@@ -670,6 +606,7 @@ int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Control Path (CMD handling, init, reset) (PCI)
 
 // CMDs (PCI:Control Path)
+int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
 // Configure (PCI:Control Path)
 
@@ -731,6 +668,7 @@ int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Control Path (CMD handling, init, reset) (USB)
 
 // CMDs (USB:Control Path)
+int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
 // Configure (USB:Control Path)
 
@@ -781,6 +719,7 @@ int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // Control Path (CMD handling, init, reset) (Mem)
 
 // CMDs (Mem:Control Path)
+int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
 // Configure (Mem:Control Path)
 

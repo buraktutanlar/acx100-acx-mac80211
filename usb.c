@@ -261,13 +261,6 @@ int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 #undef FUNC
 #define FUNC "issue_cmd"
 
-#if !ACX_DEBUG
-int
-acxusb_s_issue_cmd_timeo(acx_device_t * adev,
-			 unsigned cmd,
-			 void *buffer, unsigned buflen, unsigned timeout)
-{
-#else
 int
 acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
@@ -275,7 +268,6 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned buflen,
 			       unsigned timeout, const char *cmdstr)
 {
-#endif
 	/* USB ignores timeout param */
 
 	struct usb_device *usbdev;

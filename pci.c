@@ -1025,13 +1025,6 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 #undef FUNC
 #define FUNC "issue_cmd"
 
-#if !ACX_DEBUG
-int
-acxpci_s_issue_cmd_timeo(acx_device_t * adev,
-			 unsigned int cmd,
-			 void *buffer, unsigned buflen, unsigned cmd_timeout)
-{
-#else
 int
 acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
@@ -1040,7 +1033,6 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd_timeout, const char *cmdstr)
 {
 	unsigned long start = jiffies;
-#endif
 	const char *devname;
 	unsigned counter;
 	u16 irqtype;
