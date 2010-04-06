@@ -22,7 +22,7 @@
 #include "acx_commands.h"
 
 /*
- * BOM Common prototypes
+ * BOM Common
  * ==================================================
  */
 
@@ -235,6 +235,7 @@ void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
 int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
 
 // BOM Control Path (CMD handling, init, reset) (Common)
 // -----
@@ -260,6 +261,10 @@ int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char*
 
 // BOM Configure (Common:Control Path)
 // -----
+int acx_s_init_mac(acx_device_t *adev);
+// void acx_update_capabilities(acx_device_t *adev);
+void acx_s_start(acx_device_t *adev);
+void acx_s_update_card_settings(acx_device_t *adev);
 
 // BOM Template (Common:Control Path)
 // -----
@@ -298,12 +303,16 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
 
 // BOM Irq Handling, Timer (Common)
 // -----
+void acx_init_task_scheduler(acx_device_t *adev);
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+void acx_i_timer(unsigned long a);
 
 // BOM Mac80211 Ops (Common)
 // -----
 
 // BOM Helpers (Common)
 // -----
+void acx_s_mwait(int ms);
 
 // MAC address helpers
 // ---
@@ -430,35 +439,7 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 // -----
 
 
-
-/***********************************************************************
-** Unsorted yet :)
-*/
-
-
-
-
-void acx_s_mwait(int ms);
-int acx_s_init_mac(acx_device_t *adev);
-void acx_set_reg_domain(acx_device_t *adev, unsigned char reg_dom_id);
-void acx_update_capabilities(acx_device_t *adev);
-void acx_s_start(acx_device_t *adev);
-
-void acx_s_update_card_settings(acx_device_t *adev);
-void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
-
-void acx_init_task_scheduler(acx_device_t *adev);
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-
-int acx_e_ioctl_old(struct net_device *ndev, struct ifreq *ifr, int cmd);
-
-client_t *acx_l_sta_list_get(acx_device_t *adev, const u8 *address);
-void acx_l_sta_list_del(acx_device_t *adev, client_t *clt);
-
-void acx_i_timer(unsigned long a);
-
-struct sk_buff *acx_rxbuf_to_ether(acx_device_t *adev, rxbuffer_t *rxbuf);
-int acx_ether_to_txbuf(acx_device_t *adev, void *txbuf, const struct sk_buff *skb);
+// BOM Unsorted yet :) =================================================
 
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 
