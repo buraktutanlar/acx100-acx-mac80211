@@ -111,7 +111,7 @@ static void acxpci_l_process_rxdesc(acx_device_t *adev);
 // Tx Path (PCI)
 static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
-static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
+static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
 static inline txdesc_t *get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
@@ -1927,7 +1927,7 @@ tx_t* acxpci_l_alloc_tx(acx_device_t * adev)
 
 void *acxpci_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 {
-	return get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
+	return acxpci_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
 
 
@@ -1959,7 +1959,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = get_txhostdesc(adev, txdesc);
+	hostdesc1 = acxpci_get_txhostdesc(adev, txdesc);
 	wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
 
 	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
@@ -2258,7 +2258,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		// OW TODO 20091116 Compare mem.c
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
-		hostdesc = get_txhostdesc(adev, txdesc);
+		hostdesc = acxpci_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 		txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
@@ -2580,7 +2580,7 @@ static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
 	return (txdesc_t *) (((u8 *) txdesc) + inc * adev->txdesc_size);
 }
 
-static txhostdesc_t *get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
+static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
 {
 	int index = (u8 *) txdesc - (u8 *) adev->txdesc_start;
 
