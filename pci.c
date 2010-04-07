@@ -1672,6 +1672,63 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
  * ==================================================
  */
 
+static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+{
+	rxdesc_t *rxdesc;
+	u32 mem_offs;
+	int i;
+
+	FN_ENTER;
+
+	/* done by memset: adev->rx_tail = 0; */
+
+	/* ACX111 doesn't need any further config: preconfigures itself.
+	 * Simply print ring buffer for debugging */
+	if (IS_ACX111(adev)) {
+		/* rxdesc_start already set here */
+
+		adev->rxdesc_start =
+		    (rxdesc_t *) ((u8 *) adev->iobase2 + rx_queue_start);
+
+		rxdesc = adev->rxdesc_start;
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "acx: rx descriptor %d @ 0x%p\n", i, rxdesc);
+			rxdesc = adev->rxdesc_start = (rxdesc_t *)
+			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
+		}
+	} else {
+		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
+		/* rxdesc_start should be right AFTER Tx pool */
+		adev->rxdesc_start = (rxdesc_t *)
+		    ((u8 *) adev->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
+		/* NB: sizeof(txdesc_t) above is valid because we know
+		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
+		 ** acx111's txdesc is larger! */
+
+		memset(adev->rxdesc_start, 0, RX_CNT * sizeof(*rxdesc));
+
+		/* loop over whole receive pool */
+		rxdesc = adev->rxdesc_start;
+		mem_offs = rx_queue_start;
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "acx: rx descriptor @ 0x%p\n", rxdesc);
+			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
+			/* point to next rxdesc */
+			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
+			/* go to the next one */
+			mem_offs += sizeof(*rxdesc);
+			rxdesc++;
+		}
+		/* go to the last one */
+		rxdesc--;
+
+		/* and point to the first making it a ring buffer */
+		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
+	}
+	FN_EXIT0;
+}
+
+
 /*
  * acxpci_s_create_rx_host_desc_queue
  *
@@ -3610,8 +3667,6 @@ static const u16 IO_ACX111[] = {
 	0x0108,			/* IO_ACX_ECPU_CTRL */
 };
 
-
-
 #ifdef CONFIG_PCI
 static int __devinit
 acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -4176,64 +4231,6 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 
 
 
-/***************************************************************
-** acxpci_create_rx_desc_queue
-*/
-static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
-{
-	rxdesc_t *rxdesc;
-	u32 mem_offs;
-	int i;
-
-	FN_ENTER;
-
-	/* done by memset: adev->rx_tail = 0; */
-
-	/* ACX111 doesn't need any further config: preconfigures itself.
-	 * Simply print ring buffer for debugging */
-	if (IS_ACX111(adev)) {
-		/* rxdesc_start already set here */
-
-		adev->rxdesc_start =
-		    (rxdesc_t *) ((u8 *) adev->iobase2 + rx_queue_start);
-
-		rxdesc = adev->rxdesc_start;
-		for (i = 0; i < RX_CNT; i++) {
-			log(L_DEBUG, "acx: rx descriptor %d @ 0x%p\n", i, rxdesc);
-			rxdesc = adev->rxdesc_start = (rxdesc_t *)
-			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
-		}
-	} else {
-		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
-		/* rxdesc_start should be right AFTER Tx pool */
-		adev->rxdesc_start = (rxdesc_t *)
-		    ((u8 *) adev->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
-		/* NB: sizeof(txdesc_t) above is valid because we know
-		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
-		 ** acx111's txdesc is larger! */
-
-		memset(adev->rxdesc_start, 0, RX_CNT * sizeof(*rxdesc));
-
-		/* loop over whole receive pool */
-		rxdesc = adev->rxdesc_start;
-		mem_offs = rx_queue_start;
-		for (i = 0; i < RX_CNT; i++) {
-			log(L_DEBUG, "acx: rx descriptor @ 0x%p\n", rxdesc);
-			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
-			/* point to next rxdesc */
-			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
-			/* go to the next one */
-			mem_offs += sizeof(*rxdesc);
-			rxdesc++;
-		}
-		/* go to the last one */
-		rxdesc--;
-
-		/* and point to the first making it a ring buffer */
-		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
-	}
-	FN_EXIT0;
-}
 
 
 
