@@ -241,9 +241,6 @@ void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t
 void acx_s_get_firmware_version(acx_device_t *adev);
 void acx_display_hardware_details(acx_device_t *adev);
 
-// BOM Control Path (CMD handling, init, reset) (Common)
-// -----
-
 // BOM CMDs (Common:Control Path)
 // -----
 #define CMD_TIMEOUT_MS(n)	(n)
@@ -512,12 +509,10 @@ int acxpci_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxpci_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acxpci_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 
-// Control Path (CMD handling, init, reset) (PCI)
-
 // CMDs (PCI:Control Path)
 int acxpci_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
-// Configure (PCI:Control Path)
+// Init, Configure (PCI:Control Path)
 int acxpci_s_reset_dev(acx_device_t *adev);
 
 // Template (PCI:Control Path)
@@ -572,12 +567,10 @@ void __exit acxpci_e_cleanup_module(void);
 int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
-// Control Path (CMD handling, init, reset) (USB)
-
 // CMDs (USB:Control Path)
 int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
-// Configure (USB:Control Path)
+// Init, Configure (USB:Control Path)
 
 // Template (USB:Control Path)
 
@@ -629,12 +622,10 @@ int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 
-// Control Path (CMD handling, init, reset) (Mem)
-
 // CMDs (Mem:Control Path)
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 
-// Configure (Mem:Control Path)
+// Init, Configure (Mem:Control Path)
 int acxmem_s_reset_dev(acx_device_t *adev);
 
 // Template (Mem:Control Path)

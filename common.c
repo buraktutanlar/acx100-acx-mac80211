@@ -35,7 +35,12 @@
 #include "wlan_hdr.h"
 
 /*
- * Module
+ * BOM Config
+ * ==================================================
+ */
+
+/*
+ * BOM Module
  * ==================================================
  */
 
@@ -79,22 +84,22 @@ static int acx111_s_create_dma_regions(acx_device_t *adev);
 // Firmware, EEPROM, Phy
 //-----
 
-// Control Path (CMD handling, init, reset)
-//-----
-
 // CMDs (Control Path)
+//-----
 static int acx111_s_get_feature_config(acx_device_t *adev, u32 *feature_options, u32 *data_flow_options);
 static int acx111_s_set_feature_config(acx_device_t *adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
 
-// Configure (Control Path)
+// Init, Configure (Control Path)
+//-----
 static void acx_s_select_opmode(acx_device_t *adev);
 static int acx111_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Template (Control Path)
+//-----
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_proberesp *templ, struct sk_buff *skb);
 static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
 static int acx_s_init_max_template_generic(acx_device_t *adev, unsigned int len, unsigned int cmd);
@@ -110,10 +115,12 @@ static int acx_s_set_null_data_template(acx_device_t * adev);
 #endif
 
 // Recalibration (Control Path)
+//-----
 static int acx_s_recalib_radio(acx_device_t *adev);
 static void acx_s_after_interrupt_recalib(acx_device_t * adev);
 
 // Other (Control Path)
+//-----
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 #endif
@@ -1467,13 +1474,11 @@ int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 	return (NOT_OK);
 }
 
+
 /*
- * BOM Control Path (CMD handling, init, reset)
+ * BOM CMDs (Control Path)
  * ==================================================
  */
-
-// BOM CMDs (Control Path)
-// --------------------
 
 int
 acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
@@ -1770,8 +1775,11 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         FN_EXIT0;
 }
 
-// BOM Configuration (Control Path)
-// --------------------
+/*
+ * BOM Configuration (Control Path)
+ * ==================================================
+ */
+
 void acx_s_set_defaults(acx_device_t * adev)
 {
 	struct ieee80211_conf *conf = &adev->ieee->conf;
@@ -2707,8 +2715,11 @@ void acx_update_capabilities(acx_device_t * adev)
 }
 */
 
-// BOM Template (Control Path)
-// --------------------
+/*
+ * BOM Template (Control Path)
+ * ==================================================
+ */
+
 static int
 acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
                                         struct acx_template_beacon *templ,
@@ -2958,8 +2969,11 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 }
 #endif
 
-// BOM Recalibration (Control Path)
-// --------------------
+/*
+ * BOM Recalibration (Control Path)
+ * ==================================================
+ */
+
 static int acx_s_recalib_radio(acx_device_t *adev) {
 
 	if (IS_ACX111(adev)) {
@@ -3054,8 +3068,10 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 }
 
 
-// BOM Other (Control Path)
-// --------------------
+/*
+ * BOM Other (Control Path)
+ * ==================================================
+ */
 
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
@@ -3271,6 +3287,7 @@ static u8 acx_rate111to100(u16 r)
  * BOM Proc, Debug
  * ==================================================
  */
+
 #ifdef CONFIG_PROC_FS
 
 static int acx_e_proc_show_diag(struct seq_file *file, void *v)
