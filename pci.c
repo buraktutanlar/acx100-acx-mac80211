@@ -2981,6 +2981,12 @@ void acxpci_l_power_led(acx_device_t * adev, int enable)
 			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 
+INLINE_IO int adev_present(acx_device_t *adev)
+{
+	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
+	 * which should be safe): */
+	return acx_readl(adev->iobase) != 0xffffffff;
+}
 
 /*
  * BOM Driver, Module
@@ -2990,12 +2996,7 @@ void acxpci_l_power_led(acx_device_t * adev, int enable)
 
 // BOM Cleanup ==========================================================================
 
-INLINE_IO int adev_present(acx_device_t *adev)
-{
-	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
-	 * which should be safe): */
-	return acx_readl(adev->iobase) != 0xffffffff;
-}
+
 
 
 /***********************************************************************
