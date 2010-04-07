@@ -1441,6 +1441,15 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 	FN_EXIT0;
 }
 
+/*
+ * acxpci_s_up
+ *
+ * This function is called by acxpci_e_open (when ifconfig sets the device as up)
+ *
+ * Side effects:
+ * - Enables on-card interrupt requests
+ * - calls acx_s_start
+ */
 static void acxpci_s_up(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -3742,17 +3751,6 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 #endif /* CONFIG_PCI */
 
 // BOM Cleanup ==========================================================================
-
-
-/***********************************************************************
-** acxpci_s_up
-**
-** This function is called by acxpci_e_open (when ifconfig sets the device as up)
-**
-** Side effects:
-** - Enables on-card interrupt requests
-** - calls acx_s_start
-*/
 
 
 /*
