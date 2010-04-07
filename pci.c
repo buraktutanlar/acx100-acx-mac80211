@@ -2878,8 +2878,8 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 	if (likely(adev->initialized)) {
 
 		/* save the reason code and call our bottom half. */
-		// TODO Should perhaps be: adev->irq_reason |= irqtype;
-		adev->irq_reason = irqtype;
+		// In case we two interrupts in a row, don't overwrite the previous bits, but add them
+		adev->irq_reason |= irqtype;
 
 		// OW TODO Logging and handling of other irq not done this way ...
 		if ((irqtype & HOST_INT_RX_COMPLETE) || (irqtype & HOST_INT_TX_COMPLETE))
