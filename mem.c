@@ -3648,6 +3648,7 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work)
 	 update_link_quality_led(adev);
 	 */
 
+	// Enable previously extra masked irqs again
 	acxmem_irq_enable(adev);
 
 	/* write_flush(adev); - not needed, last op was read anyway */
