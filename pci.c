@@ -121,7 +121,7 @@ static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int fi
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void acxpci_disable_acx_irq(acx_device_t *adev);
 static void acxpci_enable_acx_irq(acx_device_t *adev);
-static void handle_info_irq(acx_device_t *adev);
+static void acxpci_handle_info_irq(acx_device_t *adev);
 static void log_unusual_irq(u16 irqtype);
 
 // Mac80211 Ops (PCI)
@@ -2744,7 +2744,7 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 			       | HOST_INT_SCAN_COMPLETE)) {
 
 			if (irqtype & HOST_INT_INFO) {
-				handle_info_irq(adev);
+				acxpci_handle_info_irq(adev);
 			}
 
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
@@ -2931,7 +2931,7 @@ more bytes may follow
     after we set it once. Let's hope this will be fixed in firmware someday
 */
 
-static void handle_info_irq(acx_device_t * adev)
+static void acxpci_handle_info_irq(acx_device_t * adev)
 {
 #if ACX_DEBUG
 	static const char *const info_type_msg[] = {
