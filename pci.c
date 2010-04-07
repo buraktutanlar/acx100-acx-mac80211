@@ -70,8 +70,8 @@
  */
 
 // Logging (PCI)
-static void log_rxbuffer(const acx_device_t *adev);
-static void log_txbuffer(acx_device_t *adev);
+static void acxpci_log_rxbuffer(const acx_device_t *adev);
+static void acxpci_log_txbuffer(acx_device_t *adev);
 
 // Data Access (PCI)
 INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset);
@@ -184,11 +184,11 @@ INLINE_IO int adev_present(acx_device_t *adev);
  */
 
 #if !ACX_DEBUG
-static inline void log_rxbuffer(const acx_device_t * adev)
+static inline void acxpci_log_rxbuffer(const acx_device_t * adev)
 {
 }
 #else
-static void log_rxbuffer(const acx_device_t * adev)
+static void acxpci_log_rxbuffer(const acx_device_t * adev)
 {
 	register const struct rxhostdesc *rxhostdesc;
 	int i;
@@ -208,11 +208,11 @@ static void log_rxbuffer(const acx_device_t * adev)
 #endif
 
 #if !ACX_DEBUG
-static inline void log_txbuffer(const acx_device_t * adev)
+static inline void acxpci_log_txbuffer(const acx_device_t * adev)
 {
 }
 #else
-static void log_txbuffer(acx_device_t * adev)
+static void acxpci_log_txbuffer(acx_device_t * adev)
 {
 	txdesc_t *txdesc;
 	int i;
@@ -1812,7 +1812,7 @@ static void acxpci_l_process_rxdesc(acx_device_t * adev)
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_BUFR))
-		log_rxbuffer(adev);
+		acxpci_log_rxbuffer(adev);
 
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
@@ -2216,7 +2216,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_DEBUG))
-		log_txbuffer(adev);
+		acxpci_log_txbuffer(adev);
 
 	log(L_BUFT, "acx: tx: cleaning up bufs from %u\n", adev->tx_tail);
 
