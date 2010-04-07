@@ -53,8 +53,96 @@
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
 
-/***********************************************************************
-*/
+/*
+ * BOM Config
+ * ==================================================
+ */
+
+/* Pick one */
+/* #define INLINE_IO static */
+#define INLINE_IO static inline
+
+/*
+ * BOM Static prototypes
+ * ==================================================
+ */
+
+// Locking (PCI)
+
+// Logging (PCI)
+static void log_rxbuffer(const acx_device_t *adev);
+static void log_txbuffer(acx_device_t *adev);
+
+// Data Access (PCI)
+INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset);
+INLINE_IO u16 read_reg16(acx_device_t * adev, unsigned int offset);
+INLINE_IO u8 read_reg8(acx_device_t * adev, unsigned int offset);
+INLINE_IO void write_reg32(acx_device_t * adev, unsigned int offset, u32 val);
+INLINE_IO void write_reg16(acx_device_t * adev, unsigned int offset, u16 val);
+INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val);
+INLINE_IO void write_flush(acx_device_t * adev);
+
+static void acxpci_s_delete_dma_regions(acx_device_t *adev);
+static inline void free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+
+// Firmware, EEPROM, Phy (PCI)
+static int acxpci_s_upload_fw(acx_device_t *adev);
+static inline void read_eeprom_area(acx_device_t * adev);
+
+// Control Path (CMD handling, init, reset) (PCI)
+
+// CMDs (PCI:Control Path)
+static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
+static inline void init_mboxes(acx_device_t * adev);
+
+// Init, Configure (PCI:Control Path)
+static int acxpci_s_verify_init(acx_device_t *adev);
+static void acxpci_l_reset_mac(acx_device_t *adev);
+static void acxpci_s_down(struct ieee80211_hw *hw);
+static void acxpci_s_up(struct ieee80211_hw *hw);
+
+// Template (PCI:Control Path)
+
+// Recalibration (PCI:Control Path)
+
+// Other (PCI:Control Path)
+
+// Proc, Debug (PCI)
+
+// Rx Path (PCI)
+static int acxpci_s_create_rx_host_desc_queue(acx_device_t *adev);
+static void acxpci_l_process_rxdesc(acx_device_t *adev);
+
+// Tx Path (PCI)
+static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
+static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
+static inline txdesc_t *get_txdesc(acx_device_t * adev, int index);
+static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
+
+// Crypto (PCI)
+
+// Irq Handling, Timer (PCI)
+static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
+static void acxpci_disable_acx_irq(acx_device_t *adev);
+static void acxpci_enable_acx_irq(acx_device_t *adev);
+static void handle_info_irq(acx_device_t *adev);
+
+// Mac80211 Ops (PCI)
+static int acxpci_e_op_open(struct ieee80211_hw *hw);
+static void acxpci_e_op_close(struct ieee80211_hw *hw);
+
+// Helpers (PCI)
+INLINE_IO int adev_present(acx_device_t *adev);
+
+// Driver, Module (PCI)
+
+/*
+ * BOM Defines, static vars, etc.
+ * ==================================================
+ */
+
+// PCI
+// -----
 #ifdef CONFIG_PCI
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
 #define PCI_ACX100_REGION1		0x01
@@ -94,33 +182,21 @@
 #endif
 #endif /* CONFIG_PCI */
 
-/***********************************************************************
-*/
+/*
+ * BOM Logging
+ * ==================================================
+ */
 
-static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
-
-static void acxpci_disable_acx_irq(acx_device_t * adev);
-
-static int acxpci_e_op_open(struct ieee80211_hw *hw);
-static void acxpci_e_op_close(struct ieee80211_hw *hw);
-static void acxpci_s_up(struct ieee80211_hw *hw);
-static void acxpci_s_down(struct ieee80211_hw *hw);
-
-/***********************************************************************
-** Register access
-**
-**
-*/
+/*
+ * BOM Data Access
+ * ==================================================
+ */
 
 /* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
 #define acx_readl(v)	le32_to_cpu(readl((v)))
 #define acx_readw(v)	le16_to_cpu(readw((v)))
 #define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
 #define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
-
-/* Pick one */
-/* #define INLINE_IO static */
-#define INLINE_IO static inline
 
 INLINE_IO u32 read_reg32(acx_device_t * adev, unsigned int offset)
 {
@@ -174,6 +250,64 @@ INLINE_IO void write_flush(acx_device_t * adev)
 	 * which should also be safe): */
 	readb(adev->iobase);
 }
+
+/*
+ * BOM Firmware, EEPROM, Phy
+ * ==================================================
+ */
+
+/*
+ * BOM CMDs (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Configuration (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Other (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Proc, Debug
+ * ==================================================
+ */
+
+/*
+ * BOM Rx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Tx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Irq Handling, Timer
+ * ==================================================
+ */
+
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
+
+/*
+ * BOM Helpers
+ * ==================================================
+ */
+
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
+
+
+// BOM Cleanup ==========================================================================
 
 INLINE_IO int adev_present(acx_device_t *adev)
 {
