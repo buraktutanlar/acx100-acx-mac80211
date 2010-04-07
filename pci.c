@@ -4225,18 +4225,60 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 #endif /* CONFIG_PM */
 #endif /* CONFIG_PCI */
 
-// BOM Cleanup ==========================================================================
+/*
+ * Data for init_module/cleanup_module
+ */
+#ifdef CONFIG_PCI
+static const struct pci_device_id acxpci_id_tbl[] __devinitdata = {
+	{
+	 .vendor = PCI_VENDOR_ID_TI,
+	 .device = PCI_DEVICE_ID_TI_TNETW1100A,
+	 .subvendor = PCI_ANY_ID,
+	 .subdevice = PCI_ANY_ID,
+	 .driver_data = CHIPTYPE_ACX100,
+	 },
+	{
+	 .vendor = PCI_VENDOR_ID_TI,
+	 .device = PCI_DEVICE_ID_TI_TNETW1100B,
+	 .subvendor = PCI_ANY_ID,
+	 .subdevice = PCI_ANY_ID,
+	 .driver_data = CHIPTYPE_ACX100,
+	 },
+	{
+	 .vendor = PCI_VENDOR_ID_TI,
+	 .device = PCI_DEVICE_ID_TI_TNETW1130,
+	 .subvendor = PCI_ANY_ID,
+	 .subdevice = PCI_ANY_ID,
+	 .driver_data = CHIPTYPE_ACX111,
+	 },
+	{
+	 .vendor = 0,
+	 .device = 0,
+	 .subvendor = 0,
+	 .subdevice = 0,
+	 .driver_data = 0,
+	 }
+};
+
+MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
+
+static struct pci_driver
+ acxpci_drv_id = {
+	.name = "acx_pci",
+	.id_table = acxpci_id_tbl,
+	.probe = acxpci_e_probe,
+	.remove = __devexit_p(acxpci_e_remove),
+#ifdef CONFIG_PM
+	.suspend = acxpci_e_suspend,
+	.resume = acxpci_e_resume
+#endif /* CONFIG_PM */
+};
+#endif /* CONFIG_PCI */
 
 
-
-
-
-
-
-
-
-
-
+/*
+ * VLYNQ support
+ */
 
 #ifdef CONFIG_VLYNQ
 struct vlynq_reg_config {
@@ -4610,61 +4652,11 @@ static struct vlynq_driver vlynq_acx = {
 #endif /* CONFIG_VLYNQ */
 
 
-/***********************************************************************
-** Data for init_module/cleanup_module
-*/
-#ifdef CONFIG_PCI
-static const struct pci_device_id acxpci_id_tbl[] __devinitdata = {
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1100A,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX100,
-	 },
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1100B,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX100,
-	 },
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1130,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX111,
-	 },
-	{
-	 .vendor = 0,
-	 .device = 0,
-	 .subvendor = 0,
-	 .subdevice = 0,
-	 .driver_data = 0,
-	 }
-};
-
-MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
-
-static struct pci_driver
- acxpci_drv_id = {
-	.name = "acx_pci",
-	.id_table = acxpci_id_tbl,
-	.probe = acxpci_e_probe,
-	.remove = __devexit_p(acxpci_e_remove),
-#ifdef CONFIG_PM
-	.suspend = acxpci_e_suspend,
-	.resume = acxpci_e_resume
-#endif /* CONFIG_PM */
-};
-#endif /* CONFIG_PCI */
-
-/***********************************************************************
-** acxpci_e_init_module
-**
-** Module initialization routine, called once at module load time
-*/
+/*
+ * acxpci_e_init_module
+ *
+ * Module initialization routine, called once at module load time
+ */
 int __init acxpci_e_init_module(void)
 {
 	int res;
@@ -4707,12 +4699,12 @@ int __init acxpci_e_init_module(void)
 }
 
 
-/***********************************************************************
-** acxpci_e_cleanup_module
-**
-** Called at module unload time. This is our last chance to
-** clean up after ourselves.
-*/
+/*
+ * acxpci_e_cleanup_module
+ *
+ * Called at module unload time. This is our last chance to
+ * clean up after ourselves.
+ */
 void __exit acxpci_e_cleanup_module(void)
 {
 	FN_ENTER;
