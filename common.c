@@ -4744,7 +4744,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
-		logf0(L_ANY, "Performing CMD_RADIO_RECALIB\n");
+		logf0(L_ANY, "Schedule CMD_RADIO_RECALIB\n");
 		acx_unlock(adev, flags);
 		acx_s_after_interrupt_recalib(adev);
 		acx_lock(adev, flags);
