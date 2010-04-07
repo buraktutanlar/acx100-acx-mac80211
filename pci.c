@@ -1149,9 +1149,282 @@ static inline void init_mboxes(acx_device_t * adev)
 }
 
 /*
- * BOM Configuration (Control Path)
+ * BOM Init, Configuration (Control Path)
  * ==================================================
  */
+
+/*
+ * acxpci_s_reset_dev
+ *
+ * Arguments:
+ *	netdevice that contains the adev variable
+ * Returns:
+ *	NOT_OK on fail
+ *	OK on success
+ * Side effects:
+ *	device is hard reset
+ * Call context:
+ *	acxpci_e_probe
+ * Comment:
+ *	This resets the device using low level hardware calls
+ *	as well as uploads and verifies the firmware to the card
+ */
+int acxpci_s_reset_dev(acx_device_t * adev)
+{
+	const char *msg = "";
+	unsigned long flags;
+	int result = NOT_OK;
+	u16 hardware_info;
+	u16 ecpu_ctrl;
+	int count;
+
+	FN_ENTER;
+
+	/* reset the device to make sure the eCPU is stopped
+	 * to upload the firmware correctly */
+
+	acx_lock(adev, flags);
+
+#ifdef CONFIG_PCI
+	acxpci_l_reset_mac(adev);
+#endif
+
+	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
+	if (!ecpu_ctrl) {
+		msg = "acx: eCPU is already running. ";
+		goto end_unlock;
+	}
+#if 0
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
+		/* eCPU most likely means "embedded CPU" */
+		msg = "acx: eCPU did not start after boot from flash. ";
+		goto end_unlock;
+	}
+
+	/* check sense on reset flags */
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
+		printk("acx: %s: eCPU did not start after boot (SOR), "
+		       "is this fatal?\n", wiphy_name(adev->ieee->wiphy));
+	}
+#endif
+	/* scan, if any, is stopped now, setting corresponding IRQ bit */
+	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+
+	acx_unlock(adev, flags);
+
+	/* need to know radio type before fw load */
+	/* Need to wait for arrival of this information in a loop,
+	 * most probably since eCPU runs some init code from EEPROM
+	 * (started burst read in reset_mac()) which also
+	 * sets the radio type ID */
+
+	count = 0xffff;
+	do {
+		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+		if (!--count) {
+			msg = "acx: eCPU didn't indicate radio type";
+			goto end_fail;
+		}
+		cpu_relax();
+	} while (!(hardware_info & 0xff00));	/* radio type still zero? */
+
+	/* printk("acx: DEBUG: count %d\n", count); */
+	adev->form_factor = hardware_info & 0xff;
+	adev->radio_type = hardware_info >> 8;
+
+	/* load the firmware */
+	if (OK != acxpci_s_upload_fw(adev))
+		goto end_fail;
+
+	/* acx_s_mwait(10);    this one really shouldn't be required */
+
+	/* now start eCPU by clearing bit */
+	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+	log(L_DEBUG, "acx: booted eCPU up and waiting for completion...\n");
+
+	/* wait for eCPU bootup */
+	if (OK != acxpci_s_verify_init(adev)) {
+		msg = "acx: timeout waiting for eCPU. ";
+		goto end_fail;
+	}
+	log(L_DEBUG, "acx: eCPU has woken up, card is ready to be configured\n");
+
+	init_mboxes(adev);
+	acxpci_write_cmd_type_status(adev, 0, 0);
+
+	/* test that EEPROM is readable */
+	read_eeprom_area(adev);
+
+	result = OK;
+	goto end;
+
+/* Finish error message. Indicate which function failed */
+      end_unlock:
+	acx_unlock(adev, flags);
+      end_fail:
+	printk("acx: %sreset_dev() FAILED\n", msg);
+      end:
+	FN_EXIT1(result);
+	return result;
+}
+
+static int acxpci_s_verify_init(acx_device_t * adev)
+{
+	int result = NOT_OK;
+	unsigned long timeout;
+
+	FN_ENTER;
+
+	timeout = jiffies + 2 * HZ;
+	for (;;) {
+		u16 irqstat = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if (irqstat & HOST_INT_FCS_THRESHOLD) {
+			result = OK;
+			write_reg16(adev, IO_ACX_IRQ_ACK,
+				    HOST_INT_FCS_THRESHOLD);
+			break;
+		}
+		if (time_after(jiffies, timeout))
+			break;
+		/* Init may take up to ~0.5 sec total */
+		acx_s_mwait(50);
+	}
+
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * acxpci_l_reset_mac
+ *
+ * MAC will be reset
+ * Call context: reset_dev
+ *
+ * Origin: Standard Read/Write to IO
+ */
+static void acxpci_l_reset_mac(acx_device_t * adev)
+{
+	u16 temp;
+
+	FN_ENTER;
+
+	/* halt eCPU */
+	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
+	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
+
+	/* now do soft reset of eCPU, set bit */
+	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
+	log(L_DEBUG, "acx: enable soft reset\n");
+	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
+	write_flush(adev);
+
+	/* now clear bit again: deassert eCPU reset */
+	log(L_DEBUG, "acx: disable soft reset and go to init mode\n");
+	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
+
+	/* now start a burst read from initial EEPROM */
+	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
+	write_reg16(adev, IO_ACX_EE_START, temp);
+	write_flush(adev);
+
+	FN_EXIT0;
+}
+
+static void acxpci_s_up(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+	acxpci_enable_acx_irq(adev);
+	acx_unlock(adev, flags);
+
+	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
+	 ** used to use it. But we don't do that anymore, our OS
+	 ** has reliable software timers */
+	init_timer(&adev->mgmt_timer);
+	adev->mgmt_timer.function = acx_i_timer;
+	adev->mgmt_timer.data = (unsigned long)adev;
+
+	/* Need to set ACX_STATE_IFACE_UP first, or else
+	 ** timer won't be started by acx_set_status() */
+	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	acx_s_start(adev);
+
+	FN_EXIT0;
+}
+
+
+/*
+ * acxpci_s_down
+ *
+ * NB: device may be already hot unplugged if called from acxpci_e_remove()
+ *
+ * Disables on-card interrupt request, stops softirq and timer, stops queue,
+ * sets status == STOPPED
+ */
+static void acxpci_s_down(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	/* Disable IRQs first, so that IRQs cannot race with us */
+	/* then wait until interrupts have finished executing on other CPUs */
+
+	acx_lock(adev, flags);
+	acxpci_disable_acx_irq(adev);
+	synchronize_irq(adev->irq);
+	acx_unlock(adev, flags);
+
+	/* we really don't want to have an asynchronous tasklet disturb us
+	 ** after something vital for its job has been shut down, so
+	 ** end all remaining work now.
+	 **
+	 ** NB: carrier_off (done by set_status below) would lead to
+	 ** not yet fully understood deadlock in flush_scheduled_work().
+	 ** That's why we do FLUSH first.
+	 **
+	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
+	 ** waits for acx_e_after_interrupt_task to complete if it is running
+	 ** on another CPU, but acx_e_after_interrupt_task
+	 ** will sleep on sem forever, because it is taken by us!
+	 ** Work around that by temporary sem unlock.
+	 ** This will fail miserably if we'll be hit by concurrent
+	 ** iwconfig or something in between. TODO! */
+
+	//acx_sem_unlock(adev);
+
+	// OW TODO I'm not sure if explicit flushing is still required or done
+	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
+	// hang upon .remove_interface and .close and .stop
+
+	// OW flush_scheduled_work();
+	//acx_sem_lock(adev);
+
+	/* This is possible:
+	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
+	 ** -> set_status(ASSOCIATED) -> wake_queue()
+	 ** That's why we stop queue _after_ flush_scheduled_work
+	 ** lock/unlock is just paranoia, maybe not needed */
+
+	acx_lock(adev, flags);
+	acx_stop_queue(adev->ieee, "on ifdown");
+	acx_unlock(adev, flags);
+
+	/* kernel/timer.c says it's illegal to del_timer_sync()
+	 ** a timer which restarts itself. We guarantee this cannot
+	 ** ever happen because acx_i_timer() never does this if
+	 ** status is ACX_STATUS_0_STOPPED */
+	del_timer_sync(&adev->mgmt_timer);
+
+	FN_EXIT0;
+}
+
 
 /*
  * BOM Other (Control Path)
@@ -1270,91 +1543,8 @@ static txhostdesc_t *get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc)
 
 
 
-/***********************************************************************
-** acxpci_l_reset_mac
-**
-** MAC will be reset
-** Call context: reset_dev
-**
-** Origin: Standard Read/Write to IO
-*/
-static void acxpci_l_reset_mac(acx_device_t * adev)
-{
-	u16 temp;
-
-	FN_ENTER;
-
-	/* halt eCPU */
-	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
-	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
-
-	/* now do soft reset of eCPU, set bit */
-	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
-	log(L_DEBUG, "acx: enable soft reset\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
-	write_flush(adev);
-
-	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "acx: disable soft reset and go to init mode\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
-
-	/* now start a burst read from initial EEPROM */
-	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
-	write_reg16(adev, IO_ACX_EE_START, temp);
-	write_flush(adev);
-
-	FN_EXIT0;
-}
 
 
-/***********************************************************************
-** acxpci_s_verify_init
-*/
-static int acxpci_s_verify_init(acx_device_t * adev)
-{
-	int result = NOT_OK;
-	unsigned long timeout;
-
-	FN_ENTER;
-
-	timeout = jiffies + 2 * HZ;
-	for (;;) {
-		u16 irqstat = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if (irqstat & HOST_INT_FCS_THRESHOLD) {
-			result = OK;
-			write_reg16(adev, IO_ACX_IRQ_ACK,
-				    HOST_INT_FCS_THRESHOLD);
-			break;
-		}
-		if (time_after(jiffies, timeout))
-			break;
-		/* Init may take up to ~0.5 sec total */
-		acx_s_mwait(50);
-	}
-
-	FN_EXIT1(result);
-	return result;
-}
-
-
-
-
-/***********************************************************************
-** acxpci_s_reset_dev
-**
-** Arguments:
-**	netdevice that contains the adev variable
-** Returns:
-**	NOT_OK on fail
-**	OK on success
-** Side effects:
-**	device is hard reset
-** Call context:
-**	acxpci_e_probe
-** Comment:
-**	This resets the device using low level hardware calls
-**	as well as uploads and verifies the firmware to the card
-*/
 
 
 
@@ -1375,104 +1565,6 @@ static inline void read_eeprom_area(acx_device_t * adev)
 }
 
 
-int acxpci_s_reset_dev(acx_device_t * adev)
-{
-	const char *msg = "";
-	unsigned long flags;
-	int result = NOT_OK;
-	u16 hardware_info;
-	u16 ecpu_ctrl;
-	int count;
-
-	FN_ENTER;
-
-	/* reset the device to make sure the eCPU is stopped
-	 * to upload the firmware correctly */
-
-	acx_lock(adev, flags);
-
-#ifdef CONFIG_PCI
-	acxpci_l_reset_mac(adev);
-#endif
-
-	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
-	if (!ecpu_ctrl) {
-		msg = "acx: eCPU is already running. ";
-		goto end_unlock;
-	}
-#if 0
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
-		/* eCPU most likely means "embedded CPU" */
-		msg = "acx: eCPU did not start after boot from flash. ";
-		goto end_unlock;
-	}
-
-	/* check sense on reset flags */
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
-		printk("acx: %s: eCPU did not start after boot (SOR), "
-		       "is this fatal?\n", wiphy_name(adev->ieee->wiphy));
-	}
-#endif
-	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
-
-	acx_unlock(adev, flags);
-
-	/* need to know radio type before fw load */
-	/* Need to wait for arrival of this information in a loop,
-	 * most probably since eCPU runs some init code from EEPROM
-	 * (started burst read in reset_mac()) which also
-	 * sets the radio type ID */
-
-	count = 0xffff;
-	do {
-		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
-		if (!--count) {
-			msg = "acx: eCPU didn't indicate radio type";
-			goto end_fail;
-		}
-		cpu_relax();
-	} while (!(hardware_info & 0xff00));	/* radio type still zero? */
-
-	/* printk("acx: DEBUG: count %d\n", count); */
-	adev->form_factor = hardware_info & 0xff;
-	adev->radio_type = hardware_info >> 8;
-
-	/* load the firmware */
-	if (OK != acxpci_s_upload_fw(adev))
-		goto end_fail;
-
-	/* acx_s_mwait(10);    this one really shouldn't be required */
-
-	/* now start eCPU by clearing bit */
-	write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
-	log(L_DEBUG, "acx: booted eCPU up and waiting for completion...\n");
-
-	/* wait for eCPU bootup */
-	if (OK != acxpci_s_verify_init(adev)) {
-		msg = "acx: timeout waiting for eCPU. ";
-		goto end_fail;
-	}
-	log(L_DEBUG, "acx: eCPU has woken up, card is ready to be configured\n");
-
-	init_mboxes(adev);
-	acxpci_write_cmd_type_status(adev, 0, 0);
-
-	/* test that EEPROM is readable */
-	read_eeprom_area(adev);
-
-	result = OK;
-	goto end;
-
-/* Finish error message. Indicate which function failed */
-      end_unlock:
-	acx_unlock(adev, flags);
-      end_fail:
-	printk("acx: %sreset_dev() FAILED\n", msg);
-      end:
-	FN_EXIT1(result);
-	return result;
-}
 
 
 
@@ -2253,42 +2345,6 @@ static void acxpci_enable_acx_irq(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-static void acxpci_s_up(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-	acxpci_enable_acx_irq(adev);
-	acx_unlock(adev, flags);
-
-	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
-	 ** used to use it. But we don't do that anymore, our OS
-	 ** has reliable software timers */
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_i_timer;
-	adev->mgmt_timer.data = (unsigned long)adev;
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	acx_s_start(adev);
-
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acxpci_s_down
-**
-** NB: device may be already hot unplugged if called from acxpci_e_remove()
-**
-** Disables on-card interrupt request, stops softirq and timer, stops queue,
-** sets status == STOPPED
-*/
 
 static void acxpci_disable_acx_irq(acx_device_t * adev)
 {
@@ -2305,64 +2361,6 @@ static void acxpci_disable_acx_irq(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-static void acxpci_s_down(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	/* Disable IRQs first, so that IRQs cannot race with us */
-	/* then wait until interrupts have finished executing on other CPUs */
-
-	acx_lock(adev, flags);
-	acxpci_disable_acx_irq(adev);
-	synchronize_irq(adev->irq);
-	acx_unlock(adev, flags);
-
-	/* we really don't want to have an asynchronous tasklet disturb us
-	 ** after something vital for its job has been shut down, so
-	 ** end all remaining work now.
-	 **
-	 ** NB: carrier_off (done by set_status below) would lead to
-	 ** not yet fully understood deadlock in flush_scheduled_work().
-	 ** That's why we do FLUSH first.
-	 **
-	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
-	 ** waits for acx_e_after_interrupt_task to complete if it is running
-	 ** on another CPU, but acx_e_after_interrupt_task
-	 ** will sleep on sem forever, because it is taken by us!
-	 ** Work around that by temporary sem unlock.
-	 ** This will fail miserably if we'll be hit by concurrent
-	 ** iwconfig or something in between. TODO! */
-
-	//acx_sem_unlock(adev);
-
-	// OW TODO I'm not sure if explicit flushing is still required or done
-	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
-	// hang upon .remove_interface and .close and .stop
-
-	// OW flush_scheduled_work();
-	//acx_sem_lock(adev);
-
-	/* This is possible:
-	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
-	 ** -> set_status(ASSOCIATED) -> wake_queue()
-	 ** That's why we stop queue _after_ flush_scheduled_work
-	 ** lock/unlock is just paranoia, maybe not needed */
-
-	acx_lock(adev, flags);
-	acx_stop_queue(adev->ieee, "on ifdown");
-	acx_unlock(adev, flags);
-
-	/* kernel/timer.c says it's illegal to del_timer_sync()
-	 ** a timer which restarts itself. We guarantee this cannot
-	 ** ever happen because acx_i_timer() never does this if
-	 ** status is ACX_STATUS_0_STOPPED */
-	del_timer_sync(&adev->mgmt_timer);
-
-	FN_EXIT0;
-}
 /*
 #ifdef CONFIG_NET_POLL_CONTROLLER
 void acxpci_net_poll_controller(struct net_device *net_dev)
