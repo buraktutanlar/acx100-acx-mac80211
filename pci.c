@@ -113,7 +113,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
-static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
+static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
 
@@ -225,7 +225,7 @@ static void acxpci_log_txbuffer(acx_device_t * adev)
 	printk("acx: tx: desc->Ctl8's:");
 	for (i = 0; i < TX_CNT; i++) {
 		printk("acx:  %02X", txdesc->Ctl_8);
-		txdesc = advance_txdesc(adev, txdesc, 1);
+		txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
 	}
 	printk("acx: \n");
 }
@@ -1625,7 +1625,7 @@ int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 						thd, ttl);
 			seq_printf(file, "\n");
 
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
 		}
 	seq_printf(file,
 		     "\n"
@@ -2530,7 +2530,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(*hostdesc);
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -2574,7 +2574,7 @@ static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index)
 			     index * adev->txdesc_size);
 }
 
-static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
+static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
 				       int inc)
 {
 	return (txdesc_t *) (((u8 *) txdesc) + inc * adev->txdesc_size);
@@ -3477,7 +3477,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 			       txdesc->Ctl_8,
 			       txdesc->Ctl2_8, txdesc->error,
 			       txdesc->u.r1.rate);
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
 		}
 
 	/* dump host tx descriptor ring buffer */
