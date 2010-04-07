@@ -95,7 +95,7 @@ static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 // CMDs (PCI:Control Path)
 static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
 static u32 acxpci_read_cmd_type_status(acx_device_t *adev);
-static inline void init_mboxes(acx_device_t * adev);
+static inline void acxpci_init_mboxes(acx_device_t * adev);
 
 // Init, Configure (PCI:Control Path)
 static int acxpci_s_verify_init(acx_device_t *adev);
@@ -1241,7 +1241,7 @@ static u32 acxpci_read_cmd_type_status(acx_device_t *adev)
 	return cmd_status;
 }
 
-static inline void init_mboxes(acx_device_t * adev)
+static inline void acxpci_init_mboxes(acx_device_t * adev)
 {
 	u32 cmd_offs, info_offs;
 
@@ -1360,7 +1360,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	}
 	log(L_DEBUG, "acx: eCPU has woken up, card is ready to be configured\n");
 
-	init_mboxes(adev);
+	acxpci_init_mboxes(adev);
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
 	/* test that EEPROM is readable */
