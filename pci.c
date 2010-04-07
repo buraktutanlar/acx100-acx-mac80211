@@ -83,7 +83,7 @@ INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val);
 INLINE_IO void write_flush(acx_device_t * adev);
 
 static void acxpci_s_delete_dma_regions(acx_device_t *adev);
-static inline void free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy (PCI)
@@ -328,7 +328,7 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (ptr) { \
-		free_coherent(NULL, size, ptr, phyaddr); \
+		acxpci_free_coherent(NULL, size, ptr, phyaddr); \
 		ptr = NULL; \
 		size = 0; \
 	}
@@ -377,7 +377,7 @@ static void acxpci_s_delete_dma_regions(acx_device_t * adev)
 }
 
 static inline void
-free_coherent(struct pci_dev *hwdev, size_t size,
+acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 	      void *vaddr, dma_addr_t dma_handle)
 {
 	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
