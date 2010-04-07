@@ -1551,6 +1551,31 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
  * ==================================================
  */
 
+/* FIXME: update_link_quality_led was a stub - let's comment it and avoid
+ * compiler warnings */
+/*
+static void update_link_quality_led(acx_device_t * adev)
+{
+	int qual;
+
+	qual =
+	    acx_signal_determine_quality(adev->wstats.qual.level,
+					 adev->wstats.qual.noise);
+	if (qual > adev->brange_max_quality)
+		qual = adev->brange_max_quality;
+
+	if (time_after(jiffies, adev->brange_time_last_state_change +
+		       (HZ / 2 -
+			HZ / 2 * (unsigned long)qual /
+			adev->brange_max_quality))) {
+		acxpci_l_power_led(adev, (adev->brange_last_state == 0));
+		adev->brange_last_state ^= 1;	// toggle
+		adev->brange_time_last_state_change = jiffies;
+	}
+}
+*/
+
+
 /*
  * BOM Proc, Debug
  * ==================================================
@@ -2993,6 +3018,19 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 	}
 }
 
+/*
+#ifdef CONFIG_NET_POLL_CONTROLLER
+void acxpci_net_poll_controller(struct net_device *net_dev)
+{
+        acx_device_t *adev = ndev2adev(net_dev);
+        unsigned long flags;
+
+        local_irq_save(flags);
+        acxpci_i_interrupt(adev->irq, adev);
+        local_irq_restore(flags);
+}
+#endif*/ /* CONFIG_NET_POLL_CONTROLLER */
+
 
 /*
  * BOM Mac80211 Ops
@@ -3806,54 +3844,6 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 #endif /* CONFIG_PCI */
 
 // BOM Cleanup ==========================================================================
-
-
-/*
-#ifdef CONFIG_NET_POLL_CONTROLLER
-void acxpci_net_poll_controller(struct net_device *net_dev)
-{
-        acx_device_t *adev = ndev2adev(net_dev);
-        unsigned long flags;
-
-        local_irq_save(flags);
-        acxpci_i_interrupt(adev->irq, adev);
-        local_irq_restore(flags);
-}
-#endif*/ /* CONFIG_NET_POLL_CONTROLLER */
-
-
-
-
-
-/* FIXME: update_link_quality_led was a stub - let's comment it and avoid
- * compiler warnings */
-/*
-static void update_link_quality_led(acx_device_t * adev)
-{
-	int qual;
-
-	qual =
-	    acx_signal_determine_quality(adev->wstats.qual.level,
-					 adev->wstats.qual.noise);
-	if (qual > adev->brange_max_quality)
-		qual = adev->brange_max_quality;
-
-	if (time_after(jiffies, adev->brange_time_last_state_change +
-		       (HZ / 2 -
-			HZ / 2 * (unsigned long)qual /
-			adev->brange_max_quality))) {
-		acxpci_l_power_led(adev, (adev->brange_last_state == 0));
-		adev->brange_last_state ^= 1;	// toggle
-		adev->brange_time_last_state_change = jiffies;
-	}
-}
-*/
-
-
-
-
-
-
 
 
 /***********************************************************************
