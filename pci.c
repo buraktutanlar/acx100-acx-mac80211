@@ -84,6 +84,7 @@ INLINE_IO void write_flush(acx_device_t * adev);
 
 static void acxpci_s_delete_dma_regions(acx_device_t *adev);
 static inline void free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy (PCI)
 static int acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
@@ -373,6 +374,24 @@ free_coherent(struct pci_dev *hwdev, size_t size,
 {
 	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
 			  size, vaddr, dma_handle);
+}
+
+static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
+		      const char *msg)
+{
+	void *ptr;
+
+	ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
+
+	if (ptr) {
+		log(L_DEBUG, "acx: %s sz=%d adr=0x%p phy=0x%08llx\n",
+		    msg, (int)size, ptr, (unsigned long long)*phy);
+		memset(ptr, 0, size);
+		return ptr;
+	}
+	printk(KERN_ERR "acx: %s allocation FAILED (%d bytes)\n",
+	       msg, (int)size);
+	return NULL;
 }
 
 /*
@@ -1528,6 +1547,137 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
  */
 
 /*
+ * acxpci_s_create_rx_host_desc_queue
+ *
+ * the whole size of a data buffer (header plus data body)
+ * plus 32 bytes safety offset at the end
+ */
+// OW FIXME Put this as const into function
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
+{
+	rxhostdesc_t *hostdesc;
+	rxbuffer_t *rxbuf;
+	dma_addr_t hostdesc_phy;
+	dma_addr_t rxbuf_phy;
+	int i;
+
+	FN_ENTER;
+
+	/* allocate the RX host descriptor queue pool */
+	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
+	adev->rxhostdesc_start = allocate(adev, adev->rxhostdesc_area_size,
+					  &adev->rxhostdesc_startphy,
+					  "rxhostdesc_start");
+	if (!adev->rxhostdesc_start)
+		goto fail;
+	/* check for proper alignment of RX host descriptor pool */
+	if ((long)adev->rxhostdesc_start & 3) {
+		printk
+		    ("acx: driver bug: dma alloc returns unaligned address\n");
+		goto fail;
+	}
+
+	/* allocate Rx buffer pool which will be used by the acx
+	 * to store the whole content of the received frames in it */
+	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
+	adev->rxbuf_start = allocate(adev, adev->rxbuf_area_size,
+				     &adev->rxbuf_startphy, "rxbuf_start");
+	if (!adev->rxbuf_start)
+		goto fail;
+
+	rxbuf = adev->rxbuf_start;
+	rxbuf_phy = adev->rxbuf_startphy;
+	hostdesc = adev->rxhostdesc_start;
+	hostdesc_phy = adev->rxhostdesc_startphy;
+
+	/* don't make any popular C programming pointer arithmetic mistakes
+	 * here, otherwise I'll kill you...
+	 * (and don't dare asking me why I'm warning you about that...) */
+	for (i = 0; i < RX_CNT; i++) {
+		hostdesc->data = rxbuf;
+		hostdesc->data_phy = cpu2acx(rxbuf_phy);
+		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
+		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		rxbuf++;
+		rxbuf_phy += sizeof(*rxbuf);
+		hostdesc_phy += sizeof(*hostdesc);
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		hostdesc++;
+	}
+	hostdesc--;
+	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
+	FN_EXIT1(OK);
+	return OK;
+      fail:
+	printk("acx: create_rx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
+/*
+ * acxpci_l_process_rxdesc
+ *
+ * Called directly and only from the IRQ handler
+ */
+static void acxpci_l_process_rxdesc(acx_device_t * adev)
+{
+	register rxhostdesc_t *hostdesc;
+	unsigned count, tail;
+
+	FN_ENTER;
+
+	if (unlikely(acx_debug & L_BUFR))
+		log_rxbuffer(adev);
+
+	/* First, have a loop to determine the first descriptor that's
+	 * full, just in case there's a mismatch between our current
+	 * rx_tail and the full descriptor we're supposed to handle. */
+	tail = adev->rx_tail;
+	count = RX_CNT;
+	while (1) {
+		hostdesc = &adev->rxhostdesc_start[tail];
+		/* advance tail regardless of outcome of the below test */
+		tail = (tail + 1) % RX_CNT;
+
+		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		    && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;	/* found it! */
+
+		if (unlikely(!--count))	/* hmm, no luck: all descs empty, bail out */
+			goto end;
+	}
+
+	/* now process descriptors, starting with the first we figured out */
+	while (1) {
+		log(L_BUFR, "acx: rx: tail=%u Ctl_16=%04X Status=%08X\n",
+		    tail, hostdesc->Ctl_16, hostdesc->Status);
+
+		acx_l_process_rxbuf(adev, hostdesc->data);
+		hostdesc->Status = 0;
+		/* flush all writes before adapter sees CTL_HOSTOWN change */
+		wmb();
+		/* Host no longer owns this, needs to be LAST */
+		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+
+		/* ok, descriptor is handled, now check the next descriptor */
+		hostdesc = &adev->rxhostdesc_start[tail];
+
+		/* if next descriptor is empty, then bail out */
+		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		    || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;
+
+		tail = (tail + 1) % RX_CNT;
+	}
+      end:
+	adev->rx_tail = tail;
+	FN_EXIT0;
+}
+
+
+/*
  * BOM Tx Path
  * ==================================================
  */
@@ -2558,68 +2708,6 @@ static void acxpci_e_op_close(struct ieee80211_hw *hw)
 
 
 
-/***************************************************************
-** acxpci_l_process_rxdesc
-**
-** Called directly and only from the IRQ handler
-*/
-
-
-
-static void acxpci_l_process_rxdesc(acx_device_t * adev)
-{
-	register rxhostdesc_t *hostdesc;
-	unsigned count, tail;
-
-	FN_ENTER;
-
-	if (unlikely(acx_debug & L_BUFR))
-		log_rxbuffer(adev);
-
-	/* First, have a loop to determine the first descriptor that's
-	 * full, just in case there's a mismatch between our current
-	 * rx_tail and the full descriptor we're supposed to handle. */
-	tail = adev->rx_tail;
-	count = RX_CNT;
-	while (1) {
-		hostdesc = &adev->rxhostdesc_start[tail];
-		/* advance tail regardless of outcome of the below test */
-		tail = (tail + 1) % RX_CNT;
-
-		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			break;	/* found it! */
-
-		if (unlikely(!--count))	/* hmm, no luck: all descs empty, bail out */
-			goto end;
-	}
-
-	/* now process descriptors, starting with the first we figured out */
-	while (1) {
-		log(L_BUFR, "acx: rx: tail=%u Ctl_16=%04X Status=%08X\n",
-		    tail, hostdesc->Ctl_16, hostdesc->Status);
-
-		acx_l_process_rxbuf(adev, hostdesc->data);
-		hostdesc->Status = 0;
-		/* flush all writes before adapter sees CTL_HOSTOWN change */
-		wmb();
-		/* Host no longer owns this, needs to be LAST */
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-
-		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rxhostdesc_start[tail];
-
-		/* if next descriptor is empty, then bail out */
-		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			break;
-
-		tail = (tail + 1) % RX_CNT;
-	}
-      end:
-	adev->rx_tail = tail;
-	FN_EXIT0;
-}
 
 
 
@@ -3830,23 +3918,7 @@ void acxpci_l_clean_txdesc_emergency(acx_device_t * adev)
 ** acxpci_s_create_tx_host_desc_queue
 */
 
-static void *allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
-		      const char *msg)
-{
-	void *ptr;
 
-	ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
-
-	if (ptr) {
-		log(L_DEBUG, "acx: %s sz=%d adr=0x%p phy=0x%08llx\n",
-		    msg, (int)size, ptr, (unsigned long long)*phy);
-		memset(ptr, 0, size);
-		return ptr;
-	}
-	printk(KERN_ERR "acx: %s allocation FAILED (%d bytes)\n",
-	       msg, (int)size);
-	return NULL;
-}
 
 
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
@@ -3970,77 +4042,6 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 	return NOT_OK;
 }
 
-
-/***************************************************************
-** acxpci_s_create_rx_host_desc_queue
-*/
-/* the whole size of a data buffer (header plus data body)
- * plus 32 bytes safety offset at the end */
-
-// OW FIXME Put this as const into function
-#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
-
-static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
-{
-	rxhostdesc_t *hostdesc;
-	rxbuffer_t *rxbuf;
-	dma_addr_t hostdesc_phy;
-	dma_addr_t rxbuf_phy;
-	int i;
-
-	FN_ENTER;
-
-	/* allocate the RX host descriptor queue pool */
-	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rxhostdesc_start = allocate(adev, adev->rxhostdesc_area_size,
-					  &adev->rxhostdesc_startphy,
-					  "rxhostdesc_start");
-	if (!adev->rxhostdesc_start)
-		goto fail;
-	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->rxhostdesc_start & 3) {
-		printk
-		    ("acx: driver bug: dma alloc returns unaligned address\n");
-		goto fail;
-	}
-
-	/* allocate Rx buffer pool which will be used by the acx
-	 * to store the whole content of the received frames in it */
-	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rxbuf_start = allocate(adev, adev->rxbuf_area_size,
-				     &adev->rxbuf_startphy, "rxbuf_start");
-	if (!adev->rxbuf_start)
-		goto fail;
-
-	rxbuf = adev->rxbuf_start;
-	rxbuf_phy = adev->rxbuf_startphy;
-	hostdesc = adev->rxhostdesc_start;
-	hostdesc_phy = adev->rxhostdesc_startphy;
-
-	/* don't make any popular C programming pointer arithmetic mistakes
-	 * here, otherwise I'll kill you...
-	 * (and don't dare asking me why I'm warning you about that...) */
-	for (i = 0; i < RX_CNT; i++) {
-		hostdesc->data = rxbuf;
-		hostdesc->data_phy = cpu2acx(rxbuf_phy);
-		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-		rxbuf++;
-		rxbuf_phy += sizeof(*rxbuf);
-		hostdesc_phy += sizeof(*hostdesc);
-		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-		hostdesc++;
-	}
-	hostdesc--;
-	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
-	FN_EXIT1(OK);
-	return OK;
-      fail:
-	printk("acx: create_rx_host_desc_queue FAILED\n");
-	/* dealloc will be done by free function on error case */
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
 
 
 
