@@ -67,8 +67,6 @@
  * ==================================================
  */
 
-// Locking (PCI)
-
 // Logging (PCI)
 static void log_rxbuffer(const acx_device_t *adev);
 static void log_txbuffer(acx_device_t *adev);
@@ -101,19 +99,13 @@ static void acxpci_l_reset_mac(acx_device_t *adev);
 static void acxpci_s_down(struct ieee80211_hw *hw);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 
-// Template (PCI:Control Path)
-
-// Recalibration (PCI:Control Path)
-
-// Other (PCI:Control Path)
-
-// Proc, Debug (PCI)
-
 // Rx Path (PCI)
+static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
 static int acxpci_s_create_rx_host_desc_queue(acx_device_t *adev);
 static void acxpci_l_process_rxdesc(acx_device_t *adev);
 
 // Tx Path (PCI)
+static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
 static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
 static inline txdesc_t *get_txdesc(acx_device_t * adev, int index);
@@ -134,7 +126,6 @@ static void acxpci_e_op_close(struct ieee80211_hw *hw);
 // Helpers (PCI)
 INLINE_IO int adev_present(acx_device_t *adev);
 
-// Driver, Module (PCI)
 
 /*
  * BOM Defines, static vars, etc.
@@ -186,6 +177,54 @@ INLINE_IO int adev_present(acx_device_t *adev);
  * BOM Logging
  * ==================================================
  */
+
+#if !ACX_DEBUG
+static inline void log_rxbuffer(const acx_device_t * adev)
+{
+}
+#else
+static void log_rxbuffer(const acx_device_t * adev)
+{
+	register const struct rxhostdesc *rxhostdesc;
+	int i;
+
+	/* no FN_ENTER here, we don't want that */
+
+	rxhostdesc = adev->rxhostdesc_start;
+	if (unlikely(!rxhostdesc))
+		return;
+	for (i = 0; i < RX_CNT; i++) {
+		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			printk("acx: rx: buf %d full\n", i);
+		rxhostdesc++;
+	}
+}
+#endif
+
+#if !ACX_DEBUG
+static inline void log_txbuffer(const acx_device_t * adev)
+{
+}
+#else
+static void log_txbuffer(acx_device_t * adev)
+{
+	txdesc_t *txdesc;
+	int i;
+
+	/* no FN_ENTER here, we don't want that */
+	/* no locks here, since it's entirely non-critical code */
+	txdesc = adev->txdesc_start;
+	if (unlikely(!txdesc))
+		return;
+	printk("acx: tx: desc->Ctl8's:");
+	for (i = 0; i < TX_CNT; i++) {
+		printk("acx:  %02X", txdesc->Ctl_8);
+		txdesc = advance_txdesc(adev, txdesc, 1);
+	}
+	printk("acx: \n");
+}
+#endif
 
 /*
  * BOM Data Access
@@ -251,6 +290,88 @@ INLINE_IO void write_flush(acx_device_t * adev)
 	readb(adev->iobase);
 }
 
+// -----
+
+int acxpci_s_create_hostdesc_queues(acx_device_t * adev)
+{
+	int result;
+	result = acxpci_s_create_tx_host_desc_queue(adev);
+	if (OK != result)
+		return result;
+	result = acxpci_s_create_rx_host_desc_queue(adev);
+	return result;
+}
+
+void
+acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
+			  u32 rx_queue_start)
+{
+	acxpci_create_tx_desc_queue(adev, tx_queue_start);
+	acxpci_create_rx_desc_queue(adev, rx_queue_start);
+}
+
+void acxpci_free_desc_queues(acx_device_t * adev)
+{
+	unsigned long flags;
+
+#define ACX_FREE_QUEUE(size, ptr, phyaddr) \
+	if (ptr) { \
+		free_coherent(NULL, size, ptr, phyaddr); \
+		ptr = NULL; \
+		size = 0; \
+	}
+
+	FN_ENTER;
+
+	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start,
+		       adev->txhostdesc_startphy);
+	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
+		       adev->txbuf_startphy);
+
+	// OW FIXME Review locking
+	acx_lock(adev, flags);
+	adev->txdesc_start = NULL;
+	acx_unlock(adev, flags);
+
+	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
+		       adev->rxhostdesc_startphy);
+	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
+		       adev->rxbuf_startphy);
+
+	acx_lock(adev, flags);
+	adev->rxdesc_start = NULL;
+	acx_unlock(adev, flags);
+
+	FN_EXIT0;
+}
+
+static void acxpci_s_delete_dma_regions(acx_device_t * adev)
+{
+	FN_ENTER;
+	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
+	 * here instead? Or are we that much down the road that it's no
+	 * longer possible here? */
+	write_reg16(adev, IO_ACX_ENABLE, 0);
+
+	acx_s_mwait(100);
+
+	/* NO locking for all parts of acxpci_free_desc_queues because:
+	 * while calling dma_free_coherent() interrupts need to be 'free'
+	 * but if you spinlock the whole function (acxpci_free_desc_queues)
+	 * you'll get an error */
+	acxpci_free_desc_queues(adev);
+
+	FN_EXIT0;
+}
+
+static inline void
+free_coherent(struct pci_dev *hwdev, size_t size,
+	      void *vaddr, dma_addr_t dma_handle)
+{
+	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
+			  size, vaddr, dma_handle);
+}
+
 /*
  * BOM Firmware, EEPROM, Phy
  * ==================================================
@@ -300,6 +421,26 @@ INLINE_IO void write_flush(acx_device_t * adev)
  * BOM Helpers
  * ==================================================
  */
+
+void acxpci_l_power_led(acx_device_t * adev, int enable)
+{
+	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
+
+	/* A hack. Not moving message rate limiting to adev->xxx
+	 * (it's only a debug message after all) */
+	static int rate_limit = 0;
+
+	if (rate_limit++ < 3)
+		log(L_IOCTL, "acx: Please report in case toggling the power "
+		    "LED doesn't work for your card\n");
+	if (enable)
+		write_reg16(adev, IO_ACX_GPIO_OUT,
+			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
+	else
+		write_reg16(adev, IO_ACX_GPIO_OUT,
+			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
+}
+
 
 /*
  * BOM Driver, Module
@@ -1429,72 +1570,9 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 ** function can be used if only part of the queues were allocated.
 */
 
-static inline void
-free_coherent(struct pci_dev *hwdev, size_t size,
-	      void *vaddr, dma_addr_t dma_handle)
-{
-	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
-			  size, vaddr, dma_handle);
-}
 
 
-void acxpci_free_desc_queues(acx_device_t * adev)
-{
-	unsigned long flags;
 
-#define ACX_FREE_QUEUE(size, ptr, phyaddr) \
-	if (ptr) { \
-		free_coherent(NULL, size, ptr, phyaddr); \
-		ptr = NULL; \
-		size = 0; \
-	}
-
-	FN_ENTER;
-
-	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start,
-		       adev->txhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
-		       adev->txbuf_startphy);
-	
-	// OW FIXME Review locking
-	acx_lock(adev, flags);
-	adev->txdesc_start = NULL;
-	acx_unlock(adev, flags);
-
-	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
-		       adev->rxhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
-		       adev->rxbuf_startphy);
-
-	acx_lock(adev, flags);
-	adev->rxdesc_start = NULL;
-	acx_unlock(adev, flags);
-
-	FN_EXIT0;
-}
-
-
-/***********************************************************************
-** acxpci_s_delete_dma_regions
-*/
-static void acxpci_s_delete_dma_regions(acx_device_t * adev)
-{
-	FN_ENTER;
-	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
-	 * here instead? Or are we that much down the road that it's no
-	 * longer possible here? */
-	write_reg16(adev, IO_ACX_ENABLE, 0);
-
-	acx_s_mwait(100);
-
-	/* NO locking for all parts of acxpci_free_desc_queues because:
-	 * while calling dma_free_coherent() interrupts need to be 'free'
-	 * but if you spinlock the whole function (acxpci_free_desc_queues)
-	 * you'll get an error */
-	acxpci_free_desc_queues(adev);
-
-	FN_EXIT0;
-}
 
 
 /***********************************************************************
@@ -2416,29 +2494,7 @@ static void acxpci_e_op_close(struct ieee80211_hw *hw)
 ** Called directly and only from the IRQ handler
 */
 
-#if !ACX_DEBUG
-static inline void log_rxbuffer(const acx_device_t * adev)
-{
-}
-#else
-static void log_rxbuffer(const acx_device_t * adev)
-{
-	register const struct rxhostdesc *rxhostdesc;
-	int i;
 
-	/* no FN_ENTER here, we don't want that */
-
-	rxhostdesc = adev->rxhostdesc_start;
-	if (unlikely(!rxhostdesc))
-		return;
-	for (i = 0; i < RX_CNT; i++) {
-		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			printk("acx: rx: buf %d full\n", i);
-		rxhostdesc++;
-	}
-}
-#endif
 
 static void acxpci_l_process_rxdesc(acx_device_t * adev)
 {
@@ -2864,27 +2920,6 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 }
 
 
-/***********************************************************************
-** acxpci_l_power_led
-*/
-void acxpci_l_power_led(acx_device_t * adev, int enable)
-{
-	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
-
-	/* A hack. Not moving message rate limiting to adev->xxx
-	 * (it's only a debug message after all) */
-	static int rate_limit = 0;
-
-	if (rate_limit++ < 3)
-		log(L_IOCTL, "acx: Please report in case toggling the power "
-		    "LED doesn't work for your card\n");
-	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
-	else
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
-}
 
 
 /***********************************************************************
@@ -3444,29 +3479,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
-#if !ACX_DEBUG
-static inline void log_txbuffer(const acx_device_t * adev)
-{
-}
-#else
-static void log_txbuffer(acx_device_t * adev)
-{
-	txdesc_t *txdesc;
-	int i;
 
-	/* no FN_ENTER here, we don't want that */
-	/* no locks here, since it's entirely non-critical code */
-	txdesc = adev->txdesc_start;
-	if (unlikely(!txdesc))
-		return;
-	printk("acx: tx: desc->Ctl8's:");
-	for (i = 0; i < TX_CNT; i++) {
-		printk("acx:  %02X", txdesc->Ctl_8);
-		txdesc = advance_txdesc(adev, txdesc, 1);
-	}
-	printk("acx: \n");
-}
-#endif
 
 // OW
 static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
@@ -3960,18 +3973,6 @@ static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
 }
 
 
-/***************************************************************
-** acxpci_s_create_hostdesc_queues
-*/
-int acxpci_s_create_hostdesc_queues(acx_device_t * adev)
-{
-	int result;
-	result = acxpci_s_create_tx_host_desc_queue(adev);
-	if (OK != result)
-		return result;
-	result = acxpci_s_create_rx_host_desc_queue(adev);
-	return result;
-}
 
 
 /***************************************************************
@@ -4117,16 +4118,6 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 }
 
 
-/***************************************************************
-** acxpci_create_desc_queues
-*/
-void
-acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
-			  u32 rx_queue_start)
-{
-	acxpci_create_tx_desc_queue(adev, tx_queue_start);
-	acxpci_create_rx_desc_queue(adev, rx_queue_start);
-}
 
 
 /***************************************************************
