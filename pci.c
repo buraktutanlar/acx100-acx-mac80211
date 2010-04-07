@@ -112,7 +112,7 @@ static void acxpci_l_process_rxdesc(acx_device_t *adev);
 static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
-static inline txdesc_t *get_txdesc(acx_device_t * adev, int index);
+static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
@@ -1888,7 +1888,7 @@ tx_t* acxpci_l_alloc_tx(acx_device_t * adev)
 	}
 
 	head = adev->tx_head;
-	txdesc = get_txdesc(adev, head);
+	txdesc = acxpci_get_txdesc(adev, head);
 	ctl8 = txdesc->Ctl_8;
 
 	/* 2005-10-11: there were several bug reports on this happening
@@ -2229,7 +2229,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		txdesc = get_txdesc(adev, finger);
+		txdesc = acxpci_get_txdesc(adev, finger);
 
 		/* If we allocated txdesc on tx path but then decided
 		 ** to NOT use it, then it will be left as a free "bubble"
@@ -2351,7 +2351,7 @@ void acxpci_l_clean_txdesc_emergency(acx_device_t * adev)
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txdesc = get_txdesc(adev, i);
+		txdesc = acxpci_get_txdesc(adev, i);
 
 		/* free it */
 		txdesc->ack_failures = 0;
@@ -2568,7 +2568,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 	FN_EXIT0;
 }
 
-static inline txdesc_t *get_txdesc(acx_device_t * adev, int index)
+static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index)
 {
 	return (txdesc_t *) (((u8 *) adev->txdesc_start) +
 			     index * adev->txdesc_size);
