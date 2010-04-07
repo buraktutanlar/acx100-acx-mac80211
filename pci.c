@@ -1873,7 +1873,7 @@ static void acxpci_l_process_rxdesc(acx_device_t * adev)
  * after figuring out how many we need and whether we still have
  * sufficiently many.
  */
-tx_t *acxpci_l_alloc_tx(acx_device_t * adev)
+tx_t* acxpci_l_alloc_tx(acx_device_t * adev)
 {
 	struct txdesc *txdesc;
 	unsigned head;
