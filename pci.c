@@ -1436,6 +1436,92 @@ static void acxpci_s_down(struct ieee80211_hw *hw)
  * ==================================================
  */
 
+int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev)
+{
+	const char *rtl, *thd, *ttl;
+	rxhostdesc_t *rxhostdesc;
+	txdesc_t *txdesc;
+	int i;
+
+	FN_ENTER;
+
+	seq_printf(file, "** Rx buf **\n");
+	rxhostdesc = adev->rxhostdesc_start;
+	if (rxhostdesc)
+		for (i = 0; i < RX_CNT; i++) {
+			rtl = (i == adev->rx_tail) ? " [tail]" : "";
+			if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+			    && (rxhostdesc->
+				Status & cpu_to_le32(DESC_STATUS_FULL)))
+				seq_printf(file, "%02u FULL%s\n", i, rtl);
+			else
+				seq_printf(file, "%02u empty%s\n", i, rtl);
+			rxhostdesc++;
+		}
+
+	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
+			adev->tx_free,
+			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
+
+	txdesc = adev->txdesc_start;
+	if (txdesc)
+		for (i = 0; i < TX_CNT; i++) {
+			thd = (i == adev->tx_head) ? " [head]" : "";
+			ttl = (i == adev->tx_tail) ? " [tail]" : "";
+
+			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
+				seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
+			else if (txdesc->Ctl_8 & DESC_CTL_HOSTOWN)
+				seq_printf(file, "%02u Available     (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
+			else
+				seq_printf(file, "%02u Busy          (%02X)%s%s", i, txdesc->Ctl_8,
+						thd, ttl);
+			seq_printf(file, "\n");
+
+			txdesc = advance_txdesc(adev, txdesc, 1);
+		}
+	seq_printf(file,
+		     "\n"
+		     "** PCI data **\n"
+		     "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
+		     "txdesc_size %u, txdesc_start %p\n"
+		     "txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
+		     "rxdesc_start %p\n"
+		     "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
+		     "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
+		     adev->txbuf_start, adev->txbuf_area_size,
+		     (unsigned long long)adev->txbuf_startphy,
+		     adev->txdesc_size, adev->txdesc_start,
+		     adev->txhostdesc_start, adev->txhostdesc_area_size,
+		     (unsigned long long)adev->txhostdesc_startphy,
+		     adev->rxdesc_start,
+		     adev->rxhostdesc_start, adev->rxhostdesc_area_size,
+		     (unsigned long long)adev->rxhostdesc_startphy,
+		     adev->rxbuf_start, adev->rxbuf_area_size,
+		     (unsigned long long)adev->rxbuf_startphy);
+
+	FN_EXIT0;
+	return 0;
+}
+
+int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
+{
+	char *p = buf;
+	int i;
+
+	FN_ENTER;
+
+	for (i = 0; i < 0x400; i++) {
+		acxpci_read_eeprom_byte(adev, i, p++);
+	}
+
+	FN_EXIT1(p - buf);
+	return p - buf;
+}
+
+
 /*
  * BOM Rx Path
  * ==================================================
@@ -4104,96 +4190,6 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 
 
-/***************************************************************
-** acxpci_s_proc_diag_output
-*/
-int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev)
-{
-	const char *rtl, *thd, *ttl;
-	rxhostdesc_t *rxhostdesc;
-	txdesc_t *txdesc;
-	int i;
-
-	FN_ENTER;
-
-	seq_printf(file, "** Rx buf **\n");
-	rxhostdesc = adev->rxhostdesc_start;
-	if (rxhostdesc)
-		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx_tail) ? " [tail]" : "";
-			if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-			    && (rxhostdesc->
-				Status & cpu_to_le32(DESC_STATUS_FULL)))
-				seq_printf(file, "%02u FULL%s\n", i, rtl);
-			else
-				seq_printf(file, "%02u empty%s\n", i, rtl);
-			rxhostdesc++;
-		}
-
-	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
-			adev->tx_free,
-			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
-
-	txdesc = adev->txdesc_start;
-	if (txdesc)
-		for (i = 0; i < TX_CNT; i++) {
-			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx_tail) ? " [tail]" : "";
-
-			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
-						thd, ttl);
-			else if (txdesc->Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u Available     (%02X)%s%s", i, txdesc->Ctl_8,
-						thd, ttl);
-			else
-				seq_printf(file, "%02u Busy          (%02X)%s%s", i, txdesc->Ctl_8,
-						thd, ttl);
-			seq_printf(file, "\n");
-
-			txdesc = advance_txdesc(adev, txdesc, 1);
-		}
-	seq_printf(file,
-		     "\n"
-		     "** PCI data **\n"
-		     "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
-		     "txdesc_size %u, txdesc_start %p\n"
-		     "txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
-		     "rxdesc_start %p\n"
-		     "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
-		     "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		     adev->txbuf_start, adev->txbuf_area_size,
-		     (unsigned long long)adev->txbuf_startphy,
-		     adev->txdesc_size, adev->txdesc_start,
-		     adev->txhostdesc_start, adev->txhostdesc_area_size,
-		     (unsigned long long)adev->txhostdesc_startphy,
-		     adev->rxdesc_start,
-		     adev->rxhostdesc_start, adev->rxhostdesc_area_size,
-		     (unsigned long long)adev->rxhostdesc_startphy,
-		     adev->rxbuf_start, adev->rxbuf_area_size,
-		     (unsigned long long)adev->rxbuf_startphy);
-
-	FN_EXIT0;
-	return 0;
-}
-
-
-/***********************************************************************
-*/
-int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
-{
-	char *p = buf;
-	int i;
-
-	FN_ENTER;
-
-	for (i = 0; i < 0x400; i++) {
-		acxpci_read_eeprom_byte(adev, i, p++);
-	}
-
-	FN_EXIT1(p - buf);
-	return p - buf;
-}
 
 
 /***********************************************************************
