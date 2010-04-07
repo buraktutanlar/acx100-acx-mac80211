@@ -90,7 +90,7 @@ static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 static int acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_upload_fw(acx_device_t *adev);
-static inline void read_eeprom_area(acx_device_t * adev);
+static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 
 // CMDs (PCI:Control Path)
 static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
@@ -920,7 +920,7 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 	return res;
 }
 
-static inline void read_eeprom_area(acx_device_t * adev)
+static inline void acxpci_read_eeprom_area(acx_device_t * adev)
 {
 #if ACX_DEBUG > 1
 	int offs;
@@ -1364,7 +1364,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	acxpci_write_cmd_type_status(adev, 0, 0);
 
 	/* test that EEPROM is readable */
-	read_eeprom_area(adev);
+	acxpci_read_eeprom_area(adev);
 
 	result = OK;
 	goto end;
