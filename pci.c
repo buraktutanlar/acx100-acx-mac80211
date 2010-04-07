@@ -129,7 +129,7 @@ static int acxpci_e_op_open(struct ieee80211_hw *hw);
 static void acxpci_e_op_close(struct ieee80211_hw *hw);
 
 // Helpers (PCI)
-INLINE_IO int adev_present(acx_device_t *adev);
+INLINE_IO int acxpci_adev_present(acx_device_t *adev);
 
 
 /*
@@ -3231,7 +3231,7 @@ void acxpci_l_power_led(acx_device_t * adev, int enable)
 			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 
-INLINE_IO int adev_present(acx_device_t *adev)
+INLINE_IO int acxpci_adev_present(acx_device_t *adev)
 {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
@@ -4035,7 +4035,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	acx_sem_lock(adev);
 
 	/* If device wasn't hot unplugged... */
-	if (adev_present(adev)) {
+	if (acxpci_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
@@ -4581,7 +4581,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	adev->initialized = 0;
 
 	/* If device wasn't hot unplugged... */
-	if (adev_present(adev)) {
+	if (acxpci_adev_present(adev)) {
 
 		acx_sem_lock(adev);
 
