@@ -2844,6 +2844,119 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
  * ==================================================
  */
 
+static const struct ieee80211_ops acxpci_hw_ops = {
+	.tx = acx_i_op_tx,
+	.conf_tx = acx_e_conf_tx,
+	.add_interface = acx_e_op_add_interface,
+	.remove_interface = acx_e_op_remove_interface,
+	.start = acxpci_e_op_open,
+	.configure_filter = acx_i_op_configure_filter,
+	.stop = acxpci_e_op_close,
+	.config = acx_e_op_config,
+	.bss_info_changed = acx_e_op_bss_info_changed,
+	.set_key = acx_e_op_set_key,
+	.get_stats = acx_e_op_get_stats,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	.get_tx_stats = acx_e_op_get_tx_stats,
+#endif
+};
+
+
+/*
+ * acxpci_e_open
+ *
+ * Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
+ * from clear to set. In other words: ifconfig up.
+ *
+ * Returns:
+ *	0	success
+ *	>0	f/w reported error
+ *	<0	driver reported error
+ */
+static int acxpci_e_op_open(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	int result = OK;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	adev->initialized = 0;
+
+/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+
+	/* ifup device */
+	acxpci_s_up(hw);
+
+	/* We don't currently have to do anything else.
+	 * The setup of the MAC should be subsequently completed via
+	 * the mlme commands.
+	 * Higher layers know we're ready from dev->start==1 and
+	 * dev->tbusy==0.  Our rx path knows to pass up received/
+	 * frames because of dev->flags&IFF_UP is true.
+	 */
+	// OW ieee80211_start_queues(adev->ieee);
+	// A guess
+	ieee80211_wake_queues(adev->ieee);
+
+	adev->initialized = 1;
+
+	acx_sem_unlock(adev);
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * acxpci_e_close
+ *
+ * This function stops the network functionality of the interface (invoked
+ * when the user calls ifconfig <wlan> down). The tx queue is halted and
+ * the device is marked as down.
+ *
+ * Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
+ * from set to clear. I.e. called by "ifconfig DEV down"
+ *
+ * Returns:
+ *	0	success
+ *	>0	f/w reported error
+ *	<0	driver reported error
+ */
+static void acxpci_e_op_close(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	/* ifdown device */
+	if (adev->initialized) {
+		acxpci_s_down(hw);
+	}
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	/* disable all IRQs, release shared IRQ handler */
+	acx_lock(adev, flags);
+	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_flush(adev);
+	acx_unlock(adev, flags);
+
+	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+
+	/* We currently don't have to do anything else.
+	 * Higher layers know we're not ready from dev->start==0 and
+	 * dev->tbusy==1.  Our rx path knows to not pass up received
+	 * frames because of dev->flags&IFF_UP is false.
+	 */
+	adev->initialized = 0;
+	log(L_INIT, "acxpci: closed device\n");
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+}
+
+
 /*
  * BOM Helpers
  * ==================================================
@@ -3106,22 +3219,6 @@ static const u16 IO_ACX111[] = {
 	0x0108,			/* IO_ACX_ECPU_CTRL */
 };
 
-static const struct ieee80211_ops acxpci_hw_ops = {
-	.tx = acx_i_op_tx,
-	.conf_tx = acx_e_conf_tx,
-	.add_interface = acx_e_op_add_interface,
-	.remove_interface = acx_e_op_remove_interface,
-	.start = acxpci_e_op_open,
-	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxpci_e_op_close,
-	.config = acx_e_op_config,
-	.bss_info_changed = acx_e_op_bss_info_changed,
-	.set_key = acx_e_op_set_key,
-	.get_stats = acx_e_op_get_stats,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	.get_tx_stats = acx_e_op_get_tx_stats,
-#endif
-};
 
 
 #ifdef CONFIG_PCI
@@ -3706,100 +3803,6 @@ void acxpci_net_poll_controller(struct net_device *net_dev)
 }
 #endif*/ /* CONFIG_NET_POLL_CONTROLLER */
 
-/***********************************************************************
-** acxpci_e_open
-**
-** Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
-** from clear to set. In other words: ifconfig up.
-**
-** Returns:
-**	0	success
-**	>0	f/w reported error
-**	<0	driver reported error
-*/
-static int acxpci_e_op_open(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	int result = OK;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	adev->initialized = 0;
-
-/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
-
-	/* ifup device */
-	acxpci_s_up(hw);
-
-	/* We don't currently have to do anything else.
-	 * The setup of the MAC should be subsequently completed via
-	 * the mlme commands.
-	 * Higher layers know we're ready from dev->start==1 and
-	 * dev->tbusy==0.  Our rx path knows to pass up received/
-	 * frames because of dev->flags&IFF_UP is true.
-	 */
-	// OW ieee80211_start_queues(adev->ieee);
-	// A guess
-	ieee80211_wake_queues(adev->ieee);
-
-	adev->initialized = 1;
-
-	acx_sem_unlock(adev);
-	FN_EXIT1(result);
-	return result;
-}
-
-
-/***********************************************************************
-** acxpci_e_close
-**
-** This function stops the network functionality of the interface (invoked
-** when the user calls ifconfig <wlan> down). The tx queue is halted and
-** the device is marked as down.
-**
-** Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
-** from set to clear. I.e. called by "ifconfig DEV down"
-**
-** Returns:
-**	0	success
-**	>0	f/w reported error
-**	<0	driver reported error
-*/
-static void acxpci_e_op_close(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	/* ifdown device */
-	if (adev->initialized) {
-		acxpci_s_down(hw);
-	}
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	/* disable all IRQs, release shared IRQ handler */
-	acx_lock(adev, flags);
-	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	write_flush(adev);
-	acx_unlock(adev, flags);
-
-	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
-
-	/* We currently don't have to do anything else.
-	 * Higher layers know we're not ready from dev->start==0 and
-	 * dev->tbusy==1.  Our rx path knows to not pass up received
-	 * frames because of dev->flags&IFF_UP is false.
-	 */
-	adev->initialized = 0;
-	log(L_INIT, "acxpci: closed device\n");
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-}
 
 
 
