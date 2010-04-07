@@ -315,6 +315,13 @@ acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 	acxpci_create_rx_desc_queue(adev, rx_queue_start);
 }
 
+/*
+ * acxpci_free_desc_queues
+ *
+ * Releases the queues that have been allocated, the
+ * others have been initialised to NULL so this
+ * function can be used if only part of the queues were allocated.
+ */
 void acxpci_free_desc_queues(acx_device_t * adev)
 {
 	unsigned long flags;
@@ -3081,37 +3088,6 @@ INLINE_IO int adev_present(acx_device_t *adev)
 // BOM Cleanup ==========================================================================
 
 
-
-
-/***********************************************************************
-*/
-
-
-
-
-
-/***********************************************************************
-** EEPROM and PHY read/write helpers
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-/***********************************************************************
-** acxpci_free_desc_queues
-**
-** Releases the queues that have been allocated, the
-** others have been initialised to NULL so this
-** function can be used if only part of the queues were allocated.
-*/
 
 
 
