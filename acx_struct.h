@@ -23,7 +23,7 @@
 #include "acx_commands.h"
 
 /***********************************************************************
-** Forward declarations of types
+** BOM Forward declarations of types
 */
 typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
@@ -35,7 +35,7 @@ typedef struct txhostdesc txhostdesc_t;
 
 
 /***********************************************************************
-** Debug / log functionality
+** BOM Debug / log functionality
 */
 enum {
 	L_LOCK		= (ACX_DEBUG>1)*0x0001,	/* locking debug log */
@@ -70,14 +70,14 @@ enum {
 };
 
 /***********************************************************************
-** Random helpers
+** BOM Random helpers
 */
 #define ACX_PACKED __attribute__ ((packed))
 
 #define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 /***********************************************************************
-** Constants
+** BOM Constants
 */
 #define OK	0
 #define NOT_OK	1
@@ -159,7 +159,7 @@ enum {
 
 
 /***********************************************************************
-** Tx/Rx buffer sizes and watermarks
+** BOM  Tx/Rx buffer sizes and watermarks
 **
 ** This will alloc and use DMAable buffers of
 ** WLAN_A4FR_MAXLEN_WEP_FCS * (RX_CNT + TX_CNT) bytes
@@ -182,7 +182,7 @@ enum {
 
 
 /***********************************************************************
-**Information Frames Structures
+** BOM Information Frames Structures
 */
 
 /* Used in beacon frames and the like */
@@ -204,7 +204,7 @@ enum {
 
 
 /***********************************************************************
-** Hardware structures
+** BOM Hardware structures
 */
 
 /* An opaque typesafe helper type
@@ -303,7 +303,7 @@ typedef struct {
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
 /***********************************************************************
-** PCI structures
+** BOM PCI structures
 */
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
@@ -364,7 +364,7 @@ struct rxdesc {
 } __attribute__ ((packed));		/* size 52 = 0x34 */
 
 /***********************************************************************
-** rxbuffer_t
+** BOM rxbuffer_t
 **
 ** This is the format of rx data returned by acx
 */
@@ -610,7 +610,7 @@ typedef struct shared_queueindicator {
 } ACX_PACKED queueindicator_t;
 
 /***********************************************************************
-** Hardware structures
+** BOM Hardware structures
 */
 
 /* An opaque typesafe helper type
@@ -705,7 +705,7 @@ typedef struct shared_queueindicator {
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
 /***********************************************************************
-** PCI structures
+** BOM PCI structures
 */
 /* IRQ Constants
 ** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE)
@@ -834,7 +834,7 @@ struct rxhostdesc {
 
 
 /***********************************************************************
-** USB structures and constants
+** BOM USB structures and constants
 */
 #ifdef ACX_MAC80211_USB
 
@@ -895,7 +895,7 @@ typedef struct usb_rx {
 #endif /* ACX_USB */
 
 /***********************************************************************
-** Main acx per-device data structure
+** BOM Main acx per-device data structure
 */
 #define ACX_STATE_FW_LOADED	0x01
 #define ACX_STATE_IFACE_UP	0x02
@@ -1524,7 +1524,7 @@ typedef struct acx111_ie_powersave {
 
 
 /***********************************************************************
-** Commands and template structures
+** BOM Commands and template structures
 */
 
 /*
@@ -1820,7 +1820,7 @@ acx_struct_size_check(void)
 
 
 /***********************************************************************
-** Global data
+** BOM Global data
 */
 extern const u8 acx_bitpos2ratebyte[];
 extern const u8 acx_bitpos2rate100[];
