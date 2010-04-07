@@ -122,7 +122,7 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void acxpci_disable_acx_irq(acx_device_t *adev);
 static void acxpci_enable_acx_irq(acx_device_t *adev);
 static void acxpci_handle_info_irq(acx_device_t *adev);
-static void log_unusual_irq(u16 irqtype);
+static void acxpci_log_unusual_irq(u16 irqtype);
 
 // Mac80211 Ops (PCI)
 static int acxpci_e_op_open(struct ieee80211_hw *hw);
@@ -2775,7 +2775,7 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 				/* | HOST_INT_SCAN_COMPLETE */
 				| HOST_INT_FCS_THRESHOLD
 				| HOST_INT_UNKNOWN)) {
-			log_unusual_irq(irqtype);
+			acxpci_log_unusual_irq(irqtype);
 		}
 
 #if IRQ_ITERATE
@@ -2975,7 +2975,7 @@ static void acxpci_handle_info_irq(acx_device_t * adev)
 }
 
 
-static void log_unusual_irq(u16 irqtype)
+static void acxpci_log_unusual_irq(u16 irqtype)
 {
 	/*
 	   if (!printk_ratelimit())
