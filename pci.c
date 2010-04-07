@@ -114,7 +114,7 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t *adev);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
 
 // Irq Handling, Timer (PCI)
@@ -2094,7 +2094,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
+static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 		struct ieee80211_tx_info *info)
 {
 	const char *err = "unknown error";
@@ -2309,7 +2309,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		}
 */
 		if (unlikely(error))
-			handle_tx_error(adev, error, finger,  txstatus);
+			acxpci_handle_tx_error(adev, error, finger,  txstatus);
 
 		if (IS_ACX111(adev))
 			log(L_BUFT,
