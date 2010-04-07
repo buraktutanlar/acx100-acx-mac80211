@@ -3084,30 +3084,20 @@ INLINE_IO int adev_present(acx_device_t *adev)
  * ==================================================
  */
 
-
-// BOM Cleanup ==========================================================================
-
-
-
-
-
-
-
-
-/***********************************************************************
-** acxpci_e_probe
-**
-** Probe routine called when a PCI device w/ matching ID is found.
-** Here's the sequence:
-**   - Allocate the PCI resources.
-**   - Read the PCMCIA attribute memory to make sure we have a WLAN card
-**   - Reset the MAC
-**   - Initialize the dev and wlan data
-**   - Initialize the MAC
-**
-** pdev	- ptr to pci device structure containing info about pci configuration
-** id	- ptr to the device id entry that matched this device
-*/
+/*
+ * acxpci_e_probe
+ *
+ * Probe routine called when a PCI device w/ matching ID is found.
+ * Here's the sequence:
+ *   - Allocate the PCI resources.
+ *   - Read the PCMCIA attribute memory to make sure we have a WLAN card
+ *   - Reset the MAC
+ *   - Initialize the dev and wlan data
+ *   - Initialize the MAC
+ *
+ * pdev	- ptr to pci device structure containing info about pci configuration
+ * id	- ptr to the device id entry that matched this device
+ */
 static const u16 IO_ACX100[] = {
 	0x0000,			/* IO_ACX_SOFT_RESET */
 
@@ -3536,14 +3526,14 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 }
 
 
-/***********************************************************************
-** acxpci_e_remove
-**
-** Shut device down (if not hot unplugged)
-** and deallocate PCI resources for the acx chip.
-**
-** pdev - ptr to PCI device structure containing info about pci configuration
-*/
+/*
+ * acxpci_e_remove
+ *
+ * Shut device down (if not hot unplugged)
+ * and deallocate PCI resources for the acx chip.
+ *
+ * pdev - ptr to PCI device structure containing info about pci configuration
+ */
 static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
@@ -3750,6 +3740,9 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 }
 #endif /* CONFIG_PM */
 #endif /* CONFIG_PCI */
+
+// BOM Cleanup ==========================================================================
+
 
 /***********************************************************************
 ** acxpci_s_up
