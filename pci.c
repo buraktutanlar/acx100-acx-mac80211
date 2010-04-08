@@ -17,7 +17,6 @@
  */
 #define ACX_MAC80211_PCI 1
 
-// OW Cleanup includes
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
@@ -26,7 +25,7 @@
 #include <generated/utsrelease.h>
 #endif
 
-#include <linux/compiler.h>	/* required for Lx 2.6.8 ?? */
+#include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -34,8 +33,6 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 #include <linux/netdevice.h>
