@@ -1495,15 +1495,9 @@ acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 	return (NOT_OK);
 }
 
-#if !ACX_DEBUG
-int acx_s_configure(acx_device_t * adev, void *pdr, int type)
-{
-#else
-int
-acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
+int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 		      const char *typestr)
 {
-#endif
 	u16 len;
 	int res;
 	char msgbuf[255];
@@ -1645,18 +1639,10 @@ static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
 	return acx111_s_set_feature_config(adev, f, d, 2);
 }
 
-// OW TODO Replace the FUNC #defs by __func__ in logging
-#undef FUNC
-#define FUNC "interrogate"
-#if !ACX_DEBUG
-int acx_s_interrogate(acx_device_t * adev, void *pdr, int type)
-{
-#else
 int
 acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 			const char *typestr)
 {
-#endif
 	u16 len;
 	int res;
 
@@ -1669,17 +1655,17 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	log(L_CTL, "acx: " FUNC "(type:%s,len:%u)\n", typestr, len);
+	log(L_CTL, "acx: %s: (type:%s,len:%u)\n", __func__, typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		printk("acx: %s: " FUNC "(type:%s) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		printk("acx: %s: %s: (type:%s) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
 		       typestr);
 #else
-		printk("acx: %s: " FUNC "(type:0x%X) FAILED\n", wiphy_name(adev->ieee->wiphy),
+		printk("acx: %s: %s: (type:0x%X) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
 		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -5020,7 +5006,9 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 	FN_EXIT0;
 }
 
-
+// FUNCTION_GREP_RESET 
+// The function_grep script can get confused with multiple "{"" opening braces 
+// due e.g. due to #ifdefs. This tag reset the parser state of the script.
 
 int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
