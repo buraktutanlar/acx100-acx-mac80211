@@ -22,6 +22,14 @@
 #include "acx_commands.h"
 
 /*
+ * BOM Config
+ * ==================================================
+ */
+#define CMD_TIMEOUT_MS(n)	(n)
+#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
+
+
+/*
  * BOM Common
  * ==================================================
  */
@@ -80,8 +88,6 @@
 
 void acx_lock_debug(acx_device_t *adev, const char* where);
 void acx_unlock_debug(acx_device_t *adev, const char* where);
-void acx_down_debug(acx_device_t *adev, const char* where);
-void acx_up_debug(acx_device_t *adev, const char* where);
 void acx_lock_unhold(void);
 void acx_sem_unhold(void);
 
@@ -166,8 +172,12 @@ void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
 void log_fn_exit_v(const char *funcname, int v);
 
-char* acx_print_mac(char *buf, const u8 *mac);
+char *acx_print_mac(char *buf, const u8 *mac);
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
+void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
+
+void acx_dump_bytes(const void *data, int num);
+const char *acx_cmd_status_str(unsigned int state);
 
 #define FN_ENTER \
 	do { \
@@ -224,27 +234,20 @@ do { \
 #endif 
 //---
 
-void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
-void acx_dump_bytes(const void *, int);
-const char *acx_cmd_status_str(unsigned int state);
-
-
 // BOM Data Access (Common)
 // -----
 
 // BOM Firmware, EEPROM, Phy (Common)
 // -----
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 *size);
+void acx_s_get_firmware_version(acx_device_t * adev);
+void acx_display_hardware_details(acx_device_t * adev);
+firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 * size);
+void acx_s_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);
 int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-void acx_s_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t *pcfg);
-void acx_s_get_firmware_version(acx_device_t *adev);
-void acx_display_hardware_details(acx_device_t *adev);
 
 // BOM CMDs (Common:Control Path)
 // -----
-#define CMD_TIMEOUT_MS(n)	(n)
-#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
 
 int acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 #define acx_s_issue_cmd(adev,cmd,param,len) \
@@ -260,16 +263,19 @@ int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char*
 #define acx_s_interrogate(adev,pdr,type) \
 	acx_s_interrogate_debug(adev,pdr,type,#type)
 
+void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
+
 // BOM Configuration (Common:Control Path)
 // -----
-void acx_s_set_defaults(acx_device_t *adev);
-int acx_s_init_mac(acx_device_t *adev);
-// void acx_update_capabilities(acx_device_t *adev);
-void acx_s_start(acx_device_t *adev);
+void acx_s_set_defaults(acx_device_t * adev);
 void acx_s_update_card_settings(acx_device_t *adev);
-int acx_setup_modes(acx_device_t *adev);
-void acx_free_modes(acx_device_t *adev);
+void acx_s_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
+int acx_s_init_mac(acx_device_t * adev);
+void acx_free_modes(acx_device_t * adev);
+int acx_setup_modes(acx_device_t *adev);
+int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
+// void acx_update_capabilities(acx_device_t *adev);
 
 // BOM Template (Common:Control Path)
 // -----
@@ -312,13 +318,16 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
 
 // BOM Crypto (Common)
 // -----
+int acx_clear_keys(acx_device_t * adev);
+int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee80211_key_conf *key, const u8 *mac_addr);
 
 // BOM Irq Handling, Timer (Common)
 // -----
 void acx_init_task_scheduler(acx_device_t *adev);
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-void acx_i_timer(unsigned long a);
 void acx_e_after_interrupt_task(acx_device_t *adev);
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+void acx_i_timer(unsigned long address);
+void acx_set_timer(acx_device_t * adev, int timeout_us);
 
 // BOM Mac80211 Ops (Common)
 // -----
@@ -357,6 +366,12 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_s
 void acx_s_mwait(int ms);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 // void great_inquisitor(acx_device_t *adev);
+
+#if !ACX_DEBUG
+static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
+#else
+const char *acx_get_packet_type_string(u16 fc);
+#endif
 
 // MAC address helpers
 // ---
@@ -478,12 +493,6 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 {
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
-
-#if !ACX_DEBUG
-static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
-#else
-const char *acx_get_packet_type_string(u16 fc);
-#endif
 
 // BOM Driver, Module (Common)
 // -----
