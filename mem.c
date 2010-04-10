@@ -4659,6 +4659,24 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
   * BOM Mac80211 Ops
   * ==================================================
   */
+
+static const struct ieee80211_ops acxmem_hw_ops = {
+		.tx = acx_i_op_tx,
+		.conf_tx = acx_e_conf_tx,
+		.add_interface = acx_e_op_add_interface,
+		.remove_interface = acx_e_op_remove_interface,
+		.start = acxmem_e_op_start,
+		.configure_filter = acx_i_op_configure_filter,
+		.stop = acxmem_e_op_stop,
+		.config = acx_e_op_config,
+		.bss_info_changed = acx_e_op_bss_info_changed,
+		.set_key = acx_e_op_set_key,
+		.get_stats = acx_e_op_get_stats,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+		.get_tx_stats = acx_e_op_get_tx_stats,
+#endif
+		};
+
 /*
  * acxmem_e_op_start
  *
@@ -5143,6 +5161,17 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
   * BOM Driver, Module
   * ==================================================
   */
+static int __devinit acxmem_e_probe(struct platform_device *pdev);
+static int __devexit acxmem_e_remove(struct platform_device *pdev);
+#ifdef CONFIG_PM
+static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
+static int acxmem_e_resume(struct platform_device *pdev);
+#endif
+int __init acxmem_e_init_module(void);
+void __exit acxmem_e_cleanup_module(void);
+
+// OW Remove, since not used
+void acxmem_e_release(struct device *dev);
 
 
 // BOM Cleanup ============================================================
@@ -5223,24 +5252,6 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  ** id	- ptr to the device id entry that matched this device
  */
 
-
-// OW FIXME Put this in the beginning of the file, when reordering code
-static const struct ieee80211_ops acxmem_hw_ops = {
-		.tx = acx_i_op_tx,
-		.conf_tx = acx_e_conf_tx,
-		.add_interface = acx_e_op_add_interface,
-		.remove_interface = acx_e_op_remove_interface,
-		.start = acxmem_e_op_start,
-		.configure_filter = acx_i_op_configure_filter,
-		.stop = acxmem_e_op_stop,
-		.config = acx_e_op_config,
-		.bss_info_changed = acx_e_op_bss_info_changed,
-		.set_key = acx_e_op_set_key,
-		.get_stats = acx_e_op_get_stats,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-		.get_tx_stats = acx_e_op_get_tx_stats,
-#endif
-		};
 
 
 static int __devinit acxmem_e_probe(struct platform_device *pdev) {
