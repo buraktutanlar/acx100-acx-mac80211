@@ -108,17 +108,14 @@
  * ==================================================
  */
 
-// Locking (Mem)
-
 // Logging (Mem)
-// OW Remove: static inline void log_txbuffer(const acx_device_t *adev);
-static void log_txbuffer(acx_device_t *adev);
  // OW Remove: static inline void log_rxbuffer(const acx_device_t *adev);
 static void log_rxbuffer(const acx_device_t *adev);
+// OW Remove: static inline void log_txbuffer(const acx_device_t *adev);
+static void log_txbuffer(acx_device_t *adev);
 static void dump_acxmem(acx_device_t *adev, u32 start, int length);
 
 // Data Access (Mem)
-
 INLINE_IO u32 read_id_register(acx_device_t *adev);
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset);
 INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset);
@@ -140,30 +137,30 @@ static void copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, in
 static void chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
 static void chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
 
+int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev);
+static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev);
+void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
+static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 void acxmem_free_desc_queues(acx_device_t *adev);
 static void acxmem_s_delete_dma_regions(acx_device_t *adev);
-static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev);
-static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev);
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
-static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
-static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
-void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 static void *allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
-
 // Firmware, EEPROM, Phy (Mem)
+int acxmem_s_upload_radio(acx_device_t *adev);
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
+static inline void read_eeprom_area(acx_device_t *adev);
 int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static int acxmem_s_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_s_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_s_upload_fw(acx_device_t *adev);
-int acxmem_s_upload_radio(acx_device_t *adev);
-static inline void read_eeprom_area(acx_device_t *adev);
-static void acx_show_card_eeprom_id(acx_device_t *adev);
 
-// Control Path (CMD handling, init, reset) (Mem)
+#if defined(NONESSENTIAL_FEATURES)
+static void acx_show_card_eeprom_id(acx_device_t *adev);
+#endif
 
 // CMDs (Mem:Control Path)
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
@@ -180,10 +177,6 @@ static void acxmem_s_up(struct ieee80211_hw *hw);
 static void acxmem_s_down(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
-// Template (Mem:Control Path)
-
-// Recalibration (Mem:Control Path)
-
 // Other (Mem:Control Path)
 
 // Proc, Debug (Mem)
@@ -194,9 +187,19 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 static void acxmem_l_process_rxdesc(acx_device_t *adev);
 
 // Tx Path (Mem)
+tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
+void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
+
+void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count);
 void reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
+
+void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
+
 static void init_acx_txbuf(acx_device_t *adev);
 static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
@@ -204,29 +207,18 @@ static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
 static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
-tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
-void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
-void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
-static void acxmem_i_tx_timeout(struct net_device *ndev);
 int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
-
-
-// Crypto (Mem)
+//static void acxmem_i_tx_timeout(struct net_device *ndev);
 
 // Irq Handling, Timer (Mem)
 static void acxmem_irq_enable(acx_device_t *adev);
 static void acxmem_irq_disable(acx_device_t *adev);
-
-static void handle_info_irq(acx_device_t *adev);
-static void log_unusual_irq(u16 irqtype);
-static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
 void acxmem_i_interrupt_tasklet(struct work_struct *work);
 static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
+static void handle_info_irq(acx_device_t *adev);
+static void log_unusual_irq(u16 irqtype);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops (Mem)
@@ -234,10 +226,10 @@ static int acxmem_e_op_start(struct ieee80211_hw *hw);
 static void acxmem_e_op_stop(struct ieee80211_hw *hw);
 
 // Helpers (Mem)
-static char printable(char c);
-INLINE_IO int adev_present(acx_device_t *adev);
 void acxmem_l_power_led(acx_device_t *adev, int enable);
-static void update_link_quality_led(acx_device_t *adev);
+INLINE_IO int adev_present(acx_device_t *adev);
+static char printable(char c);
+//static void update_link_quality_led(acx_device_t *adev);
 
 // Ioctls
 // int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
@@ -246,12 +238,15 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_
 // Driver, Module (Mem)
 static int __devinit acxmem_e_probe(struct platform_device *pdev);
 static int __devexit acxmem_e_remove(struct platform_device *pdev);
+#ifdef CONFIG_PM
 static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
 static int acxmem_e_resume(struct platform_device *pdev);
+#endif
 int __init acxmem_e_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
+
+// OW Remove, since not used
 void acxmem_e_release(struct device *dev);
-// -----
 
 
 /*
@@ -5680,7 +5675,8 @@ static struct platform_driver acxmem_drv_id = {
 		.remove = __devexit_p(acxmem_e_remove),
 
 		#ifdef CONFIG_PM
-		.suspend = acxmem_e_suspend, .resume = acxmem_e_resume
+		.suspend = acxmem_e_suspend,
+		.resume = acxmem_e_resume
 		#endif /* CONFIG_PM */
 
 };
