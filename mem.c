@@ -130,10 +130,10 @@ INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val);
 INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address);
 INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val);
 INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address);
-static void copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
-static void copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
-static void chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
-static void chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
+static void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
+static void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
+static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
+static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
 
 int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
 static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev);
@@ -143,7 +143,7 @@ static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 void acxmem_free_desc_queues(acx_device_t *adev);
 static void acxmem_s_delete_dma_regions(acx_device_t *adev);
-static void *allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
+static void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
 int acxmem_s_upload_radio(acx_device_t *adev);
@@ -392,7 +392,7 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 
 	while (length > 0) {
 		printk("%04x ", start);
-		copy_from_slavemem(adev, buf, start, 16);
+		acxmem_copy_from_slavemem(adev, buf, start, 16);
 		for (i = 0; (i < 16) && (i < length); i++) {
 			printk("%02x ", buf[i]);
 		}
@@ -657,7 +657,7 @@ INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address) {
  *
  * TODO - rewrite using address autoincrement, handle partial words
  */
-static void copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source,
+static void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source,
 		int count) {
 	u32 tmp = 0;
 	u8 *ptmp = (u8 *) &tmp;
@@ -699,7 +699,7 @@ static void copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source,
  *
  * TODO - rewrite using autoincrement, handle partial words
  */
-static void copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source,
+static void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source,
 		int count) {
 	u32 tmp = 0;
 	u8* ptmp = (u8 *) &tmp;
@@ -752,7 +752,7 @@ static void copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source,
  * transmit buffer structure with minimal intervention on our part.
  * Interrupts should be disabled when calling this.
  */
-static void chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source,
+static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source,
 		int count) {
 	u32 val;
 	u32 *data = (u32 *) source;
@@ -812,7 +812,7 @@ static void chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *sourc
  * receive buffer structures with minimal intervention on our part.
  * Interrupts should be disabled when calling this.
  */
-static void chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source,
+static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source,
 		int count) {
 	u32 val;
 	u32 *data = (u32 *) destination;
@@ -904,7 +904,7 @@ static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev) {
 	/* allocate the RX host descriptor queue pool */
 	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
 
-	adev->rxhostdesc_start = allocate(adev, adev->rxhostdesc_area_size,
+	adev->rxhostdesc_start = acxmem_allocate(adev, adev->rxhostdesc_area_size,
 			&adev->rxhostdesc_startphy, "rxhostdesc_start");
 	if (!adev->rxhostdesc_start)
 		goto fail;
@@ -919,7 +919,7 @@ static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev) {
 	 * to store the whole content of the received frames in it */
 	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
 
-	adev->rxbuf_start = allocate(adev, adev->rxbuf_area_size,
+	adev->rxbuf_start = acxmem_allocate(adev, adev->rxbuf_area_size,
 			&adev->rxbuf_startphy, "rxbuf_start");
 	if (!adev->rxbuf_start)
 		goto fail;
@@ -964,7 +964,7 @@ static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* WLAN_A4FR_MAXLEN_WEP_FCS */
 	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
 
-	adev->txbuf_start = allocate(adev, adev->txbuf_area_size,
+	adev->txbuf_start = acxmem_allocate(adev, adev->txbuf_area_size,
 			&adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
 		goto fail;
@@ -972,7 +972,7 @@ static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* allocate the TX host descriptor queue pool */
 	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
 
-	adev->txhostdesc_start = allocate(adev, adev->txhostdesc_area_size,
+	adev->txhostdesc_start = acxmem_allocate(adev, adev->txhostdesc_area_size,
 			&adev->txhostdesc_startphy, "txhostdesc_start");
 	if (!adev->txhostdesc_start)
 		goto fail;
@@ -1266,7 +1266,7 @@ static void acxmem_s_delete_dma_regions(acx_device_t *adev) {
 }
 
 static void*
-allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg) {
+acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg) {
 	void *ptr;
 	ptr = kmalloc(size, GFP_KERNEL);
 	/*
@@ -2020,7 +2020,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		/*
 		 * slave memory version
 		 */
-		copy_to_slavemem(adev, (u32) (adev->cmd_area + 4), buffer, (cmd
+		acxmem_copy_to_slavemem(adev, (u32) (adev->cmd_area + 4), buffer, (cmd
 				== ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
@@ -2153,7 +2153,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	/* read in result parameters if needed */
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
-		copy_from_slavemem(adev, buffer, (u32) (adev->cmd_area + 4), buflen);
+		acxmem_copy_from_slavemem(adev, buffer, (u32) (adev->cmd_area + 4), buflen);
 		if (acx_debug & L_DEBUG) {
 			log(L_ANY, "acxmem: %s: output buffer (len=%u): ", __func__, buflen);
 			acx_dump_bytes(buffer, buflen);
@@ -2439,7 +2439,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly after reset */
-		copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
+		acxmem_copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
 	}
 
 	if (OK != acx_s_init_mac(adev))
@@ -2712,7 +2712,7 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx_tail) ? " [tail]" : "";
-			copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
 			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
 				seq_printf(file, "%02u ready to free (%02X)%s%s", i, Ctl_8, thd,
@@ -2745,7 +2745,7 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 
 #if 1
 			if (txd.AcxMemPtr.v) {
-				copy_from_slavemem(adev, buf, txd.AcxMemPtr.v, sizeof(buf));
+				acxmem_copy_from_slavemem(adev, buf, txd.AcxMemPtr.v, sizeof(buf));
 				for (j = 0; (j < txd.total_length) && (j < (sizeof(buf) - 4)); j
 						+= 16) {
 					seq_printf(file, "    ");
@@ -2884,7 +2884,7 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
-				chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
+				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
 						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_l_process_rxbuf(adev, hostdesc->data);
@@ -3083,7 +3083,7 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * Clear out all of the transmit descriptor except for the next pointer
 	 */
-	copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
+	acxmem_copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
 			(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
 					- sizeof(tmptxdesc.pNextDesc));
 
@@ -3435,7 +3435,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 */
 		addr = allocate_acx_txbuf_space(adev, len);
 		if (addr) {
-			chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
+			acxmem_chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
 		} else {
 			/*
 			 * Bummer.  We thought we might have enough room in the transmit
@@ -3710,7 +3710,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 
 		/* ...and free the desc by clearing all the fields
 		 except the next pointer */
-		copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
+		acxmem_copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
 				(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
 						- sizeof(tmptxdesc.pNextDesc));
 
