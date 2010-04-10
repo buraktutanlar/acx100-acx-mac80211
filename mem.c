@@ -107,10 +107,10 @@
  */
 
 // Logging
-static void log_rxbuffer(const acx_device_t *adev);
-static void log_txbuffer(acx_device_t *adev);
+static void acxmem_log_rxbuffer(const acx_device_t *adev);
+static void acxmem_log_txbuffer(acx_device_t *adev);
 #if DUMP_MEM_DEFINED > 0
-static void dump_acxmem(acx_device_t *adev, u32 start, int length);
+static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
 #endif
 
 // Data Access
@@ -351,7 +351,7 @@ static const u16 IO_ACX111[] = { 0x0000, /* IO_ACX_SOFT_RESET */
  * ==================================================
  */
 
-static void log_rxbuffer(const acx_device_t *adev) {
+static void acxmem_log_rxbuffer(const acx_device_t *adev) {
 	register const struct rxhostdesc *rxhostdesc;
 	int i;
 	/* no FN_ENTER here, we don't want that */
@@ -366,7 +366,7 @@ static void log_rxbuffer(const acx_device_t *adev) {
 	}
 }
 
-static void log_txbuffer(acx_device_t *adev) {
+static void acxmem_log_txbuffer(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	int i;
 	u8 Ctl_8;
@@ -386,7 +386,7 @@ static void log_txbuffer(acx_device_t *adev) {
 }
 
 #if DUMP_MEM_DEFINED > 0
-static void dump_acxmem(acx_device_t *adev, u32 start, int length) {
+static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 	int i;
 	u8 buf[16];
 
@@ -827,7 +827,7 @@ static void chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 sou
 	 */
 	if ((source & 0x00ffffe0) != source) {
 		printk("acx chaincopy: source block 0x%04x not aligned!\n", source);
-		dump_acxmem(adev, 0, 0x10000);
+		acxmem_dump_mem(adev, 0, 0x10000);
 	}
 	if ((u32) destination & 3) {
 		//printk ("acx chaincopy: data destination not word aligned!\n");
@@ -2000,7 +2000,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		printk("acxmem: %s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
 				__func__, devname, cmd_status);
 #if DUMP_IF_SLOW > 0
-		dump_acxmem (adev, 0, 0x10000);
+		acxmem_dump_mem (adev, 0, 0x10000);
 		panic ("not idle");
 #endif
 		goto bad;
@@ -2682,7 +2682,7 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	FN_ENTER;
 
 #if DUMP_MEM_DURING_DIAG > 0
-	dump_acxmem (adev, 0, 0x10000);
+	acxmem_dump_mem (adev, 0, 0x10000);
 	panic ("dump finished");
 #endif
 
@@ -2824,7 +2824,7 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_BUFR))
-		log_rxbuffer(adev);
+		acxmem_log_rxbuffer(adev);
 
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
@@ -2881,7 +2881,7 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 				 */
 				if (addr & 0xffff0000) {
 					log(L_ANY, "acxmem: %s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
-					dump_acxmem(adev, 0, 0x10000);
+					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
 				chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
@@ -3646,7 +3646,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 	tmptxdesc.u.r1.rate = 0x0a;
 
 	if (unlikely(acx_debug & L_DEBUG))
-		log_txbuffer(adev);
+		acxmem_log_txbuffer(adev);
 
 	log(L_BUFT, "acx: tx: cleaning up bufs from %u\n", adev->tx_tail);
 
