@@ -252,10 +252,6 @@ static int acxmem_e_resume(struct platform_device *pdev);
 int __init acxmem_e_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
 
-// OW Remove, since not used
-void acxmem_e_release(struct device *dev);
-
-
 /*
  * BOM Defines, static vars, etc.
  * ==================================================
@@ -5161,99 +5157,21 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
   * BOM Driver, Module
   * ==================================================
   */
-static int __devinit acxmem_e_probe(struct platform_device *pdev);
-static int __devexit acxmem_e_remove(struct platform_device *pdev);
-#ifdef CONFIG_PM
-static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
-static int acxmem_e_resume(struct platform_device *pdev);
-#endif
-int __init acxmem_e_init_module(void);
-void __exit acxmem_e_cleanup_module(void);
 
-// OW Remove, since not used
-void acxmem_e_release(struct device *dev);
-
-
-// BOM Cleanup ============================================================
-
-
-/***********************************************************************
- ** Register access
+/*
+ * acxmem_e_probe
+ *
+ * Probe routine called when a PCI device w/ matching ID is found.
+ * Here's the sequence:
+ *   - Allocate the PCI resources.
+ *   - Read the PCMCIA attribute memory to make sure we have a WLAN card
+ *   - Reset the MAC
+ *   - Initialize the dev and wlan data
+ *   - Initialize the MAC
+ *
+ * pdev	- ptr to pci device structure containing info about pci configuration
+ * id	- ptr to the device id entry that matched this device
  */
-
-
-
-
-
-
-
-
-/***********************************************************************
- */
-
-/***********************************************************************
- ** EEPROM and PHY read/write helpers
- */
-
-
-
-
-/***********************************************************************
- */
-
-
-
-
-
-
-/***********************************************************************
- ** acxmem_s_verify_init
- */
-
-/***********************************************************************
- ** A few low-level helpers
- **
- ** Note: these functions are not protected by lock
- ** and thus are never allowed to be called from IRQ.
- ** Also they must not race with fw upload which uses same hw regs
- */
-
-/***********************************************************************
- ** acxmem_write_cmd_type_status
- */
-
-
-/***********************************************************************
- ** acxmem_read_cmd_type_status
- */
-
-
-
-/***********************************************************************
- */
-
-
-/***********************************************************************
- ** acxmem_s_delete_dma_regions
- */
-
-/***********************************************************************
- ** acxmem_e_probe
- **
- ** Probe routine called when a PCI device w/ matching ID is found.
- ** Here's the sequence:
- **   - Allocate the PCI resources.
- **   - Read the PCMCIA attribute memory to make sure we have a WLAN card
- **   - Reset the MAC
- **   - Initialize the dev and wlan data
- **   - Initialize the MAC
- **
- ** pdev	- ptr to pci device structure containing info about pci configuration
- ** id	- ptr to the device id entry that matched this device
- */
-
-
-
 static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 
 	acx_device_t *adev = NULL;
@@ -5498,13 +5416,13 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	return result;
 }
 
-/***********************************************************************
- ** acxmem_e_remove
- **
- ** Shut device down (if not hot unplugged)
- ** and deallocate PCI resources for the acx chip.
- **
- ** pdev - ptr to PCI device structure containing info about pci configuration
+/*
+ * acxmem_e_remove
+ *
+ * Shut device down (if not hot unplugged)
+ * and deallocate PCI resources for the acx chip.
+ *
+ * pdev - ptr to PCI device structure containing info about pci configuration
  */
 static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 
@@ -5615,8 +5533,8 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	return(0);
 }
 
-/***********************************************************************
- ** TODO: PM code needs to be fixed / debugged / tested.
+/*
+ * TODO: PM code needs to be fixed / debugged / tested.
  */
 #ifdef CONFIG_PM
 static int
@@ -5715,70 +5633,6 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 #endif /* CONFIG_PM */
 
 
-
-
-
-
-
-
-
-/***********************************************************************
- ** acxmem_l_power_led
- */
-
-
-/***********************************************************************
- ** Ioctls
- */
-
-/***********************************************************************
- */
-
-
-
-/*
- * acxmem_l_get_txbuf
- */
-
-
-
-
-
-
-/***********************************************************************
- ** acxmem_s_create_tx_host_desc_queue
- */
-
-
-
-
-/***************************************************************
- ** acxmem_s_create_hostdesc_queues
- */
-
-/***************************************************************
- ** acxmem_create_tx_desc_queue
- */
-
-/***************************************************************
- ** acxmem_create_rx_desc_queue
- */
-
-/***************************************************************
- ** acxmem_create_desc_queues
- */
-
-/***************************************************************
- ** acxmem_s_proc_diag_output
- */
-
-/***********************************************************************
- */
-
-/***********************************************************************
- */
-
-
 static struct platform_driver acxmem_drv_id = {
 		.driver = {
 				.name = "acx-mem",
@@ -5793,10 +5647,10 @@ static struct platform_driver acxmem_drv_id = {
 
 };
 
-/***********************************************************************
- ** acxmem_e_init_module
- **
- ** Module initialization routine, called once at module load time
+/*
+ * acxmem_e_init_module
+ *
+ * Module initialization routine, called once at module load time
  */
 int __init acxmem_e_init_module(void) {
 	int res;
@@ -5828,11 +5682,11 @@ int __init acxmem_e_init_module(void) {
 	return res;
 }
 
-/***********************************************************************
- ** acxmem_e_cleanup_module
- **
- ** Called at module unload time. This is our last chance to
- ** clean up after ourselves.
+/*
+ * acxmem_e_cleanup_module
+ *
+ * Called at module unload time. This is our last chance to
+ * clean up after ourselves.
  */
 void __exit acxmem_e_cleanup_module(void) {
 	FN_ENTER;
@@ -5843,11 +5697,6 @@ void __exit acxmem_e_cleanup_module(void) {
 	FN_EXIT0;
 }
 
-void acxmem_e_release(struct device *dev) {
-}
-
 MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );
 MODULE_DESCRIPTION( "ACX Slave Memory Driver" );
 MODULE_LICENSE( "GPL" );
-
-
