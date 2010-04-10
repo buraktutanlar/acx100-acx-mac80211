@@ -111,11 +111,11 @@
  */
 
 // Logging
- // OW Remove: static inline void log_rxbuffer(const acx_device_t *adev);
 static void log_rxbuffer(const acx_device_t *adev);
-// OW Remove: static inline void log_txbuffer(const acx_device_t *adev);
 static void log_txbuffer(acx_device_t *adev);
+#if DUMP_MEM_DEFINED > 0
 static void dump_acxmem(acx_device_t *adev, u32 start, int length);
+#endif
 
 // Data Access
 INLINE_IO u32 read_id_register(acx_device_t *adev);
@@ -275,6 +275,61 @@ typedef enum {
  * BOM Logging
  * ==================================================
  */
+
+static void log_rxbuffer(const acx_device_t *adev) {
+	register const struct rxhostdesc *rxhostdesc;
+	int i;
+	/* no FN_ENTER here, we don't want that */
+
+	rxhostdesc = adev->rxhostdesc_start;
+	if (unlikely(!rxhostdesc)) return;
+	for (i = 0; i < RX_CNT; i++) {
+		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			printk("acx: rx: buf %d full\n", i);
+		rxhostdesc++;
+	}
+}
+
+static void log_txbuffer(acx_device_t *adev) {
+	txdesc_t *txdesc;
+	int i;
+	u8 Ctl_8;
+
+	/* no FN_ENTER here, we don't want that */
+	/* no locks here, since it's entirely non-critical code */
+	txdesc = adev->txdesc_start;
+	if (unlikely(!txdesc))
+			return;
+	printk("acx: tx: desc->Ctl8's: ");
+	for (i = 0; i < TX_CNT; i++) {
+		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+		printk("%02X ", Ctl_8);
+		txdesc = advance_txdesc(adev, txdesc, 1);
+	}
+	printk("\n");
+}
+
+#if DUMP_MEM_DEFINED > 0
+static void dump_acxmem(acx_device_t *adev, u32 start, int length) {
+	int i;
+	u8 buf[16];
+
+	while (length > 0) {
+		printk("%04x ", start);
+		copy_from_slavemem(adev, buf, start, 16);
+		for (i = 0; (i < 16) && (i < length); i++) {
+			printk("%02x ", buf[i]);
+		}
+		for (i = 0; (i < 16) && (i < length); i++) {
+			printk("%c", printable(buf[i]));
+		}
+		printk("\n");
+		start += 16;
+		length -= 16;
+	}
+}
+#endif
 
 
  /*
@@ -818,26 +873,6 @@ static char printable(char c) {
 	return ((c >= 20) && (c < 127)) ? c : '.';
 }
 
-#if DUMP_MEM_DEFINED > 0
-static void dump_acxmem(acx_device_t *adev, u32 start, int length) {
-	int i;
-	u8 buf[16];
-
-	while (length > 0) {
-		printk("%04x ", start);
-		copy_from_slavemem(adev, buf, start, 16);
-		for (i = 0; (i < 16) && (i < length); i++) {
-			printk("%02x ", buf[i]);
-		}
-		for (i = 0; (i < 16) && (i < length); i++) {
-			printk("%c", printable(buf[i]));
-		}
-		printk("\n");
-		start += 16;
-		length -= 16;
-	}
-}
-#endif
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	int blocks_needed;
@@ -3264,24 +3299,6 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev) {
  ** Called directly and only from the IRQ handler
  */
 
-#if !ACX_DEBUG
-static inline void log_rxbuffer(const acx_device_t *adev) {}
-#else
-static void log_rxbuffer(const acx_device_t *adev) {
-	register const struct rxhostdesc *rxhostdesc;
-	int i;
-	/* no FN_ENTER here, we don't want that */
-
-	rxhostdesc = adev->rxhostdesc_start;
-	if (unlikely(!rxhostdesc)) return;
-	for (i = 0; i < RX_CNT; i++) {
-		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			printk("acx: rx: buf %d full\n", i);
-		rxhostdesc++;
-	}
-}
-#endif
 
 static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 	register rxhostdesc_t *hostdesc;
@@ -4803,30 +4820,6 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 }
 
 
-#if !ACX_DEBUG
-static inline void log_txbuffer(const acx_device_t *adev)
-{
-}
-#else
-static void log_txbuffer(acx_device_t *adev) {
-	txdesc_t *txdesc;
-	int i;
-	u8 Ctl_8;
-
-	/* no FN_ENTER here, we don't want that */
-	/* no locks here, since it's entirely non-critical code */
-	txdesc = adev->txdesc_start;
-	if (unlikely(!txdesc))
-			return;
-	printk("acx: tx: desc->Ctl8's: ");
-	for (i = 0; i < TX_CNT; i++) {
-		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-		printk("%02X ", Ctl_8);
-		txdesc = advance_txdesc(adev, txdesc, 1);
-	}
-	printk("\n");
-}
-#endif
 
 static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 	struct ieee80211_tx_info *info) {
