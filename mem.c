@@ -4755,6 +4755,53 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
   * BOM Helpers
   * ==================================================
   */
+void acxmem_l_power_led(acx_device_t *adev, int enable) {
+	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
+
+	/* A hack. Not moving message rate limiting to adev->xxx
+	 * (it's only a debug message after all) */
+	static int rate_limit = 0;
+
+	if (rate_limit++ < 3)
+		log(L_IOCTL, "acx: Please report in case toggling the power "
+				"LED doesn't work for your card!\n");
+	if (enable)
+		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
+				& ~gpio_pled);
+	else
+		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
+				| gpio_pled);
+}
+
+INLINE_IO int adev_present(acx_device_t *adev) {
+	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
+	 * which should be safe): */
+	return acx_readl(adev->iobase) != 0xffffffff;
+}
+
+static char printable(char c) {
+	return ((c >= 20) && (c < 127)) ? c : '.';
+}
+
+// OW TODO
+#if 0
+static void update_link_quality_led(acx_device_t *adev) {
+	int qual;
+
+	qual = acx_signal_determine_quality(adev->wstats.qual.level,
+			adev->wstats.qual.noise);
+	if (qual > adev->brange_max_quality)
+		qual = adev->brange_max_quality;
+
+	if (time_after(jiffies, adev->brange_time_last_state_change +
+			(HZ/2 - HZ/2 * (unsigned long)qual / adev->brange_max_quality ) )) {
+		acxmem_l_power_led(adev, (adev->brange_last_state == 0));
+		adev->brange_last_state ^= 1; /* toggle */
+		adev->brange_time_last_state_change = jiffies;
+	}
+}
+#endif
+
 
  /*
   * BOM Ioctls
@@ -4775,19 +4822,11 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
  */
 
 
-static char printable(char c) {
-	return ((c >= 20) && (c < 127)) ? c : '.';
-}
 
 
 
 
 
-INLINE_IO int adev_present(acx_device_t *adev) {
-	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
-	 * which should be safe): */
-	return acx_readl(adev->iobase) != 0xffffffff;
-}
 
 /***********************************************************************
  */
@@ -5337,24 +5376,6 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 
 
 
-// OW TODO
-#if 0
-static void update_link_quality_led(acx_device_t *adev) {
-	int qual;
-
-	qual = acx_signal_determine_quality(adev->wstats.qual.level,
-			adev->wstats.qual.noise);
-	if (qual > adev->brange_max_quality)
-		qual = adev->brange_max_quality;
-
-	if (time_after(jiffies, adev->brange_time_last_state_change +
-			(HZ/2 - HZ/2 * (unsigned long)qual / adev->brange_max_quality ) )) {
-		acxmem_l_power_led(adev, (adev->brange_last_state == 0));
-		adev->brange_last_state ^= 1; /* toggle */
-		adev->brange_time_last_state_change = jiffies;
-	}
-}
-#endif
 
 
 
@@ -5362,23 +5383,7 @@ static void update_link_quality_led(acx_device_t *adev) {
 /***********************************************************************
  ** acxmem_l_power_led
  */
-void acxmem_l_power_led(acx_device_t *adev, int enable) {
-	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
-	/* A hack. Not moving message rate limiting to adev->xxx
-	 * (it's only a debug message after all) */
-	static int rate_limit = 0;
-
-	if (rate_limit++ < 3)
-		log(L_IOCTL, "acx: Please report in case toggling the power "
-				"LED doesn't work for your card!\n");
-	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
-				& ~gpio_pled);
-	else
-		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
-				| gpio_pled);
-}
 
 /***********************************************************************
  ** Ioctls
