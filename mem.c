@@ -110,14 +110,14 @@
  * ==================================================
  */
 
-// Logging (Mem)
+// Logging
  // OW Remove: static inline void log_rxbuffer(const acx_device_t *adev);
 static void log_rxbuffer(const acx_device_t *adev);
 // OW Remove: static inline void log_txbuffer(const acx_device_t *adev);
 static void log_txbuffer(acx_device_t *adev);
 static void dump_acxmem(acx_device_t *adev, u32 start, int length);
 
-// Data Access (Mem)
+// Data Access
 INLINE_IO u32 read_id_register(acx_device_t *adev);
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset);
 INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset);
@@ -149,7 +149,7 @@ void acxmem_free_desc_queues(acx_device_t *adev);
 static void acxmem_s_delete_dma_regions(acx_device_t *adev);
 static void *allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
-// Firmware, EEPROM, Phy (Mem)
+// Firmware, EEPROM, Phy
 int acxmem_s_upload_radio(acx_device_t *adev);
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
@@ -164,13 +164,13 @@ static int acxmem_s_upload_fw(acx_device_t *adev);
 static void acx_show_card_eeprom_id(acx_device_t *adev);
 #endif
 
-// CMDs (Mem:Control Path)
+// CMDs (Control Path)
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
 static inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 static u32 acxmem_read_cmd_type_status(acx_device_t *adev);
 static inline void init_mboxes(acx_device_t *adev);
 
-// Init, Configure (Mem:Control Path)
+// Init, Configure (Control Path)
 int acxmem_s_reset_dev(acx_device_t *adev);
 static int acxmem_s_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
@@ -179,16 +179,16 @@ static void acxmem_s_up(struct ieee80211_hw *hw);
 static void acxmem_s_down(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
-// Other (Mem:Control Path)
+// Other (Control Path)
 
-// Proc, Debug (Mem)
+// Proc, Debug
 int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 
-// Rx Path (Mem)
+// Rx Path
 static void acxmem_l_process_rxdesc(acx_device_t *adev);
 
-// Tx Path (Mem)
+// Tx Path
 tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
@@ -214,7 +214,7 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 //static void acxmem_i_tx_timeout(struct net_device *ndev);
 
-// Irq Handling, Timer (Mem)
+// Irq Handling, Timer
 static void acxmem_irq_enable(acx_device_t *adev);
 static void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_i_interrupt_tasklet(struct work_struct *work);
@@ -223,11 +223,11 @@ static void handle_info_irq(acx_device_t *adev);
 static void log_unusual_irq(u16 irqtype);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
-// Mac80211 Ops (Mem)
+// Mac80211 Ops
 static int acxmem_e_op_start(struct ieee80211_hw *hw);
 static void acxmem_e_op_stop(struct ieee80211_hw *hw);
 
-// Helpers (Mem)
+// Helpers
 void acxmem_l_power_led(acx_device_t *adev, int enable);
 INLINE_IO int adev_present(acx_device_t *adev);
 static char printable(char c);
@@ -237,7 +237,7 @@ static char printable(char c);
 // int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
-// Driver, Module (Mem)
+// Driver, Module
 static int __devinit acxmem_e_probe(struct platform_device *pdev);
 static int __devexit acxmem_e_remove(struct platform_device *pdev);
 #ifdef CONFIG_PM
@@ -269,6 +269,78 @@ typedef enum {
 } acxreg_t;
 
 //OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4)
+
+
+/*
+ * BOM Logging
+ * ==================================================
+ */
+
+
+ /*
+  * BOM Data Access
+  * ==================================================
+  */
+
+ /*
+  * BOM Firmware, EEPROM, Phy
+  * ==================================================
+  */
+
+ /*
+  * BOM CMDs (Control Path)
+  * ==================================================
+  */
+
+ /*
+  * BOM Init, Configure (Control Path)
+  * ==================================================
+  */
+
+ /*
+  * BOM Other (Control Path)
+  * ==================================================
+  */
+
+ /*
+  * BOM Proc, Debug
+  * ==================================================
+  */
+
+ /*
+  * BOM Rx Path
+  * ==================================================
+  */
+
+ /*
+  * BOM Tx Path
+  * ==================================================
+  */
+
+ /*
+  * BOM Irq Handling, Timer
+  * ==================================================
+  */
+
+ /*
+  * BOM Mac80211 Ops
+  * ==================================================
+  */
+
+ /*
+  * BOM Helpers
+  * ==================================================
+  */
+
+ /*
+  * BOM Ioctls
+  * ==================================================
+  */
+
+ /*
+  * BOM Driver, Module
+  * ==================================================
+  */
 
 
 // BOM Cleanup ============================================================
