@@ -37,31 +37,16 @@
  */
 
 #define ACX_MAC80211_MEM 1
-// OW PM for later
-#undef CONFIG_PM
 
-/*
- * non-zero makes it dump the ACX memory to the console then
- * panic when you cat /proc/driver/acx_wlan0_diag
- */
-#define DUMP_MEM_DEFINED 1
-
-#define DUMP_MEM_DURING_DIAG 0
-#define DUMP_IF_SLOW 0
-
-// OW #define PATCH_AROUND_BAD_SPOTS 1
-#define PATCH_AROUND_BAD_SPOTS 1
-#define HX4700_FIRMWARE_CHECKSUM 0x0036862e
-#define HX4700_ALTERNATE_FIRMWARE_CHECKSUM 0x00368a75
 
 #include <linux/version.h>
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 #include <linux/utsrelease.h>
 #else
 #include <generated/utsrelease.h>
 #endif
 
+// OW TODO Cleanup includes
 #include <linux/compiler.h> /* required for Lx 2.6.8 ?? */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -97,6 +82,23 @@
  * BOM Config
  * ==================================================
  */
+
+// OW PM for later
+#undef CONFIG_PM
+
+/*
+ * non-zero makes it dump the ACX memory to the console then
+ * panic when you cat /proc/driver/acx_wlan0_diag
+ */
+#define DUMP_MEM_DEFINED 1
+
+#define DUMP_MEM_DURING_DIAG 0
+#define DUMP_IF_SLOW 0
+
+// OW #define PATCH_AROUND_BAD_SPOTS 1
+#define PATCH_AROUND_BAD_SPOTS 1
+#define HX4700_FIRMWARE_CHECKSUM 0x0036862e
+#define HX4700_ALTERNATE_FIRMWARE_CHECKSUM 0x00368a75
 
 /* Pick one */
 /* #define INLINE_IO static */
