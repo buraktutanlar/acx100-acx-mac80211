@@ -104,6 +104,8 @@
 /* #define INLINE_IO static */
 #define INLINE_IO static inline
 
+#define FW_NO_AUTO_INCREMENT	1
+
 /*
  * BOM Prototypes
  * ... static and also none-static for overview reasons (maybe not best practice ...)
@@ -152,7 +154,9 @@ static void *allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const ch
 // Firmware, EEPROM, Phy
 int acxmem_s_upload_radio(acx_device_t *adev);
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+#ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
+#endif
 static inline void read_eeprom_area(acx_device_t *adev);
 int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
@@ -1216,6 +1220,643 @@ allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg) {
   * ==================================================
   */
 
+/*
+ * acxmem_s_upload_radio
+ *
+ * Uploads the appropriate radio module firmware into the card.
+ */
+int acxmem_s_upload_radio(acx_device_t *adev) {
+	acx_ie_memmap_t mm;
+	firmware_image_t *radio_image;
+	acx_cmd_radioinit_t radioinit;
+	int res = NOT_OK;
+	int try;
+	u32 offset;
+	u32 size;
+	char filename[sizeof("RADIONN.BIN")];
+
+	if (!adev->need_radio_fw)
+		return OK;
+
+	FN_ENTER;
+
+	acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+	offset = le32_to_cpu(mm.CodeEnd);
+
+	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
+	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
+	if (!radio_image) {
+		printk("acx: can't load radio module '%s'\n", filename);
+		goto fail;
+	}
+
+	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+
+	for (try = 1; try <= 5; try++) {
+		res = acxmem_s_write_fw(adev, radio_image, offset);
+		log(L_DEBUG|L_INIT, "acx: acx_write_fw (radio): %d\n", res);
+		if (OK == res) {
+			res = acxmem_s_validate_fw(adev, radio_image, offset);
+			log(L_DEBUG|L_INIT, "acx: acx_validate_fw (radio): %d\n", res);
+		}
+
+		if (OK == res)
+			break;
+		printk("acx: radio firmware upload attempt #%d FAILED, "
+			"retrying...\n", try);
+		acx_s_mwait(1000); /* better wait for a while... */
+	}
+
+	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	radioinit.offset = cpu_to_le32(offset);
+
+	/* no endian conversion needed, remains in card CPU area: */
+	radioinit.len = radio_image->size;
+
+	vfree(radio_image);
+
+	if (OK != res)
+		goto fail;
+
+	/* will take a moment so let's have a big timeout */
+	acx_s_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
+			&radioinit, sizeof(radioinit), CMD_TIMEOUT_MS(1000));
+
+	res = acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+
+	fail:
+	FN_EXIT1(res);
+	return res;
+}
+
+/*
+ * acxmem_read_eeprom_byte
+ *
+ * Function called to read an octet in the EEPROM.
+ *
+ * This function is used by acxmem_e_probe to check if the
+ * connected card is a legal one or not.
+ *
+ * Arguments:
+ *	adev		ptr to acx_device structure
+ *	addr		address to read in the EEPROM
+ *	charbuf		ptr to a char. This is where the read octet
+ *			will be stored
+ */
+int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
+	int result;
+	int count;
+
+	FN_ENTER;
+
+	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
+	write_flush(adev);
+	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
+
+	count = 0xffff;
+	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+		/* scheduling away instead of CPU burning loop
+		 * doesn't seem to work here at all:
+		 * awful delay, sometimes also failure.
+		 * Doesn't matter anyway (only small delay). */
+		if (unlikely(!--count)) {
+			printk("acx: %s: timeout waiting for EEPROM read\n", wiphy_name(
+					adev->ieee->wiphy));
+			result = NOT_OK;
+			goto fail;
+		}
+		cpu_relax();
+	}
+
+	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
+	log(L_DEBUG, "acx: EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
+	result = OK;
+
+	fail:
+	FN_EXIT1(result);
+	return result;
+
+}
+
+/*
+ * We don't lock hw accesses here since we never r/w eeprom in IRQ
+ * Note: this function sleeps only because of GFP_KERNEL alloc
+ */
+#ifdef UNUSED
+int
+acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
+		const u8 *charbuf)
+{
+	u8 *data_verify = NULL;
+	unsigned long flags;
+	int count, i;
+	int result = NOT_OK;
+	u16 gpio_orig;
+
+	printk("acx: WARNING! I would write to EEPROM now. "
+			"Since I really DON'T want to unless you know "
+			"what you're doing (THIS CODE WILL PROBABLY "
+			"NOT WORK YET!), I will abort that now. And "
+			"definitely make sure to make a "
+			"/proc/driver/acx_wlan0_eeprom backup copy first!!! "
+			"(the EEPROM content includes the PCI config header!! "
+			"If you kill important stuff, then you WILL "
+			"get in trouble and people DID get in trouble already)\n");
+	return OK;
+
+	FN_ENTER;
+
+	data_verify = kmalloc(len, GFP_KERNEL);
+	if (!data_verify) {
+		goto end;
+	}
+
+	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
+	 * to be able to write to the EEPROM.
+	 * NOTE: an EEPROM writing success has been reported,
+	 * but you probably have to modify GPIO_OUT, too,
+	 * and you probably need to activate a different GPIO
+	 * line instead! */
+	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
+	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
+	write_flush(adev);
+
+	/* ok, now start writing the data out */
+	for (i = 0; i < len; i++) {
+		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
+		write_reg32(adev, IO_ACX_EEPROM_DATA, *(charbuf + i));
+		write_flush(adev);
+		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
+
+		count = 0xffff;
+		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+			if (unlikely(!--count)) {
+				printk("acx: WARNING, DANGER!!! "
+						"Timeout waiting for EEPROM write\n");
+				goto end;
+			}
+			cpu_relax();
+		}
+	}
+
+	/* disable EEPROM writing */
+	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
+	write_flush(adev);
+
+	/* now start a verification run */
+	for (i = 0; i < len; i++) {
+		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
+		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
+		write_flush(adev);
+		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
+
+		count = 0xffff;
+		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
+			if (unlikely(!--count)) {
+				printk("acx: timeout waiting for EEPROM read\n");
+				goto end;
+			}
+			cpu_relax();
+		}
+
+		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
+	}
+
+	if (0 == memcmp(charbuf, data_verify, len))
+	result = OK; /* read data matches, success */
+
+	end:
+	kfree(data_verify);
+	FN_EXIT1(result);
+	return result;
+}
+#endif /* UNUSED */
+
+static inline void read_eeprom_area(acx_device_t *adev) {
+#if ACX_DEBUG > 1
+	int offs;
+	u8 tmp;
+
+	FN_ENTER;
+
+	for (offs = 0x8c; offs < 0xb9; offs++)
+		acxmem_read_eeprom_byte(adev, offs, &tmp);
+
+	FN_EXIT0;
+
+#endif
+}
+
+/*
+ * acxmem_s_read_phy_reg
+ *
+ * Messing with rx/tx disabling and enabling here
+ * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
+ */
+int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
+	int result = NOT_OK;
+	int count;
+
+	FN_ENTER;
+
+	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
+	write_flush(adev);
+	write_reg32(adev, IO_ACX_PHY_CTL, 2);
+
+	count = 0xffff;
+	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
+		/* scheduling away instead of CPU burning loop
+		 * doesn't seem to work here at all:
+		 * awful delay, sometimes also failure.
+		 * Doesn't matter anyway (only small delay). */
+		if (unlikely(!--count)) {
+			printk("acx: %s: timeout waiting for phy read\n", wiphy_name(
+					adev->ieee->wiphy));
+			*charbuf = 0;
+			goto fail;
+		}
+		cpu_relax();
+	}
+
+	log(L_DEBUG, "acx: the count was %u\n", count);
+	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
+
+	log(L_DEBUG, "acx: radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
+	result = OK;
+	goto fail; /* silence compiler warning */
+	fail:
+	FN_EXIT1(result);
+	return result;
+}
+
+int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
+	int count;
+	FN_ENTER;
+
+	/* mprusko said that 32bit accesses result in distorted sensitivity
+	 * on his card. Unconfirmed, looks like it's not true (most likely since we
+	 * now properly flush writes). */
+	write_reg32(adev, IO_ACX_PHY_DATA, value);
+	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
+	write_flush(adev);
+	write_reg32(adev, IO_ACX_PHY_CTL, 1);
+	write_flush(adev);
+
+	count = 0xffff;
+	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
+		/* scheduling away instead of CPU burning loop
+		 * doesn't seem to work here at all:
+		 * awful delay, sometimes also failure.
+		 * Doesn't matter anyway (only small delay). */
+		if (unlikely(!--count)) {
+			printk("acx: %s: timeout waiting for phy read\n", wiphy_name(
+					adev->ieee->wiphy));
+			goto fail;
+		}
+		cpu_relax();
+	}
+
+	log(L_DEBUG, "acx: radio PHY write 0x%02X at 0x%04X\n", value, reg);
+	fail:
+	FN_EXIT1(OK);
+	return OK;
+}
+
+/*
+ * acxmem_s_write_fw
+ *
+ * Write the firmware image into the card.
+ *
+ * Arguments:
+ *	adev		wlan device structure
+ *	fw_image	firmware image.
+ *
+ * Returns:
+ *	1	firmware image corrupted
+ *	0	success
+ */
+static int acxmem_s_write_fw(acx_device_t *adev,
+		const firmware_image_t *fw_image, u32 offset) {
+	int len, size, checkMismatch = -1;
+	u32 sum, v32, tmp, id;
+
+	/* we skip the first four bytes which contain the control sum */
+	const u8 *p = (u8*) fw_image + 4;
+
+	FN_ENTER;
+
+	/* start the image checksum by adding the image size value */
+	sum = p[0] + p[1] + p[2] + p[3];
+	p += 4;
+
+#ifdef NOPE
+#if FW_NO_AUTO_INCREMENT
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+#else
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+	write_flush(adev);
+#endif
+#endif
+	len = 0;
+	size = le32_to_cpu(fw_image->size) & (~3);
+
+	while (likely(len < size)) {
+		v32 = be32_to_cpu(*(u32*)p);
+		sum += p[0] + p[1] + p[2] + p[3];
+		p += 4;
+		len += 4;
+
+#ifdef NOPE
+#if FW_NO_AUTO_INCREMENT
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+		write_flush(adev);
+#endif
+		write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
+		write_flush(adev);
+#endif
+		write_slavemem32(adev, offset + len - 4, v32);
+
+		id = read_id_register(adev);
+
+		/*
+		 * check the data written
+		 */
+		tmp = read_slavemem32(adev, offset + len - 4);
+		if (checkMismatch && (tmp != v32)) {
+			printk(
+					"first data mismatch at 0x%08x good 0x%08x bad 0x%08x id 0x%08x\n",
+					offset + len - 4, v32, tmp, id);
+			checkMismatch = 0;
+		}
+	}
+	log(L_DEBUG, "acx: firmware written, size:%d sum1:%x sum2:%x\n",
+			size, sum, le32_to_cpu(fw_image->chksum));
+
+	/* compare our checksum with the stored image checksum */
+	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
+	return (sum != le32_to_cpu(fw_image->chksum));
+}
+
+/*
+ * acxmem_s_validate_fw
+ *
+ * Compare the firmware image given with
+ * the firmware image written into the card.
+ *
+ * Arguments:
+ *	adev		wlan device structure
+ *	fw_image	firmware image.
+ *
+ * Returns:
+ *	NOT_OK	firmware image corrupted or not correctly written
+ *	OK	success
+ */
+static int acxmem_s_validate_fw(acx_device_t *adev,
+		const firmware_image_t *fw_image, u32 offset) {
+	u32 sum, v32, w32;
+	int len, size;
+	int result = OK;
+	/* we skip the first four bytes which contain the control sum */
+	const u8 *p = (u8*) fw_image + 4;
+
+	FN_ENTER;
+
+	/* start the image checksum by adding the image size value */
+	sum = p[0] + p[1] + p[2] + p[3];
+	p += 4;
+
+	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
+
+#if FW_NO_AUTO_INCREMENT
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+#else
+	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+#endif
+
+	len = 0;
+	size = le32_to_cpu(fw_image->size) & (~3);
+
+	while (likely(len < size)) {
+		v32 = be32_to_cpu(*(u32*)p);
+		p += 4;
+		len += 4;
+
+#ifdef NOPE
+#if FW_NO_AUTO_INCREMENT
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+#endif
+		udelay(10);
+		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
+#endif
+
+		w32 = read_slavemem32(adev, offset + len - 4);
+
+		if (unlikely(w32 != v32)) {
+			printk("acx: FATAL: firmware upload: "
+				"data parts at offset %d don't match\n(0x%08X vs. 0x%08X)!\n"
+				"I/O timing issues or defective memory, with DWL-xx0+? "
+				"ACX_IO_WIDTH=16 may help. Please report\n", len, v32, w32);
+			result = NOT_OK;
+			break;
+		}
+
+		sum += (u8) w32 + (u8) (w32 >> 8) + (u8) (w32 >> 16) + (u8) (w32 >> 24);
+	}
+
+	/* sum control verification */
+	if (result != NOT_OK) {
+		if (sum != le32_to_cpu(fw_image->chksum)) {
+			printk("acx: FATAL: firmware upload: "
+				"checksums don't match!\n");
+			result = NOT_OK;
+		}
+	}
+
+	FN_EXIT1(result);
+	return result;
+}
+
+static int acxmem_s_upload_fw(acx_device_t *adev) {
+	firmware_image_t *fw_image = NULL;
+	int res = NOT_OK;
+	int try;
+	u32 file_size;
+	char *filename = "WLANGEN.BIN";
+
+#ifdef PATCH_AROUND_BAD_SPOTS
+	u32 offset;
+	int i;
+	/*
+	 * arm-linux-objdump -d patch.bin, or
+	 * od -Ax -t x4 patch.bin after finding the bounds
+	 * of the .text section with arm-linux-objdump -s patch.bin
+	 */
+	u32 patch[] = { 0xe584c030, 0xe59fc008, 0xe92d1000, 0xe59fc004, 0xe8bd8000,
+			0x0000080c, 0x0000aa68, 0x605a2200, 0x2c0a689c, 0x2414d80a,
+			0x2f00689f, 0x1c27d007, 0x06241e7c, 0x2f000e24, 0xe000d1f6,
+			0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
+			0xffff0808 };
+#endif
+
+	FN_ENTER;
+	/* No combined image; tell common we need the radio firmware, too */
+	adev->need_radio_fw = 1;
+
+	fw_image = acx_s_read_fw(adev->bus_dev, filename, &file_size);
+	if (!fw_image) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+
+	for (try = 1; try <= 5; try++) {
+		res = acxmem_s_write_fw(adev, fw_image, 0);
+		log(L_DEBUG|L_INIT, "acx: acx_write_fw (main): %d\n", res);
+		if (OK == res) {
+			res = acxmem_s_validate_fw(adev, fw_image, 0);
+			log(L_DEBUG|L_INIT, "acx: acx_validate_fw "
+					"(main): %d\n", res);
+		}
+
+		if (OK == res) {
+			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
+			break;
+		}
+		printk("acx: firmware upload attempt #%d FAILED, "
+			"retrying...\n", try);
+		acx_s_mwait(1000); /* better wait for a while... */
+	}
+
+#ifdef PATCH_AROUND_BAD_SPOTS
+	/*
+	 * Only want to do this if the firmware is exactly what we expect for an
+	 * iPaq 4700; otherwise, bad things would ensue.
+	 */
+	if ((HX4700_FIRMWARE_CHECKSUM == fw_image->chksum)
+			|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
+		/*
+		 * Put the patch after the main firmware image.  0x950c contains
+		 * the ACX's idea of the end of the firmware.  Use that location to
+		 * load ours (which depends on that location being 0xab58) then
+		 * update that location to point to after ours.
+		 */
+
+		offset = read_slavemem32(adev, 0x950c);
+
+		log (L_DEBUG, "acx: patching in at 0x%04x\n", offset);
+
+		for (i = 0; i < sizeof(patch) / sizeof(patch[0]); i++) {
+			write_slavemem32(adev, offset, patch[i]);
+			offset += sizeof(u32);
+		}
+
+		/*
+		 * Patch the instruction at 0x0804 to branch to our ARM patch at 0xab58
+		 */
+		write_slavemem32(adev, 0x0804, 0xea000000 + (0xab58 - 0x0804 - 8) / 4);
+
+		/*
+		 * Patch the instructions at 0x1f40 to branch to our Thumb patch at 0xab74
+		 *
+		 * 4a00 ldr r2, [pc, #0]
+		 * 4710 bx  r2
+		 * .data 0xab74+1
+		 */
+		write_slavemem32(adev, 0x1f40, 0x47104a00);
+		write_slavemem32(adev, 0x1f44, 0x0000ab74 + 1);
+
+		/*
+		 * Bump the end of the firmware up to beyond our patch.
+		 */
+		write_slavemem32(adev, 0x950c, offset);
+
+	}
+#endif
+
+	vfree(fw_image);
+
+	FN_EXIT1(res);
+	return res;
+}
+
+#if defined(NONESSENTIAL_FEATURES)
+typedef struct device_id {
+	unsigned char id[6];
+	char *descr;
+	char *type;
+}device_id_t;
+
+static const device_id_t
+device_ids[] =
+{
+	{
+		{	'G', 'l', 'o', 'b', 'a', 'l'},
+		NULL,
+		NULL,
+	},
+	{
+		{	0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		"uninitialized",
+		"SpeedStream SS1021 or Gigafast WF721-AEX"
+	},
+	{
+		{	0x80, 0x81, 0x82, 0x83, 0x84, 0x85},
+		"non-standard",
+		"DrayTek Vigor 520"
+	},
+	{
+		{	'?', '?', '?', '?', '?', '?'},
+		"non-standard",
+		"Level One WPC-0200"
+	},
+	{
+		{	0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		"empty",
+		"DWL-650+ variant"
+	}
+};
+
+static void
+acx_show_card_eeprom_id(acx_device_t *adev)
+{
+	unsigned char buffer[CARD_EEPROM_ID_SIZE];
+	int i;
+
+	FN_ENTER;
+
+	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
+	/* use direct EEPROM access */
+	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
+		if (OK != acxmem_read_eeprom_byte(adev,
+						ACX100_EEPROM_ID_OFFSET + i,
+						&buffer[i])) {
+			printk("acx: reading EEPROM FAILED\n");
+			break;
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(device_ids); i++) {
+		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
+			if (device_ids[i].descr) {
+				printk("acx: EEPROM card ID string check "
+						"found %s card ID: is this %s?\n",
+						device_ids[i].descr, device_ids[i].type);
+			}
+			break;
+		}
+	}
+	if (i == ARRAY_SIZE(device_ids)) {
+		printk("acx: EEPROM card ID string check found "
+				"unknown card: expected 'Global', got '%.*s\'. "
+				"Please report\n", CARD_EEPROM_ID_SIZE, buffer);
+	}
+	FN_EXIT0;
+}
+#endif /* NONESSENTIAL_FEATURES */
+
  /*
   * BOM CMDs (Control Path)
   * ==================================================
@@ -1510,561 +2151,16 @@ static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c,
 /***********************************************************************
  ** EEPROM and PHY read/write helpers
  */
-/***********************************************************************
- ** acxmem_read_eeprom_byte
- **
- ** Function called to read an octet in the EEPROM.
- **
- ** This function is used by acxmem_e_probe to check if the
- ** connected card is a legal one or not.
- **
- ** Arguments:
- **	adev		ptr to acx_device structure
- **	addr		address to read in the EEPROM
- **	charbuf		ptr to a char. This is where the read octet
- **			will be stored
- */
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
-	int result;
-	int count;
 
-	FN_ENTER;
 
-	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
 
-	count = 0xffff;
-	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			printk("acx: %s: timeout waiting for EEPROM read\n", wiphy_name(
-					adev->ieee->wiphy));
-			result = NOT_OK;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
-	log(L_DEBUG, "acx: EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
-	result = OK;
-
-	fail:
-	FN_EXIT1(result);
-	return result;
-
-}
-
-/***********************************************************************
- ** We don't lock hw accesses here since we never r/w eeprom in IRQ
- ** Note: this function sleeps only because of GFP_KERNEL alloc
- */
-#ifdef UNUSED
-int
-acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
-		const u8 *charbuf)
-{
-	u8 *data_verify = NULL;
-	unsigned long flags;
-	int count, i;
-	int result = NOT_OK;
-	u16 gpio_orig;
-
-	printk("acx: WARNING! I would write to EEPROM now. "
-			"Since I really DON'T want to unless you know "
-			"what you're doing (THIS CODE WILL PROBABLY "
-			"NOT WORK YET!), I will abort that now. And "
-			"definitely make sure to make a "
-			"/proc/driver/acx_wlan0_eeprom backup copy first!!! "
-			"(the EEPROM content includes the PCI config header!! "
-			"If you kill important stuff, then you WILL "
-			"get in trouble and people DID get in trouble already)\n");
-	return OK;
-
-	FN_ENTER;
-
-	data_verify = kmalloc(len, GFP_KERNEL);
-	if (!data_verify) {
-		goto end;
-	}
-
-	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
-	 * to be able to write to the EEPROM.
-	 * NOTE: an EEPROM writing success has been reported,
-	 * but you probably have to modify GPIO_OUT, too,
-	 * and you probably need to activate a different GPIO
-	 * line instead! */
-	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
-	write_flush(adev);
-
-	/* ok, now start writing the data out */
-	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
-		write_reg32(adev, IO_ACX_EEPROM_DATA, *(charbuf + i));
-		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
-
-		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-			if (unlikely(!--count)) {
-				printk("acx: WARNING, DANGER!!! "
-						"Timeout waiting for EEPROM write\n");
-				goto end;
-			}
-			cpu_relax();
-		}
-	}
-
-	/* disable EEPROM writing */
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
-	write_flush(adev);
-
-	/* now start a verification run */
-	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
-		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
-
-		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-			if (unlikely(!--count)) {
-				printk("acx: timeout waiting for EEPROM read\n");
-				goto end;
-			}
-			cpu_relax();
-		}
-
-		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
-	}
-
-	if (0 == memcmp(charbuf, data_verify, len))
-	result = OK; /* read data matches, success */
-
-	end:
-	kfree(data_verify);
-	FN_EXIT1(result);
-	return result;
-}
-#endif /* UNUSED */
-
-/***********************************************************************
- ** acxmem_s_read_phy_reg
- **
- ** Messing with rx/tx disabling and enabling here
- ** (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
- */
-int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
-	int result = NOT_OK;
-	int count;
-
-	FN_ENTER;
-
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 2);
-
-	count = 0xffff;
-	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			printk("acx: %s: timeout waiting for phy read\n", wiphy_name(
-					adev->ieee->wiphy));
-			*charbuf = 0;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	log(L_DEBUG, "acx: the count was %u\n", count);
-	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
-
-	log(L_DEBUG, "acx: radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
-	result = OK;
-	goto fail; /* silence compiler warning */
-	fail:
-	FN_EXIT1(result);
-	return result;
-}
 
 /***********************************************************************
  */
-int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
-	int count;
-	FN_ENTER;
 
-	/* mprusko said that 32bit accesses result in distorted sensitivity
-	 * on his card. Unconfirmed, looks like it's not true (most likely since we
-	 * now properly flush writes). */
-	write_reg32(adev, IO_ACX_PHY_DATA, value);
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 1);
-	write_flush(adev);
 
-	count = 0xffff;
-	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			printk("acx: %s: timeout waiting for phy read\n", wiphy_name(
-					adev->ieee->wiphy));
-			goto fail;
-		}
-		cpu_relax();
-	}
 
-	log(L_DEBUG, "acx: radio PHY write 0x%02X at 0x%04X\n", value, reg);
-	fail:
-	FN_EXIT1(OK);
-	return OK;
-}
 
-#define NO_AUTO_INCREMENT	1
-
-/***********************************************************************
- ** acxmem_s_write_fw
- **
- ** Write the firmware image into the card.
- **
- ** Arguments:
- **	adev		wlan device structure
- **	fw_image	firmware image.
- **
- ** Returns:
- **	1	firmware image corrupted
- **	0	success
- */
-static int acxmem_s_write_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset) {
-	int len, size, checkMismatch = -1;
-	u32 sum, v32, tmp, id;
-
-	/* we skip the first four bytes which contain the control sum */
-	const u8 *p = (u8*) fw_image + 4;
-
-	FN_ENTER;
-
-	/* start the image checksum by adding the image size value */
-	sum = p[0] + p[1] + p[2] + p[3];
-	p += 4;
-
-#ifdef NOPE
-#if NO_AUTO_INCREMENT
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
-#else
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
-	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
-	write_flush(adev);
-#endif
-#endif
-	len = 0;
-	size = le32_to_cpu(fw_image->size) & (~3);
-
-	while (likely(len < size)) {
-		v32 = be32_to_cpu(*(u32*)p);
-		sum += p[0] + p[1] + p[2] + p[3];
-		p += 4;
-		len += 4;
-
-#ifdef NOPE
-#if NO_AUTO_INCREMENT
-		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
-		write_flush(adev);
-#endif
-		write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
-		write_flush(adev);
-#endif
-		write_slavemem32(adev, offset + len - 4, v32);
-
-		id = read_id_register(adev);
-
-		/*
-		 * check the data written
-		 */
-		tmp = read_slavemem32(adev, offset + len - 4);
-		if (checkMismatch && (tmp != v32)) {
-			printk(
-					"first data mismatch at 0x%08x good 0x%08x bad 0x%08x id 0x%08x\n",
-					offset + len - 4, v32, tmp, id);
-			checkMismatch = 0;
-		}
-	}
-	log(L_DEBUG, "acx: firmware written, size:%d sum1:%x sum2:%x\n",
-			size, sum, le32_to_cpu(fw_image->chksum));
-
-	/* compare our checksum with the stored image checksum */
-	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
-	return (sum != le32_to_cpu(fw_image->chksum));
-}
-
-/***********************************************************************
- ** acxmem_s_validate_fw
- **
- ** Compare the firmware image given with
- ** the firmware image written into the card.
- **
- ** Arguments:
- **	adev		wlan device structure
- **	fw_image	firmware image.
- **
- ** Returns:
- **	NOT_OK	firmware image corrupted or not correctly written
- **	OK	success
- */
-static int acxmem_s_validate_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset) {
-	u32 sum, v32, w32;
-	int len, size;
-	int result = OK;
-	/* we skip the first four bytes which contain the control sum */
-	const u8 *p = (u8*) fw_image + 4;
-
-	FN_ENTER;
-
-	/* start the image checksum by adding the image size value */
-	sum = p[0] + p[1] + p[2] + p[3];
-	p += 4;
-
-	write_reg32(adev, IO_ACX_SLV_END_CTL, 0);
-
-#if NO_AUTO_INCREMENT
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
-#else
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
-	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
-#endif
-
-	len = 0;
-	size = le32_to_cpu(fw_image->size) & (~3);
-
-	while (likely(len < size)) {
-		v32 = be32_to_cpu(*(u32*)p);
-		p += 4;
-		len += 4;
-
-#ifdef NOPE
-#if NO_AUTO_INCREMENT
-		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
-#endif
-		udelay(10);
-		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
-#endif
-
-		w32 = read_slavemem32(adev, offset + len - 4);
-
-		if (unlikely(w32 != v32)) {
-			printk("acx: FATAL: firmware upload: "
-				"data parts at offset %d don't match\n(0x%08X vs. 0x%08X)!\n"
-				"I/O timing issues or defective memory, with DWL-xx0+? "
-				"ACX_IO_WIDTH=16 may help. Please report\n", len, v32, w32);
-			result = NOT_OK;
-			break;
-		}
-
-		sum += (u8) w32 + (u8) (w32 >> 8) + (u8) (w32 >> 16) + (u8) (w32 >> 24);
-	}
-
-	/* sum control verification */
-	if (result != NOT_OK) {
-		if (sum != le32_to_cpu(fw_image->chksum)) {
-			printk("acx: FATAL: firmware upload: "
-				"checksums don't match!\n");
-			result = NOT_OK;
-		}
-	}
-
-	FN_EXIT1(result);
-	return result;
-}
-
-/***********************************************************************
- ** acxmem_s_upload_fw
- **
- ** Called from acx_reset_dev
- */
-static int acxmem_s_upload_fw(acx_device_t *adev) {
-	firmware_image_t *fw_image = NULL;
-	int res = NOT_OK;
-	int try;
-	u32 file_size;
-	char *filename = "WLANGEN.BIN";
-
-#ifdef PATCH_AROUND_BAD_SPOTS
-	u32 offset;
-	int i;
-	/*
-	 * arm-linux-objdump -d patch.bin, or
-	 * od -Ax -t x4 patch.bin after finding the bounds
-	 * of the .text section with arm-linux-objdump -s patch.bin
-	 */
-	u32 patch[] = { 0xe584c030, 0xe59fc008, 0xe92d1000, 0xe59fc004, 0xe8bd8000,
-			0x0000080c, 0x0000aa68, 0x605a2200, 0x2c0a689c, 0x2414d80a,
-			0x2f00689f, 0x1c27d007, 0x06241e7c, 0x2f000e24, 0xe000d1f6,
-			0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
-			0xffff0808 };
-#endif
-
-	FN_ENTER;
-	/* No combined image; tell common we need the radio firmware, too */
-	adev->need_radio_fw = 1;
-
-	fw_image = acx_s_read_fw(adev->bus_dev, filename, &file_size);
-	if (!fw_image) {
-		FN_EXIT1(NOT_OK);
-		return NOT_OK;
-	}
-
-	for (try = 1; try <= 5; try++) {
-		res = acxmem_s_write_fw(adev, fw_image, 0);
-		log(L_DEBUG|L_INIT, "acx: acx_write_fw (main): %d\n", res);
-		if (OK == res) {
-			res = acxmem_s_validate_fw(adev, fw_image, 0);
-			log(L_DEBUG|L_INIT, "acx: acx_validate_fw "
-					"(main): %d\n", res);
-		}
-
-		if (OK == res) {
-			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
-			break;
-		}
-		printk("acx: firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
-		acx_s_mwait(1000); /* better wait for a while... */
-	}
-
-#ifdef PATCH_AROUND_BAD_SPOTS
-	/*
-	 * Only want to do this if the firmware is exactly what we expect for an
-	 * iPaq 4700; otherwise, bad things would ensue.
-	 */
-	if ((HX4700_FIRMWARE_CHECKSUM == fw_image->chksum)
-			|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
-		/*
-		 * Put the patch after the main firmware image.  0x950c contains
-		 * the ACX's idea of the end of the firmware.  Use that location to
-		 * load ours (which depends on that location being 0xab58) then
-		 * update that location to point to after ours.
-		 */
-
-		offset = read_slavemem32(adev, 0x950c);
-
-		log (L_DEBUG, "acx: patching in at 0x%04x\n", offset);
-
-		for (i = 0; i < sizeof(patch) / sizeof(patch[0]); i++) {
-			write_slavemem32(adev, offset, patch[i]);
-			offset += sizeof(u32);
-		}
-
-		/*
-		 * Patch the instruction at 0x0804 to branch to our ARM patch at 0xab58
-		 */
-		write_slavemem32(adev, 0x0804, 0xea000000 + (0xab58 - 0x0804 - 8) / 4);
-
-		/*
-		 * Patch the instructions at 0x1f40 to branch to our Thumb patch at 0xab74
-		 *
-		 * 4a00 ldr r2, [pc, #0]
-		 * 4710 bx  r2
-		 * .data 0xab74+1
-		 */
-		write_slavemem32(adev, 0x1f40, 0x47104a00);
-		write_slavemem32(adev, 0x1f44, 0x0000ab74 + 1);
-
-		/*
-		 * Bump the end of the firmware up to beyond our patch.
-		 */
-		write_slavemem32(adev, 0x950c, offset);
-
-	}
-#endif
-
-	vfree(fw_image);
-
-	FN_EXIT1(res);
-	return res;
-}
-
-/***********************************************************************
- ** acxmem_s_upload_radio
- **
- ** Uploads the appropriate radio module firmware into the card.
- */
-int acxmem_s_upload_radio(acx_device_t *adev) {
-	acx_ie_memmap_t mm;
-	firmware_image_t *radio_image;
-	acx_cmd_radioinit_t radioinit;
-	int res = NOT_OK;
-	int try;
-	u32 offset;
-	u32 size;
-	char filename[sizeof("RADIONN.BIN")];
-
-	if (!adev->need_radio_fw)
-		return OK;
-
-	FN_ENTER;
-
-	acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
-	offset = le32_to_cpu(mm.CodeEnd);
-
-	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
-	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
-	if (!radio_image) {
-		printk("acx: can't load radio module '%s'\n", filename);
-		goto fail;
-	}
-
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
-
-	for (try = 1; try <= 5; try++) {
-		res = acxmem_s_write_fw(adev, radio_image, offset);
-		log(L_DEBUG|L_INIT, "acx: acx_write_fw (radio): %d\n", res);
-		if (OK == res) {
-			res = acxmem_s_validate_fw(adev, radio_image, offset);
-			log(L_DEBUG|L_INIT, "acx: acx_validate_fw (radio): %d\n", res);
-		}
-
-		if (OK == res)
-			break;
-		printk("acx: radio firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
-		acx_s_mwait(1000); /* better wait for a while... */
-	}
-
-	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
-	radioinit.offset = cpu_to_le32(offset);
-
-	/* no endian conversion needed, remains in card CPU area: */
-	radioinit.len = radio_image->size;
-
-	vfree(radio_image);
-
-	if (OK != res)
-		goto fail;
-
-	/* will take a moment so let's have a big timeout */
-	acx_s_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
-			&radioinit, sizeof(radioinit), CMD_TIMEOUT_MS(1000));
-
-	res = acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
-
-	fail:
-	FN_EXIT1(res);
-	return res;
-}
 
 /***********************************************************************
  ** acxmem_l_reset_mac
@@ -2219,20 +2315,6 @@ static inline void init_mboxes(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-static inline void read_eeprom_area(acx_device_t *adev) {
-#if ACX_DEBUG > 1
-	int offs;
-	u8 tmp;
-
-	FN_ENTER;
-
-	for (offs = 0x8c; offs < 0xb9; offs++)
-		acxmem_read_eeprom_byte(adev, offs, &tmp);
-
-	FN_EXIT0;
-
-#endif
-}
 
 int acxmem_s_reset_dev(acx_device_t *adev) {
 	const char* msg = "";
@@ -2634,80 +2716,6 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 /***********************************************************************
  */
-#if defined(NONESSENTIAL_FEATURES)
-typedef struct device_id {
-	unsigned char id[6];
-	char *descr;
-	char *type;
-}device_id_t;
-
-static const device_id_t
-device_ids[] =
-{
-	{
-		{	'G', 'l', 'o', 'b', 'a', 'l'},
-		NULL,
-		NULL,
-	},
-	{
-		{	0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		"uninitialized",
-		"SpeedStream SS1021 or Gigafast WF721-AEX"
-	},
-	{
-		{	0x80, 0x81, 0x82, 0x83, 0x84, 0x85},
-		"non-standard",
-		"DrayTek Vigor 520"
-	},
-	{
-		{	'?', '?', '?', '?', '?', '?'},
-		"non-standard",
-		"Level One WPC-0200"
-	},
-	{
-		{	0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		"empty",
-		"DWL-650+ variant"
-	}
-};
-
-static void
-acx_show_card_eeprom_id(acx_device_t *adev)
-{
-	unsigned char buffer[CARD_EEPROM_ID_SIZE];
-	int i;
-
-	FN_ENTER;
-
-	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
-	/* use direct EEPROM access */
-	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (OK != acxmem_read_eeprom_byte(adev,
-						ACX100_EEPROM_ID_OFFSET + i,
-						&buffer[i])) {
-			printk("acx: reading EEPROM FAILED\n");
-			break;
-		}
-	}
-
-	for (i = 0; i < ARRAY_SIZE(device_ids); i++) {
-		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
-			if (device_ids[i].descr) {
-				printk("acx: EEPROM card ID string check "
-						"found %s card ID: is this %s?\n",
-						device_ids[i].descr, device_ids[i].type);
-			}
-			break;
-		}
-	}
-	if (i == ARRAY_SIZE(device_ids)) {
-		printk("acx: EEPROM card ID string check found "
-				"unknown card: expected 'Global', got '%.*s\'. "
-				"Please report\n", CARD_EEPROM_ID_SIZE, buffer);
-	}
-	FN_EXIT0;
-}
-#endif /* NONESSENTIAL_FEATURES */
 
 
 /***********************************************************************
