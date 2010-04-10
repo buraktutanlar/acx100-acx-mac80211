@@ -38,7 +38,6 @@
 
 #define ACX_MAC80211_MEM 1
 
-
 #include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 #include <linux/utsrelease.h>
@@ -46,8 +45,7 @@
 #include <generated/utsrelease.h>
 #endif
 
-// OW TODO Cleanup includes
-#include <linux/compiler.h> /* required for Lx 2.6.8 ?? */
+#include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -55,25 +53,19 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/if_arp.h>
 #include <linux/irq.h>
-#include <linux/rtnetlink.h>
+#include <linux/interrupt.h>
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 #include <linux/netdevice.h>
 #include <linux/ioport.h>
-#include <linux/pci.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
-//#include <linux/delay.h>
 #include <linux/workqueue.h>
-//#include <linux/inetdevice.h>
-#include <linux/interrupt.h>
 #include <asm/io.h>
 
 #include "acx.h"
-
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
 
