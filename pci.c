@@ -80,8 +80,15 @@ INLINE_IO void write_reg32(acx_device_t * adev, unsigned int offset, u32 val);
 INLINE_IO void write_reg16(acx_device_t * adev, unsigned int offset, u16 val);
 INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val);
 INLINE_IO void write_flush(acx_device_t * adev);
+
 int acxpci_s_create_hostdesc_queues(acx_device_t * adev);
+static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev);
+static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev);
+
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
+static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
+static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
+
 void acxpci_free_desc_queues(acx_device_t * adev);
 static void acxpci_s_delete_dma_regions(acx_device_t * adev);
 static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
@@ -119,8 +126,6 @@ int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
 
 // Rx Path
-static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
-static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev);
 static void acxpci_l_process_rxdesc(acx_device_t * adev);
 
 // Tx Path
@@ -130,8 +135,6 @@ void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee8
 static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
 void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
-static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev);
-static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
@@ -161,8 +164,10 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_
 // Driver, Module
 static int __devinit acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void __devexit acxpci_e_remove(struct pci_dev *pdev);
+#ifdef CONFIG_PM
 static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state);
 static int acxpci_e_resume(struct pci_dev *pdev);
+#endif
 
 #ifdef CONFIG_VLYNQ
 int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
@@ -336,6 +341,199 @@ int acxpci_s_create_hostdesc_queues(acx_device_t * adev)
 	return result;
 }
 
+/*
+ * acxpci_s_create_rx_host_desc_queue
+ *
+ * the whole size of a data buffer (header plus data body)
+ * plus 32 bytes safety offset at the end
+ */
+// OW FIXME Put this as const into function
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
+{
+	rxhostdesc_t *hostdesc;
+	rxbuffer_t *rxbuf;
+	dma_addr_t hostdesc_phy;
+	dma_addr_t rxbuf_phy;
+	int i;
+
+	FN_ENTER;
+
+	/* allocate the RX host descriptor queue pool */
+	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
+	adev->rxhostdesc_start = acxpci_allocate(adev, adev->rxhostdesc_area_size,
+					  &adev->rxhostdesc_startphy,
+					  "rxhostdesc_start");
+	if (!adev->rxhostdesc_start)
+		goto fail;
+	/* check for proper alignment of RX host descriptor pool */
+	if ((long)adev->rxhostdesc_start & 3) {
+		printk
+		    ("acx: driver bug: dma alloc returns unaligned address\n");
+		goto fail;
+	}
+
+	/* allocate Rx buffer pool which will be used by the acx
+	 * to store the whole content of the received frames in it */
+	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
+	adev->rxbuf_start = acxpci_allocate(adev, adev->rxbuf_area_size,
+				     &adev->rxbuf_startphy, "rxbuf_start");
+	if (!adev->rxbuf_start)
+		goto fail;
+
+	rxbuf = adev->rxbuf_start;
+	rxbuf_phy = adev->rxbuf_startphy;
+	hostdesc = adev->rxhostdesc_start;
+	hostdesc_phy = adev->rxhostdesc_startphy;
+
+	/* don't make any popular C programming pointer arithmetic mistakes
+	 * here, otherwise I'll kill you...
+	 * (and don't dare asking me why I'm warning you about that...) */
+	for (i = 0; i < RX_CNT; i++) {
+		hostdesc->data = rxbuf;
+		hostdesc->data_phy = cpu2acx(rxbuf_phy);
+		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
+		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		rxbuf++;
+		rxbuf_phy += sizeof(*rxbuf);
+		hostdesc_phy += sizeof(*hostdesc);
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		hostdesc++;
+	}
+	hostdesc--;
+	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
+	FN_EXIT1(OK);
+	return OK;
+      fail:
+	printk("acx: create_rx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
+static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
+{
+	txhostdesc_t *hostdesc;
+	u8 *txbuf;
+	dma_addr_t hostdesc_phy;
+	dma_addr_t txbuf_phy;
+	int i;
+
+	FN_ENTER;
+
+	/* allocate TX buffer */
+	adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
+	adev->txbuf_start = acxpci_allocate(adev, adev->txbuf_area_size,
+				     &adev->txbuf_startphy, "txbuf_start");
+	if (!adev->txbuf_start)
+		goto fail;
+
+	/* allocate the TX host descriptor queue pool */
+	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
+	adev->txhostdesc_start = acxpci_allocate(adev, adev->txhostdesc_area_size,
+					  &adev->txhostdesc_startphy,
+					  "txhostdesc_start");
+	if (!adev->txhostdesc_start)
+		goto fail;
+	/* check for proper alignment of TX host descriptor pool */
+	if ((long)adev->txhostdesc_start & 3) {
+		printk
+		    ("acx: driver bug: dma alloc returns unaligned address\n");
+		goto fail;
+	}
+
+	hostdesc = adev->txhostdesc_start;
+	hostdesc_phy = adev->txhostdesc_startphy;
+	txbuf = adev->txbuf_start;
+	txbuf_phy = adev->txbuf_startphy;
+
+#if 0
+/* Each tx buffer is accessed by hardware via
+** txdesc -> txhostdesc(s) -> txbuffer(s).
+** We use only one txhostdesc per txdesc, but it looks like
+** acx111 is buggy: it accesses second txhostdesc
+** (via hostdesc.desc_phy_next field) even if
+** txdesc->length == hostdesc->length and thus
+** entire packet was placed into first txhostdesc.
+** Due to this bug acx111 hangs unless second txhostdesc
+** has le16_to_cpu(hostdesc.length) = 3 (or larger)
+** Storing NULL into hostdesc.desc_phy_next
+** doesn't seem to help.
+**
+** Update: although it worked on Xterasys XN-2522g
+** with len=3 trick, WG311v2 is even more bogus, doesn't work.
+** Keeping this code (#ifdef'ed out) for documentational purposes.
+*/
+	for (i = 0; i < TX_CNT * 2; i++) {
+		hostdesc_phy += sizeof(*hostdesc);
+		if (!(i & 1)) {
+			hostdesc->data_phy = cpu2acx(txbuf_phy);
+			/* hostdesc->data_offset = ... */
+			/* hostdesc->reserved = ... */
+			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+			/* hostdesc->length = ... */
+			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+			hostdesc->pNext = ptr2acx(NULL);
+			/* hostdesc->Status = ... */
+			/* below: non-hardware fields */
+			hostdesc->data = txbuf;
+
+			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS;
+			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS;
+		} else {
+			/* hostdesc->data_phy = ... */
+			/* hostdesc->data_offset = ... */
+			/* hostdesc->reserved = ... */
+			/* hostdesc->Ctl_16 = ... */
+			hostdesc->length = cpu_to_le16(3);	/* bug workaround */
+			/* hostdesc->desc_phy_next = ... */
+			/* hostdesc->pNext = ... */
+			/* hostdesc->Status = ... */
+			/* below: non-hardware fields */
+			/* hostdesc->data = ... */
+		}
+		hostdesc++;
+	}
+#endif
+/* We initialize two hostdescs so that they point to adjacent
+** memory areas. Thus txbuf is really just a contiguous memory area */
+	for (i = 0; i < TX_CNT * 2; i++) {
+		hostdesc_phy += sizeof(*hostdesc);
+
+		hostdesc->data_phy = cpu2acx(txbuf_phy);
+		/* done by memset(0): hostdesc->data_offset = 0; */
+		/* hostdesc->reserved = ... */
+		hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+		/* hostdesc->length = ... */
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
+		/* hostdesc->Status = ... */
+		/* ->data is a non-hardware field: */
+		hostdesc->data = txbuf;
+
+		if (!(i & 1)) {
+			txbuf += 24 /*WLAN_HDR_A3_LEN*/;
+			txbuf_phy += 24 /*WLAN_HDR_A3_LEN*/;
+		} else {
+			txbuf +=  30 + 2132 + 4 - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
+			txbuf_phy += 30 + 2132 +4  - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
+		}
+		hostdesc++;
+	}
+	hostdesc--;
+	hostdesc->desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
+
+	FN_EXIT1(OK);
+	return OK;
+      fail:
+	printk("acx: create_tx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
+
+
 void
 acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 			  u32 rx_queue_start)
@@ -343,6 +541,142 @@ acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 	acxpci_create_tx_desc_queue(adev, tx_queue_start);
 	acxpci_create_rx_desc_queue(adev, rx_queue_start);
 }
+
+static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+{
+	rxdesc_t *rxdesc;
+	u32 mem_offs;
+	int i;
+
+	FN_ENTER;
+
+	/* done by memset: adev->rx_tail = 0; */
+
+	/* ACX111 doesn't need any further config: preconfigures itself.
+	 * Simply print ring buffer for debugging */
+	if (IS_ACX111(adev)) {
+		/* rxdesc_start already set here */
+
+		adev->rxdesc_start =
+		    (rxdesc_t *) ((u8 *) adev->iobase2 + rx_queue_start);
+
+		rxdesc = adev->rxdesc_start;
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "acx: rx descriptor %d @ 0x%p\n", i, rxdesc);
+			rxdesc = adev->rxdesc_start = (rxdesc_t *)
+			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
+		}
+	} else {
+		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
+		/* rxdesc_start should be right AFTER Tx pool */
+		adev->rxdesc_start = (rxdesc_t *)
+		    ((u8 *) adev->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
+		/* NB: sizeof(txdesc_t) above is valid because we know
+		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
+		 ** acx111's txdesc is larger! */
+
+		memset(adev->rxdesc_start, 0, RX_CNT * sizeof(*rxdesc));
+
+		/* loop over whole receive pool */
+		rxdesc = adev->rxdesc_start;
+		mem_offs = rx_queue_start;
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "acx: rx descriptor @ 0x%p\n", rxdesc);
+			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
+			/* point to next rxdesc */
+			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
+			/* go to the next one */
+			mem_offs += sizeof(*rxdesc);
+			rxdesc++;
+		}
+		/* go to the last one */
+		rxdesc--;
+
+		/* and point to the first making it a ring buffer */
+		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
+	}
+	FN_EXIT0;
+}
+
+static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
+{
+	txdesc_t *txdesc;
+	txhostdesc_t *hostdesc;
+	dma_addr_t hostmemptr;
+	u32 mem_offs;
+	int i;
+
+	FN_ENTER;
+
+	if (IS_ACX100(adev))
+		adev->txdesc_size = sizeof(*txdesc);
+	else
+		/* the acx111 txdesc is 4 bytes larger */
+		adev->txdesc_size = sizeof(*txdesc) + 4;
+
+	adev->txdesc_start = (txdesc_t *) (adev->iobase2 + tx_queue_start);
+
+	log(L_DEBUG, "acx: adev->iobase2=%p\n"
+	    "acx: tx_queue_start=%08X\n"
+	    "acx: adev->txdesc_start=%p\n",
+	    adev->iobase2, tx_queue_start, adev->txdesc_start);
+
+	adev->tx_free = TX_CNT;
+	/* done by memset: adev->tx_head = 0; */
+	/* done by memset: adev->tx_tail = 0; */
+	txdesc = adev->txdesc_start;
+	mem_offs = tx_queue_start;
+	hostmemptr = adev->txhostdesc_startphy;
+	hostdesc = adev->txhostdesc_start;
+
+	if (IS_ACX111(adev)) {
+		/* ACX111 has a preinitialized Tx buffer! */
+		/* loop over whole send pool */
+		/* FIXME: do we have to do the hostmemptr stuff here?? */
+		for (i = 0; i < TX_CNT; i++) {
+			txdesc->HostMemPtr = ptr2acx(hostmemptr);
+			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+			/* reserve two (hdr desc and payload desc) */
+			hostdesc += 2;
+			hostmemptr += 2 * sizeof(*hostdesc);
+			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
+		}
+	} else {
+		/* ACX100 Tx buffer needs to be initialized by us */
+		/* clear whole send pool. sizeof is safe here (we are acx100) */
+		memset(adev->txdesc_start, 0, TX_CNT * sizeof(*txdesc));
+
+		/* loop over whole send pool */
+		for (i = 0; i < TX_CNT; i++) {
+			log(L_DEBUG, "acx: configure card tx descriptor: 0x%p, "
+			    "size: 0x%X\n", txdesc, adev->txdesc_size);
+
+			/* pointer to hostdesc memory */
+			txdesc->HostMemPtr = ptr2acx(hostmemptr);
+			/* initialise ctl */
+			txdesc->Ctl_8 = (DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM
+					 | DESC_CTL_AUTODMA |
+					 DESC_CTL_FIRSTFRAG);
+			/* done by memset(0): txdesc->Ctl2_8 = 0; */
+			/* point to next txdesc */
+			txdesc->pNextDesc =
+			    cpu2acx(mem_offs + adev->txdesc_size);
+			/* reserve two (hdr desc and payload desc) */
+			hostdesc += 2;
+			hostmemptr += 2 * sizeof(*hostdesc);
+			/* go to the next one */
+			mem_offs += adev->txdesc_size;
+			/* ++ is safe here (we are acx100) */
+			txdesc++;
+		}
+		/* go back to the last one */
+		txdesc--;
+		/* and point to the first making it a ring buffer */
+		txdesc->pNextDesc = cpu2acx(tx_queue_start);
+	}
+	FN_EXIT0;
+}
+
 
 /*
  * acxpci_free_desc_queues
@@ -1701,132 +2035,7 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
  * ==================================================
  */
 
-static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
-{
-	rxdesc_t *rxdesc;
-	u32 mem_offs;
-	int i;
 
-	FN_ENTER;
-
-	/* done by memset: adev->rx_tail = 0; */
-
-	/* ACX111 doesn't need any further config: preconfigures itself.
-	 * Simply print ring buffer for debugging */
-	if (IS_ACX111(adev)) {
-		/* rxdesc_start already set here */
-
-		adev->rxdesc_start =
-		    (rxdesc_t *) ((u8 *) adev->iobase2 + rx_queue_start);
-
-		rxdesc = adev->rxdesc_start;
-		for (i = 0; i < RX_CNT; i++) {
-			log(L_DEBUG, "acx: rx descriptor %d @ 0x%p\n", i, rxdesc);
-			rxdesc = adev->rxdesc_start = (rxdesc_t *)
-			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
-		}
-	} else {
-		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
-		/* rxdesc_start should be right AFTER Tx pool */
-		adev->rxdesc_start = (rxdesc_t *)
-		    ((u8 *) adev->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
-		/* NB: sizeof(txdesc_t) above is valid because we know
-		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
-		 ** acx111's txdesc is larger! */
-
-		memset(adev->rxdesc_start, 0, RX_CNT * sizeof(*rxdesc));
-
-		/* loop over whole receive pool */
-		rxdesc = adev->rxdesc_start;
-		mem_offs = rx_queue_start;
-		for (i = 0; i < RX_CNT; i++) {
-			log(L_DEBUG, "acx: rx descriptor @ 0x%p\n", rxdesc);
-			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
-			/* point to next rxdesc */
-			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
-			/* go to the next one */
-			mem_offs += sizeof(*rxdesc);
-			rxdesc++;
-		}
-		/* go to the last one */
-		rxdesc--;
-
-		/* and point to the first making it a ring buffer */
-		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
-	}
-	FN_EXIT0;
-}
-
-
-/*
- * acxpci_s_create_rx_host_desc_queue
- *
- * the whole size of a data buffer (header plus data body)
- * plus 32 bytes safety offset at the end
- */
-// OW FIXME Put this as const into function
-#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
-static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
-{
-	rxhostdesc_t *hostdesc;
-	rxbuffer_t *rxbuf;
-	dma_addr_t hostdesc_phy;
-	dma_addr_t rxbuf_phy;
-	int i;
-
-	FN_ENTER;
-
-	/* allocate the RX host descriptor queue pool */
-	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rxhostdesc_start = acxpci_allocate(adev, adev->rxhostdesc_area_size,
-					  &adev->rxhostdesc_startphy,
-					  "rxhostdesc_start");
-	if (!adev->rxhostdesc_start)
-		goto fail;
-	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->rxhostdesc_start & 3) {
-		printk
-		    ("acx: driver bug: dma alloc returns unaligned address\n");
-		goto fail;
-	}
-
-	/* allocate Rx buffer pool which will be used by the acx
-	 * to store the whole content of the received frames in it */
-	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rxbuf_start = acxpci_allocate(adev, adev->rxbuf_area_size,
-				     &adev->rxbuf_startphy, "rxbuf_start");
-	if (!adev->rxbuf_start)
-		goto fail;
-
-	rxbuf = adev->rxbuf_start;
-	rxbuf_phy = adev->rxbuf_startphy;
-	hostdesc = adev->rxhostdesc_start;
-	hostdesc_phy = adev->rxhostdesc_startphy;
-
-	/* don't make any popular C programming pointer arithmetic mistakes
-	 * here, otherwise I'll kill you...
-	 * (and don't dare asking me why I'm warning you about that...) */
-	for (i = 0; i < RX_CNT; i++) {
-		hostdesc->data = rxbuf;
-		hostdesc->data_phy = cpu2acx(rxbuf_phy);
-		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-		rxbuf++;
-		rxbuf_phy += sizeof(*rxbuf);
-		hostdesc_phy += sizeof(*hostdesc);
-		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-		hostdesc++;
-	}
-	hostdesc--;
-	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
-	FN_EXIT1(OK);
-	return OK;
-      fail:
-	printk("acx: create_rx_host_desc_queue FAILED\n");
-	/* dealloc will be done by free function on error case */
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
 
 /*
  * acxpci_l_process_rxdesc
@@ -2395,207 +2604,6 @@ void acxpci_l_clean_txdesc_emergency(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-
-static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
-{
-	txhostdesc_t *hostdesc;
-	u8 *txbuf;
-	dma_addr_t hostdesc_phy;
-	dma_addr_t txbuf_phy;
-	int i;
-
-	FN_ENTER;
-
-	/* allocate TX buffer */
-	adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
-	adev->txbuf_start = acxpci_allocate(adev, adev->txbuf_area_size,
-				     &adev->txbuf_startphy, "txbuf_start");
-	if (!adev->txbuf_start)
-		goto fail;
-
-	/* allocate the TX host descriptor queue pool */
-	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->txhostdesc_start = acxpci_allocate(adev, adev->txhostdesc_area_size,
-					  &adev->txhostdesc_startphy,
-					  "txhostdesc_start");
-	if (!adev->txhostdesc_start)
-		goto fail;
-	/* check for proper alignment of TX host descriptor pool */
-	if ((long)adev->txhostdesc_start & 3) {
-		printk
-		    ("acx: driver bug: dma alloc returns unaligned address\n");
-		goto fail;
-	}
-
-	hostdesc = adev->txhostdesc_start;
-	hostdesc_phy = adev->txhostdesc_startphy;
-	txbuf = adev->txbuf_start;
-	txbuf_phy = adev->txbuf_startphy;
-
-#if 0
-/* Each tx buffer is accessed by hardware via
-** txdesc -> txhostdesc(s) -> txbuffer(s).
-** We use only one txhostdesc per txdesc, but it looks like
-** acx111 is buggy: it accesses second txhostdesc
-** (via hostdesc.desc_phy_next field) even if
-** txdesc->length == hostdesc->length and thus
-** entire packet was placed into first txhostdesc.
-** Due to this bug acx111 hangs unless second txhostdesc
-** has le16_to_cpu(hostdesc.length) = 3 (or larger)
-** Storing NULL into hostdesc.desc_phy_next
-** doesn't seem to help.
-**
-** Update: although it worked on Xterasys XN-2522g
-** with len=3 trick, WG311v2 is even more bogus, doesn't work.
-** Keeping this code (#ifdef'ed out) for documentational purposes.
-*/
-	for (i = 0; i < TX_CNT * 2; i++) {
-		hostdesc_phy += sizeof(*hostdesc);
-		if (!(i & 1)) {
-			hostdesc->data_phy = cpu2acx(txbuf_phy);
-			/* hostdesc->data_offset = ... */
-			/* hostdesc->reserved = ... */
-			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-			/* hostdesc->length = ... */
-			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-			hostdesc->pNext = ptr2acx(NULL);
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			hostdesc->data = txbuf;
-
-			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS;
-			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS;
-		} else {
-			/* hostdesc->data_phy = ... */
-			/* hostdesc->data_offset = ... */
-			/* hostdesc->reserved = ... */
-			/* hostdesc->Ctl_16 = ... */
-			hostdesc->length = cpu_to_le16(3);	/* bug workaround */
-			/* hostdesc->desc_phy_next = ... */
-			/* hostdesc->pNext = ... */
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			/* hostdesc->data = ... */
-		}
-		hostdesc++;
-	}
-#endif
-/* We initialize two hostdescs so that they point to adjacent
-** memory areas. Thus txbuf is really just a contiguous memory area */
-	for (i = 0; i < TX_CNT * 2; i++) {
-		hostdesc_phy += sizeof(*hostdesc);
-
-		hostdesc->data_phy = cpu2acx(txbuf_phy);
-		/* done by memset(0): hostdesc->data_offset = 0; */
-		/* hostdesc->reserved = ... */
-		hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-		/* hostdesc->length = ... */
-		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-		/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
-		/* hostdesc->Status = ... */
-		/* ->data is a non-hardware field: */
-		hostdesc->data = txbuf;
-
-		if (!(i & 1)) {
-			txbuf += 24 /*WLAN_HDR_A3_LEN*/;
-			txbuf_phy += 24 /*WLAN_HDR_A3_LEN*/;
-		} else {
-			txbuf +=  30 + 2132 + 4 - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
-			txbuf_phy += 30 + 2132 +4  - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
-		}
-		hostdesc++;
-	}
-	hostdesc--;
-	hostdesc->desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
-
-	FN_EXIT1(OK);
-	return OK;
-      fail:
-	printk("acx: create_tx_host_desc_queue FAILED\n");
-	/* dealloc will be done by free function on error case */
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
-
-
-static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
-{
-	txdesc_t *txdesc;
-	txhostdesc_t *hostdesc;
-	dma_addr_t hostmemptr;
-	u32 mem_offs;
-	int i;
-
-	FN_ENTER;
-
-	if (IS_ACX100(adev))
-		adev->txdesc_size = sizeof(*txdesc);
-	else
-		/* the acx111 txdesc is 4 bytes larger */
-		adev->txdesc_size = sizeof(*txdesc) + 4;
-
-	adev->txdesc_start = (txdesc_t *) (adev->iobase2 + tx_queue_start);
-
-	log(L_DEBUG, "acx: adev->iobase2=%p\n"
-	    "acx: tx_queue_start=%08X\n"
-	    "acx: adev->txdesc_start=%p\n",
-	    adev->iobase2, tx_queue_start, adev->txdesc_start);
-
-	adev->tx_free = TX_CNT;
-	/* done by memset: adev->tx_head = 0; */
-	/* done by memset: adev->tx_tail = 0; */
-	txdesc = adev->txdesc_start;
-	mem_offs = tx_queue_start;
-	hostmemptr = adev->txhostdesc_startphy;
-	hostdesc = adev->txhostdesc_start;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111 has a preinitialized Tx buffer! */
-		/* loop over whole send pool */
-		/* FIXME: do we have to do the hostmemptr stuff here?? */
-		for (i = 0; i < TX_CNT; i++) {
-			txdesc->HostMemPtr = ptr2acx(hostmemptr);
-			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
-			/* reserve two (hdr desc and payload desc) */
-			hostdesc += 2;
-			hostmemptr += 2 * sizeof(*hostdesc);
-			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
-		}
-	} else {
-		/* ACX100 Tx buffer needs to be initialized by us */
-		/* clear whole send pool. sizeof is safe here (we are acx100) */
-		memset(adev->txdesc_start, 0, TX_CNT * sizeof(*txdesc));
-
-		/* loop over whole send pool */
-		for (i = 0; i < TX_CNT; i++) {
-			log(L_DEBUG, "acx: configure card tx descriptor: 0x%p, "
-			    "size: 0x%X\n", txdesc, adev->txdesc_size);
-
-			/* pointer to hostdesc memory */
-			txdesc->HostMemPtr = ptr2acx(hostmemptr);
-			/* initialise ctl */
-			txdesc->Ctl_8 = (DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM
-					 | DESC_CTL_AUTODMA |
-					 DESC_CTL_FIRSTFRAG);
-			/* done by memset(0): txdesc->Ctl2_8 = 0; */
-			/* point to next txdesc */
-			txdesc->pNextDesc =
-			    cpu2acx(mem_offs + adev->txdesc_size);
-			/* reserve two (hdr desc and payload desc) */
-			hostdesc += 2;
-			hostmemptr += 2 * sizeof(*hostdesc);
-			/* go to the next one */
-			mem_offs += adev->txdesc_size;
-			/* ++ is safe here (we are acx100) */
-			txdesc++;
-		}
-		/* go back to the last one */
-		txdesc--;
-		/* and point to the first making it a ring buffer */
-		txdesc->pNextDesc = cpu2acx(tx_queue_start);
-	}
-	FN_EXIT0;
-}
 
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index)
 {
