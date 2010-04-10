@@ -203,7 +203,7 @@ static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
 
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
 void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
 
@@ -3524,7 +3524,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
+static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 	struct ieee80211_tx_info *info) {
 	const char *err = "unknown error";
 
@@ -3732,7 +3732,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		/* Rate handling is done in mac80211 */
 
 		if (unlikely(error))
-			handle_tx_error(adev, error, finger, txstatus);
+			acxmem_handle_tx_error(adev, error, finger, txstatus);
 
 		if (IS_ACX111(adev)) {
 			log(L_BUFT,
