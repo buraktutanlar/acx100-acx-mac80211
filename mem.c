@@ -2815,11 +2815,128 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev) {
 	return p - buf;
 }
 
-
  /*
   * BOM Rx Path
   * ==================================================
   */
+
+/*
+ * acxmem_l_process_rxdesc
+ *
+ * Called directly and only from the IRQ handler
+ */
+static void acxmem_l_process_rxdesc(acx_device_t *adev) {
+	register rxhostdesc_t *hostdesc;
+	register rxdesc_t *rxdesc;
+	unsigned count, tail;
+	u32 addr;
+	u8 Ctl_8;
+
+	FN_ENTER;
+
+	if (unlikely(acx_debug & L_BUFR))
+		log_rxbuffer(adev);
+
+	/* First, have a loop to determine the first descriptor that's
+	 * full, just in case there's a mismatch between our current
+	 * rx_tail and the full descriptor we're supposed to handle. */
+	tail = adev->rx_tail;
+	count = RX_CNT;
+	while (1) {
+		hostdesc = &adev->rxhostdesc_start[tail];
+		rxdesc = &adev->rxdesc_start[tail];
+		/* advance tail regardless of outcome of the below test */
+		tail = (tail + 1) % RX_CNT;
+
+		/*
+		 * Unlike the PCI interface, where the ACX can write directly to
+		 * the host descriptors, on the slave memory interface we have to
+		 * pull these.  All we really need to do is check the Ctl_8 field
+		 * in the rx descriptor on the ACX, which should be 0x11000000 if
+		 * we should process it.
+		 */
+		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
+			break; /* found it! */
+
+		if (unlikely(!--count)) /* hmm, no luck: all descs empty, bail out */
+			goto end;
+	}
+
+	/* now process descriptors, starting with the first we figured out */
+	while (1) {
+		log(L_BUFR, "acxmem: %s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
+		/*
+		 * If the ACX has CTL_RECLAIM set on this descriptor there
+		 * is no buffer associated; it just wants us to tell it to
+		 * reclaim the memory.
+		 */
+		if (!(Ctl_8 & DESC_CTL_RECLAIM)) {
+
+			/*
+			 * slave interface - pull data now
+			 */
+			hostdesc->length = read_slavemem16(adev,
+					(u32) &(rxdesc->total_length));
+
+			/*
+			 * hostdesc->data is an rxbuffer_t, which includes header information,
+			 * but the length in the data packet doesn't.  The header information
+			 * takes up an additional 12 bytes, so add that to the length we copy.
+			 */
+			addr = read_slavemem32(adev, (u32) &(rxdesc->ACXMemPtr));
+			if (addr) {
+				/*
+				 * How can &(rxdesc->ACXMemPtr) above ever be zero?  Looks like we
+				 * get that now and then - try to trap it for debug.
+				 */
+				if (addr & 0xffff0000) {
+					log(L_ANY, "acxmem: %s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
+					dump_acxmem(adev, 0, 0x10000);
+					panic("Bad access!");
+				}
+				chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
+						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
+
+				acx_l_process_rxbuf(adev, hostdesc->data);
+			}
+		} else {
+			log(L_ANY, "acxmem: %s: rx reclaim only!\n", __func__);
+		}
+
+		hostdesc->Status = 0;
+
+		/*
+		 * Let the ACX know we're done.
+		 */
+		CLEAR_BIT (Ctl_8, DESC_CTL_HOSTOWN);
+		SET_BIT (Ctl_8, DESC_CTL_HOSTDONE);
+		SET_BIT (Ctl_8, DESC_CTL_RECLAIM);
+		write_slavemem8(adev, (u32) &rxdesc->Ctl_8, Ctl_8);
+
+		/*
+		 * Now tell the ACX we've finished with the receive buffer so
+		 * it can finish the reclaim.
+		 */
+		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
+
+		/* ok, descriptor is handled, now check the next descriptor */
+		hostdesc = &adev->rxhostdesc_start[tail];
+		rxdesc = &adev->rxdesc_start[tail];
+
+		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+
+		/* if next descriptor is empty, then bail out */
+		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))
+			break;
+
+		tail = (tail + 1) % RX_CNT;
+	}
+	end:
+		adev->rx_tail = tail;
+		FN_EXIT0;
+}
+
 
  /*
   * BOM Tx Path
@@ -3796,124 +3913,6 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 
 #endif
 
-/***************************************************************
- ** acxmem_l_process_rxdesc
- **
- ** Called directly and only from the IRQ handler
- */
-
-
-static void acxmem_l_process_rxdesc(acx_device_t *adev) {
-	register rxhostdesc_t *hostdesc;
-	register rxdesc_t *rxdesc;
-	unsigned count, tail;
-	u32 addr;
-	u8 Ctl_8;
-
-	FN_ENTER;
-
-	if (unlikely(acx_debug & L_BUFR))
-		log_rxbuffer(adev);
-
-	/* First, have a loop to determine the first descriptor that's
-	 * full, just in case there's a mismatch between our current
-	 * rx_tail and the full descriptor we're supposed to handle. */
-	tail = adev->rx_tail;
-	count = RX_CNT;
-	while (1) {
-		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
-		/* advance tail regardless of outcome of the below test */
-		tail = (tail + 1) % RX_CNT;
-
-		/*
-		 * Unlike the PCI interface, where the ACX can write directly to
-		 * the host descriptors, on the slave memory interface we have to
-		 * pull these.  All we really need to do is check the Ctl_8 field
-		 * in the rx descriptor on the ACX, which should be 0x11000000 if
-		 * we should process it.
-		 */
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
-		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
-			break; /* found it! */
-
-		if (unlikely(!--count)) /* hmm, no luck: all descs empty, bail out */
-			goto end;
-	}
-
-	/* now process descriptors, starting with the first we figured out */
-	while (1) {
-		log(L_BUFR, "acxmem: %s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
-		/*
-		 * If the ACX has CTL_RECLAIM set on this descriptor there
-		 * is no buffer associated; it just wants us to tell it to
-		 * reclaim the memory.
-		 */
-		if (!(Ctl_8 & DESC_CTL_RECLAIM)) {
-
-			/*
-			 * slave interface - pull data now
-			 */
-			hostdesc->length = read_slavemem16(adev,
-					(u32) &(rxdesc->total_length));
-
-			/*
-			 * hostdesc->data is an rxbuffer_t, which includes header information,
-			 * but the length in the data packet doesn't.  The header information
-			 * takes up an additional 12 bytes, so add that to the length we copy.
-			 */
-			addr = read_slavemem32(adev, (u32) &(rxdesc->ACXMemPtr));
-			if (addr) {
-				/*
-				 * How can &(rxdesc->ACXMemPtr) above ever be zero?  Looks like we
-				 * get that now and then - try to trap it for debug.
-				 */
-				if (addr & 0xffff0000) {
-					log(L_ANY, "acxmem: %s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
-					dump_acxmem(adev, 0, 0x10000);
-					panic("Bad access!");
-				}
-				chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
-						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
-
-				acx_l_process_rxbuf(adev, hostdesc->data);
-			}
-		} else {
-			log(L_ANY, "acxmem: %s: rx reclaim only!\n", __func__);
-		}
-
-		hostdesc->Status = 0;
-
-		/*
-		 * Let the ACX know we're done.
-		 */
-		CLEAR_BIT (Ctl_8, DESC_CTL_HOSTOWN);
-		SET_BIT (Ctl_8, DESC_CTL_HOSTDONE);
-		SET_BIT (Ctl_8, DESC_CTL_RECLAIM);
-		write_slavemem8(adev, (u32) &rxdesc->Ctl_8, Ctl_8);
-
-		/*
-		 * Now tell the ACX we've finished with the receive buffer so
-		 * it can finish the reclaim.
-		 */
-		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
-
-		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
-
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
-
-		/* if next descriptor is empty, then bail out */
-		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))
-			break;
-
-		tail = (tail + 1) % RX_CNT;
-	}
-	end:
-		adev->rx_tail = tail;
-		FN_EXIT0;
-}
 
 /***********************************************************************
  ** acxmem_i_interrupt
