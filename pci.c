@@ -2934,7 +2934,9 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 }
 
-// Info IRQ
+/*
+ * acxpci_handle_info_irq
+ */
 
 /* scan is complete. all frames now on the receive queue are valid */
 #define INFO_SCAN_COMPLETE      0x0001
