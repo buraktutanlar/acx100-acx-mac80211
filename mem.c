@@ -274,6 +274,88 @@ typedef enum {
 
 //OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4)
 
+static const u16 IO_ACX100[] = {
+0x0000, /* IO_ACX_SOFT_RESET */
+
+0x0014, /* IO_ACX_SLV_MEM_ADDR */
+0x0018, /* IO_ACX_SLV_MEM_DATA */
+0x001c, /* IO_ACX_SLV_MEM_CTL */
+0x0020, /* IO_ACX_SLV_END_CTL */
+
+0x0034, /* IO_ACX_FEMR */
+
+0x007c, /* IO_ACX_INT_TRIG */
+0x0098, /* IO_ACX_IRQ_MASK */
+0x00a4, /* IO_ACX_IRQ_STATUS_NON_DES */
+0x00a8, /* IO_ACX_IRQ_REASON */
+0x00ac, /* IO_ACX_IRQ_ACK */
+0x00b0, /* IO_ACX_HINT_TRIG */
+
+0x0104, /* IO_ACX_ENABLE */
+
+0x0250, /* IO_ACX_EEPROM_CTL */
+0x0254, /* IO_ACX_EEPROM_ADDR */
+0x0258, /* IO_ACX_EEPROM_DATA */
+0x025c, /* IO_ACX_EEPROM_CFG */
+
+0x0268, /* IO_ACX_PHY_ADDR */
+0x026c, /* IO_ACX_PHY_DATA */
+0x0270, /* IO_ACX_PHY_CTL */
+
+0x0290, /* IO_ACX_GPIO_OE */
+
+0x0298, /* IO_ACX_GPIO_OUT */
+
+0x02a4, /* IO_ACX_CMD_MAILBOX_OFFS */
+0x02a8, /* IO_ACX_INFO_MAILBOX_OFFS */
+0x02ac, /* IO_ACX_EEPROM_INFORMATION */
+
+0x02d0, /* IO_ACX_EE_START */
+0x02d4, /* IO_ACX_SOR_CFG */
+0x02d8 /* IO_ACX_ECPU_CTRL */
+};
+
+static const u16 IO_ACX111[] = { 0x0000, /* IO_ACX_SOFT_RESET */
+
+0x0014, /* IO_ACX_SLV_MEM_ADDR */
+0x0018, /* IO_ACX_SLV_MEM_DATA */
+0x001c, /* IO_ACX_SLV_MEM_CTL */
+0x0020, /* IO_ACX_SLV_END_CTL */
+
+0x0034, /* IO_ACX_FEMR */
+
+0x00b4, /* IO_ACX_INT_TRIG */
+0x00d4, /* IO_ACX_IRQ_MASK */
+/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
+0x00f0, /* IO_ACX_IRQ_STATUS_NON_DES */
+0x00e4, /* IO_ACX_IRQ_REASON */
+0x00e8, /* IO_ACX_IRQ_ACK */
+0x00ec, /* IO_ACX_HINT_TRIG */
+
+0x01d0, /* IO_ACX_ENABLE */
+
+0x0338, /* IO_ACX_EEPROM_CTL */
+0x033c, /* IO_ACX_EEPROM_ADDR */
+0x0340, /* IO_ACX_EEPROM_DATA */
+0x0344, /* IO_ACX_EEPROM_CFG */
+
+0x0350, /* IO_ACX_PHY_ADDR */
+0x0354, /* IO_ACX_PHY_DATA */
+0x0358, /* IO_ACX_PHY_CTL */
+
+0x0374, /* IO_ACX_GPIO_OE */
+
+0x037c, /* IO_ACX_GPIO_OUT */
+
+0x0388, /* IO_ACX_CMD_MAILBOX_OFFS */
+0x038c, /* IO_ACX_INFO_MAILBOX_OFFS */
+0x0390, /* IO_ACX_EEPROM_INFORMATION */
+
+0x0100, /* IO_ACX_EE_START */
+0x0104, /* IO_ACX_SOR_CFG */
+0x0108, /* IO_ACX_ECPU_CTRL */
+};
+
 
 /*
  * BOM Logging
@@ -2185,6 +2267,408 @@ static inline void init_mboxes(acx_device_t *adev) {
   * BOM Init, Configure (Control Path)
   * ==================================================
   */
+/*
+ * acxmem_s_reset_dev
+ *
+ * Arguments:
+ *	netdevice that contains the adev variable
+ * Returns:
+ *	NOT_OK on fail
+ *	OK on success
+ * Side effects:
+ *	device is hard reset
+ * Call context:
+ *	acxmem_e_probe
+ * Comment:
+ *	This resets the device using low level hardware calls
+ *	as well as uploads and verifies the firmware to the card
+ */
+int acxmem_s_reset_dev(acx_device_t *adev) {
+	const char* msg = "";
+	unsigned long flags;
+	int result = NOT_OK;
+	u16 hardware_info;
+	u16 ecpu_ctrl;
+	int count;
+	u32 tmp;
+
+	FN_ENTER;
+	/*
+	 write_reg32 (adev, IO_ACX_SLV_MEM_CP, 0);
+	 */
+	/* reset the device to make sure the eCPU is stopped
+	 * to upload the firmware correctly */
+
+	acx_lock(adev, flags);
+
+	/* Windows driver does some funny things here */
+	/*
+	 * clear bit 0x200 in register 0x2A0
+	 */
+	clear_regbits(adev, 0x2A0, 0x200);
+
+	/*
+	 * Set bit 0x200 in ACX_GPIO_OUT
+	 */
+	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+
+	/*
+	 * read register 0x900 until its value is 0x8400104C, sleeping
+	 * in between reads if it's not immediate
+	 */
+	tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
+	count = 500;
+	while (count-- && (tmp != ACX_VENDOR_ID)) {
+		mdelay (10);
+		tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
+	}
+
+	/* end what Windows driver does */
+
+	acxmem_l_reset_mac(adev);
+
+	ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
+	if (!ecpu_ctrl) {
+		msg = "acx: eCPU is already running. ";
+		goto end_unlock;
+	}
+
+#if 0
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
+		/* eCPU most likely means "embedded CPU" */
+		msg = "acx: eCPU did not start after boot from flash. ";
+		goto end_unlock;
+	}
+
+	/* check sense on reset flags */
+	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
+		printk("acx: %s: eCPU did not start after boot (SOR), "
+				"is this fatal?\n", adev->ndev->name);
+	}
+#endif
+
+	/* scan, if any, is stopped now, setting corresponding IRQ bit */
+	adev->irq_status |= HOST_INT_SCAN_COMPLETE;
+
+	acx_unlock(adev, flags);
+
+	/* need to know radio type before fw load */
+	/* Need to wait for arrival of this information in a loop,
+	 * most probably since eCPU runs some init code from EEPROM
+	 * (started burst read in reset_mac()) which also
+	 * sets the radio type ID */
+
+	count = 0xffff;
+	do {
+		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+		if (!--count) {
+			msg = "acx: eCPU didn't indicate radio type";
+			goto end_fail;
+		}
+		cpu_relax();
+	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
+
+	printk("acx: ACX radio type 0x%02x\n", (hardware_info >> 8) & 0xff);
+	/* printk("DEBUG: count %d\n", count); */
+	adev->form_factor = hardware_info & 0xff;
+	adev->radio_type = hardware_info >> 8;
+
+	/* load the firmware */
+	if (OK != acxmem_s_upload_fw(adev))
+		goto end_fail;
+
+	/* acx_s_mwait(10);	this one really shouldn't be required */
+
+	/* now start eCPU by clearing bit */
+	clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+	log(L_DEBUG, "acx: booted eCPU up and waiting for completion...\n");
+
+	/* Windows driver clears bit 0x200 in register 0x2A0 here */
+	clear_regbits(adev, 0x2A0, 0x200);
+
+	/* Windows driver sets bit 0x200 in ACX_GPIO_OUT here */
+	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+	/* wait for eCPU bootup */
+	if (OK != acxmem_s_verify_init(adev)) {
+		msg = "acx: timeout waiting for eCPU. ";
+		goto end_fail;
+	}
+	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
+	init_mboxes(adev);
+	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+
+	/* test that EEPROM is readable */
+	read_eeprom_area(adev);
+
+	result = OK;
+	goto end;
+
+	/* Finish error message. Indicate which function failed */
+	end_unlock: acx_unlock(adev, flags);
+	end_fail: printk("acx: %sreset_dev() FAILED\n", msg);
+	end:
+	FN_EXIT1(result);
+	return result;
+}
+
+static int acxmem_s_verify_init(acx_device_t *adev) {
+	int result = NOT_OK;
+	unsigned long timeout;
+
+	FN_ENTER;
+
+	timeout = jiffies + 2 * HZ;
+	for (;;) {
+		u32 irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if ((irqstat != 0xFFFFFFFF) && (irqstat & HOST_INT_FCS_THRESHOLD)) {
+			result = OK;
+			write_reg32(adev, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
+			break;
+		}
+		if (time_after(jiffies, timeout))
+			break;
+		/* Init may take up to ~0.5 sec total */
+		acx_s_mwait(50);
+	}
+
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * Most of the acx specific pieces of hardware reset.
+ */
+static int acxmem_complete_hw_reset(acx_device_t *adev) {
+	acx111_ie_configoption_t co;
+
+	/* NB: read_reg() reads may return bogus data before reset_dev(),
+	 * since the firmware which directly controls large parts of the I/O
+	 * registers isn't initialized yet.
+	 * acx100 seems to be more affected than acx111 */
+	if (OK != acxmem_s_reset_dev(adev))
+		return -1;
+
+	if (IS_ACX100(adev)) {
+		/* ACX100: configopt struct in cmd mailbox - directly after reset */
+		copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
+	}
+
+	if (OK != acx_s_init_mac(adev))
+		return -3;
+
+	if (IS_ACX111(adev)) {
+		/* ACX111: configopt struct needs to be queried after full init */
+		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
+	}
+
+	/*
+	 * Set up transmit buffer administration
+	 */
+	init_acx_txbuf(adev);
+
+	/*
+	 * Windows driver writes 0x01000000 to register 0x288, RADIO_CTL, if the form factor
+	 * is 3.  It also write protects the EEPROM by writing 1<<9 to GPIO_OUT
+	 */
+	if (adev->form_factor == 3) {
+		set_regbits(adev, 0x288, 0x01000000);
+		set_regbits(adev, 0x298, 1 << 9);
+	}
+
+	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+		return -2;
+
+	acx_s_parse_configoption(adev, &co);
+	acx_s_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
+	acx_display_hardware_details(adev);
+
+	return 0;
+}
+
+/*
+ * acxmem_l_reset_mac
+ *
+ * MAC will be reset
+ * Call context: reset_dev
+ */
+static void acxmem_l_reset_mac(acx_device_t *adev) {
+	int count;
+	FN_ENTER;
+
+	// OW Bit setting done differently in pci.c
+	/* halt eCPU */
+	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+
+	/* now do soft reset of eCPU, set bit */
+	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+	log(L_DEBUG, "acx: %s: enable soft reset...\n", __func__);
+
+	/* Windows driver sleeps here for a while with this sequence */
+	for (count = 0; count < 200; count++) {
+		udelay (50);
+	}
+
+	/* now clear bit again: deassert eCPU reset */
+	log(L_DEBUG, "acx: %s: disable soft reset and go to init mode...\n", __func__);
+	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+
+	/* now start a burst read from initial EEPROM */
+	set_regbits(adev, IO_ACX_EE_START, 0x1);
+
+	/*
+	 * Windows driver sleeps here for a while with this sequence
+	 */
+	for (count = 0; count < 200; count++) {
+		udelay (50);
+	}
+
+	/* Windows driver writes 0x10000 to register 0x808 here */
+
+	write_reg32(adev, 0x808, 0x10000);
+
+	FN_EXIT0;
+}
+
+static void acxmem_s_up(struct ieee80211_hw *hw) {
+	acx_device_t *adev = ieee2adev(hw);
+
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+	acxmem_irq_enable(adev);
+	acx_unlock(adev, flags);
+
+	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
+	 ** used to use it. But we don't do that anymore, our OS
+	 ** has reliable software timers */
+	init_timer(&adev->mgmt_timer);
+	adev->mgmt_timer.function = acx_i_timer;
+	adev->mgmt_timer.data = (unsigned long) adev;
+
+	/* Need to set ACX_STATE_IFACE_UP first, or else
+	 ** timer won't be started by acx_set_status() */
+	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	// OW FIXME Check acx_set_status?
+#if 0
+	switch (adev->mode) {
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_2_STA:
+		/* actual scan cmd will happen in start() */
+		acx_set_status(adev, ACX_STATUS_1_SCANNING);
+		break;
+	case ACX_MODE_3_AP:
+	case ACX_MODE_MONITOR:
+		acx_set_status(adev, ACX_STATUS_4_ASSOCIATED);
+		break;
+	}
+#endif
+
+	acx_s_start(adev);
+
+	FN_EXIT0;
+}
+
+static void acxmem_s_down(struct ieee80211_hw *hw) {
+
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	/* Disable IRQs first, so that IRQs cannot race with us */
+	/* then wait until interrupts have finished executing on other CPUs */
+
+	acx_lock(adev, flags);
+	acxmem_irq_disable(adev);
+	synchronize_irq(adev->irq);
+	acx_unlock(adev, flags);
+
+	/* we really don't want to have an asynchronous tasklet disturb us
+	 ** after something vital for its job has been shut down, so
+	 ** end all remaining work now.
+	 **
+	 ** NB: carrier_off (done by set_status below) would lead to
+	 ** not yet fully understood deadlock in flush_scheduled_work().
+	 ** That's why we do FLUSH first.
+	 **
+	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
+	 ** waits for acx_e_after_interrupt_task to complete if it is running
+	 ** on another CPU, but acx_e_after_interrupt_task
+	 ** will sleep on sem forever, because it is taken by us!
+	 ** Work around that by temporary sem unlock.
+	 ** This will fail miserably if we'll be hit by concurrent
+	 ** iwconfig or something in between. TODO! */
+
+	// OW FIXME Fix Locking ...
+	// acx_sem_unlock(adev);
+
+	// OW TODO I'm not sure if explicit flushing is still required or done
+	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
+	// hang upon .remove_interface and .close and .stop
+	//flush_scheduled_work();
+
+	// acx_sem_lock(adev);
+
+	/* This is possible:
+	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
+	 ** -> set_status(ASSOCIATED) -> wake_queue()
+	 ** That's why we stop queue _after_ flush_scheduled_work
+	 ** lock/unlock is just paranoia, maybe not needed */
+
+	acx_lock(adev, flags);
+	acx_stop_queue(adev->ieee, "on ifdown");
+	acx_unlock(adev, flags);
+
+	/* kernel/timer.c says it's illegal to del_timer_sync()
+	 ** a timer which restarts itself. We guarantee this cannot
+	 ** ever happen because acx_i_timer() never does this if
+	 ** status is ACX_STATUS_0_STOPPED */
+	del_timer_sync(&adev->mgmt_timer);
+
+	FN_EXIT0;
+}
+
+#if 0
+/***********************************************************************
+ ** acxmem_i_set_multicast_list
+ ** FIXME: most likely needs refinement
+ */
+static void acxmem_i_set_multicast_list(struct net_device *ndev) {
+	acx_device_t *adev = ndev2adev(ndev);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+
+	/* firmwares don't have allmulti capability,
+	 * so just use promiscuous mode instead in this case. */
+	if (ndev->flags & (IFF_PROMISC|IFF_ALLMULTI)) {
+		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+		/* let kernel know in case *we* needed to set promiscuous */
+		ndev->flags |= (IFF_PROMISC|IFF_ALLMULTI);
+	} else {
+		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
+		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
+		SET_BIT(adev->set_mask, SET_RXCONFIG);
+		ndev->flags &= ~(IFF_PROMISC|IFF_ALLMULTI);
+	}
+
+	/* cannot update card settings directly here, atomic context */
+	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+
+	acx_unlock(adev, flags);
+
+	FN_EXIT0;
+}
+#endif
+
 
  /*
   * BOM Other (Control Path)
@@ -2481,76 +2965,10 @@ static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c,
 
 
 
-/***********************************************************************
- ** acxmem_l_reset_mac
- **
- ** MAC will be reset
- ** Call context: reset_dev
- */
-static void acxmem_l_reset_mac(acx_device_t *adev) {
-	int count;
-	FN_ENTER;
-
-	// OW Bit setting done differently in pci.c
-	/* halt eCPU */
-	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
-
-	/* now do soft reset of eCPU, set bit */
-	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-	log(L_DEBUG, "acx: %s: enable soft reset...\n", __func__);
-
-	/* Windows driver sleeps here for a while with this sequence */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
-	}
-
-	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "acx: %s: disable soft reset and go to init mode...\n", __func__);
-	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-
-	/* now start a burst read from initial EEPROM */
-	set_regbits(adev, IO_ACX_EE_START, 0x1);
-
-	/*
-	 * Windows driver sleeps here for a while with this sequence
-	 */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
-	}
-
-	/* Windows driver writes 0x10000 to register 0x808 here */
-
-	write_reg32(adev, 0x808, 0x10000);
-
-	FN_EXIT0;
-}
 
 /***********************************************************************
  ** acxmem_s_verify_init
  */
-static int acxmem_s_verify_init(acx_device_t *adev) {
-	int result = NOT_OK;
-	unsigned long timeout;
-
-	FN_ENTER;
-
-	timeout = jiffies + 2 * HZ;
-	for (;;) {
-		u32 irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if ((irqstat != 0xFFFFFFFF) && (irqstat & HOST_INT_FCS_THRESHOLD)) {
-			result = OK;
-			write_reg32(adev, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
-			break;
-		}
-		if (time_after(jiffies, timeout))
-			break;
-		/* Init may take up to ~0.5 sec total */
-		acx_s_mwait(50);
-	}
-
-	FN_EXIT1(result);
-	return result;
-}
 
 /***********************************************************************
  ** A few low-level helpers
@@ -2569,152 +2987,6 @@ static int acxmem_s_verify_init(acx_device_t *adev) {
  ** acxmem_read_cmd_type_status
  */
 
-/***********************************************************************
- ** acxmem_s_reset_dev
- **
- ** Arguments:
- **	netdevice that contains the adev variable
- ** Returns:
- **	NOT_OK on fail
- **	OK on success
- ** Side effects:
- **	device is hard reset
- ** Call context:
- **	acxmem_e_probe
- ** Comment:
- **	This resets the device using low level hardware calls
- **	as well as uploads and verifies the firmware to the card
- */
-
-
-
-int acxmem_s_reset_dev(acx_device_t *adev) {
-	const char* msg = "";
-	unsigned long flags;
-	int result = NOT_OK;
-	u16 hardware_info;
-	u16 ecpu_ctrl;
-	int count;
-	u32 tmp;
-
-	FN_ENTER;
-	/*
-	 write_reg32 (adev, IO_ACX_SLV_MEM_CP, 0);
-	 */
-	/* reset the device to make sure the eCPU is stopped
-	 * to upload the firmware correctly */
-
-	acx_lock(adev, flags);
-
-	/* Windows driver does some funny things here */
-	/*
-	 * clear bit 0x200 in register 0x2A0
-	 */
-	clear_regbits(adev, 0x2A0, 0x200);
-
-	/*
-	 * Set bit 0x200 in ACX_GPIO_OUT
-	 */
-	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
-
-	/*
-	 * read register 0x900 until its value is 0x8400104C, sleeping
-	 * in between reads if it's not immediate
-	 */
-	tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-	count = 500;
-	while (count-- && (tmp != ACX_VENDOR_ID)) {
-		mdelay (10);
-		tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-	}
-
-	/* end what Windows driver does */
-
-	acxmem_l_reset_mac(adev);
-
-	ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
-	if (!ecpu_ctrl) {
-		msg = "acx: eCPU is already running. ";
-		goto end_unlock;
-	}
-
-#if 0
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
-		/* eCPU most likely means "embedded CPU" */
-		msg = "acx: eCPU did not start after boot from flash. ";
-		goto end_unlock;
-	}
-
-	/* check sense on reset flags */
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
-		printk("acx: %s: eCPU did not start after boot (SOR), "
-				"is this fatal?\n", adev->ndev->name);
-	}
-#endif
-
-	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	adev->irq_status |= HOST_INT_SCAN_COMPLETE;
-
-	acx_unlock(adev, flags);
-
-	/* need to know radio type before fw load */
-	/* Need to wait for arrival of this information in a loop,
-	 * most probably since eCPU runs some init code from EEPROM
-	 * (started burst read in reset_mac()) which also
-	 * sets the radio type ID */
-
-	count = 0xffff;
-	do {
-		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
-		if (!--count) {
-			msg = "acx: eCPU didn't indicate radio type";
-			goto end_fail;
-		}
-		cpu_relax();
-	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
-
-	printk("acx: ACX radio type 0x%02x\n", (hardware_info >> 8) & 0xff);
-	/* printk("DEBUG: count %d\n", count); */
-	adev->form_factor = hardware_info & 0xff;
-	adev->radio_type = hardware_info >> 8;
-
-	/* load the firmware */
-	if (OK != acxmem_s_upload_fw(adev))
-		goto end_fail;
-
-	/* acx_s_mwait(10);	this one really shouldn't be required */
-
-	/* now start eCPU by clearing bit */
-	clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
-	log(L_DEBUG, "acx: booted eCPU up and waiting for completion...\n");
-
-	/* Windows driver clears bit 0x200 in register 0x2A0 here */
-	clear_regbits(adev, 0x2A0, 0x200);
-
-	/* Windows driver sets bit 0x200 in ACX_GPIO_OUT here */
-	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
-	/* wait for eCPU bootup */
-	if (OK != acxmem_s_verify_init(adev)) {
-		msg = "acx: timeout waiting for eCPU. ";
-		goto end_fail;
-	}
-	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
-	init_mboxes(adev);
-	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
-
-	/* test that EEPROM is readable */
-	read_eeprom_area(adev);
-
-	result = OK;
-	goto end;
-
-	/* Finish error message. Indicate which function failed */
-	end_unlock: acx_unlock(adev, flags);
-	end_fail: printk("acx: %sreset_dev() FAILED\n", msg);
-	end:
-	FN_EXIT1(result);
-	return result;
-}
 
 
 /***********************************************************************
@@ -2739,137 +3011,7 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
  ** pdev	- ptr to pci device structure containing info about pci configuration
  ** id	- ptr to the device id entry that matched this device
  */
-static const u16 IO_ACX100[] = { 0x0000, /* IO_ACX_SOFT_RESET */
 
-0x0014, /* IO_ACX_SLV_MEM_ADDR */
-0x0018, /* IO_ACX_SLV_MEM_DATA */
-0x001c, /* IO_ACX_SLV_MEM_CTL */
-0x0020, /* IO_ACX_SLV_END_CTL */
-
-0x0034, /* IO_ACX_FEMR */
-
-0x007c, /* IO_ACX_INT_TRIG */
-0x0098, /* IO_ACX_IRQ_MASK */
-0x00a4, /* IO_ACX_IRQ_STATUS_NON_DES */
-0x00a8, /* IO_ACX_IRQ_REASON */
-0x00ac, /* IO_ACX_IRQ_ACK */
-0x00b0, /* IO_ACX_HINT_TRIG */
-
-0x0104, /* IO_ACX_ENABLE */
-
-0x0250, /* IO_ACX_EEPROM_CTL */
-0x0254, /* IO_ACX_EEPROM_ADDR */
-0x0258, /* IO_ACX_EEPROM_DATA */
-0x025c, /* IO_ACX_EEPROM_CFG */
-
-0x0268, /* IO_ACX_PHY_ADDR */
-0x026c, /* IO_ACX_PHY_DATA */
-0x0270, /* IO_ACX_PHY_CTL */
-
-0x0290, /* IO_ACX_GPIO_OE */
-
-0x0298, /* IO_ACX_GPIO_OUT */
-
-0x02a4, /* IO_ACX_CMD_MAILBOX_OFFS */
-0x02a8, /* IO_ACX_INFO_MAILBOX_OFFS */
-0x02ac, /* IO_ACX_EEPROM_INFORMATION */
-
-0x02d0, /* IO_ACX_EE_START */
-0x02d4, /* IO_ACX_SOR_CFG */
-0x02d8 /* IO_ACX_ECPU_CTRL */
-};
-
-static const u16 IO_ACX111[] = { 0x0000, /* IO_ACX_SOFT_RESET */
-
-0x0014, /* IO_ACX_SLV_MEM_ADDR */
-0x0018, /* IO_ACX_SLV_MEM_DATA */
-0x001c, /* IO_ACX_SLV_MEM_CTL */
-0x0020, /* IO_ACX_SLV_END_CTL */
-
-0x0034, /* IO_ACX_FEMR */
-
-0x00b4, /* IO_ACX_INT_TRIG */
-0x00d4, /* IO_ACX_IRQ_MASK */
-/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
-0x00f0, /* IO_ACX_IRQ_STATUS_NON_DES */
-0x00e4, /* IO_ACX_IRQ_REASON */
-0x00e8, /* IO_ACX_IRQ_ACK */
-0x00ec, /* IO_ACX_HINT_TRIG */
-
-0x01d0, /* IO_ACX_ENABLE */
-
-0x0338, /* IO_ACX_EEPROM_CTL */
-0x033c, /* IO_ACX_EEPROM_ADDR */
-0x0340, /* IO_ACX_EEPROM_DATA */
-0x0344, /* IO_ACX_EEPROM_CFG */
-
-0x0350, /* IO_ACX_PHY_ADDR */
-0x0354, /* IO_ACX_PHY_DATA */
-0x0358, /* IO_ACX_PHY_CTL */
-
-0x0374, /* IO_ACX_GPIO_OE */
-
-0x037c, /* IO_ACX_GPIO_OUT */
-
-0x0388, /* IO_ACX_CMD_MAILBOX_OFFS */
-0x038c, /* IO_ACX_INFO_MAILBOX_OFFS */
-0x0390, /* IO_ACX_EEPROM_INFORMATION */
-
-0x0100, /* IO_ACX_EE_START */
-0x0104, /* IO_ACX_SOR_CFG */
-0x0108, /* IO_ACX_ECPU_CTRL */
-};
-
-/*
- * Most of the acx specific pieces of hardware reset.
- */
-static int acxmem_complete_hw_reset(acx_device_t *adev) {
-	acx111_ie_configoption_t co;
-
-	/* NB: read_reg() reads may return bogus data before reset_dev(),
-	 * since the firmware which directly controls large parts of the I/O
-	 * registers isn't initialized yet.
-	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxmem_s_reset_dev(adev))
-		return -1;
-
-	if (IS_ACX100(adev)) {
-		/* ACX100: configopt struct in cmd mailbox - directly after reset */
-		copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
-	}
-
-	if (OK != acx_s_init_mac(adev))
-		return -3;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111: configopt struct needs to be queried after full init */
-		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	}
-
-	/*
-	 * Set up transmit buffer administration
-	 */
-	init_acx_txbuf(adev);
-
-	/*
-	 * Windows driver writes 0x01000000 to register 0x288, RADIO_CTL, if the form factor
-	 * is 3.  It also write protects the EEPROM by writing 1<<9 to GPIO_OUT
-	 */
-	if (adev->form_factor == 3) {
-		set_regbits(adev, 0x288, 0x01000000);
-		set_regbits(adev, 0x298, 1 << 9);
-	}
-
-	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
-	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		return -2;
-
-	acx_s_parse_configoption(adev, &co);
-	acx_s_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
-	acx_display_hardware_details(adev);
-
-	return 0;
-}
 
 // OW FIXME Put this in the beginning of the file, when reordering code
 static const struct ieee80211_ops acxmem_hw_ops = {
@@ -3358,47 +3500,6 @@ static void acxmem_irq_enable(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-static void acxmem_s_up(struct ieee80211_hw *hw) {
-	acx_device_t *adev = ieee2adev(hw);
-
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-	acxmem_irq_enable(adev);
-	acx_unlock(adev, flags);
-
-	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
-	 ** used to use it. But we don't do that anymore, our OS
-	 ** has reliable software timers */
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_i_timer;
-	adev->mgmt_timer.data = (unsigned long) adev;
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	// OW FIXME Check acx_set_status?
-#if 0
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-	case ACX_MODE_2_STA:
-		/* actual scan cmd will happen in start() */
-		acx_set_status(adev, ACX_STATUS_1_SCANNING);
-		break;
-	case ACX_MODE_3_AP:
-	case ACX_MODE_MONITOR:
-		acx_set_status(adev, ACX_STATUS_4_ASSOCIATED);
-		break;
-	}
-#endif
-
-	acx_s_start(adev);
-
-	FN_EXIT0;
-}
 
 
 
@@ -3415,73 +3516,6 @@ static void acxmem_irq_disable(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-/***********************************************************************
- ** acxmem_s_down
- **
- ** This disables the netdevice
- **
- ** Side effects:
- ** - disables on-card interrupt request
- */
-static void acxmem_s_down(struct ieee80211_hw *hw) {
-
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	/* Disable IRQs first, so that IRQs cannot race with us */
-	/* then wait until interrupts have finished executing on other CPUs */
-
-	acx_lock(adev, flags);
-	acxmem_irq_disable(adev); 
-	synchronize_irq(adev->irq);
-	acx_unlock(adev, flags);
-
-	/* we really don't want to have an asynchronous tasklet disturb us
-	 ** after something vital for its job has been shut down, so
-	 ** end all remaining work now.
-	 **
-	 ** NB: carrier_off (done by set_status below) would lead to
-	 ** not yet fully understood deadlock in flush_scheduled_work().
-	 ** That's why we do FLUSH first.
-	 **
-	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
-	 ** waits for acx_e_after_interrupt_task to complete if it is running
-	 ** on another CPU, but acx_e_after_interrupt_task
-	 ** will sleep on sem forever, because it is taken by us!
-	 ** Work around that by temporary sem unlock.
-	 ** This will fail miserably if we'll be hit by concurrent
-	 ** iwconfig or something in between. TODO! */
-
-	// OW FIXME Fix Locking ...
-	// acx_sem_unlock(adev);
-	
-	// OW TODO I'm not sure if explicit flushing is still required or done
-	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
-	// hang upon .remove_interface and .close and .stop
-	//flush_scheduled_work();
-	
-	// acx_sem_lock(adev);
-
-	/* This is possible:
-	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
-	 ** -> set_status(ASSOCIATED) -> wake_queue()
-	 ** That's why we stop queue _after_ flush_scheduled_work
-	 ** lock/unlock is just paranoia, maybe not needed */
-
-	acx_lock(adev, flags);
-	acx_stop_queue(adev->ieee, "on ifdown");
-	acx_unlock(adev, flags);
-
-	/* kernel/timer.c says it's illegal to del_timer_sync()
-	 ** a timer which restarts itself. We guarantee this cannot
-	 ** ever happen because acx_i_timer() never does this if
-	 ** status is ACX_STATUS_0_STOPPED */
-	del_timer_sync(&adev->mgmt_timer);
-
-	FN_EXIT0;
-}
 
 /***********************************************************************
  ** acxmem_e_op_start
@@ -3624,40 +3658,6 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	FN_EXIT0;
 }
 
-/***********************************************************************
- ** acxmem_i_set_multicast_list
- ** FIXME: most likely needs refinement
- */
-static void acxmem_i_set_multicast_list(struct net_device *ndev) {
-	acx_device_t *adev = ndev2adev(ndev);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-
-	/* firmwares don't have allmulti capability,
-	 * so just use promiscuous mode instead in this case. */
-	if (ndev->flags & (IFF_PROMISC|IFF_ALLMULTI)) {
-		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-		/* let kernel know in case *we* needed to set promiscuous */
-		ndev->flags |= (IFF_PROMISC|IFF_ALLMULTI);
-	} else {
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-		ndev->flags &= ~(IFF_PROMISC|IFF_ALLMULTI);
-	}
-
-	/* cannot update card settings directly here, atomic context */
-	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-
-	acx_unlock(adev, flags);
-
-	FN_EXIT0;
-}
 #endif
 
 /***************************************************************
