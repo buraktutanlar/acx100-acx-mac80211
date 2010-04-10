@@ -4659,6 +4659,97 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
   * BOM Mac80211 Ops
   * ==================================================
   */
+/*
+ * acxmem_e_op_start
+ *
+ * Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
+ * from clear to set. In other words: ifconfig up.
+ *
+ * Returns:
+ *	0	success
+ *	>0	f/w reported error
+ *	<0	driver reported error
+ */
+static int acxmem_e_op_start(struct ieee80211_hw *hw) {
+	acx_device_t *adev = ieee2adev(hw);
+	int result = OK;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	//OW acx_init_task_scheduler(adev);
+	adev->initialized = 0;
+
+	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+
+	/* ifup device */
+	acxmem_s_up(hw);
+
+	/* We don't currently have to do anything else.
+	 * The setup of the MAC should be subsequently completed via
+	 * the mlme commands.
+	 * Higher layers know we're ready from dev->start==1 and
+	 * dev->tbusy==0.  Our rx path knows to pass up received/
+	 * frames because of dev->flags&IFF_UP is true.
+	 */
+
+	ieee80211_wake_queues(adev->ieee);
+
+	adev->initialized = 1;
+
+	acx_sem_unlock(adev);
+	FN_EXIT1(result);
+
+	return result;
+}
+
+/*
+ * acxmem_e_stop
+ *
+ * Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
+ * from set to clear. I.e. called by "ifconfig DEV down"
+ *
+ * Returns:
+ *	0	success
+ *	>0	f/w reported error
+ *	<0	driver reported error
+ */
+static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+
+	FN_ENTER;
+
+	acx_sem_lock(adev);
+
+	/* ifdown device */
+	if (adev->initialized) {
+		acxmem_s_down(hw);
+	}
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	/* disable all IRQs, release shared IRQ handler */
+	acx_lock(adev, flags);
+	//write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	//write_reg16(adev, IO_ACX_FEMR, 0x0);
+	acxmem_irq_disable(adev);
+	acx_unlock(adev, flags);
+
+	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+
+	/* We currently don't have to do anything else.
+	 * Higher layers know we're not ready from dev->start==0 and
+	 * dev->tbusy==1.  Our rx path knows to not pass up received
+	 * frames because of dev->flags&IFF_UP is false.
+	 */
+
+	adev->initialized = 0;
+
+	acx_sem_unlock(adev);
+
+	log(L_INIT, "acxmem: closed device\n");
+	FN_EXIT0;
+}
 
  /*
   * BOM Helpers
@@ -5243,97 +5334,6 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 #endif /* CONFIG_PM */
 
 
-/***********************************************************************
- ** acxmem_e_op_start
- **
- ** Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
- ** from clear to set. In other words: ifconfig up.
- **
- ** Returns:
- **	0	success
- **	>0	f/w reported error
- **	<0	driver reported error
- */
-static int acxmem_e_op_start(struct ieee80211_hw *hw) {
-	acx_device_t *adev = ieee2adev(hw);
-	int result = OK;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	//OW acx_init_task_scheduler(adev);
-	adev->initialized = 0;
-
-	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
-
-	/* ifup device */
-	acxmem_s_up(hw);
-
-	/* We don't currently have to do anything else.
-	 * The setup of the MAC should be subsequently completed via
-	 * the mlme commands.
-	 * Higher layers know we're ready from dev->start==1 and
-	 * dev->tbusy==0.  Our rx path knows to pass up received/
-	 * frames because of dev->flags&IFF_UP is true.
-	 */
-
-	ieee80211_wake_queues(adev->ieee);
-
-	adev->initialized = 1;
-
-	acx_sem_unlock(adev);
-	FN_EXIT1(result);
-
-	return result;
-}
-
-/***********************************************************************
- ** acxmem_e_stop
- **
- ** Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
- ** from set to clear. I.e. called by "ifconfig DEV down"
- **
- ** Returns:
- **	0	success
- **	>0	f/w reported error
- **	<0	driver reported error
- */
-static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	acx_sem_lock(adev);
-
-	/* ifdown device */
-	if (adev->initialized) {
-		acxmem_s_down(hw);
-	}
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	/* disable all IRQs, release shared IRQ handler */
-	acx_lock(adev, flags);
-	//write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-	//write_reg16(adev, IO_ACX_FEMR, 0x0);
-	acxmem_irq_disable(adev);
-	acx_unlock(adev, flags);
-
-	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
-
-	/* We currently don't have to do anything else.
-	 * Higher layers know we're not ready from dev->start==0 and
-	 * dev->tbusy==1.  Our rx path knows to not pass up received
-	 * frames because of dev->flags&IFF_UP is false.
-	 */
-
-	adev->initialized = 0;
-
-	acx_sem_unlock(adev);
-
-	log(L_INIT, "acxmem: closed device\n");
-	FN_EXIT0;
-}
 
 
 
