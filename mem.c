@@ -193,7 +193,7 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count);
-void reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
+static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void init_acx_txbuf(acx_device_t *adev);
 static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
@@ -3184,7 +3184,7 @@ static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count) {
  * This routine gets called in interrupt context, so it shouldn't block to protect
  * the integrity of the linked list.  The ISR already holds the lock.
  */
-void reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
+static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 	u32 cur, last, next;
 	unsigned long flags;
 
@@ -3705,7 +3705,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		 */
 		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
 		if (acxmem) {
-			reclaim_acx_txbuf_space(adev, acxmem);
+			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
 		}
 
 		/* ...and free the desc by clearing all the fields
@@ -3791,7 +3791,7 @@ void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
 		 */
 		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
 		if (acxmem) {
-			reclaim_acx_txbuf_space(adev, acxmem);
+			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
 		}
 
 		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
