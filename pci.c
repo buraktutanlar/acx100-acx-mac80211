@@ -91,12 +91,12 @@ static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 int acxpci_s_upload_radio(acx_device_t * adev);
 int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
+static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static int acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_upload_fw(acx_device_t * adev);
-static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 // static void acx_show_card_eeprom_id(acx_device_t * adev);
 
 // CMDs (Control Path)
@@ -655,6 +655,20 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 }
 #endif /* UNUSED */
 
+static inline void acxpci_read_eeprom_area(acx_device_t * adev)
+{
+#if ACX_DEBUG > 1
+	int offs;
+	u8 tmp;
+
+	FN_ENTER;
+
+	for (offs = 0x8c; offs < 0xb9; offs++)
+		acxpci_read_eeprom_byte(adev, offs, &tmp);
+
+	FN_EXIT0;
+#endif
+}
 
 /*
  * acxpci_s_read_phy_reg
@@ -949,20 +963,6 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 	return res;
 }
 
-static inline void acxpci_read_eeprom_area(acx_device_t * adev)
-{
-#if ACX_DEBUG > 1
-	int offs;
-	u8 tmp;
-
-	FN_ENTER;
-
-	for (offs = 0x8c; offs < 0xb9; offs++)
-		acxpci_read_eeprom_byte(adev, offs, &tmp);
-
-	FN_EXIT0;
-#endif
-}
 
 #ifdef NONESSENTIAL_FEATURES
 typedef struct device_id {
