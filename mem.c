@@ -239,8 +239,8 @@ static char printable(char c);
 //static void update_link_quality_led(acx_device_t *adev);
 
 // Ioctls
-// int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
-int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
+//int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
+//int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
 // Driver, Module
 static int __devinit acxmem_e_probe(struct platform_device *pdev);
@@ -4807,6 +4807,337 @@ static void update_link_quality_led(acx_device_t *adev) {
   * BOM Ioctls
   * ==================================================
   */
+// OW TODO Not used in pci either !?
+#if 0
+int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
+		struct iw_param *vwrq, char *extra) {
+#if ACX_DEBUG > 1
+
+	acx_device_t *adev = ieee2adev(hw);
+	rxdesc_t *rxdesc;
+	txdesc_t *txdesc;
+	rxhostdesc_t *rxhostdesc;
+	txhostdesc_t *txhostdesc;
+	struct acx111_ie_memoryconfig memconf;
+	struct acx111_ie_queueconfig queueconf;
+	unsigned long flags;
+	int i;
+	char memmap[0x34];
+	char rxconfig[0x8];
+	char fcserror[0x8];
+	char ratefallback[0x5];
+
+	if (!(acx_debug & (L_IOCTL | L_DEBUG)))
+		return OK;
+	/* using printk() since we checked debug flag already */
+
+	acx_sem_lock(adev);
+
+	if (!IS_ACX111(adev)) {
+		printk("acx: acx111-specific function called "
+			"with non-acx111 chip, aborting\n");
+		goto end_ok;
+	}
+
+	/* get Acx111 Memory Configuration */
+	memset(&memconf, 0, sizeof(memconf));
+	/* BTW, fails with 12 (Write only) error code.
+	 ** Retained for easy testing of issue_cmd error handling :) */
+	printk("Interrogating queue config\n");
+	acx_s_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
+	printk("done with queue config\n");
+
+	/* get Acx111 Queue Configuration */
+	memset(&queueconf, 0, sizeof(queueconf));
+	printk("Interrogating mem config options\n");
+	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+	printk("done with mem config options\n");
+
+	/* get Acx111 Memory Map */
+	memset(memmap, 0, sizeof(memmap));
+	printk("Interrogating mem map\n");
+	acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
+	printk("done with mem map\n");
+
+	/* get Acx111 Rx Config */
+	memset(rxconfig, 0, sizeof(rxconfig));
+	printk("Interrogating rxconfig\n");
+	acx_s_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
+	printk("done with queue rxconfig\n");
+
+	/* get Acx111 fcs error count */
+	memset(fcserror, 0, sizeof(fcserror));
+	printk("Interrogating fcs err count\n");
+	acx_s_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
+	printk("done with err count\n");
+
+	/* get Acx111 rate fallback */
+	memset(ratefallback, 0, sizeof(ratefallback));
+	printk("Interrogating rate fallback\n");
+	acx_s_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
+	printk("done with rate fallback\n");
+
+	/* force occurrence of a beacon interrupt */
+	/* TODO: comment why is this necessary */
+	write_reg16(adev, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
+
+	/* dump Acx111 Mem Configuration */
+	printk("acx: dump mem config:\n"
+		"data read: %d, struct size: %d\n"
+		"Number of stations: %1X\n"
+		"Memory block size: %1X\n"
+		"tx/rx memory block allocation: %1X\n"
+		"count rx: %X / tx: %X queues\n"
+		"options %1X\n"
+		"fragmentation %1X\n"
+		"Rx Queue 1 Count Descriptors: %X\n"
+		"Rx Queue 1 Host Memory Start: %X\n"
+		"Tx Queue 1 Count Descriptors: %X\n"
+		"Tx Queue 1 Attributes: %X\n",
+		  memconf.len, (int) sizeof(memconf),
+			memconf.no_of_stations,
+			memconf.memory_block_size,
+			memconf.tx_rx_memory_block_allocation,
+			memconf.count_rx_queues, memconf.count_tx_queues,
+			memconf.options,
+			memconf.fragmentation,
+			memconf.rx_queue1_count_descs,
+			acx2cpu(memconf.rx_queue1_host_rx_start),
+			memconf.tx_queue1_count_descs, memconf.tx_queue1_attributes);
+
+	/* dump Acx111 Queue Configuration */
+	printk("acx: dump queue head:\n"
+		"data read: %d, struct size: %d\n"
+		"tx_memory_block_address (from card): %X\n"
+		"rx_memory_block_address (from card): %X\n"
+		"rx1_queue address (from card): %X\n"
+		"tx1_queue address (from card): %X\n"
+		"tx1_queue attributes (from card): %X\n",
+			queueconf.len, (int) sizeof(queueconf),
+			queueconf.tx_memory_block_address,
+			queueconf.rx_memory_block_address,
+			queueconf.rx1_queue_address,
+			queueconf.tx1_queue_address, queueconf.tx1_attributes);
+
+	/* dump Acx111 Mem Map */
+	printk("acx: dump mem map:\n"
+		"data read: %d, struct size: %d\n"
+		"Code start: %X\n"
+		"Code end: %X\n"
+		"WEP default key start: %X\n"
+		"WEP default key end: %X\n"
+		"STA table start: %X\n"
+		"STA table end: %X\n"
+		"Packet template start: %X\n"
+		"Packet template end: %X\n"
+		"Queue memory start: %X\n"
+		"Queue memory end: %X\n"
+		"Packet memory pool start: %X\n"
+		"Packet memory pool end: %X\n"
+		"iobase: %p\n"
+		"iobase2: %p\n",
+			*((u16 *) &memmap[0x02]), (int) sizeof(memmap),
+			*((u32 *) &memmap[0x04]),
+			*((u32 *) &memmap[0x08]),
+			*((u32 *) &memmap[0x0C]),
+			*((u32 *) &memmap[0x10]),
+			*((u32 *) &memmap[0x14]),
+			*((u32 *) &memmap[0x18]),
+			*((u32 *) &memmap[0x1C]),
+			*((u32 *) &memmap[0x20]),
+			*((u32 *) &memmap[0x24]),
+			*((u32 *) &memmap[0x28]),
+			*((u32 *) &memmap[0x2C]),
+			*((u32 *) &memmap[0x30]), adev->iobase,
+			adev->iobase2);
+
+	/* dump Acx111 Rx Config */
+	printk("acx: dump rx config:\n"
+		"data read: %d, struct size: %d\n"
+		"rx config: %X\n"
+		"rx filter config: %X\n",
+			*((u16 *) &rxconfig[0x02]),	(int) sizeof(rxconfig),
+			*((u16 *) &rxconfig[0x04]),	*((u16 *) &rxconfig[0x06]));
+
+	/* dump Acx111 fcs error */
+	printk("acx: dump fcserror:\n"
+		"data read: %d, struct size: %d\n"
+		"fcserrors: %X\n",
+			*((u16 *) &fcserror[0x02]), (int) sizeof(fcserror),
+			*((u32 *) &fcserror[0x04]));
+
+	/* dump Acx111 rate fallback */
+	printk("acx: dump rate fallback:\n"
+		"data read: %d, struct size: %d\n"
+		"ratefallback: %X\n",
+			*((u16 *) &ratefallback[0x02]),
+			(int) sizeof(ratefallback),
+			*((u8 *) &ratefallback[0x04]));
+
+	/* protect against IRQ */
+	acx_lock(adev, flags);
+
+	/* dump acx111 internal rx descriptor ring buffer */
+	rxdesc = adev->rxdesc_start;
+
+	/* loop over complete receive pool */
+	if (rxdesc)
+		for (i = 0; i < RX_CNT; i++) {
+			printk("acx: \ndump internal rxdesc %d:\n"
+				"mem pos %p\n"
+				"next 0x%X\n"
+				"acx mem pointer (dynamic) 0x%X\n"
+				"CTL (dynamic) 0x%X\n"
+				"Rate (dynamic) 0x%X\n"
+				"RxStatus (dynamic) 0x%X\n"
+				"Mod/Pre (dynamic) 0x%X\n",
+				i,
+				rxdesc,
+				acx2cpu(rxdesc->pNextDesc),
+				acx2cpu(rxdesc->ACXMemPtr),
+				rxdesc->Ctl_8, rxdesc->rate,	rxdesc->error, rxdesc->SNR);
+			rxdesc++;
+		}
+
+		/* dump host rx descriptor ring buffer */
+
+		rxhostdesc = adev->rxhostdesc_start;
+
+		/* loop over complete receive pool */
+		if (rxhostdesc)
+		for (i = 0; i < RX_CNT; i++) {
+			printk("acx: \ndump host rxdesc %d:\n"
+					"mem pos %p\n"
+					"buffer mem pos 0x%X\n"
+					"buffer mem offset 0x%X\n"
+					"CTL 0x%X\n"
+					"Length 0x%X\n"
+					"next 0x%X\n"
+					"Status 0x%X\n",
+					i,
+					rxhostdesc,
+					acx2cpu(rxhostdesc->data_phy),
+					rxhostdesc->data_offset,
+					le16_to_cpu(rxhostdesc->Ctl_16),
+					le16_to_cpu(rxhostdesc->length),
+					acx2cpu(rxhostdesc->desc_phy_next),
+					rxhostdesc->Status);
+			rxhostdesc++;
+		}
+
+		/* dump acx111 internal tx descriptor ring buffer */
+		txdesc = adev->txdesc_start;
+
+		/* loop over complete transmit pool */
+		if (txdesc)
+		for (i = 0; i < TX_CNT; i++) {
+			printk("acx: \ndump internal txdesc %d:\n"
+					"size 0x%X\n"
+					"mem pos %p\n"
+					"next 0x%X\n"
+					"acx mem pointer (dynamic) 0x%X\n"
+					"host mem pointer (dynamic) 0x%X\n"
+					"length (dynamic) 0x%X\n"
+					"CTL (dynamic) 0x%X\n"
+					"CTL2 (dynamic) 0x%X\n"
+					"Status (dynamic) 0x%X\n"
+					"Rate (dynamic) 0x%X\n",
+					i,
+					(int) sizeof(struct txdesc),
+					txdesc,
+					acx2cpu(txdesc->pNextDesc),
+					acx2cpu(txdesc->AcxMemPtr),
+					acx2cpu(txdesc->HostMemPtr),
+					le16_to_cpu(txdesc->total_length),
+					txdesc->Ctl_8,
+					txdesc->Ctl2_8,
+					txdesc->error,
+					txdesc->u.r1.rate);
+			txdesc = advance_txdesc(adev, txdesc, 1);
+		}
+
+		/* dump host tx descriptor ring buffer */
+
+		txhostdesc = adev->txhostdesc_start;
+
+		/* loop over complete host send pool */
+		if (txhostdesc)
+		for (i = 0; i < TX_CNT * 2; i++) {
+			printk("acx: \ndump host txdesc %d:\n"
+					"mem pos %p\n"
+					"buffer mem pos 0x%X\n"
+					"buffer mem offset 0x%X\n"
+					"CTL 0x%X\n"
+					"Length 0x%X\n"
+					"next 0x%X\n"
+					"Status 0x%X\n",
+					i,
+					txhostdesc,
+					acx2cpu(txhostdesc->data_phy),
+					txhostdesc->data_offset,
+					le16_to_cpu(txhostdesc->Ctl_16),
+					le16_to_cpu(txhostdesc->length),
+					acx2cpu(txhostdesc->desc_phy_next),
+					le32_to_cpu(txhostdesc->Status));
+			txhostdesc++;
+		}
+
+		/* write_reg16(adev, 0xb4, 0x4); */
+
+		acx_unlock(adev, flags);
+		end_ok:
+
+		acx_sem_unlock(adev);
+#endif /* ACX_DEBUG */
+	return OK;
+}
+
+/***********************************************************************
+ */
+int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
+		struct iw_request_info *info,
+		struct iw_param *vwrq, char *extra) {
+	// OW
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+	u16 gpio_old;
+
+	if (!IS_ACX100(adev)) {
+		/* WARNING!!!
+		 * Removing this check *might* damage
+		 * hardware, since we're tweaking GPIOs here after all!!!
+		 * You've been warned...
+		 * WARNING!!! */
+		printk("acx: sorry, setting bias level for non-acx100 "
+			"is not supported yet\n");
+		return OK;
+	}
+
+	if (*extra > 7) {
+		printk("acx: invalid bias parameter, range is 0-7\n");
+		return -EINVAL;
+	}
+
+	acx_sem_lock(adev);
+
+	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
+	 * IRQ handler uses it to update LED */
+	acx_lock(adev, flags);
+	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
+	write_reg16(adev, IO_ACX_GPIO_OUT,
+			(gpio_old & 0xf8ff)	| ((u16) *extra << 8));
+	acx_unlock(adev, flags);
+
+	log(L_DEBUG, "acx: gpio_old: 0x%04X\n", gpio_old);
+	printk("acx: %s: PHY power amplifier bias: old:%d, new:%d\n",
+			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
+
+	acx_sem_unlock(adev);
+
+	return OK;
+}
+#endif
+
 
  /*
   * BOM Driver, Module
@@ -5391,336 +5722,6 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 
 /***********************************************************************
  */
-// OW TODO Not used in pci either !?
-#if 0
-int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
-		struct iw_param *vwrq, char *extra) {
-#if ACX_DEBUG > 1
-
-	acx_device_t *adev = ieee2adev(hw);
-	rxdesc_t *rxdesc;
-	txdesc_t *txdesc;
-	rxhostdesc_t *rxhostdesc;
-	txhostdesc_t *txhostdesc;
-	struct acx111_ie_memoryconfig memconf;
-	struct acx111_ie_queueconfig queueconf;
-	unsigned long flags;
-	int i;
-	char memmap[0x34];
-	char rxconfig[0x8];
-	char fcserror[0x8];
-	char ratefallback[0x5];
-
-	if (!(acx_debug & (L_IOCTL | L_DEBUG)))
-		return OK;
-	/* using printk() since we checked debug flag already */
-
-	acx_sem_lock(adev);
-
-	if (!IS_ACX111(adev)) {
-		printk("acx: acx111-specific function called "
-			"with non-acx111 chip, aborting\n");
-		goto end_ok;
-	}
-
-	/* get Acx111 Memory Configuration */
-	memset(&memconf, 0, sizeof(memconf));
-	/* BTW, fails with 12 (Write only) error code.
-	 ** Retained for easy testing of issue_cmd error handling :) */
-	printk("Interrogating queue config\n");
-	acx_s_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
-	printk("done with queue config\n");
-
-	/* get Acx111 Queue Configuration */
-	memset(&queueconf, 0, sizeof(queueconf));
-	printk("Interrogating mem config options\n");
-	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
-	printk("done with mem config options\n");
-
-	/* get Acx111 Memory Map */
-	memset(memmap, 0, sizeof(memmap));
-	printk("Interrogating mem map\n");
-	acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
-	printk("done with mem map\n");
-
-	/* get Acx111 Rx Config */
-	memset(rxconfig, 0, sizeof(rxconfig));
-	printk("Interrogating rxconfig\n");
-	acx_s_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
-	printk("done with queue rxconfig\n");
-
-	/* get Acx111 fcs error count */
-	memset(fcserror, 0, sizeof(fcserror));
-	printk("Interrogating fcs err count\n");
-	acx_s_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
-	printk("done with err count\n");
-
-	/* get Acx111 rate fallback */
-	memset(ratefallback, 0, sizeof(ratefallback));
-	printk("Interrogating rate fallback\n");
-	acx_s_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
-	printk("done with rate fallback\n");
-
-	/* force occurrence of a beacon interrupt */
-	/* TODO: comment why is this necessary */
-	write_reg16(adev, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
-
-	/* dump Acx111 Mem Configuration */
-	printk("acx: dump mem config:\n"
-		"data read: %d, struct size: %d\n"
-		"Number of stations: %1X\n"
-		"Memory block size: %1X\n"
-		"tx/rx memory block allocation: %1X\n"
-		"count rx: %X / tx: %X queues\n"
-		"options %1X\n"
-		"fragmentation %1X\n"
-		"Rx Queue 1 Count Descriptors: %X\n"
-		"Rx Queue 1 Host Memory Start: %X\n"
-		"Tx Queue 1 Count Descriptors: %X\n"
-		"Tx Queue 1 Attributes: %X\n",
-		  memconf.len, (int) sizeof(memconf),
-			memconf.no_of_stations,
-			memconf.memory_block_size,
-			memconf.tx_rx_memory_block_allocation,
-			memconf.count_rx_queues, memconf.count_tx_queues,
-			memconf.options,
-			memconf.fragmentation,
-			memconf.rx_queue1_count_descs,
-			acx2cpu(memconf.rx_queue1_host_rx_start),
-			memconf.tx_queue1_count_descs, memconf.tx_queue1_attributes);
-
-	/* dump Acx111 Queue Configuration */
-	printk("acx: dump queue head:\n"
-		"data read: %d, struct size: %d\n"
-		"tx_memory_block_address (from card): %X\n"
-		"rx_memory_block_address (from card): %X\n"
-		"rx1_queue address (from card): %X\n"
-		"tx1_queue address (from card): %X\n"
-		"tx1_queue attributes (from card): %X\n",
-			queueconf.len, (int) sizeof(queueconf),
-			queueconf.tx_memory_block_address,
-			queueconf.rx_memory_block_address,
-			queueconf.rx1_queue_address,
-			queueconf.tx1_queue_address, queueconf.tx1_attributes);
-
-	/* dump Acx111 Mem Map */
-	printk("acx: dump mem map:\n"
-		"data read: %d, struct size: %d\n"
-		"Code start: %X\n"
-		"Code end: %X\n"
-		"WEP default key start: %X\n"
-		"WEP default key end: %X\n"
-		"STA table start: %X\n"
-		"STA table end: %X\n"
-		"Packet template start: %X\n"
-		"Packet template end: %X\n"
-		"Queue memory start: %X\n"
-		"Queue memory end: %X\n"
-		"Packet memory pool start: %X\n"
-		"Packet memory pool end: %X\n"
-		"iobase: %p\n"
-		"iobase2: %p\n",
-			*((u16 *) &memmap[0x02]), (int) sizeof(memmap),
-			*((u32 *) &memmap[0x04]),
-			*((u32 *) &memmap[0x08]),
-			*((u32 *) &memmap[0x0C]),
-			*((u32 *) &memmap[0x10]),
-			*((u32 *) &memmap[0x14]),
-			*((u32 *) &memmap[0x18]),
-			*((u32 *) &memmap[0x1C]),
-			*((u32 *) &memmap[0x20]),
-			*((u32 *) &memmap[0x24]),
-			*((u32 *) &memmap[0x28]),
-			*((u32 *) &memmap[0x2C]),
-			*((u32 *) &memmap[0x30]), adev->iobase,
-			adev->iobase2);
-
-	/* dump Acx111 Rx Config */
-	printk("acx: dump rx config:\n"
-		"data read: %d, struct size: %d\n"
-		"rx config: %X\n"
-		"rx filter config: %X\n",
-			*((u16 *) &rxconfig[0x02]),	(int) sizeof(rxconfig),
-			*((u16 *) &rxconfig[0x04]),	*((u16 *) &rxconfig[0x06]));
-
-	/* dump Acx111 fcs error */
-	printk("acx: dump fcserror:\n"
-		"data read: %d, struct size: %d\n"
-		"fcserrors: %X\n",
-			*((u16 *) &fcserror[0x02]), (int) sizeof(fcserror),
-			*((u32 *) &fcserror[0x04]));
-
-	/* dump Acx111 rate fallback */
-	printk("acx: dump rate fallback:\n"
-		"data read: %d, struct size: %d\n"
-		"ratefallback: %X\n",
-			*((u16 *) &ratefallback[0x02]),
-			(int) sizeof(ratefallback),
-			*((u8 *) &ratefallback[0x04]));
-
-	/* protect against IRQ */
-	acx_lock(adev, flags);
-
-	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rxdesc_start;
-
-	/* loop over complete receive pool */
-	if (rxdesc)
-		for (i = 0; i < RX_CNT; i++) {
-			printk("acx: \ndump internal rxdesc %d:\n"
-				"mem pos %p\n"
-				"next 0x%X\n"
-				"acx mem pointer (dynamic) 0x%X\n"
-				"CTL (dynamic) 0x%X\n"
-				"Rate (dynamic) 0x%X\n"
-				"RxStatus (dynamic) 0x%X\n"
-				"Mod/Pre (dynamic) 0x%X\n",
-				i,
-				rxdesc,
-				acx2cpu(rxdesc->pNextDesc),
-				acx2cpu(rxdesc->ACXMemPtr),
-				rxdesc->Ctl_8, rxdesc->rate,	rxdesc->error, rxdesc->SNR);
-			rxdesc++;
-		}
-
-		/* dump host rx descriptor ring buffer */
-
-		rxhostdesc = adev->rxhostdesc_start;
-
-		/* loop over complete receive pool */
-		if (rxhostdesc)
-		for (i = 0; i < RX_CNT; i++) {
-			printk("acx: \ndump host rxdesc %d:\n"
-					"mem pos %p\n"
-					"buffer mem pos 0x%X\n"
-					"buffer mem offset 0x%X\n"
-					"CTL 0x%X\n"
-					"Length 0x%X\n"
-					"next 0x%X\n"
-					"Status 0x%X\n",
-					i,
-					rxhostdesc,
-					acx2cpu(rxhostdesc->data_phy),
-					rxhostdesc->data_offset,
-					le16_to_cpu(rxhostdesc->Ctl_16),
-					le16_to_cpu(rxhostdesc->length),
-					acx2cpu(rxhostdesc->desc_phy_next),
-					rxhostdesc->Status);
-			rxhostdesc++;
-		}
-
-		/* dump acx111 internal tx descriptor ring buffer */
-		txdesc = adev->txdesc_start;
-
-		/* loop over complete transmit pool */
-		if (txdesc)
-		for (i = 0; i < TX_CNT; i++) {
-			printk("acx: \ndump internal txdesc %d:\n"
-					"size 0x%X\n"
-					"mem pos %p\n"
-					"next 0x%X\n"
-					"acx mem pointer (dynamic) 0x%X\n"
-					"host mem pointer (dynamic) 0x%X\n"
-					"length (dynamic) 0x%X\n"
-					"CTL (dynamic) 0x%X\n"
-					"CTL2 (dynamic) 0x%X\n"
-					"Status (dynamic) 0x%X\n"
-					"Rate (dynamic) 0x%X\n",
-					i,
-					(int) sizeof(struct txdesc),
-					txdesc,
-					acx2cpu(txdesc->pNextDesc),
-					acx2cpu(txdesc->AcxMemPtr),
-					acx2cpu(txdesc->HostMemPtr),
-					le16_to_cpu(txdesc->total_length),
-					txdesc->Ctl_8,
-					txdesc->Ctl2_8,
-					txdesc->error,
-					txdesc->u.r1.rate);
-			txdesc = advance_txdesc(adev, txdesc, 1);
-		}
-
-		/* dump host tx descriptor ring buffer */
-
-		txhostdesc = adev->txhostdesc_start;
-
-		/* loop over complete host send pool */
-		if (txhostdesc)
-		for (i = 0; i < TX_CNT * 2; i++) {
-			printk("acx: \ndump host txdesc %d:\n"
-					"mem pos %p\n"
-					"buffer mem pos 0x%X\n"
-					"buffer mem offset 0x%X\n"
-					"CTL 0x%X\n"
-					"Length 0x%X\n"
-					"next 0x%X\n"
-					"Status 0x%X\n",
-					i,
-					txhostdesc,
-					acx2cpu(txhostdesc->data_phy),
-					txhostdesc->data_offset,
-					le16_to_cpu(txhostdesc->Ctl_16),
-					le16_to_cpu(txhostdesc->length),
-					acx2cpu(txhostdesc->desc_phy_next),
-					le32_to_cpu(txhostdesc->Status));
-			txhostdesc++;
-		}
-
-		/* write_reg16(adev, 0xb4, 0x4); */
-
-		acx_unlock(adev, flags);
-		end_ok:
-
-		acx_sem_unlock(adev);
-#endif /* ACX_DEBUG */
-	return OK;
-}
-
-/***********************************************************************
- */
-int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
-		struct iw_request_info *info,
-		struct iw_param *vwrq, char *extra) {
-	// OW
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-	u16 gpio_old;
-
-	if (!IS_ACX100(adev)) {
-		/* WARNING!!!
-		 * Removing this check *might* damage
-		 * hardware, since we're tweaking GPIOs here after all!!!
-		 * You've been warned...
-		 * WARNING!!! */
-		printk("acx: sorry, setting bias level for non-acx100 "
-			"is not supported yet\n");
-		return OK;
-	}
-
-	if (*extra > 7) {
-		printk("acx: invalid bias parameter, range is 0-7\n");
-		return -EINVAL;
-	}
-
-	acx_sem_lock(adev);
-
-	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
-	 * IRQ handler uses it to update LED */
-	acx_lock(adev, flags);
-	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
-	write_reg16(adev, IO_ACX_GPIO_OUT,
-			(gpio_old & 0xf8ff)	| ((u16) *extra << 8));
-	acx_unlock(adev, flags);
-
-	log(L_DEBUG, "acx: gpio_old: 0x%04X\n", gpio_old);
-	printk("acx: %s: PHY power amplifier bias: old:%d, new:%d\n",
-			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
-
-	acx_sem_unlock(adev);
-
-	return OK;
-}
-#endif
 
 
 
