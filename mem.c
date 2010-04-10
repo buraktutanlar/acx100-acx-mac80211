@@ -200,12 +200,6 @@ void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count);
 void reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
-
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
-
 static void init_acx_txbuf(acx_device_t *adev);
 static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
@@ -213,6 +207,11 @@ static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
 static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
+
+void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
@@ -2937,50 +2936,179 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 		FN_EXIT0;
 }
 
-
  /*
   * BOM Tx Path
   * ==================================================
   */
 
- /*
-  * BOM Irq Handling, Timer
-  * ==================================================
-  */
-
- /*
-  * BOM Mac80211 Ops
-  * ==================================================
-  */
-
- /*
-  * BOM Helpers
-  * ==================================================
-  */
-
- /*
-  * BOM Ioctls
-  * ==================================================
-  */
-
- /*
-  * BOM Driver, Module
-  * ==================================================
-  */
-
-
-// BOM Cleanup ============================================================
-
-
-/***********************************************************************
- ** Register access
+/*
+ * acxmem_l_alloc_tx
+ * Actually returns a txdesc_t* ptr
+ *
+ * FIXME: in case of fragments, should allocate multiple descrs
+ * after figuring out how many we need and whether we still have
+ * sufficiently many.
  */
+ // OW TODO Align with pci.c
+tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
+	struct txdesc *txdesc;
+	unsigned head;
+	u8 ctl8;
+	static int txattempts = 0;
 
+	int blocks_needed;
 
-static char printable(char c) {
-	return ((c >= 20) && (c < 127)) ? c : '.';
+	FN_ENTER;
+
+	if (unlikely(!adev->tx_free)) {
+		log(L_ANY, "acxmem: %s: BUG: no free txdesc left\n", __func__);
+		/*
+		 * Probably the ACX ignored a transmit attempt and now there's a packet
+		 * sitting in the queue we think should be transmitting but the ACX doesn't
+		 * know about.
+		 * On the first pass, send the ACX a TxProc interrupt to try moving
+		 * things along, and if that doesn't work (ie, we get called again) completely
+		 * flush the transmit queue.
+		 */
+		if (txattempts < 10) {
+			txattempts++;
+			log(L_ANY, "acxmem: %s: trying to wake up ACX\n", __func__);
+			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+			write_flush(adev);
+		} else {
+			txattempts = 0;
+			log(L_ANY, "acxmem: %s: flushing transmit queue.\n", __func__);
+			acxmem_l_clean_txdesc_emergency(adev);
+		}
+		txdesc = NULL;
+		goto end;
+	}
+
+	/*
+	 * Make a quick check to see if there is transmit buffer space on
+	 * the ACX.  This can't guarantee there is enough space for the packet
+	 * since we don't yet know how big it is, but it will prevent at least some
+	 * annoyances.
+	 */
+
+	/* OW 20090815
+	 * Make a detailed check of required tx_buf blocks, to avoid 'out of tx_buf' situation.
+	 *
+	 * The empty tx_buf and reuse trick in acxmem_l_tx_data doen't wotk well.
+	 * I think it confused mac80211, that was supposing the packet was send,
+	 * but actually it was dropped.	According to mac80211 dropping should not happen,
+	 * altough a bit of dropping seemed to be ok.
+	 *
+	 * What we do now is simpler and clean I think:
+	 * - first check the number of required blocks
+	 * - and if there are not enough: Stop the queue and report NOT_OK.
+	 *
+	 * Reporting NOT_OK here shouldn't be done neither according to mac80211,
+	 * but it seems to work better here.
+   	*/
+
+	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
+	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
+		txdesc = NULL;
+		log(L_BUFT, "acxmem: %s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
+				"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
+				"Stopping queue.\n",
+				__func__,
+				len, blocks_needed, adev->acx_txbuf_blocks_free);
+		acx_stop_queue(adev->ieee, NULL);
+		goto end;
+	}
+
+	head = adev->tx_head;
+	/*
+	 * txdesc points to ACX memory
+	 */
+	txdesc = get_txdesc(adev, head);
+	ctl8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+
+	/*
+	 * If we don't own the buffer (HOSTOWN) it is certainly not free; however,
+	 * we may have previously thought we had enough memory to send
+	 * a packet, allocated the buffer then gave up when we found not enough
+	 * transmit buffer space on the ACX. In that case, HOSTOWN and
+	 * ACXDONE will both be set.
+	 */
+
+	// TODO OW Check if this is correct
+	// TODO 20100115 Changed to DESC_CTL_ACXDONE_HOSTOWN like in pci.c
+	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
+		/* whoops, descr at current index is not free, so probably
+		 * ring buffer already full */
+		log(L_ANY, "acxmem: %s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
+			__func__,
+			head, ctl8);
+		txdesc = NULL;
+		goto end;
+	}
+
+	/* Needed in case txdesc won't be eventually submitted for tx */
+	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
+
+	adev->tx_free--;
+	log(L_BUFT, "acxmem: %s: tx: got desc %u, %u remain\n",
+			__func__, head, adev->tx_free);
+	/* Keep a few free descs between head and tail of tx ring.
+	 ** It is not absolutely needed, just feels safer */
+	if (adev->tx_free < TX_STOP_QUEUE) {
+		log(L_BUF, "acxmem: %s: stop queue (%u tx desc left)\n", __func__, adev->tx_free);
+		acx_stop_queue(adev->ieee, NULL);
+	}
+
+	/* returning current descriptor, so advance to next free one */
+	adev->tx_head = (head + 1) % TX_CNT;
+
+	end:
+	FN_EXIT0;
+
+	return (tx_t*) txdesc;
 }
 
+/*
+ * acxmem_l_dealloc_tx
+ *
+ * Clears out a previously allocatedvoid acxmem_l_dealloc_tx(tx_t *tx_opaque);
+ * transmit descriptor.
+ * The ACX can get confused if we skip transmit descriptors in the queue,
+ * so when we don't need a descriptor return it to its original
+ * state and move the queue head pointer back.
+ *
+ */
+void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
+	/*
+	 * txdesc is the address of the descriptor on the ACX.
+	 */
+	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
+	txdesc_t tmptxdesc;
+	int index;
+
+	memset (&tmptxdesc, 0, sizeof(tmptxdesc));
+	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
+	tmptxdesc.u.r1.rate = 0x0a;
+
+	/*
+	 * Clear out all of the transmit descriptor except for the next pointer
+	 */
+	copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
+			(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
+					- sizeof(tmptxdesc.pNextDesc));
+
+	/*
+	 * This is only called immediately after we've allocated, so we should
+	 * be able to set the head back to this descriptor.
+	 */
+	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
+	printk("acx_dealloc: moving head from %d to %d\n", adev->tx_head, index);
+	adev->tx_head = index;
+}
+
+void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
+	return get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
+}
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	int blocks_needed;
@@ -3134,14 +3262,6 @@ static void init_acx_txbuf(acx_device_t *adev) {
 
 }
 
-INLINE_IO int adev_present(acx_device_t *adev) {
-	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
-	 * which should be safe): */
-	return acx_readl(adev->iobase) != 0xffffffff;
-}
-
-/***********************************************************************
- */
 static inline txdesc_t*
 get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
@@ -3203,6 +3323,721 @@ static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c,
 	adev->txc[index] = c;
 	adev->txr[index] = r111;
 }
+
+/*
+ * acxmem_l_tx_data
+ *
+ * Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
+ * Can be called from acx_i_start_xmit (data frames from net core).
+ *
+ * FIXME: in case of fragments, should loop over the number of
+ * pre-allocated tx descrs, properly setting up transfer data and
+ * CTL_xxx flags according to fragment number.
+ */
+void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+			struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
+	/*
+	 * txdesc is the address on the ACX
+	 */
+	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
+	struct ieee80211_hdr *wireless_header;
+	txhostdesc_t *hostdesc1, *hostdesc2;
+	int rate_cur;
+	u8 Ctl_8, Ctl2_8;
+	int wlhdr_len;
+	u32 addr;
+
+	FN_ENTER;
+
+	/* fw doesn't tx such packets anyhow */
+	/* if (unlikely(len < WLAN_HDR_A3_LEN))
+		goto end;
+	 */
+
+	hostdesc1 = get_txhostdesc(adev, txdesc);
+	wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
+
+	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
+	wlhdr_len = WLAN_HDR_A3_LEN;
+
+	/* modify flag status in separate variable to be able to write it back
+	 * in one big swoop later (also in order to have less device memory
+	 * accesses) */
+	Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+	Ctl2_8 = 0; /* really need to init it to 0, not txdesc->Ctl2_8, it seems */
+
+	hostdesc2 = hostdesc1 + 1;
+
+	/* DON'T simply set Ctl field to 0 here globally,
+	 * it needs to maintain a consistent flag status (those are state flags!!),
+	 * otherwise it may lead to severe disruption. Only set or reset particular
+	 * flags at the exact moment this is needed... */
+
+	/* let chip do RTS/CTS handshaking before sending
+	 * in case packet size exceeds threshold */
+
+	// if (len > adev->rts_threshold)
+	if (ieeectl->flags & IEEE80211_TX_RC_USE_RTS_CTS)
+		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
+	else
+		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
+
+	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+
+	if (unlikely(!rate_cur)) {
+		printk("acx: driver bug! bad ratemask\n");
+		goto end;
+	}
+
+	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
+	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
+
+	if (IS_ACX111(adev)) {
+		/* note that if !txdesc->do_auto, txrate->cur
+		 ** has only one nonzero bit */
+		txdesc->u.r2.rate111 = cpu_to_le16(rate_cur
+				/* WARNING: I was never able to make it work with prism54 AP.
+				 ** It was falling down to 1Mbit where shortpre is not applicable,
+				 ** and not working at all at "5,11 basic rates only" setting.
+				 ** I even didn't see tx packets in radio packet capture.
+				 ** Disabled for now --vda */
+				/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
+		);
+
+#ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
+		/* should add this to rate111 above as necessary */
+		| (clt->pbcc511 ? RATE111_PBCC511 : 0)
+#endif
+		hostdesc1->length = cpu_to_le16(len);
+	}
+	/* ACX100 */
+	else {
+		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), rate_100);
+
+#ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
+		if (clt->pbcc511) {
+			if (n == RATE100_5 || n == RATE100_11)
+			n |= RATE100_PBCC511;
+		}
+
+		if (clt->shortpre && (clt->cur != RATE111_1))
+		SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE); /* set Short Preamble */
+#endif
+
+		/* set autodma and reclaim and 1st mpdu */
+		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG);
+
+#if ACX_FRAGMENTATION
+		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
+#endif
+
+		hostdesc1->length = cpu_to_le16(wlhdr_len);
+
+		/*
+		 * Since we're not using autodma copy the packet data to the acx now.
+		 * Even host descriptors point to the packet header, and the odd indexed
+		 * descriptor following points to the packet data.
+		 *
+		 * The first step is to find free memory in the ACX transmit buffers.
+		 * They don't necessarily map one to one with the transmit queue entries,
+		 * so search through them starting just after the last one used.
+		 */
+		addr = allocate_acx_txbuf_space(adev, len);
+		if (addr) {
+			chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
+		} else {
+			/*
+			 * Bummer.  We thought we might have enough room in the transmit
+			 * buffers to send this packet, but it turns out we don't.  alloc_tx
+			 * has already marked this transmit descriptor as HOSTOWN and ACXDONE,
+			 * which means the ACX will hang when it gets to this descriptor unless
+			 * we do something about it.  Having a bubble in the transmit queue just
+			 * doesn't seem to work, so we have to reset this transmit queue entry's
+			 * state to its original value and back up our head pointer to point
+			 * back to this entry.
+			 */
+			 // OW FIXME Logging
+			printk("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
+			hostdesc1->length = 0;
+			hostdesc2->length = 0;
+			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
+			write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
+					| DESC_CTL_FIRSTFRAG);
+			adev->tx_head = ((u8*) txdesc - (u8*) adev->txdesc_start)
+					/ adev->txdesc_size;
+			adev->tx_free++;
+			goto end;
+		}
+		/*
+		 * Tell the ACX where the packet is.
+		 */
+		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), addr);
+
+	}
+	/* don't need to clean ack/rts statistics here, already
+	 * done on descr cleanup */
+
+	/* clears HOSTOWN and ACXDONE bits, thus telling that the descriptors
+	 * are now owned by the acx100; do this as LAST operation */
+	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
+	/* flush writes before we release hostdesc to the adapter here */
+	//wmb();
+
+
+	/* write back modified flags */
+	//At this point Ctl_8 should just be FIRSTFRAG
+	CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
+	write_slavemem8(adev, (u32) &(txdesc->Ctl2_8), Ctl2_8);
+	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), Ctl_8);
+	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
+
+	/*
+	 * Update the queue indicator to say there's data on the first queue.
+	 */
+	acxmem_update_queue_indicator(adev, 0);
+
+	/* flush writes before we tell the adapter that it's its turn now */
+	mmiowb();
+	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+	write_flush(adev);
+
+	hostdesc1->skb = skb;
+
+	/* log the packet content AFTER sending it,
+	 * in order to not delay sending any further than absolutely needed
+	 * Do separate logs for acx100/111 to have human-readable rates */
+
+	end:
+
+	// Debugging
+	if (unlikely(acx_debug & (L_XFER|L_DATA))) {
+		u16 fc = ((struct ieee80211_hdr *) hostdesc1->data)->frame_control;
+		if (IS_ACX111(adev))
+			printk("acx: tx: pkt (%s): len %d "
+				"rate %04X%s status %u\n", acx_get_packet_type_string(
+					le16_to_cpu(fc)), len, le16_to_cpu(txdesc->u.r2.rate111), (le16_to_cpu(txdesc->u.r2.rate111)& RATE111_SHORTPRE) ? "(SPr)" : "",
+					adev->status);
+		else
+			printk("acx: tx: pkt (%s): len %d rate %03u%s status %u\n",
+					acx_get_packet_type_string(fc), len, read_slavemem8(adev,
+							(u32) &(txdesc->u.r1.rate)), (Ctl_8
+							& DESC_CTL_SHORT_PREAMBLE) ? "(SPr)" : "",
+					adev->status);
+
+		if (0 && acx_debug & L_DATA) {
+			printk("acx: tx: 802.11 [%d]: ", len);
+			acx_dump_bytes(hostdesc1->data, len);
+		}
+	}
+
+	FN_EXIT0;
+}
+
+static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
+	struct ieee80211_tx_info *info) {
+	const char *err = "unknown error";
+
+	/* hmm, should we handle this as a mask
+	 * of *several* bits?
+	 * For now I think only caring about
+	 * individual bits is ok... */
+	switch (error) {
+	case 0x01:
+		err = "no Tx due to error in other fragment";
+		// OW adev->wstats.discard.fragment++;
+		break;
+	case 0x02:
+		err = "Tx aborted";
+		adev->stats.tx_aborted_errors++;
+		break;
+	case 0x04:
+		err = "Tx desc wrong parameters";
+		// OW adev->wstats.discard.misc++;
+		break;
+	case 0x08:
+		err = "WEP key not found";
+		// OW adev->wstats.discard.misc++;
+		break;
+	case 0x10:
+		err = "MSDU lifetime timeout? - try changing "
+			"'iwconfig retry lifetime XXX'";
+		// OW adev->wstats.discard.misc++;
+		break;
+	case 0x20:
+		err = "excessive Tx retries due to either distance "
+			"too high or unable to Tx or Tx frame error - "
+			"try changing 'iwconfig txpower XXX' or "
+			"'sens'itivity or 'retry'";
+		// OW adev->wstats.discard.retries++;
+
+		/* Tx error 0x20 also seems to occur on
+		 * overheating, so I'm not sure whether we
+		 * actually want to do aggressive radio recalibration,
+		 * since people maybe won't notice then that their hardware
+		 * is slowly getting cooked...
+		 * Or is it still a safe long distance from utter
+		 * radio non-functionality despite many radio recalibs
+		 * to final destructive overheating of the hardware?
+		 * In this case we really should do recalib here...
+		 * I guess the only way to find out is to do a
+		 * potentially fatal self-experiment :-\
+		 * Or maybe only recalib in case we're using Tx
+		 * rate auto (on errors switching to lower speed
+		 * --> less heat?) or 802.11 power save mode?
+		 *
+		 * ok, just do it. */
+		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
+			if (adev->retry_errors_msg_ratelimit <= 20) {
+				logf1(L_ANY, "%s: several excessive Tx "
+					"retry errors occurred, attempting "
+					"to recalibrate radio. Radio "
+					"drift might be caused by increasing "
+					"card temperature, please check the card "
+					"before it's too late!\n", wiphy_name(adev->ieee->wiphy));
+				if (adev->retry_errors_msg_ratelimit == 20)
+					logf0(L_ANY, "disabling above message\n");
+			}
+
+			acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+		}
+		// OW TODO Check what to do with excessive_retries in mac80211, 2.6.31
+		//info->status.excessive_retries++;
+		break;
+	case 0x40:
+		err = "Tx buffer overflow";
+		adev->stats.tx_fifo_errors++;
+		break;
+	case 0x80:
+		err = "DMA error";
+		// OW adev->wstats.discard.misc++;
+		break;
+	}
+	adev->stats.tx_errors++;
+	if (adev->stats.tx_errors <= 20)
+		printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
+				adev->ieee->wiphy),	error, finger, err);
+	else
+		printk("acx: %s: tx error 0x%02X, buf %02u!\n", wiphy_name(
+				adev->ieee->wiphy), error, finger);
+}
+
+/*
+ * acxmem_l_clean_txdesc
+ *
+ * This function resets the txdescs' status when the ACX100
+ * signals the TX done IRQ (txdescs have been processed), starting with
+ * the pool index of the descriptor which we would use next,
+ * in order to make sure that we can be as fast as possible
+ * in filling new txdescs.
+ * Everytime we get called we know where the next packet to be cleaned is.
+ */
+unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
+	txdesc_t *txdesc;
+	txhostdesc_t *hostdesc;
+	unsigned finger;
+	int num_cleaned;
+	u16 r111;
+	u8 error, ack_failures, rts_failures, rts_ok, r100, Ctl_8;
+	u32 acxmem;
+	txdesc_t tmptxdesc;
+
+	struct ieee80211_tx_info *txstatus;
+
+	FN_ENTER;
+
+	/*
+	 * Set up a template descriptor for re-initialization.  The only
+	 * things that get set are Ctl_8 and the rate, and the rate defaults
+	 * to 1Mbps.
+	 */
+	memset (&tmptxdesc, 0, sizeof (tmptxdesc));
+	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
+	tmptxdesc.u.r1.rate = 0x0a;
+
+	if (unlikely(acx_debug & L_DEBUG))
+		log_txbuffer(adev);
+
+	log(L_BUFT, "acx: tx: cleaning up bufs from %u\n", adev->tx_tail);
+
+	/* We know first descr which is not free yet. We advance it as far
+	 ** as we see correct bits set in following descs (if next desc
+	 ** is NOT free, we shouldn't advance at all). We know that in
+	 ** front of tx_tail may be "holes" with isolated free descs.
+	 ** We will catch up when all intermediate descs will be freed also */
+
+	finger = adev->tx_tail;
+	num_cleaned = 0;
+	while (likely(finger != adev->tx_head)) {
+		txdesc = get_txdesc(adev, finger);
+
+		/* If we allocated txdesc on tx path but then decided
+		 ** to NOT use it, then it will be left as a free "bubble"
+		 ** in the "allocated for tx" part of the ring.
+		 ** We may meet it on the next ring pass here. */
+
+		/* stop if not marked as "tx finished" and "host owned" */
+		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+
+		// OW FIXME Check against pci.c
+		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
+			//if (unlikely(!num_cleaned)) { /* maybe remove completely */
+			log(L_BUFT, "acx: clean_txdesc: tail isn't free. "
+				"finger=%d, tail=%d, head=%d\n", finger, adev->tx_tail,
+					adev->tx_head);
+			//}
+			break;
+		}
+
+		/* remember desc values... */
+		error = read_slavemem8(adev, (u32) &(txdesc->error));
+		ack_failures = read_slavemem8(adev, (u32) &(txdesc->ack_failures));
+		rts_failures = read_slavemem8(adev, (u32) &(txdesc->rts_failures));
+		rts_ok = read_slavemem8(adev, (u32) &(txdesc->rts_ok));
+		r100 = read_slavemem8(adev, (u32) &(txdesc->u.r1.rate));
+		r111 = le16_to_cpu(read_slavemem16 (adev, (u32) &(txdesc->u.r2.rate111)));
+
+		/* need to check for certain error conditions before we
+		 * clean the descriptor: we still need valid descr data here */
+
+		hostdesc = get_txhostdesc(adev, txdesc);
+		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
+		txstatus->flags |= IEEE80211_TX_STAT_ACK;
+
+		if (unlikely(0x30 & error)) {
+			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
+			 * all other errors mean we screwed up locally */
+			txstatus->flags &= ~IEEE80211_TX_STAT_ACK;
+		}
+
+		/*
+		 * Free up the transmit data buffers
+		 */
+		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
+		if (acxmem) {
+			reclaim_acx_txbuf_space(adev, acxmem);
+		}
+
+		/* ...and free the desc by clearing all the fields
+		 except the next pointer */
+		copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
+				(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
+						- sizeof(tmptxdesc.pNextDesc));
+
+		adev->tx_free++;
+		num_cleaned++;
+
+		// OW 20100207 TODO Perhaps it's better to do this ater reporting skb status to mac80211?
+		if ((adev->tx_free >= TX_START_QUEUE) &&
+			acx_queue_stopped(adev->ieee)
+		) {
+			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",	adev->tx_free);
+			acx_wake_queue(adev->ieee, NULL);
+		}
+
+		/* do error checking, rate handling and logging
+		 * AFTER having done the work, it's faster */
+
+		/* do rate handling */
+		/* Rate handling is done in mac80211 */
+
+		if (unlikely(error))
+			handle_tx_error(adev, error, finger, txstatus);
+
+		if (IS_ACX111(adev)) {
+			log(L_BUFT,
+					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X tx_free=%u\n",
+					finger, ack_failures, rts_failures, rts_ok, r111, adev->tx_free);
+		} else {
+			log(L_BUFT,
+					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u rate=%u tx_free=%u\n",
+					finger, ack_failures, rts_failures, rts_ok, r100, adev->tx_free);
+		}
+
+			/* And finally report upstream */
+		if (hostdesc) {
+			// TODO OW Does below still exists in mac80211 ??
+			//txstatus->status.excessive_retries = rts_failures;
+			//txstatus->status.retry_count = ack_failures;
+
+			//OW ieee80211_tx_status(adev->ieee,hostdesc->skb, &hostdesc->txstatus);
+			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
+
+			memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
+		}
+
+		/* update pointer for descr to be cleaned next */
+		finger = (finger + 1) % TX_CNT;
+	}
+
+	/* remember last position */
+	adev->tx_tail = finger;
+	/* end: */
+	FN_EXIT1(num_cleaned);
+	return num_cleaned;
+}
+
+/* clean *all* Tx descriptors, and regardless of their previous state.
+ * Used for brute-force reset handling. */
+void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
+	txdesc_t *txdesc;
+	int i;
+	u32 acxmem;
+
+	FN_ENTER;
+
+	for (i = 0; i < TX_CNT; i++) {
+		txdesc = get_txdesc(adev, i);
+
+		/* free it */
+		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
+		write_slavemem8(adev, (u32) &(txdesc->rts_failures), 0);
+		write_slavemem8(adev, (u32) &(txdesc->rts_ok), 0);
+		write_slavemem8(adev, (u32) &(txdesc->error), 0);
+		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN);
+
+		/*
+		 * Clean up the memory allocated on the ACX for this transmit descriptor.
+		 */
+		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
+		if (acxmem) {
+			reclaim_acx_txbuf_space(adev, acxmem);
+		}
+
+		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
+	}
+
+	adev->tx_free = TX_CNT;
+
+	FN_EXIT0;
+}
+
+void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
+#ifdef USING_MORE_THAN_ONE_TRANSMIT_QUEUE
+	u32 indicator;
+	unsigned long flags;
+	int count;
+
+	/*
+	 * Can't handle an interrupt while we're fiddling with the ACX's lock,
+	 * according to TI.  The ACX is supposed to hold fw_lock for at most
+	 * 500ns.
+	 */
+	local_irq_save(flags);
+
+	/*
+	 * Wait for ACX to release the lock (at most 500ns).
+	 */
+	count = 0;
+	while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
+			&& (count++ < 50)) {
+		ndelay (10);
+	}
+	if (count < 50) {
+
+		/*
+		 * Take out the host lock - anything non-zero will work, so don't worry about
+		 * be/le
+		 */
+		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 1);
+
+		/*
+		 * Avoid a race condition
+		 */
+		count = 0;
+		while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
+				&& (count++ < 50)) {
+			ndelay (10);
+		}
+
+		if (count < 50) {
+			/*
+			 * Mark the queue active
+			 */
+			indicator = read_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator));
+			indicator |= cpu_to_le32 (1 << txqueue);
+			write_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator), indicator);
+		}
+
+		/*
+		 * Release the host lock
+		 */
+		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 0);
+
+	}
+
+	/*
+	 * Restore interrupts
+	 */
+	local_irq_restore (flags);
+#endif
+}
+
+int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm) {
+	struct acx111_ie_tx_level tx_level;
+
+	/* since it can be assumed that at least the Maxim radio has a
+	 * maximum power output of 20dBm and since it also can be
+	 * assumed that these values drive the DAC responsible for
+	 * setting the linear Tx level, I'd guess that these values
+	 * should be the corresponding linear values for a dBm value,
+	 * in other words: calculate the values from that formula:
+	 * Y [dBm] = 10 * log (X [mW])
+	 * then scale the 0..63 value range onto the 1..100mW range (0..20 dBm)
+	 * and you're done...
+	 * Hopefully that's ok, but you never know if we're actually
+	 * right... (especially since Windows XP doesn't seem to show
+	 * actual Tx dBm values :-P) */
+
+	/* NOTE: on Maxim, value 30 IS 30mW, and value 10 IS 10mW - so the
+	 * values are EXACTLY mW!!! Not sure about RFMD and others,
+	 * though... */
+	static const u8 dbm2val_maxim[21] = { 63, 63, 63, 62, 61, 61, 60, 60, 59,
+			58, 57, 55, 53, 50, 47, 43, 38, 31, 23, 13, 0 };
+	static const u8 dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8,
+			10, 13, 16, 20, 25, 32, 41, 50, 63 };
+	const u8 *table;
+
+	switch (adev->radio_type) {
+	case RADIO_0D_MAXIM_MAX2820:
+		table = &dbm2val_maxim[0];
+		break;
+	case RADIO_11_RFMD:
+	case RADIO_15_RALINK:
+		table = &dbm2val_rfmd[0];
+		break;
+	default:
+		printk("acx: %s: unknown/unsupported radio type, "
+			"cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
+		return NOT_OK;
+	}
+	/*
+	 * The hx4700 EEPROM, at least, only supports 1 power setting.  The configure
+	 * routine matches the PA bias with the gain, so just use its default value.
+	 * The values are: 0x2b for the gain and 0x03 for the PA bias.  The firmware
+	 * writes the gain level to the Tx gain control DAC and the PA bias to the Maxim
+	 * radio's PA bias register.  The firmware limits itself to 0 - 64 when writing to the
+	 * gain control DAC.
+	 *
+	 * Physically between the ACX and the radio, higher Tx gain control DAC values result
+	 * in less power output; 0 volts to the Maxim radio results in the highest output power
+	 * level, which I'm assuming matches up with 0 in the Tx Gain DAC register.
+	 *
+	 * Although there is only the 1 power setting, one of the radio firmware functions adjusts
+	 * the transmit power level up and down.  That function is called by the ACX FIQ handler
+	 * under certain conditions.
+	 */
+	tx_level.level = 1;
+	//return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
+
+	printk("acx: %s: changing radio power level to %u dBm (%u)\n", wiphy_name(adev->ieee->wiphy),
+			level_dbm, table[level_dbm]);
+	acxmem_s_write_phy_reg(adev, 0x11, table[level_dbm]);
+
+	return 0;
+}
+
+// OW TODO See if this is usable with mac80211
+#if 0
+/***********************************************************************
+ ** acxmem_i_tx_timeout
+ **
+ ** Called from network core. Must not sleep!
+ */
+static void acxmem_i_tx_timeout(struct net_device *ndev) {
+	acx_device_t *adev = ndev2adev(ndev);
+	unsigned long flags;
+	unsigned int tx_num_cleaned;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+
+	/* clean processed tx descs, they may have been completely full */
+	tx_num_cleaned = acxmem_l_clean_txdesc(adev);
+
+	/* nothing cleaned, yet (almost) no free buffers available?
+	 * --> clean all tx descs, no matter which status!!
+	 * Note that I strongly suspect that doing emergency cleaning
+	 * may confuse the firmware. This is a last ditch effort to get
+	 * ANYTHING to work again...
+	 *
+	 * TODO: it's best to simply reset & reinit hw from scratch...
+	 */
+	if ((adev->tx_free <= TX_EMERG_CLEAN) && (tx_num_cleaned == 0)) {
+		printk("%s: FAILED to free any of the many full tx buffers. "
+			"Switching to emergency freeing. "
+			"Please report!\n", ndev->name);
+		acxmem_l_clean_txdesc_emergency(adev);
+	}
+
+	if (acx_queue_stopped(ndev) && (ACX_STATUS_4_ASSOCIATED == adev->status))
+		acx_wake_queue(ndev, "after tx timeout");
+
+	/* stall may have happened due to radio drift, so recalib radio */
+	acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+
+	/* do unimportant work last */
+	printk("%s: tx timeout!\n", ndev->name);
+	adev->stats.tx_errors++;
+
+	acx_unlock(adev, flags);
+
+	FN_EXIT0;
+}
+#endif
+
+
+ /*
+  * BOM Irq Handling, Timer
+  * ==================================================
+  */
+
+ /*
+  * BOM Mac80211 Ops
+  * ==================================================
+  */
+
+ /*
+  * BOM Helpers
+  * ==================================================
+  */
+
+ /*
+  * BOM Ioctls
+  * ==================================================
+  */
+
+ /*
+  * BOM Driver, Module
+  * ==================================================
+  */
+
+
+// BOM Cleanup ============================================================
+
+
+/***********************************************************************
+ ** Register access
+ */
+
+
+static char printable(char c) {
+	return ((c >= 20) && (c < 127)) ? c : '.';
+}
+
+
+
+
+
+INLINE_IO int adev_present(acx_device_t *adev) {
+	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
+	 * which should be safe): */
+	return acx_readl(adev->iobase) != 0xffffffff;
+}
+
+/***********************************************************************
+ */
 
 /***********************************************************************
  ** EEPROM and PHY read/write helpers
@@ -3853,65 +4688,15 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
 	 * dev->tbusy==1.  Our rx path knows to not pass up received
 	 * frames because of dev->flags&IFF_UP is false.
 	 */
-	 
+
 	adev->initialized = 0;
-	
+
 	acx_sem_unlock(adev);
 
 	log(L_INIT, "acxmem: closed device\n");
 	FN_EXIT0;
 }
 
-// OW TODO See if this is usable with mac80211
-#if 0
-/***********************************************************************
- ** acxmem_i_tx_timeout
- **
- ** Called from network core. Must not sleep!
- */
-static void acxmem_i_tx_timeout(struct net_device *ndev) {
-	acx_device_t *adev = ndev2adev(ndev);
-	unsigned long flags;
-	unsigned int tx_num_cleaned;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-
-	/* clean processed tx descs, they may have been completely full */
-	tx_num_cleaned = acxmem_l_clean_txdesc(adev);
-
-	/* nothing cleaned, yet (almost) no free buffers available?
-	 * --> clean all tx descs, no matter which status!!
-	 * Note that I strongly suspect that doing emergency cleaning
-	 * may confuse the firmware. This is a last ditch effort to get
-	 * ANYTHING to work again...
-	 *
-	 * TODO: it's best to simply reset & reinit hw from scratch...
-	 */
-	if ((adev->tx_free <= TX_EMERG_CLEAN) && (tx_num_cleaned == 0)) {
-		printk("%s: FAILED to free any of the many full tx buffers. "
-			"Switching to emergency freeing. "
-			"Please report!\n", ndev->name);
-		acxmem_l_clean_txdesc_emergency(adev);
-	}
-
-	if (acx_queue_stopped(ndev) && (ACX_STATUS_4_ASSOCIATED == adev->status))
-		acx_wake_queue(ndev, "after tx timeout");
-
-	/* stall may have happened due to radio drift, so recalib radio */
-	acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-
-	/* do unimportant work last */
-	printk("%s: tx timeout!\n", ndev->name);
-	adev->stats.tx_errors++;
-
-	acx_unlock(adev, flags);
-
-	FN_EXIT0;
-}
-
-#endif
 
 
 /***********************************************************************
@@ -4265,7 +5050,7 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work)
 #endif
 
 	FN_ENTER;
-	
+
 	acx_lock(adev, flags);
 
 	irqtype = adev->irq_reason;
@@ -4311,7 +5096,7 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work)
 	irqtype = unmasked & ~adev->irq_mask;
 
 	/* ACK all IRQs ASAP */
-	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);	
+	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
 	log(L_IRQ, "acxmem: IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
 				unmasked, adev->irq_mask, irqtype);
 
@@ -4332,7 +5117,7 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work)
 	}
 }
 #endif
-	
+
 	/* Routine to perform blink with range
 	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
 	 if (unlikely(adev->led_power == 2))
@@ -4401,7 +5186,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id) {
 		/* save the state for the running issue_cmd() */
 		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 	}
-	
+
 	log(L_IRQ,"acxmem: %s: irqtype=%04X, unmasked=%04X, mask=%04X: will IRQ_HANDLED\n",
 		__func__, irqtype, unmasked, adev->irq_mask);
 
@@ -4877,729 +5662,16 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 }
 #endif
 
-/***************************************************************
- ** acxmem_l_alloc_tx
- ** Actually returns a txdesc_t* ptr
- **
- ** FIXME: in case of fragments, should allocate multiple descrs
- ** after figuring out how many we need and whether we still have
- ** sufficiently many.
- */
- 
- // OW TODO Align with pci.c
-tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
-	struct txdesc *txdesc;
-	unsigned head;
-	u8 ctl8;
-	static int txattempts = 0;
 
-	int blocks_needed;
-
-	FN_ENTER;
-
-	if (unlikely(!adev->tx_free)) {
-		log(L_ANY, "acxmem: %s: BUG: no free txdesc left\n", __func__);
-		/*
-		 * Probably the ACX ignored a transmit attempt and now there's a packet
-		 * sitting in the queue we think should be transmitting but the ACX doesn't
-		 * know about.
-		 * On the first pass, send the ACX a TxProc interrupt to try moving
-		 * things along, and if that doesn't work (ie, we get called again) completely
-		 * flush the transmit queue.
-		 */
-		if (txattempts < 10) {
-			txattempts++;
-			log(L_ANY, "acxmem: %s: trying to wake up ACX\n", __func__);
-			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
-			write_flush(adev);
-		} else {
-			txattempts = 0;
-			log(L_ANY, "acxmem: %s: flushing transmit queue.\n", __func__);
-			acxmem_l_clean_txdesc_emergency(adev);
-		}
-		txdesc = NULL;
-		goto end;
-	}
-
-	/*
-	 * Make a quick check to see if there is transmit buffer space on
-	 * the ACX.  This can't guarantee there is enough space for the packet
-	 * since we don't yet know how big it is, but it will prevent at least some
-	 * annoyances.
-	 */
-
-	/* OW 20090815
-	 * Make a detailed check of required tx_buf blocks, to avoid 'out of tx_buf' situation.
-	 *
-	 * The empty tx_buf and reuse trick in acxmem_l_tx_data doen't wotk well.
-	 * I think it confused mac80211, that was supposing the packet was send,
-	 * but actually it was dropped.	According to mac80211 dropping should not happen,
-	 * altough a bit of dropping seemed to be ok.
-	 *
-	 * What we do now is simpler and clean I think:
-	 * - first check the number of required blocks
-	 * - and if there are not enough: Stop the queue and report NOT_OK.
-	 *
-	 * Reporting NOT_OK here shouldn't be done neither according to mac80211,
-	 * but it seems to work better here.
-   	*/
-
-	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
-	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
-		txdesc = NULL;
-		log(L_BUFT, "acxmem: %s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
-				"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
-				"Stopping queue.\n",
-				__func__,
-				len, blocks_needed, adev->acx_txbuf_blocks_free);
-		acx_stop_queue(adev->ieee, NULL);
-		goto end;
-	}
-
-	head = adev->tx_head;
-	/*
-	 * txdesc points to ACX memory
-	 */
-	txdesc = get_txdesc(adev, head);
-	ctl8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-
-	/*
-	 * If we don't own the buffer (HOSTOWN) it is certainly not free; however,
-	 * we may have previously thought we had enough memory to send
-	 * a packet, allocated the buffer then gave up when we found not enough
-	 * transmit buffer space on the ACX. In that case, HOSTOWN and
-	 * ACXDONE will both be set.
-	 */
-	 
-	// TODO OW Check if this is correct
-	// TODO 20100115 Changed to DESC_CTL_ACXDONE_HOSTOWN like in pci.c
-	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
-		/* whoops, descr at current index is not free, so probably
-		 * ring buffer already full */
-		log(L_ANY, "acxmem: %s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
-			__func__,
-			head, ctl8);
-		txdesc = NULL;
-		goto end;
-	}
-
-	/* Needed in case txdesc won't be eventually submitted for tx */
-	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
-
-	adev->tx_free--;
-	log(L_BUFT, "acxmem: %s: tx: got desc %u, %u remain\n",
-			__func__, head, adev->tx_free);
-	/* Keep a few free descs between head and tail of tx ring.
-	 ** It is not absolutely needed, just feels safer */
-	if (adev->tx_free < TX_STOP_QUEUE) {
-		log(L_BUF, "acxmem: %s: stop queue (%u tx desc left)\n", __func__, adev->tx_free);
-		acx_stop_queue(adev->ieee, NULL);
-	}
-
-	/* returning current descriptor, so advance to next free one */
-	adev->tx_head = (head + 1) % TX_CNT;
-
-	end:
-	FN_EXIT0;
-
-	return (tx_t*) txdesc;
-}
-
-/***************************************************************
- ** acxmem_l_dealloc_tx
- ** Clears out a previously allocatedvoid acxmem_l_dealloc_tx(tx_t *tx_opaque);
- transmit descriptor.  The ACX
- ** can get confused if we skip transmit descriptors in the queue,
- ** so when we don't need a descriptor return it to its original
- ** state and move the queue head pointer back.
- **
- */
-void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
-	/*
-	 * txdesc is the address of the descriptor on the ACX.
-	 */
-	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
-	txdesc_t tmptxdesc;
-	int index;
-
-	memset (&tmptxdesc, 0, sizeof(tmptxdesc));
-	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
-	tmptxdesc.u.r1.rate = 0x0a;
-
-	/*
-	 * Clear out all of the transmit descriptor except for the next pointer
-	 */
-	copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
-			(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
-					- sizeof(tmptxdesc.pNextDesc));
-
-	/*
-	 * This is only called immediately after we've allocated, so we should
-	 * be able to set the head back to this descriptor.
-	 */
-	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
-	printk("acx_dealloc: moving head from %d to %d\n", adev->tx_head, index);
-	adev->tx_head = index;
-}
 
 /*
  * acxmem_l_get_txbuf
  */
-void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
-	return get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
-}
 
 
-void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
-#ifdef USING_MORE_THAN_ONE_TRANSMIT_QUEUE
-	u32 indicator;
-	unsigned long flags;
-	int count;
 
-	/*
-	 * Can't handle an interrupt while we're fiddling with the ACX's lock,
-	 * according to TI.  The ACX is supposed to hold fw_lock for at most
-	 * 500ns.
-	 */
-	local_irq_save(flags);
 
-	/*
-	 * Wait for ACX to release the lock (at most 500ns).
-	 */
-	count = 0;
-	while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
-			&& (count++ < 50)) {
-		ndelay (10);
-	}
-	if (count < 50) {
 
-		/*
-		 * Take out the host lock - anything non-zero will work, so don't worry about
-		 * be/le
-		 */
-		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 1);
-
-		/*
-		 * Avoid a race condition
-		 */
-		count = 0;
-		while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
-				&& (count++ < 50)) {
-			ndelay (10);
-		}
-
-		if (count < 50) {
-			/*
-			 * Mark the queue active
-			 */
-			indicator = read_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator));
-			indicator |= cpu_to_le32 (1 << txqueue);
-			write_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator), indicator);
-		}
-
-		/*
-		 * Release the host lock
-		 */
-		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 0);
-
-	}
-
-	/*
-	 * Restore interrupts
-	 */
-	local_irq_restore (flags);
-#endif
-}
-
-/***********************************************************************
- ** acxmem_l_tx_data
- **
- ** Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
- ** Can be called from acx_i_start_xmit (data frames from net core).
- **
- ** FIXME: in case of fragments, should loop over the number of
- ** pre-allocated tx descrs, properly setting up transfer data and
- ** CTL_xxx flags according to fragment number.
- */
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-			struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
-	/*
-	 * txdesc is the address on the ACX
-	 */
-	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
-	struct ieee80211_hdr *wireless_header;
-	txhostdesc_t *hostdesc1, *hostdesc2;
-	int rate_cur;
-	u8 Ctl_8, Ctl2_8;
-	int wlhdr_len;
-	u32 addr;
-
-	FN_ENTER;
-
-	/* fw doesn't tx such packets anyhow */
-	/* if (unlikely(len < WLAN_HDR_A3_LEN))
-		goto end;
-	 */
-
-	hostdesc1 = get_txhostdesc(adev, txdesc);
-	wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
-
-	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
-	wlhdr_len = WLAN_HDR_A3_LEN;
-
-	/* modify flag status in separate variable to be able to write it back
-	 * in one big swoop later (also in order to have less device memory
-	 * accesses) */
-	Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-	Ctl2_8 = 0; /* really need to init it to 0, not txdesc->Ctl2_8, it seems */
-
-	hostdesc2 = hostdesc1 + 1;
-
-	/* DON'T simply set Ctl field to 0 here globally,
-	 * it needs to maintain a consistent flag status (those are state flags!!),
-	 * otherwise it may lead to severe disruption. Only set or reset particular
-	 * flags at the exact moment this is needed... */
-
-	/* let chip do RTS/CTS handshaking before sending
-	 * in case packet size exceeds threshold */
-	 
-	// if (len > adev->rts_threshold)
-	if (ieeectl->flags & IEEE80211_TX_RC_USE_RTS_CTS)
-		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
-	else
-		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
-
-	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-
-	if (unlikely(!rate_cur)) {
-		printk("acx: driver bug! bad ratemask\n");
-		goto end;
-	}
-
-	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
-	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
-
-	if (IS_ACX111(adev)) {
-		/* note that if !txdesc->do_auto, txrate->cur
-		 ** has only one nonzero bit */
-		txdesc->u.r2.rate111 = cpu_to_le16(rate_cur
-				/* WARNING: I was never able to make it work with prism54 AP.
-				 ** It was falling down to 1Mbit where shortpre is not applicable,
-				 ** and not working at all at "5,11 basic rates only" setting.
-				 ** I even didn't see tx packets in radio packet capture.
-				 ** Disabled for now --vda */
-				/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
-		);
-
-#ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
-		/* should add this to rate111 above as necessary */
-		| (clt->pbcc511 ? RATE111_PBCC511 : 0)
-#endif
-		hostdesc1->length = cpu_to_le16(len);
-	}
-	/* ACX100 */
-	else {
-		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), rate_100);
-
-#ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
-		if (clt->pbcc511) {
-			if (n == RATE100_5 || n == RATE100_11)
-			n |= RATE100_PBCC511;
-		}
-
-		if (clt->shortpre && (clt->cur != RATE111_1))
-		SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE); /* set Short Preamble */
-#endif
-
-		/* set autodma and reclaim and 1st mpdu */
-		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG);
-
-#if ACX_FRAGMENTATION
-		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
-#endif
-
-		hostdesc1->length = cpu_to_le16(wlhdr_len);
-
-		/*
-		 * Since we're not using autodma copy the packet data to the acx now.
-		 * Even host descriptors point to the packet header, and the odd indexed
-		 * descriptor following points to the packet data.
-		 *
-		 * The first step is to find free memory in the ACX transmit buffers.
-		 * They don't necessarily map one to one with the transmit queue entries,
-		 * so search through them starting just after the last one used.
-		 */
-		addr = allocate_acx_txbuf_space(adev, len);
-		if (addr) {
-			chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
-		} else {
-			/*
-			 * Bummer.  We thought we might have enough room in the transmit
-			 * buffers to send this packet, but it turns out we don't.  alloc_tx
-			 * has already marked this transmit descriptor as HOSTOWN and ACXDONE,
-			 * which means the ACX will hang when it gets to this descriptor unless
-			 * we do something about it.  Having a bubble in the transmit queue just
-			 * doesn't seem to work, so we have to reset this transmit queue entry's
-			 * state to its original value and back up our head pointer to point
-			 * back to this entry.
-			 */
-			 // OW FIXME Logging
-			printk("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
-			hostdesc1->length = 0;
-			hostdesc2->length = 0;
-			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
-			write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
-					| DESC_CTL_FIRSTFRAG);
-			adev->tx_head = ((u8*) txdesc - (u8*) adev->txdesc_start)
-					/ adev->txdesc_size;
-			adev->tx_free++;
-			goto end;
-		}
-		/*
-		 * Tell the ACX where the packet is.
-		 */
-		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), addr);
-
-	}
-	/* don't need to clean ack/rts statistics here, already
-	 * done on descr cleanup */
-
-	/* clears HOSTOWN and ACXDONE bits, thus telling that the descriptors
-	 * are now owned by the acx100; do this as LAST operation */
-	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
-	/* flush writes before we release hostdesc to the adapter here */
-	//wmb();
-
-
-	/* write back modified flags */
-	//At this point Ctl_8 should just be FIRSTFRAG
-	CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
-	write_slavemem8(adev, (u32) &(txdesc->Ctl2_8), Ctl2_8);
-	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), Ctl_8);
-	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
-
-	/*
-	 * Update the queue indicator to say there's data on the first queue.
-	 */
-	acxmem_update_queue_indicator(adev, 0);
-
-	/* flush writes before we tell the adapter that it's its turn now */
-	mmiowb();
-	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
-	write_flush(adev);
-
-	hostdesc1->skb = skb;
-
-	/* log the packet content AFTER sending it,
-	 * in order to not delay sending any further than absolutely needed
-	 * Do separate logs for acx100/111 to have human-readable rates */
-
-	end:
-
-	// Debugging
-	if (unlikely(acx_debug & (L_XFER|L_DATA))) {
-		u16 fc = ((struct ieee80211_hdr *) hostdesc1->data)->frame_control;
-		if (IS_ACX111(adev))
-			printk("acx: tx: pkt (%s): len %d "
-				"rate %04X%s status %u\n", acx_get_packet_type_string(
-					le16_to_cpu(fc)), len, le16_to_cpu(txdesc->u.r2.rate111), (le16_to_cpu(txdesc->u.r2.rate111)& RATE111_SHORTPRE) ? "(SPr)" : "",
-					adev->status);
-		else
-			printk("acx: tx: pkt (%s): len %d rate %03u%s status %u\n",
-					acx_get_packet_type_string(fc), len, read_slavemem8(adev,
-							(u32) &(txdesc->u.r1.rate)), (Ctl_8
-							& DESC_CTL_SHORT_PREAMBLE) ? "(SPr)" : "",
-					adev->status);
-
-		if (0 && acx_debug & L_DATA) {
-			printk("acx: tx: 802.11 [%d]: ", len);
-			acx_dump_bytes(hostdesc1->data, len);
-		}
-	}
-
-	FN_EXIT0;
-}
-
-
-
-static void handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
-	struct ieee80211_tx_info *info) {
-	const char *err = "unknown error";
-
-	/* hmm, should we handle this as a mask
-	 * of *several* bits?
-	 * For now I think only caring about
-	 * individual bits is ok... */
-	switch (error) {
-	case 0x01:
-		err = "no Tx due to error in other fragment";
-		// OW adev->wstats.discard.fragment++;
-		break;
-	case 0x02:
-		err = "Tx aborted";
-		adev->stats.tx_aborted_errors++;
-		break;
-	case 0x04:
-		err = "Tx desc wrong parameters";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x08:
-		err = "WEP key not found";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x10:
-		err = "MSDU lifetime timeout? - try changing "
-			"'iwconfig retry lifetime XXX'";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x20:
-		err = "excessive Tx retries due to either distance "
-			"too high or unable to Tx or Tx frame error - "
-			"try changing 'iwconfig txpower XXX' or "
-			"'sens'itivity or 'retry'";
-		// OW adev->wstats.discard.retries++;
-
-		/* Tx error 0x20 also seems to occur on
-		 * overheating, so I'm not sure whether we
-		 * actually want to do aggressive radio recalibration,
-		 * since people maybe won't notice then that their hardware
-		 * is slowly getting cooked...
-		 * Or is it still a safe long distance from utter
-		 * radio non-functionality despite many radio recalibs
-		 * to final destructive overheating of the hardware?
-		 * In this case we really should do recalib here...
-		 * I guess the only way to find out is to do a
-		 * potentially fatal self-experiment :-\
-		 * Or maybe only recalib in case we're using Tx
-		 * rate auto (on errors switching to lower speed
-		 * --> less heat?) or 802.11 power save mode?
-		 *
-		 * ok, just do it. */
-		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
-			if (adev->retry_errors_msg_ratelimit <= 20) {
-				logf1(L_ANY, "%s: several excessive Tx "
-					"retry errors occurred, attempting "
-					"to recalibrate radio. Radio "
-					"drift might be caused by increasing "
-					"card temperature, please check the card "
-					"before it's too late!\n", wiphy_name(adev->ieee->wiphy));
-				if (adev->retry_errors_msg_ratelimit == 20)
-					logf0(L_ANY, "disabling above message\n");
-			}
-
-			acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-		}
-		// OW TODO Check what to do with excessive_retries in mac80211, 2.6.31
-		//info->status.excessive_retries++;
-		break;
-	case 0x40:
-		err = "Tx buffer overflow";
-		adev->stats.tx_fifo_errors++;
-		break;
-	case 0x80:
-		err = "DMA error";
-		// OW adev->wstats.discard.misc++;
-		break;
-	}
-	adev->stats.tx_errors++;
-	if (adev->stats.tx_errors <= 20)
-		printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
-				adev->ieee->wiphy),	error, finger, err);
-	else
-		printk("acx: %s: tx error 0x%02X, buf %02u!\n", wiphy_name(
-				adev->ieee->wiphy), error, finger);
-}
-
-/***********************************************************************
- ** acxmem_l_clean_txdesc
- **
- ** This function resets the txdescs' status when the ACX100
- ** signals the TX done IRQ (txdescs have been processed), starting with
- ** the pool index of the descriptor which we would use next,
- ** in order to make sure that we can be as fast as possible
- ** in filling new txdescs.
- ** Everytime we get called we know where the next packet to be cleaned is.
- */
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
-	txdesc_t *txdesc;
-	txhostdesc_t *hostdesc;
-	unsigned finger;
-	int num_cleaned;
-	u16 r111;
-	u8 error, ack_failures, rts_failures, rts_ok, r100, Ctl_8;
-	u32 acxmem;
-	txdesc_t tmptxdesc;
-
-	struct ieee80211_tx_info *txstatus;
-
-	FN_ENTER;
-
-	/*
-	 * Set up a template descriptor for re-initialization.  The only
-	 * things that get set are Ctl_8 and the rate, and the rate defaults
-	 * to 1Mbps.
-	 */
-	memset (&tmptxdesc, 0, sizeof (tmptxdesc));
-	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
-	tmptxdesc.u.r1.rate = 0x0a;
-
-	if (unlikely(acx_debug & L_DEBUG))
-		log_txbuffer(adev);
-
-	log(L_BUFT, "acx: tx: cleaning up bufs from %u\n", adev->tx_tail);
-
-	/* We know first descr which is not free yet. We advance it as far
-	 ** as we see correct bits set in following descs (if next desc
-	 ** is NOT free, we shouldn't advance at all). We know that in
-	 ** front of tx_tail may be "holes" with isolated free descs.
-	 ** We will catch up when all intermediate descs will be freed also */
-
-	finger = adev->tx_tail;
-	num_cleaned = 0;
-	while (likely(finger != adev->tx_head)) {
-		txdesc = get_txdesc(adev, finger);
-
-		/* If we allocated txdesc on tx path but then decided
-		 ** to NOT use it, then it will be left as a free "bubble"
-		 ** in the "allocated for tx" part of the ring.
-		 ** We may meet it on the next ring pass here. */
-
-		/* stop if not marked as "tx finished" and "host owned" */
-		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-
-		// OW FIXME Check against pci.c
-		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
-			//if (unlikely(!num_cleaned)) { /* maybe remove completely */
-			log(L_BUFT, "acx: clean_txdesc: tail isn't free. "
-				"finger=%d, tail=%d, head=%d\n", finger, adev->tx_tail,
-					adev->tx_head);
-			//}
-			break;
-		}
-
-		/* remember desc values... */
-		error = read_slavemem8(adev, (u32) &(txdesc->error));
-		ack_failures = read_slavemem8(adev, (u32) &(txdesc->ack_failures));
-		rts_failures = read_slavemem8(adev, (u32) &(txdesc->rts_failures));
-		rts_ok = read_slavemem8(adev, (u32) &(txdesc->rts_ok));
-		r100 = read_slavemem8(adev, (u32) &(txdesc->u.r1.rate));
-		r111 = le16_to_cpu(read_slavemem16 (adev, (u32) &(txdesc->u.r2.rate111)));
-
-		/* need to check for certain error conditions before we
-		 * clean the descriptor: we still need valid descr data here */
-
-		hostdesc = get_txhostdesc(adev, txdesc);
-		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
-		txstatus->flags |= IEEE80211_TX_STAT_ACK;
-
-		if (unlikely(0x30 & error)) {
-			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
-			 * all other errors mean we screwed up locally */
-			txstatus->flags &= ~IEEE80211_TX_STAT_ACK;
-		}
-
-		/*
-		 * Free up the transmit data buffers
-		 */
-		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-		if (acxmem) {
-			reclaim_acx_txbuf_space(adev, acxmem);
-		}
-
-		/* ...and free the desc by clearing all the fields
-		 except the next pointer */
-		copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
-				(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
-						- sizeof(tmptxdesc.pNextDesc));
-
-		adev->tx_free++;
-		num_cleaned++;
-
-		// OW 20100207 TODO Perhaps it's better to do this ater reporting skb status to mac80211?
-		if ((adev->tx_free >= TX_START_QUEUE) &&
-			acx_queue_stopped(adev->ieee)
-		) {
-			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",	adev->tx_free);
-			acx_wake_queue(adev->ieee, NULL);
-		}
-
-		/* do error checking, rate handling and logging
-		 * AFTER having done the work, it's faster */
-
-		/* do rate handling */
-		/* Rate handling is done in mac80211 */
-
-		if (unlikely(error))
-			handle_tx_error(adev, error, finger, txstatus);
-
-		if (IS_ACX111(adev)) {
-			log(L_BUFT,
-					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X tx_free=%u\n",
-					finger, ack_failures, rts_failures, rts_ok, r111, adev->tx_free);
-		} else {
-			log(L_BUFT,
-					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u rate=%u tx_free=%u\n",
-					finger, ack_failures, rts_failures, rts_ok, r100, adev->tx_free);
-		}
-
-			/* And finally report upstream */
-		if (hostdesc) {
-			// TODO OW Does below still exists in mac80211 ??
-			//txstatus->status.excessive_retries = rts_failures;
-			//txstatus->status.retry_count = ack_failures;
-
-			//OW ieee80211_tx_status(adev->ieee,hostdesc->skb, &hostdesc->txstatus);
-			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
-
-			memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
-		}
-
-		/* update pointer for descr to be cleaned next */
-		finger = (finger + 1) % TX_CNT;
-	}
-
-	/* remember last position */
-	adev->tx_tail = finger;
-	/* end: */
-	FN_EXIT1(num_cleaned);
-	return num_cleaned;
-}
-
-/* clean *all* Tx descriptors, and regardless of their previous state.
- * Used for brute-force reset handling. */
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
-	txdesc_t *txdesc;
-	int i;
-	u32 acxmem;
-
-	FN_ENTER;
-
-	for (i = 0; i < TX_CNT; i++) {
-		txdesc = get_txdesc(adev, i);
-
-		/* free it */
-		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_ok), 0);
-		write_slavemem8(adev, (u32) &(txdesc->error), 0);
-		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN);
-
-		/*
-		 * Clean up the memory allocated on the ACX for this transmit descriptor.
-		 */
-		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-		if (acxmem) {
-			reclaim_acx_txbuf_space(adev, acxmem);
-		}
-
-		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
-	}
-
-	adev->tx_free = TX_CNT;
-
-	FN_EXIT0;
-}
 
 /***********************************************************************
  ** acxmem_s_create_tx_host_desc_queue
@@ -5689,69 +5761,7 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 
 /***********************************************************************
  */
-int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm) {
-	struct acx111_ie_tx_level tx_level;
 
-	/* since it can be assumed that at least the Maxim radio has a
-	 * maximum power output of 20dBm and since it also can be
-	 * assumed that these values drive the DAC responsible for
-	 * setting the linear Tx level, I'd guess that these values
-	 * should be the corresponding linear values for a dBm value,
-	 * in other words: calculate the values from that formula:
-	 * Y [dBm] = 10 * log (X [mW])
-	 * then scale the 0..63 value range onto the 1..100mW range (0..20 dBm)
-	 * and you're done...
-	 * Hopefully that's ok, but you never know if we're actually
-	 * right... (especially since Windows XP doesn't seem to show
-	 * actual Tx dBm values :-P) */
-
-	/* NOTE: on Maxim, value 30 IS 30mW, and value 10 IS 10mW - so the
-	 * values are EXACTLY mW!!! Not sure about RFMD and others,
-	 * though... */
-	static const u8 dbm2val_maxim[21] = { 63, 63, 63, 62, 61, 61, 60, 60, 59,
-			58, 57, 55, 53, 50, 47, 43, 38, 31, 23, 13, 0 };
-	static const u8 dbm2val_rfmd[21] = { 0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 8,
-			10, 13, 16, 20, 25, 32, 41, 50, 63 };
-	const u8 *table;
-
-	switch (adev->radio_type) {
-	case RADIO_0D_MAXIM_MAX2820:
-		table = &dbm2val_maxim[0];
-		break;
-	case RADIO_11_RFMD:
-	case RADIO_15_RALINK:
-		table = &dbm2val_rfmd[0];
-		break;
-	default:
-		printk("acx: %s: unknown/unsupported radio type, "
-			"cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
-		return NOT_OK;
-	}
-	/*
-	 * The hx4700 EEPROM, at least, only supports 1 power setting.  The configure
-	 * routine matches the PA bias with the gain, so just use its default value.
-	 * The values are: 0x2b for the gain and 0x03 for the PA bias.  The firmware
-	 * writes the gain level to the Tx gain control DAC and the PA bias to the Maxim
-	 * radio's PA bias register.  The firmware limits itself to 0 - 64 when writing to the
-	 * gain control DAC.
-	 *
-	 * Physically between the ACX and the radio, higher Tx gain control DAC values result
-	 * in less power output; 0 volts to the Maxim radio results in the highest output power
-	 * level, which I'm assuming matches up with 0 in the Tx Gain DAC register.
-	 *
-	 * Although there is only the 1 power setting, one of the radio firmware functions adjusts
-	 * the transmit power level up and down.  That function is called by the ACX FIQ handler
-	 * under certain conditions.
-	 */
-	tx_level.level = 1;
-	//return acx_s_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
-
-	printk("acx: %s: changing radio power level to %u dBm (%u)\n", wiphy_name(adev->ieee->wiphy),
-			level_dbm, table[level_dbm]);
-	acxmem_s_write_phy_reg(adev, 0x11, table[level_dbm]);
-
-	return 0;
-}
 
 static struct platform_driver acxmem_drv_id = {
 		.driver = {
