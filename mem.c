@@ -216,8 +216,8 @@ static void acxmem_irq_enable(acx_device_t *adev);
 static void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_i_interrupt_tasklet(struct work_struct *work);
 static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
-static void handle_info_irq(acx_device_t *adev);
-static void log_unusual_irq(u16 irqtype);
+static void acxmem_handle_info_irq(acx_device_t *adev);
+static void acxmem_log_unusual_irq(u16 irqtype);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops
@@ -4223,7 +4223,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id) {
 			) {
 
 		if (irqtype & HOST_INT_INFO) {
-			handle_info_irq(adev);
+			acxmem_handle_info_irq(adev);
 		}
 
 		if (irqtype & HOST_INT_SCAN_COMPLETE) {
@@ -4255,7 +4255,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id) {
 		| HOST_INT_FCS_THRESHOLD
 		| HOST_INT_UNKNOWN))
 	{
-		log_unusual_irq(irqtype);
+		acxmem_log_unusual_irq(irqtype);
 	}
 
 	irq_handled:
@@ -4307,7 +4307,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id) {
  after we set it once. Let's hope this will be fixed in firmware someday
  */
 
-static void handle_info_irq(acx_device_t *adev) {
+static void acxmem_handle_info_irq(acx_device_t *adev) {
 #if ACX_DEBUG
 	static const char * const info_type_msg[] = {
 			"(unknown)",
@@ -4349,7 +4349,7 @@ static void handle_info_irq(acx_device_t *adev) {
 }
 
 
-static void log_unusual_irq(u16 irqtype) {
+static void acxmem_log_unusual_irq(u16 irqtype) {
 	/*
 	 if (!printk_ratelimit())
 	 return;
@@ -4560,7 +4560,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 				SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 			}
 			if (irqtype & HOST_INT_INFO) {
-				handle_info_irq(adev);
+				acxmem_handle_info_irq(adev);
 			}
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
 				log(L_IRQ, "got Scan_Complete IRQ\n");
@@ -4591,7 +4591,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 		| HOST_INT_FCS_THRESHOLD
 		| HOST_INT_UNKNOWN))
 		{
-			log_unusual_irq(irqtype);
+			acxmem_log_unusual_irq(irqtype);
 		}
 
 #if IRQ_ITERATE
