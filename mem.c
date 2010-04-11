@@ -226,8 +226,8 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
 void acxmem_l_power_led(acx_device_t *adev, int enable);
-INLINE_IO int adev_present(acx_device_t *adev);
-static char printable(char c);
+INLINE_IO int acxmem_adev_present(acx_device_t *adev);
+static char acxmem_printable(char c);
 //static void update_link_quality_led(acx_device_t *adev);
 
 // Ioctls
@@ -397,7 +397,7 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 			printk("%02x ", buf[i]);
 		}
 		for (i = 0; (i < 16) && (i < length); i++) {
-			printk("%c", printable(buf[i]));
+			printk("%c", acxmem_printable(buf[i]));
 		}
 		printk("\n");
 		start += 16;
@@ -4779,13 +4779,13 @@ void acxmem_l_power_led(acx_device_t *adev, int enable) {
 				| gpio_pled);
 }
 
-INLINE_IO int adev_present(acx_device_t *adev) {
+INLINE_IO int acxmem_adev_present(acx_device_t *adev) {
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
-static char printable(char c) {
+static char acxmem_printable(char c) {
 	return ((c >= 20) && (c < 127)) ? c : '.';
 }
 
@@ -5434,7 +5434,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	acx_sem_lock(adev);
 
 	/* If device wasn't hot unplugged... */
-	if (adev_present(adev)) {
+	if (acxmem_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
