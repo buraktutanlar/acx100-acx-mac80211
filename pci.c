@@ -1384,9 +1384,6 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
  * 1) stop doing many iters - go to sleep after first
  * 2) go to waitqueue based approach: wait, not poll!
  */
-#undef FUNC
-#define FUNC "issue_cmd"
-
 int
 acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
@@ -1407,13 +1404,14 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, FUNC "acx: (cmd:%s,buflen:%u,timeout:%ums,type:0x%04X)\n",
-	    cmdstr, buflen, cmd_timeout,
+	log(L_CTL, "acx: %s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X\n",
+	    __func__, cmdstr, buflen, cmd_timeout,
 	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		printk("acx: %s: " FUNC "(): firmware is not loaded yet, "
-		       "cannot execute commands!\n", devname);
+		printk("acx: %s: %s: firmware is not loaded yet, "
+		       "cannot execute commands!\n", 
+           __func__, devname);
 		goto bad;
 	}
 
@@ -1443,12 +1441,13 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	if (!counter) {
 		/* the card doesn't get idle, we're in trouble */
-		printk("acx: %s: " FUNC "(): cmd_status is not IDLE: 0x%04X!=0\n",
-		       devname, cmd_status);
+		printk("acx: %s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
+		       __func__, devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) {	/* if waited >10ms... */
-		log(L_CTL | L_DEBUG, "acx: " FUNC "(): waited for IDLE %dms. "
-		    "Please report\n", 199 - counter);
+		log(L_CTL | L_DEBUG, "acx: %s: waited for IDLE %dms. "
+		    "Please report\n", 
+        __func__, 199 - counter);
 	}
 
 	/* now write the parameters of the command if needed */
@@ -1520,26 +1519,29 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	/* Timed out! */
 	if (counter == -1) {
-		log(L_ANY, "acx: %s: " FUNC "(): timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "acx: %s: %s: timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
-		       devname, (adev->irqs_active) ? "waiting" : "polling",
+		       __func__, devname, 
+           (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 		log(L_ANY, "acx: timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
 				counter, cmd_timeout, cmd_timeout - counter);
 
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
-		log(L_CTL | L_DEBUG, "acx: " FUNC "(): %s for CMD_COMPLETE %dms. "
+		log(L_CTL | L_DEBUG, "acx: %s: %s for CMD_COMPLETE %dms. "
 		    "count:%d. Please report\n",
+		    __func__,
 		    (adev->irqs_active) ? "waited" : "polled",
 		    cmd_timeout - counter, counter);
 	}
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
-		log(L_ANY, "acx: %s: " FUNC "(): ERROR: cmd_status is not SUCCESS: %d (%s). "
+		log(L_ANY, "acx: %s: %s: ERROR: cmd_status is not SUCCESS: %d (%s). "
 		       "Took %dms of %d\n",
-		       devname, cmd_status, acx_cmd_status_str(cmd_status),
+		       __func__, devname, 
+           cmd_status, acx_cmd_status_str(cmd_status),
 		       cmd_timeout - counter, cmd_timeout);
 		/* zero out result buffer
 		 * WARNING: this will trash stack in case of illegally large input
@@ -1559,21 +1561,21 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		}
 	}
 	/* ok: */
-	log(L_CTL, "acx: " FUNC "(%s): took %ld jiffies to complete\n",
-	    cmdstr, jiffies - start);
+	log(L_CTL, "acx: %s: %s: took %ld jiffies to complete\n",
+	    __func__, cmdstr, jiffies - start);
 	FN_EXIT1(OK);
 	return OK;
 
       bad:
 	/* Give enough info so that callers can avoid
-	 ** printing their own diagnostic messages */
-#if ACX_DEBUG
-	printk("acx: %s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
-#else
-	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
-#endif
+	 ** printing their own diagnostic messages */	
+	log(L_CTL, "acx: %s: %s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: FAILED\n",
+	    __func__, devname,
+      cmdstr, buflen, cmd_timeout,
+	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);    
 	// dump_stack();
 	FN_EXIT1(NOT_OK);
+	
 	return NOT_OK;
 }
 
