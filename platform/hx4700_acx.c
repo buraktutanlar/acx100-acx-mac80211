@@ -102,8 +102,9 @@ hx4700_wlan_init( void )
 	// Check if the (or another) driver was found, aka if probe succeeded
 	if (acx_device.dev.driver == NULL) {
 		printk( "hx4700_acx: %s: acx-mem platform_device_register: failed\n", __func__);
+		platform_device_unregister( &acx_device );
 		hx4700_wlan_stop();
-		return(-1);
+		return(-EINVAL);
 	}
 
 	return res;
