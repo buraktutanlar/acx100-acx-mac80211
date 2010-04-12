@@ -226,6 +226,8 @@ void __exit acxpci_e_cleanup_module(void);
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 
+#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)
+
 /*
  * BOM Logging
  * ==================================================
@@ -2727,7 +2729,6 @@ static void acxpci_disable_acx_irq(acx_device_t * adev)
 }
 
 /* Interrupt handler bottom-half */
-#define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)
 void acxpci_interrupt_tasklet(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
