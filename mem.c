@@ -263,6 +263,8 @@ typedef enum {
 
 //OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4)
 
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+
 static const u16 IO_ACX100[] = {
 0x0000, /* IO_ACX_SOFT_RESET */
 
@@ -891,9 +893,6 @@ int acxmem_s_create_hostdesc_queues(acx_device_t *adev) {
  * the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end
  */
-// OW FIXME Put this as const into function
-#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
-
 static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev) {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
