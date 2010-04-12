@@ -224,6 +224,8 @@ void __exit acxpci_e_cleanup_module(void);
 #endif
 #endif /* CONFIG_PCI */
 
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+
 /*
  * BOM Logging
  * ==================================================
@@ -347,8 +349,6 @@ int acxpci_s_create_hostdesc_queues(acx_device_t * adev)
  * the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end
  */
-// OW FIXME Put this as const into function
-#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
 {
 	rxhostdesc_t *hostdesc;
