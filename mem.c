@@ -2181,19 +2181,11 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	bad:
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
-#if ACX_DEBUG
 	log(L_ANY, "acxmem: %s: %s: "
 			"cmdstr=%s, cmd=0x%04X, type=0x%04X: FAILED\n",
 			__func__, devname,
 			cmdstr, cmd,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
-#else
-	log(L_ANY, "acxmem: %s: %s: "
-			"cmd=0x%04X, type=0x%04X: FAILED\n",
-			__func__, devname,
-			cmd,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
-#endif
 
 	FN_EXIT1(NOT_OK);
 
