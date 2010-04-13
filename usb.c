@@ -117,17 +117,11 @@ static int acxusb_s_fill_configoption(acx_device_t * adev);
 
 // Rx Path
 static void acxusb_i_complete_rx(struct urb *);
-
-// TODO make static
-void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
-void acxusb_i_complete_rx(struct urb *urb);
+static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
+static void acxusb_i_complete_rx(struct urb *urb);
 
 // Tx Path
-static void acxusb_i_complete_tx(struct urb *);
-
-// TODO make static
-void acxusb_i_complete_tx(struct urb *urb);
-
+static void acxusb_i_complete_tx(struct urb *urb);
 tx_t *acxusb_l_alloc_tx(acx_device_t *adev);
 void acxusb_l_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
@@ -149,14 +143,10 @@ static void dump_config_descriptor(struct usb_config_descriptor *cd);
 static void dump_device_descriptor(struct usb_device_descriptor *dd);
 #endif
 
-// Ioctls
-
 // Driver, Module
 static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID);
-
-// TODO make static
-void acxusb_e_disconnect(struct usb_interface *intf);
-int acxusb_e_open(struct ieee80211_hw *hw);
+static void acxusb_e_disconnect(struct usb_interface *intf);
+static int acxusb_e_open(struct ieee80211_hw *hw);
 static void acxusb_e_close(struct ieee80211_hw *hw);
 
 int __init acxusb_e_init_module(void);
@@ -1176,7 +1166,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 ** network devices have to be taken down and all allocated memory has
 ** to be freed.
 */
-void acxusb_e_disconnect(struct usb_interface *intf)
+static void acxusb_e_disconnect(struct usb_interface *intf)
 {
 	unsigned long flags;
 	int i;
@@ -1235,7 +1225,7 @@ void acxusb_e_disconnect(struct usb_interface *intf)
 ** It initializes a management timer, sets up the USB card and starts
 ** the network tx queue and USB receive.
 */
-int acxusb_e_open(struct ieee80211_hw *hw)
+static int acxusb_e_open(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -1354,7 +1344,7 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 ** acxusb_l_poll_rx
 ** This function (re)initiates a bulk-in USB transfer on a given urb
 */
-void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
+static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 {
 	struct usb_device *usbdev;
 	struct urb *rxurb;
@@ -1410,7 +1400,7 @@ void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 ** The received data is then committed to the network stack and the next
 ** USB receive is triggered.
 */
-void acxusb_i_complete_rx(struct urb *urb)
+static void acxusb_i_complete_rx(struct urb *urb)
 {
 	acx_device_t *adev;
 	rxbuffer_t *ptr;
@@ -1640,7 +1630,7 @@ void acxusb_i_complete_rx(struct urb *urb)
 **
 ** This function is invoked upon termination of a USB transfer.
 */
-void acxusb_i_complete_tx(struct urb *urb)
+static void acxusb_i_complete_tx(struct urb *urb)
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;
