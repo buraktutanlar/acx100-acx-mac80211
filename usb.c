@@ -45,6 +45,161 @@
 
 #include "acx.h"
 
+/*
+ * BOM Config
+ * ==================================================
+ */
+
+/*
+ * BOM Prototypes
+ * ... static and also none-static for overview reasons (maybe not best practice ...)
+ * ==================================================
+ */
+ 
+// Logging
+
+// Data Access
+
+// Firmware, EEPROM, Phy
+int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
+int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
+static void acxusb_s_read_eeprom_version(acx_device_t * adev);
+static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
+static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
+
+// CMDs (Control Path)
+int acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
+
+// Init, Configure (Control Path)
+static int acxusb_s_fill_configoption(acx_device_t * adev);
+
+// Other (Control Path)
+
+// Proc, Debug
+
+// Rx Path
+static void acxusb_i_complete_rx(struct urb *);
+
+// TODO make static
+void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
+void acxusb_i_complete_rx(struct urb *urb);
+
+// Tx Path
+static void acxusb_i_complete_tx(struct urb *);
+
+// TODO make static
+void acxusb_i_complete_tx(struct urb *urb);
+
+tx_t *acxusb_l_alloc_tx(acx_device_t *adev);
+void acxusb_l_dealloc_tx(tx_t * tx_opaque);
+void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+
+// Irq Handling, Timer
+void acxusb_interrupt_tasklet(struct work_struct *work);
+
+// Mac80211 Ops
+static int acxusb_e_open(struct ieee80211_hw *);
+static void acxusb_e_close(struct ieee80211_hw *);
+
+// Helpers
+static void acxusb_unlink_urb(struct urb *urb);
+
+#ifdef UNUSED
+static void dump_device(struct usb_device *usbdev);
+static void dump_config_descriptor(struct usb_config_descriptor *cd);
+static void dump_device_descriptor(struct usb_device_descriptor *dd);
+#endif
+
+// Ioctls
+
+// Driver, Module
+static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID);
+
+// TODO make static
+void acxusb_e_disconnect(struct usb_interface *intf);
+int acxusb_e_open(struct ieee80211_hw *hw);
+
+static void acxusb_e_close(struct ieee80211_hw *hw);
+
+int __init acxusb_e_init_module(void);
+void __exit acxusb_e_cleanup_module(void);
+
+ 
+ /*
+ * BOM Defines, static vars, etc.
+ * ==================================================
+ */
+
+/*
+ * BOM Logging
+ * ==================================================
+ */
+
+/*
+ * BOM Data Access
+ * ==================================================
+ */
+ 
+/*
+ * BOM Firmware, EEPROM, Phy
+ * ==================================================
+ */
+
+/*
+ * BOM CMDs (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Init, Configure (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Other (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Proc, Debug
+ * ==================================================
+ */
+
+/*
+ * BOM Rx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Tx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Irq Handling, Timer
+ * ==================================================
+ */
+
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
+
+/*
+ * BOM Helpers
+ * ==================================================
+ */
+
+/*
+ * BOM Ioctls
+ * ==================================================
+ */
+
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
 
 /***********************************************************************
 */
@@ -101,25 +256,6 @@
 #define ACX_USB_REQ_ACK_CS	0x11
 #define ACX_USB_REQ_CMD		0x12
 
-/***********************************************************************
-** Prototypes
-*/
-static int acxusb_e_probe(struct usb_interface *, const struct usb_device_id *);
-static void acxusb_e_disconnect(struct usb_interface *);
-static void acxusb_i_complete_tx(struct urb *);
-static void acxusb_i_complete_rx(struct urb *);
-static int acxusb_e_open(struct ieee80211_hw *);
-static void acxusb_e_close(struct ieee80211_hw *);
-//static void acxusb_i_set_rx_mode(struct net_device *);
-static int acxusb_boot(struct usb_device *, int is_tnetw1450, int *radio_type);
-
-static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
-
-/*static void acxusb_i_tx_timeout(struct net_device *);*/
-
-/* static void dump_device(struct usb_device *); */
-/* static void dump_device_descriptor(struct usb_device_descriptor *); */
-/* static void dump_config_descriptor(struct usb_config_descriptor *); */
 
 /***********************************************************************
 ** Module Data
