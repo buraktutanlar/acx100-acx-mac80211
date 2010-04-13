@@ -45,10 +45,48 @@
 
 #include "acx.h"
 
+/* OW, 20091205, TODO, Info on TNETW1450 support:
+ * Firmware loads, device shows activity, however RX and TX paths are broken.
+ * The RX path problem possibly related to urb,rxbuffer handling (in acxusb_i_complete_rx).
+ *
+ * Observed as followed: (Too) big packet to mac80211 and subsequent machine crash (e.g. double faults, etc.)
+ * acx: rx: CTL/UNKNOWN time:620888198 len:65528 signal:20 SNR:100 macstat:AB phystat:44 phyrate:134 status:0
+ */
+
 /*
  * BOM Config
  * ==================================================
  */
+
+/* ACX100 (TNETW1100) USB device: D-Link DWL-120+ */
+#define ACX100_VENDOR_ID 			0x2001
+#define ACX100_PRODUCT_ID_UNBOOTED 	0x3B01
+#define ACX100_PRODUCT_ID_BOOTED 	0x3B00
+
+/* TNETW1450 USB devices */
+#define VENDOR_ID_DLINK		0x07b8	/* D-Link Corp. */
+#define PRODUCT_ID_WUG2400	0xb21a	/* AboCom WUG2400 or SafeCom SWLUT-54125 */
+#define VENDOR_ID_AVM_GMBH	0x057c
+#define PRODUCT_ID_AVM_WLAN_USB		0x5601
+#define PRODUCT_ID_AVM_WLAN_USB_si	0x6201  /* "self install" named Version:
+											 * driver kills kernel on inbound scans from fritz box ??  */
+#define VENDOR_ID_ZCOM			0x0cde
+#define PRODUCT_ID_ZCOM_XG750	0x0017	/* not tested yet */
+#define VENDOR_ID_TI			0x0451
+#define PRODUCT_ID_TI_UNKNOWN	0x60c5	/* not tested yet */
+
+// Module Data
+static const struct usb_device_id acxusb_ids[] = {
+	{USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED)},
+	{USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_UNBOOTED)},
+	{USB_DEVICE(VENDOR_ID_DLINK, PRODUCT_ID_WUG2400)},
+	{USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB)},
+	{USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB_si)},
+	{USB_DEVICE(VENDOR_ID_ZCOM, PRODUCT_ID_ZCOM_XG750)},
+	{USB_DEVICE(VENDOR_ID_TI, PRODUCT_ID_TI_UNKNOWN)},
+	{}
+};
+MODULE_DEVICE_TABLE(usb, acxusb_ids);
 
 /*
  * BOM Prototypes
@@ -119,7 +157,6 @@ static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id
 // TODO make static
 void acxusb_e_disconnect(struct usb_interface *intf);
 int acxusb_e_open(struct ieee80211_hw *hw);
-
 static void acxusb_e_close(struct ieee80211_hw *hw);
 
 int __init acxusb_e_init_module(void);
@@ -130,6 +167,42 @@ void __exit acxusb_e_cleanup_module(void);
  * BOM Defines, static vars, etc.
  * ==================================================
  */
+
+/* number of endpoints of an interface */
+#define NUM_EP(intf) (intf)->altsetting[0].desc.bNumEndpoints
+#define EP(intf, nr) (intf)->altsetting[0].endpoint[(nr)].desc
+#define GET_DEV(udev) usb_get_dev((udev))
+#define PUT_DEV(udev) usb_put_dev((udev))
+
+/* removed in 2.6.14. We will use fake value for now
+ * TODO: maybe we should just remove all lines that include
+ * URB_ASYNC_UNLINK somewhere?
+*/
+#define URB_ASYNC_UNLINK 0
+
+#define ACX_USB_CTRL_TIMEOUT	5500	/* steps in ms */
+
+/* Buffer size for fw upload, same for both ACX100 USB and TNETW1450 */
+#define USB_RWMEM_MAXLEN	2048
+
+/* The number of bulk URBs to use */
+#define ACX_TX_URB_CNT		8
+#define ACX_RX_URB_CNT		2
+
+/* Should be sent to the bulkout endpoint */
+#define ACX_USB_REQ_UPLOAD_FW	0x10
+#define ACX_USB_REQ_ACK_CS	0x11
+#define ACX_USB_REQ_CMD		0x12
+
+#define TXBUFSIZE sizeof(usb_txbuffer_t)
+/*
+ * Now, this is just plain lying, but the device insists in giving us
+ * huge packets. We supply extra space after rxbuffer. Need to understand
+ * it better...
+ */
+#define RXBUFSIZE (sizeof(rxbuffer_t) + \
+		   (sizeof(usb_rx_t) - sizeof(struct usb_rx_plain)))
+
 
 /*
  * BOM Logging
@@ -200,87 +273,6 @@ void __exit acxusb_e_cleanup_module(void);
  * BOM Driver, Module
  * ==================================================
  */
-
-/***********************************************************************
-*/
-/* number of endpoints of an interface */
-#define NUM_EP(intf) (intf)->altsetting[0].desc.bNumEndpoints
-#define EP(intf, nr) (intf)->altsetting[0].endpoint[(nr)].desc
-#define GET_DEV(udev) usb_get_dev((udev))
-#define PUT_DEV(udev) usb_put_dev((udev))
-
-/* removed in 2.6.14. We will use fake value for now
- * TODO: maybe we should just remove all lines that include
- * URB_ASYNC_UNLINK somewhere?
-*/
-#define URB_ASYNC_UNLINK 0
-
-/***********************************************************************
-*/
-/* ACX100 (TNETW1100) USB device: D-Link DWL-120+ */
-#define ACX100_VENDOR_ID 0x2001
-#define ACX100_PRODUCT_ID_UNBOOTED 0x3B01
-#define ACX100_PRODUCT_ID_BOOTED 0x3B00
-
-/* OW, 20091205, TODO, Info on TNETW1450 support:
- * Firmware loads, device shows activity, however RX and TX paths are broken.
- * The RX path problem possibly related to urb,rxbuffer handling (in acxusb_i_complete_rx).
- *
- * Observed as followed: (Too) big packet to mac80211 and subsequent machine crash (e.g. double faults, etc.)
- * acx: rx: CTL/UNKNOWN time:620888198 len:65528 signal:20 SNR:100 macstat:AB phystat:44 phyrate:134 status:0
- */
-
-/* TNETW1450 USB devices */
-#define VENDOR_ID_DLINK		0x07b8	/* D-Link Corp. */
-#define PRODUCT_ID_WUG2400	0xb21a	/* AboCom WUG2400 or SafeCom SWLUT-54125 */
-#define VENDOR_ID_AVM_GMBH	0x057c
-#define PRODUCT_ID_AVM_WLAN_USB	0x5601
-#define PRODUCT_ID_AVM_WLAN_USB_si	0x6201  /* "self install" named Version:
-						 * driver kills kernel on inbound scans from fritz box ??  */
-#define VENDOR_ID_ZCOM		0x0cde
-#define PRODUCT_ID_ZCOM_XG750	0x0017	/* not tested yet */
-#define VENDOR_ID_TI		0x0451
-#define PRODUCT_ID_TI_UNKNOWN	0x60c5	/* not tested yet */
-
-#define ACX_USB_CTRL_TIMEOUT	5500	/* steps in ms */
-
-/* Buffer size for fw upload, same for both ACX100 USB and TNETW1450 */
-#define USB_RWMEM_MAXLEN	2048
-
-/* The number of bulk URBs to use */
-#define ACX_TX_URB_CNT		8
-#define ACX_RX_URB_CNT		2
-
-/* Should be sent to the bulkout endpoint */
-#define ACX_USB_REQ_UPLOAD_FW	0x10
-#define ACX_USB_REQ_ACK_CS	0x11
-#define ACX_USB_REQ_CMD		0x12
-
-
-/***********************************************************************
-** Module Data
-*/
-#define TXBUFSIZE sizeof(usb_txbuffer_t)
-/*
- * Now, this is just plain lying, but the device insists in giving us
- * huge packets. We supply extra space after rxbuffer. Need to understand
- * it better...
- */
-#define RXBUFSIZE (sizeof(rxbuffer_t) + \
-		   (sizeof(usb_rx_t) - sizeof(struct usb_rx_plain)))
-
-static const struct usb_device_id acxusb_ids[] = {
-	{USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_BOOTED)},
-	{USB_DEVICE(ACX100_VENDOR_ID, ACX100_PRODUCT_ID_UNBOOTED)},
-	{USB_DEVICE(VENDOR_ID_DLINK, PRODUCT_ID_WUG2400)},
-	{USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB)},
-	{USB_DEVICE(VENDOR_ID_AVM_GMBH, PRODUCT_ID_AVM_WLAN_USB_si)},
-	{USB_DEVICE(VENDOR_ID_ZCOM, PRODUCT_ID_ZCOM_XG750)},
-	{USB_DEVICE(VENDOR_ID_TI, PRODUCT_ID_TI_UNKNOWN)},
-	{}
-};
-
-MODULE_DEVICE_TABLE(usb, acxusb_ids);
 
 /* USB driver data structure as required by the kernel's USB core */
 static struct usb_driver
