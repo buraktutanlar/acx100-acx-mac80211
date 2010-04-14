@@ -78,7 +78,16 @@
  * + Code under sem can race only with IRQ code.
  * + Code under sem+lock cannot race with anything.
  * 
- * OW TODO: Explain semantics of the acx_lock and sem
+ */
+
+/* Two simplified guidelines for locking:
+ *
+ * 1) adev->spinlock protects the adev structure. When ever writing to adev,
+ * protect using acx_lock/acx_lock.
+ *
+ * 2) adev->sem coordinates external access, aka ieee80211_ops, proc access
+ * (or ioctls). An external entry point should protect with acx_sem/acx_sem_lock.
+ *
  */
 
 /* These functions *must* be inline or they will break horribly on SPARC, due
