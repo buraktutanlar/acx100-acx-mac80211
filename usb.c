@@ -1285,6 +1285,16 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
  * ==================================================
  */
 
+void acxusb_interrupt_tasklet(struct work_struct *work)
+{
+	acx_device_t *adev =
+			container_of(work, struct acx_device, after_interrupt_task);
+
+	if (adev->after_interrupt_jobs)
+		acx_e_after_interrupt_task(adev);
+}
+
+
 /*
  * BOM Mac80211 Ops
  * ==================================================
@@ -1901,17 +1911,6 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 #endif
 
 
-/*
- * For acx_e_after_interrupt_task
- */
-void acxusb_interrupt_tasklet(struct work_struct *work)
-{
-	acx_device_t *adev =
-			container_of(work, struct acx_device, after_interrupt_task);
-
-	if (adev->after_interrupt_jobs)
-		acx_e_after_interrupt_task(adev);
-}
 
 
 /***********************************************************************
