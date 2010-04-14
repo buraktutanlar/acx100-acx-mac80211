@@ -1443,48 +1443,29 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
  */
 
 /*
- * BOM Ioctls
- * ==================================================
+ * USB helper
+ *
+ * ldd3 ch13 says:
+ * When the function is usb_kill_urb, the urb lifecycle is stopped. This
+ * function is usually used when the device is disconnected from the system,
+ * in the disconnect callback. For some drivers, the usb_unlink_urb function
+ * should be used to tell the USB core to stop an urb. This function does not
+ * wait for the urb to be fully stopped before returning to the caller.
+ * This is useful for stoppingthe urb while in an interrupt handler or when
+ * a spinlock is held, as waiting for a urb to fully stop requires the ability
+ * for the USB core to put the calling process to sleep. This function requires
+ * that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
+ * to be stopped in order to work properly.
+ *
+ * (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
+ * asynchronous while usb_kill_urb is synchronous and should be called
+ * directly (drivers/usb/core/urb.c))
+ *
+ * In light of this, timeout is just for paranoid reasons...
+ *
+ * Actually, it's useful for debugging. If we reach timeout, we're doing
+ * something wrong with the urbs.
  */
-
-/*
- * BOM Driver, Module
- * ==================================================
- */
-
-/* USB driver data structure as required by the kernel's USB core */
-static struct usb_driver
- acxusb_driver = {
-	.name = "acx_usb",
-	.probe = acxusb_e_probe,
-	.disconnect = acxusb_e_disconnect,
-	.id_table = acxusb_ids
-};
-
-/***********************************************************************
-** USB helper
-**
-** ldd3 ch13 says:
-** When the function is usb_kill_urb, the urb lifecycle is stopped. This
-** function is usually used when the device is disconnected from the system,
-** in the disconnect callback. For some drivers, the usb_unlink_urb function
-** should be used to tell the USB core to stop an urb. This function does not
-** wait for the urb to be fully stopped before returning to the caller.
-** This is useful for stoppingthe urb while in an interrupt handler or when
-** a spinlock is held, as waiting for a urb to fully stop requires the ability
-** for the USB core to put the calling process to sleep. This function requires
-** that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
-** to be stopped in order to work properly.
-**
-** (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
-** asynchronous while usb_kill_urb is synchronous and should be called
-** directly (drivers/usb/core/urb.c))
-**
-** In light of this, timeout is just for paranoid reasons...
-*
-** Actually, it's useful for debugging. If we reach timeout, we're doing
-** something wrong with the urbs.
-*/
 static void acxusb_unlink_urb(struct urb *urb)
 {
 	if (!urb)
@@ -1502,6 +1483,26 @@ static void acxusb_unlink_urb(struct urb *urb)
 		}
 	}
 }
+
+
+/*
+ * BOM Ioctls
+ * ==================================================
+ */
+
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
+
+/* USB driver data structure as required by the kernel's USB core */
+static struct usb_driver
+ acxusb_driver = {
+	.name = "acx_usb",
+	.probe = acxusb_e_probe,
+	.disconnect = acxusb_e_disconnect,
+	.id_table = acxusb_ids
+};
 
 
 
