@@ -1300,6 +1300,143 @@ void acxusb_interrupt_tasklet(struct work_struct *work)
  * ==================================================
  */
 
+static const struct ieee80211_ops acxusb_hw_ops = {
+	.tx = acx_i_op_tx,
+	.conf_tx = acx_e_conf_tx,
+	.add_interface = acx_e_op_add_interface,
+	.remove_interface = acx_e_op_remove_interface,
+	.start = acxusb_e_open,
+	.configure_filter = acx_i_op_configure_filter,
+	.stop = acxusb_e_close,
+	.config = acx_e_op_config,
+	.bss_info_changed = acx_e_op_bss_info_changed,
+	.set_key = acx_e_op_set_key,
+	.get_stats = acx_e_op_get_stats,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+	.get_tx_stats = acx_e_op_get_tx_stats,
+#endif
+};
+
+/*
+ * acxusb_e_open()
+ * This function is called when the user sets up the network interface.
+ * It initializes a management timer, sets up the USB card and starts
+ * the network tx queue and USB receive.
+ */
+static int acxusb_e_open(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+	int i;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	adev->initialized = 0;
+
+	/* put the ACX100 out of sleep mode */
+//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+
+	init_timer(&adev->mgmt_timer);
+	adev->mgmt_timer.function = acx_i_timer;
+	adev->mgmt_timer.data = (unsigned long)adev;
+
+	/* acx_s_start needs it */
+	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	acx_s_start(adev);
+
+	/* don't acx_start_queue() here, we need to associate first */
+
+	acx_lock(adev, flags);
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
+		adev->usb_rx[i].urb->status = 0;
+	}
+	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
+
+	acx_wake_queue(adev->ieee, NULL);
+
+	adev->initialized = 1;
+
+	acx_unlock(adev, flags);
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return 0;
+}
+
+/*
+ * acxusb_e_close()
+ *
+ * This function stops the network functionality of the interface (invoked
+ * when the user calls ifconfig <wlan> down). The tx queue is halted and
+ * the device is marked as down. In case there were any pending USB bulk
+ * transfers, these are unlinked (asynchronously). The module in-use count
+ * is also decreased in this function.
+ */
+static void acxusb_e_close(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+	int i;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	if (adev->dev_state_mask & ACX_STATE_IFACE_UP)
+	{
+//		acxusb_e_down(adev);
+		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	}
+
+/* Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them? */
+
+    acx_free_modes(adev);
+
+	/* Make sure we don't get any more rx requests */
+	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+
+	/*
+	 * We must do FLUSH *without* holding sem to avoid a deadlock.
+	 * See pci.c:acxpci_s_down() for deails.
+	 */
+
+	// OW Maybe not required anymore. Mac80211 flushes queue
+	//	acx_sem_unlock(adev);
+	//	flush_scheduled_work();
+	//	acx_sem_lock(adev);
+
+	/* Power down the device */
+	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+
+	/* Stop the transmit queue, mark the device as DOWN */
+	acx_lock(adev, flags);
+//	acx_stop_queue(ndev, "on ifdown");
+//      acx_set_status(adev, ACX_STATUS_0_STOPPED);
+	/* stop pending rx/tx urb transfers */
+	for (i = 0; i < ACX_TX_URB_CNT; i++) {
+		acxusb_unlink_urb(adev->usb_tx[i].urb);
+		adev->usb_tx[i].busy = 0;
+	}
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
+		acxusb_unlink_urb(adev->usb_rx[i].urb);
+		adev->usb_rx[i].busy = 0;
+	}
+	adev->tx_free = ACX_TX_URB_CNT;
+	acx_unlock(adev, flags);
+
+	/* Must do this outside of lock */
+	del_timer_sync(&adev->mgmt_timer);
+
+	adev->initialized = 0;
+	log(L_INIT, "acxusb: closed device\n");
+
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+}
+
+
 /*
  * BOM Helpers
  * ==================================================
@@ -1376,23 +1513,6 @@ static void acxusb_unlink_urb(struct urb *urb)
 
 
 
-
-static const struct ieee80211_ops acxusb_hw_ops = {
-	.tx = acx_i_op_tx,
-	.conf_tx = acx_e_conf_tx,
-	.add_interface = acx_e_op_add_interface,
-	.remove_interface = acx_e_op_remove_interface,
-	.start = acxusb_e_open,
-	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxusb_e_close,
-	.config = acx_e_op_config,
-	.bss_info_changed = acx_e_op_bss_info_changed,
-	.set_key = acx_e_op_set_key,
-	.get_stats = acx_e_op_get_stats,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
-	.get_tx_stats = acx_e_op_get_tx_stats,
-#endif
-};
 
 /***********************************************************************
 ** acxusb_e_probe()
@@ -1741,125 +1861,8 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	FN_EXIT0;
 }
 
-/***********************************************************************
-** acxusb_e_open()
-** This function is called when the user sets up the network interface.
-** It initializes a management timer, sets up the USB card and starts
-** the network tx queue and USB receive.
-*/
-static int acxusb_e_open(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-	int i;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	adev->initialized = 0;
-
-	/* put the ACX100 out of sleep mode */
-//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
-
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_i_timer;
-	adev->mgmt_timer.data = (unsigned long)adev;
-
-	/* acx_s_start needs it */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	acx_s_start(adev);
-
-	/* don't acx_start_queue() here, we need to associate first */
-
-	acx_lock(adev, flags);
-	for (i = 0; i < ACX_RX_URB_CNT; i++) {
-		adev->usb_rx[i].urb->status = 0;
-	}
-	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
-
-	acx_wake_queue(adev->ieee, NULL);
-
-	adev->initialized = 1;
-
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
-
-	FN_EXIT0;
-	return 0;
-}
 
 
-/***********************************************************************
-** acxusb_e_close()
-**
-** This function stops the network functionality of the interface (invoked
-** when the user calls ifconfig <wlan> down). The tx queue is halted and
-** the device is marked as down. In case there were any pending USB bulk
-** transfers, these are unlinked (asynchronously). The module in-use count
-** is also decreased in this function.
-*/
-static void acxusb_e_close(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-	int i;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	if (adev->dev_state_mask & ACX_STATE_IFACE_UP)
-	{
-//		acxusb_e_down(adev);
-		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	}
-
-/* Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them? */
-
-    acx_free_modes(adev);
-
-	/* Make sure we don't get any more rx requests */
-	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-
-	/*
-	 * We must do FLUSH *without* holding sem to avoid a deadlock.
-	 * See pci.c:acxpci_s_down() for deails.
-	 */
-	 
-	// OW Maybe not required anymore. Mac80211 flushes queue
-	//	acx_sem_unlock(adev);
-	//	flush_scheduled_work();
-	//	acx_sem_lock(adev);
-
-	/* Power down the device */
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
-
-	/* Stop the transmit queue, mark the device as DOWN */
-	acx_lock(adev, flags);
-//	acx_stop_queue(ndev, "on ifdown");
-//      acx_set_status(adev, ACX_STATUS_0_STOPPED);
-	/* stop pending rx/tx urb transfers */
-	for (i = 0; i < ACX_TX_URB_CNT; i++) {
-		acxusb_unlink_urb(adev->usb_tx[i].urb);
-		adev->usb_tx[i].busy = 0;
-	}
-	for (i = 0; i < ACX_RX_URB_CNT; i++) {
-		acxusb_unlink_urb(adev->usb_rx[i].urb);
-		adev->usb_rx[i].busy = 0;
-	}
-	adev->tx_free = ACX_TX_URB_CNT;
-	acx_unlock(adev, flags);
-
-	/* Must do this outside of lock */
-	del_timer_sync(&adev->mgmt_timer);
-
-	adev->initialized = 0;
-	log(L_INIT, "acxusb: closed device\n");
-
-	acx_sem_unlock(adev);
-
-	FN_EXIT0;
-}
 
 
 
