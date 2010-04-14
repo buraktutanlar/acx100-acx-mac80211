@@ -1043,6 +1043,244 @@ static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
  */
 
 /*
+ * acxusb_i_complete_tx()
+ * Inputs:
+ *     urb -> pointer to USB request block
+ *    regs -> pointer to register-buffer for syscalls (see asm/ptrace.h)
+ *
+ * This function is invoked upon termination of a USB transfer.
+ */
+static void acxusb_i_complete_tx(struct urb *urb)
+{
+	acx_device_t *adev;
+	usb_tx_t *tx;
+	unsigned long flags;
+	int txnum;
+
+	FN_ENTER;
+
+	BUG_ON(!urb->context);
+
+	tx = (usb_tx_t *) urb->context;
+	adev = tx->adev;
+
+	txnum = tx - adev->usb_tx;
+
+	acx_lock(adev, flags);
+
+	/*
+	 * If the iface isn't up, we don't have any right
+	 * to play with them. The urb may get unlinked.
+	 */
+	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+		printk("acx: tx: device is down, not doing anything\n");
+		goto end_unlock;
+	}
+
+//	printk("acx: RETURN TX (%d): status=%d size=%d\n",
+//		txnum, urb->status, urb->actual_length);
+
+	/* handle USB transfer errors */
+	switch (urb->status) {
+	case 0:		/* No error */
+		break;
+	case -ESHUTDOWN:
+		goto end_unlock;
+		break;
+	case -ECONNRESET:
+		goto end_unlock;
+		break;
+		/* FIXME: real error-handling code here please */
+	default:
+		printk(KERN_ERR "acx: tx error, urb status=%d\n", urb->status);
+		/* FIXME: real error-handling code here please */
+	}
+
+	/* free the URB and check for more data */
+	tx->busy = 0;
+	adev->tx_free++;
+	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
+
+	if ((adev->tx_free >= TX_START_QUEUE)
+/*	    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
+/*	    && (acx_queue_stopped(adev->ndev)*/
+	   ){
+		log(L_BUF,
+			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
+		acx_wake_queue(adev->ieee, NULL);
+	}
+
+
+      end_unlock:
+	acx_unlock(adev, flags);
+/* end: */
+	FN_EXIT0;
+}
+
+/*
+ * acxusb_l_alloc_tx
+ * Actually returns a usb_tx_t* ptr
+ */
+tx_t *acxusb_l_alloc_tx(acx_device_t *adev)
+{
+	usb_tx_t *tx;
+	unsigned head;
+
+	FN_ENTER;
+
+	head = adev->tx_head;
+	do {
+		head = (head + 1) % ACX_TX_URB_CNT;
+		if (!adev->usb_tx[head].busy) {
+			log(L_USBRXTX,
+				"acx: allocated tx %d\n", head);
+			tx = &adev->usb_tx[head];
+			tx->busy = 1;
+			adev->tx_free--;
+			/* Keep a few free descs between head and tail of tx ring.
+			 ** It is not absolutely needed, just feels safer */
+			if (adev->tx_free < TX_STOP_QUEUE) {
+				log(L_BUF, "acx: tx: stop queue "
+					"(%u free txbufs)\n", adev->tx_free);
+				acx_stop_queue(adev->ieee, NULL);
+			}
+			goto end;
+		}
+	} while (likely(head != adev->tx_head));
+	tx = NULL;
+	printk_ratelimited("acx: tx buffers full\n");
+      end:
+	adev->tx_head = head;
+	FN_EXIT0;
+	return (tx_t *) tx;
+}
+
+/*
+ * Used if alloc_tx()'ed buffer needs to be cancelled without doing tx
+ */
+void acxusb_l_dealloc_tx(tx_t * tx_opaque)
+{
+	usb_tx_t *tx = (usb_tx_t *) tx_opaque;
+	tx->busy = 0;
+}
+
+void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
+{
+	usb_tx_t *tx = (usb_tx_t *) tx_opaque;
+	return &tx->bulkout.data;
+}
+
+/*
+ * acxusb_l_tx_data
+ *
+ * Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
+ * Can be called from acx_i_start_xmit (data frames from net core).
+ */
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
+	struct usb_device *usbdev;
+	struct urb *txurb;
+	usb_tx_t *tx;
+	usb_txbuffer_t *txbuf;
+	//	client_t *clt;
+	struct ieee80211_hdr *whdr;
+	unsigned int outpipe;
+	int ucode, txnum;
+	u8 rate_100;
+
+	FN_ENTER;
+
+	tx = ((usb_tx_t *) tx_opaque);
+
+	tx->skb = skb;
+
+	txurb = tx->urb;
+	txbuf = &tx->bulkout;
+	whdr = (struct ieee80211_hdr *) txbuf->data;
+	txnum = tx - adev->usb_tx;
+
+	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
+	    txnum, adev->tx_free, wlanpkt_len);
+/*
+	switch (adev->mode) {
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_3_AP:
+		clt = acx_l_sta_list_get(adev, whdr->a1);
+		break;
+	case ACX_MODE_2_STA:
+//              clt = adev->ap_client;
+		break;
+	default:
+		clt = NULL;
+		break;
+	}
+	if (unlikely(clt && !clt->rate_cur)) {
+		printk("acx: driver bug! bad ratemask\n");
+		goto end;
+	}
+*/
+
+	/* fill the USB transfer header */
+	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
+	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
+	txbuf->queue_index = 1;
+
+	// OW txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
+	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+	txbuf->rate = rate_100 ;
+
+	//	FIXME();	//This used to have | (clt - adev->ap_client)
+	txbuf->hostdata = (rate_100 << 16);
+
+	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
+	if (1 == adev->preamble_cur)
+		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
+	txbuf->ctrl2 = 0;
+	txbuf->data_len = cpu_to_le16(wlanpkt_len);
+
+	if (unlikely(acx_debug & L_DATA)) {
+		printk("acx: dump of bulk out urb:\n");
+		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
+	}
+
+	if (unlikely(txurb->status == -EINPROGRESS)) {
+		printk
+		    ("acx: trying to submit tx urb while already in progress\n");
+	}
+
+	/* now schedule the USB transfer */
+	usbdev = adev->usbdev;
+	outpipe = usb_sndbulkpipe(usbdev, adev->bulkoutep);
+
+	usb_fill_bulk_urb(txurb, usbdev, outpipe, txbuf,	/* dataptr */
+			  wlanpkt_len + USB_TXBUF_HDRSIZE,	/* size */
+			  acxusb_i_complete_tx,	/* handler */
+			  tx	/* handler param */
+	    );
+
+	txurb->transfer_flags = URB_ASYNC_UNLINK | URB_ZERO_PACKET;
+	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
+	log(L_USBRXTX, "acx: SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
+	    "rate=%u errcode=%d\n", txnum, outpipe, txbuf,
+	    wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
+
+	if (unlikely(ucode)) {
+		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",
+		       ucode, wlanpkt_len + USB_TXBUF_HDRSIZE);
+
+		/* on error, just mark the frame as done and update
+		 ** the statistics
+		 */
+		adev->stats.tx_errors++;
+		tx->busy = 0;
+		adev->tx_free++;
+		/* needed? if (adev->tx_free > TX_START_QUEUE) acx_wake_queue(...) */
+	}
+	FN_EXIT0;
+}
+
+
+/*
  * BOM Irq Handling, Timer
  * ==================================================
  */
@@ -1618,248 +1856,14 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 
 
 
-/***********************************************************************
-** acxusb_i_complete_tx()
-** Inputs:
-**     urb -> pointer to USB request block
-**    regs -> pointer to register-buffer for syscalls (see asm/ptrace.h)
-**
-** This function is invoked upon termination of a USB transfer.
-*/
-static void acxusb_i_complete_tx(struct urb *urb)
-{
-	acx_device_t *adev;
-	usb_tx_t *tx;
-	unsigned long flags;
-	int txnum;
-
-	FN_ENTER;
-
-	BUG_ON(!urb->context);
-
-	tx = (usb_tx_t *) urb->context;
-	adev = tx->adev;
-
-	txnum = tx - adev->usb_tx;
-
-	acx_lock(adev, flags);
-
-	/*
-	 * If the iface isn't up, we don't have any right
-	 * to play with them. The urb may get unlinked.
-	 */
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		printk("acx: tx: device is down, not doing anything\n");
-		goto end_unlock;
-	}
-
-//	printk("acx: RETURN TX (%d): status=%d size=%d\n",
-//		txnum, urb->status, urb->actual_length);
-
-	/* handle USB transfer errors */
-	switch (urb->status) {
-	case 0:		/* No error */
-		break;
-	case -ESHUTDOWN:
-		goto end_unlock;
-		break;
-	case -ECONNRESET:
-		goto end_unlock;
-		break;
-		/* FIXME: real error-handling code here please */
-	default:
-		printk(KERN_ERR "acx: tx error, urb status=%d\n", urb->status);
-		/* FIXME: real error-handling code here please */
-	}
-
-	/* free the URB and check for more data */
-	tx->busy = 0;
-	adev->tx_free++;
-	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
-
-	if ((adev->tx_free >= TX_START_QUEUE)
-/*	    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
-/*	    && (acx_queue_stopped(adev->ndev)*/
-	   ){
-		log(L_BUF,
-			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
-		acx_wake_queue(adev->ieee, NULL);
-	}
 
 
-      end_unlock:
-	acx_unlock(adev, flags);
-/* end: */
-	FN_EXIT0;
-}
 
 
-/***************************************************************
-** acxusb_l_alloc_tx
-** Actually returns a usb_tx_t* ptr
-*/
-tx_t *acxusb_l_alloc_tx(acx_device_t *adev)
-{
-	usb_tx_t *tx;
-	unsigned head;
-
-	FN_ENTER;
-
-	head = adev->tx_head;
-	do {
-		head = (head + 1) % ACX_TX_URB_CNT;
-		if (!adev->usb_tx[head].busy) {
-			log(L_USBRXTX,
-				"acx: allocated tx %d\n", head);
-			tx = &adev->usb_tx[head];
-			tx->busy = 1;
-			adev->tx_free--;
-			/* Keep a few free descs between head and tail of tx ring.
-			 ** It is not absolutely needed, just feels safer */
-			if (adev->tx_free < TX_STOP_QUEUE) {
-				log(L_BUF, "acx: tx: stop queue "
-					"(%u free txbufs)\n", adev->tx_free);
-				acx_stop_queue(adev->ieee, NULL);
-			}
-			goto end;
-		}
-	} while (likely(head != adev->tx_head));
-	tx = NULL;
-	printk_ratelimited("acx: tx buffers full\n");
-      end:
-	adev->tx_head = head;
-	FN_EXIT0;
-	return (tx_t *) tx;
-}
 
 
-/***************************************************************
-** Used if alloc_tx()'ed buffer needs to be cancelled without doing tx
-*/
-void acxusb_l_dealloc_tx(tx_t * tx_opaque)
-{
-	usb_tx_t *tx = (usb_tx_t *) tx_opaque;
-	tx->busy = 0;
-}
 
 
-/***************************************************************
-*/
-void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
-{
-	usb_tx_t *tx = (usb_tx_t *) tx_opaque;
-	return &tx->bulkout.data;
-}
-
-
-/***************************************************************
-** acxusb_l_tx_data
-**
-** Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
-** Can be called from acx_i_start_xmit (data frames from net core).
-*/
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
-	struct usb_device *usbdev;
-	struct urb *txurb;
-	usb_tx_t *tx;
-	usb_txbuffer_t *txbuf;
-	//	client_t *clt;
-	struct ieee80211_hdr *whdr;
-	unsigned int outpipe;
-	int ucode, txnum;
-	u8 rate_100;
-
-	FN_ENTER;
-
-	tx = ((usb_tx_t *) tx_opaque);
-
-	tx->skb = skb;
-
-	txurb = tx->urb;
-	txbuf = &tx->bulkout;
-	whdr = (struct ieee80211_hdr *) txbuf->data;
-	txnum = tx - adev->usb_tx;
-
-	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
-	    txnum, adev->tx_free, wlanpkt_len);
-/*
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-	case ACX_MODE_3_AP:
-		clt = acx_l_sta_list_get(adev, whdr->a1);
-		break;
-	case ACX_MODE_2_STA:
-//              clt = adev->ap_client;
-		break;
-	default:
-		clt = NULL;
-		break;
-	}
-	if (unlikely(clt && !clt->rate_cur)) {
-		printk("acx: driver bug! bad ratemask\n");
-		goto end;
-	}
-*/
-
-	/* fill the USB transfer header */
-	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
-	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
-	txbuf->queue_index = 1;
-
-	// OW txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
-	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-	txbuf->rate = rate_100 ;
-
-	//	FIXME();	//This used to have | (clt - adev->ap_client)
-	txbuf->hostdata = (rate_100 << 16);
-
-	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
-	if (1 == adev->preamble_cur)
-		SET_BIT(txbuf->ctrl1, DESC_CTL_SHORT_PREAMBLE);
-	txbuf->ctrl2 = 0;
-	txbuf->data_len = cpu_to_le16(wlanpkt_len);
-
-	if (unlikely(acx_debug & L_DATA)) {
-		printk("acx: dump of bulk out urb:\n");
-		acx_dump_bytes(txbuf, wlanpkt_len + USB_TXBUF_HDRSIZE);
-	}
-
-	if (unlikely(txurb->status == -EINPROGRESS)) {
-		printk
-		    ("acx: trying to submit tx urb while already in progress\n");
-	}
-
-	/* now schedule the USB transfer */
-	usbdev = adev->usbdev;
-	outpipe = usb_sndbulkpipe(usbdev, adev->bulkoutep);
-
-	usb_fill_bulk_urb(txurb, usbdev, outpipe, txbuf,	/* dataptr */
-			  wlanpkt_len + USB_TXBUF_HDRSIZE,	/* size */
-			  acxusb_i_complete_tx,	/* handler */
-			  tx	/* handler param */
-	    );
-
-	txurb->transfer_flags = URB_ASYNC_UNLINK | URB_ZERO_PACKET;
-	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
-	log(L_USBRXTX, "acx: SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
-	    "rate=%u errcode=%d\n", txnum, outpipe, txbuf,
-	    wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
-
-	if (unlikely(ucode)) {
-		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",
-		       ucode, wlanpkt_len + USB_TXBUF_HDRSIZE);
-
-		/* on error, just mark the frame as done and update
-		 ** the statistics
-		 */
-		adev->stats.tx_errors++;
-		tx->busy = 0;
-		adev->tx_free++;
-		/* needed? if (adev->tx_free > TX_START_QUEUE) acx_wake_queue(...) */
-	}
-	FN_EXIT0;
-}
 
 
 /***********************************************************************
