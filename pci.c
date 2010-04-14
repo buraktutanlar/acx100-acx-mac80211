@@ -2213,6 +2213,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	Ctl_8 = txdesc->Ctl_8;
 	Ctl2_8 = 0;		/* really need to init it to 0, not txdesc->Ctl2_8, it seems */
 
+  // OW TODO: For what is hostdesc2 required ?
 	hostdesc2 = hostdesc1 + 1;
 
 	/* DON'T simply set Ctl field to 0 here globally,
