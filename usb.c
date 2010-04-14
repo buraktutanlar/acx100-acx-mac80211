@@ -102,8 +102,8 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
 int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static void acxusb_s_read_eeprom_version(acx_device_t * adev);
-static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
 static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
+static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
 
 // CMDs (Control Path)
 int acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
@@ -208,120 +208,6 @@ void __exit acxusb_e_cleanup_module(void);
  * BOM Firmware, EEPROM, Phy
  * ==================================================
  */
-
-/*
- * BOM CMDs (Control Path)
- * ==================================================
- */
-
-/*
- * BOM Init, Configure (Control Path)
- * ==================================================
- */
-
-/*
- * BOM Other (Control Path)
- * ==================================================
- */
-
-/*
- * BOM Proc, Debug
- * ==================================================
- */
-
-/*
- * BOM Rx Path
- * ==================================================
- */
-
-/*
- * BOM Tx Path
- * ==================================================
- */
-
-/*
- * BOM Irq Handling, Timer
- * ==================================================
- */
-
-/*
- * BOM Mac80211 Ops
- * ==================================================
- */
-
-/*
- * BOM Helpers
- * ==================================================
- */
-
-/*
- * BOM Ioctls
- * ==================================================
- */
-
-/*
- * BOM Driver, Module
- * ==================================================
- */
-
-/* USB driver data structure as required by the kernel's USB core */
-static struct usb_driver
- acxusb_driver = {
-	.name = "acx_usb",
-	.probe = acxusb_e_probe,
-	.disconnect = acxusb_e_disconnect,
-	.id_table = acxusb_ids
-};
-
-/***********************************************************************
-** USB helper
-**
-** ldd3 ch13 says:
-** When the function is usb_kill_urb, the urb lifecycle is stopped. This
-** function is usually used when the device is disconnected from the system,
-** in the disconnect callback. For some drivers, the usb_unlink_urb function
-** should be used to tell the USB core to stop an urb. This function does not
-** wait for the urb to be fully stopped before returning to the caller.
-** This is useful for stoppingthe urb while in an interrupt handler or when
-** a spinlock is held, as waiting for a urb to fully stop requires the ability
-** for the USB core to put the calling process to sleep. This function requires
-** that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
-** to be stopped in order to work properly.
-**
-** (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
-** asynchronous while usb_kill_urb is synchronous and should be called
-** directly (drivers/usb/core/urb.c))
-**
-** In light of this, timeout is just for paranoid reasons...
-*
-** Actually, it's useful for debugging. If we reach timeout, we're doing
-** something wrong with the urbs.
-*/
-static void acxusb_unlink_urb(struct urb *urb)
-{
-	if (!urb)
-		return;
-
-	if (urb->status == -EINPROGRESS) {
-		int timeout = 10;
-
-		usb_unlink_urb(urb);
-		while (--timeout && urb->status == -EINPROGRESS) {
-			mdelay(1);
-		}
-		if (!timeout) {
-			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
-		}
-	}
-}
-
-
-/***********************************************************************
-** EEPROM and PHY read/write helpers
-*/
-/***********************************************************************
-** acxusb_s_read_phy_reg
-*/
 int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
 	/* mem_read_write_t mem; */
@@ -343,9 +229,6 @@ int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	return OK;
 }
 
-
-/***********************************************************************
-*/
 int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	mem_read_write_t mem;
@@ -363,207 +246,31 @@ int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	return OK;
 }
 
-
-/***********************************************************************
-** acxusb_s_issue_cmd_timeo
-** Excecutes a command in the command mailbox
-**
-** buffer = a pointer to the data.
-** The data must not include 4 byte command header
-*/
-
-/* TODO: ideally we shall always know how much we need
-** and this shall be 0 */
-#define BOGUS_SAFETY_PADDING 0x40
-
-#undef FUNC
-#define FUNC "issue_cmd"
-
-int
-acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
-			       unsigned cmd,
-			       void *buffer,
-			       unsigned buflen,
-			       unsigned timeout, const char *cmdstr)
+/* FIXME: maybe merge it with usual eeprom reading, into common code? */
+static void acxusb_s_read_eeprom_version(acx_device_t * adev)
 {
-	/* USB ignores timeout param */
+	u8 eeprom_ver[0x8];
 
-	struct usb_device *usbdev;
-	struct {
-		u16 cmd;
-		u16 status;
-		u8 data[1];
-	} ACX_PACKED *loc;
-	const char *devname;
-	int acklen, blocklen, inpipe, outpipe;
-	int cmd_status;
-	int result;
+	memset(eeprom_ver, 0, sizeof(eeprom_ver));
+	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
 
-	FN_ENTER;
-
-	devname = wiphy_name(adev->ieee->wiphy);
-	/* no "wlan%%d: ..." please */
-	if (!devname || !devname[0] || devname[4] == '%')
-		devname = "acx";
-
-	log(L_CTL, "acx: " FUNC "(cmd:%s,buflen:%u,type:0x%04X)\n",
-	    cmdstr, buflen,
-	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
-
-	loc = kmalloc(buflen + 4 + BOGUS_SAFETY_PADDING, GFP_KERNEL);
-	if (!loc) {
-		printk("acx: %s: " FUNC "(): no memory for data buffer\n", devname);
-		goto bad;
-	}
-
-	/* get context from acx_device */
-	usbdev = adev->usbdev;
-
-	/* check which kind of command was issued */
-	loc->cmd = cpu_to_le16(cmd);
-	loc->status = 0;
-
-/* NB: buflen == frmlen + 4
-**
-** Interrogate: write 8 bytes: (cmd,status,rid,frmlen), then
-**		read (cmd,status,rid,frmlen,data[frmlen]) back
-**
-** Configure: write (cmd,status,rid,frmlen,data[frmlen])
-**
-** Possibly bogus special handling of ACX1xx_IE_SCAN_STATUS removed
-*/
-
-	/* now write the parameters of the command if needed */
-	acklen = buflen + 4 + BOGUS_SAFETY_PADDING;
-	blocklen = buflen;
-	if (buffer && buflen) {
-		/* if it's an INTERROGATE command, just pass the length
-		 * of parameters to read, as data */
-		if (cmd == ACX1xx_CMD_INTERROGATE) {
-			blocklen = 4;
-			acklen = buflen + 4;
-		}
-		memcpy(loc->data, buffer, blocklen);
-	}
-	blocklen += 4;		/* account for cmd,status */
-
-	/* obtain the I/O pipes */
-	outpipe = usb_sndctrlpipe(usbdev, 0);
-	inpipe = usb_rcvctrlpipe(usbdev, 0);
-	log(L_CTL, "acx: trl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
-	log(L_CTL, "acx: sending USB control msg (out) (blocklen=%d)\n", blocklen);
-	if (acx_debug & L_DATA)
-		acx_dump_bytes(loc, blocklen);
-
-	result = usb_control_msg(usbdev, outpipe, ACX_USB_REQ_CMD,	/* request */
-				 USB_TYPE_VENDOR | USB_DIR_OUT,	/* requesttype */
-				 0,	/* value */
-				 0,	/* index */
-				 loc,	/* dataptr */
-				 blocklen,	/* size */
-				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
-	    );
-
-	if (result == -ENODEV) {
-		log(L_CTL, "acx: no device present (unplug?)\n");
-		goto good;
-	}
-
-	log(L_CTL, "acx: wrote %d bytes\n", result);
-	if (result < 0) {
-		goto bad;
-	}
-
-	/* check for device acknowledge */
-	log(L_CTL, "acx: sending USB control msg (in) (acklen=%d)\n", acklen);
-	loc->status = 0;	/* delete old status flag -> set to IDLE */
-	/* shall we zero out the rest? */
-	result = usb_control_msg(usbdev, inpipe, ACX_USB_REQ_CMD,	/* request */
-				 USB_TYPE_VENDOR | USB_DIR_IN,	/* requesttype */
-				 0,	/* value */
-				 0,	/* index */
-				 loc,	/* dataptr */
-				 acklen,	/* size */
-				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
-	    );
-	if (result < 0) {
-		printk("acx: %s: " FUNC "(): USB read error %d\n", devname, result);
-		goto bad;
-	}
-	if (acx_debug & L_CTL) {
-		printk("acx: read %d bytes: ", result);
-		acx_dump_bytes(loc, result);
-	}
+	/* FIXME: which one of those values to take? */
+	adev->eeprom_version = eeprom_ver[5];
+}
 
 /*
-   check for result==buflen+4? Was seen:
-
-interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
-issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
-ctrl inpipe=0x80000280 outpipe=0x80000200
-sending USB control msg (out) (blocklen=8)
-01 00 00 00 0F 10 04 00
-wrote 8 bytes
-sending USB control msg (in) (acklen=12) sizeof(loc->data
-read 4 bytes <==== MUST BE 12!!
-*/
-
-	cmd_status = le16_to_cpu(loc->status);
-	if (cmd_status != 1) {
-		printk("acx: %s: " FUNC "(): cmd_status is not SUCCESS: %d (%s)\n",
-		       devname, cmd_status, acx_cmd_status_str(cmd_status));
-		/* TODO: goto bad; ? */
-	}
-	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
-		memcpy(buffer, loc->data, buflen);
-		log(L_CTL, "acx: response frame: cmd=0x%04X status=%d\n",
-		    le16_to_cpu(loc->cmd), cmd_status);
-	}
-  
-  good:
-	kfree(loc);
-	FN_EXIT1(OK);
-	return OK;
-
-  bad:
-	/* Give enough info so that callers can avoid
-	 ** printing their own diagnostic messages */
-	 
-// OW TODO Use logf1 (for def or undef ACX_DEBUG) 
-// OW TODO Improve cmdstr handling
-#if ACX_DEBUG
-	printk("acx: %s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
-#else
-	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
-#endif
-	//dump_stack();
-	kfree(loc);
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
-
-
-/***********************************************************************
-** acxusb_boot()
-** Inputs:
-**    usbdev -> Pointer to kernel's usb_device structure
-**
-** Returns:
-**  (int) Errorcode or 0 on success
-**
-** This function triggers the loading of the firmware image from harddisk
-** and then uploads the firmware to the USB device. After uploading the
-** firmware and transmitting the checksum, the device resets and appears
-** as a new device on the USB bus (the device we can finally deal with)
-*/
-static inline int
-acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
-{
-	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
-
-	return ((num_xfers % 2) == 0);
-}
-
+ * acxusb_boot()
+ * Inputs:
+ *    usbdev -> Pointer to kernel's usb_device structure
+ *
+ * Returns:
+ *  (int) Errorcode or 0 on success
+ *
+ * This function triggers the loading of the firmware image from harddisk
+ * and then uploads the firmware to the USB device. After uploading the
+ * firmware and transmitting the checksum, the device resets and appears
+ * as a new device on the USB bus (the device we can finally deal with)
+ */
 static int
 acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 {
@@ -824,17 +531,306 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 }
 
 
-/* FIXME: maybe merge it with usual eeprom reading, into common code? */
-static void acxusb_s_read_eeprom_version(acx_device_t * adev)
+static inline
+int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
 {
-	u8 eeprom_ver[0x8];
+	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
 
-	memset(eeprom_ver, 0, sizeof(eeprom_ver));
-	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
-
-	/* FIXME: which one of those values to take? */
-	adev->eeprom_version = eeprom_ver[5];
+	return ((num_xfers % 2) == 0);
 }
+
+/*
+ * BOM CMDs (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Init, Configure (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Other (Control Path)
+ * ==================================================
+ */
+
+/*
+ * BOM Proc, Debug
+ * ==================================================
+ */
+
+/*
+ * BOM Rx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Tx Path
+ * ==================================================
+ */
+
+/*
+ * BOM Irq Handling, Timer
+ * ==================================================
+ */
+
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
+
+/*
+ * BOM Helpers
+ * ==================================================
+ */
+
+/*
+ * BOM Ioctls
+ * ==================================================
+ */
+
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
+
+/* USB driver data structure as required by the kernel's USB core */
+static struct usb_driver
+ acxusb_driver = {
+	.name = "acx_usb",
+	.probe = acxusb_e_probe,
+	.disconnect = acxusb_e_disconnect,
+	.id_table = acxusb_ids
+};
+
+/***********************************************************************
+** USB helper
+**
+** ldd3 ch13 says:
+** When the function is usb_kill_urb, the urb lifecycle is stopped. This
+** function is usually used when the device is disconnected from the system,
+** in the disconnect callback. For some drivers, the usb_unlink_urb function
+** should be used to tell the USB core to stop an urb. This function does not
+** wait for the urb to be fully stopped before returning to the caller.
+** This is useful for stoppingthe urb while in an interrupt handler or when
+** a spinlock is held, as waiting for a urb to fully stop requires the ability
+** for the USB core to put the calling process to sleep. This function requires
+** that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
+** to be stopped in order to work properly.
+**
+** (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
+** asynchronous while usb_kill_urb is synchronous and should be called
+** directly (drivers/usb/core/urb.c))
+**
+** In light of this, timeout is just for paranoid reasons...
+*
+** Actually, it's useful for debugging. If we reach timeout, we're doing
+** something wrong with the urbs.
+*/
+static void acxusb_unlink_urb(struct urb *urb)
+{
+	if (!urb)
+		return;
+
+	if (urb->status == -EINPROGRESS) {
+		int timeout = 10;
+
+		usb_unlink_urb(urb);
+		while (--timeout && urb->status == -EINPROGRESS) {
+			mdelay(1);
+		}
+		if (!timeout) {
+			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
+		}
+	}
+}
+
+
+
+
+
+
+
+/***********************************************************************
+** acxusb_s_issue_cmd_timeo
+** Excecutes a command in the command mailbox
+**
+** buffer = a pointer to the data.
+** The data must not include 4 byte command header
+*/
+
+/* TODO: ideally we shall always know how much we need
+** and this shall be 0 */
+#define BOGUS_SAFETY_PADDING 0x40
+
+#undef FUNC
+#define FUNC "issue_cmd"
+
+int
+acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
+			       unsigned cmd,
+			       void *buffer,
+			       unsigned buflen,
+			       unsigned timeout, const char *cmdstr)
+{
+	/* USB ignores timeout param */
+
+	struct usb_device *usbdev;
+	struct {
+		u16 cmd;
+		u16 status;
+		u8 data[1];
+	} ACX_PACKED *loc;
+	const char *devname;
+	int acklen, blocklen, inpipe, outpipe;
+	int cmd_status;
+	int result;
+
+	FN_ENTER;
+
+	devname = wiphy_name(adev->ieee->wiphy);
+	/* no "wlan%%d: ..." please */
+	if (!devname || !devname[0] || devname[4] == '%')
+		devname = "acx";
+
+	log(L_CTL, "acx: " FUNC "(cmd:%s,buflen:%u,type:0x%04X)\n",
+	    cmdstr, buflen,
+	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
+
+	loc = kmalloc(buflen + 4 + BOGUS_SAFETY_PADDING, GFP_KERNEL);
+	if (!loc) {
+		printk("acx: %s: " FUNC "(): no memory for data buffer\n", devname);
+		goto bad;
+	}
+
+	/* get context from acx_device */
+	usbdev = adev->usbdev;
+
+	/* check which kind of command was issued */
+	loc->cmd = cpu_to_le16(cmd);
+	loc->status = 0;
+
+/* NB: buflen == frmlen + 4
+**
+** Interrogate: write 8 bytes: (cmd,status,rid,frmlen), then
+**		read (cmd,status,rid,frmlen,data[frmlen]) back
+**
+** Configure: write (cmd,status,rid,frmlen,data[frmlen])
+**
+** Possibly bogus special handling of ACX1xx_IE_SCAN_STATUS removed
+*/
+
+	/* now write the parameters of the command if needed */
+	acklen = buflen + 4 + BOGUS_SAFETY_PADDING;
+	blocklen = buflen;
+	if (buffer && buflen) {
+		/* if it's an INTERROGATE command, just pass the length
+		 * of parameters to read, as data */
+		if (cmd == ACX1xx_CMD_INTERROGATE) {
+			blocklen = 4;
+			acklen = buflen + 4;
+		}
+		memcpy(loc->data, buffer, blocklen);
+	}
+	blocklen += 4;		/* account for cmd,status */
+
+	/* obtain the I/O pipes */
+	outpipe = usb_sndctrlpipe(usbdev, 0);
+	inpipe = usb_rcvctrlpipe(usbdev, 0);
+	log(L_CTL, "acx: trl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
+	log(L_CTL, "acx: sending USB control msg (out) (blocklen=%d)\n", blocklen);
+	if (acx_debug & L_DATA)
+		acx_dump_bytes(loc, blocklen);
+
+	result = usb_control_msg(usbdev, outpipe, ACX_USB_REQ_CMD,	/* request */
+				 USB_TYPE_VENDOR | USB_DIR_OUT,	/* requesttype */
+				 0,	/* value */
+				 0,	/* index */
+				 loc,	/* dataptr */
+				 blocklen,	/* size */
+				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
+	    );
+
+	if (result == -ENODEV) {
+		log(L_CTL, "acx: no device present (unplug?)\n");
+		goto good;
+	}
+
+	log(L_CTL, "acx: wrote %d bytes\n", result);
+	if (result < 0) {
+		goto bad;
+	}
+
+	/* check for device acknowledge */
+	log(L_CTL, "acx: sending USB control msg (in) (acklen=%d)\n", acklen);
+	loc->status = 0;	/* delete old status flag -> set to IDLE */
+	/* shall we zero out the rest? */
+	result = usb_control_msg(usbdev, inpipe, ACX_USB_REQ_CMD,	/* request */
+				 USB_TYPE_VENDOR | USB_DIR_IN,	/* requesttype */
+				 0,	/* value */
+				 0,	/* index */
+				 loc,	/* dataptr */
+				 acklen,	/* size */
+				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
+	    );
+	if (result < 0) {
+		printk("acx: %s: " FUNC "(): USB read error %d\n", devname, result);
+		goto bad;
+	}
+	if (acx_debug & L_CTL) {
+		printk("acx: read %d bytes: ", result);
+		acx_dump_bytes(loc, result);
+	}
+
+/*
+   check for result==buflen+4? Was seen:
+
+interrogate(type:ACX100_IE_DOT11_ED_THRESHOLD,len:4)
+issue_cmd(cmd:ACX1xx_CMD_INTERROGATE,buflen:8,type:4111)
+ctrl inpipe=0x80000280 outpipe=0x80000200
+sending USB control msg (out) (blocklen=8)
+01 00 00 00 0F 10 04 00
+wrote 8 bytes
+sending USB control msg (in) (acklen=12) sizeof(loc->data
+read 4 bytes <==== MUST BE 12!!
+*/
+
+	cmd_status = le16_to_cpu(loc->status);
+	if (cmd_status != 1) {
+		printk("acx: %s: " FUNC "(): cmd_status is not SUCCESS: %d (%s)\n",
+		       devname, cmd_status, acx_cmd_status_str(cmd_status));
+		/* TODO: goto bad; ? */
+	}
+	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
+		memcpy(buffer, loc->data, buflen);
+		log(L_CTL, "acx: response frame: cmd=0x%04X status=%d\n",
+		    le16_to_cpu(loc->cmd), cmd_status);
+	}
+
+  good:
+	kfree(loc);
+	FN_EXIT1(OK);
+	return OK;
+
+  bad:
+	/* Give enough info so that callers can avoid
+	 ** printing their own diagnostic messages */
+
+// OW TODO Use logf1 (for def or undef ACX_DEBUG)
+// OW TODO Improve cmdstr handling
+#if ACX_DEBUG
+	printk("acx: %s: " FUNC "(cmd:%s) FAILED\n", devname, cmdstr);
+#else
+	printk("acx: %s: " FUNC "(cmd:0x%04X) FAILED\n", devname, cmd);
+#endif
+	//dump_stack();
+	kfree(loc);
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
+
+
 
 
 /*
