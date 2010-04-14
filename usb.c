@@ -723,6 +723,27 @@ acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
  */
 
 /*
+ * acxusb_s_fill_configoption
+ *
+ * temporary helper function to at least fill important cfgopt members with
+ * useful replacement values until we figure out how one manages to fetch
+ * the configoption struct in the USB device case...
+ */
+static int acxusb_s_fill_configoption(acx_device_t * adev)
+{
+	adev->cfgopt_probe_delay = 200;
+	adev->cfgopt_dot11CCAModes = 4;
+	adev->cfgopt_dot11Diversity = 1;
+	adev->cfgopt_dot11ShortPreambleOption = 1;
+	adev->cfgopt_dot11PBCCOption = 1;
+	adev->cfgopt_dot11ChannelAgility = 0;
+	adev->cfgopt_dot11PhyType = 5;
+	adev->cfgopt_dot11TempType = 1;
+	return OK;
+}
+
+
+/*
  * BOM Other (Control Path)
  * ==================================================
  */
@@ -828,23 +849,6 @@ static void acxusb_unlink_urb(struct urb *urb)
 
 
 
-/*
- * temporary helper function to at least fill important cfgopt members with
- * useful replacement values until we figure out how one manages to fetch
- * the configoption struct in the USB device case...
- */
-static int acxusb_s_fill_configoption(acx_device_t * adev)
-{
-	adev->cfgopt_probe_delay = 200;
-	adev->cfgopt_dot11CCAModes = 4;
-	adev->cfgopt_dot11Diversity = 1;
-	adev->cfgopt_dot11ShortPreambleOption = 1;
-	adev->cfgopt_dot11PBCCOption = 1;
-	adev->cfgopt_dot11ChannelAgility = 0;
-	adev->cfgopt_dot11PhyType = 5;
-	adev->cfgopt_dot11TempType = 1;
-	return OK;
-}
 
 static const struct ieee80211_ops acxusb_hw_ops = {
 	.tx = acx_i_op_tx,
