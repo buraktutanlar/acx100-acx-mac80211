@@ -750,6 +750,111 @@ static int acxusb_s_fill_configoption(acx_device_t * adev)
  * ==================================================
  */
 
+// OW TODO Could perhaps go into the proc-debug info for usb ?
+#if ACX_DEBUG
+
+#ifdef UNUSED
+static void dump_device(struct usb_device *usbdev)
+{
+	int i;
+	struct usb_config_descriptor *cd;
+
+	printk("acx: device dump:\n");
+	printk("acx:   devnum: %d\n", usbdev->devnum);
+	printk("acx:   speed: %d\n", usbdev->speed);
+	printk("acx:   tt: 0x%X\n", (unsigned int)(usbdev->tt));
+	printk("acx:   ttport: %d\n", (unsigned int)(usbdev->ttport));
+	printk("acx:   toggle[0]: 0x%X  toggle[1]: 0x%X\n",
+	       (unsigned int)(usbdev->toggle[0]),
+	       (unsigned int)(usbdev->toggle[1]));
+	/* This saw a change after 2.6.10 */
+	printk("acx:   ep_in wMaxPacketSize: ");
+	for (i = 0; i < 16; ++i)
+		if (usbdev->ep_in[i] != NULL)
+			printk("%d:%d ", i,
+			       usbdev->ep_in[i]->desc.wMaxPacketSize);
+	printk("\n");
+	printk("acx:   ep_out wMaxPacketSize: ");
+	for (i = 0; i < ARRAY_SIZE(usbdev->ep_out); ++i)
+		if (usbdev->ep_out[i] != NULL)
+			printk("%d:%d ", i,
+			       usbdev->ep_out[i]->desc.wMaxPacketSize);
+	printk("\n");
+	printk("acx:   parent: 0x%X\n", (unsigned int)usbdev->parent);
+	printk("acx:   bus: 0x%X\n", (unsigned int)usbdev->bus);
+#ifdef NO_DATATYPE
+	printk("  configs: ");
+	for (i = 0; i < usbdev->descriptor.bNumConfigurations; i++)
+		printk("0x%X ", usbdev->config[i]);
+	printk("\n");
+#endif
+	printk("acx:   actconfig: %p\n", usbdev->actconfig);
+	dump_device_descriptor(&usbdev->descriptor);
+
+	cd = &usbdev->config->desc;
+	dump_config_descriptor(cd);
+}
+
+
+/***********************************************************************
+*/
+static void dump_config_descriptor(struct usb_config_descriptor *cd)
+{
+	printk("acx: Configuration Descriptor:\n");
+	if (!cd) {
+		printk("acx: NULL\n");
+		return;
+	}
+	printk("acx:  bLength: %d (0x%X)\n", cd->bLength, cd->bLength);
+	printk("acx:  bDescriptorType: %d (0x%X)\n", cd->bDescriptorType,
+	       cd->bDescriptorType);
+	printk("acx:  bNumInterfaces: %d (0x%X)\n", cd->bNumInterfaces,
+	       cd->bNumInterfaces);
+	printk("acx:  bConfigurationValue: %d (0x%X)\n", cd->bConfigurationValue,
+	       cd->bConfigurationValue);
+	printk("acx:  iConfiguration: %d (0x%X)\n", cd->iConfiguration,
+	       cd->iConfiguration);
+	printk("acx:  bmAttributes: %d (0x%X)\n", cd->bmAttributes,
+	       cd->bmAttributes);
+	/* printk("acx:  MaxPower: %d (0x%X)\n", cd->bMaxPower, cd->bMaxPower); */
+}
+
+
+static void dump_device_descriptor(struct usb_device_descriptor *dd)
+{
+	printk("Device Descriptor:\n");
+	if (!dd) {
+		printk("NULL\n");
+		return;
+	}
+	printk("acx:  bLength: %d (0x%X)\n", dd->bLength, dd->bLength);
+	printk("acx:  bDescriptortype: %d (0x%X)\n", dd->bDescriptorType,
+	       dd->bDescriptorType);
+	printk("acx:  bcdUSB: %d (0x%X)\n", dd->bcdUSB, dd->bcdUSB);
+	printk("acx:  bDeviceClass: %d (0x%X)\n", dd->bDeviceClass,
+	       dd->bDeviceClass);
+	printk("acx:  bDeviceSubClass: %d (0x%X)\n", dd->bDeviceSubClass,
+	       dd->bDeviceSubClass);
+	printk("acx:  bDeviceProtocol: %d (0x%X)\n", dd->bDeviceProtocol,
+	       dd->bDeviceProtocol);
+	printk("acx:  bMaxPacketSize0: %d (0x%X)\n", dd->bMaxPacketSize0,
+	       dd->bMaxPacketSize0);
+	printk("acx:  idVendor: %d (0x%X)\n", dd->idVendor, dd->idVendor);
+	printk("acx:  idProduct: %d (0x%X)\n", dd->idProduct, dd->idProduct);
+	printk("acx:  bcdDevice: %d (0x%X)\n", dd->bcdDevice, dd->bcdDevice);
+	printk("acx:  iManufacturer: %d (0x%X)\n", dd->iManufacturer,
+	       dd->iManufacturer);
+	printk("acx:  iProduct: %d (0x%X)\n", dd->iProduct, dd->iProduct);
+	printk("acx:  iSerialNumber: %d (0x%X)\n", dd->iSerialNumber,
+	       dd->iSerialNumber);
+	printk("acx:  bNumConfigurations: %d (0x%X)\n", dd->bNumConfigurations,
+	       dd->bNumConfigurations);
+}
+#endif /* UNUSED */
+
+#endif /* ACX_DEBUG */
+
+
 /*
  * BOM Rx Path
  * ==================================================
@@ -1036,6 +1141,12 @@ static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 }
 
 /*
+static void acxusb_i_set_rx_mode(struct net_device *ndev)
+{
+}
+*/
+
+/*
  * BOM Tx Path
  * ==================================================
  */
@@ -1277,6 +1388,30 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	FN_EXIT0;
 }
 
+#ifdef HAVE_TX_TIMEOUT
+/*
+void acxusb_i_tx_timeout(struct net_device *ndev)
+{
+	acx_device_t *adev = ndev2adev(ndev);
+	unsigned long flags;
+	int i;
+
+	FN_ENTER;
+
+	acx_lock(adev, flags);
+*/	/* unlink the URBs */
+/*	for (i = 0; i < ACX_TX_URB_CNT; i++) {
+		acxusb_unlink_urb(adev->usb_tx[i].urb);
+		adev->usb_tx[i].busy = 0;
+	}
+	adev->tx_free = ACX_TX_URB_CNT;
+*/	/* TODO: stats update */
+/*	acx_unlock(adev, flags);
+
+	FN_EXIT0;
+}
+*/
+#endif
 
 /*
  * BOM Irq Handling, Timer
@@ -1876,151 +2011,3 @@ void __exit acxusb_e_cleanup_module(void)
 	log(L_INIT, "acx: USB module " ACX_RELEASE " unloaded\n");
 }
 
-
-
-// BOM Cleanup ==================
-
-
-/***********************************************************************
-static void acxusb_i_set_rx_mode(struct net_device *ndev)
-{
-}
-*/
-
-
-#ifdef HAVE_TX_TIMEOUT
-/*
-void acxusb_i_tx_timeout(struct net_device *ndev)
-{
-	acx_device_t *adev = ndev2adev(ndev);
-	unsigned long flags;
-	int i;
-
-	FN_ENTER;
-
-	acx_lock(adev, flags);
-*/	/* unlink the URBs */
-/*	for (i = 0; i < ACX_TX_URB_CNT; i++) {
-		acxusb_unlink_urb(adev->usb_tx[i].urb);
-		adev->usb_tx[i].busy = 0;
-	}
-	adev->tx_free = ACX_TX_URB_CNT;
-*/	/* TODO: stats update */
-/*	acx_unlock(adev, flags);
-
-	FN_EXIT0;
-}
-*/
-#endif
-
-
-
-
-
-
-/***********************************************************************
-** DEBUG STUFF
-*/
-// OW TODO Could perhaps go into the proc-debug info for usb ?
-#if ACX_DEBUG
-
-#ifdef UNUSED
-static void dump_device(struct usb_device *usbdev)
-{
-	int i;
-	struct usb_config_descriptor *cd;
-
-	printk("acx: device dump:\n");
-	printk("acx:   devnum: %d\n", usbdev->devnum);
-	printk("acx:   speed: %d\n", usbdev->speed);
-	printk("acx:   tt: 0x%X\n", (unsigned int)(usbdev->tt));
-	printk("acx:   ttport: %d\n", (unsigned int)(usbdev->ttport));
-	printk("acx:   toggle[0]: 0x%X  toggle[1]: 0x%X\n",
-	       (unsigned int)(usbdev->toggle[0]),
-	       (unsigned int)(usbdev->toggle[1]));
-	/* This saw a change after 2.6.10 */
-	printk("acx:   ep_in wMaxPacketSize: ");
-	for (i = 0; i < 16; ++i)
-		if (usbdev->ep_in[i] != NULL)
-			printk("%d:%d ", i,
-			       usbdev->ep_in[i]->desc.wMaxPacketSize);
-	printk("\n");
-	printk("acx:   ep_out wMaxPacketSize: ");
-	for (i = 0; i < ARRAY_SIZE(usbdev->ep_out); ++i)
-		if (usbdev->ep_out[i] != NULL)
-			printk("%d:%d ", i,
-			       usbdev->ep_out[i]->desc.wMaxPacketSize);
-	printk("\n");
-	printk("acx:   parent: 0x%X\n", (unsigned int)usbdev->parent);
-	printk("acx:   bus: 0x%X\n", (unsigned int)usbdev->bus);
-#ifdef NO_DATATYPE
-	printk("  configs: ");
-	for (i = 0; i < usbdev->descriptor.bNumConfigurations; i++)
-		printk("0x%X ", usbdev->config[i]);
-	printk("\n");
-#endif
-	printk("acx:   actconfig: %p\n", usbdev->actconfig);
-	dump_device_descriptor(&usbdev->descriptor);
-
-	cd = &usbdev->config->desc;
-	dump_config_descriptor(cd);
-}
-
-
-/***********************************************************************
-*/
-static void dump_config_descriptor(struct usb_config_descriptor *cd)
-{
-	printk("acx: Configuration Descriptor:\n");
-	if (!cd) {
-		printk("acx: NULL\n");
-		return;
-	}
-	printk("acx:  bLength: %d (0x%X)\n", cd->bLength, cd->bLength);
-	printk("acx:  bDescriptorType: %d (0x%X)\n", cd->bDescriptorType,
-	       cd->bDescriptorType);
-	printk("acx:  bNumInterfaces: %d (0x%X)\n", cd->bNumInterfaces,
-	       cd->bNumInterfaces);
-	printk("acx:  bConfigurationValue: %d (0x%X)\n", cd->bConfigurationValue,
-	       cd->bConfigurationValue);
-	printk("acx:  iConfiguration: %d (0x%X)\n", cd->iConfiguration,
-	       cd->iConfiguration);
-	printk("acx:  bmAttributes: %d (0x%X)\n", cd->bmAttributes,
-	       cd->bmAttributes);
-	/* printk("acx:  MaxPower: %d (0x%X)\n", cd->bMaxPower, cd->bMaxPower); */
-}
-
-
-static void dump_device_descriptor(struct usb_device_descriptor *dd)
-{
-	printk("Device Descriptor:\n");
-	if (!dd) {
-		printk("NULL\n");
-		return;
-	}
-	printk("acx:  bLength: %d (0x%X)\n", dd->bLength, dd->bLength);
-	printk("acx:  bDescriptortype: %d (0x%X)\n", dd->bDescriptorType,
-	       dd->bDescriptorType);
-	printk("acx:  bcdUSB: %d (0x%X)\n", dd->bcdUSB, dd->bcdUSB);
-	printk("acx:  bDeviceClass: %d (0x%X)\n", dd->bDeviceClass,
-	       dd->bDeviceClass);
-	printk("acx:  bDeviceSubClass: %d (0x%X)\n", dd->bDeviceSubClass,
-	       dd->bDeviceSubClass);
-	printk("acx:  bDeviceProtocol: %d (0x%X)\n", dd->bDeviceProtocol,
-	       dd->bDeviceProtocol);
-	printk("acx:  bMaxPacketSize0: %d (0x%X)\n", dd->bMaxPacketSize0,
-	       dd->bMaxPacketSize0);
-	printk("acx:  idVendor: %d (0x%X)\n", dd->idVendor, dd->idVendor);
-	printk("acx:  idProduct: %d (0x%X)\n", dd->idProduct, dd->idProduct);
-	printk("acx:  bcdDevice: %d (0x%X)\n", dd->bcdDevice, dd->bcdDevice);
-	printk("acx:  iManufacturer: %d (0x%X)\n", dd->iManufacturer,
-	       dd->iManufacturer);
-	printk("acx:  iProduct: %d (0x%X)\n", dd->iProduct, dd->iProduct);
-	printk("acx:  iSerialNumber: %d (0x%X)\n", dd->iSerialNumber,
-	       dd->iSerialNumber);
-	printk("acx:  bNumConfigurations: %d (0x%X)\n", dd->bNumConfigurations,
-	       dd->bNumConfigurations);
-}
-#endif /* UNUSED */
-
-#endif /* ACX_DEBUG */
