@@ -145,8 +145,6 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd);
 // Driver, Module
 static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID);
 static void acxusb_e_disconnect(struct usb_interface *intf);
-static int acxusb_e_open(struct ieee80211_hw *hw);
-static void acxusb_e_close(struct ieee80211_hw *hw);
 
 int __init acxusb_e_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
@@ -1505,27 +1503,15 @@ static struct usb_driver
 };
 
 
-
-
-
-
-
-
-
-
-
-
-/***********************************************************************
-** acxusb_e_probe()
-**
-** This function is invoked by the kernel's USB core whenever a new device is
-** attached to the system or the module is loaded. It is presented a usb_device
-** structure from which information regarding the device is obtained and evaluated.
-** In case this driver is able to handle one of the offered devices, it returns
-** a non-null pointer to a driver context and thereby claims the device.
-*/
-
-
+/*
+ * acxusb_e_probe()
+ *
+ * This function is invoked by the kernel's USB core whenever a new device is
+ * attached to the system or the module is loaded. It is presented a usb_device
+ * structure from which information regarding the device is obtained and evaluated.
+ * In case this driver is able to handle one of the offered devices, it returns
+ * a non-null pointer to a driver context and thereby claims the device.
+ */
 static int
 acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 {
@@ -1800,15 +1786,14 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	return result;
 }
 
-
-/***********************************************************************
-** acxusb_e_disconnect()
-**
-** This function is invoked whenever the user pulls the plug from the USB
-** device or the module is removed from the kernel. In these cases, the
-** network devices have to be taken down and all allocated memory has
-** to be freed.
-*/
+/*
+ * acxusb_e_disconnect()
+ *
+ * This function is invoked whenever the user pulls the plug from the USB
+ * device or the module is removed from the kernel. In these cases, the
+ * network devices have to be taken down and all allocated memory has
+ * to be freed.
+ */
 static void acxusb_e_disconnect(struct usb_interface *intf)
 {
 	unsigned long flags;
@@ -1862,22 +1847,38 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	FN_EXIT0;
 }
 
+/*
+ * init_module()
+ *
+ * This function is invoked upon loading of the kernel module.
+ * It registers itself at the kernel's USB subsystem.
+ *
+ * Returns: Errorcode on failure, 0 on success
+ */
+int __init acxusb_e_init_module(void)
+{
+	log(L_INIT, "acx: USB module " ACX_RELEASE " initialized, "
+	    "probing for devices...\n");
+	return usb_register(&acxusb_driver);
+}
 
 
 
+/*
+ * cleanup_module()
+ *
+ * This function is invoked as last step of the module unloading. It simply
+ * deregisters this module at the kernel's USB subsystem.
+ */
+void __exit acxusb_e_cleanup_module(void)
+{
+	usb_deregister(&acxusb_driver);
+	log(L_INIT, "acx: USB module " ACX_RELEASE " unloaded\n");
+}
 
 
 
-
-
-
-
-
-
-
-
-
-
+// BOM Cleanup ==================
 
 
 /***********************************************************************
@@ -1887,8 +1888,6 @@ static void acxusb_i_set_rx_mode(struct net_device *ndev)
 */
 
 
-/***********************************************************************
-*/
 #ifdef HAVE_TX_TIMEOUT
 /*
 void acxusb_i_tx_timeout(struct net_device *ndev)
@@ -1917,34 +1916,6 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 
 
 
-/***********************************************************************
-** init_module()
-**
-** This function is invoked upon loading of the kernel module.
-** It registers itself at the kernel's USB subsystem.
-**
-** Returns: Errorcode on failure, 0 on success
-*/
-int __init acxusb_e_init_module(void)
-{
-	log(L_INIT, "acx: USB module " ACX_RELEASE " initialized, "
-	    "probing for devices...\n");
-	return usb_register(&acxusb_driver);
-}
-
-
-
-/***********************************************************************
-** cleanup_module()
-**
-** This function is invoked as last step of the module unloading. It simply
-** deregisters this module at the kernel's USB subsystem.
-*/
-void __exit acxusb_e_cleanup_module(void)
-{
-	usb_deregister(&acxusb_driver);
-	log(L_INIT, "acx: USB module " ACX_RELEASE " unloaded\n");
-}
 
 
 /***********************************************************************
