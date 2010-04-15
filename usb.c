@@ -114,6 +114,11 @@ static int acxusb_s_fill_configoption(acx_device_t * adev);
 // Other (Control Path)
 
 // Proc, Debug
+#ifdef UNUSED
+static void dump_device(struct usb_device *usbdev);
+static void dump_config_descriptor(struct usb_config_descriptor *cd);
+static void dump_device_descriptor(struct usb_device_descriptor *dd);
+#endif
 
 // Rx Path
 static void acxusb_i_complete_rx(struct urb *);
@@ -135,12 +140,6 @@ static void acxusb_e_close(struct ieee80211_hw *);
 
 // Helpers
 static void acxusb_unlink_urb(struct urb *urb);
-
-#ifdef UNUSED
-static void dump_device(struct usb_device *usbdev);
-static void dump_config_descriptor(struct usb_config_descriptor *cd);
-static void dump_device_descriptor(struct usb_device_descriptor *dd);
-#endif
 
 // Driver, Module
 static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID);
