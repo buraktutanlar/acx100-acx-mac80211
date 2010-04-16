@@ -574,48 +574,39 @@ void __exit acxpci_e_cleanup_module(void);
  * ==================================================
  */
 
-// Locking (USB)
+// Logging
 
-// Logging (USB)
+// Data Access
 
-// Data Access (USB)
+// Firmware, EEPROM, Phy
+int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
+int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 
-// Firmware, EEPROM, Phy (USB)
-int acxusb_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acxusb_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+// CMDs (Control Path)
+int acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
 
-// CMDs (USB:Control Path)
-int acxusb_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+// Init, Configure (Control Path)
 
-// Init, Configure (USB:Control Path)
+// Other (Control Path)
 
-// Template (USB:Control Path)
+// Proc, Debug
 
-// Recalibration (USB:Control Path)
+// Rx Path
 
-// Other (USB:Control Path)
+// Tx Path
+tx_t *acxusb_l_alloc_tx(acx_device_t *adev);
+void acxusb_l_dealloc_tx(tx_t * tx_opaque);
+void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
+void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
-// Proc, Debug (USB)
-
-// Rx Path (USB)
-
-// Tx Path (USB)
-tx_t* acxusb_l_alloc_tx(acx_device_t *adev);
-void acxusb_l_dealloc_tx(tx_t *tx_opaque);
-void* acxusb_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-
-// Crypto (USB)
-
-// Irq Handling, Timer (USB)
+// Irq Handling, Timer
 void acxusb_interrupt_tasklet(struct work_struct *work);
 
-// Mac80211 Ops (USB)
+// Mac80211 Ops
 
-// Helpers (USB)
+// Helpers
 
-// Driver, Module (USB)
+// Driver, Module
 int __init acxusb_e_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
 
