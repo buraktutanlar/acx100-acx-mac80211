@@ -409,10 +409,10 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 #endif
 
 
- /*
-  * BOM Data Access
-  * ==================================================
-  */
+/*
+ * BOM Data Access
+ * ==================================================
+ */
 
 /* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
 #define acx_readl(v)	le32_to_cpu(readl((v)))
@@ -1285,10 +1285,10 @@ acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *ms
 }
 
 
- /*
-  * BOM Firmware, EEPROM, Phy
-  * ==================================================
-  */
+/*
+ * BOM Firmware, EEPROM, Phy
+ * ==================================================
+ */
 
 /*
  * acxmem_s_upload_radio
@@ -1927,10 +1927,11 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 }
 #endif /* NONESSENTIAL_FEATURES */
 
- /*
-  * BOM CMDs (Control Path)
-  * ==================================================
-  */
+/*
+ * BOM CMDs (Control Path)
+ * ==================================================
+ */
+
 /*
  * acxmem_s_issue_cmd_timeo
  *
@@ -2243,10 +2244,11 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
 }
 
 
- /*
-  * BOM Init, Configure (Control Path)
-  * ==================================================
-  */
+/*
+ * BOM Init, Configure (Control Path)
+ * ==================================================
+ */
+
 /*
  * acxmem_s_reset_dev
  *
@@ -2650,15 +2652,15 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev) {
 #endif
 
 
- /*
-  * BOM Other (Control Path)
-  * ==================================================
-  */
+/*
+ * BOM Other (Control Path)
+ * ==================================================
+ */
 
- /*
-  * BOM Proc, Debug
-  * ==================================================
-  */
+/*
+ * BOM Proc, Debug
+ * ==================================================
+ */
 int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
@@ -2795,10 +2797,10 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev) {
 	return p - buf;
 }
 
- /*
-  * BOM Rx Path
-  * ==================================================
-  */
+/*
+ * BOM Rx Path
+ * ==================================================
+ */
 
 /*
  * acxmem_l_process_rxdesc
@@ -2917,10 +2919,10 @@ static void acxmem_l_process_rxdesc(acx_device_t *adev) {
 		FN_EXIT0;
 }
 
- /*
-  * BOM Tx Path
-  * ==================================================
-  */
+/*
+ * BOM Tx Path
+ * ==================================================
+ */
 
 /*
  * acxmem_l_alloc_tx
@@ -3969,10 +3971,11 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 #endif
 
 
- /*
-  * BOM Irq Handling, Timer
-  * ==================================================
-  */
+/*
+ * BOM Irq Handling, Timer
+ * ==================================================
+ */
+
 static void acxmem_irq_enable(acx_device_t *adev) {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -4634,10 +4637,10 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 // ---
 
 
- /*
-  * BOM Mac80211 Ops
-  * ==================================================
-  */
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
 
 static const struct ieee80211_ops acxmem_hw_ops = {
 		.tx = acx_i_op_tx,
@@ -4748,10 +4751,11 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
 	FN_EXIT0;
 }
 
- /*
-  * BOM Helpers
-  * ==================================================
-  */
+/*
+ * BOM Helpers
+ * ==================================================
+ */
+
 void acxmem_l_power_led(acx_device_t *adev, int enable) {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
@@ -4800,10 +4804,11 @@ static void update_link_quality_led(acx_device_t *adev) {
 #endif
 
 
- /*
-  * BOM Ioctls
-  * ==================================================
-  */
+/*
+ * BOM Ioctls
+ * ==================================================
+ */
+
 // OW TODO Not used in pci either !?
 #if 0
 int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
@@ -5136,10 +5141,10 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 #endif
 
 
- /*
-  * BOM Driver, Module
-  * ==================================================
-  */
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
 
 /*
  * acxmem_e_probe
