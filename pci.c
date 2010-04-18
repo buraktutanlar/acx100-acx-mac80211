@@ -4075,12 +4075,15 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		goto end_no_lock;
 	}
 
-	acx_sem_lock(adev);
+	// Unregister ieee80211 device
+	log(L_INIT, "acxpci: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	ieee80211_unregister_hw(adev->ieee);
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
 
-		/* disable both Tx and Rx to shut radio down properly */
+		/* Disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -4114,27 +4117,12 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 
 	}
 
-	/* unregister the device to not let the kernel
-	 * (e.g. ioctls) access a half-deconfigured device
-	 * NB: this will cause acxpci_e_close() to be called,
-	 * thus we shouldn't call it under sem!
-	 */
-	//	acxpci_e_close(hw);
-	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
-
-	/* unregister_netdev ensures that no references to us left.
-	 * For paranoid reasons we continue to follow the rules */
-
-	if (adev->dev_state_mask & ACX_STATE_IFACE_UP) {
-		acxpci_s_down(hw);
-		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	}
-
 	// Proc
 	acx_proc_unregister_entries(adev->ieee, 0);
 
-	// IRQ
+	// IRQs
+	acxpci_disable_acx_irq(adev);
+	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 
 	// Mem regions
@@ -4161,9 +4149,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	/* remove dev registration */
 	pci_set_drvdata(pdev, NULL);
 
-	// Sem better to be freed before ieee80211_free_hw
-	acx_sem_unlock(adev);
-
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
 	 * by a netdev timeout handler execution
@@ -4174,7 +4159,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 #ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
-
 
 	end_no_lock:
 	FN_EXIT0;
@@ -4758,6 +4742,6 @@ void __exit acxpci_e_cleanup_module(void)
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
 	log(L_INIT,
-	    "acx: PCI module " ACX_RELEASE " unloaded\n");
+	    "acxpci: PCI module " ACX_RELEASE " unloaded\n");
 	FN_EXIT0;
 }
