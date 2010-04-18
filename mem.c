@@ -5427,7 +5427,10 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 		goto end_no_lock;
 	}
 
-	acx_sem_lock(adev);
+	// Unregister ieee80211 device
+	log(L_INIT, "acxmem: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	ieee80211_unregister_hw(adev->ieee);
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
 	if (acxmem_adev_present(adev)) {
@@ -5465,33 +5468,16 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 			write_flush(adev);
 		}
-
 		acx_unlock(adev, flags);
-	}
 
-	/*
-	 * Unregister the notifier chain
-	 */
-
-	/* unregister the device to not let the kernel
-	 * (e.g. ioctls) access a half-deconfigured device
-	 * NB: this will cause acxmem_e_close() to be called,
-	 * thus we shouldn't call it under sem! */
-	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
-
-	/* unregister_netdev ensures that no references to us left.
-	 * For paranoid reasons we continue to follow the rules */
-
-	if (adev->dev_state_mask & ACX_STATE_IFACE_UP) {
-		acxmem_s_down(hw);
-		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	}
 
 	// Proc
 	acx_proc_unregister_entries(adev->ieee, 0);
 
-	// Irq
+	// IRQs
+	acxmem_irq_disable(adev);
+	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */
@@ -5499,13 +5485,8 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	if (adev->iobase)
 		iounmap(adev->iobase);
 
-	// This should be done subsequently by the corresponding platform module, e.g. hx4700_acx.c
-	//(void) hwdata->stop_hw();
-
 	/* remove dev registration */
 	platform_set_drvdata(pdev, NULL);
-
-	acx_sem_unlock(adev);
 
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
@@ -5513,7 +5494,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	printk("acx: %s done\n", __func__);
+	printk("acxmem: %s done\n", __func__);
 
 	end_no_lock:
 	FN_EXIT0;
@@ -5679,7 +5660,7 @@ int __init acxmem_e_init_module(void) {
 void __exit acxmem_e_cleanup_module(void) {
 	FN_ENTER;
 
-	printk("acx: cleanup_module\n");
+	printk("acxmem: cleanup_module\n");
 	platform_driver_unregister(&acxmem_drv_id);
 
 	FN_EXIT0;
