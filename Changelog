@@ -1,4 +1,12 @@
-2009-01-31 Oliver Winker <oliver@oli1170.net>
+2010-04-19 Oliver Winker <oliver@oli1170.net>
+	* DKMS support added
+	* Fix module unload on ifup
+	* hx4700: Fix platform device cleanup, when device registered 
+	  without driver.
+	* Fixed pci possible dropping of interrupts 
+	* Cleanups and refactoring common.c, pci.c, mem.c, usb.c
+
+2010-01-31 Oliver Winker <oliver@oli1170.net>
 	* Slave memory interface updates:
 
 	- Update to 2.6.32 mac80211
@@ -6,7 +14,7 @@
 	- Load stability improvements
 	- Various other bits and pieces
     
-2009-01-03 Oliver Winker <oli1417@hallo.ms>
+2010-01-03 Oliver Winker <oli1417@hallo.ms>
 	* Mac80211 2.6.32 API changes
 	* acx111 support with for mac80211 (WPA, WPA2)
 	* Issue_cmd fixed correctly. Timeout back to 50ms.
