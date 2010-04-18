@@ -43,8 +43,11 @@ else
 	EXTRA_CFLAGS:= \
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=m,%,$(filter %=m,$(EXTRA_KCONFIG)))) \
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=y,%,$(filter %=y,$(EXTRA_KCONFIG))))
-	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+	
+	KVERSION ?= $(shell uname -r)
+	KERNELDIR ?= /lib/modules/$(KVERSION)/build
 	PWD := $(shell pwd)
+	
 all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) $(EXTRA_KCONFIG) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" modules
 
