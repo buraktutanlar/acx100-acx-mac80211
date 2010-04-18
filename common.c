@@ -2346,6 +2346,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			default:
 				break;
 		}
+		// OW TODO 20100418: Check, if this is done correctly, otherwise comment out
 		if (adev->beacon_cache)
 		{
 			acx_s_set_beacon_template(adev, adev->beacon_cache);
