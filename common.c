@@ -40,31 +40,6 @@
  */
 
 /*
- * BOM Module
- * ==================================================
- */
-
-#if ACX_DEBUG
-
-/* will add __read_mostly later */
-unsigned int acx_debug = ACX_DEFAULT_MSG;
-
-/* parameter is 'debug', corresponding var is acx_debug */
-module_param_named(debug, acx_debug, uint, 0);
-MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
-#endif
-
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual MPL/GPL");
-#endif
-/* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
-MODULE_AUTHOR("ACX100 Open Source Driver development team");
-MODULE_DESCRIPTION
-    ("Driver for TI ACX1xx based wireless cards (CardBus/PCI/USB)");
-
-MODULE_VERSION(ACX_RELEASE);
-
-/*
  * BOM Prototypes
  * ... static and also none-static for overview reasons (maybe not best practice ...)
  * ==================================================
@@ -5585,5 +5560,28 @@ static void __exit acx_e_cleanup_module(void)
 
 }
 
+/*
+ * BOM Module
+ * ==================================================
+ */
+
 module_init(acx_e_init_module)
 module_exit(acx_e_cleanup_module)
+
+#if ACX_DEBUG
+/* will add __read_mostly later */
+unsigned int acx_debug = ACX_DEFAULT_MSG;
+/* parameter is 'debug', corresponding var is acx_debug */
+module_param_named(debug, acx_debug, uint, 0);
+MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
+#endif
+
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual MPL/GPL");
+#endif
+/* USB had this: MODULE_AUTHOR("Martin Wawro <martin.wawro AT uni-dortmund.de>"); */
+MODULE_AUTHOR("ACX100 Open Source Driver development team");
+MODULE_DESCRIPTION
+    ("Driver for TI ACX1xx based wireless cards (CardBus/PCI/USB)");
+
+MODULE_VERSION(ACX_RELEASE);
