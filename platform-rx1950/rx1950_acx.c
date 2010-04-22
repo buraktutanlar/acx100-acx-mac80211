@@ -6,7 +6,7 @@
  * more details.
  *
  * Copyright (c) 2008 Denis Grigoriev <dgreenday at gmail.com>
- * Copyright (c) 2010 Vasily Khoruzhick <dgreenday at gmail.com>
+ * Copyright (c) 2010 Vasily Khoruzhick <anarsoul at gmail.com>
  */
 
 
