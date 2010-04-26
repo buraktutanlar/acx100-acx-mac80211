@@ -1159,6 +1159,10 @@ struct acx_device {
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
 
+/*************************************************************************
+ *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
+ *************************************************************************/
+
 #ifdef CONFIG_ACX_MAC80211_MEM
 	u32 acx_txbuf_start;
 	int acx_txbuf_numblocks;
@@ -1167,16 +1171,8 @@ struct acx_device {
 	queueindicator_t *acx_queue_indicator;
 #endif
 
-
-/*************************************************************************
- *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
- *************************************************************************/
-
-	/* hack to let common code compile. FIXME */
-	dma_addr_t	rxhostdesc_startphy;
-
 	/*** PCI stuff ***/
-#if (defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM))
+#if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
 	/* pointers to tx buffers, tx host descriptors (in host memory)
 	** and tx descs in device memory */
 	unsigned int	tx_tail;
@@ -1200,7 +1196,7 @@ struct acx_device {
 	rxdesc_t	*rxdesc_start;
 	/* physical addresses of above host memory areas */
 	dma_addr_t	rxbuf_startphy;
-	/* dma_addr_t	rxhostdesc_startphy; */
+	dma_addr_t	rxhostdesc_startphy;
 	unsigned int	rxbuf_area_size;
 	unsigned int	rxhostdesc_area_size;
 
