@@ -2080,24 +2080,24 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* timed out! */
 	if (counter == -1) {
 
-		log(L_ANY, "acxmem: %s: %s:"
-				"timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "acxmem: %s: %s: "
+				"Timed out %s for CMD_COMPLETE. "
 				"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 				"cmd_status:%d (%s)\n",
 		       __func__, devname,
 		       (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		log(L_ANY, "acxmem: %s: "
+		log(L_DEBUG, "acxmem: %s: "
 				"timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
 				__func__,
 				counter, cmd_timeout, cmd_timeout - counter);
 
-		log(L_ANY, "acx: %s: %s: "
+		log(L_DEBUG, "acxmem: %s: %s: "
 				"device irq status 0x%04x\n",
 				__func__, devname,
 				read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES));
-		log(L_ANY, "acx: %s: %s: "
+		log(L_DEBUG, "acxmem: %s: %s: "
 				"IO_ACX_IRQ_MASK 0x%04x IO_ACX_FEMR 0x%04x\n",
 				__func__, devname,
 				read_reg16(adev, IO_ACX_IRQ_MASK), read_reg16(adev,	IO_ACX_FEMR));
