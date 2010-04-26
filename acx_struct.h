@@ -1010,7 +1010,9 @@ struct acx_device {
 	u32		initialized:1;
 	/* Barely used in USB case */
 	u16		irq_status;
+#ifdef UNUSED
 	int		irq_savedstate;
+#endif	
 	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
 
@@ -1057,10 +1059,12 @@ struct acx_device {
 	u8		channel;
 	u8		reg_dom_id;		/* reg domain setting */
 	u16		reg_dom_chanmask;
+
+#ifdef UNUSED
 	u16		auth_or_assoc_retries;
 	u16		scan_retries;
 	unsigned long	scan_start;		/* YES, jiffies is defined as "unsigned long" */
-
+#endif
 
 	/* MAC80211 Template Reference */
 	struct sk_buff *beacon_cache;
@@ -1069,10 +1073,12 @@ struct acx_device {
 //	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
 //	client_t	*ap_client;		/* this one is our AP (STA mode only) */
 
+#ifdef UNUSED
 	int		dup_count;
 	int		nondup_count;
 	unsigned long	dup_msg_expiry;
 	u16		last_seq_ctrl;		/* duplicate packet detection */
+#endif
 
 	/* 802.11 power save mode */
 	u8		ps_wakeup_cfg;
@@ -1121,7 +1127,9 @@ struct acx_device {
 	u16		listen_interval;	/* given in units of beacon interval */
 	u32		beacon_interval;
 
+#ifdef UNUSED
 	u16		capabilities;
+#endif
 	u8		rate_supported_len;
 	u8		rate_supported[13];
 
