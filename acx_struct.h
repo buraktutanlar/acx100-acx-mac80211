@@ -614,6 +614,7 @@ typedef struct shared_queueindicator {
 ** BOM Hardware structures
 */
 
+#ifdef DEFINED_DOUBLE
 /* An opaque typesafe helper type
  *
  * Some hardware fields are actually pointers,
@@ -705,9 +706,12 @@ typedef struct shared_queueindicator {
 #define DESC_CTL2_WEP		0x40	/* encrypt this frame */
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
+#endif
+
 /***********************************************************************
 ** BOM PCI structures
 */
+
 /* IRQ Constants
 ** (outside of "#ifdef PCI" because USB (mis)uses HOST_INT_SCAN_COMPLETE)
 ** descriptions taken from BSD driver */
