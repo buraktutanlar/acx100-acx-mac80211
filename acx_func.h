@@ -573,10 +573,6 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_
 
 // Driver, Module
 
-#ifdef CONFIG_VLYNQ
-int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
-#endif
-
 int __init acxpci_e_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 

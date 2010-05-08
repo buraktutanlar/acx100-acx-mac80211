@@ -170,7 +170,7 @@ static int acxpci_e_resume(struct pci_dev *pdev);
 #endif
 
 #ifdef CONFIG_VLYNQ
-int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
+static int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
 static void vlynq_remove(struct vlynq_device *vdev);
 #endif
 
@@ -4436,6 +4436,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_alloc_netdev;
 	}
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
+	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+			| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
 
 	adev = ieee2adev(ieee);
