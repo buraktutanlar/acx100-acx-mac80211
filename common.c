@@ -184,7 +184,10 @@ int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd, struct ieee8
 void acx_i_op_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 int acx_e_conf_tx(struct ieee80211_hw *hw, u16 queue, const struct ieee80211_tx_queue_params *params);
 int acx_e_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw, struct ieee80211_tx_queue_stats *stats);
+#endif
 
 // Helpers
 void acx_s_mwait(int ms);
@@ -4900,7 +4903,7 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
  * ==================================================
  */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_if_init_conf *conf)
 #else
@@ -4918,7 +4921,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	if (conf->type == NL80211_IFTYPE_MONITOR) {
 #else
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
@@ -4928,7 +4931,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 		if (adev->interface.operating)
 			goto out_unlock;
 		adev->interface.operating = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 #else
@@ -4949,7 +4952,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 
 	printk(KERN_INFO "acx: Virtual interface added "
 	       "(type: 0x%08X, MAC: %s)\n",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	       conf->type,
 	       acx_print_mac(mac, conf->mac_addr)
 #else
@@ -4966,7 +4969,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	return err;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
 #else
@@ -4981,7 +4984,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	if (conf->type == NL80211_IFTYPE_MONITOR) {
 #else
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
@@ -4992,7 +4995,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 		adev->interface.operating = 0;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	log(L_DEBUG, "acx: %s: interface.operating=%d, conf->type=%d\n",
 			__func__,
 			adev->interface.operating, conf->type);
@@ -5007,7 +5010,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 
 	log(L_ANY, "acx: Virtual interface removed: "
 	       "type=%d, MAC=%s\n",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	       conf->type, acx_print_mac(mac, conf->mac_addr)
 #else
 	       vif->type, acx_print_mac(mac, vif->addr)
@@ -5351,7 +5354,7 @@ acx_e_op_get_stats(struct ieee80211_hw *hw,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
 {

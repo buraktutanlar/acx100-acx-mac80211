@@ -3149,7 +3149,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.bss_info_changed = acx_e_op_bss_info_changed,
 	.set_key = acx_e_op_set_key,
 	.get_stats = acx_e_op_get_stats,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
 #endif
 };

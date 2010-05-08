@@ -28,6 +28,17 @@
 #define CMD_TIMEOUT_MS(n)	(n)
 #define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
 
+// CONFIG_ACX_MAC80211_VERSION allows to specify the version of the used
+// wireless mac80211 api, in case it is different of the used kernel.
+// OpenWRT e.g. uses a version of compat-wireless, which is ahead of
+// the used kernel.
+//
+// CONFIG_ACX_MAC80211_VERSION can be defined on the make command line by
+// passing EXTRA_CFLAGS="-DCONFIG_ACX_MAC80211_VERSION=\"KERNEL_VERSION(2,6,34)\""
+
+#ifndef CONFIG_ACX_MAC80211_VERSION
+	#define CONFIG_ACX_MAC80211_VERSION LINUX_VERSION_CODE
+#endif
 
 /*
  * BOM Common
@@ -341,7 +352,7 @@ void acx_set_timer(acx_device_t * adev, int timeout_us);
 // BOM Mac80211 Ops (Common)
 // -----
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_add_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_if_init_conf *conf);
 void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
@@ -366,7 +377,7 @@ int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 int acx_e_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
 #endif
 
