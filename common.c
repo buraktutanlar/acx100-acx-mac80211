@@ -2690,7 +2690,7 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 }
 
 
-/*
+
 void acx_update_capabilities(acx_device_t * adev)
 {
 	u16 cap = 0;
@@ -2702,10 +2702,11 @@ void acx_update_capabilities(acx_device_t * adev)
 	case ACX_MODE_0_ADHOC:
 		SET_BIT(cap, WF_MGMT_CAP_IBSS);
 		break;
-*/		/* other types of stations do not emit beacons */
-/*	}
+		/* other types of stations do not emit beacons */
+	}
 
-	if (adev->wep_restricted) {
+	// OW TODO 20100509 Hack
+	if (adev->wep_restricted || 1) {
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
 	}
 	if (adev->cfgopt_dot11ShortPreambleOption) {
@@ -2721,7 +2722,7 @@ void acx_update_capabilities(acx_device_t * adev)
 	    adev->capabilities, cap);
 	adev->capabilities = cap;
 }
-*/
+
 
 /*
  * BOM Templates (Control Path)
