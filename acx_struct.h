@@ -1131,9 +1131,7 @@ struct acx_device {
 	u16		listen_interval;	/* given in units of beacon interval */
 	u32		beacon_interval;
 
-#ifdef UNUSED
 	u16		capabilities;
-#endif
 	u8		rate_supported_len;
 	u8		rate_supported[13];
 
