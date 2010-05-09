@@ -4326,7 +4326,7 @@ struct vlynq_known {
 #define CHIP_TNETW1130 0x00000009
 #define CHIP_TNETW1350 0x00000029
 
-static struct vlynq_known known_devices[] = {
+static struct vlynq_known vlynq_known_devices[] = {
 	{
 		.chip_id = CHIP_TNETW1130, .name = "TI TNETW1130",
 		.rx_mapping = {
@@ -4385,6 +4385,7 @@ static struct vlynq_device_id acx_vlynq_id[] = {
 	{ 0, 0, 0 },
 };
 
+
 static __devinit int vlynq_probe(struct vlynq_device *vdev,
 				 struct vlynq_device_id *id)
 {
@@ -4397,47 +4398,21 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_known *match = NULL;
 
 	FN_ENTER;
-	result = vlynq_enable_device(vdev);
-	if (result)
-		return result;
-
-	match = &known_devices[id->driver_data];
-
-	if (!match) {
-		result = -ENODEV;
-		goto fail;
-	}
-
-	mapping[0].offset = ARCH_PFN_OFFSET << PAGE_SHIFT;
-	mapping[0].size = 0x02000000;
-	vlynq_set_local_mapping(vdev, vdev->mem_start, mapping);
-	vlynq_set_remote_mapping(vdev, 0, match->rx_mapping);
-
-	set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
-
-	addr = (u32)ioremap(vdev->mem_start, 0x1000);
-	if (!addr) {
-		printk(KERN_ERR "acx: %s: failed to remap io memory\n",
-		       dev_name(&vdev->dev));
-		result = -ENXIO;
-		goto fail;
-	}
-
-	for (i = 0; i < match->num_regs; i++)
-		iowrite32(match->regs[i].value,
-			  (u32 *)(addr + match->regs[i].offset));
-
-	iounmap((void *)addr);
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!ieee) {
 		printk("acx: could not allocate ieee80211 structure %s\n",
 		       dev_name(&vdev->dev));
-		goto fail_alloc_netdev;
+		goto fail_vlynq_ieee80211_alloc_hw;
 	}
+
+	// Initialize driver private data
+	SET_IEEE80211_DEV(ieee, &vdev->dev);
 	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
-	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
-			| BIT(NL80211_IFTYPE_ADHOC);
+	ieee->wiphy->interface_modes =
+			BIT(NL80211_IFTYPE_STATION)	|
+			BIT(NL80211_IFTYPE_ADHOC) |
+			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
 
 	adev = ieee2adev(ieee);
@@ -4455,18 +4430,52 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
 
-/** Finished with private interface **/
+	// Finished with private interface
+
+	// Begin board specific inits
+	result = vlynq_enable_device(vdev);
+	if (result)
+		goto fail_vlynq_enable_device;
 
 	vlynq_set_drvdata(vdev, ieee);
+
+	match = &vlynq_known_devices[id->driver_data];
+
+	if (!match) {
+		result = -ENODEV;
+		goto fail_vlynq_known_devices;
+	}
+
+	mapping[0].offset = ARCH_PFN_OFFSET << PAGE_SHIFT;
+	mapping[0].size = 0x02000000;
+	vlynq_set_local_mapping(vdev, vdev->mem_start, mapping);
+	vlynq_set_remote_mapping(vdev, 0, match->rx_mapping);
+
+	set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
+
+	addr = (u32)ioremap(vdev->mem_start, 0x1000);
+	if (!addr) {
+		printk(KERN_ERR "acx: %s: failed to remap io memory\n",
+		       dev_name(&vdev->dev));
+		result = -ENXIO;
+		goto fail_vlynq_ioremap1;
+	}
+
+	for (i = 0; i < match->num_regs; i++)
+		iowrite32(match->regs[i].value,
+			  (u32 *)(addr + match->regs[i].offset));
+
+	iounmap((void *)addr);
+
 	if (!request_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start, "acx")) {
 		printk("acx: cannot reserve VLYNQ memory region\n");
-		goto fail_request_mem_region;
+		goto fail_vlynq_request_mem_region;
 	}
 
 	adev->iobase = ioremap(vdev->mem_start, vdev->mem_end - vdev->mem_start);
 	if (!adev->iobase) {
 		printk("acx: ioremap() FAILED\n");
-		goto fail_ioremap;
+		goto fail_vlynq_ioremap2;
 	}
 	adev->iobase2 = adev->iobase + match->rx_mapping[0].size;
 	adev->chip_type = CHIPTYPE_ACX111;
@@ -4482,9 +4491,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	if (0 == adev->irq) {
 		printk("acx: can't use IRQ 0\n");
-		goto fail_irq;
+		goto fail_vlynq_irq;
 	}
-	SET_IEEE80211_DEV(ieee, &vdev->dev);
 
 	/* request shared IRQ handler */
 	if (request_irq
@@ -4493,7 +4501,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		result = -EAGAIN;
 		goto done;
 	}
-	log(L_DEBUG | L_IRQ, "acx: request_irq %d successful\n", adev->irq);
+	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -4507,15 +4515,15 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
 	if (OK != acxpci_s_reset_dev(adev))
-		goto fail_reset;
+		goto fail_vlynq_reset_dev;
 
 	if (OK != acx_s_init_mac(adev))
-		goto fail_init_mac;
+		goto fail_vlynq_init_mac;
 
 	acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 /* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		goto fail_read_eeprom_version;
+		goto fail_vlynq_read_eeprom_version;
 
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev);
@@ -4526,8 +4534,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 
-
-	acx_proc_register_entries(ieee, 0);
+	if (acx_proc_register_entries(ieee, 0) != OK)
+		goto fail_vlynq_proc_register_entries;
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a network yet */
@@ -4542,21 +4550,19 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
 
-	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
-
 /** done with board specific setup **/
 
 	result = acx_setup_modes(adev);
 	if (result) {
 	printk("acx: can't register hwmode\n");
-		goto fail_register_netdev;
+		goto fail_vlynq_setup_modes;
 	}
 
 	acx_init_task_scheduler(adev);
 	result = ieee80211_register_hw(adev->ieee);
 	if (OK != result) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", result);
-		goto fail_register_netdev;
+		goto fail_vlynq_ieee80211_register_hw;
 	}
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
@@ -4567,27 +4573,41 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* error paths: undo everything in reverse order... */
 
+	fail_vlynq_ieee80211_register_hw:
 
-	acxpci_s_delete_dma_regions(adev);
+	fail_vlynq_setup_modes:
 
-      fail_init_mac:
-      fail_read_eeprom_version:
-      fail_reset:
+	fail_vlynq_proc_register_entries:
+		acx_proc_unregister_entries(ieee, 0);
 
-      fail_alloc_netdev:
-      fail_irq:
+    fail_vlynq_read_eeprom_version:
 
-	iounmap(adev->iobase);
-      fail_ioremap:
+	fail_vlynq_init_mac:
 
-	release_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start);
-      fail_request_mem_region:
-      fail_register_netdev:
-	ieee80211_free_hw(ieee);
-      fail:
-	vlynq_disable_device(vdev);
-      done:
-	FN_EXIT1(result);
+    fail_vlynq_reset_dev:
+
+	fail_vlynq_irq:
+      iounmap(adev->iobase);
+
+    fail_vlynq_ioremap2:
+		release_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start);
+
+    fail_vlynq_request_mem_region:
+
+    fail_vlynq_ioremap1:
+
+    fail_vlynq_known_devices:
+		vlynq_disable_device(vdev);
+		vlynq_set_drvdata(vdev, NULL);
+
+    fail_vlynq_enable_device:
+		ieee80211_free_hw(ieee);
+
+    fail_vlynq_ieee80211_alloc_hw:
+
+	done:
+		FN_EXIT1(result);
+
 	return result;
 }
 
@@ -4601,53 +4621,41 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	if (!hw) {
 		log(L_DEBUG, "acx: %s: card is unused. Skipping any release code\n",
 		    __func__);
-		goto end;
+		goto end_no_lock;
 	}
 
 
-	acx_lock(adev, flags);
-	acx_unlock(adev, flags);
-	adev->initialized = 0;
+	// Unregister ieee80211 device
+	log(L_INIT, "acxpci: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	ieee80211_unregister_hw(adev->ieee);
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
-
-		acx_sem_lock(adev);
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			adev->initialized = 0;
 		}
 		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
+
 		/* stop our eCPU */
+		// OW PCI still does something here (although also need to be reviewed).
 		acx_unlock(adev, flags);
-
-		acx_sem_unlock(adev);
 	}
 
-	/* unregister the device to not let the kernel
-	 * (e.g. ioctls) access a half-deconfigured device
-	 * NB: this will cause acxpci_e_close() to be called,
-	 * thus we shouldn't call it under sem!
-	 */
-	acxpci_e_op_close(hw);
-	log(L_INIT, "acx: removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
-
-	/* unregister_netdev ensures that no references to us left.
-	 * For paranoid reasons we continue to follow the rules */
-	acx_sem_lock(adev);
-
-	if (adev->dev_state_mask & ACX_STATE_IFACE_UP) {
-		acxpci_s_down(hw);
-		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	}
-
+	// Proc
 	acx_proc_unregister_entries(adev->ieee, 0);
+
+	// IRQs
+	acxpci_disable_acx_irq(adev);
+	synchronize_irq(adev->irq);
+	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */
 	acxpci_s_delete_dma_regions(adev);
@@ -4657,10 +4665,10 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		iounmap(adev->iobase2);
 	release_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start);
 
-	/* remove dev registration */
-
-	acx_sem_unlock(adev);
 	vlynq_disable_device(vdev);
+
+	/* remove dev registration */
+	vlynq_set_drvdata(vdev, NULL);
 
 	/* Free netdev (quite late,
 	 * since otherwise we might get caught off-guard
@@ -4668,7 +4676,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-      end:
+	end_no_lock:
 	FN_EXIT0;
 }
 
