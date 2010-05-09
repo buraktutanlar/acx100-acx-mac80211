@@ -3989,6 +3989,10 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* error paths: undo everything in reverse order... */
 
+	// TODO FIXME OW 20100507
+	// Check if reverse doing is correct. e.g. if alloc failed, no dealloc is required !!
+	// => See vlynq probe
+
 	// err = ieee80211_register_hw(ieee);
 	fail_ieee80211_register_hw:
 		ieee80211_unregister_hw(ieee);
