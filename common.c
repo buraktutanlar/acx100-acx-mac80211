@@ -101,17 +101,19 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
-// Template (Control Path)
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, struct sk_buff* skb);
-static int acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb);
+// Templates (Control Path)
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, u16 fc);
+static int acx_s_set_beacon_template(acx_device_t *adev);
 static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
-static inline int acx_s_init_max_null_data_template(acx_device_t * adev);
-static inline int acx_s_init_max_beacon_template(acx_device_t * adev);
-static inline int acx_s_init_max_tim_template(acx_device_t * adev);
-static inline int acx_s_init_max_probe_response_template(acx_device_t * adev);
-static inline int acx_s_init_max_probe_request_template(acx_device_t * adev);
+static int acx_s_init_max_null_data_template(acx_device_t * adev);
+static int acx_s_init_max_beacon_template(acx_device_t * adev);
+static int acx_s_init_max_tim_template(acx_device_t * adev);
+static int acx_s_init_max_probe_response_template(acx_device_t * adev);
+static int acx_s_init_max_probe_request_template(acx_device_t * adev);
+static int acx_s_set_probe_response_template(acx_device_t *adev);
+static int acx_s_set_probe_request_template(acx_device_t *adev);
 
 #if POWER_SAVE_80211
 static int acx_s_set_null_data_template(acx_device_t * adev);
@@ -2722,36 +2724,9 @@ void acx_update_capabilities(acx_device_t * adev)
 */
 
 /*
- * BOM Template (Control Path)
+ * BOM Templates (Control Path)
  * ==================================================
  */
-
-static int
-acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
-                                        struct acx_template_beacon *templ,
-                                        struct sk_buff* skb /* in host order! */)
-{
-        FN_ENTER;
-
-        memcpy(templ,skb->data, skb->len);
-        FN_EXIT1(skb->len);
-        return skb->len;
-}
-
-static int
-acx_s_set_beacon_template(acx_device_t *adev, struct sk_buff *skb)
-{
-        struct acx_template_beacon bcn;
-        int len, result;
-
-        FN_ENTER;
-	printk("acx: Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
-        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, skb);
-        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
-
-        FN_EXIT1(result);
-        return result;
-}
 
 static int
 acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
@@ -2770,6 +2745,47 @@ acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
 	templ.null.size = cpu_to_le16(len - 2);
 	res = acx_s_issue_cmd(adev, cmd, &templ, len);
 	return res;
+}
+
+static int acx_s_init_max_null_data_template(acx_device_t * adev)
+{
+	/* OW
+	 * hh version:       issue_cmd(cmd:cmd,buflen:26,timeout:50ms,type:0x0018)
+	 * mac80211 version: issue_cmd: begin: (cmd:cmd,buflen:32,timeout:50ms,type:0x001E)
+	 *
+	 * diff with hh is struct ieee80211_hdr included in acx_template_nullframe_t,
+	 * which is bigger, thus size if bigger
+	 */
+	return acx_s_init_max_template_generic(adev,
+			sizeof(acx_template_nullframe_t), ACX1xx_CMD_CONFIG_NULL_DATA);
+}
+
+
+static int acx_s_init_max_beacon_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_beacon_t),
+					       ACX1xx_CMD_CONFIG_BEACON);
+}
+
+static int acx_s_init_max_tim_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev, sizeof(acx_template_tim_t),
+					       ACX1xx_CMD_CONFIG_TIM);
+}
+
+static int acx_s_init_max_probe_response_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_proberesp_t),
+					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
+}
+
+static int acx_s_init_max_probe_request_template(acx_device_t * adev)
+{
+	return acx_s_init_max_template_generic(adev,
+					       sizeof(acx_template_probereq_t),
+					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
 }
 
 /*
@@ -2827,6 +2843,149 @@ static int acx_s_set_tim_template(acx_device_t * adev)
 	FN_EXIT1(result);
 	return result;
 }
+
+
+/*
+ * acx_fill_beacon_or_proberesp_template
+ *
+ * For frame format info, please see 802.11-1999.pdf item 7.2.3.9 and below!!
+ *
+ * NB: we use the fact that
+ * struct acx_template_proberesp and struct acx_template_beacon are the same
+ * (well, almost...)
+ *
+ * [802.11] Beacon's body consist of these IEs:
+ * 1 Timestamp
+ * 2 Beacon interval
+ * 3 Capability information
+ * 4 SSID
+ * 5 Supported rates (up to 8 rates)
+ * 6 FH Parameter Set (frequency-hopping PHYs only)
+ * 7 DS Parameter Set (direct sequence PHYs only)
+ * 8 CF Parameter Set (only if PCF is supported)
+ * 9 IBSS Parameter Set (ad-hoc only)
+ *
+ * Beacon only:
+ * 10 TIM (AP only) (see 802.11 7.3.2.6)
+ * 11 Country Information (802.11d)
+ * 12 FH Parameters (802.11d)
+ * 13 FH Pattern Table (802.11d)
+ * ... (?!! did not yet find relevant PDF file... --vda)
+ * 19 ERP Information (extended rate PHYs)
+ * 20 Extended Supported Rates (if more than 8 rates)
+ *
+ * Proberesp only:
+ * 10 Country information (802.11d)
+ * 11 FH Parameters (802.11d)
+ * 12 FH Pattern Table (802.11d)
+ * 13-n Requested information elements (802.11d)
+ * ????
+ * 18 ERP Information (extended rate PHYs)
+ * 19 Extended Supported Rates (if more than 8 rates)
+ */
+static int
+acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
+    struct acx_template_beacon *templ, u16 fc /* in host order! */)
+{
+	int len;
+	u8 *p;
+
+	FN_ENTER;
+
+	memset(templ, 0, sizeof(*templ));
+	MAC_BCAST(templ->da);
+	MAC_COPY(templ->sa, adev->dev_addr);
+	MAC_COPY(templ->bssid, adev->bssid);
+
+	templ->beacon_interval = cpu_to_le16(adev->beacon_interval);
+	acx_update_capabilities(adev);
+	templ->cap = cpu_to_le16(adev->capabilities);
+
+	p = templ->variable;
+	p = wlan_fill_ie_ssid(p, adev->essid_len, adev->essid);
+	p = wlan_fill_ie_rates(p, adev->rate_supported_len, adev->rate_supported);
+	p = wlan_fill_ie_ds_parms(p, adev->channel);
+	/* NB: should go AFTER tim, but acx seem to keep tim last always */
+	p = wlan_fill_ie_rates_ext(p, adev->rate_supported_len, adev->rate_supported);
+
+	switch (adev->mode) {
+	case ACX_MODE_0_ADHOC:
+		/* ATIM window */
+		p = wlan_fill_ie_ibss_parms(p, 0); break;
+	case ACX_MODE_3_AP:
+		/* TIM IE is set up as separate template */
+		break;
+	}
+
+	len = p - (u8*)templ;
+	templ->fc = cpu_to_le16(WF_FTYPE_MGMT | fc);
+	/* - 2: do not count 'u16 size' field */
+	templ->size = cpu_to_le16(len - 2);
+
+	FN_EXIT1(len);
+	return len;
+}
+
+
+#if POWER_SAVE_80211
+static int acx_s_set_null_data_template(acx_device_t * adev)
+{
+	struct acx_template_nullframe b;
+	int result;
+
+	FN_ENTER;
+
+	/* memset(&b, 0, sizeof(b)); not needed, setting all members */
+
+	b.size = cpu_to_le16(sizeof(b) - 2);
+	b.hdr.fc = WF_FTYPE_MGMTi | WF_FSTYPE_NULLi;
+	b.hdr.dur = 0;
+	MAC_BCAST(b.hdr.a1);
+	MAC_COPY(b.hdr.a2, adev->dev_addr);
+	MAC_COPY(b.hdr.a3, adev->bssid);
+	b.hdr.seq = 0;
+
+	result =
+	    acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
+
+	FN_EXIT1(result);
+	return result;
+}
+#endif
+
+
+static int
+acx_s_set_beacon_template(acx_device_t *adev)
+{
+        struct acx_template_beacon bcn;
+        int len, result;
+
+        FN_ENTER;
+        // printk("acx: Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
+        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, WF_FSTYPE_BEACON);
+        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
+
+        FN_EXIT1(result);
+        return result;
+}
+
+
+static int
+acx_s_set_probe_response_template(acx_device_t *adev)
+{
+	struct acx_template_proberesp pr;
+	int len, result;
+
+	FN_ENTER;
+
+	len = acx_fill_beacon_or_proberesp_template(adev, &pr, WF_FSTYPE_PROBERESP);
+	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len);
+
+	FN_EXIT1(result);
+	return result;
+}
+
+
 
 /*
  * acx_s_init_packet_templates()
@@ -2892,7 +3051,8 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	    "acx: .CodeEnd=0x%X\n"
 	    "acx: .WEPCacheStart=0x%X\n"
 	    "acx: .WEPCacheEnd=0x%X\n"
-	    "acx: .PacketTemplateStart=0x%X\n" ".PacketTemplateEnd=0x%X\n",
+	    "acx: .PacketTemplateStart=0x%X\n"
+		"acx: .PacketTemplateEnd=0x%X\n",
 	    /* len, */
 	    le32_to_cpu(mm.CodeStart),
 	    le32_to_cpu(mm.CodeEnd),
@@ -2909,71 +3069,36 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	return result;
 }
 
-static inline int acx_s_init_max_null_data_template(acx_device_t * adev)
+static int
+acx_s_set_probe_request_template(acx_device_t *adev)
 {
-	/* OW
-	 * hh version:       issue_cmd(cmd:cmd,buflen:26,timeout:50ms,type:0x0018)
-	 * mac80211 version: issue_cmd: begin: (cmd:cmd,buflen:32,timeout:50ms,type:0x001E)
-	 *
-	 * diff with hh is struct ieee80211_hdr included in acx_template_nullframe_t,
-	 * which is bigger, thus size if bigger
-	 */
-	return acx_s_init_max_template_generic(adev,
-			sizeof(acx_template_nullframe_t), ACX1xx_CMD_CONFIG_NULL_DATA);
-}
-
-static inline int acx_s_init_max_beacon_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_beacon_t),
-					       ACX1xx_CMD_CONFIG_BEACON);
-}
-
-static inline int acx_s_init_max_tim_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev, sizeof(acx_template_tim_t),
-					       ACX1xx_CMD_CONFIG_TIM);
-}
-
-static inline int acx_s_init_max_probe_response_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_proberesp_t),
-					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
-}
-
-static inline int acx_s_init_max_probe_request_template(acx_device_t * adev)
-{
-	return acx_s_init_max_template_generic(adev,
-					       sizeof(acx_template_probereq_t),
-					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
-}
-
-#if POWER_SAVE_80211
-static int acx_s_set_null_data_template(acx_device_t * adev)
-{
-	struct acx_template_nullframe b;
-	int result;
+	struct acx_template_probereq probereq;
+	char *p;
+	int res;
+	int frame_len;
 
 	FN_ENTER;
 
-	/* memset(&b, 0, sizeof(b)); not needed, setting all members */
+	memset(&probereq, 0, sizeof(probereq));
 
-	b.size = cpu_to_le16(sizeof(b) - 2);
-	b.hdr.fc = WF_FTYPE_MGMTi | WF_FSTYPE_NULLi;
-	b.hdr.dur = 0;
-	MAC_BCAST(b.hdr.a1);
-	MAC_COPY(b.hdr.a2, adev->dev_addr);
-	MAC_COPY(b.hdr.a3, adev->bssid);
-	b.hdr.seq = 0;
+	probereq.fc = WF_FTYPE_MGMTi | WF_FSTYPE_PROBEREQi;
+	MAC_BCAST(probereq.da);
+	MAC_COPY(probereq.sa, adev->dev_addr);
+	MAC_BCAST(probereq.bssid);
 
-	result =
-	    acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
+	p = probereq.variable;
+	p = wlan_fill_ie_ssid(p, adev->essid_len, adev->essid);
+	p = wlan_fill_ie_rates(p, adev->rate_supported_len, adev->rate_supported);
+	p = wlan_fill_ie_rates_ext(p, adev->rate_supported_len, adev->rate_supported);
+	frame_len = p - (char*)&probereq;
+	probereq.size = cpu_to_le16(frame_len - 2);
 
-	FN_EXIT1(result);
-	return result;
+	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
+	FN_EXIT0;
+	return res;
 }
-#endif
+
+
 
 /*
  * BOM Recalibration (Control Path)
