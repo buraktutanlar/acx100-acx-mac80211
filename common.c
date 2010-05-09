@@ -5098,9 +5098,11 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 			goto out_unlock;
 		adev->interface.operating = 1;
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-		adev->interface.mac_addr = conf->mac_addr;
+        adev->vif = conf->vif;
+        adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 #else
+        adev->vif = vif;
 		adev->interface.mac_addr = vif->addr;
 		adev->interface.type = vif->type;
 #endif
