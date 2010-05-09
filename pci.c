@@ -1397,7 +1397,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 	const char *devname;
 	unsigned counter;
 	u16 irqtype;
-	u16 cmd_status;
+	u16 cmd_status=-1;
 	unsigned long timeout;
 
 	FN_ENTER;
@@ -1525,7 +1525,7 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
 		       __func__, devname, 
-           (adev->irqs_active) ? "waiting" : "polling",
+                       (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 		log(L_ANY, "acx: timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
@@ -1539,12 +1539,14 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		    cmd_timeout - counter, counter);
 	}
 
+	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
+			devname,
+			cmdstr, buflen, cmd_timeout,
+			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+			acx_cmd_status_str(cmd_status)
+	);
+
 	if (1 != cmd_status) {	/* it is not a 'Success' */
-		log(L_ANY, "acx: %s: %s: ERROR: cmd_status is not SUCCESS: %d (%s). "
-		       "Took %dms of %d\n",
-		       __func__, devname, 
-           cmd_status, acx_cmd_status_str(cmd_status),
-		       cmd_timeout - counter, cmd_timeout);
 		/* zero out result buffer
 		 * WARNING: this will trash stack in case of illegally large input
 		 * length! */
@@ -1563,18 +1565,20 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 		}
 	}
 	/* ok: */
-	log(L_CTL, "acx: %s: %s: took %ld jiffies to complete\n",
+	log(L_DEBUG, "acx: %s: %s: took %ld jiffies to complete\n",
 	    __func__, cmdstr, jiffies - start);
 	FN_EXIT1(OK);
 	return OK;
 
-      bad:
+     bad:
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */	
-	log(L_CTL, "acx: %s: %s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: FAILED\n",
-	    __func__, devname,
-      cmdstr, buflen, cmd_timeout,
-	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);    
+	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
+			devname,
+			cmdstr, buflen, cmd_timeout,
+			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+			acx_cmd_status_str(cmd_status)
+	);
 	// dump_stack();
 	FN_EXIT1(NOT_OK);
 	
@@ -1601,7 +1605,7 @@ static u32 acxpci_read_cmd_type_status(acx_device_t *adev)
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
-	log(L_CTL, "acx: cmd_type:%04X cmd_status:%04X [%s]\n",
+	logf1(L_DEBUG, "cmd_type=%04X cmd_status=%04X [%s]\n",
 	    cmd_type, cmd_status, acx_cmd_status_str(cmd_status));
 
 	FN_EXIT1(cmd_status);
