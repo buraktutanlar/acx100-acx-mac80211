@@ -3002,7 +3002,6 @@ acx_s_set_beacon_template(acx_device_t *adev)
         int len, result;
 
         FN_ENTER;
-        // printk("acx: Size of template: %08zX, Size of beacon: %08X\n", sizeof(struct acx_template_beacon),skb->len);
         len = acx_fill_beacon_or_proberesp_template(adev, &bcn, WF_FSTYPE_BEACON);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
 
