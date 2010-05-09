@@ -5161,6 +5161,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 //      assert(bcm->interface.monitor >= 0);
 	} else {
 		adev->interface.operating = 0;
+		adev->vif=NULL;
 	}
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
