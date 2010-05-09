@@ -5302,6 +5302,7 @@ void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 			MAC_COPY(adev->bssid, info->bssid);
 		}
 	}
+
 	if ((vif->type == NL80211_IFTYPE_AP) && (adev->vif == vif)) {
 
 		if (info->bssid && (strlen(info->bssid) > 0)) {
@@ -5311,19 +5312,18 @@ void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		}
 	}
 
-	// OW: Beacon update condition, as seen in b43/main.c
 	if (info->enable_beacon) {
 
 		skb_tmp = ieee80211_beacon_get(hw, vif);
-		if (skb_tmp != 0) {
-			adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
-			// OW adev->beacon_cache = conf->beacon;
+		if (skb_tmp != NULL) {
 			adev->beacon_cache = skb_tmp;
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
 
+		adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
 		if (info->beacon_int != adev->beacon_interval)
 			adev->beacon_interval = info->beacon_int;
+
+		SET_BIT(adev->set_mask, SET_TEMPLATES);
 
 	}
 
