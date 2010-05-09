@@ -2290,8 +2290,11 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			adev->aid = 0;
 			//acx111_s_feature_off(adev, 0,
 			//	    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+            if (IS_ACX111(adev)) {
+                    acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+            }
 			MAC_COPY(adev->bssid, adev->dev_addr);
-			acx_s_cmd_join_bssid(adev, adev->dev_addr);
+   			acx_s_cmd_join_bssid(adev, adev->dev_addr);
 			break;
 		case ACX_MODE_MONITOR:
 			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
@@ -2318,6 +2321,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		CLEAR_BIT(adev->set_mask, GETSET_MODE);
 	}
 
+#if 0
 	if (adev->set_mask & SET_TEMPLATES) {
 		switch (adev->mode)
 		{
@@ -2336,6 +2340,42 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		}
 		CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
 	}
+#endif
+
+        if (adev->set_mask & SET_TEMPLATES) {
+                log(L_INIT, "acx: updating packet templates\n");
+                switch (adev->mode) {
+                case ACX_MODE_2_STA:
+                        acx_s_set_probe_request_template(adev);
+#if POWER_SAVE_80211
+                        acx_s_set_null_data_template(adev);
+#endif
+                        break;
+                case ACX_MODE_0_ADHOC:
+                        acx_s_set_probe_request_template(adev);
+#if POWER_SAVE_80211
+                        /* maybe power save functionality is somehow possible
+                         * for Ad-Hoc mode, too... FIXME: verify it somehow? firmware debug fields? */
+                        acx_s_set_null_data_template(adev);
+#endif
+                        /* fall through */
+                case ACX_MODE_3_AP:
+                        acx_s_set_beacon_template(adev);
+                        acx_s_set_tim_template(adev);
+                        /* BTW acx111 firmware would not send probe responses
+                        ** if probe request does not have all basic rates flagged
+                        ** by 0x80! Thus firmware does not conform to 802.11,
+                        ** it should ignore 0x80 bit in ratevector from STA.
+                        ** We can 'fix' it by not using this template and
+                        ** sending probe responses by hand. TODO --vda */
+                        acx_s_set_probe_response_template(adev);
+                }
+                /* Needed if generated frames are to be emitted at different tx rate now */
+                log(L_IRQ, "redoing cmd_join_bssid() after template cfg\n");
+                acx_s_cmd_join_bssid(adev, adev->bssid);
+                CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
+        }
+
 
 	if (adev->set_mask & SET_RXCONFIG) {
 		acx_s_initialize_rx_config(adev);
