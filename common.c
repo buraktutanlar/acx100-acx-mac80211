@@ -1773,7 +1773,9 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         /* Setting up how Beacon, Probe Response, RTS, and PS-Poll frames
         ** will be sent (rate/modulation/preamble) */
         tmp.genfrm_txrate = bitpos2genframe_txrate[lowest_bit(adev->rate_basic)];
-        tmp.genfrm_mod_pre = 0; /* FIXME: was = adev->capab_short (which was always 0); */
+        tmp.genfrm_mod_pre = 0;
+        /* FIXME: was = adev->capab_short (which was always 0); */
+
         /* we can use short pre *if* all peers can understand it */
         /* FIXME #2: we need to correctly set PBCC/OFDM bits here too */
 
