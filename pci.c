@@ -2272,6 +2272,8 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	}
 	/* ACX100 */
 	else {
+
+		// FIXME OW 20100511 Rate setting here needs to be fixed, as for acx111
 		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 		txdesc->u.r1.rate = rate_100;
 
