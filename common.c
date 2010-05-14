@@ -114,7 +114,12 @@ static int acx_s_init_max_tim_template(acx_device_t * adev);
 static int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static int acx_s_init_max_probe_request_template(acx_device_t * adev);
 static int acx_s_set_probe_response_template(acx_device_t *adev);
+
+#ifdef UNUSED_BUT_USEFULL
 static int acx_s_set_probe_request_template(acx_device_t *adev);
+static int acx_s_set_probe_response_template_off(acx_device_t *adev);
+static int acx_s_set_tim_template_off(acx_device_t *adev);
+#endif
 
 #if POWER_SAVE_80211
 static int acx_s_set_null_data_template(acx_device_t * adev);
@@ -2918,6 +2923,22 @@ static int acx_s_set_tim_template(acx_device_t *adev)
 	return result;
 }
 
+#ifdef UNUSED_BUT_USEFULL
+static int acx_s_set_tim_template_off(acx_device_t *adev) {
+
+	acx_template_nullframe_t templ;
+	int result;
+
+	FN_ENTER;
+	memset(&templ, 0, sizeof(templ));
+	templ.size = cpu_to_le16(sizeof(templ) - 2);;
+
+	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
+
+	FN_EXIT1(result);
+	return result;
+}
+#endif
 
 /*
  * acx_fill_beacon_or_proberesp_template
@@ -3083,7 +3104,23 @@ acx_s_set_probe_response_template(acx_device_t *adev)
 	return result;
 }
 
+#ifdef UNUSED_BUT_USEFULL
+static int acx_s_set_probe_response_template_off(acx_device_t *adev) {
 
+	acx_template_nullframe_t templ;
+	int result;
+
+	FN_ENTER;
+	memset(&templ, 0, sizeof(templ));
+	templ.size = cpu_to_le16(sizeof(templ) - 2);;
+
+	result=
+			acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &templ, sizeof(templ));
+
+	FN_EXIT1(result);
+	return result;
+}
+#endif
 
 /*
  * acx_s_init_packet_templates()
