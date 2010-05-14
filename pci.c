@@ -2889,7 +2889,12 @@ static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
 
 	FN_ENTER;
 
+
 	if (!adev)
+		return IRQ_NONE;
+
+	// On a shared irq line, irqs should only be for us, when enabled them
+	if (!adev->irqs_active)
 		return IRQ_NONE;
 
 	acx_lock(adev, flags);
