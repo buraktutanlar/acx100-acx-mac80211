@@ -29,6 +29,8 @@
 ** http://acx100.sf.net
 ** ---------------------------------------------------------------------
 */
+#ifndef _ACX_WLAN_COMPAT_H_
+#define _ACX_WLAN_COMPAT_H_
 
 /***********************************************************************
 ** This code is based on elements which are
@@ -251,3 +253,5 @@ typedef struct wlan_snap {
 	u8	oui[WLAN_IEEE_OUI_LEN];
 	u16	type;
 } WLAN_PACKED wlan_snap_t;
+
+#endif
