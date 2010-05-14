@@ -3204,6 +3204,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	return result;
 }
 
+#ifdef UNUSED_BUT_USEFULL
 static int
 acx_s_set_probe_request_template(acx_device_t *adev)
 {
@@ -3232,7 +3233,7 @@ acx_s_set_probe_request_template(acx_device_t *adev)
 	FN_EXIT0;
 	return res;
 }
-
+#endif
 
 
 /*
