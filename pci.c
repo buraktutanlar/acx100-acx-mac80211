@@ -2298,6 +2298,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 		hostdesc1->length = cpu_to_le16(wlhdr_len);
 	}
+
 	/* don't need to clean ack/rts statistics here, already
 	 * done on descr cleanup */
 
