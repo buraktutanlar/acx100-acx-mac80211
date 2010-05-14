@@ -26,6 +26,7 @@ struct acx_key {
 	u8 algorithm;
 };
 
+// TODO OW 20100510 Remove acx_interface and this header file
 struct acx_interface {
         /* Opaque ID of the operating interface (!= monitor
          * interface) from the ieee80211 subsystem.
