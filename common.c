@@ -102,7 +102,8 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Templates (Control Path)
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, u16 fc);
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int with_tim, u16 fc);
+
 static int acx_s_set_beacon_template(acx_device_t *adev);
 static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t * adev);
@@ -2933,9 +2934,8 @@ static int acx_s_set_tim_template(acx_device_t * adev)
  * 18 ERP Information (extended rate PHYs)
  * 19 Extended Supported Rates (if more than 8 rates)
  */
-static int
-acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
-    struct acx_template_beacon *templ, u16 fc /* in host order! */)
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
+		struct acx_template_beacon *templ, int with_tim, u16 fc /* in host order! */)
 {
 	int len;
 	u8 *p;
@@ -2943,6 +2943,25 @@ acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
 	FN_ENTER;
 
 	memset(templ, 0, sizeof(*templ));
+
+	p = (u8*) &templ->fc;
+	if (with_tim) {
+		len = adev->beacon_skb->len;
+	} else {
+		len = adev->beacon_tim - adev->beacon_skb->data;
+
+	}
+
+	if (acx_debug & L_DEBUG) {
+		logf1(L_ANY, "adev->beacon_skb->data, len=%d, sizeof(acx_template_probereq_t)=%d:\n",
+				len, sizeof(acx_template_probereq_t));
+		acx_dump_bytes(adev->beacon_skb->data, len);
+	}
+
+	memcpy(p, adev->beacon_skb->data, len);
+	p += len;
+
+#if 0
 	MAC_BCAST(templ->da);
 	MAC_COPY(templ->sa, adev->dev_addr);
 	MAC_COPY(templ->bssid, adev->bssid);
@@ -2952,12 +2971,15 @@ acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
 	templ->cap = cpu_to_le16(adev->capabilities);
 
 	p = templ->variable;
+
 	p = wlan_fill_ie_ssid(p, adev->essid_len, adev->essid);
 	p = wlan_fill_ie_rates(p, adev->rate_supported_len, adev->rate_supported);
 	p = wlan_fill_ie_ds_parms(p, adev->channel);
 	/* NB: should go AFTER tim, but acx seem to keep tim last always */
 	p = wlan_fill_ie_rates_ext(p, adev->rate_supported_len, adev->rate_supported);
+#endif
 
+#if 0
 	switch (adev->mode) {
 	case ACX_MODE_0_ADHOC:
 		/* ATIM window */
@@ -2966,9 +2988,13 @@ acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
 		/* TIM IE is set up as separate template */
 		break;
 	}
+#endif
 
-	len = p - (u8*)templ;
+#if 0
 	templ->fc = cpu_to_le16(WF_FTYPE_MGMT | fc);
+#endif
+
+	len = p - (u8*) templ;
 	/* - 2: do not count 'u16 size' field */
 	templ->size = cpu_to_le16(len - 2);
 
