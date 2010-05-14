@@ -1666,7 +1666,8 @@ typedef struct acx_template_proberesp {
 					/* 24 n SSID * */
 					/* nn n Supported Rates * */
 					/* nn 1 DS Parameter Set * */
-	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2];
+// OW 20100514	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2];
+	u8	variable[0x154 - 2-2-6-6-6-2-8-2-2];
 } ACX_PACKED acx_template_proberesp_t;
 #define acx_template_beacon_t acx_template_proberesp_t
 #define acx_template_beacon acx_template_proberesp
