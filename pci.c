@@ -4528,6 +4528,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	}
 	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
 
+	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	acxpci_disable_acx_irq(adev);
+
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
 	adev->mgmt_timer.function = (void (*)(unsigned long))0x0000dead;
