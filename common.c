@@ -5372,6 +5372,37 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	return 0;
 }
 
+// Find position of TIM IE
+static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb) {
+
+	u8 *p1, *p2, *tim;
+	int len1;
+
+	struct wlan_ie_base {
+		u8 eid;
+		u8 len;
+	}__attribute__ ((packed));
+	struct wlan_ie_base *ie;
+
+	p1 = beacon_skb->data;
+	len1 = beacon_skb->len;
+	p2 = p1;
+	p2 += offsetof(struct ieee80211_mgmt, u.beacon.variable);
+
+	tim = p2;
+	while (tim < p1 + len1) {
+		ie = (struct wlan_ie_base*) tim;
+		if (ie->eid == WLAN_EID_TIM)
+			break;
+		tim += ie->len + 2;
+	}
+	if (tim >= p1 + len1) {
+		logf0(L_ANY, "No TIM IE found\n");
+		return NULL;
+	}
+	return tim;
+}
+
 void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
