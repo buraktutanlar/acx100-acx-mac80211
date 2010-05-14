@@ -2876,21 +2876,44 @@ static int acx_s_init_max_probe_request_template(acx_device_t * adev)
     00000000 00000000 01010101 01010101 01010101 00000000 00000000...
     (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
 */
-static int acx_s_set_tim_template(acx_device_t * adev)
+static int acx_s_set_tim_template(acx_device_t *adev)
 {
-/* For now, configure smallish test bitmap, all zero ("no pending data") */
+    /* For now, configure smallish test bitmap, all zero ("no pending data") */
+#if 0
 	enum { bitmap_size = 5 };
+#endif
 
-	acx_template_tim_t t;
+	acx_template_tim_t templ;
 	int result;
+
+	int len;
+	u8 *p;
 
 	FN_ENTER;
 
-	memset(&t, 0, sizeof(t));
-	t.size = 5 + bitmap_size;	/* eid+len+count+period+bmap_ctrl + bmap */
-	t.tim_eid = WLAN_EID_TIM;
-	t.len = 3 + bitmap_size;	/* count+period+bmap_ctrl + bmap */
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &t, sizeof(t));
+	memset(&templ, 0, sizeof(templ));
+#if 0
+	templ.size = 5 + bitmap_size;	/* eid+len+count+period+bmap_ctrl + bmap */
+	templ.tim_eid = WLAN_EID_TIM;
+	templ.len = 3 + bitmap_size;	/* count+period+bmap_ctrl + bmap */
+#endif
+
+	p = (u8*) &templ.tim_eid;
+	len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
+
+	if (acx_debug & L_DEBUG) {
+		logf1(L_ANY, "adev->beacon_tim, len=%d:\n", len);
+		acx_dump_bytes(adev->beacon_tim, len);
+	}
+
+	memcpy(p, adev->beacon_tim, len);
+	p += len;
+
+	len = p - (u8*) &templ;
+	/* - 2: do not count 'u16 size' field */
+	templ.size = cpu_to_le16(len - 2);
+
+	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
 	FN_EXIT1(result);
 	return result;
 }
