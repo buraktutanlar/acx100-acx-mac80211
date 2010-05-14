@@ -2627,25 +2627,32 @@ static void acx_s_select_opmode(acx_device_t *adev)
 				adev->mode = ACX_MODE_3_AP;
 				changed = 1;
 			}
+			logf0(L_ANY, "NL80211_IFTYPE_AP\n");
 			break;
 		case NL80211_IFTYPE_ADHOC:
 			if (adev->mode != ACX_MODE_0_ADHOC) {
 				adev->mode = ACX_MODE_0_ADHOC;
 				changed = 1;
 			}
+			logf0(L_ANY, "NL80211_IFTYPE_ADHOC\n");
 			break;
 		case NL80211_IFTYPE_STATION:
 			if (adev->mode != ACX_MODE_2_STA) {
 				adev->mode = ACX_MODE_2_STA;
 				changed = 1;
 			}
+			logf0(L_ANY, "NL80211_IFTYPE_STATION\n");
 			break;
+
 		case NL80211_IFTYPE_WDS:
+			logf0(L_ANY, "NL80211_IFTYPE_WDS\n");
+
 		default:
 			if (adev->mode != ACX_MODE_OFF) {
 				adev->mode = ACX_MODE_OFF;
 				changed = 1;
 			}
+			logf0(L_ANY, "default\n");
 			break;
 		}
 	} else {
@@ -2654,11 +2661,13 @@ static void acx_s_select_opmode(acx_device_t *adev)
 				adev->mode = ACX_MODE_MONITOR;
 				changed = 1;
 			}
+			logf0(L_ANY, "NL80211_IFTYPE_MONITOR\n");
 		} else {
 			if (adev->mode != ACX_MODE_OFF) {
 				adev->mode = ACX_MODE_OFF;
 				changed = 1;
 			}
+			logf0(L_ANY, "NL80211_IFTYPE_MONITOR else\n");
 		}
 	}
 
