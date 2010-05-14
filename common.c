@@ -5183,34 +5183,42 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	acx_device_t *adev = ieee2adev(ieee);
 	unsigned long flags;
 	int err = -EOPNOTSUPP;
-
 	char mac[] = MACSTR; // approximate max length
+
+	int vif_type;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 	acx_lock(adev, flags);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	if (conf->type == NL80211_IFTYPE_MONITOR) {
+	vif_type = conf->type;
 #else
-	if (vif->type == NL80211_IFTYPE_MONITOR) {
+	vif_type = vif->type;
 #endif
+	logf1(L_ANY, "vif_type=%04X\n", vif_type);
+
+
+	if (vif_type == NL80211_IFTYPE_MONITOR) {
 		adev->interface.monitor++;
-	} else {
+	}
+
+	else {
 		if (adev->interface.operating)
 			goto out_unlock;
+
 		adev->interface.operating = 1;
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-        adev->vif = conf->vif;
-        adev->interface.mac_addr = conf->mac_addr;
+		adev->vif = conf->vif;
+		adev->interface.mac_addr = conf->mac_addr;
 		adev->interface.type = conf->type;
 #else
-        adev->vif = vif;
+		adev->vif = vif;
 		adev->interface.mac_addr = vif->addr;
 		adev->interface.type = vif->type;
 #endif
 	}
-//	adev->mode = conf->type;
+
 
 	acx_unlock(adev, flags);
 
