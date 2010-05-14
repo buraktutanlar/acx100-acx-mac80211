@@ -22,6 +22,9 @@
 #include "acx_firmware.h"
 #include "acx_commands.h"
 
+#include "wlan_compat.h"
+#include "wlan_hdr.h"
+
 /***********************************************************************
 ** BOM Forward declarations of types
 */
@@ -453,7 +456,8 @@ typedef struct rxbuffer {
 **	phy_hdr_t phy			*/
 	struct ieee80211_hdr hdr_a3;
 	/* maximally sized data part of wlan packet */
-	u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
+	// OW 20100513 u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
+	u8	data_a3[WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN];
 	/* can add hdr/data_a4 if needed */
 } ACX_PACKED rxbuffer_t;
 
@@ -857,7 +861,8 @@ typedef struct usb_txbuffer {
 	u8	ctrl2;
 	u16	data_len;
 	/* wlan packet content is placed here: */
-	u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
+	// OW 20100513 u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
+	u8	data[WLAN_A4FR_MAXLEN_WEP_FCS];
 } ACX_PACKED usb_txbuffer_t;
 
 /* USB returns either rx packets (see rxbuffer) or
