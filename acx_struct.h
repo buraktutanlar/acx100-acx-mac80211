@@ -1076,7 +1076,9 @@ struct acx_device {
 #endif
 
 	/* MAC80211 Template Reference */
-	struct sk_buff *beacon_cache;
+	struct sk_buff *beacon_skb;
+	u8 *beacon_tim;
+	int beacon_ready;
 	/* stations known to us (if we're an ap) */
 //	client_t	sta_list[32];		/* tab is larger than list, so that */
 //	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */

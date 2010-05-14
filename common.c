@@ -5403,54 +5403,60 @@ static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb) {
 	return tim;
 }
 
-void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
-		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed) {
+void
+acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+    struct ieee80211_bss_conf *info, u32 changed)
+{
 	acx_device_t *adev = ieee2adev(hw);
 
 	unsigned long flags;
 	int err = -ENODEV;
 
 	struct sk_buff *skb_tmp;
+	u8 *p1;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 
+	logf1(L_DEBUG, "changed=%04X\n", changed);
+
 	if (!adev->interface.operating)
 		goto end_sem_unlock;
 
-	if (adev->initialized)
-		acx_s_select_opmode(adev);
+//	if (adev->initialized)
+//		acx_s_select_opmode(adev);
 
 	acx_lock(adev, flags);
 
-	if ((vif->type != NL80211_IFTYPE_MONITOR) && (adev->vif == vif)) {
-		if (info->bssid) {
-			adev->interface.bssid = info->bssid;
-			MAC_COPY(adev->bssid, info->bssid);
-		}
-	}
-
-	if ((vif->type == NL80211_IFTYPE_AP) && (adev->vif == vif)) {
+	if (changed & BSS_CHANGED_BSSID) {
 
 		if (info->bssid && (strlen(info->bssid) > 0)) {
+			MAC_COPY(adev->bssid, info->bssid);
 			adev->essid_len = strlen(info->bssid);
 			memcpy(adev->essid, info->bssid, strlen(info->bssid));
+
 			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
 	}
 
-	if (info->enable_beacon) {
+	// BOM BSS_CHANGED_BEACON
+	if (changed & BSS_CHANGED_BEACON) {
 
 		skb_tmp = ieee80211_beacon_get(hw, vif);
 		if (skb_tmp != NULL) {
-			adev->beacon_cache = skb_tmp;
+			adev->beacon_skb = skb_tmp;
+			p1 = acx_beacon_find_tim(adev->beacon_skb);
+			if (p1 != NULL) {
+				adev->beacon_tim = p1;
+			} else {
+				logf0(L_ANY, "Problem: Beacon has no tim !?");
+			}
 		}
 
-		adev->beacon_interval = DEFAULT_BEACON_INTERVAL;
-		if (info->beacon_int != adev->beacon_interval)
-			adev->beacon_interval = info->beacon_int;
+		adev->beacon_interval = info->beacon_int;
 
 		SET_BIT(adev->set_mask, SET_TEMPLATES);
+		SET_BIT(adev->set_mask, GETSET_CHANNEL);
 
 	}
 
@@ -5458,7 +5464,7 @@ void acx_e_op_bss_info_changed(struct ieee80211_hw *hw,
 
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
-	//		acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+
 	err = 0;
 
 	end_sem_unlock:
