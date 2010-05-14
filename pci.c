@@ -2585,7 +2585,8 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 
 			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
 
-			memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
+			// OW 20100514 Let's ratecontrol keep higher rates
+			// OW 20100514 memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
 		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
