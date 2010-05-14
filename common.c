@@ -394,12 +394,18 @@ static const u16 acx111_ie_len_dot11[] = {
 	0,
 };
 
+// OW 20100514 FIXME Rates need to be defined correctly
+// OW 20100514 FIXME acx100 is probably currently quite wrong!
 static struct ieee80211_rate __acx_rates[] = {
-	{ .bitrate = 10, .hw_value = 0, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 20, .hw_value = 1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 55, .hw_value = 2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 110, .hw_value = 3, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-	{ .bitrate = 60, .hw_value = 4, },
+//		{ .bitrate = 10, .hw_value = RATE111_1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+//		{ .bitrate = 20, .hw_value = RATE111_2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+//		{ .bitrate = 55, .hw_value = RATE111_5, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+//		{ .bitrate = 110, .hw_value = RATE111_11, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
+		{ .bitrate = 10, .hw_value = RATE111_1,  },
+		{ .bitrate = 20, .hw_value = RATE111_2, },
+		{ .bitrate = 55, .hw_value = RATE111_5, },
+		{ .bitrate = 110, .hw_value = RATE111_11, },
+	{ .bitrate = 60, .hw_value = 6, },
 	{ .bitrate = 90, .hw_value = 5, },
 	{ .bitrate = 120, .hw_value = 6, },
 	{ .bitrate = 180, .hw_value = 7, },
