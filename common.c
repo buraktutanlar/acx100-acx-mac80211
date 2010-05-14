@@ -2589,7 +2589,8 @@ int acx_setup_modes(acx_device_t *adev)
 		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
         	err = acx_setup_modes_gphy(adev);
 */
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
+// OW 20100513		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
 	}
 	// OX FIXME This is probably not very logic ?!
 	else
