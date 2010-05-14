@@ -1847,7 +1847,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 	MAC_BCAST(adev->ap);
 
 	adev->essid_len =
-	    snprintf(adev->essid, sizeof(adev->essid), "STA%02X%02X%02X",
+	    snprintf(adev->essid, sizeof(adev->essid), "ACXSTA%02X%02X%02X",
 		     adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
 	adev->essid_active = 1;
 
