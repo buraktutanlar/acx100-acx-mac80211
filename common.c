@@ -432,12 +432,14 @@ static struct ieee80211_channel channels[] = {
 	{ .center_freq = 2484, .hw_value = 14, },
 };
 
+#ifdef TEMPORARILY_UNUSED_BUT_USEFULL
 static struct ieee80211_supported_band g_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
 	.bitrates = __acx_rates,
 	.n_bitrates = 12,
 };
+#endif
 
 static struct ieee80211_supported_band b_band_2GHz = {
 	.channels = channels,
