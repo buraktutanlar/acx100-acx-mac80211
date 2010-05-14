@@ -2115,9 +2115,56 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		CLEAR_BIT(adev->set_mask, GETSET_STATION_ID);
 	}
 
+	// BOM SET_TEMPLATES
+        if (adev->set_mask & SET_TEMPLATES) {
+                log(L_INIT, "acx: updating packet templates\n");
+                switch (adev->mode) {
+                case ACX_MODE_2_STA:
+                        //acx_s_set_probe_request_template(adev);
+#if POWER_SAVE_80211
+                        acx_s_set_null_data_template(adev);
+#endif
+                        break;
+                case ACX_MODE_0_ADHOC:
+                        //acx_s_set_probe_request_template(adev);
+#if POWER_SAVE_80211
+                        /* maybe power save functionality is somehow possible
+                         * for Ad-Hoc mode, too... FIXME: verify it somehow? firmware debug fields? */
+                        acx_s_set_null_data_template(adev);
+#endif
+                        /* fall through */
+                case ACX_MODE_3_AP:
+						if (adev->beacon_skb != NULL) {
+							acx_s_set_beacon_template(adev);
+							acx_s_set_tim_template(adev);
+							//acx_s_set_tim_template_off(adev);
+
+							/* BTW acx111 firmware would not send probe responses
+							 ** if probe request does not have all basic rates flagged
+							 ** by 0x80! Thus firmware does not conform to 802.11,
+							 ** it should ignore 0x80 bit in ratevector from STA.
+							 ** We can 'fix' it by not using this template and
+							 ** sending probe responses by hand. TODO --vda */
+							acx_s_set_probe_response_template(adev);
+							//acx_s_set_probe_response_template_off(adev);
+
+							adev->beacon_ready=1;
+						}
+
+                }
+                /* Needed if generated frames are to be emitted at different tx rate now */
+                if (adev->beacon_ready){
+                	logf0(L_ANY, "redoing cmd_join_bssid() after template cfg\n");
+                	acx_s_cmd_join_bssid(adev, adev->bssid);
+                }
+                CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
+        }
+
+
 	if (adev->set_mask & SET_STA_LIST) {
 		CLEAR_BIT(adev->set_mask, SET_STA_LIST);
 	}
+
 	if (adev->set_mask & SET_RATE_FALLBACK) {
 		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
 
@@ -2129,6 +2176,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		acx_s_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
 		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
 	}
+
 	if (adev->set_mask & GETSET_TXPOWER) {
 		log(L_INIT, "acx: updating the transmit power: %u dBm\n",
 		    adev->tx_level_dbm);
@@ -2243,9 +2291,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
 			 * Maybe redundant with GETSET_MODE below.
 			 */
-			if (IS_ACX111(adev)) {
-				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-			}
+//			if (IS_ACX111(adev)) {
+//				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+//			}
 
 			acx_wake_queue(adev->ieee, NULL);
 		}
@@ -2302,13 +2350,19 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		switch (adev->mode) {
 		case ACX_MODE_3_AP:
 			adev->aid = 0;
-			//acx111_s_feature_off(adev, 0,
-			//	    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+//			acx111_s_feature_off(adev, 0,
+//				    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             if (IS_ACX111(adev)) {
                     acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             }
 			MAC_COPY(adev->bssid, adev->dev_addr);
-   			acx_s_cmd_join_bssid(adev, adev->dev_addr);
+
+			if (adev->beacon_ready){
+				logf0(L_ANY, "Turning on AP beacons\n");
+				acx_s_cmd_join_bssid(adev, adev->dev_addr);
+			} else {
+				logf0(L_ANY, "Not turning on AP beacons. Beacon not ready.\n");
+			}
 			break;
 		case ACX_MODE_MONITOR:
 			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
@@ -2334,62 +2388,6 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		}
 		CLEAR_BIT(adev->set_mask, GETSET_MODE);
 	}
-
-#if 0
-	if (adev->set_mask & SET_TEMPLATES) {
-		switch (adev->mode)
-		{
-			case ACX_MODE_3_AP:
-				acx_s_set_tim_template(adev);
-				break;
-			default:
-				break;
-		}
-		// OW TODO 20100418: Check, if this is done correctly, otherwise comment out
-		if (adev->beacon_cache)
-		{
-			acx_s_set_beacon_template(adev, adev->beacon_cache);
-			dev_kfree_skb(adev->beacon_cache);
-			adev->beacon_cache = NULL;
-		}
-		CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
-	}
-#endif
-
-        if (adev->set_mask & SET_TEMPLATES) {
-                log(L_INIT, "acx: updating packet templates\n");
-                switch (adev->mode) {
-                case ACX_MODE_2_STA:
-                        acx_s_set_probe_request_template(adev);
-#if POWER_SAVE_80211
-                        acx_s_set_null_data_template(adev);
-#endif
-                        break;
-                case ACX_MODE_0_ADHOC:
-                        acx_s_set_probe_request_template(adev);
-#if POWER_SAVE_80211
-                        /* maybe power save functionality is somehow possible
-                         * for Ad-Hoc mode, too... FIXME: verify it somehow? firmware debug fields? */
-                        acx_s_set_null_data_template(adev);
-#endif
-                        /* fall through */
-                case ACX_MODE_3_AP:
-                        acx_s_set_beacon_template(adev);
-                        acx_s_set_tim_template(adev);
-                        /* BTW acx111 firmware would not send probe responses
-                        ** if probe request does not have all basic rates flagged
-                        ** by 0x80! Thus firmware does not conform to 802.11,
-                        ** it should ignore 0x80 bit in ratevector from STA.
-                        ** We can 'fix' it by not using this template and
-                        ** sending probe responses by hand. TODO --vda */
-                        acx_s_set_probe_response_template(adev);
-                }
-                /* Needed if generated frames are to be emitted at different tx rate now */
-                log(L_IRQ, "redoing cmd_join_bssid() after template cfg\n");
-                acx_s_cmd_join_bssid(adev, adev->bssid);
-                CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
-        }
-
 
 	if (adev->set_mask & SET_RXCONFIG) {
 		acx_s_initialize_rx_config(adev);
