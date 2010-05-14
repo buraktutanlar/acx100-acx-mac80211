@@ -3076,7 +3076,7 @@ acx_s_set_probe_response_template(acx_device_t *adev)
 
 	FN_ENTER;
 
-	len = acx_fill_beacon_or_proberesp_template(adev, &pr, WF_FSTYPE_PROBERESP);
+	len = acx_fill_beacon_or_proberesp_template(adev, &pr, 1, WF_FSTYPE_PROBERESP);
 	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len);
 
 	FN_EXIT1(result);
