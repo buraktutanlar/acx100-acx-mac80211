@@ -2754,7 +2754,7 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 }
 
 
-#if UNUSED
+#ifdef UNUSED
 void acx_update_capabilities(acx_device_t * adev)
 {
 	u16 cap = 0;
