@@ -30,6 +30,9 @@
 ** ---------------------------------------------------------------------
 */
 
+#ifndef _ACX_WLAN_HDR_H_
+#define _ACX_WLAN_HDR_H_
+
 /***********************************************************************
 ** This code is based on elements which are
 ** Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
@@ -495,3 +498,5 @@ typedef struct wlansniffrm {
 #define WLANSNIFFFRM_rate	0x8041
 #define WLANSNIFFFRM_istx	0x9041
 #define WLANSNIFFFRM_frmlen	0xA041
+
+#endif
