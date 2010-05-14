@@ -3058,9 +3058,9 @@ acx_s_set_beacon_template(acx_device_t *adev)
 {
         struct acx_template_beacon bcn;
         int len, result;
-
         FN_ENTER;
-        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, WF_FSTYPE_BEACON);
+
+        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, 0, WF_FSTYPE_BEACON);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
 
         FN_EXIT1(result);
