@@ -424,7 +424,8 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 	FN_ENTER;
 
 	/* allocate TX buffer */
-	adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
+	// OW 20100513 adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
+	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
 	adev->txbuf_start = acxpci_allocate(adev, adev->txbuf_area_size,
 				     &adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
@@ -514,11 +515,15 @@ static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
 		hostdesc->data = txbuf;
 
 		if (!(i & 1)) {
-			txbuf += 24 /*WLAN_HDR_A3_LEN*/;
-			txbuf_phy += 24 /*WLAN_HDR_A3_LEN*/;
+			// OW 20100513 txbuf += 24 /*WLAN_HDR_A3_LEN*/;
+			// OW 20100513 txbuf_phy += 24 /*WLAN_HDR_A3_LEN*/;
+			txbuf += WLAN_HDR_A3_LEN;
+			txbuf_phy += WLAN_HDR_A3_LEN;
 		} else {
-			txbuf +=  30 + 2132 + 4 - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
-			txbuf_phy += 30 + 2132 +4  - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
+			// OW 20100513 txbuf +=  30 + 2132 + 4 - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
+			// OW 20100513 txbuf_phy += 30 + 2132 +4  - 24/*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN*/;
+			txbuf +=  WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
+			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
 		}
 		hostdesc++;
 	}
@@ -2208,7 +2213,7 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	hostdesc1 = acxpci_get_txhostdesc(adev, txdesc);
 	wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
 
-	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
+	//wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
 	wlhdr_len = WLAN_HDR_A3_LEN;
 
 	/* modify flag status in separate variable to be able to write it back
@@ -2217,7 +2222,6 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	Ctl_8 = txdesc->Ctl_8;
 	Ctl2_8 = 0;		/* really need to init it to 0, not txdesc->Ctl2_8, it seems */
 
-  // OW TODO: For what is hostdesc2 required ?
 	hostdesc2 = hostdesc1 + 1;
 
 	/* DON'T simply set Ctl field to 0 here globally,
@@ -2228,11 +2232,14 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
 	if (ieeectl->flags & IEEE80211_TX_RC_USE_RTS_CTS)
+	{
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
-	else
+	}
+	else {
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
+	}
 
-	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->hw_value;
 
 	if (unlikely(!rate_cur)) {
 		printk("acx: driver bug! bad ratemask\n");
