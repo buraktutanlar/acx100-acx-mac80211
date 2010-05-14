@@ -3769,8 +3769,10 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 ~IEEE80211_HW_WEP_INCLUDE_IV;
 	 */
 
-	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
-			| BIT(NL80211_IFTYPE_ADHOC);
+	ieee->wiphy->interface_modes =
+			BIT(NL80211_IFTYPE_STATION)	|
+			BIT(NL80211_IFTYPE_ADHOC) |
+			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
 
