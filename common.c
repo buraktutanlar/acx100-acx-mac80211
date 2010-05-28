@@ -5465,6 +5465,11 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 		skb_tmp = ieee80211_beacon_get(hw, vif);
 		if (skb_tmp != NULL) {
+
+			// Free previous beacon, if changed
+			if (adev->beacon_skb != NULL)
+				dev_kfree_skb(adev->beacon_skb);
+
 			adev->beacon_skb = skb_tmp;
 			p1 = acx_beacon_find_tim(adev->beacon_skb);
 			if (p1 != NULL) {
