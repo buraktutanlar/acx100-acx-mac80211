@@ -2518,13 +2518,9 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		 * clean the descriptor: we still need valid descr data here */
 		hostdesc = acxpci_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
-		txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-		if (unlikely(0x30 & error)) {
-			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
-			 * all other errors mean we screwed up locally */
-			txstatus->flags &= ~IEEE80211_TX_STAT_ACK;
-		}
+        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (error == 0))
+			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
 		/* ...and free the desc */
 		txdesc->error = 0;
