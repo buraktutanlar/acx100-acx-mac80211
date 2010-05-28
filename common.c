@@ -2912,7 +2912,12 @@ static int acx_s_set_tim_template(acx_device_t *adev)
 #endif
 
 	p = (u8*) &templ.tim_eid;
-	len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
+
+	// Handle not yet configured beacon template
+	len = 0;
+	if (adev->beacon_skb != NULL) {
+		len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
+	}
 
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "adev->beacon_tim, len=%d:\n", len);
