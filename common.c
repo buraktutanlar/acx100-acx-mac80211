@@ -104,7 +104,7 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int with_tim, u16 fc);
 
-static int acx_s_set_beacon_template(acx_device_t *adev);
+static int acx_s_set_beacon_template(acx_device_t *adev, int len);
 static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
@@ -3088,14 +3088,14 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 
 
 static int
-acx_s_set_beacon_template(acx_device_t *adev)
+acx_s_set_beacon_template(acx_device_t *adev, int len)
 {
         struct acx_template_beacon bcn;
-        int len, result;
+        int len2, result;
         FN_ENTER;
 
-        len = acx_fill_beacon_or_proberesp_template(adev, &bcn, 0, WF_FSTYPE_BEACON);
-        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len);
+        len2 = acx_fill_beacon_or_proberesp_template(adev, &bcn, len, WF_FSTYPE_BEACON);
+        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len2);
 
         FN_EXIT1(result);
         return result;
