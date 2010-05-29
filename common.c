@@ -102,7 +102,7 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Templates (Control Path)
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int with_tim, u16 fc);
+static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
 static int acx_s_set_beacon_template(acx_device_t *adev, int len);
 static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
@@ -2992,9 +2992,8 @@ static int acx_s_set_tim_template_off(acx_device_t *adev) {
  * 19 Extended Supported Rates (if more than 8 rates)
  */
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
-		struct acx_template_beacon *templ, int with_tim, u16 fc /* in host order! */)
+		struct acx_template_beacon *templ, int len, u16 fc /* in host order! */)
 {
-	int len;
 	u8 *p;
 
 	FN_ENTER;
@@ -3002,12 +3001,6 @@ static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
 	memset(templ, 0, sizeof(*templ));
 
 	p = (u8*) &templ->fc;
-	if (with_tim) {
-		len = adev->beacon_skb->len;
-	} else {
-		len = adev->beacon_tim - adev->beacon_skb->data;
-
-	}
 
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "adev->beacon_skb->data, len=%d, sizeof(acx_template_probereq_t)=%d:\n",
