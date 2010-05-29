@@ -1494,18 +1494,15 @@ acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
 
 
 	do {
-		if (!adev->irqs_active) {	/* IRQ disabled: poll */
-			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-			if (irqtype & HOST_INT_CMD_COMPLETE) {
-				write_reg16(adev, IO_ACX_IRQ_ACK,
-					    HOST_INT_CMD_COMPLETE);
-				break;
-			}
-		} else {	/* Wait when IRQ will set the bit */
-			irqtype = adev->irq_status;
-			if (irqtype & HOST_INT_CMD_COMPLETE)
-				break;
+		irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if (irqtype & HOST_INT_CMD_COMPLETE) {
+			write_reg16(adev, IO_ACX_IRQ_ACK,
+				    HOST_INT_CMD_COMPLETE);
+			break;
 		}
+
+		if (adev->irq_status & HOST_INT_CMD_COMPLETE)
+			break;
 
 		if (counter % 8 == 0) {
 			// Timeout
