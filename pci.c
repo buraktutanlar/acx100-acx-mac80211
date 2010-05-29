@@ -2544,24 +2544,6 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
-
-		/* Rate handling is done in mac80211 */
-/*		if (adev->rate_auto) {
-			struct client *clt = get_txc(adev, txdesc);
-			if (clt) {
-				u16 cur = get_txr(adev, txdesc);
-				if (clt->rate_cur == cur) {
-					acx_l_handle_txrate_auto(adev, clt, cur,*/	/* intended rate */
-								 /*r100, r111,*/	/* actually used rate */
-								 /*(error & 0x30),*/	/* was there an error? */
-/*								 TX_CNT +
-								 TX_CLEAN_BACKLOG
-								 -
-								 adev->tx_free);
-				}
-			}
-		}
-*/
 		if (unlikely(error))
 			acxpci_handle_tx_error(adev, error, finger,  txstatus);
 
