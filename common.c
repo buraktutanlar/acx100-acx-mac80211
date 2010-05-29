@@ -5437,7 +5437,6 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	int err = -ENODEV;
 
 	struct sk_buff *skb_tmp;
-	u8 *p1;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -5474,12 +5473,10 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 				dev_kfree_skb(adev->beacon_skb);
 
 			adev->beacon_skb = skb_tmp;
-			p1 = acx_beacon_find_tim(adev->beacon_skb);
-			if (p1 != NULL) {
-				adev->beacon_tim = p1;
-			} else {
-				logf0(L_ANY, "Problem: Beacon has no tim !?");
-			}
+			adev->beacon_tim = acx_beacon_find_tim(adev->beacon_skb);
+			if (adev->beacon_tim == NULL)
+				logf0(L_DEBUG, "Beacon contained no tim");
+
 		}
 
 		adev->beacon_interval = info->beacon_int;
