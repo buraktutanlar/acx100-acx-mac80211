@@ -2915,7 +2915,7 @@ static int acx_s_set_tim_template(acx_device_t *adev)
 
 	// Handle not yet configured beacon template
 	len = 0;
-	if (adev->beacon_skb != NULL) {
+	if (adev->beacon_skb != NULL && adev->beacon_tim != NULL) {
 		len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
 	}
 
