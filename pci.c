@@ -146,7 +146,7 @@ static void acxpci_disable_acx_irq(acx_device_t * adev);
 void acxpci_interrupt_tasklet(struct work_struct *work);
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void acxpci_handle_info_irq(acx_device_t * adev);
-static void acxpci_log_unusual_irq(u16 irqtype);
+static void acxpci_log_irq(u16 irqtype);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
@@ -3007,53 +3007,59 @@ static void acxpci_handle_info_irq(acx_device_t * adev)
 }
 
 
-static void acxpci_log_unusual_irq(u16 irqtype)
+static void acxpci_log_irq(u16 irqtype)
 {
-	/*
-	   if (!printk_ratelimit())
-	   return;
-	 */
+	printk("acxpci: %s: got: ", __func__);
 
-	printk("acx: got");
-	if (irqtype & HOST_INT_RX_DATA) {
-		printk("acx:  Rx_Data");
-	}
-	/* HOST_INT_TX_COMPLETE   */
-	if (irqtype & HOST_INT_TX_XFER) {
-		printk("acx:  Tx_Xfer");
-	}
-	/* HOST_INT_RX_COMPLETE   */
-	if (irqtype & HOST_INT_DTIM) {
-		printk("acx:  DTIM");
-	}
-	if (irqtype & HOST_INT_BEACON) {
-		printk("acx:  Beacon");
-	}
-	if (irqtype & HOST_INT_TIMER) {
-		log(L_IRQ, "acx:  Timer");
-	}
-	if (irqtype & HOST_INT_KEY_NOT_FOUND) {
-		printk("acx:  Key_Not_Found");
-	}
-	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
-		printk("acx:  IV_ICV_Failure (crypto)");
-	}
-	/* HOST_INT_CMD_COMPLETE  */
-	/* HOST_INT_INFO          */
-	if (irqtype & HOST_INT_OVERFLOW) {
-		printk("acx:  Overflow");
-	}
-	if (irqtype & HOST_INT_PROCESS_ERROR) {
-		printk("acx:  Process_Error");
-	}
-	/* HOST_INT_SCAN_COMPLETE */
-	if (irqtype & HOST_INT_FCS_THRESHOLD) {
-		printk("acx:  FCS_Threshold");
-	}
-	if (irqtype & HOST_INT_UNKNOWN) {
-		printk("acx:  Unknown");
-	}
-	printk("acx:  IRQ(s)\n");
+	if (irqtype & HOST_INT_RX_DATA)
+		printk("Rx_Data,");
+
+	if (irqtype & HOST_INT_TX_COMPLETE)
+		printk("Tx_Complete,");
+
+	if (irqtype & HOST_INT_TX_XFER)
+		printk("Tx_Xfer,");
+
+	if (irqtype & HOST_INT_RX_COMPLETE)
+		printk("Rx_Complete,");
+
+	if (irqtype & HOST_INT_DTIM)
+		printk("DTIM,");
+
+	if (irqtype & HOST_INT_BEACON)
+		printk("Beacon,");
+
+	if (irqtype & HOST_INT_TIMER)
+		log(L_IRQ, "Timer,");
+
+	if (irqtype & HOST_INT_KEY_NOT_FOUND)
+		printk("Key_Not_Found,");
+
+	if (irqtype & HOST_INT_IV_ICV_FAILURE)
+		printk("IV_ICV_Failure (crypto),");
+
+	if (irqtype & HOST_INT_CMD_COMPLETE)
+		printk("Cmd_Complete,");
+
+	if (irqtype & HOST_INT_INFO)
+		printk("Info,");
+
+	if (irqtype & HOST_INT_OVERFLOW)
+		printk("Overflow,");
+
+	if (irqtype & HOST_INT_PROCESS_ERROR)
+		printk("Process_Error,");
+
+	if (irqtype & HOST_INT_SCAN_COMPLETE)
+		printk("Scan_Complete,");
+
+	if (irqtype & HOST_INT_FCS_THRESHOLD)
+		printk("FCS_Threshold,");
+
+	if (irqtype & HOST_INT_UNKNOWN)
+		printk("Unknown,");
+
+	printk(": IRQ(s)\n");
 }
 
 void acxpci_set_interrupt_mask(acx_device_t * adev)
