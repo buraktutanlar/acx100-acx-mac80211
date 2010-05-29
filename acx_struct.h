@@ -736,6 +736,8 @@ typedef struct shared_queueindicator {
 #define HOST_INT_FCS_THRESHOLD	0x4000	/* not documented yet - in BSD driver: ACX_DEV_INTF_BOOT ??? */
 #define HOST_INT_UNKNOWN	0x8000	/* not documented yet - in BSD driver: ACX_DEV_INTF_UNKNOWN5 */
 
+#define HOST_INT_MASK_ALL	0xffff
+
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */
 #if defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM)
