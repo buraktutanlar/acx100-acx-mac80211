@@ -1977,7 +1977,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 {
 	unsigned long flags;
 	unsigned int start_scan = 0;
-	int i;
+	int i, len;
 
 	FN_ENTER;
 
@@ -2137,9 +2137,18 @@ void acx_s_update_card_settings(acx_device_t *adev)
                         /* fall through */
                 case ACX_MODE_3_AP:
 						if (adev->beacon_skb != NULL) {
-							acx_s_set_beacon_template(adev);
+
+					        // If beacon_tim is set, we only fill the acx beacon template until the tim IE
+					        // the tim IE will be configured using acx_fill_beacon_or_proberesp_template
+					        if (adev->beacon_tim){
+					        	len = adev->beacon_tim - adev->beacon_skb->data;
+					        }
+					        // else we fill the complete beacon_skb
+					        else {
+					        	len = adev->beacon_skb->len;
+					        }
+							acx_s_set_beacon_template(adev, len);
 							acx_s_set_tim_template(adev);
-							//acx_s_set_tim_template_off(adev);
 
 							/* BTW acx111 firmware would not send probe responses
 							 ** if probe request does not have all basic rates flagged
