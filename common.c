@@ -3106,12 +3106,13 @@ static int
 acx_s_set_probe_response_template(acx_device_t *adev)
 {
 	struct acx_template_proberesp pr;
-	int len, result;
+	int len1, len2, result;
 
 	FN_ENTER;
 
-	len = acx_fill_beacon_or_proberesp_template(adev, &pr, 1, WF_FSTYPE_PROBERESP);
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len);
+	len1 = adev->beacon_skb->len;
+	len2 = acx_fill_beacon_or_proberesp_template(adev, &pr, len1, WF_FSTYPE_PROBERESP);
+	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len2);
 
 	FN_EXIT1(result);
 	return result;
