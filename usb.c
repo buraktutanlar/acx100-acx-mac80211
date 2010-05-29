@@ -1207,6 +1207,8 @@ static void acxusb_i_complete_tx(struct urb *urb)
 	/* free the URB and check for more data */
 	tx->busy = 0;
 	adev->tx_free++;
+
+	// FIXME OW 20100520 Fix tx_info reporting to mac80211
 	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
 
 	if ((adev->tx_free >= TX_START_QUEUE)
