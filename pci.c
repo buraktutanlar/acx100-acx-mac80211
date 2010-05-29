@@ -3079,12 +3079,6 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 					  | HOST_INT_FCS_THRESHOLD
 					  /* | HOST_INT_UNKNOWN        */
 		    );
-		/* Or else acx100 won't signal cmd completion, right? */
-		// adev->irq_mask_off = (u16) ~ (HOST_INT_CMD_COMPLETE);	/* 0xfdff */
-
-		// OW 20100101 Also HOST_INT_CMD_COMPLETE should be off.
-		// Otherwise it interfers with possible polling, e.g. in initial issue_cmd
-		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
 
 	} else {
 		adev->irq_mask = (u16) ~ (0
@@ -3105,7 +3099,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 					  /* | HOST_INT_FCS_THRESHOLD  */
 					  /* | HOST_INT_UNKNOWN        */
 		    );
-		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
+
 	}
 }
 
