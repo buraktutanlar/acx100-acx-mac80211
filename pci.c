@@ -692,7 +692,6 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
  */
 void acxpci_free_desc_queues(acx_device_t * adev)
 {
-	unsigned long flags;
 
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
 	if (ptr) { \
@@ -708,19 +707,14 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
 		       adev->txbuf_startphy);
 
-	// OW FIXME Review locking
-	acx_lock(adev, flags);
 	adev->txdesc_start = NULL;
-	acx_unlock(adev, flags);
 
 	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
 		       adev->rxhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
 		       adev->rxbuf_startphy);
 
-	acx_lock(adev, flags);
 	adev->rxdesc_start = NULL;
-	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
@@ -1654,7 +1648,6 @@ static inline void acxpci_init_mboxes(acx_device_t * adev)
 int acxpci_s_reset_dev(acx_device_t * adev)
 {
 	const char *msg = "";
-	unsigned long flags;
 	int result = NOT_OK;
 	u16 hardware_info;
 	u16 ecpu_ctrl;
@@ -1664,8 +1657,6 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
-
-	acx_lock(adev, flags);
 
 #ifdef CONFIG_PCI
 	acxpci_l_reset_mac(adev);
@@ -1691,8 +1682,6 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 #endif
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
 	SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
-
-	acx_unlock(adev, flags);
 
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
@@ -1742,7 +1731,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 
 /* Finish error message. Indicate which function failed */
       end_unlock:
-	acx_unlock(adev, flags);
+
       end_fail:
 	printk("acx: %sreset_dev() FAILED\n", msg);
       end:
@@ -1824,13 +1813,10 @@ static void acxpci_l_reset_mac(acx_device_t * adev)
 static void acxpci_s_up(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
 
 	acxpci_irq_enable(adev);
-	acx_lock(adev, flags);
-	acx_unlock(adev, flags);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
 	 ** used to use it. But we don't do that anymore, our OS
@@ -3777,7 +3763,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_save_state(pdev);
 #endif
 
-
 	err = acx_setup_modes(adev);
 	if (err) {
 	printk("acx: can't setup hwmode\n");
@@ -3879,7 +3864,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long mem_region1, mem_region2;
-	unsigned long flags;
+
 	FN_ENTER;
 
 	if (!hw) {
@@ -3909,7 +3894,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 		 * since not supported by all firmware versions */
 		acx_s_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
-		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
@@ -3926,7 +3910,6 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 			write_flush(adev);
 		}
-		acx_unlock(adev, flags);
 
 	}
 
@@ -4436,7 +4419,6 @@ static void vlynq_remove(struct vlynq_device *vdev)
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 	FN_ENTER;
 
 	if (!hw) {
@@ -4460,14 +4442,12 @@ static void vlynq_remove(struct vlynq_device *vdev)
 			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 			adev->initialized = 0;
 		}
-		acx_lock(adev, flags);
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
 		acxpci_l_power_led(adev, 0);
 
 		/* stop our eCPU */
 		// OW PCI still does something here (although also need to be reviewed).
-		acx_unlock(adev, flags);
 	}
 
 	// Proc
