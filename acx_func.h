@@ -559,7 +559,7 @@ void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
 int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
-void acxpci_interrupt_tasklet(struct work_struct *work);
+void acxpci_irq_work(struct work_struct *work);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops

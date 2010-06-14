@@ -142,7 +142,7 @@ int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 // Irq Handling, Timer
 static void acxpci_irq_enable(acx_device_t * adev);
 static void acxpci_irq_disable(acx_device_t * adev);
-void acxpci_interrupt_tasklet(struct work_struct *work);
+void acxpci_irq_work(struct work_struct *work);
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
 static void acxpci_handle_info_irq(acx_device_t * adev);
 static void acxpci_log_irq(u16 irqtype);
@@ -2652,12 +2652,11 @@ static void acxpci_irq_disable(acx_device_t * adev)
 }
 
 /* Interrupt handler bottom-half */
-void acxpci_interrupt_tasklet(struct work_struct *work)
+void acxpci_irq_work(struct work_struct *work)
 {
-	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
+	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
 	int irqreason;
 	int irqmasked;
-	unsigned long flags;
 
 #define IRQ_ITERATE 0
 #if IRQ_ITERATE
@@ -2667,7 +2666,7 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
+	acx_sem_lock(adev);
 
 	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
 	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
@@ -2678,6 +2677,19 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
 
 #if IRQ_ITERATE
+
+	/* OW, 20100611: Iterating and latency:
+	 *
+	 * It might be interresting, to iterate over irqs for latency, since it avoids waiting for the schedling
+	 * of the work tasklet.
+	 *
+	 * If it would be done, then however it should be aligned with tx_work and tx_cleanup: new tx work skbs
+	 * should be put into the device queue right after tx_clanup in the ame function. => See wl12xxx handling.
+	 *
+	 * Currently the IRQ_ITERATE code is anyway broken (fixes not complicated however).
+	 *
+	 */
+
 	if (jiffies != adev->irq_last_jiffies) {
 		adev->irq_loops_this_jiffy = 0;
 		adev->irq_last_jiffies = jiffies;
@@ -2690,14 +2702,14 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 
 		// HOST_INT_CMD_COMPLETE handling
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
-			log(L_IRQ, "acx: got Command_Complete IRQ\n");
+			log(L_IRQ, "acxpci: got Command_Complete IRQ\n");
 			/* save the state for the running issue_cmd() */
 			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
 		/* Handle most important IRQ types first */
 		if (irqmasked & HOST_INT_RX_COMPLETE) {
-			log(L_IRQ, "acx: got Rx_Complete IRQ\n");
+			log(L_IRQ, "acxpci: got Rx_Complete IRQ\n");
 			acxpci_l_process_rxdesc(adev);
 		}
 
@@ -2719,7 +2731,7 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 		}
 
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
-			log(L_IRQ, "acx: got Scan_Complete IRQ\n");
+			log(L_IRQ, "acxpci: got Scan_Complete IRQ\n");
 			/* need to do that in process context */
 			/* remember that fw is not scanning anymore */
 			SET_BIT(adev->irq_status,
@@ -2730,7 +2742,7 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 		 * or we keep them masked out */
 		if (acx_debug & L_IRQ)
 		{
-			acxpci_log_irq(irqreason);
+			acx_log_irq(irqreason);
 		}
 
 #if IRQ_ITERATE
@@ -2769,12 +2781,12 @@ void acxpci_interrupt_tasklet(struct work_struct *work)
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
 	write_flush(adev);
 
-	acx_unlock(adev, flags);
-
 	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
 	if (adev->after_interrupt_jobs){
 		acx_e_after_interrupt_task(adev);
 	}
+
+	acx_sem_unlock(adev);
 
 	FN_EXIT0;
 	return;
