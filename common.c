@@ -186,6 +186,7 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee
 void acx_init_task_scheduler(acx_device_t *adev);
 void acx_e_after_interrupt_task(acx_device_t *adev);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+void acx_log_irq(u16 irqtype);
 void acx_i_timer(unsigned long address);
 void acx_set_timer(acx_device_t * adev, int timeout_us);
 
@@ -5189,6 +5190,62 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 
 	FN_EXIT0;
 }
+
+void acx_log_irq(u16 irqtype)
+{
+	printk("acx: %s: got: ", __func__);
+
+	if (irqtype & HOST_INT_RX_DATA)
+		printk("Rx_Data,");
+
+	if (irqtype & HOST_INT_TX_COMPLETE)
+		printk("Tx_Complete,");
+
+	if (irqtype & HOST_INT_TX_XFER)
+		printk("Tx_Xfer,");
+
+	if (irqtype & HOST_INT_RX_COMPLETE)
+		printk("Rx_Complete,");
+
+	if (irqtype & HOST_INT_DTIM)
+		printk("DTIM,");
+
+	if (irqtype & HOST_INT_BEACON)
+		printk("Beacon,");
+
+	if (irqtype & HOST_INT_TIMER)
+		log(L_IRQ, "Timer,");
+
+	if (irqtype & HOST_INT_KEY_NOT_FOUND)
+		printk("Key_Not_Found,");
+
+	if (irqtype & HOST_INT_IV_ICV_FAILURE)
+		printk("IV_ICV_Failure (crypto),");
+
+	if (irqtype & HOST_INT_CMD_COMPLETE)
+		printk("Cmd_Complete,");
+
+	if (irqtype & HOST_INT_INFO)
+		printk("Info,");
+
+	if (irqtype & HOST_INT_OVERFLOW)
+		printk("Overflow,");
+
+	if (irqtype & HOST_INT_PROCESS_ERROR)
+		printk("Process_Error,");
+
+	if (irqtype & HOST_INT_SCAN_COMPLETE)
+		printk("Scan_Complete,");
+
+	if (irqtype & HOST_INT_FCS_THRESHOLD)
+		printk("FCS_Threshold,");
+
+	if (irqtype & HOST_INT_UNKNOWN)
+		printk("Unknown,");
+
+	printk(": IRQ(s)\n");
+}
+
 
 /*
  * acx_schedule_task
