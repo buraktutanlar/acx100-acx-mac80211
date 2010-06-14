@@ -149,7 +149,7 @@ static void acxpci_log_irq(u16 irqtype);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
-static int acxpci_e_op_open(struct ieee80211_hw *hw);
+static int acxpci_e_op_start(struct ieee80211_hw *hw);
 static void acxpci_e_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
@@ -3046,7 +3046,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.conf_tx = acx_e_conf_tx,
 	.add_interface = acx_e_op_add_interface,
 	.remove_interface = acx_e_op_remove_interface,
-	.start = acxpci_e_op_open,
+	.start = acxpci_e_op_start,
 	.configure_filter = acx_i_op_configure_filter,
 	.stop = acxpci_e_op_stop,
 	.config = acx_e_op_config,
@@ -3059,18 +3059,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 };
 
 
-/*
- * acxpci_e_open
- *
- * Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
- * from clear to set. In other words: ifconfig up.
- *
- * Returns:
- *	0	success
- *	>0	f/w reported error
- *	<0	driver reported error
- */
-static int acxpci_e_op_open(struct ieee80211_hw *hw)
+static int acxpci_e_op_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	int result = OK;
@@ -3080,7 +3069,7 @@ static int acxpci_e_op_open(struct ieee80211_hw *hw)
 
 	adev->initialized = 0;
 
-/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
 	/* ifup device */
 	acxpci_s_up(hw);
@@ -3092,8 +3081,6 @@ static int acxpci_e_op_open(struct ieee80211_hw *hw)
 	 * dev->tbusy==0.  Our rx path knows to pass up received/
 	 * frames because of dev->flags&IFF_UP is true.
 	 */
-	// OW ieee80211_start_queues(adev->ieee);
-	// A guess
 	ieee80211_wake_queues(adev->ieee);
 
 	adev->initialized = 1;
