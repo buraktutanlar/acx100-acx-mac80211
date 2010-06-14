@@ -607,7 +607,7 @@ void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Irq Handling, Timer
-void acxusb_interrupt_tasklet(struct work_struct *work);
+void acxusb_irq_work(struct work_struct *work);
 
 // Mac80211 Ops
 

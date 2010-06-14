@@ -132,7 +132,7 @@ void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Irq Handling, Timer
-void acxusb_interrupt_tasklet(struct work_struct *work);
+void acxusb_irq_work(struct work_struct *work);
 
 // Mac80211 Ops
 static int acxusb_e_start(struct ieee80211_hw *);
@@ -1419,10 +1419,10 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
  * ==================================================
  */
 
-void acxusb_interrupt_tasklet(struct work_struct *work)
+void acxusb_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev =
-			container_of(work, struct acx_device, after_interrupt_task);
+			container_of(work, struct acx_device, irq_work);
 
 	if (adev->after_interrupt_jobs)
 		acx_e_after_interrupt_task(adev);
