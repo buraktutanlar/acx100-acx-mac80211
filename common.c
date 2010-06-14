@@ -3623,6 +3623,8 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 	seq_printf(file, "bssid     " MACSTR "\n", MAC(adev->bssid));
 	seq_printf(file, "ap_filter " MACSTR "\n", MAC(adev->ap));
 
+	seq_printf(file, "tx_queue len: %d\n", skb_queue_len(&adev->tx_queue));
+
 	seq_printf(file, "\n" "** PHY status **\n"
 		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
 		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
