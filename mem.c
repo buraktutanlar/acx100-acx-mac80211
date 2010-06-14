@@ -2504,21 +2504,6 @@ static void acxmem_s_up(struct ieee80211_hw *hw) {
 	 ** timer won't be started by acx_set_status() */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
-	// OW FIXME Check acx_set_status?
-#if 0
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-	case ACX_MODE_2_STA:
-		/* actual scan cmd will happen in start() */
-		acx_set_status(adev, ACX_STATUS_1_SCANNING);
-		break;
-	case ACX_MODE_3_AP:
-	case ACX_MODE_MONITOR:
-		acx_set_status(adev, ACX_STATUS_4_ASSOCIATED);
-		break;
-	}
-#endif
-
 	acx_s_start(adev);
 
 	FN_EXIT0;
