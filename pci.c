@@ -140,7 +140,7 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
 int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
-static void acxpci_enable_acx_irq(acx_device_t * adev);
+static void acxpci_irq_enable(acx_device_t * adev);
 static void acxpci_disable_acx_irq(acx_device_t * adev);
 void acxpci_interrupt_tasklet(struct work_struct *work);
 static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
@@ -1829,8 +1829,8 @@ static void acxpci_s_up(struct ieee80211_hw *hw)
 
 	FN_ENTER;
 
+	acxpci_irq_enable(adev);
 	acx_lock(adev, flags);
-	acxpci_enable_acx_irq(adev);
 	acx_unlock(adev, flags);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
@@ -2628,7 +2628,7 @@ int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
  * ==================================================
  */
 
-static void acxpci_enable_acx_irq(acx_device_t * adev)
+static void acxpci_irq_enable(acx_device_t * adev)
 {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
