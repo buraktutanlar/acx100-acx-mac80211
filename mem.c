@@ -2356,8 +2356,10 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	goto end;
 
 	/* Finish error message. Indicate which function failed */
-	end_unlock: acx_unlock(adev, flags);
-	end_fail: printk("acx: %sreset_dev() FAILED\n", msg);
+	end_fail:
+
+	printk("acx: %sreset_dev() FAILED\n", msg);
+
 	end:
 	FN_EXIT1(result);
 	return result;
