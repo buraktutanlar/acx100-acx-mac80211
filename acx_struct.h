@@ -1081,6 +1081,10 @@ struct acx_device {
 //	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
 //	client_t	*ap_client;		/* this one is our AP (STA mode only) */
 
+	// Mac80211 Tx_queue
+	struct sk_buff_head tx_queue;
+	struct work_struct tx_work;
+
 #ifdef UNUSED
 	int		dup_count;
 	int		nondup_count;
