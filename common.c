@@ -4432,10 +4432,37 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 	}
 
-	/*
-	 * FIXME: should it really be done here??
-	 */
-	ieee80211_rx_irqsafe(adev->ieee, skb);
+	// See:
+	//
+	//	commit d20ef63d32461332958661df73e21c0ca42601b0
+	//	Author: Johannes Berg <johannes@sipsolutions.net>
+	//	Date:   Sun Oct 11 15:10:40 2009 +0200
+	//
+	//    mac80211: document ieee80211_rx() context requirement
+	//
+	//    ieee80211_rx() must be called with softirqs disabled
+	//    since the networking stack requires this for netif_rx()
+	//    and some code in mac80211 can assume that it can not
+	//    be processing its own tasklet and this call at the same
+	//    time.
+	//
+	// Problem: ... I still get some "NOHZ: local_softirq_pending 08" messages
+	if (IS_PCI(adev) || IS_MEM(adev)) {
+#if CONFIG_ACX_MAC80211_VERSION <= KERNEL_VERSION(2, 6, 32)
+		local_bh_disable();
+		ieee80211_rx(adev->ieee, skb);
+		local_bh_enable();
+#else
+		ieee80211_rx_ni(adev->ieee, skb);
+#endif
+	}
+	// Usb Rx is happening in_interupt()
+	else if (IS_USB(adev)) {
+		ieee80211_rx_irqsafe(adev->ieee, skb);
+	} else {
+		logf0(L_ANY, "ERROR: Undefined device type !?\n");
+	}
+
 	adev->stats.rx_packets++;
 	adev->stats.rx_bytes += skb->len;
 
