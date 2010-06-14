@@ -4423,17 +4423,6 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 #endif
 		};
 
-/*
- * acxmem_e_op_start
- *
- * Called as a result of SIOCSIFFLAGS ioctl changing the flags bit IFF_UP
- * from clear to set. In other words: ifconfig up.
- *
- * Returns:
- *	0	success
- *	>0	f/w reported error
- *	<0	driver reported error
- */
 static int acxmem_e_op_start(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
 	int result = OK;
