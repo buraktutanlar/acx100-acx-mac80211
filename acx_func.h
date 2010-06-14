@@ -329,7 +329,6 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_tx_work(struct work_struct *work);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
 void acx_tx_queue_flush(acx_device_t *adev);
-int acx_i_op_tx(struct ieee80211_hw *ieee,	struct sk_buff *skb);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);

@@ -4359,7 +4359,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
  */
 
 static const struct ieee80211_ops acxmem_hw_ops = {
-		.tx = acx_i_op_tx,
+		.tx = acx_op_tx,
 		.conf_tx = acx_e_conf_tx,
 		.add_interface = acx_e_op_add_interface,
 		.remove_interface = acx_e_op_remove_interface,

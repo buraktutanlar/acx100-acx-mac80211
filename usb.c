@@ -1436,7 +1436,7 @@ void acxusb_irq_work(struct work_struct *work)
  */
 
 static const struct ieee80211_ops acxusb_hw_ops = {
-	.tx = acx_i_op_tx,
+	.tx = acx_op_tx,
 	.conf_tx = acx_e_conf_tx,
 	.add_interface = acx_e_op_add_interface,
 	.remove_interface = acx_e_op_remove_interface,

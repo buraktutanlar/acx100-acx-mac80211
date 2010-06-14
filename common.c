@@ -161,7 +161,6 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
-int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_tx_work(struct work_struct *work);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
