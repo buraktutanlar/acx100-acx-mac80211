@@ -1810,12 +1810,8 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 void acx_s_set_defaults(acx_device_t * adev)
 {
 	struct ieee80211_conf *conf = &adev->ieee->conf;
-	unsigned long flags;
 
 	FN_ENTER;
-
-	// OW FIXME - review locking
-	acx_lock(adev, flags);
 
 	/* do it before getting settings, prevent bogus channel 0 warning */
 	adev->channel = 1;
@@ -1831,9 +1827,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
 
 	// OW FIXME - review locking
-	acx_unlock(adev, flags);
 	acx_s_update_card_settings(adev);
-	acx_lock(adev, flags);
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
@@ -1913,20 +1907,16 @@ void acx_s_set_defaults(acx_device_t * adev)
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
 		conf->power_level = adev->tx_level_dbm;
-		acx_unlock(adev, flags);
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-		acx_lock(adev, flags);
 	} else {
 		/* don't use max. level, since it might be dangerous
 		 * (e.g. WRT54G people experience
 		 * excessive Tx power damage!) */
 		adev->tx_level_dbm = 18;
 		conf->power_level = adev->tx_level_dbm;
-		acx_unlock(adev, flags);
 		acx_s_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-		acx_lock(adev, flags);
 	}
 
 	/* adev->tx_level_auto = 1; */
@@ -1962,9 +1952,6 @@ void acx_s_set_defaults(acx_device_t * adev)
 #endif
 	    ;
 
-	acx_unlock(adev, flags);
-	acx_lock_unhold();	/* hold time 844814 CPU ticks @2GHz */
-
 	acx_s_initialize_rx_config(adev);
 
 	FN_EXIT0;
@@ -1979,8 +1966,6 @@ void acx_s_set_defaults(acx_device_t * adev)
  */
 void acx_s_update_card_settings(acx_device_t *adev)
 {
-	unsigned long flags;
-	unsigned int start_scan = 0;
 	int i, len;
 
 	FN_ENTER;
@@ -2262,14 +2247,12 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		/* Enable Tx */
 		log(L_INIT, "acx: updating the power LED status: %u\n", adev->led_power);
 
-		acx_lock(adev, flags); /* acxpci_l_power_led expects that the lock is already taken! */
 		if (IS_PCI(adev))
 			acxpci_l_power_led(adev, adev->led_power);
 		else if (IS_MEM(adev))
 			acxmem_l_power_led(adev, adev->led_power);
 
 		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
-		acx_unlock(adev, flags);
 	}
 
 	if (adev->set_mask & GETSET_POWER_80211) {
@@ -3575,7 +3558,6 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
-	unsigned long flags;
 	ssize_t len = 0, partlen;
 	u32 temp1, temp2;
 	u8 *st, *st_end;
@@ -3596,7 +3578,6 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 
 	FN_ENTER;
 	acx_sem_lock(adev);
-	acx_lock(adev, flags);
 
 	if (IS_PCI(adev))
 		acxpci_s_proc_diag_output(file, adev);
@@ -3612,6 +3593,7 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 		     adev->dev_state_mask,
 		     adev->mode, adev->channel,
 		     adev->reg_dom_id, adev->reg_dom_chanmask);
+
 	seq_printf(file,
 		     "ESSID \"%s\", essid_active %d, essid_len %d, "
 		     "essid_for_assoc \"%s\", nick \"%s\"\n"
@@ -3638,8 +3620,6 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 		     adev->frag_threshold, adev->short_retry, adev->long_retry,
 		     adev->msdu_lifetime, adev->listen_interval,
 		     adev->beacon_interval);
-
-	acx_unlock(adev, flags);
 
 	seq_printf(file,
 		     "\n"
@@ -5097,32 +5077,21 @@ void acx_init_task_scheduler(acx_device_t *adev) {
 
 void acx_e_after_interrupt_task(acx_device_t *adev)
 {
-	unsigned long flags;
-
-	// OW 20090722 TODO Is all the locking required ???
-
 	FN_ENTER;
 
 	if (!adev->after_interrupt_jobs || !adev->initialized)
 		goto end_no_lock;	/* no jobs to do */
 
-	acx_sem_lock(adev);
-	acx_lock(adev, flags);
-
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
 		logf0(L_ANY, "Schedule CMD_RADIO_RECALIB\n");
-		acx_unlock(adev, flags);
 		acx_s_after_interrupt_recalib(adev);
-		acx_lock(adev, flags);
 	}
 
 	/* a poor interrupt code wanted to do update_card_settings() */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
 		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
-			acx_unlock(adev, flags);
 			acx_s_update_card_settings(adev);
-			acx_lock(adev, flags);
 		}
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
@@ -5182,9 +5151,6 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 		printk("acx: %s: Jobs still to be run: 0x%02X\n",__func__, adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
-
-	acx_unlock(adev, flags);
-	acx_sem_unlock(adev);
 
 	end_no_lock:
 
@@ -5260,22 +5226,15 @@ void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
 
 /*
 * acx_i_timer
-*
-* Fires up periodically. Used to kick scan/auth/assoc if something goes wrong
 */
 void acx_i_timer(unsigned long address)
 {
-	unsigned long flags;
-	acx_device_t *adev = (acx_device_t *) address;
+	//acx_device_t *adev = (acx_device_t *) address;
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
-
 	FIXME();
 	/* We need calibration and stats gather tasks to perform here */
-
-	acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
@@ -5320,7 +5279,6 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 #endif
 {
 	acx_device_t *adev = ieee2adev(ieee);
-	unsigned long flags;
 	int err = -EOPNOTSUPP;
 	char mac[] = MACSTR; // approximate max length
 
@@ -5328,7 +5286,6 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 
 	FN_ENTER;
 	acx_sem_lock(adev);
-	acx_lock(adev, flags);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	vif_type = conf->type;
@@ -5359,12 +5316,8 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	}
 
 
-	acx_unlock(adev, flags);
-
 	if (adev->initialized)
 		acx_s_select_opmode(adev);
-
-	acx_lock(adev, flags);
 
 	err = 0;
 
@@ -5380,7 +5333,6 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	);
 
     out_unlock:
-	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
@@ -5451,7 +5403,6 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
 	struct ieee80211_conf *conf = &hw->conf;
-	unsigned long flags;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -5460,14 +5411,10 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	if (!adev->initialized)
 		goto end_sem_unlock;
 
-	acx_lock(adev, flags);
-
 	if (conf->channel->hw_value != adev->channel) {
 
-		acx_unlock(adev, flags);
 		acx_selectchannel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
-		acx_lock(adev, flags);
 
 		/*		acx_schedule_task(adev,
 		 ACX_AFTER_IRQ_UPDATE_CARD_CFG
@@ -5512,7 +5459,6 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 
 	//TODO: phymode
 	//TODO: antennas
-	acx_unlock(adev, flags);
 
 	if (adev->set_mask > 0) {
 		acx_s_update_card_settings(adev);
@@ -5563,7 +5509,6 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	unsigned long flags;
 	int err = -ENODEV;
 
 	struct sk_buff *skb_tmp;
@@ -5578,8 +5523,6 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 //	if (adev->initialized)
 //		acx_s_select_opmode(adev);
-
-	acx_lock(adev, flags);
 
 	if (changed & BSS_CHANGED_BSSID) {
 
@@ -5615,8 +5558,6 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		SET_BIT(adev->set_mask, GETSET_CHANNEL);
 
 	}
-
-	acx_unlock(adev, flags);
 
 	if (adev->set_mask != 0)
 		acx_s_update_card_settings(adev);
@@ -5746,11 +5687,10 @@ void acx_i_op_configure_filter(struct ieee80211_hw *hw,
 		unsigned int changed_flags, unsigned int *total_flags, u64 multicast) {
 
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
+	acx_sem_lock(adev);
 
 	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
 			| FIF_CONTROL | FIF_OTHER_BSS);
@@ -5771,12 +5711,13 @@ void acx_i_op_configure_filter(struct ieee80211_hw *hw,
 	}
 
 	/* cannot update card settings directly here, atomic context */
+
 	// TODO This is one point to check for better cmd and interrupt handling
 	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-
-	acx_unlock(adev, flags);
-
 	//acx_s_update_card_settings(adev);
+
+	acx_sem_unlock(adev);
+
 
 	FN_EXIT0;
 }
@@ -5798,14 +5739,11 @@ acx_e_op_get_stats(struct ieee80211_hw *hw,
 		struct ieee80211_low_level_stats *stats)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	acx_lock(adev, flags);
 	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
-	acx_unlock(adev, flags);
 
 	acx_sem_unlock(adev);
 	FN_EXIT0;
