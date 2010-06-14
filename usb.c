@@ -135,7 +135,7 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, stru
 void acxusb_interrupt_tasklet(struct work_struct *work);
 
 // Mac80211 Ops
-static int acxusb_e_open(struct ieee80211_hw *);
+static int acxusb_e_start(struct ieee80211_hw *);
 static void acxusb_e_close(struct ieee80211_hw *);
 
 // Helpers
@@ -1439,7 +1439,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.conf_tx = acx_e_conf_tx,
 	.add_interface = acx_e_op_add_interface,
 	.remove_interface = acx_e_op_remove_interface,
-	.start = acxusb_e_open,
+	.start = acxusb_e_start,
 	.configure_filter = acx_i_op_configure_filter,
 	.stop = acxusb_e_close,
 	.config = acx_e_op_config,
@@ -1452,15 +1452,14 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 };
 
 /*
- * acxusb_e_open()
+ * acxusb_e_start()
  * This function is called when the user sets up the network interface.
  * It initializes a management timer, sets up the USB card and starts
  * the network tx queue and USB receive.
  */
-static int acxusb_e_open(struct ieee80211_hw *hw)
+static int acxusb_e_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 	int i;
 
 	FN_ENTER;
@@ -1469,7 +1468,7 @@ static int acxusb_e_open(struct ieee80211_hw *hw)
 	adev->initialized = 0;
 
 	/* put the ACX100 out of sleep mode */
-//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	init_timer(&adev->mgmt_timer);
 	adev->mgmt_timer.function = acx_i_timer;
@@ -1481,7 +1480,6 @@ static int acxusb_e_open(struct ieee80211_hw *hw)
 
 	/* don't acx_start_queue() here, we need to associate first */
 
-	acx_lock(adev, flags);
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		adev->usb_rx[i].urb->status = 0;
 	}
@@ -1491,7 +1489,6 @@ static int acxusb_e_open(struct ieee80211_hw *hw)
 
 	adev->initialized = 1;
 
-	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
