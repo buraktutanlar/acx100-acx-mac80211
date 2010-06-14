@@ -3875,11 +3875,7 @@ static void acxmem_irq_enable(acx_device_t *adev) {
 static void acxmem_irq_disable(acx_device_t *adev) {
 	FN_ENTER;
 
-	/* I guess mask is not 0xffff because acx100 won't signal
-	 ** cmd completion then (needed for ifup).
-	 ** I can't ifconfig up after ifconfig down'ing on my acx100
-	 ** Someone with acx100 please confirm */
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask_off);
+	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
 	adev->irqs_active = 0;
 	FN_EXIT0;
