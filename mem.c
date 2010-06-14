@@ -4170,13 +4170,6 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 		| HOST_INT_FCS_THRESHOLD
 		| HOST_INT_UNKNOWN);
 
-		/* Or else acx100 won't signal cmd completion, right? */
-		//adev->irq_mask_off = (u16) ~(HOST_INT_CMD_COMPLETE); /* 0xfdff */
-
-		// OW 20100101 Also HOST_INT_CMD_COMPLETE should be off.
-		// Otherwise it interfers with possible polling, e.g. in initial issue_cmd
-		adev->irq_mask_off = (u16) ~ (HOST_INT_UNKNOWN);	/* 0x7fff */
-
 	} else {
 		adev->irq_mask = (u16) ~(0
 		| HOST_INT_RX_DATA
@@ -4190,13 +4183,12 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 		/* | HOST_INT_IV_ICV_FAILURE */
 		| HOST_INT_CMD_COMPLETE
 		| HOST_INT_INFO
-		 | HOST_INT_OVERFLOW
-		 | HOST_INT_PROCESS_ERROR
+		| HOST_INT_OVERFLOW
+		| HOST_INT_PROCESS_ERROR
 		| HOST_INT_SCAN_COMPLETE
 		/* | HOST_INT_FCS_THRESHOLD  */
 		/* | HOST_INT_BEACON_MISSED        */
 		);
-		adev->irq_mask_off = (u16) ~(HOST_INT_UNKNOWN); /* 0x7fff */
 
 	}
 
