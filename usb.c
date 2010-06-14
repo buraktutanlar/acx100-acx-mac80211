@@ -1921,7 +1921,6 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
  */
 static void acxusb_e_disconnect(struct usb_interface *intf)
 {
-	unsigned long flags;
 	int i;
 	acx_device_t *adev = usb_get_intfdata(intf);
 
@@ -1945,7 +1944,6 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	ieee80211_unregister_hw(adev->ieee);
 
 	acx_sem_lock(adev);
-	acx_lock(adev, flags);
 	/* This device exists no more */
 	usb_set_intfdata(intf, NULL);
 
@@ -1964,11 +1962,11 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
 	kfree(adev->usb_rx);
 	kfree(adev->usb_tx);
 
-	acx_unlock(adev, flags);
 	acx_sem_unlock(adev);
 
 	ieee80211_free_hw(adev->ieee);
-      end:
+
+	end:
 	FN_EXIT0;
 }
 
