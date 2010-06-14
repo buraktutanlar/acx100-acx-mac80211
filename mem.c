@@ -1214,7 +1214,6 @@ static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start) 
  * function can be used if only part of the queues were allocated.
  */
 void acxmem_free_desc_queues(acx_device_t *adev) {
-	unsigned long flags;
 
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
         if (ptr) { \
@@ -1224,7 +1223,6 @@ void acxmem_free_desc_queues(acx_device_t *adev) {
         }
 
 	FN_ENTER;
-	acx_lock(adev, flags);
 
 	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start, adev->txhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start, adev->txbuf_startphy);
@@ -1234,7 +1232,6 @@ void acxmem_free_desc_queues(acx_device_t *adev) {
 	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start, adev->rxbuf_startphy);
 	adev->rxdesc_start = NULL;
 
-	acx_unlock(adev, flags);
 	FN_EXIT0;
 }
 
@@ -1255,9 +1252,7 @@ static void acxmem_s_delete_dma_regions(acx_device_t *adev) {
 
 	acx_s_mwait(100);
 
-	// acx_lock(adev, flags);
 	acxmem_free_desc_queues(adev);
-	/// acx_unlock(adev, flags);
 
 	FN_EXIT0;
 }
@@ -2237,7 +2232,6 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
  */
 int acxmem_s_reset_dev(acx_device_t *adev) {
 	const char* msg = "";
-	unsigned long flags;
 	int result = NOT_OK;
 	u16 hardware_info;
 	u16 ecpu_ctrl;
@@ -2250,8 +2244,6 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	 */
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
-
-	acx_lock(adev, flags);
 
 	/* Windows driver does some funny things here */
 	/*
@@ -2282,7 +2274,7 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "acx: eCPU is already running. ";
-		goto end_unlock;
+		goto end_fail;
 	}
 
 #if 0
@@ -2301,8 +2293,6 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
 	adev->irq_status |= HOST_INT_SCAN_COMPLETE;
-
-	acx_unlock(adev, flags);
 
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
@@ -2487,13 +2477,9 @@ static void acxmem_l_reset_mac(acx_device_t *adev) {
 static void acxmem_s_up(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
 
-	unsigned long flags;
-
 	FN_ENTER;
 
-	acx_lock(adev, flags);
 	acxmem_irq_enable(adev);
-	acx_unlock(adev, flags);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
 	 ** used to use it. But we don't do that anymore, our OS
@@ -3001,9 +2987,6 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	u32 block, next, last_block;
 	int blocks_needed;
-	unsigned long flags;
-
-	spin_lock_irqsave(&adev->txbuf_lock, flags);
 
 	/*
 	 * Take 4 off the memory block size to account for the reserved word at the start of
@@ -3057,7 +3040,6 @@ static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	} else {
 		block = 0;
 	}
-	spin_unlock_irqrestore (&adev->txbuf_lock, flags);
 
 	return block;
 }
@@ -3071,9 +3053,6 @@ static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count) {
  */
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 	u32 cur, last, next;
-	unsigned long flags;
-
-	spin_lock_irqsave (&adev->txbuf_lock, flags);
 
 	if ((blockptr >= adev->acx_txbuf_start) &&
 		(blockptr <= adev->acx_txbuf_start +
@@ -3107,8 +3086,6 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 		}
 		adev->acx_txbuf_free = blockptr;
 	}
-
-	spin_unlock_irqrestore(&adev->txbuf_lock, flags);
 
 }
 
@@ -4931,7 +4908,6 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
 	spin_lock_init(&adev->spinlock); /* initial state: unlocked */
-	spin_lock_init(&adev->txbuf_lock);
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	mutex_init(&adev->mutex);
 	/* since nobody can see new netdev yet, we can as well
@@ -5137,8 +5113,6 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
 
-	unsigned long flags;
-
 	FN_ENTER;
 
 	if (!hw) {
@@ -5168,7 +5142,6 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 		 * since not supported by all firmware versions */
 		acx_s_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
-		acx_lock(adev, flags);
 
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
@@ -5188,7 +5161,6 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
 			write_flush(adev);
 		}
-		acx_unlock(adev, flags);
 
 	}
 
