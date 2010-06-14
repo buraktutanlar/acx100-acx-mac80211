@@ -1024,9 +1024,7 @@ struct acx_device {
 	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
 
-	// OW FIXME Interrupt handling
-	struct work_struct	after_interrupt_task;	/* our task for after interrupt actions */
-	// struct tasklet_struct interrupt_tasklet;
+	struct work_struct	irq_work;	/* our task for after interrupt actions */
 
 	unsigned int	irq;
 
