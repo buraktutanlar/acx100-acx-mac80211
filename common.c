@@ -5065,19 +5065,19 @@ void acx_init_task_scheduler(acx_device_t *adev) {
 	/* configure task scheduler */
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	if (IS_PCI(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxpci_interrupt_tasklet);
+		INIT_WORK(&adev->irq_work, acxpci_irq_work);
 		return;
 	}
 #endif
 #if defined(CONFIG_ACX_MAC80211_USB)
 	if (IS_USB(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxusb_interrupt_tasklet);
+		INIT_WORK(&adev->irq_work, acxusb_irq_work);
 		return;
 	}
 #endif
 #if defined(CONFIG_ACX_MAC80211_MEM)
 	if (IS_MEM(adev)) {
-		INIT_WORK(&adev->after_interrupt_task, acxmem_i_interrupt_tasklet);
+		INIT_WORK(&adev->irq_work, acxmem_irq_work);
 		return;
 	}
 #endif
