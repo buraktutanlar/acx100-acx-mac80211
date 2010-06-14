@@ -49,61 +49,23 @@
 // -----
 
 /*
- * LOCKING
- * We have adev->sem and adev->spinlock.
+ * Locking is done mainly using the adev->sem.
  *
- * We employ following naming convention in order to get locking right:
+ * The locking rule is: All external entry paths are protected by the sem.
  *
- * acx_e_xxxx - external entry points called from process context.
- *	It is okay to sleep. adev->sem is to be taken on entry.
- * acx_i_xxxx - external entry points possibly called from atomic context.
- *	Sleeping is not allowed (and thus down(sem) is not legal!)
- * acx_s_xxxx - potentially sleeping functions. Do not ever call under lock!
- * acx_l_xxxx - functions which expect lock to be already taken.
- * rest       - non-sleeping functions which do not require locking
- *		but may be run under lock
- *
- * A small number of local helpers do not have acx_[eisl]_ prefix.
- * They are always close to caller and are to be reviewed locally.
- *
- * Theory of operation:
- *
- * All process-context entry points (_e_ functions) take sem
- * immediately. IRQ handler and other 'atomic-context' entry points
- * (_i_ functions) take lock immediately on entry, but dont take sem
- * because that might sleep.
- *
- * Thus *all* code is either protected by sem or lock, or both.
- *
- * Code which must not run concurrently with IRQ takes lock.
- * Such code is marked with _l_.
- *
- * This results in the following rules of thumb useful in code review:
- *
- * + If a function calls _s_ fn, it must be an _s_ itself.
- * + You can call _l_ fn only (a) from another _l_ fn
- *   or (b) from _s_, _e_ or _i_ fn by taking lock, calling _l_,
- *   and dropping lock.
- * + All IRQ code runs under lock.
- * + Any _s_ fn is running under sem.
- * + Code under sem can race only with IRQ code.
- * + Code under sem+lock cannot race with anything.
+ * The adev->sem is still kept for the irq top-half, although even there it
+ * wouldn't be really required. It's just to not get interrupted during irq
+ * handling itself. For this we don't need the acx_lock macros anymore.
  * 
- */
-
-/* Two simplified guidelines for locking:
- *
- * 1) adev->spinlock protects the adev structure. When ever writing to adev,
- * protect using acx_lock/acx_lock.
- *
- * 2) adev->sem coordinates external access, aka ieee80211_ops, proc access
- * (or ioctls). An external entry point should protect with acx_sem/acx_sem_lock.
- *
  */
 
 /* These functions *must* be inline or they will break horribly on SPARC, due
  * to its weird semantics for save/restore flags */
 
+#define acx_sem_lock(adev)		mutex_lock(&(adev)->mutex)
+#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
+
+#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 
 void acx_lock_debug(acx_device_t *adev, const char* where);
@@ -123,15 +85,18 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 	acx_unlock_debug(adev, where);
 	spin_unlock_irqrestore(&adev->spinlock, *fp);
 }
+#ifdef OBSELETE_OW20100613
 #define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
 #define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags), __FILE__ ":" STRING(__LINE__))
-#define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
-#define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
+#endif
 
 #elif defined(DO_LOCKING)
 
-#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
-#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
+//#define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock, flags)
+//#define acx_unlock(adev, flags)	spin_unlock_irqrestore(&adev->spinlock, flags)
+#define acx_lock(adev, flags)	((void)0)
+#define acx_unlock(adev, flags)	((void)0)
+
 #define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
 #define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 #define acx_lock_unhold()	((void)0)
@@ -147,6 +112,8 @@ acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
 #define acx_sem_unhold()	((void)0)
 
 #endif
+#endif
+
 
 // BOM Logging (Common)
 // -----

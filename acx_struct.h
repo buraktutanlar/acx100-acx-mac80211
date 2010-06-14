@@ -945,6 +945,7 @@ struct acx_device {
 	// OW spinlock is used to protect acx_device adev structure
 	spinlock_t		spinlock;
 
+#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
 #if defined(PARANOID_LOCKING) /* Lock debugging */
 	const char		*last_sem;
 	const char		*last_lock;

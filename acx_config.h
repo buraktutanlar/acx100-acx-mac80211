@@ -66,12 +66,14 @@
 /* if you want very early packet fragmentation bits and pieces */
 #define ACX_FRAGMENTATION 0
 
+#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
 /* Locking: */
 /* very talkative */
 #define PARANOID_LOCKING 1
 /* normal (use when bug-free) */
 /* #define DO_LOCKING 1 */
 /* else locking is disabled! */
+#endif
 
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
