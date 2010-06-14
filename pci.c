@@ -150,7 +150,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
 static int acxpci_e_op_open(struct ieee80211_hw *hw);
-static void acxpci_e_op_close(struct ieee80211_hw *hw);
+static void acxpci_e_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
 void acxpci_l_power_led(acx_device_t * adev, int enable);
@@ -3048,7 +3048,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.remove_interface = acx_e_op_remove_interface,
 	.start = acxpci_e_op_open,
 	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxpci_e_op_close,
+	.stop = acxpci_e_op_stop,
 	.config = acx_e_op_config,
 	.bss_info_changed = acx_e_op_bss_info_changed,
 	.set_key = acx_e_op_set_key,
@@ -3103,50 +3103,34 @@ static int acxpci_e_op_open(struct ieee80211_hw *hw)
 	return result;
 }
 
-/*
- * acxpci_e_close
- *
- * This function stops the network functionality of the interface (invoked
- * when the user calls ifconfig <wlan> down). The tx queue is halted and
- * the device is marked as down.
- *
- * Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
- * from set to clear. I.e. called by "ifconfig DEV down"
- *
- * Returns:
- *	0	success
- *	>0	f/w reported error
- *	<0	driver reported error
- */
-static void acxpci_e_op_close(struct ieee80211_hw *hw)
+static void acxpci_e_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	/* ifdown device */
-	if (adev->initialized) {
-		acxpci_s_down(hw);
-	}
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	acx_stop_queue(adev->ieee, "on ifdown");
 
 	/* disable all IRQs, release shared IRQ handler */
-	acx_lock(adev, flags);
-	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	write_flush(adev);
-	acx_unlock(adev, flags);
+	acxpci_irq_disable(adev);
+	synchronize_irq(adev->irq);
+
+	acx_sem_unlock(adev);
+	cancel_work_sync(&adev->irq_work);
+	cancel_work_sync(&adev->tx_work);
+	acx_sem_lock(adev);
+
+	acx_tx_queue_flush(adev);
+
+	del_timer_sync(&adev->mgmt_timer);
+
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
-	/* We currently don't have to do anything else.
-	 * Higher layers know we're not ready from dev->start==0 and
-	 * dev->tbusy==1.  Our rx path knows to not pass up received
-	 * frames because of dev->flags&IFF_UP is false.
-	 */
 	adev->initialized = 0;
+
 	log(L_INIT, "acxpci: closed device\n");
 
 	acx_sem_unlock(adev);
