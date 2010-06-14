@@ -174,7 +174,6 @@ static int acxmem_s_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
 static void acxmem_l_reset_mac(acx_device_t *adev);
 static void acxmem_s_up(struct ieee80211_hw *hw);
-static void acxmem_s_down(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
 // Other (Control Path)
@@ -2554,65 +2553,6 @@ static void acxmem_s_up(struct ieee80211_hw *hw) {
 	FN_EXIT0;
 }
 
-static void acxmem_s_down(struct ieee80211_hw *hw) {
-
-	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
-
-	FN_ENTER;
-
-	/* Disable IRQs first, so that IRQs cannot race with us */
-	/* then wait until interrupts have finished executing on other CPUs */
-
-	acx_lock(adev, flags);
-	acxmem_irq_disable(adev);
-	synchronize_irq(adev->irq);
-	acx_unlock(adev, flags);
-
-	/* we really don't want to have an asynchronous tasklet disturb us
-	 ** after something vital for its job has been shut down, so
-	 ** end all remaining work now.
-	 **
-	 ** NB: carrier_off (done by set_status below) would lead to
-	 ** not yet fully understood deadlock in flush_scheduled_work().
-	 ** That's why we do FLUSH first.
-	 **
-	 ** NB2: we have a bad locking bug here: flush_scheduled_work()
-	 ** waits for acx_e_after_interrupt_task to complete if it is running
-	 ** on another CPU, but acx_e_after_interrupt_task
-	 ** will sleep on sem forever, because it is taken by us!
-	 ** Work around that by temporary sem unlock.
-	 ** This will fail miserably if we'll be hit by concurrent
-	 ** iwconfig or something in between. TODO! */
-
-	// OW FIXME Fix Locking ...
-	// acx_sem_unlock(adev);
-
-	// OW TODO I'm not sure if explicit flushing is still required or done
-	// by mac80211. Problem was, that flush_scheduled_work() caused driver to
-	// hang upon .remove_interface and .close and .stop
-	//flush_scheduled_work();
-
-	// acx_sem_lock(adev);
-
-	/* This is possible:
-	 ** flush_scheduled_work -> acx_e_after_interrupt_task ->
-	 ** -> set_status(ASSOCIATED) -> wake_queue()
-	 ** That's why we stop queue _after_ flush_scheduled_work
-	 ** lock/unlock is just paranoia, maybe not needed */
-
-	acx_lock(adev, flags);
-	acx_stop_queue(adev->ieee, "on ifdown");
-	acx_unlock(adev, flags);
-
-	/* kernel/timer.c says it's illegal to del_timer_sync()
-	 ** a timer which restarts itself. We guarantee this cannot
-	 ** ever happen because acx_i_timer() never does this if
-	 ** status is ACX_STATUS_0_STOPPED */
-	del_timer_sync(&adev->mgmt_timer);
-
-	FN_EXIT0;
-}
 
 #if 0
 /***********************************************************************
