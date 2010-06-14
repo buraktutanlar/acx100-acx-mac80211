@@ -1164,8 +1164,9 @@ static void acxusb_i_complete_tx(struct urb *urb)
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;
-	unsigned long flags;
 	int txnum;
+	struct ieee80211_tx_info *txstatus;
+	// unsigned long flags;
 
 	FN_ENTER;
 
@@ -1174,9 +1175,11 @@ static void acxusb_i_complete_tx(struct urb *urb)
 	tx = (usb_tx_t *) urb->context;
 	adev = tx->adev;
 
-	txnum = tx - adev->usb_tx;
+	// OW, 20100613: A urb call-back is done in_interrupt(), therefore
+	// I could image, that no locking is actually required
+	// spin_lock_irqsave(&adev->spinlock, flags);
 
-	acx_lock(adev, flags);
+	txnum = tx - adev->usb_tx;
 
 	/*
 	 * If the iface isn't up, we don't have any right
@@ -1187,8 +1190,8 @@ static void acxusb_i_complete_tx(struct urb *urb)
 		goto end_unlock;
 	}
 
-//	printk("acx: RETURN TX (%d): status=%d size=%d\n",
-//		txnum, urb->status, urb->actual_length);
+	//	printk("acx: RETURN TX (%d): status=%d size=%d\n",
+	//		txnum, urb->status, urb->actual_length);
 
 	/* handle USB transfer errors */
 	switch (urb->status) {
@@ -1210,22 +1213,24 @@ static void acxusb_i_complete_tx(struct urb *urb)
 	tx->busy = 0;
 	adev->tx_free++;
 
-	// FIXME OW 20100520 Fix tx_info reporting to mac80211
+	txstatus = IEEE80211_SKB_CB(tx->skb);
+
+    if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (urb->status == 0))
+		txstatus->flags |= IEEE80211_TX_STAT_ACK;
+
 	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
 
-	if ((adev->tx_free >= TX_START_QUEUE)
-/*	    && (adev->status == ACX_STATUS_4_ASSOCIATED) */
-/*	    && (acx_queue_stopped(adev->ndev)*/
-	   ){
-		log(L_BUF,
-			"acx: tx: wake queue (%u free txbufs)\n", adev->tx_free);
+	if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+		log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
+				adev->tx_free);
 		acx_wake_queue(adev->ieee, NULL);
+		ieee80211_queue_work(adev->ieee, &adev->tx_work);
 	}
 
+    end_unlock:
+	//spin_unlock_irqrestore(&adev->spinlock, flags);
 
-      end_unlock:
-	acx_unlock(adev, flags);
-/* end: */
+    /* end: */
 	FN_EXIT0;
 }
 
