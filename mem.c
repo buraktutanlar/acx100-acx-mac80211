@@ -2946,12 +2946,6 @@ tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
 	adev->tx_free--;
 	log(L_BUFT, "acxmem: %s: tx: got desc %u, %u remain\n",
 			__func__, head, adev->tx_free);
-	/* Keep a few free descs between head and tail of tx ring.
-	 ** It is not absolutely needed, just feels safer */
-	if (adev->tx_free < TX_STOP_QUEUE) {
-		log(L_BUF, "acxmem: %s: stop queue (%u tx desc left)\n", __func__, adev->tx_free);
-		acx_stop_queue(adev->ieee, NULL);
-	}
 
 	/* returning current descriptor, so advance to next free one */
 	adev->tx_head = (head + 1) % TX_CNT;
@@ -3526,6 +3520,7 @@ static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int fi
  * in filling new txdescs.
  * Everytime we get called we know where the next packet to be cleaned is.
  */
+// OW TODO Very similar with pci: possible merging.
 unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -3588,6 +3583,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		ack_failures = read_slavemem8(adev, (u32) &(txdesc->ack_failures));
 		rts_failures = read_slavemem8(adev, (u32) &(txdesc->rts_failures));
 		rts_ok = read_slavemem8(adev, (u32) &(txdesc->rts_ok));
+		// OW FIXME does this also require le16_to_cpu()?
 		r100 = read_slavemem8(adev, (u32) &(txdesc->u.r1.rate));
 		r111 = le16_to_cpu(read_slavemem16 (adev, (u32) &(txdesc->u.r2.rate111)));
 
@@ -3596,13 +3592,9 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 
 		hostdesc = get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
-		txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-		if (unlikely(0x30 & error)) {
-			/* only send IWEVTXDROP in case of retry or lifetime exceeded;
-			 * all other errors mean we screwed up locally */
-			txstatus->flags &= ~IEEE80211_TX_STAT_ACK;
-		}
+        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (error == 0))
+			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
 		/*
 		 * Free up the transmit data buffers
@@ -3621,20 +3613,15 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		adev->tx_free++;
 		num_cleaned++;
 
-		// OW 20100207 TODO Perhaps it's better to do this ater reporting skb status to mac80211?
-		if ((adev->tx_free >= TX_START_QUEUE) &&
-			acx_queue_stopped(adev->ieee)
-		) {
-			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",	adev->tx_free);
+		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+			log(L_BUF, "acxmem: tx: wake queue (avail. Tx desc %u)\n",
+					adev->tx_free);
 			acx_wake_queue(adev->ieee, NULL);
+			ieee80211_queue_work(adev->ieee, &adev->tx_work);
 		}
 
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
-
-		/* do rate handling */
-		/* Rate handling is done in mac80211 */
-
 		if (unlikely(error))
 			acxmem_handle_tx_error(adev, error, finger, txstatus);
 
@@ -3648,25 +3635,15 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 					finger, ack_failures, rts_failures, rts_ok, r100, adev->tx_free);
 		}
 
-			/* And finally report upstream */
-		if (hostdesc) {
-			// TODO OW Does below still exists in mac80211 ??
-			//txstatus->status.excessive_retries = rts_failures;
-			//txstatus->status.retry_count = ack_failures;
-
-			//OW ieee80211_tx_status(adev->ieee,hostdesc->skb, &hostdesc->txstatus);
-			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
-
-			memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
-		}
+		/* And finally report upstream */
+		ieee80211_tx_status(adev->ieee, hostdesc->skb);
 
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
 	}
-
 	/* remember last position */
 	adev->tx_tail = finger;
-	/* end: */
+
 	FN_EXIT1(num_cleaned);
 	return num_cleaned;
 }
@@ -4464,7 +4441,6 @@ static int acxmem_e_op_start(struct ieee80211_hw *hw) {
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	//OW acx_init_task_scheduler(adev);
 	adev->initialized = 0;
 
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
@@ -4509,6 +4485,7 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
 
 	acx_sem_lock(adev);
 
+	acx_stop_queue(adev->ieee, "on ifdown");
 	/* ifdown device */
 	if (adev->initialized) {
 		acxmem_s_down(hw);
@@ -4522,13 +4499,12 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
 	acxmem_irq_disable(adev);
 	acx_unlock(adev, flags);
 
-	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+	acx_sem_unlock(adev);
+	cancel_work_sync(&adev->irq_work);
+	cancel_work_sync(&adev->tx_work);
+	acx_sem_lock(adev);
 
-	/* We currently don't have to do anything else.
-	 * Higher layers know we're not ready from dev->start==0 and
-	 * dev->tbusy==1.  Our rx path knows to not pass up received
-	 * frames because of dev->flags&IFF_UP is false.
-	 */
+	acx_tx_queue_flush(adev);
 
 	adev->initialized = 0;
 
@@ -5095,7 +5071,14 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	acx_show_card_eeprom_id(adev);
 #endif /* NONESSENTIAL_FEATURES */
 
-	/* ok, pci setup is finished, now start initializing the card */
+	/* Device setup is finished, now start initializing the card */
+	// ---
+
+	acx_init_task_scheduler(adev);
+
+	// Mac80211 Tx_queue
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
 
 	// OK init parts from pci.c are done in acxmem_complete_hw_reset(adev)
 	if (OK != acxmem_complete_hw_reset(adev))
@@ -5146,7 +5129,6 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 		goto fail_acx_setup_modes;
 	}
 
-	acx_init_task_scheduler(adev);
 	err = ieee80211_register_hw(ieee);
 	if (OK != err) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", err);
