@@ -2963,20 +2963,6 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 }
 
 /*
-#ifdef CONFIG_NET_POLL_CONTROLLER
-void acxpci_net_poll_controller(struct net_device *net_dev)
-{
-        acx_device_t *adev = ndev2adev(net_dev);
-        unsigned long flags;
-
-        local_irq_save(flags);
-        acxpci_i_interrupt(adev->irq, adev);
-        local_irq_restore(flags);
-}
-#endif*/ /* CONFIG_NET_POLL_CONTROLLER */
-
-
-/*
  * BOM Mac80211 Ops
  * ==================================================
  */
