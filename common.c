@@ -5168,18 +5168,8 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
  * the interrupt context.
  */
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
-
-	// OW TODO This has currently no effect
-	// OW TODO Interrupt handling ...
-
-	//	if (!adev->after_interrupt_jobs)
-	//	{
 	SET_BIT(adev->after_interrupt_jobs, set_flag);
-
-	// OW Use mac80211 workqueue
-	ieee80211_queue_work(adev->ieee, &adev->after_interrupt_task);
-
-	//	}
+	ieee80211_queue_work(adev->ieee, &adev->irq_work);
 }
 
 /*
