@@ -4343,7 +4343,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_init_mac;
 
 	acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_vlynq_read_eeprom_version;
 
