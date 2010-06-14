@@ -876,8 +876,8 @@ static void acxusb_i_complete_rx(struct urb *urb)
 	rxbuffer_t *ptr;
 	rxbuffer_t *inbuf;
 	usb_rx_t *rx;
-	unsigned long flags;
 	int size, remsize, packetsize, rxnum;
+	// unsigned long flags;
 
 	FN_ENTER;
 
@@ -886,7 +886,9 @@ static void acxusb_i_complete_rx(struct urb *urb)
 	rx = (usb_rx_t *) urb->context;
 	adev = rx->adev;
 
-	acx_lock(adev, flags);
+	// OW, 20100613: A urb call-back is done in_interrupt(), therefore
+	// I could image, that no locking is actually required
+	// spin_lock_irqsave(&adev->spinlock, flags);
 
 	/*
 	 * Happens on disconnect or close. Don't play with the urb.
@@ -903,16 +905,16 @@ static void acxusb_i_complete_rx(struct urb *urb)
 	remsize = size;
 	rxnum = rx - adev->usb_rx;
 
-	log(L_USBRXTX, "acx: RETURN RX (%d) status=%d size=%d\n",
+	log(L_USBRXTX, "acxusb: RETURN RX (%d) status=%d size=%d\n",
 		rxnum, urb->status, size);
 
 	/* Send the URB that's waiting. */
-	log(L_USBRXTX, "acx: rxnum=%d, sending=%d\n",
+	log(L_USBRXTX, "acxusb: rxnum=%d, sending=%d\n",
 		rxnum, rxnum ^ 1);
 	acxusb_l_poll_rx(adev, &adev->usb_rx[rxnum ^ 1]);
 
 	if (unlikely(size > sizeof(rxbuffer_t)))
-		printk("acx_usb: rx too large: %d, please report\n", size);
+		log(L_USBRXTX, "acxusb: rx too large: %d, please report\n", size);
 
 	/* check if the transfer was aborted */
 	switch (urb->status) {
@@ -1085,7 +1087,7 @@ static void acxusb_i_complete_rx(struct urb *urb)
 	}
 
     end_unlock:
-	acx_unlock(adev, flags);
+	//spin_unlock_irqrestore(&adev->spinlock, flags);
 
 	/* end: */
 	FN_EXIT0;
