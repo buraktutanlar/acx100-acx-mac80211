@@ -213,7 +213,7 @@ int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 // Irq Handling, Timer
 static void acxmem_irq_enable(acx_device_t *adev);
 static void acxmem_irq_disable(acx_device_t *adev);
-void acxmem_i_interrupt_tasklet(struct work_struct *work);
+void acxmem_irq_work(struct work_struct *work);
 static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
 static void acxmem_handle_info_irq(acx_device_t *adev);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
@@ -3937,11 +3937,12 @@ static void acxmem_irq_disable(acx_device_t *adev) {
 }
 
 /* Interrupt handler bottom-half */
-void acxmem_i_interrupt_tasklet(struct work_struct *work)
+// OW TODO Copy of pci: possible merging.
+void acxmem_irq_work(struct work_struct *work)
 {
-	acx_device_t *adev = container_of(work, struct acx_device, after_interrupt_task);
-	int irqtype;
-	unsigned long flags;
+	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
+	int irqreason;
+	int irqmasked;
 
 #define IRQ_ITERATE 0
 #if IRQ_ITERATE
@@ -3951,258 +3952,193 @@ void acxmem_i_interrupt_tasklet(struct work_struct *work)
 
 	FN_ENTER;
 
-	acx_lock(adev, flags);
+	acx_sem_lock(adev);
 
-	irqtype = adev->irq_reason;
-	adev->irq_reason = 0;
+	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
+	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
+	 * IO_ACX_IRQ_STATUS_NON_DES
+	 */
+	irqreason = read_reg16(adev, IO_ACX_IRQ_REASON);
+	irqmasked = irqreason & ~adev->irq_mask;
+	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
 
 #if IRQ_ITERATE
+
+	/* OW, 20100611: Iterating and latency:
+	 *
+	 * It might be interresting, to iterate over irqs for latency, since it avoids waiting for the schedling
+	 * of the work tasklet.
+	 *
+	 * If it would be done, then however it should be aligned with tx_work and tx_cleanup: new tx work skbs
+	 * should be put into the device queue right after tx_clanup in the ame function. => See wl12xxx handling.
+	 *
+	 * Currently the IRQ_ITERATE code is anyway broken (fixes not complicated however).
+	 *
+	 */
+
 	if (jiffies != adev->irq_last_jiffies) {
 		adev->irq_loops_this_jiffy = 0;
 		adev->irq_last_jiffies = jiffies;
 	}
 
-	/* safety condition; we'll normally abort loop below
-	 * in case no IRQ type occurred */
+/* safety condition; we'll normally abort loop below
+ * in case no IRQ type occurred */
 	while (likely(--irqcount)) {
-
 #endif
 
-	/* Handle most important IRQ types first */
-	if (irqtype & HOST_INT_RX_DATA) {
-		log(L_IRQ, "acxmem: %s: got HOST_INT_RX_DATA IRQ\n", __func__);
-		acxmem_l_process_rxdesc(adev);
-	}
-
-	if (irqtype & HOST_INT_TX_COMPLETE) {
-		log(L_IRQ, "acxmem: %s: got HOST_INT_TX_COMPLETE IRQ\n", __func__);
-		/* don't clean up on each Tx complete, wait a bit
-		 * unless we're going towards full, in which case
-		 * we do it immediately, too (otherwise we might lockup
-		 * with a full Tx buffer if we go into
-		 * acxpci_l_clean_txdesc() at a time when we won't wakeup
-		 * the net queue in there for some reason...) */
-		if (adev->tx_free <= TX_START_CLEAN) {
-			acxmem_l_clean_txdesc(adev);
+		// HOST_INT_CMD_COMPLETE handling
+		if (irqmasked & HOST_INT_CMD_COMPLETE) {
+			log(L_IRQ, "acxmem: got Command_Complete IRQ\n");
+			/* save the state for the running issue_cmd() */
+			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
-	}
+		/* Handle most important IRQ types first */
+		if (irqmasked & HOST_INT_RX_DATA) {
+			log(L_IRQ, "acxmem: got Rx_Complete IRQ\n");
+			acxmem_l_process_rxdesc(adev);
+		}
 
+		if (irqmasked & HOST_INT_TX_COMPLETE) {
+			log(L_IRQ, "acxmem: got Tx_Complete IRQ\n");
+			/* don't clean up on each Tx complete, wait a bit
+			 * unless we're going towards full, in which case
+			 * we do it immediately, too (otherwise we might lockup
+			 * with a full Tx buffer if we go into
+			 * acxpci_l_clean_txdesc() at a time when we won't wakeup
+			 * the net queue in there for some reason...) */
+			if (adev->tx_free <= TX_START_CLEAN) {
+				acxmem_l_clean_txdesc(adev);
+			}
+		}
 
-
-#if IRQ_ITERATE
-
-	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
-	irqtype = unmasked & ~adev->irq_mask;
-
-	/* ACK all IRQs ASAP */
-	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
-	log(L_IRQ, "acxmem: IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
-				unmasked, adev->irq_mask, irqtype);
-
-	/* Bail out if no new IRQ bits or if all are masked out */
-	if (!irqtype)
-		break;
-
-	if (unlikely
-		(++adev->irq_loops_this_jiffy> MAX_IRQLOOPS_PER_JIFFY)) {
-		printk(KERN_ERR
-				"acxmem: too many interrupts per jiffy!\n");
-		/* Looks like card floods us with IRQs! Try to stop that */
-		write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-		/* This will short-circuit all future attempts to handle IRQ.
-		 * We cant do much more... */
-		adev->irq_mask = 0;
-		break;
-	}
-}
-#endif
-
-	/* Routine to perform blink with range
-	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
-	 if (unlikely(adev->led_power == 2))
-	 update_link_quality_led(adev);
-	 */
-
-	// Enable previously extra masked irqs again
-	acxmem_irq_enable(adev);
-
-	/* write_flush(adev); - not needed, last op was read anyway */
-	acx_unlock(adev, flags);
-
-	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
-	if (adev->after_interrupt_jobs){
-		acx_e_after_interrupt_task(adev);
-	}
-
-	FN_EXIT0;
-	return;
-
-}
-
-#if 1
-static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id) {
-
-	acx_device_t *adev = dev_id;
-	unsigned long flags;
-	register u16 irqtype;
-	u16 unmasked;
-
-	u16 extra_irq_mask = 0;
-
-	FN_ENTER;
-
-	if (!adev)
-		return IRQ_NONE;
-
-	acx_lock(adev, flags);
-
-	unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
-	log(L_IRQ, "acxmem: %s: unmasked=%04X\n", __func__, unmasked);
-
-	if (unlikely(0xffff == unmasked)) {
-		/* 0xffff value hints at missing hardware,
-		 * so don't do anything.
-		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "acxmem: %s, unmasked:FFFF: Device removed? IRQ_NONE\n", __func__);
-		goto irq_none;
-	}
-
-	/* We will check only "interesting" IRQ types */
-	irqtype = unmasked & ~adev->irq_mask;
-	if (!irqtype) {
-		/* We are on a shared IRQ line and it wasn't our IRQ */
-		log(L_IRQ,"acxmem: %s: irqtype=%04X, unmasked=%04X, mask=%04X: All are masked, IRQ_NONE\n",
-			__func__, irqtype, unmasked, adev->irq_mask);
-		goto irq_none;
-	}
-
-	/* Go ahead and ACK our interrupt */
-	write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
-
-	// HOST_INT_CMD_COMPLETE handling
-	if (irqtype & HOST_INT_CMD_COMPLETE) {
-		log(L_IRQ, "acxmem:  got Command_Complete IRQ\n");
-		/* save the state for the running issue_cmd() */
-		SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
-	}
-
-	log(L_IRQ,"acxmem: %s: irqtype=%04X, unmasked=%04X, mask=%04X: will IRQ_HANDLED\n",
-		__func__, irqtype, unmasked, adev->irq_mask);
-
-
-	/* Only accept IRQs, if we are initialized properly.
-	 * This avoids an RX race while initializing.
-	 * We should probably not enable IRQs before we are initialized
-	 * completely, but some careful work is needed to fix this. I think it
-	 * is best to stay with this cheap workaround for now... .
-	 */
-	if (unlikely(!adev->initialized))
-		goto irq_handled;
-
-	/* OW 20100131
-	 *
-	 * With the slave memory interface and using the work-queue tasklet we
-	 * use following (not really satisfying) defensive approach for Rx, Tx
-	 * processing:
-	 * ---
-	 * 1) We disable Rx and Tx interrupts until the tasklet, where we will
-	 * process und then re-enable these interrupt.
-	 *
-	 * This way the connection is becoming quite stable also under load.
-	 *
-	 * 2) When we schedule the the tasklet, we set by default that we do both
-	 * Rx and Tx processing, even if we didn't get both as interrupts.
-	 *
-	 * This also seems to have a stabilizing effect, especially for repeating
-	 * ifup/ifdown.
-	 * ---
-	 *
-	 * The reason for this workaround kind of solution is still to be researched
-	 * and better understood. Objective is of course real solid ifup/ifdown and
-	 * efficiency processing handling for optimal performance.
-	 *
-	 */
-	if ((irqtype & HOST_INT_RX_DATA) ) {
-
-		SET_BIT(extra_irq_mask, HOST_INT_RX_DATA);
-		SET_BIT(extra_irq_mask, HOST_INT_TX_COMPLETE);
-
-		SET_BIT(adev->irq_reason, HOST_INT_RX_DATA);
-		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
-		acx_schedule_task(adev, 0);
-	}
-
-	if (irqtype & HOST_INT_TX_COMPLETE) {
-
-		SET_BIT(extra_irq_mask, HOST_INT_RX_DATA);
-		SET_BIT(extra_irq_mask, HOST_INT_TX_COMPLETE);
-
-		SET_BIT(adev->irq_reason, HOST_INT_RX_DATA);
-		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
-		acx_schedule_task(adev, 0);
-	}
-
-	// Disable extra irqs, if requested
-	if (extra_irq_mask){
-		write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask | extra_irq_mask);
-	}
-
-	/* Less frequent ones */
-	if (irqtype & (0 |
-			HOST_INT_CMD_COMPLETE |
-			HOST_INT_INFO |
-			HOST_INT_SCAN_COMPLETE)
-			) {
-
-		if (irqtype & HOST_INT_INFO) {
+		if (irqmasked & HOST_INT_INFO) {
 			acxmem_handle_info_irq(adev);
 		}
 
-		if (irqtype & HOST_INT_SCAN_COMPLETE) {
+		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
 			log(L_IRQ, "acxmem: got Scan_Complete IRQ\n");
 			/* need to do that in process context */
 			/* remember that fw is not scanning anymore */
 			SET_BIT(adev->irq_status,
 					HOST_INT_SCAN_COMPLETE);
 		}
+
+		/* These we just log, but either they happen rarely
+		 * or we keep them masked out */
+		if (acx_debug & L_IRQ)
+		{
+			acx_log_irq(irqreason);
+		}
+
+#if IRQ_ITERATE
+		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
+		irqtype = unmasked & ~adev->irq_mask;
+
+		/* ACK all IRQs ASAP */
+		write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
+		log(L_IRQ, "IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
+				unmasked, adev->irq_mask, irqtype);
+		/* Bail out if no new IRQ bits or if all are masked out */
+		if (!irqtype)
+			break;
+
+		if (unlikely
+		    (++adev->irq_loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
+			printk(KERN_ERR
+			       "acx: too many interrupts per jiffy!\n");
+			/* Looks like card floods us with IRQs! Try to stop that */
+			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+			/* This will short-circuit all future attempts to handle IRQ.
+			 * We cant do much more... */
+			adev->irq_mask = 0;
+			break;
+		}
+	}
+#endif
+
+	/* Routine to perform blink with range
+	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
+	if (unlikely(adev->led_power == 2))
+		update_link_quality_led(adev);
+	*/
+
+	// Renable irq-signal again for irqs we are interested in
+	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
+	write_flush(adev);
+
+	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
+	if (adev->after_interrupt_jobs){
+		acx_e_after_interrupt_task(adev);
 	}
 
-	/* These we just log, but either they happen rarely
-	 * or we keep them masked out */
-	if (irqtype & (0
-	// | HOST_INT_RX_DATA
-		| HOST_INT_RX_COMPLETE
-	// | HOST_INT_TX_COMPLETE
-		| HOST_INT_TX_XFER
-		| HOST_INT_DTIM
-		| HOST_INT_BEACON
-		| HOST_INT_TIMER
-		| HOST_INT_KEY_NOT_FOUND
-		| HOST_INT_IV_ICV_FAILURE
-	// | HOST_INT_CMD_COMPLETE
-	// | HOST_INT_INFO
-		| HOST_INT_OVERFLOW
-		| HOST_INT_PROCESS_ERROR
-	// | HOST_INT_SCAN_COMPLETE
-		| HOST_INT_FCS_THRESHOLD
-		| HOST_INT_UNKNOWN))
-	{
-		acxmem_log_unusual_irq(irqtype);
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return;
+
+}
+
+// OW TODO Copy of pci: possible merging.
+static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
+{
+	acx_device_t *adev = dev_id;
+	unsigned long flags;
+	u16 irqreason;
+	u16 irqmasked;
+
+	if (!adev)
+		return IRQ_NONE;
+
+	// On a shared irq line, irqs should only be for us, when enabled them
+	if (!adev->irqs_active)
+		return IRQ_NONE;
+
+	FN_ENTER;
+
+	spin_lock_irqsave(&adev->spinlock, flags);
+
+	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
+	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
+	 * IO_ACX_IRQ_STATUS_NON_DES
+	 */
+	irqreason = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+	irqmasked = irqreason & ~adev->irq_mask;
+	log(L_IRQ, "acxmem: irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
+
+	if (unlikely(irqreason == 0xffff)) {
+		/* 0xffff value hints at missing hardware,
+		 * so don't do anything.
+		 * Not very clean, but other drivers do the same... */
+		log(L_IRQ, "acxmem: irqstatus=FFFF: Device removed?: IRQ_NONE\n");
+		goto none;
 	}
 
-	irq_handled:
-	acx_unlock(adev, flags);
+	/* Our irq-signals are the ones, that were triggered by the IO_ACX_IRQ_MASK
+	 * unmasked irqs.
+	 */
+	if (!irqmasked) {
+		/* We are on a shared IRQ line and it wasn't our IRQ */
+		log(L_IRQ, "acxmem: irqmasked zero: IRQ_NONE\n");
+		goto none;
+	}
+
+	// Mask all irqs, until we handle them. We will unmask them later in the tasklet.
+	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
+	write_flush(adev);
+	acx_schedule_task(adev, 0);
+
+	spin_unlock_irqrestore(&adev->spinlock, flags);
 	FN_EXIT0;
 	return IRQ_HANDLED;
 
-	irq_none:
-	acx_unlock(adev, flags);
+	none:
+
+	spin_unlock_irqrestore(&adev->spinlock, flags);
 	FN_EXIT0;
 	return IRQ_NONE;
 
 }
-#endif
 
 /*
  * acxmem_handle_info_irq

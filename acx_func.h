@@ -663,7 +663,7 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Irq Handling, Timer
-void acxmem_i_interrupt_tasklet(struct work_struct *work);
+void acxmem_irq_work(struct work_struct *work);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Helpers
