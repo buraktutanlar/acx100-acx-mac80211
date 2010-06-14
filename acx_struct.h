@@ -1250,7 +1250,6 @@ struct acx_device {
 	u8 __iomem	*info_area;
 
 	u16		irq_mask;		/* interrupt types to mask out (not wanted) with many IRQs activated */
-	u16		irq_mask_off;		/* interrupt types to mask out (not wanted) with IRQs off */
 	unsigned int	irq_loops_this_jiffy;
 	unsigned long	irq_last_jiffies;
 #endif
