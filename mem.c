@@ -4466,38 +4466,19 @@ static int acxmem_e_op_start(struct ieee80211_hw *hw) {
 	return result;
 }
 
-/*
- * acxmem_e_stop
- *
- * Called as a result of SIOCSIIFFLAGS ioctl changing the flags bit IFF_UP
- * from set to clear. I.e. called by "ifconfig DEV down"
- *
- * Returns:
- *	0	success
- *	>0	f/w reported error
- *	<0	driver reported error
- */
-static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
+
+static void acxmem_e_op_stop(struct ieee80211_hw *hw)
+{
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 
 	FN_ENTER;
-
 	acx_sem_lock(adev);
 
 	acx_stop_queue(adev->ieee, "on ifdown");
-	/* ifdown device */
-	if (adev->initialized) {
-		acxmem_s_down(hw);
-	}
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* disable all IRQs, release shared IRQ handler */
-	acx_lock(adev, flags);
-	//write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-	//write_reg16(adev, IO_ACX_FEMR, 0x0);
 	acxmem_irq_disable(adev);
-	acx_unlock(adev, flags);
+	synchronize_irq(adev->irq);
 
 	acx_sem_unlock(adev);
 	cancel_work_sync(&adev->irq_work);
@@ -4506,11 +4487,17 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw) {
 
 	acx_tx_queue_flush(adev);
 
+	del_timer_sync(&adev->mgmt_timer);
+
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+
 	adev->initialized = 0;
 
-	acx_sem_unlock(adev);
+	log(L_INIT, "acxpci: closed device\n");
 
-	log(L_INIT, "acxmem: closed device\n");
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 }
 
