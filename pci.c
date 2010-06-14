@@ -2087,12 +2087,6 @@ tx_t* acxpci_l_alloc_tx(acx_device_t * adev)
 
 	adev->tx_free--;
 	log(L_BUFT, "acx: tx: got desc %u, %u remain\n", head, adev->tx_free);
-	/* Keep a few free descs between head and tail of tx ring.
-	 ** It is not absolutely needed, just feels safer */
-	if (adev->tx_free < TX_STOP_QUEUE) {
-		log(L_BUF, "acx: stop queue (%u tx desc left)\n", adev->tx_free);
-		acx_stop_queue(adev->ieee, NULL);
-	}
 
 	/* returning current descriptor, so advance to next free one */
 	adev->tx_head = (head + 1) % TX_CNT;
@@ -2440,6 +2434,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		ack_failures = txdesc->ack_failures;
 		rts_failures = txdesc->rts_failures;
 		rts_ok = txdesc->rts_ok;
+		// OW FIXME does this also require le16_to_cpu()?
 		r100 = txdesc->u.r1.rate;
 		r111 = le16_to_cpu(txdesc->u.r2.rate111);
 
@@ -2464,12 +2459,11 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		adev->tx_free++;
 		num_cleaned++;
 
-		if ((adev->tx_free >= TX_START_QUEUE) &&
-				acx_queue_stopped(adev->ieee)
-		    ) {
+		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
 			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
-			    adev->tx_free);
+					adev->tx_free);
 			acx_wake_queue(adev->ieee, NULL);
+			ieee80211_queue_work(adev->ieee, &adev->tx_work);
 		}
 
 		/* do error checking, rate handling and logging
@@ -2487,23 +2481,14 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 			    finger, ack_failures, rts_failures, rts_ok, r100);
 
 		/* And finally report upstream */
-		if (hostdesc)
-		{
-			// TODO OW Does below still exists in mac80211 ??
-			// OW txstatus.status.excessive_retries = rts_failures;
-			// OW txstatus.status.retry_count = ack_failures;
+		ieee80211_tx_status(adev->ieee, hostdesc->skb);
 
-			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
-
-			// OW 20100514 Let's ratecontrol keep higher rates
-			// OW 20100514 memset(txstatus, 0, sizeof(struct ieee80211_tx_info));
-		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
 	}
 	/* remember last position */
 	adev->tx_tail = finger;
-/* end: */
+
 	FN_EXIT1(num_cleaned);
 	return num_cleaned;
 }
@@ -3798,7 +3783,14 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif /* NONESSENTIAL_FEATURES */
 
 
-	/* ok, pci setup is finished, now start initializing the card */
+	/* PCI setup is finished, now start initializing the card */
+	// -----
+	
+	acx_init_task_scheduler(adev);
+
+	// Mac80211 Tx_queue
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
 
 	/* NB: read_reg() reads may return bogus data before reset_dev(),
 	 * since the firmware which directly controls large parts of the I/O
@@ -3863,7 +3855,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_setup_modes;
 	}
 
-	acx_init_task_scheduler(adev);
 	err = ieee80211_register_hw(ieee);
 	if (OK != err) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", err);
@@ -4403,8 +4394,14 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * to unconfigured interface (ifup) */
 	adev->mgmt_timer.function = (void (*)(unsigned long))0x0000dead;
 
+	/* PCI setup is finished, now start initializing the card */
+	// -----
 
-	/* ok, pci setup is finished, now start initializing the card */
+	acx_init_task_scheduler(adev);
+
+	// Mac80211 Tx_queue
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
 
 	/* NB: read_reg() reads may return bogus data before reset_dev(),
 	 * since the firmware which directly controls large parts of the I/O
@@ -4454,7 +4451,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_setup_modes;
 	}
 
-	acx_init_task_scheduler(adev);
 	result = ieee80211_register_hw(adev->ieee);
 	if (OK != result) {
 		printk("acx: ieee80211_register_hw() FAILED: %d\n", result);
