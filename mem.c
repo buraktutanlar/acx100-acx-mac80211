@@ -216,7 +216,6 @@ static void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_i_interrupt_tasklet(struct work_struct *work);
 static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
 static void acxmem_handle_info_irq(acx_device_t *adev);
-static void acxmem_log_unusual_irq(u16 irqtype);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops
@@ -4280,66 +4279,6 @@ static void acxmem_handle_info_irq(acx_device_t *adev) {
 			info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
 			0 : info_type]
 	);
-}
-
-
-static void acxmem_log_unusual_irq(u16 irqtype) {
-	/*
-	 if (!printk_ratelimit())
-	 return;
-	 */
-
-	printk("acxmem: got");
-	if (irqtype & HOST_INT_RX_DATA) {
-		printk(" Rx_Data");
-	}
-	if (irqtype & HOST_INT_TX_COMPLETE) {
-		printk(" Tx_Complete");
-	}
-	if (irqtype & HOST_INT_TX_XFER) {
-		printk(" Tx_Xfer");
-	}
-	if (irqtype & HOST_INT_RX_COMPLETE) {
-		printk(" Rx_Complete");
-	}
-	if (irqtype & HOST_INT_DTIM) {
-		printk(" DTIM");
-	}
-	if (irqtype & HOST_INT_BEACON) {
-		printk(" Beacon");
-	}
-	if (irqtype & HOST_INT_TIMER) {
-		log(L_IRQ, "acx: Timer");
-	}
-	if (irqtype & HOST_INT_KEY_NOT_FOUND) {
-		printk(" Key_Not_Found");
-	}
-	if (irqtype & HOST_INT_IV_ICV_FAILURE) {
-		printk(" IV_ICV_Failure (crypto)");
-	}
-	if (irqtype & HOST_INT_CMD_COMPLETE) {
-		printk(" CMD_COMPLETE");
-	}
-	if (irqtype & HOST_INT_INFO) {
-		printk(" INFO");
-	}
-	if (irqtype & HOST_INT_OVERFLOW) {
-		printk(" Overflow");
-	}
-	if (irqtype & HOST_INT_PROCESS_ERROR) {
-		printk(" Process_Error");
-	}
-	if (irqtype & HOST_INT_SCAN_COMPLETE) {
-		printk(" SCAN_COMPLETE");
-	}
-	if (irqtype & HOST_INT_FCS_THRESHOLD) {
-		printk(" FCS_Threshold");
-	}
-	if (irqtype & HOST_INT_UNKNOWN) {
-		printk(" Unknown");
-	}
-
-	printk(" IRQ(s)\n");
 }
 
 void acxmem_set_interrupt_mask(acx_device_t *adev) {
