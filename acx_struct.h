@@ -951,10 +951,6 @@ struct acx_device {
 	unsigned long		sem_time;
 	unsigned long		lock_time;
 #endif
-
-// OW TODO Used in mem.c. Maybe not really required.
-#if defined(CONFIG_ACX_MAC80211_MEM)
-        spinlock_t              txbuf_lock;
 #endif
 
 	/*** Linux network device ***/
