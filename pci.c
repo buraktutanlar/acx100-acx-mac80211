@@ -4001,7 +4001,7 @@ acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	acx_sem_lock(adev);
 
 	ieee80211_unregister_hw(hw);	/* this one cannot sleep */
-	acxpci_s_down(hw);
+	// OW 20100603 FIXME acxpci_s_down(hw);
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
