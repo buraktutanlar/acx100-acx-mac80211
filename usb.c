@@ -136,7 +136,7 @@ void acxusb_interrupt_tasklet(struct work_struct *work);
 
 // Mac80211 Ops
 static int acxusb_e_start(struct ieee80211_hw *);
-static void acxusb_e_close(struct ieee80211_hw *);
+static void acxusb_e_stop(struct ieee80211_hw *);
 
 // Helpers
 static void acxusb_unlink_urb(struct urb *urb);
@@ -1441,7 +1441,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.remove_interface = acx_e_op_remove_interface,
 	.start = acxusb_e_start,
 	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxusb_e_close,
+	.stop = acxusb_e_stop,
 	.config = acx_e_op_config,
 	.bss_info_changed = acx_e_op_bss_info_changed,
 	.set_key = acx_e_op_set_key,
@@ -1496,7 +1496,7 @@ static int acxusb_e_start(struct ieee80211_hw *hw)
 }
 
 /*
- * acxusb_e_close()
+ * acxusb_e_stop()
  *
  * This function stops the network functionality of the interface (invoked
  * when the user calls ifconfig <wlan> down). The tx queue is halted and
@@ -1504,47 +1504,34 @@ static int acxusb_e_start(struct ieee80211_hw *hw)
  * transfers, these are unlinked (asynchronously). The module in-use count
  * is also decreased in this function.
  */
-static void acxusb_e_close(struct ieee80211_hw *hw)
+static void acxusb_e_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
-	unsigned long flags;
 	int i;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	if (adev->dev_state_mask & ACX_STATE_IFACE_UP)
-	{
-//		acxusb_e_down(adev);
-		CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	}
-
-/* Code below is remarkably similar to acxpci_s_down(). Maybe we can merge them? */
-
-    acx_free_modes(adev);
+	acx_stop_queue(adev->ieee, "on ifdown");
 
 	/* Make sure we don't get any more rx requests */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 
-	/*
-	 * We must do FLUSH *without* holding sem to avoid a deadlock.
-	 * See pci.c:acxpci_s_down() for deails.
-	 */
-
-	// OW Maybe not required anymore. Mac80211 flushes queue
-	//	acx_sem_unlock(adev);
-	//	flush_scheduled_work();
-	//	acx_sem_lock(adev);
-
 	/* Power down the device */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
-	/* Stop the transmit queue, mark the device as DOWN */
-	acx_lock(adev, flags);
-//	acx_stop_queue(ndev, "on ifdown");
-//      acx_set_status(adev, ACX_STATUS_0_STOPPED);
+	acx_sem_unlock(adev);
+	cancel_work_sync(&adev->irq_work);
+	cancel_work_sync(&adev->tx_work);
+	acx_sem_lock(adev);
+
+	acx_tx_queue_flush(adev);
+
+    acx_free_modes(adev);
+
 	/* stop pending rx/tx urb transfers */
+	// OW TODO Maybe we need to report pending skbs in urbs still to mac80211 ? see wl1251 flush
 	for (i = 0; i < ACX_TX_URB_CNT; i++) {
 		acxusb_unlink_urb(adev->usb_tx[i].urb);
 		adev->usb_tx[i].busy = 0;
@@ -1554,12 +1541,13 @@ static void acxusb_e_close(struct ieee80211_hw *hw)
 		adev->usb_rx[i].busy = 0;
 	}
 	adev->tx_free = ACX_TX_URB_CNT;
-	acx_unlock(adev, flags);
 
 	/* Must do this outside of lock */
 	del_timer_sync(&adev->mgmt_timer);
 
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	adev->initialized = 0;
+
 	log(L_INIT, "acxusb: closed device\n");
 
 	acx_sem_unlock(adev);
