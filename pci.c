@@ -4542,9 +4542,9 @@ int __init acxpci_e_init_module(void)
 	    " PCI/VLYNQ module " ACX_RELEASE " initialized, "
 	    "waiting for cards to probe...\n");
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI)
 	res = pci_register_driver(&acxpci_drv_id);
-#elif CONFIG_VLYNQ
+#elif defined(CONFIG_VLYNQ)
 	res = vlynq_register_driver(&vlynq_acx);
 #endif
 
@@ -4567,9 +4567,9 @@ void __exit acxpci_e_cleanup_module(void)
 {
 	FN_ENTER;
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI)
 	pci_unregister_driver(&acxpci_drv_id);
-#elif CONFIG_VLYNQ
+#elif defined(CONFIG_VLYNQ)
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
 	log(L_INIT,
