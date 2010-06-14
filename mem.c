@@ -1944,14 +1944,15 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  */
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
+
 	unsigned long start = jiffies;
 	const char *devname;
 	unsigned counter;
 	u16 irqtype;
+	u16 cmd_status=-1;
+	unsigned long timeout;
 	int i, j;
 	u8 *p;
-	u16 cmd_status;
-	unsigned long timeout;
 
 	FN_ENTER;
 
@@ -1959,7 +1960,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_DEBUG, "acxmem: %s: begin: (cmdstr:%s,cmd:0x%04X,buflen:%u,timeout:%ums,type:0x%04X)\n",
+	log(L_CTL, "acxmem: %s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
 			__func__, cmdstr, cmd, buflen, cmd_timeout,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
@@ -1997,10 +1998,6 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		/* the card doesn't get idle, we're in trouble */
 		printk("acxmem: %s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
 				__func__, devname, cmd_status);
-#if DUMP_IF_SLOW > 0
-		acxmem_dump_mem (adev, 0, 0x10000);
-		panic ("not idle");
-#endif
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
 		log(L_CTL|L_DEBUG, "acx: %s: waited for IDLE %dms. Please report\n",
@@ -2045,17 +2042,14 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	timeout = jiffies + cmd_timeout * HZ / 1000;
 
 	do {
-		if (!adev->irqs_active) { /* IRQ disabled: poll */
-			irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-			if (irqtype & HOST_INT_CMD_COMPLETE) {
-				write_reg16(adev, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
-				break;
-			}
-		} else { /* Wait when IRQ will set the bit */
-			irqtype = adev->irq_status;
-			if (irqtype & HOST_INT_CMD_COMPLETE)
-				break;
+		irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if (irqtype & HOST_INT_CMD_COMPLETE) {
+			write_reg16(adev, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
+			break;
 		}
+
+		if (adev->irq_status & HOST_INT_CMD_COMPLETE)
+			break;
 
 		// Timeout
 		if (counter % 8 == 0) {
@@ -2075,37 +2069,25 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* put the card in IDLE state */
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
-	/* timed out! */
+	/* Timed out! */
 	if (counter == -1) {
 
-		log(L_ANY, "acxmem: %s: %s: "
-				"Timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "acxmem: %s: %s: Timed out %s for CMD_COMPLETE. "
 				"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 				"cmd_status:%d (%s)\n",
 		       __func__, devname,
 		       (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		log(L_DEBUG, "acxmem: %s: "
+		log(L_ANY, "acxmem: %s: "
 				"timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
 				__func__,
 				counter, cmd_timeout, cmd_timeout - counter);
-
-		log(L_DEBUG, "acxmem: %s: %s: "
-				"device irq status 0x%04x\n",
-				__func__, devname,
-				read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES));
-		log(L_DEBUG, "acxmem: %s: %s: "
-				"IO_ACX_IRQ_MASK 0x%04x IO_ACX_FEMR 0x%04x\n",
-				__func__, devname,
-				read_reg16(adev, IO_ACX_IRQ_MASK), read_reg16(adev,	IO_ACX_FEMR));
 
 		if (read_reg16(adev, IO_ACX_IRQ_MASK) == 0xffff) {
 			log(L_ANY,"acxmem: firmware probably hosed - reloading: FIXME: Not implmemented\n");
 			FIXME();
 		}
-
-		goto bad;
 
 	} else if (cmd_timeout - counter > 30) { /* if waited >30ms... */
 		log(L_CTL|L_DEBUG, "acxmem: %s: "
@@ -2115,14 +2097,15 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 				cmd_timeout - counter, counter);
 	}
 
+	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
+			devname,
+			cmdstr, buflen, cmd_timeout,
+			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+			acx_cmd_status_str(cmd_status)
+	);
+
 	if (cmd_status != 1) { /* it is not a 'Success' */
-		log(L_ANY, "acx: %s: %s: "
-				"ERROR: cmd_status is NOT SUCCESS: %d (%s). "
-				"Took %dms of %d\n",
-				__func__, devname,
-				cmd_status,
-				acx_cmd_status_str(cmd_status), cmd_timeout - counter,
-				cmd_timeout);
+
 		/* zero out result buffer
 		 * WARNING: this will trash stack in case of illegally large input
 		 * length! */
@@ -2159,20 +2142,8 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	}
 
 	/* ok: */
-	if (acx_debug & L_DEBUG) {
-		log(L_DEBUG, "acxmem: %s: %s: "
-				"cmdstr:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X, took jiffies: %ld\n",
-				__func__, devname,
-				cmdstr, cmd, buflen, cmd_timeout,
-				buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1,
-				jiffies - start);
-	} else if (acx_debug & L_CTL) {
-		log(L_CTL, "acxmem: %s: %s: "
-				"cmdstr=%s, cmd=0x%04X, type=0x%04X: OK\n",
-				__func__, devname,
-				cmdstr, cmd,
-				buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
-	}
+	log(L_DEBUG, "acx: %s: %s: took %ld jiffies to complete\n",
+	    __func__, cmdstr, jiffies - start);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -2180,11 +2151,12 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	bad:
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
-	log(L_ANY, "acxmem: %s: %s: "
-			"cmdstr=%s, cmd=0x%04X, type=0x%04X: FAILED\n",
-			__func__, devname,
-			cmdstr, cmd,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
+	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
+			devname,
+			cmdstr, buflen, cmd_timeout,
+			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+			acx_cmd_status_str(cmd_status)
+	);
 
 	FN_EXIT1(NOT_OK);
 
