@@ -2004,12 +2004,6 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			/* Beacons contain channel# - update them */
 			SET_BIT(adev->set_mask, SET_TEMPLATES);
 		}
-
-		switch (adev->mode) {
-		case ACX_MODE_0_ADHOC:
-		case ACX_MODE_2_STA:
-			start_scan = 1;
-		}
 	}
 
 	/* Apply settings */
