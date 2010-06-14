@@ -162,6 +162,10 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
 int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+void acx_tx_work(struct work_struct *work);
+int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
+void acx_tx_queue_flush(acx_device_t *adev);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
@@ -4450,22 +4454,30 @@ out:
  * BOM Tx Path
  * ==================================================
  */
-int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
-	acx_device_t *adev = ieee2adev(hw);
-	tx_t *tx;
-	void *txbuf;
-	unsigned long flags;
 
-	struct ieee80211_tx_info *ctl = IEEE80211_SKB_CB(skb);
-	int txresult = NOT_OK;
+int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+{
+	acx_device_t *adev = ieee2adev(hw);
+
+	skb_queue_tail(&adev->tx_queue, skb);
+
+	ieee80211_queue_work(adev->ieee, &adev->tx_work);
+
+	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
+		acx_stop_queue(adev->ieee, NULL);
+
+	return NETDEV_TX_OK;
+}
+
+void acx_tx_work(struct work_struct *work) {
+
+	acx_device_t *adev = container_of(work, struct acx_device, tx_work);
+	struct sk_buff *skb;
+	int ret;
 
 	FN_ENTER;
 
-	if (unlikely(!skb)) {
-		/* indicate success */
-		txresult = OK;
-		goto out;
-	}
+	acx_sem_lock(adev);
 
 	if (unlikely(!adev)) {
 		goto out;
@@ -4474,43 +4486,92 @@ int acx_i_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb) {
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		goto out;
 	}
+
 	if (unlikely(!adev->initialized)) {
 		goto out;
 	}
 
-	acx_lock(adev, flags);
+	while ((skb = skb_dequeue(&adev->tx_queue))) {
+
+		ret = acx_tx_frame(adev, skb);
+
+		if (ret == -EBUSY) {
+			logf0(L_BUFT, "EBUSY: Stop queue. Requeuing skb.\n");
+			acx_stop_queue(adev->ieee, NULL);
+			skb_queue_head(&adev->tx_queue, skb);
+			goto out;
+		} else if (ret < 0) {
+			logf0(L_BUF, "Other ERR: (Card was removed ?!): Stop queue. Dealloc skb.\n");
+			acx_stop_queue(adev->ieee, NULL);
+			dev_kfree_skb(skb);
+			goto out;
+		}
+
+		/* Keep a few free descs between head and tail of tx ring. It is not absolutely needed, just feels safer */
+		if (adev->tx_free < TX_STOP_QUEUE) {
+			logf1(L_BUF, "Tx_free<TX_STOP_QUEUE (%u tx desc left): Stop queue.\n", adev->tx_free);
+			acx_stop_queue(adev->ieee, NULL);
+			goto out;
+		}
+
+	}
+
+	out:
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return;
+}
+
+int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
+
+	tx_t *tx;
+	void *txbuf;
+	struct ieee80211_tx_info *ctl;
+	ctl = IEEE80211_SKB_CB(skb);
 
 	tx = acx_l_alloc_tx(adev, skb->len);
 
 	if (unlikely(!tx)) {
-		log(L_BUFT, "acx: %s: start_xmit: txdesc ring is full, " "dropping tx\n", wiphy_name(adev->ieee->wiphy));
-		txresult = NOT_OK;
-		goto out_unlock;
+		logf0(L_BUFT, "No tx available\n");
+		return (-EBUSY);
 	}
 
 	txbuf = acx_l_get_txbuf(adev, tx);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
-		txresult = NOT_OK;
+		logf0(L_BUF, "Txbuf==NULL. (Card was removed ?!): Stop queue. Dealloc skb.\n");
+
 		// OW only USB implemented
 		acx_l_dealloc_tx(adev, tx);
-		goto out_unlock;
+		return (-ENXIO);
 	}
+
 	memcpy(txbuf, skb->data, skb->len);
 
 	acx_l_tx_data(adev, tx, skb->len, ctl, skb);
 
-	txresult = OK;
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
 
-out_unlock:
-	acx_unlock(adev, flags);
+	return 0;
+}
 
-out:
-	FN_EXIT1(txresult);
-	return txresult;
+void acx_tx_queue_flush(acx_device_t *adev) {
+	struct sk_buff *skb;
+	struct ieee80211_tx_info *info;
+
+	while ((skb = skb_dequeue(&adev->tx_queue))) {
+		info = IEEE80211_SKB_CB(skb);
+
+		logf1(L_BUF, "Flushing skb 0x%p", skb);
+
+		if (!(info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS))
+			continue;
+
+		ieee80211_tx_status(adev->ieee, skb);
+	}
 }
 
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg)

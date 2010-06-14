@@ -184,6 +184,7 @@ enum {
 /* we start queue if we have >= N free txbufs: */
 #define TX_START_QUEUE 5
 
+#define ACX_TX_QUEUE_MAX_LENGTH 10
 
 /***********************************************************************
 ** BOM Information Frames Structures
