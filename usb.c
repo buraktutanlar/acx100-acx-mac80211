@@ -1247,19 +1247,13 @@ tx_t *acxusb_l_alloc_tx(acx_device_t *adev)
 			tx = &adev->usb_tx[head];
 			tx->busy = 1;
 			adev->tx_free--;
-			/* Keep a few free descs between head and tail of tx ring.
-			 ** It is not absolutely needed, just feels safer */
-			if (adev->tx_free < TX_STOP_QUEUE) {
-				log(L_BUF, "acx: tx: stop queue "
-					"(%u free txbufs)\n", adev->tx_free);
-				acx_stop_queue(adev->ieee, NULL);
-			}
 			goto end;
 		}
 	} while (likely(head != adev->tx_head));
 	tx = NULL;
-	printk_ratelimited("acx: tx buffers full\n");
-      end:
+	printk_ratelimited("acxusb: tx buffers full\n");
+
+	end:
 	adev->tx_head = head;
 	FN_EXIT0;
 	return (tx_t *) tx;
@@ -1832,6 +1826,12 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
 	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
 
+	acx_init_task_scheduler(adev);
+
+	// Mac80211 Tx_queue
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
+
 	/* put acx out of sleep mode and initialize it */
 	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
@@ -1865,10 +1865,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	acx_proc_register_entries(ieee, 0);
 
-
 	printk("acx: USB module " ACX_RELEASE " loaded successfully\n");
-
-	acx_init_task_scheduler(adev);
 
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
