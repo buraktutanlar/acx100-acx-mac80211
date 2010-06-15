@@ -940,9 +940,7 @@ struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
 
 	/*** Locking ***/
-	// OW mutex is used to coordinates access from userspace
 	struct mutex		mutex;
-	// OW spinlock is used to protect acx_device adev structure
 	spinlock_t		spinlock;
 
 #ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE

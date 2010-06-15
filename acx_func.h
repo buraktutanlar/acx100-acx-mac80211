@@ -53,7 +53,7 @@
  *
  * The locking rule is: All external entry paths are protected by the sem.
  *
- * The adev->sem is still kept for the irq top-half, although even there it
+ * The adev->spinlock is still kept for the irq top-half, although even there it
  * wouldn't be really required. It's just to not get interrupted during irq
  * handling itself. For this we don't need the acx_lock macros anymore.
  * 
