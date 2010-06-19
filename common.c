@@ -131,8 +131,10 @@ static int acx_s_recalib_radio(acx_device_t *adev);
 static void acx_s_after_interrupt_recalib(acx_device_t * adev);
 
 // Other (Control Path)
+#if 0
 static u8 acx_plcp_get_bitrate_cck(u8 plcp);
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
+#endif
 static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
 static void acx111_s_sens_radio_16_17(acx_device_t * adev);
 static void acx_l_update_ratevector(acx_device_t * adev);
@@ -3392,8 +3394,8 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 }
 #endif
 
-
-
+// TODO Verify these functions: translation rxbuffer.phy_plcp_signal to rate_idx
+#if 0
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
@@ -3432,7 +3434,7 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
         }
         return 0;
 }
-
+#endif
 
 static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
@@ -4409,12 +4411,18 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	status->band = adev->rx_status.band;
 
 	status->antenna = 1;
+
+	// TODO I'm not sure whether this is (currently) really required. In tests
+	// this didn't made a difference. Maybe compare what other drivers do.
+	// TODO Verify translation to rate_idx.
+#if 0
 	if (rxbuf->phy_stat_baseband & (1 << 3)) { /* Uses OFDM */
 		status->rate_idx = acx_plcp_get_bitrate_ofdm(rxbuf->phy_plcp_signal);
 	}
 	else {
 		status->rate_idx = acx_plcp_get_bitrate_cck(rxbuf->phy_plcp_signal);
 	}
+#endif
 
 	// See:
 	//
