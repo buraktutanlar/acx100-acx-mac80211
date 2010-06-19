@@ -3194,7 +3194,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
 	struct ieee80211_hdr *wireless_header;
 	txhostdesc_t *hostdesc1, *hostdesc2;
-	int rate_cur;
+	int rate;
 	u8 Ctl_8, Ctl2_8;
 	int wlhdr_len;
 	u32 addr;
@@ -3234,27 +3234,23 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-
-	if (unlikely(!rate_cur)) {
-		printk("acx: driver bug! bad ratemask\n");
-		goto end;
-	}
+	rate = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 
 	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
 	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
 
+	/* ACX111 */
 	if (IS_ACX111(adev)) {
 		/* note that if !txdesc->do_auto, txrate->cur
 		 ** has only one nonzero bit */
-		txdesc->u.r2.rate111 = cpu_to_le16(rate_cur
-				/* WARNING: I was never able to make it work with prism54 AP.
-				 ** It was falling down to 1Mbit where shortpre is not applicable,
-				 ** and not working at all at "5,11 basic rates only" setting.
-				 ** I even didn't see tx packets in radio packet capture.
-				 ** Disabled for now --vda */
-				/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
-		);
+		txdesc->u.r2.rate111 = cpu_to_le16(rate);
+
+		/* WARNING: I was never able to make it work with prism54 AP.
+		 ** It was falling down to 1Mbit where shortpre is not applicable,
+		 ** and not working at all at "5,11 basic rates only" setting.
+		 ** I even didn't see tx packets in radio packet capture.
+		 ** Disabled for now --vda */
+		/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		/* should add this to rate111 above as necessary */
@@ -3264,7 +3260,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	}
 	/* ACX100 */
 	else {
-		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+		u8 rate_100 = rate;
 		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), rate_100);
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
