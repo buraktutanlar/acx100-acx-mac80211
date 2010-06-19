@@ -965,6 +965,7 @@ struct acx_device {
 //	struct iw_statistics	wstats;		/* wireless statistics */
 #endif
 	struct ieee80211_hw	*ieee;
+	// FIXME OW 20100616 rx_status is reported for each skb. Check if this field is really required
 	struct ieee80211_rx_status rx_status;
 	struct ieee80211_vif	*vif;
 
