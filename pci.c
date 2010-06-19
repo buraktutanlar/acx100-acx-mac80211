@@ -2105,9 +2105,11 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	txdesc_t *txdesc = (txdesc_t *) tx_opaque;
 	struct ieee80211_hdr *wireless_header;
 	txhostdesc_t *hostdesc1, *hostdesc2;
-	int rate_cur;
+	int rate;
 	u8 Ctl_8, Ctl2_8;
 	int wlhdr_len;
+
+	int bitrate;
 
 	FN_ENTER;
 
@@ -2145,31 +2147,27 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 	}
 
-	rate_cur = ieee80211_get_tx_rate(adev->ieee, ieeectl)->hw_value;
+	bitrate = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+	rate = ieee80211_get_tx_rate(adev->ieee, ieeectl)->hw_value;
 
-	if (unlikely(!rate_cur)) {
-		printk("acx: driver bug! bad ratemask\n");
-		goto end;
-	}
-
-	/* used in tx cleanup routine for auto rate and accounting: */
-	/*	put_txcr(adev, txdesc, clt, rate_cur);  deprecated by mac80211 */
+//	logf1(L_ANY, "bitrate=%i, rate(hw_value)=%04X\n", bitrate, rate)
 
 	txdesc->total_length = cpu_to_le16(len);
 	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
 
+	/* ACX111 */
 	if (IS_ACX111(adev)) {
 		/* note that if !txdesc->do_auto, txrate->cur
 		 ** has only one nonzero bit */
-		txdesc->u.r2.rate111 = cpu_to_le16(rate_cur
-						   /* WARNING: I was never able to make it work with prism54 AP.
-						    ** It was falling down to 1Mbit where shortpre is not applicable,
-						    ** and not working at all at "5,11 basic rates only" setting.
-						    ** I even didn't see tx packets in radio packet capture.
-						    ** Disabled for now --vda */
-						   /*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
-		    );
-
+		txdesc->u.r2.rate111 = cpu_to_le16(rate);
+		
+		/* WARNING: I was never able to make it work with prism54 AP.
+		 * It was falling down to 1Mbit where shortpre is not applicable,
+		 * and not working at all at "5,11 basic rates only" setting.
+		 * I even didn't see tx packets in radio packet capture.
+		 * Disabled for now --vda */
+		/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
+		    
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		/* should add this to rate111 above as necessary */
 		|(clt->pbcc511 ? RATE111_PBCC511 : 0)
@@ -2178,17 +2176,13 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	}
 	/* ACX100 */
 	else {
-
-		// FIXME OW 20100511 Rate setting here needs to be fixed, as for acx111
-		u8 rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-		txdesc->u.r1.rate = rate_100;
+		txdesc->u.r1.rate = rate;
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {
 			if (n == RATE100_5 || n == RATE100_11)
 				n |= RATE100_PBCC511;
 		}
-
 		if (clt->shortpre && (clt->cur != RATE111_1))
 			SET_BIT(Ctl_8, DESC_CTL_SHORT_PREAMBLE);	/* set Short Preamble */
 #endif
@@ -2199,7 +2193,8 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			DESC_CTL_FIRSTFRAG);
 
 #if ACX_FRAGMENTATION
-		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
+		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally,
+       needs to be set for all non-last fragments */
 #endif
 
 		hostdesc1->length = cpu_to_le16(wlhdr_len);
@@ -2232,8 +2227,6 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/* log the packet content AFTER sending it,
 	 * in order to not delay sending any further than absolutely needed
 	 * Do separate logs for acx100/111 to have human-readable rates */
-
-	end:
 
 	// Debugging
 	if (unlikely(acx_debug & (L_XFER|L_DATA))) {
