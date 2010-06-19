@@ -96,7 +96,6 @@ void acx_s_update_card_settings(acx_device_t *adev);
 void acx_s_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_s_init_mac(acx_device_t * adev);
-void acx_free_modes(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 static void acx_s_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
@@ -2571,13 +2570,6 @@ int acx_s_init_mac(acx_device_t * adev)
 		printk("acx: init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;
-}
-
-
-void acx_free_modes(acx_device_t * adev)
-{
-//        kfree(adev->modes);
-//        adev->modes = NULL;
 }
 
 int acx_setup_modes(acx_device_t *adev)

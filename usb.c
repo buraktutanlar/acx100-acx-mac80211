@@ -1529,8 +1529,6 @@ static void acxusb_e_stop(struct ieee80211_hw *hw)
 
 	acx_tx_queue_flush(adev);
 
-    acx_free_modes(adev);
-
 	/* stop pending rx/tx urb transfers */
 	// OW TODO Maybe we need to report pending skbs in urbs still to mac80211 ? see wl1251 flush
 	for (i = 0; i < ACX_TX_URB_CNT; i++) {

@@ -259,7 +259,6 @@ void acx_s_update_card_settings(acx_device_t *adev);
 void acx_s_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_s_init_mac(acx_device_t * adev);
-void acx_free_modes(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 // void acx_update_capabilities(acx_device_t *adev);
