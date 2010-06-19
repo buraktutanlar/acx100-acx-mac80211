@@ -2419,7 +2419,12 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		hostdesc = acxpci_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
-        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (error == 0))
+        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) &&
+        		(error == 0) &&
+        		// OW 20100619 We also take ack and rts failuers into account.
+        		// Without this I observed connection stall during scp tests.
+        		(ack_failures < 2) && (rts_failures <2)
+        	)
 			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
 		/* ...and free the desc */
