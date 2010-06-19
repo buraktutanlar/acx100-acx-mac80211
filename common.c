@@ -407,25 +407,32 @@ static const u16 acx111_ie_len_dot11[] = {
 	0,
 };
 
-// OW 20100514 FIXME Rates need to be defined correctly
-// OW 20100514 FIXME acx100 is probably currently quite wrong!
-static struct ieee80211_rate __acx_rates[] = {
-//		{ .bitrate = 10, .hw_value = RATE111_1, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-//		{ .bitrate = 20, .hw_value = RATE111_2, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-//		{ .bitrate = 55, .hw_value = RATE111_5, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-//		{ .bitrate = 110, .hw_value = RATE111_11, .flags = IEEE80211_RATE_SHORT_PREAMBLE },
-		{ .bitrate = 10, .hw_value = RATE111_1,  },
-		{ .bitrate = 20, .hw_value = RATE111_2, },
-		{ .bitrate = 55, .hw_value = RATE111_5, },
-		{ .bitrate = 110, .hw_value = RATE111_11, },
-	{ .bitrate = 60, .hw_value = 6, },
-	{ .bitrate = 90, .hw_value = 5, },
-	{ .bitrate = 120, .hw_value = 6, },
-	{ .bitrate = 180, .hw_value = 7, },
-	{ .bitrate = 240, .hw_value = 8, },
-	{ .bitrate = 360, .hw_value = 9, },
-	{ .bitrate = 480, .hw_value = 10, },
-	{ .bitrate = 540, .hw_value = 11, },
+// BOM Rate and channel definition
+// ---
+
+// We define rates without short-preamble support fo now
+
+static struct ieee80211_rate acx100_rates[] = {
+		{ .bitrate = 10, .hw_value = RATE100_1, },
+		{ .bitrate = 20, .hw_value = RATE100_2, },
+		{ .bitrate = 55, .hw_value = RATE100_5, },
+		{ .bitrate = 110, .hw_value = RATE100_11, },
+		{ .bitrate = 220, .hw_value = RATE100_22, },
+};
+
+static struct ieee80211_rate acx111_rates[] = {
+	{ .bitrate = 10, .hw_value = RATE111_1, },
+	{ .bitrate = 20, .hw_value = RATE111_2, },
+	{ .bitrate = 55, .hw_value = RATE111_5, },
+	{ .bitrate = 60, .hw_value = RATE111_6, },
+	{ .bitrate = 90, .hw_value = RATE111_9, },
+	{ .bitrate = 110, .hw_value = RATE111_11, },
+	{ .bitrate = 120, .hw_value = RATE111_12, },
+	{ .bitrate = 180, .hw_value = RATE111_18, },
+	{ .bitrate = 240, .hw_value = RATE111_24, },
+	{ .bitrate = 360, .hw_value = RATE111_36, },
+	{ .bitrate = 480, .hw_value = RATE111_48, },
+	{ .bitrate = 540, .hw_value = RATE111_54, },
 };
 
 static struct ieee80211_channel channels[] = {
@@ -445,20 +452,18 @@ static struct ieee80211_channel channels[] = {
 	{ .center_freq = 2484, .hw_value = 14, },
 };
 
-#ifdef TEMPORARILY_UNUSED_BUT_USEFULL
-static struct ieee80211_supported_band g_band_2GHz = {
+static struct ieee80211_supported_band acx100_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = __acx_rates,
-	.n_bitrates = 12,
+	.bitrates = acx100_rates,
+	.n_bitrates = ARRAY_SIZE(acx100_rates),
 };
-#endif
 
-static struct ieee80211_supported_band b_band_2GHz = {
+static struct ieee80211_supported_band acx111_band_2GHz = {
 	.channels = channels,
 	.n_channels = ARRAY_SIZE(channels),
-	.bitrates = __acx_rates,
-	.n_bitrates = 4,
+	.bitrates = acx111_rates,
+	.n_bitrates = ARRAY_SIZE(acx111_rates),
 };
 
 static const u8 bitpos2genframe_txrate[] = {
@@ -2576,33 +2581,20 @@ int acx_s_init_mac(acx_device_t * adev)
 
 int acx_setup_modes(acx_device_t *adev)
 {
-	struct ieee80211_hw *hw = adev->ieee;
-
 	FN_ENTER;
 
-	if (IS_ACX111(adev) || IS_ACX100(adev)) {
-/*
-		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode) * 2, GFP_KERNEL);
-        	err = acx_setup_modes_gphy(adev);
-*/
-// OW 20100513		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &g_band_2GHz;
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
-	}
-	// OX FIXME This is probably not very logic ?!
-	else
-	{
-/*
-		adev->modes = kzalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
-		err = acx_setup_modes_bphy(adev);
-*/
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &b_band_2GHz;
-	}
-/*	if (err && adev->modes)
-		kfree(adev->modes);*/
+  if (IS_ACX100(adev)) {
+      adev->ieee->wiphy->bands[IEEE80211_BAND_2GHZ] = &acx100_band_2GHz;
+  } else 
+  if (IS_ACX111(adev))
+  		adev->ieee->wiphy->bands[IEEE80211_BAND_2GHZ] = &acx111_band_2GHz;
+  else {
+    logf0(L_ANY, "Error: Unknown device");
+    return -1;
+  }
 
 	FN_EXIT0;
 	return 0;
-
 }
 
 static void acx_s_select_opmode(acx_device_t *adev)
