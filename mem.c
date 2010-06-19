@@ -4900,7 +4900,9 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	 * max_noise values will not be initialised by now, as they do not
 	 * seem to be supported or how to acquire them is still unknown. */
 
-	// OW ieee->max_rssi = 100;
+	// We base signal quality on winlevel approach of previous driver
+	// TODO OW 20100615 This should into a common init code
+	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	ieee->max_signal = 100;
 
 	adev = ieee2adev(ieee);

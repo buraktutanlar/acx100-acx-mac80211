@@ -3558,7 +3558,9 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * max_noise values will not be initialised by now, as they do not
 	 * seem to be supported or how to acquire them is still unknown. */
 
-	// OW ieee->max_rssi = 100;
+	// We base signal quality on winlevel approach of previous driver
+	// TODO OW 20100615 This should into a common init code
+	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	ieee->max_signal = 100;
 
 	adev = ieee2adev(ieee);
@@ -4210,6 +4212,11 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
+
+	// We base signal quality on winlevel approach of previous driver
+	// TODO OW 20100615 This should into a common init code
+	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	ieee->max_signal = 100;
 
 	adev = ieee2adev(ieee);
 

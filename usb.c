@@ -1715,7 +1715,10 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	ieee->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
 
-	/* Register the callbacks for the network device functions */
+	// We base signal quality on winlevel approach of previous driver
+	// TODO OW 20100615 This should into a common init code
+	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	ieee->max_signal = 100;
 
 	/* Setup private driver context */
 

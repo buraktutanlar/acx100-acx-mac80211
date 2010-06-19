@@ -4311,19 +4311,20 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	// For debugging
-	if (
-			((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
+	if (((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
 			(acx_debug & (L_XFER|L_DATA))
 	){
 		printk(	"acx: rx: %s "
-				"time:%u len:%u signal:%u SNR:%u macstat:%02X "
+				"time:%u len:%u "
+				"signal:%u,raw=%u SNR:%u,raw=%u "
+				"macstat:%02X "
 				"phystat:%02X phyrate:%u status:%u\n",
 				acx_get_packet_type_string(fc),
 
 				le32_to_cpu(rxbuf->time),
 				buf_len,
-				acx_signal_to_winlevel(rxbuf->phy_level),
-				acx_signal_to_winlevel(rxbuf->phy_snr),
+				acx_signal_to_winlevel(rxbuf->phy_level),rxbuf->phy_level,
+				acx_signal_to_winlevel(rxbuf->phy_snr),rxbuf->phy_snr,
 				rxbuf->mac_status,
 
 				rxbuf->phy_stat_baseband,
@@ -4344,6 +4345,8 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	 * be expressed in dBm, or it's some pretty complicated
 	 * calculation. */
 
+	// FIXME OW 20100619 Is this still required. Only for adev local use.
+	// Mac80211 signal level is reported in acx_l_rx for each skb.
 	/* TODO: only the RSSI seems to be reported */
 	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
 
@@ -4364,6 +4367,8 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	struct ieee80211_hdr *w_hdr;
 	struct sk_buff *skb;
 	int buflen;
+	int level, noise;
+
 	FN_ENTER;
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
@@ -4391,12 +4396,12 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	memset(status, 0, sizeof(*status));
 
 	status->mactime = rxbuf->time;
-	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
 
-	/* TODO: they do not seem to be reported, at least on the acx111
-	 * (and TNETW1450?), therefore commenting them out
-	status->signal = acx_signal_to_winlevel(rxbuf->phy_level);
-	status->noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
+	level = acx_signal_to_winlevel(rxbuf->phy_level);
+	noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+	//status->signal = acx_signal_determine_quality(level, noise);
+	// TODO OW 20100619 On ACX100 seem to be always zero (seen during hx4700 tests ?!) 
+	status->signal = level;
 
 	status->flag = 0;
 
