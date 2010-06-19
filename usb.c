@@ -1215,6 +1215,7 @@ static void acxusb_i_complete_tx(struct urb *urb)
 
 	txstatus = IEEE80211_SKB_CB(tx->skb);
 
+	// TODO OW 20100619 Is urb->status also the wireless tx status ? Not sure ...
     if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (urb->status == 0))
 		txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
@@ -1336,7 +1337,7 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	txbuf->mpdu_len = cpu_to_le16(wlanpkt_len);
 	txbuf->queue_index = 1;
 
-	// OW txbuf->rate = ctl->tx_rate->bitrate; //clt->rate_100;
+	// FIXME OW 20100619 acx111 handling missing here
 	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 	txbuf->rate = rate_100 ;
 
