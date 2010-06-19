@@ -3386,6 +3386,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
+// TODO OW 20100619 Merge with pci
 static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 	struct ieee80211_tx_info *info) {
 	const char *err = "unknown error";
@@ -3469,9 +3470,6 @@ static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int fi
 	if (adev->stats.tx_errors <= 20)
 		printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
 				adev->ieee->wiphy),	error, finger, err);
-	else
-		printk("acx: %s: tx error 0x%02X, buf %02u!\n", wiphy_name(
-				adev->ieee->wiphy), error, finger);
 }
 
 /*
