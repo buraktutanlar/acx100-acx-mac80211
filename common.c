@@ -4270,7 +4270,7 @@ static void acx_s_initialize_rx_config(acx_device_t * adev)
 					   | RX_CFG2_RCV_MGMT_FRAMES
 					   | RX_CFG2_RCV_PROBE_REQ
 					   | RX_CFG2_RCV_PROBE_RESP
-					   | RX_CFG2_RCV_ACK_FRAMES
+					   /*| RX_CFG2_RCV_ACK_FRAMES*/
 					   | RX_CFG2_RCV_OTHER);
 		break;
 	}
