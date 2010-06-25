@@ -2485,10 +2485,11 @@ void acx_s_start(acx_device_t * adev)
 	 * was up we get the changes asked for
 	 */
 
-	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP
-		| GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
-		GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
-		GETSET_TX | GETSET_RX | GETSET_STATION_ID);
+	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP |
+			GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
+			GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
+			GETSET_TX | GETSET_RX | GETSET_STATION_ID |
+			GETSET_RETRY | SET_MSDU_LIFETIME | SET_RATE_FALLBACK);
 
 	log(L_INIT, "acx: updating initial settings on iface activation\n");
 	acx_s_update_card_settings(adev);
