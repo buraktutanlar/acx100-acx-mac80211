@@ -131,7 +131,6 @@ static void acxpci_l_process_rxdesc(acx_device_t * adev);
 tx_t *acxpci_l_alloc_tx(acx_device_t * adev);
 void *acxpci_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
 void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
@@ -2251,105 +2250,6 @@ acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
-static void acxpci_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
-		struct ieee80211_tx_info *info)
-{
-	const char *err = "unknown error";
-
-	/* hmm, should we handle this as a mask
-	 * of *several* bits?
-	 * For now I think only caring about
-	 * individual bits is ok... */
-	switch (error) {
-	case 0x01:
-		err = "no Tx due to error in other fragment";
-/*		adev->wstats.discard.fragment++; */
-		break;
-	case 0x02:
-		err = "Tx aborted";
-		adev->stats.tx_aborted_errors++;
-		break;
-	case 0x04:
-		err = "Tx desc wrong parameters";
-/*		adev->wstats.discard.misc++; */
-		break;
-	case 0x08:
-		err = "WEP key not found";
-/*		adev->wstats.discard.misc++; */
-		break;
-	case 0x10:
-		err = "MSDU lifetime timeout? - try changing "
-		    "'iwconfig retry lifetime XXX'";
-/*		adev->wstats.discard.misc++; */
-		break;
-	case 0x20:
-		err = "excessive Tx retries due to either distance "
-		    "too high or unable to Tx or Tx frame error - "
-		    "try changing 'iwconfig txpower XXX' or "
-		    "'sens'itivity or 'retry'";
-/*		adev->wstats.discard.retries++; */
-		/* Tx error 0x20 also seems to occur on
-		 * overheating, so I'm not sure whether we
-		 * actually want to do aggressive radio recalibration,
-		 * since people maybe won't notice then that their hardware
-		 * is slowly getting cooked...
-		 * Or is it still a safe long distance from utter
-		 * radio non-functionality despite many radio recalibs
-		 * to final destructive overheating of the hardware?
-		 * In this case we really should do recalib here...
-		 * I guess the only way to find out is to do a
-		 * potentially fatal self-experiment :-\
-		 * Or maybe only recalib in case we're using Tx
-		 * rate auto (on errors switching to lower speed
-		 * --> less heat?) or 802.11 power save mode?
-		 *
-		 * ok, just do it. */
-		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
-			if (adev->retry_errors_msg_ratelimit <= 20) {
-				logf1(L_ANY, "%s: several excessive Tx "
-				       "retry errors occurred, attempting "
-				       "to recalibrate radio. Radio "
-				       "drift might be caused by increasing "
-				       "card temperature, please check the card "
-				       "before it's too late!\n",
-				       wiphy_name(adev->ieee->wiphy));
-				if (adev->retry_errors_msg_ratelimit == 20)
-					logf0(L_ANY, "disabling above message\n");
-			}
-
-			acx_schedule_task(adev,
-					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-		}
-		// OW TODO Check what to do with excessive_retries in mac80211, 2.6.31
-		// info->status.excessive_retries++;
-		break;
-	case 0x40:
-		err = "Tx buffer overflow";
-		adev->stats.tx_fifo_errors++;
-		break;
-	case 0x80:
-		/* possibly ACPI C-state powersaving related!!!
-		 * (DMA timeout due to excessively high wakeup
-		 * latency after C-state activation!?)
-		 * Disable C-State powersaving and try again,
-		 * then PLEASE REPORT, I'm VERY interested in
-		 * whether my theory is correct that this is
-		 * actually the problem here.
-		 * In that case, use new Linux idle wakeup latency
-		 * requirements kernel API to prevent this issue. */
-		err = "DMA error";
-/*		adev->wstats.discard.misc++; */
-		break;
-	}
-
-	adev->stats.tx_errors++;
-
-	if (adev->stats.tx_errors <= 20)
-		printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n",
-		       wiphy_name(adev->ieee->wiphy), error, finger, err);
-
-}
-
 /*
  * acxpci_l_clean_txdesc
  *
@@ -2446,7 +2346,7 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
 		if (unlikely(error))
-			acxpci_handle_tx_error(adev, error, finger,  txstatus);
+			acxpcimem_handle_tx_error(adev, error, finger,  txstatus);
 
 		if (IS_ACX111(adev))
 			log(L_BUFT,

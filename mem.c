@@ -202,7 +202,6 @@ static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
 
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
 void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
 
@@ -3382,91 +3381,6 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
-// TODO OW 20100619 Merge with pci
-static void acxmem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
-	struct ieee80211_tx_info *info) {
-	const char *err = "unknown error";
-
-	/* hmm, should we handle this as a mask
-	 * of *several* bits?
-	 * For now I think only caring about
-	 * individual bits is ok... */
-	switch (error) {
-	case 0x01:
-		err = "no Tx due to error in other fragment";
-		// OW adev->wstats.discard.fragment++;
-		break;
-	case 0x02:
-		err = "Tx aborted";
-		adev->stats.tx_aborted_errors++;
-		break;
-	case 0x04:
-		err = "Tx desc wrong parameters";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x08:
-		err = "WEP key not found";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x10:
-		err = "MSDU lifetime timeout? - try changing "
-			"'iwconfig retry lifetime XXX'";
-		// OW adev->wstats.discard.misc++;
-		break;
-	case 0x20:
-		err = "excessive Tx retries due to either distance "
-			"too high or unable to Tx or Tx frame error - "
-			"try changing 'iwconfig txpower XXX' or "
-			"'sens'itivity or 'retry'";
-		// OW adev->wstats.discard.retries++;
-
-		/* Tx error 0x20 also seems to occur on
-		 * overheating, so I'm not sure whether we
-		 * actually want to do aggressive radio recalibration,
-		 * since people maybe won't notice then that their hardware
-		 * is slowly getting cooked...
-		 * Or is it still a safe long distance from utter
-		 * radio non-functionality despite many radio recalibs
-		 * to final destructive overheating of the hardware?
-		 * In this case we really should do recalib here...
-		 * I guess the only way to find out is to do a
-		 * potentially fatal self-experiment :-\
-		 * Or maybe only recalib in case we're using Tx
-		 * rate auto (on errors switching to lower speed
-		 * --> less heat?) or 802.11 power save mode?
-		 *
-		 * ok, just do it. */
-		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
-			if (adev->retry_errors_msg_ratelimit <= 20) {
-				logf1(L_ANY, "%s: several excessive Tx "
-					"retry errors occurred, attempting "
-					"to recalibrate radio. Radio "
-					"drift might be caused by increasing "
-					"card temperature, please check the card "
-					"before it's too late!\n", wiphy_name(adev->ieee->wiphy));
-				if (adev->retry_errors_msg_ratelimit == 20)
-					logf0(L_ANY, "disabling above message\n");
-			}
-
-			acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-		}
-		// OW TODO Check what to do with excessive_retries in mac80211, 2.6.31
-		//info->status.excessive_retries++;
-		break;
-	case 0x40:
-		err = "Tx buffer overflow";
-		adev->stats.tx_fifo_errors++;
-		break;
-	case 0x80:
-		err = "DMA error";
-		// OW adev->wstats.discard.misc++;
-		break;
-	}
-	adev->stats.tx_errors++;
-	if (adev->stats.tx_errors <= 20)
-		printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
-				adev->ieee->wiphy),	error, finger, err);
-}
 
 /*
  * acxmem_l_clean_txdesc
@@ -3583,7 +3497,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
 		if (unlikely(error))
-			acxmem_handle_tx_error(adev, error, finger, txstatus);
+			acxpcimem_handle_tx_error(adev, error, finger, txstatus);
 
 		if (IS_ACX111(adev)) {
 			log(L_BUFT,
