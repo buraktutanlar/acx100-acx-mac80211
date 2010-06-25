@@ -193,10 +193,16 @@ const char *acx_cmd_status_str(unsigned int state);
 	} while (0)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
-#define printk_ratelimited(args...) printk(args)
+
+#define printk_ratelimited(args...) \
+do { \
+	if (printk_ratelimit()) \
+		printk(args); \
+} while (0)
+
 #endif
 
-// Log with prefix "acx: __func__ 
+// Log with prefix "acx: __func__
 #define logf0(chan, msg) \
 		log(chan, "acx: %s: " msg, __func__);
 #define logf1(chan, msg, args...) \
