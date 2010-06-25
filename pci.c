@@ -2336,13 +2336,6 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		adev->tx_free++;
 		num_cleaned++;
 
-		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
-					adev->tx_free);
-			acx_wake_queue(adev->ieee, NULL);
-			ieee80211_queue_work(adev->ieee, &adev->tx_work);
-		}
-
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
 		if (unlikely(error))
@@ -2514,21 +2507,28 @@ static void acxpci_irq_disable(acx_device_t * adev)
 }
 
 /* Interrupt handler bottom-half */
+#define IRQ_ITERATE 0
 void acxpci_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
 	int irqreason;
 	int irqmasked;
-
-#define IRQ_ITERATE 0
 #if IRQ_ITERATE
-	unsigned int irqcount = MAX_IRQLOOPS_PER_JIFFY;
-	u16 unmasked;
+	unsigned int irqcnt=10;
 #endif
 
 	FN_ENTER;
 
 	acx_sem_lock(adev);
+
+	/* OW, 20100611: Iterating and latency:
+	 *
+	 * IRQ iteration can improve latency, by avoiding waiting for the schedling
+	 * of the tx worklet.
+	 */
+#if IRQ_ITERATE
+	while(irqcnt--) {
+#endif
 
 	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
 	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
@@ -2539,59 +2539,79 @@ void acxpci_irq_work(struct work_struct *work)
 	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
 
 #if IRQ_ITERATE
-
-	/* OW, 20100611: Iterating and latency:
-	 *
-	 * It might be interresting, to iterate over irqs for latency, since it avoids waiting for the schedling
-	 * of the work tasklet.
-	 *
-	 * If it would be done, then however it should be aligned with tx_work and tx_cleanup: new tx work skbs
-	 * should be put into the device queue right after tx_clanup in the ame function. => See wl12xxx handling.
-	 *
-	 * Currently the IRQ_ITERATE code is anyway broken (fixes not complicated however).
-	 *
-	 */
-
-	if (jiffies != adev->irq_last_jiffies) {
-		adev->irq_loops_this_jiffy = 0;
-		adev->irq_last_jiffies = jiffies;
-	}
-
-/* safety condition; we'll normally abort loop below
- * in case no IRQ type occurred */
-	while (likely(--irqcount)) {
+	if (!irqmasked) break;
 #endif
 
-		// HOST_INT_CMD_COMPLETE handling
+		/* HOST_INT_CMD_COMPLETE handling */
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
 			log(L_IRQ, "acxpci: got Command_Complete IRQ\n");
+
 			/* save the state for the running issue_cmd() */
 			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
-		/* Handle most important IRQ types first */
+		/* First report tx status. Just a guess, but it might be better in
+		 * AP mode with hostapd, because tx status reporting of previous tx
+		 * and new rx receiving are now in sequence. */
+		if (irqmasked & HOST_INT_TX_COMPLETE) {
+			log(L_IRQ, "acx: got Tx_Complete IRQ\n");
+			
+			/* The condition on TX_START_CLEAN was removed, because
+			 * if was creating a race, sequencing problem in AP mode
+			 * during WPA association with different STAs.
+			 * 
+			 * The result were many WPA assoc retries of the STA,
+			 * until assoc finally succeeded. It happens 
+			 * sporadically, but still often. I oberserved this 
+			 * with a ath5k and acx STA.
+			 * 
+			 * It manifested as followed:
+			 * 1) STA authenticates and associates
+			 * 2) And then hostapd reported reception of a 
+			 *    Data/PS-poll frame of an unassociated STA
+			 * 3) hostapd sends disassoc frame
+			 * 4) And then it was looping in retrying this seq, 
+			 *    until it succeed 'by accident'
+			 *
+			 * Removing the TX_START_CLEAN check and always report
+			 * directly on the tx status resolved this problem.
+			 * Now WPA assoc succeeds directly and robust.			 			 			 			 
+			 */			 
+			acxpci_l_clean_txdesc(adev);
+
+			// Restart queue if stopped and enough tx-descr free
+			if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(
+					adev->ieee)) {
+				log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
+						adev->tx_free);
+				acx_wake_queue(adev->ieee, NULL);
+				// Schedule the tx. Doesn't harm. Required in case of irq-iteration.
+				ieee80211_queue_work(adev->ieee, &adev->tx_work);
+			}
+
+		}
+
+		/* Now do Rx processing */
 		if (irqmasked & HOST_INT_RX_COMPLETE) {
 			log(L_IRQ, "acxpci: got Rx_Complete IRQ\n");
 			acxpci_l_process_rxdesc(adev);
 		}
 
-		if (irqmasked & HOST_INT_TX_COMPLETE) {
-			log(L_IRQ, "acx: got Tx_Complete IRQ\n");
-			/* don't clean up on each Tx complete, wait a bit
-			 * unless we're going towards full, in which case
-			 * we do it immediately, too (otherwise we might lockup
-			 * with a full Tx buffer if we go into
-			 * acxpci_l_clean_txdesc() at a time when we won't wakeup
-			 * the net queue in there for some reason...) */
-			if (adev->tx_free <= TX_START_CLEAN) {
-				acxpci_l_clean_txdesc(adev);
-			}
-		}
 
+#if IRQ_ITERATE
+		/* Tx new frames, after rx processing
+		 * If queue is running. We indirectly use this as indicator,
+		 * that tx_free >= TX_START_QUEUE */
+		if (!acx_queue_stopped(adev->ieee))
+				acx_tx_queue_go(adev);
+#endif
+
+		/* HOST_INT_INFO */
 		if (irqmasked & HOST_INT_INFO) {
 			acxpci_handle_info_irq(adev);
 		}
 
+		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
 			log(L_IRQ, "acxpci: got Scan_Complete IRQ\n");
 			/* need to do that in process context */
@@ -2608,28 +2628,6 @@ void acxpci_irq_work(struct work_struct *work)
 		}
 
 #if IRQ_ITERATE
-		unmasked = read_reg16(adev, IO_ACX_IRQ_REASON);
-		irqtype = unmasked & ~adev->irq_mask;
-
-		/* ACK all IRQs ASAP */
-		write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
-		log(L_IRQ, "IRQ type:%04X, mask:%04X, type & ~mask:%04X\n",
-				unmasked, adev->irq_mask, irqtype);
-		/* Bail out if no new IRQ bits or if all are masked out */
-		if (!irqtype)
-			break;
-
-		if (unlikely
-		    (++adev->irq_loops_this_jiffy > MAX_IRQLOOPS_PER_JIFFY)) {
-			printk(KERN_ERR
-			       "acx: too many interrupts per jiffy!\n");
-			/* Looks like card floods us with IRQs! Try to stop that */
-			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-			/* This will short-circuit all future attempts to handle IRQ.
-			 * We cant do much more... */
-			adev->irq_mask = 0;
-			break;
-		}
 	}
 #endif
 
