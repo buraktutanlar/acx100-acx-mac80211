@@ -166,6 +166,7 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 // Tx Path
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_tx_work(struct work_struct *work);
+void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
 void acx_tx_queue_flush(acx_device_t *adev);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
@@ -4477,8 +4478,6 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 void acx_tx_work(struct work_struct *work) {
 
 	acx_device_t *adev = container_of(work, struct acx_device, tx_work);
-	struct sk_buff *skb;
-	int ret;
 
 	FN_ENTER;
 
@@ -4495,6 +4494,20 @@ void acx_tx_work(struct work_struct *work) {
 	if (unlikely(!adev->initialized)) {
 		goto out;
 	}
+
+	acx_tx_queue_go(adev);
+
+	out:
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return;
+}
+
+void acx_tx_queue_go(acx_device_t *adev) {
+
+	struct sk_buff *skb;
+	int ret;
 
 	while ((skb = skb_dequeue(&adev->tx_queue))) {
 
@@ -4522,9 +4535,6 @@ void acx_tx_work(struct work_struct *work) {
 	}
 
 	out:
-	acx_sem_unlock(adev);
-
-	FN_EXIT0;
 	return;
 }
 

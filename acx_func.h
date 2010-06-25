@@ -299,6 +299,7 @@ void acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
 // -----
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_tx_work(struct work_struct *work);
+void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
 void acx_tx_queue_flush(acx_device_t *adev);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
