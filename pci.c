@@ -2309,7 +2309,6 @@ unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
 		ack_failures = txdesc->ack_failures;
 		rts_failures = txdesc->rts_failures;
 		rts_ok = txdesc->rts_ok;
-		// OW FIXME does this also require le16_to_cpu()?
 		r100 = txdesc->u.r1.rate;
 		r111 = le16_to_cpu(txdesc->u.r2.rate111);
 
