@@ -1901,7 +1901,7 @@ void acx_s_set_defaults(acx_device_t * adev)
 	adev->rate_bcast = RATE111_1;
 	adev->rate_bcast100 = RATE100_1;
 	adev->rate_basic = RATE111_1 | RATE111_2;
-	adev->rate_auto = 1;
+	adev->rate_auto = 0;
 	if (IS_ACX111(adev)) {
 		adev->rate_oper = RATE111_ALL;
 	} else {
