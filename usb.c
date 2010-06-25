@@ -1216,8 +1216,12 @@ static void acxusb_i_complete_tx(struct urb *urb)
 	txstatus = IEEE80211_SKB_CB(tx->skb);
 
 	// TODO OW 20100619 Is urb->status also the wireless tx status ? Not sure ...
-    if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (urb->status == 0))
+	if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (urb->status == 0))
+	{
 		txstatus->flags |= IEEE80211_TX_STAT_ACK;
+		// Improvised ack count handling
+		txstatus->status.rates[0].count = 1;
+	}
 
 	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
 
