@@ -4095,7 +4095,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	// Initialize driver private data
 	SET_IEEE80211_DEV(ieee, &vdev->dev);
-	ieee->flags &=	 ~IEEE80211_HW_RX_INCLUDES_FCS;
+	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+
 	ieee->wiphy->interface_modes =
 			BIT(NL80211_IFTYPE_STATION)	|
 			BIT(NL80211_IFTYPE_ADHOC) |
