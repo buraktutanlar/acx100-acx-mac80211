@@ -4309,9 +4309,9 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 
 	// For debugging
 	if (((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
-			(acx_debug & (L_XFER|L_DATA))
+		(acx_debug & (L_XFER|L_DATA))
 	){
-		printk(	"acx: rx: %s "
+		printk_ratelimited(	"acx: rx: %s "
 				"time:%u len:%u "
 				"signal:%u,raw=%u SNR:%u,raw=%u "
 				"macstat:%02X "
@@ -4335,6 +4335,7 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	}
 
 	acx_l_rx(adev, rxbuf);
+
 	/* Now check Rx quality level, AFTER processing packet.
 	 * I tried to figure out how to map these levels to dBm
 	 * values, but for the life of me I really didn't
