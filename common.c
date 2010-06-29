@@ -1856,6 +1856,8 @@ void acx_s_set_defaults(acx_device_t * adev)
 	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	MAC_BCAST(adev->ap);
 
+	MAC_COPY(adev->bssid, adev->dev_addr);
+
 	adev->essid_len =
 	    snprintf(adev->essid, sizeof(adev->essid), "ACXSTA%02X%02X%02X",
 		     adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
@@ -2359,11 +2361,10 @@ void acx_s_update_card_settings(acx_device_t *adev)
             if (IS_ACX111(adev)) {
                     acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             }
-			MAC_COPY(adev->bssid, adev->dev_addr);
 
 			if (adev->beacon_ready){
 				logf0(L_ANY, "Turning on AP beacons\n");
-				acx_s_cmd_join_bssid(adev, adev->dev_addr);
+				acx_s_cmd_join_bssid(adev, adev->bssid);
 			} else {
 				logf0(L_ANY, "Not turning on AP beacons. Beacon not ready.\n");
 			}
@@ -5648,14 +5649,9 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 //		acx_s_select_opmode(adev);
 
 	if (changed & BSS_CHANGED_BSSID) {
-
-		if (info->bssid && (strlen(info->bssid) > 0)) {
-			MAC_COPY(adev->bssid, info->bssid);
-			adev->essid_len = strlen(info->bssid);
-			memcpy(adev->essid, info->bssid, strlen(info->bssid));
-
-			SET_BIT(adev->set_mask, SET_TEMPLATES);
-		}
+		MAC_COPY(adev->bssid, info->bssid);
+		// TODO FIXME Check if and what needs to be done exactly with essid
+		SET_BIT(adev->set_mask, SET_TEMPLATES);
 	}
 
 	// BOM BSS_CHANGED_BEACON
