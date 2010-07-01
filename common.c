@@ -5547,23 +5547,58 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	acx_device_t *adev = ieee2adev(hw);
 	struct ieee80211_conf *conf = &hw->conf;
 
+	u32 changed_not_done = changed;
+
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	//FIXME();
 	if (!adev->initialized)
 		goto end_sem_unlock;
 
-	if (conf->channel->hw_value != adev->channel) {
+	logf1(L_DEBUG, "changed=%08X\n", changed);
+
+	// IEEE80211_CONF_CHANGE_POWER
+	if (changed & IEEE80211_CONF_CHANGE_POWER) {
+		logf0(L_ANY, "IEEE80211_CONF_CHANGE_POWER not implemented\n");
+	}
+
+	// IEEE80211_CONF_CHANGE_CHANNEL
+	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
+		changed_not_done &= ~IEEE80211_CONF_CHANGE_CHANNEL;
+
+		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_CHANNEL, channel->hw_value=%i\n", conf->channel->hw_value);
+
+		if (conf->channel->hw_value == adev->channel)
+			goto change_channel_done;
 
 		acx_selectchannel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
+		adev->tx_disabled = 0;
 
-		/*		acx_schedule_task(adev,
-		 ACX_AFTER_IRQ_UPDATE_CARD_CFG
-		 *//*+ ACX_AFTER_IRQ_RESTART_SCAN *//*);*/
+		acx_s_update_card_settings(adev);
 
 	}
+	change_channel_done:
+
+	// ---
+	if (adev->set_mask > 0) {
+		acx_s_update_card_settings(adev);
+	}
+
+	// ---
+	if (changed_not_done) {
+		logf1(L_DEBUG, "changed_not_done=%08X\n", changed_not_done);
+	}
+
+	end_sem_unlock:
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+
+	return 0;
+
+	// Kept for documentation
+#if 0
 	/*
 	 if (conf->short_slot_time != adev->short_slot) {
 	 //                assert(phy->type == BCM43xx_PHYTYPE_G);
@@ -5577,7 +5612,6 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 
 	// OW FIXME mac80211 depreciates radio_enabled. Perhaps related to rfkill changes ?
 	//adev->tx_disabled = !conf->radio_enabled;
-	adev->tx_disabled = 0;
 
 	/*	if (conf->power_level != 0){
 	 adev->tx_level_dbm = conf->power_level;
@@ -5587,32 +5621,11 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 	 }
 	 */
 	//FIXME: This does not seem to wake up:
-#if 0
-	if (conf->power_level == 0)
-	{
-		if (radio->enabled)
-		bcm43xx_radio_turn_off(bcm);
-	}
-	else
-	{
-		if (!radio->enabled)
-		bcm43xx_radio_turn_on(bcm);
-	}
-#endif
 
 	//TODO: phymode
 	//TODO: antennas
+#endif
 
-	if (adev->set_mask > 0) {
-		acx_s_update_card_settings(adev);
-	}
-
-	end_sem_unlock:
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-
-	return 0;
 }
 
 // Find position of TIM IE
