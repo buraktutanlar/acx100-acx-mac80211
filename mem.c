@@ -2069,12 +2069,22 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  *
  * Sends command to fw, extract result
  *
- * NB: we do _not_ take lock inside, so be sure to not touch anything
- * which may interfere with IRQ handler operation
+ * OW, 20100630:
  *
- * TODO: busy wait is a bit silly, so:
- * 1) stop doing many iters - go to sleep after first
- * 2) go to waitqueue based approach: wait, not poll!
+ * The mem device is quite sensible to data access operations, therefore
+ * we may not sleep during the command handling.
+ *
+ * This has manifested as problem during sw-scan while if up. The acx got
+ * stuck - most probably due to concurrent data access collision.
+ *
+ * By not sleeping anymore and doing the entire operation completely under
+ * spinlock (thus with irqs disabled), the sw scan problem was solved.
+ *
+ * We can now run repeating sw scans, under load, without that the acx
+ * device gets stuck.
+ *
+ * Also ifup/down works more reliable on the mem device.
+ *
  */
 int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
@@ -2084,11 +2094,13 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	unsigned counter;
 	u16 irqtype;
 	u16 cmd_status=-1;
-	unsigned long timeout;
 	int i, j;
 	u8 *p;
 
+	acxmem_lock_flags;
+
 	FN_ENTER;
+	acxmem_lock();
 
 	devname = wiphy_name(adev->ieee->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
@@ -2110,25 +2122,17 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	}
 
 	/* wait for firmware to become idle for our command submission */
-	timeout = HZ / 5;
-	counter = (timeout * 1000 / HZ) - 1; /* in ms */
-	timeout += jiffies;
+	counter = 199; /* in ms */
 	do {
 		cmd_status = acxmem_read_cmd_type_status(adev);
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
-		if (counter % 8 == 0) {
-			if (time_after(jiffies, timeout)) {
-				counter = 0;
-				break;
-			}
-			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mwait(8);
-		}
+
+		udelay(1000);
 	} while (likely(--counter));
 
-	if (!counter) {
+	if (counter == 0) {
 		/* the card doesn't get idle, we're in trouble */
 		printk("acxmem: %s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
 				__func__, devname, cmd_status);
@@ -2173,8 +2177,6 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	/* we schedule away sometimes (timeout can be large) */
 	counter = cmd_timeout;
-	timeout = jiffies + cmd_timeout * HZ / 1000;
-
 	do {
 		irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
 		if (irqtype & HOST_INT_CMD_COMPLETE) {
@@ -2185,15 +2187,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		if (adev->irq_status & HOST_INT_CMD_COMPLETE)
 			break;
 
-		// Timeout
-		if (counter % 8 == 0) {
-			if (time_after(jiffies, timeout)) {
-				counter = -1;
-				break;
-			}
-			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mwait(8);
-		}
+		udelay(1000);
 
 	} while (likely(--counter));
 
@@ -2204,7 +2198,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* Timed out! */
-	if (counter == -1) {
+	if (counter == 0) {
 
 		log(L_ANY, "acxmem: %s: %s: Timed out %s for CMD_COMPLETE. "
 				"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
@@ -2279,6 +2273,7 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	log(L_DEBUG, "acx: %s: %s: took %ld jiffies to complete\n",
 	    __func__, cmdstr, jiffies - start);
 
+	acxmem_unlock();
 	FN_EXIT1(OK);
 	return OK;
 
@@ -2292,8 +2287,8 @@ int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			acx_cmd_status_str(cmd_status)
 	);
 
+	acxmem_unlock();
 	FN_EXIT1(NOT_OK);
-
 	return NOT_OK;
 }
 
