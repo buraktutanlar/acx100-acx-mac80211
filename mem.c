@@ -3617,18 +3617,24 @@ void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
 		write_slavemem8(adev, (u32) &(txdesc->error), 0);
 		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN);
 
+#if 0
+		u32 acxmem;
 		/*
 		 * Clean up the memory allocated on the ACX for this transmit descriptor.
 		 */
 		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
+
 		if (acxmem) {
 			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
 		}
+#endif
 
 		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
 	}
 
 	adev->tx_free = TX_CNT;
+
+	acxmem_init_acx_txbuf2(adev);
 
 	FN_EXIT0;
 }
