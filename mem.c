@@ -1177,6 +1177,9 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 	u32 *p;
 	int i;
 
+	acxmem_lock_flags;
+	acxmem_lock();
+
 	acxmem_create_tx_desc_queue(adev, tx_queue_start);
 	acxmem_create_rx_desc_queue(adev, rx_queue_start);
 	p = (u32 *) adev->acx_queue_indicator;
@@ -1184,6 +1187,8 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 		write_slavemem32(adev, (u32) p, 0);
 		p++;
 	}
+	acxmem_unlock();
+
 }
 
 static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start) {
@@ -1411,6 +1416,8 @@ int acxmem_s_upload_radio(acx_device_t *adev) {
 	u32 size;
 	char filename[sizeof("RADIONN.BIN")];
 
+	acxmem_lock_flags;
+
 	if (!adev->need_radio_fw)
 		return OK;
 
@@ -1429,12 +1436,14 @@ int acxmem_s_upload_radio(acx_device_t *adev) {
 	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
+		acxmem_lock();
 		res = acxmem_s_write_fw(adev, radio_image, offset);
 		log(L_DEBUG|L_INIT, "acx: acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
 			res = acxmem_s_validate_fw(adev, radio_image, offset);
 			log(L_DEBUG|L_INIT, "acx: acx_validate_fw (radio): %d\n", res);
 		}
+		acxmem_unlock();
 
 		if (OK == res)
 			break;
@@ -1634,8 +1643,10 @@ static inline void read_eeprom_area(acx_device_t *adev) {
 int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 	int result = NOT_OK;
 	int count;
+	acxmem_lock_flags;
 
 	FN_ENTER;
+	acxmem_lock();
 
 	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
 	write_flush(adev);
@@ -1663,13 +1674,18 @@ int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 	result = OK;
 	goto fail; /* silence compiler warning */
 	fail:
+
+	acxmem_unlock();
 	FN_EXIT1(result);
 	return result;
 }
 
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	int count;
+	acxmem_lock_flags;
+
 	FN_ENTER;
+	acxmem_lock();
 
 	/* mprusko said that 32bit accesses result in distorted sensitivity
 	 * on his card. Unconfirmed, looks like it's not true (most likely since we
@@ -1696,6 +1712,8 @@ int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 
 	log(L_DEBUG, "acx: radio PHY write 0x%02X at 0x%04X\n", value, reg);
 	fail:
+
+	acxmem_unlock();
 	FN_EXIT1(OK);
 	return OK;
 }
@@ -1863,6 +1881,8 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 	u32 file_size;
 	char *filename = "WLANGEN.BIN";
 
+	acxmem_lock_flags;
+
 #ifdef PATCH_AROUND_BAD_SPOTS
 	u32 offset;
 	int i;
@@ -1879,6 +1899,7 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 #endif
 
 	FN_ENTER;
+
 	/* No combined image; tell common we need the radio firmware, too */
 	adev->need_radio_fw = 1;
 
@@ -1889,6 +1910,8 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 	}
 
 	for (try = 1; try <= 5; try++) {
+
+		acxmem_lock();
 		res = acxmem_s_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx: acx_write_fw (main): %d\n", res);
 		if (OK == res) {
@@ -1896,6 +1919,7 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 			log(L_DEBUG|L_INIT, "acx: acx_validate_fw "
 					"(main): %d\n", res);
 		}
+		acxmem_unlock();
 
 		if (OK == res) {
 			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
@@ -1907,6 +1931,7 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 	}
 
 #ifdef PATCH_AROUND_BAD_SPOTS
+	acxmem_lock();
 	/*
 	 * Only want to do this if the firmware is exactly what we expect for an
 	 * iPaq 4700; otherwise, bad things would ensue.
@@ -1950,6 +1975,7 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 		write_slavemem32(adev, 0x950c, offset);
 
 	}
+	acxmem_unlock();
 #endif
 
 	vfree(fw_image);
@@ -2350,8 +2376,11 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	u16 ecpu_ctrl;
 	int count;
 	u32 tmp;
+	acxmem_lock_flags;
 
 	FN_ENTER;
+	acxmem_lock();
+
 	/*
 	 write_reg32 (adev, IO_ACX_SLV_MEM_CP, 0);
 	 */
@@ -2428,9 +2457,11 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	adev->form_factor = hardware_info & 0xff;
 	adev->radio_type = hardware_info >> 8;
 
+	acxmem_unlock();
 	/* load the firmware */
 	if (OK != acxmem_s_upload_fw(adev))
 		goto end_fail;
+	acxmem_lock();
 
 	/* acx_s_mwait(10);	this one really shouldn't be required */
 
@@ -2443,11 +2474,15 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 
 	/* Windows driver sets bit 0x200 in ACX_GPIO_OUT here */
 	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+
+	acxmem_unlock();
 	/* wait for eCPU bootup */
 	if (OK != acxmem_s_verify_init(adev)) {
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
 	}
+	acxmem_lock();
+
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 	acxmem_init_mboxes(adev);
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
@@ -2464,6 +2499,8 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	printk("acx: %sreset_dev() FAILED\n", msg);
 
 	end:
+
+	acxmem_unlock();
 	FN_EXIT1(result);
 	return result;
 }
@@ -2471,17 +2508,24 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 static int acxmem_s_verify_init(acx_device_t *adev) {
 	int result = NOT_OK;
 	unsigned long timeout;
+	u32 irqstat;
+
+	acxmem_lock_flags;
 
 	FN_ENTER;
 
 	timeout = jiffies + 2 * HZ;
 	for (;;) {
-		u32 irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		acxmem_lock();
+		irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
 		if ((irqstat != 0xFFFFFFFF) && (irqstat & HOST_INT_FCS_THRESHOLD)) {
 			result = OK;
 			write_reg32(adev, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
+			acxmem_unlock();
 			break;
 		}
+		acxmem_unlock();
+
 		if (time_after(jiffies, timeout))
 			break;
 		/* Init may take up to ~0.5 sec total */
@@ -2497,6 +2541,7 @@ static int acxmem_s_verify_init(acx_device_t *adev) {
  */
 static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	acx111_ie_configoption_t co;
+	acxmem_lock_flags;
 
 	/* NB: read_reg() reads may return bogus data before reset_dev(),
 	 * since the firmware which directly controls large parts of the I/O
@@ -2505,10 +2550,12 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	if (OK != acxmem_s_reset_dev(adev))
 		return -1;
 
+	acxmem_lock();
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly after reset */
 		acxmem_copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
 	}
+	acxmem_unlock();
 
 	if (OK != acx_s_init_mac(adev))
 		return -3;
@@ -2523,6 +2570,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	 */
 	init_acx_txbuf(adev);
 
+	acxmem_lock();
 	/*
 	 * Windows driver writes 0x01000000 to register 0x288, RADIO_CTL, if the form factor
 	 * is 3.  It also write protects the EEPROM by writing 1<<9 to GPIO_OUT
@@ -2535,6 +2583,8 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
 	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		return -2;
+
+	acxmem_unlock();
 
 	acx_s_parse_configoption(adev, &co);
 	acx_s_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
@@ -2589,10 +2639,13 @@ static void acxmem_l_reset_mac(acx_device_t *adev) {
 
 static void acxmem_s_up(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
 
 	FN_ENTER;
 
+	acxmem_lock();
 	acxmem_irq_enable(adev);
+	acxmem_unlock();
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
 	 ** used to use it. But we don't do that anymore, our OS
@@ -2838,13 +2891,16 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev) {
 	char *p = buf;
 	int i;
+	acxmem_lock_flags;
 
 	FN_ENTER;
+	acxmem_lock();
 
 	for (i = 0; i < 0x400; i++) {
 		acxmem_read_eeprom_byte(adev, i, p++);
 	}
 
+	acxmem_unlock();
 	FN_EXIT1(p - buf);
 	return p - buf;
 }
@@ -2990,10 +3046,11 @@ tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
 	unsigned head;
 	u8 ctl8;
 	static int txattempts = 0;
-
 	int blocks_needed;
+	acxmem_lock_flags;
 
 	FN_ENTER;
+	acxmem_lock();
 
 	if (unlikely(!adev->tx_free)) {
 		log(L_ANY, "acxmem: %s: BUG: no free txdesc left\n", __func__);
@@ -3092,6 +3149,8 @@ tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
 	adev->tx_head = (head + 1) % TX_CNT;
 
 	end:
+
+	acxmem_unlock();
 	FN_EXIT0;
 
 	return (tx_t*) txdesc;
@@ -3115,6 +3174,9 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	txdesc_t tmptxdesc;
 	int index;
 
+	acxmem_lock_flags;
+	acxmem_lock();
+
 	memset (&tmptxdesc, 0, sizeof(tmptxdesc));
 	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
 	tmptxdesc.u.r1.rate = 0x0a;
@@ -3133,6 +3195,9 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
 	printk("acx_dealloc: moving head from %d to %d\n", adev->tx_head, index);
 	adev->tx_head = index;
+
+	acxmem_unlock();
+
 }
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
@@ -3394,7 +3459,10 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	int wlhdr_len;
 	u32 addr;
 
+	acxmem_lock_flags;
+
 	FN_ENTER;
+	acxmem_lock();
 
 	/* fw doesn't tx such packets anyhow */
 	/* if (unlikely(len < WLAN_HDR_A3_LEN))
@@ -3574,6 +3642,8 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		}
 	}
 
+	acxmem_unlock();
+
 	FN_EXIT0;
 }
 
@@ -3699,7 +3769,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		}
 
 		/* And finally report upstream */
-		ieee80211_tx_status(adev->ieee, hostdesc->skb);
+		ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
 
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
@@ -3716,7 +3786,6 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	int i;
-	u32 acxmem;
 
 	FN_ENTER;
 
@@ -3957,10 +4026,12 @@ void acxmem_irq_work(struct work_struct *work)
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
 	int irqreason;
 	int irqmasked;
+	acxmem_lock_flags;
 
 	FN_ENTER;
 
 	acx_sem_lock(adev);
+	acxmem_lock();
 
 	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
 	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
@@ -4028,6 +4099,8 @@ void acxmem_irq_work(struct work_struct *work)
 	// Renable irq-signal again for irqs we are interested in
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
 	write_flush(adev);
+
+	acxmem_unlock();
 
 	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
 	if (adev->after_interrupt_jobs){
@@ -4464,6 +4537,7 @@ static int acxmem_e_op_start(struct ieee80211_hw *hw) {
 static void acxmem_e_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -4471,7 +4545,9 @@ static void acxmem_e_op_stop(struct ieee80211_hw *hw)
 	acx_stop_queue(adev->ieee, "on ifdown");
 
 	/* disable all IRQs, release shared IRQ handler */
+	acxmem_lock();
 	acxmem_irq_disable(adev);
+	acxmem_unlock();
 	synchronize_irq(adev->irq);
 
 	acx_sem_unlock(adev);
@@ -4916,6 +4992,8 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	unsigned long addr_size = 0;
 	u8 chip_type;
 
+	acxmem_lock_flags;
+
 	struct ieee80211_hw *ieee;
 
 	FN_ENTER;
@@ -5043,7 +5121,9 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 	log(L_ANY, "acx: request_irq %d successful\n", adev->irq);
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	acxmem_lock();
 	acxmem_irq_disable(adev);
+	acxmem_unlock();
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -5167,6 +5247,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 
 	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
 
 	FN_ENTER;
 
@@ -5198,6 +5279,8 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 		acx_s_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
 
+		acxmem_lock();
+
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
 		acxmem_l_power_led(adev, 0);
@@ -5217,13 +5300,17 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 			write_flush(adev);
 		}
 
+		acxmem_unlock();
 	}
 
 	// Proc
 	acx_proc_unregister_entries(adev->ieee, 0);
 
 	// IRQs
+	acxmem_lock();
 	acxmem_irq_disable(adev);
+	acxmem_unlock();
+
 	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 

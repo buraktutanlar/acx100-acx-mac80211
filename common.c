@@ -4455,7 +4455,7 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	//    time.
 	//
 	// Problem: ... I still get some "NOHZ: local_softirq_pending 08" messages
-	if (IS_PCI(adev) || IS_MEM(adev)) {
+	if (IS_PCI(adev)) {
 #if CONFIG_ACX_MAC80211_VERSION <= KERNEL_VERSION(2, 6, 32)
 		local_bh_disable();
 		ieee80211_rx(adev->ieee, skb);
@@ -4465,7 +4465,7 @@ static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 #endif
 	}
 	// Usb Rx is happening in_interupt()
-	else if (IS_USB(adev)) {
+	else if (IS_USB(adev) || IS_MEM(adev)) {
 		ieee80211_rx_irqsafe(adev->ieee, skb);
 	} else {
 		logf0(L_ANY, "ERROR: Undefined device type !?\n");
