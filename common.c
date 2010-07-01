@@ -2679,6 +2679,7 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 	adev->rx_status.band = IEEE80211_BAND_2GHZ;
 
 	adev->channel = channel;
+
 	/* hmm, the following code part is strange, but this is how
 	 * it was being done before... */
 	log(L_IOCTL, "acx: Changing to channel %d\n", channel);
