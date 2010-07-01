@@ -2145,6 +2145,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 					        	len = adev->beacon_skb->len;
 					        }
 							acx_s_set_beacon_template(adev, len);
+							// We need to set always a tim template, since otherwise the acx 
+							// is sending a not 100% well structured beacon (may not be 
+							// blocking though)
 							acx_s_set_tim_template(adev);
 
 							/* BTW acx111 firmware would not send probe responses
@@ -2902,7 +2905,10 @@ static int acx_s_set_tim_template(acx_device_t *adev)
 	if (adev->beacon_skb != NULL && adev->beacon_tim != NULL) {
 		len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
 	}
-
+	// We need to set always a tim template, even with len=0, 
+	// since otherwise the acx is sending a not 100% well structured beacon 
+	// (this may not be blocking though, but it's better like this)
+			
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "adev->beacon_tim, len=%d:\n", len);
 		acx_dump_bytes(adev->beacon_tim, len);
