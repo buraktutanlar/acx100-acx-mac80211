@@ -1,3 +1,21 @@
+2010-07 > 04 Oliver Winker <oliver@oli1170.net>
+	* Fix sw-scan during if up problem on mem
+	* Fix sporadic WPA assoc problems in AP 
+	* Add rate-handling based on mac80211
+	* Refactor locking based on sem-lock and irq handling
+	* Introduce skb tx_queue in tx-path
+	* Fix ADHOC support
+	* Add AP support to pci,vlynq
+
+2010-05-08 Bernhard Loos <bernhardloos@googlemail.com>
+	* pci: Vlynq fixes
+
+2010-04-22 Vasily Khoruzhick <anarsoul@gmail.com>
+	* mem: Add platform module for iPAQ rx1950
+
+2010-03-14 Florian Fainelli <florian@openwrt.org>
+	* 2.6.34 mac80211 API adaptations
+
 2010-04-19 Oliver Winker <oliver@oli1170.net>
 	* DKMS support added
 	* Fix module unload on ifup
@@ -5,6 +23,10 @@
 	  without driver.
 	* Fixed pci possible dropping of interrupts 
 	* Cleanups and refactoring common.c, pci.c, mem.c, usb.c
+
+2010-02-01 Andreas Mohr <andi@lisas.de>	
+	* Add more specific radio type descriptions	
+	* Fix uninitialized radio_type variable bug in USB driver part
 
 2010-01-31 Oliver Winker <oliver@oli1170.net>
 	* Slave memory interface updates:
