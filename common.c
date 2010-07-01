@@ -3954,12 +3954,11 @@ static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
 	logf1(L_ANY, "acx_diag: 0x%04x\n", val);
 
 	// Execute operation
-	if (val & ACX_DIAG_OP_RECALIB) {
+	if (val == ACX_DIAG_OP_RECALIB) {
 		logf0(L_ANY, "ACX_DIAG_OP_RECALIB: Scheduling immediate radio recalib\n");
 		adev->recalib_time_last_success =- RECALIB_PAUSE * 60 * HZ;
 		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-	}
-
+	} else
 	// Execute operation
 	if (val & ACX_DIAG_OP_PROCESS_TX_RX) {
 		logf0(L_ANY, "ACX_DIAG_OP_PROCESS_TX_RX: Scheduling immediate Rx, Tx processing\n");
@@ -3972,6 +3971,19 @@ static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
 		}
 		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
 		acx_schedule_task(adev, 0);
+	} else
+	// Execute operation
+	if (val & ACX_DIAG_OP_REINIT_TX_BUF) {
+		if (IS_MEM(adev)){
+			logf0(L_ANY, "ACX_DIAG_OP_REINIT_TX_BUF\n");
+			acxmem_init_acx_txbuf2(adev);
+		} else{
+			logf0(L_ANY, "ACX_DIAG_OP_REINIT_TX_BUF: Only valid for mem device\n");
+		}
+	}
+	// Unknown
+	else {
+		logf1(L_ANY, "Unknown command: 0x%04x\n", val);
 	}
 
 	exit_unlock:

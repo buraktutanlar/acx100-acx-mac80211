@@ -70,7 +70,8 @@ enum { acx_debug = 0 };
  */
 enum {
 	ACX_DIAG_OP_RECALIB = 0x0001,
-	ACX_DIAG_OP_PROCESS_TX_RX = 0x0002
+	ACX_DIAG_OP_PROCESS_TX_RX = 0x0002,
+	ACX_DIAG_OP_REINIT_TX_BUF = 0x0003
 };
 
 /***********************************************************************
