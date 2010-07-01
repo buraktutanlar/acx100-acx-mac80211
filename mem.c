@@ -194,6 +194,7 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count);
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void init_acx_txbuf(acx_device_t *adev);
+void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
@@ -3165,6 +3166,33 @@ static void init_acx_txbuf(acx_device_t *adev) {
 	 * to see it, too, so leave it alone.  This is only ever called after a firmware
 	 * reset, so the ACX memory is in the state we want.
 	 */
+
+}
+
+/* Re-initialize tx-buffer list
+ */
+void acxmem_init_acx_txbuf2(acx_device_t *adev) {
+
+	int i;
+	u32 adr, next_adr;
+
+	adr = adev->acx_txbuf_start;
+	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {
+		next_adr = adr + adev->memblocksize;
+
+		// Last block is marked with 0x02000000
+		if (i == adev->acx_txbuf_numblocks - 1) {
+			write_slavemem32(adev, adr, 0x02000000);
+		}
+		// Else write pointer to next block
+		else {
+			write_slavemem32(adev, adr, (next_adr >> 5));
+		}
+		adr = next_adr;
+	}
+
+	adev->acx_txbuf_free = adev->acx_txbuf_start;
+	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
 
 }
 
