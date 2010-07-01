@@ -406,9 +406,73 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 }
 #endif
 
+/*
+ * Locking in mem
+ * ==================================================
+ */
+
+/*
+* Locking in mem is more complex as for pci, because the different data-access 
+* functions below need to be protected against incoming interrupts. 
+* 
+* Data-access on the mem device is always going in serveral, none-atomic steps, 
+* involving 2 or more register writes (e.g. ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA).
+*
+* If an interrupt is serviced while a data-access function is ongoing, this 
+* may give access interference with by the involved operations, since the 
+* irq routine is also using the same data-access functions.
+* 
+* In case of interference, this often manifests during driver operations as
+* failure of device cmds and subsequent hanging of the device. It especially 
+* appeared during sw-scans while a connection was up. 
+* 
+* For this reason, irqs shall be off while data access functions are executed,
+* and for this we'll use the acx-spinlock.
+*
+* In pci we don't have this problem, because all data-access functions are 
+* atomic enough and we use dma (and the sw-scan problem is also not observed in 
+* pci, which indicates confirmation).
+* 
+* Apart from this, the pure acx-sem locking is already coordinating accesses 
+* well enough, that simple driver operation without inbetween scans work without 
+* problems.
+*
+* Different locking approaches a possible to solves this (e.g. fine vs 
+* coarse-grained). 
+* 
+* The chosen approach is:
+* 
+* 1) Mem.c data-access functions contain all a check to insure, they are executed 
+* under the acx-spinlock. 
+* => This is the red line that tells, if something needs coverage.
+* 
+* 2) The scope of acx-spinlocking is local, in this case here only to mem.c. 
+* All common.c functions are already protected by the sem.
+*
+* 3) In order to consolidate locking calls and also to account for the logic 
+* of the various write_flush() calls around, locking in mem should be: 
+* 
+* a) as coarse-grained as possible, and ...
+* 
+* b) ... as fine-grained as required. Basically that means, that before 
+* functions, that sleep, unlocking needs to be done. And locking is taken up 
+* again inside the sleeping function. Specifically the cmd-functions are used 
+* in this path.
+*
+* Once stable, the locking checks in the data-access functions could be #defined
+* away. Mem.c is anyway more used two smaller cpus (pxa UP e.g.), so the implied 
+* runtime constraints by the lock won't take much effect. 
+* 
+*/
+
+#define acxmem_lock_flags		unsigned long flags
+#define acxmem_lock()			spin_lock_irqsave(&adev->spinlock, flags)
+#define acxmem_unlock()			spin_unlock_irqrestore(&adev->spinlock, flags)
 
 /*
  * BOM Data Access
+ * 
+ * => See locking comment above  
  * ==================================================
  */
 
@@ -418,7 +482,16 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 #define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
 #define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
 
+#define ACXMEM_WARN_NOT_SPIN_LOCKED \
+do { \
+	if (!spin_is_locked(&adev->spinlock)){\
+		logf0(L_ANY, "mem: warning: data access not locked!\n");\
+		dump_stack(); \
+	}\
+} while (0)
+
 INLINE_IO u32 read_id_register(acx_device_t *adev) {
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	acx_writel (0x24, &adev->iobase[ACX_SLV_REG_ADDR]);
 	return acx_readl (&adev->iobase[ACX_SLV_REG_DATA]);
 }
@@ -426,6 +499,8 @@ INLINE_IO u32 read_id_register(acx_device_t *adev) {
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset) {
 	u32 val;
 	u32 addr;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
@@ -446,6 +521,8 @@ INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset) {
 	u16 lo;
 	u32 addr;
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
 	else
@@ -465,6 +542,8 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset) {
 	u8 lo;
 	u32 addr;
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
 	else
@@ -481,6 +560,8 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset) {
 
 INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val) {
 	u32 addr;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
@@ -499,6 +580,8 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val) {
 INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val) {
 	u32 addr;
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
 	else
@@ -514,6 +597,8 @@ INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val) {
 
 INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val) {
 	u32 addr;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	if (offset > IO_ACX_ECPU_CTRL)
 		addr = offset;
@@ -537,11 +622,14 @@ INLINE_IO void write_flush(acx_device_t *adev) {
 	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
 	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should also be safe): */
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	(void) acx_readl(adev->iobase);
 }
 
 INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
 	u32 tmp;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	tmp = read_reg32(adev, offset);
 	tmp = tmp | bits;
@@ -551,6 +639,8 @@ INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
 
 INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
 	u32 tmp;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	tmp = read_reg32(adev, offset);
 	tmp = tmp & ~bits;
@@ -563,6 +653,8 @@ INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits) 
  * addresses are 32 bit aligned.  Count is in bytes.
  */
 INLINE_IO void write_slavemem32(acx_device_t *adev, u32 slave_address, u32 val) {
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0x0);
 	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, slave_address);
 	udelay (10);
@@ -571,6 +663,8 @@ INLINE_IO void write_slavemem32(acx_device_t *adev, u32 slave_address, u32 val) 
 
 INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address) {
 	u32 val;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0x0);
 	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, slave_address);
@@ -584,6 +678,8 @@ INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val) {
 	u32 data;
 	u32 base;
 	int offset;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	/*
 	 * Get the word containing the target address and the byte offset in that word.
@@ -603,6 +699,8 @@ INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address) {
 	u32 data;
 	int offset;
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	base = slave_address & ~3;
 	offset = (slave_address & 3) * 8;
 
@@ -620,6 +718,8 @@ INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val) 
 	u32 data;
 	u32 base;
 	int offset;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	/*
 	 * Get the word containing the target address and the byte offset in that word.
@@ -642,6 +742,8 @@ INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address) {
 	u32 data;
 	int offset;
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	base = slave_address & ~3;
 	offset = (slave_address & 3) * 8;
 
@@ -661,6 +763,8 @@ static void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 s
 		int count) {
 	u32 tmp = 0;
 	u8 *ptmp = (u8 *) &tmp;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	/*
 	 * Right now I'm making the assumption that the destination is aligned, but
@@ -692,6 +796,7 @@ static void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 s
 			*destination++ = *ptmp++;
 		}
 	}
+
 }
 
 /*
@@ -704,6 +809,8 @@ static void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *sou
 	u32 tmp = 0;
 	u8* ptmp = (u8 *) &tmp;
 	static u8 src[512]; /* make static to avoid huge stack objects */
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	/*
 	 * For now, make sure the source is word-aligned by copying it to a word-aligned
@@ -758,6 +865,8 @@ static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8
 	u32 *data = (u32 *) source;
 	static u8 aligned_source[WLAN_A4FR_MAXLEN_WEP_FCS];
 
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
+
 	/*
 	 * Warn if the pointers don't look right.  Destination must fit in [23:5] with
 	 * zero elsewhere and source should be 32 bit aligned.
@@ -805,6 +914,7 @@ static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8
 		acx_writel (*data++, &adev->iobase[ACX_SLV_MEM_DATA]);
 		count -= 4;
 	}
+
 }
 
 /*
@@ -818,6 +928,8 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 	u32 *data = (u32 *) destination;
 	static u8 aligned_destination[WLAN_A4FR_MAXLEN_WEP_FCS];
 	int saved_count = count;
+
+	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	/*
 	 * Warn if the pointers don't look right.  Destination must fit in [23:5] with
@@ -874,6 +986,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 	if ((u32) destination & 3) {
 		memcpy(destination, aligned_destination, saved_count);
 	}
+
 }
 
 int acxmem_s_create_hostdesc_queues(acx_device_t *adev) {
