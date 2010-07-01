@@ -2550,12 +2550,14 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	u8 Ctl_8;
 	rxdesc_t *rxdesc;
 	int i;
-	u32 tmp;
+	u32 tmp, tmp2;
 	txdesc_t txd;
-	u8 buf[0x200];
-	int j, k;
+	rxdesc_t rxd;
+
+	acxmem_lock_flags;
 
 	FN_ENTER;
+	acxmem_lock();
 
 #if DUMP_MEM_DURING_DIAG > 0
 	acxmem_dump_mem (adev, 0, 0x10000);
@@ -2569,9 +2571,31 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 			rtl = (i == adev->rx_tail) ? " [tail]" : "";
 			Ctl_8 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u (%02x) FULL%s\n", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
 			else
-				seq_printf(file, "%02u (%02x) empty%s\n", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) empty%-10s", i, Ctl_8, rtl);
+
+			//seq_printf(file, "\n");
+
+			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (u32) rxdesc, sizeof(rxd));
+			seq_printf(file,
+						 "%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
+							(u32) rxdesc,
+							rxd.pNextDesc.v,
+							rxd.HostMemPtr.v,
+							rxd.ACXMemPtr.v,
+							rxd.rx_time,
+							rxd.total_length,
+							rxd.WEP_length,
+							rxd.WEP_ofs,
+							rxd.Ctl_8,
+							rxd.rate,
+							rxd.error,
+							rxd.SNR,
+							rxd.RxLevel,
+							rxd.queue_ctrl,
+							rxd.unknown,
+							rxd.unknown2);
 			rxdesc++;
 		}
 
@@ -2583,34 +2607,25 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 			"** Tx buf %d blocks total, %d available, free list head %04x\n",
 			adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 			adev->acx_txbuf_free);
+
 	txdesc = adev->txdesc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx_tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
+
 			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u ready to free (%02X)%s%s", i, Ctl_8, thd,
-						ttl);
+				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
 			else if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u available     (%02X)%s%s", i, Ctl_8, thd,
-						ttl);
+				seq_printf(file, "%02u available     (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
 			else
-				seq_printf(file, "%02u busy          (%02X)%s%s", i, Ctl_8, thd,
-						ttl);
-			tmp = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-			if (tmp) {
-				seq_printf(file, " %04x", tmp);
-				while ((tmp = read_slavemem32(adev, (u32) tmp)) != 0x02000000) {
-					tmp <<= 5;
-					seq_printf(file, " %04x", tmp);
-				}
-			}
-			seq_printf(file, "\n");
+				seq_printf(file, "%02u busy          (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+
 			seq_printf(file,
-						 "  %04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x\n"
-						 "%02x %02x %02x %02x %04x\n", (u32) txdesc,
+						 "%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
+						 "%02x %02x %02x %02x %04x: ", (u32) txdesc,
 						 txd.pNextDesc.v, txd.HostMemPtr.v, txd.AcxMemPtr.v,
 						 txd.tx_time, txd.total_length, txd.Reserved,
 						 txd.dummy[0], txd.dummy[1], txd.dummy[2],
@@ -2619,7 +2634,26 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 						 txd.rts_ok, txd.u.r1.rate,
 						 txd.u.r1.queue_ctrl, txd.queue_info);
 
+			tmp = read_slavemem32(adev, (u32) & (txdesc->AcxMemPtr));
+			seq_printf(file, " %04x: ", tmp);
+
+			// Output allocated tx-buffer chain
 #if 1
+			if (tmp) {
+				while ((tmp2 = read_slavemem32(adev, (u32) tmp)) != 0x02000000) {
+					tmp2 = tmp2 << 5;
+					seq_printf(file, "%04x=%04x,", tmp, tmp2);
+					tmp = tmp2;
+				}
+				seq_printf(file, " %04x=%04x", tmp, tmp2);
+			}
+#endif
+			seq_printf(file, "\n");
+
+#if 0
+			u8 buf[0x200];
+			int j, k;
+
 			if (txd.AcxMemPtr.v) {
 				acxmem_copy_from_slavemem(adev, buf, txd.AcxMemPtr.v, sizeof(buf));
 				for (j = 0; (j < txd.total_length) && (j < (sizeof(buf) - 4)); j
@@ -2636,6 +2670,26 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 			txdesc = advance_txdesc(adev, txdesc, 1);
 		}
 	}
+
+#if 1
+	// Tx-buffer list dump
+	seq_printf(file, "\n");
+	seq_printf(file, "* Tx-buffer list dump\n");
+	seq_printf(file, "acx_txbuf_numblocks=%d, acx_txbuf_blocks_free=%d, \n"
+		"acx_txbuf_start==%04x, acx_txbuf_free=%04x, memblocksize=%d\n",
+			adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
+			adev->acx_txbuf_start, adev->acx_txbuf_free, adev->memblocksize);
+
+	tmp = adev->acx_txbuf_start;
+	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {
+		tmp2 = read_slavemem32(adev, (u32) tmp);
+		seq_printf(file, "%02d: %04x=%04x,%04x\n", i, tmp, tmp2, tmp2 << 5);
+
+		tmp += adev->memblocksize;
+	}
+	seq_printf(file, "\n");
+	// ---
+#endif
 
 	seq_printf(file, "\n"
 		"** Generic slave data **\n"
@@ -2662,6 +2716,7 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
 		adev->rxbuf_start, adev->rxbuf_area_size);
 
+	acxmem_unlock();
 	FN_EXIT0;
 	return 0;
 }
