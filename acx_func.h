@@ -19,7 +19,6 @@
 #define _ACX_FUNC_H_
 
 #include <linux/version.h>
-#include "acx_commands.h"
 
 /*
  * BOM Config

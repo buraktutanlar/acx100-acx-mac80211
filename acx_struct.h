@@ -20,7 +20,6 @@
 
 #include <linux/version.h>
 #include "acx_firmware.h"
-#include "acx_commands.h"
 
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
@@ -162,6 +161,53 @@ enum {
    label: G3 55ZCT27 TNETW3422 */
 #define RADIO_1B_TI_TNETW3422	0x1b
 
+/* BOM Controller Commands
+ * Can be found in the cmdTable table on the "Rev. 1.5.0" (FW150) firmware
+ */
+#define ACX1xx_CMD_RESET		    0x00
+#define ACX1xx_CMD_INTERROGATE		0x01
+#define ACX1xx_CMD_CONFIGURE		0x02
+#define ACX1xx_CMD_ENABLE_RX		0x03
+#define ACX1xx_CMD_ENABLE_TX		0x04
+#define ACX1xx_CMD_DISABLE_RX		0x05
+#define ACX1xx_CMD_DISABLE_TX		0x06
+#define ACX1xx_CMD_FLUSH_QUEUE		0x07
+#define ACX1xx_CMD_SCAN			    0x08
+#define ACX1xx_CMD_STOP_SCAN		0x09
+#define ACX1xx_CMD_CONFIG_TIM		0x0A
+#define ACX1xx_CMD_JOIN			    0x0B
+#define ACX1xx_CMD_WEP_MGMT		    0x0C
+#ifdef OLD_FIRMWARE_VERSIONS
+#define ACX100_CMD_HALT             0x0E    /* mapped to unknownCMD in FW150 */
+#else
+#define ACX1xx_CMD_MEM_READ         0x0D
+#define ACX1xx_CMD_MEM_WRITE        0x0E
+#endif /* OLD_FIRMWARE_VERSIONS */
+#define ACX1xx_CMD_SLEEP		    0x0F
+#define ACX1xx_CMD_WAKE			    0x10
+#define ACX1xx_CMD_UNKNOWN_11		0x11	/* mapped to unknownCMD in FW150 */
+#define ACX100_CMD_INIT_MEMORY		0x12
+#define ACX1FF_CMD_DISABLE_RADIO	0x12	/* new firmware? TNETW1450? + NOT in BSD driver */
+#define ACX1xx_CMD_CONFIG_BEACON	0x13
+#define ACX1xx_CMD_CONFIG_PROBE_RESPONSE 0x14
+#define ACX1xx_CMD_CONFIG_NULL_DATA	0x15
+#define ACX1xx_CMD_CONFIG_PROBE_REQUEST 0x16
+#define ACX1xx_CMD_FCC_TEST		    0x17
+#define ACX1xx_CMD_RADIOINIT		0x18
+#define ACX111_CMD_RADIOCALIB		0x19
+#define ACX1FF_CMD_NOISE_HISTOGRAM	0x1c	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_RX_RESET		    0x1d	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_LNA_CONTROL		0x20	/* new firmware? TNETW1450? */
+#define ACX1FF_CMD_CONTROL_DBG_TRACE	0x21	/* new firmware? TNETW1450? */
+
+/* 'After Interrupt' Commands */
+#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x01
+#define ACX_AFTER_IRQ_CMD_ASSOCIATE	0x02
+#define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x04
+#define ACX_AFTER_IRQ_UPDATE_CARD_CFG	0x08
+#define ACX_AFTER_IRQ_TX_CLEANUP	0x10
+#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x20
+#define ACX_AFTER_IRQ_RESTART_SCAN	0x40
 
 /***********************************************************************
 ** BOM  Tx/Rx buffer sizes and watermarks
