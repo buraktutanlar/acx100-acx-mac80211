@@ -183,9 +183,13 @@ static void acx100_s_set_wepkey(acx_device_t * adev);
 static void acx111_s_set_wepkey(acx_device_t * adev);
 static void acx_s_set_wepkey(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
+
+// // OW, 20100704, Obselete, TBC for cleanup
+#if 0
 static void acx_keymac_write(acx_device_t * adev, u16 index, const u32 * addr);
 int acx_clear_keys(acx_device_t * adev);
 int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee80211_key_conf *key, const u8 *mac_addr);
+#endif
 
 // Irq Handling, Timer
 void acx_init_task_scheduler(acx_device_t *adev);
@@ -5023,7 +5027,8 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	return res;
 }
 
-
+// OW, 20100704, Obselete, TBC for cleanup
+#if 0
 static void acx_keymac_write(acx_device_t * adev, u16 index, const u32 * addr)
 {
 	/* for keys 0-3 there is no associated mac address */
@@ -5195,6 +5200,7 @@ int acx_key_write(acx_device_t *adev,
 
 
 }
+#endif
 
 /*
  * BOM Irq Handling, Timer
