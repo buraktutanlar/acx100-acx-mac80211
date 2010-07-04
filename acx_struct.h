@@ -540,7 +540,7 @@ DEF_IE(111_IE_DOT11_WEP_DEFAULT_KEY_SET,	0x1010, 1);
 DEF_IE(111_IE_DOT11_UNKNOWN_1011,		0x1011, 1); /* 11100100 20 */
 DEF_IE(111_IE_DOT11_INVAL_1012,			0x1012, -1);
 DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
-#endif /* 0 */
+#endif
 
 
 
@@ -563,111 +563,6 @@ DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 #define DOT11RATEBYTE_48_G	(48*2)
 #define DOT11RATEBYTE_54_G	(54*2)
 #define DOT11RATEBYTE_BASIC	0x80	/* flags rates included in basic rate set */
-
-
-
-/***********************************************************************
-** BOM Hardware structures
-*/
-
-/* An opaque typesafe helper type
- *
- * Some hardware fields are actually pointers,
- * but they have to remain u32, since using ptr instead
- * (8 bytes on 64bit systems!) would disrupt the fixed descriptor
- * format the acx firmware expects in the non-user area.
- * Since we cannot cram an 8 byte ptr into 4 bytes, we need to
- * enforce that pointed to data remains in low memory
- * (address value needs to fit in 4 bytes) on 64bit systems.
- *
- * This is easy to get wrong, thus we are using a small struct
- * and special macros to access it. Macros will check for
- * attempts to overflow an acx_ptr with value > 0xffffffff.
- *
- * Attempts to use acx_ptr without macros result in compile-time errors */
-
-typedef struct {
-	u32	v;
-} __attribute__ ((packed)) acx_ptr;
-
-#if ACX_DEBUG
-#define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
-#else
-#define CHECK32(n) ((void)0)
-#endif
-
-/* acx_ptr <-> integer conversion */
-#define cpu2acx(n) ({ CHECK32(n); ((acx_ptr){ .v = cpu_to_le32(n) }); })
-#define acx2cpu(a) (le32_to_cpu(a.v))
-
-/* acx_ptr <-> pointer conversion */
-#define ptr2acx(p) ({ CHECK32(p); ((acx_ptr){ .v = cpu_to_le32((u32)(long)(p)) }); })
-#define acx2ptr(a) ((void*)le32_to_cpu(a.v))
-
-/* Values for rate field (acx100 only) */
-#define RATE100_1		10
-#define RATE100_2		20
-#define RATE100_5		55
-#define RATE100_11		110
-#define RATE100_22		220
-/* This bit denotes use of PBCC:
-** (PBCC encoding is usable with 11 and 22 Mbps speeds only) */
-#define RATE100_PBCC511		0x80
-
-/* Bit values for rate111 field */
-#define RATE111_1		0x0001	/* DBPSK */
-#define RATE111_2		0x0002	/* DQPSK */
-#define RATE111_5		0x0004	/* CCK or PBCC */
-#define RATE111_6		0x0008	/* CCK-OFDM or OFDM */
-#define RATE111_9		0x0010	/* CCK-OFDM or OFDM */
-#define RATE111_11		0x0020	/* CCK or PBCC */
-#define RATE111_12		0x0040	/* CCK-OFDM or OFDM */
-#define RATE111_18		0x0080	/* CCK-OFDM or OFDM */
-#define RATE111_22		0x0100	/* PBCC */
-#define RATE111_24		0x0200	/* CCK-OFDM or OFDM */
-#define RATE111_36		0x0400	/* CCK-OFDM or OFDM */
-#define RATE111_48		0x0800	/* CCK-OFDM or OFDM */
-#define RATE111_54		0x1000	/* CCK-OFDM or OFDM */
-#define RATE111_RESERVED	0x2000
-#define RATE111_PBCC511		0x4000  /* PBCC mod at 5.5 or 11Mbit (else CCK) */
-#define RATE111_SHORTPRE	0x8000  /* short preamble */
-/* Special 'try everything' value */
-#define RATE111_ALL		0x1fff
-/* These bits denote acx100 compatible settings */
-#define RATE111_ACX100_COMPAT	0x0127
-/* These bits denote 802.11b compatible settings */
-#define RATE111_80211B_COMPAT	0x0027
-
-/* Descriptor Ctl field bits
- * init value is 0x8e, "idle" value is 0x82 (in idle tx descs)
- */
-#define DESC_CTL_SHORT_PREAMBLE	0x01	/* preamble type: 0 = long; 1 = short */
-#define DESC_CTL_FIRSTFRAG	0x02	/* this is the 1st frag of the frame */
-#define DESC_CTL_AUTODMA	0x04
-#define DESC_CTL_RECLAIM	0x08	/* ready to reuse */
-#define DESC_CTL_HOSTDONE	0x20	/* host has finished processing */
-#define DESC_CTL_ACXDONE	0x40	/* acx has finished processing */
-/* host owns the desc [has to be released last, AFTER modifying all other desc fields!] */
-#define DESC_CTL_HOSTOWN	0x80
-#define	DESC_CTL_ACXDONE_HOSTOWN (DESC_CTL_ACXDONE | DESC_CTL_HOSTOWN)
-
-/* Descriptor Status field
- */
-#define	DESC_STATUS_FULL	(1 << 31)
-
-/* NB: some bits may be interesting for Monitor mode tx (aka Raw tx): */
-#define DESC_CTL2_SEQ		0x01	/* don't increase sequence field */
-#define DESC_CTL2_FCS		0x02	/* don't add the FCS */
-#define DESC_CTL2_MORE_FRAG	0x04
-#define DESC_CTL2_RETRY		0x08	/* don't increase retry field */
-#define DESC_CTL2_POWER		0x10	/* don't increase power mgmt. field */
-#define DESC_CTL2_RTS		0x20	/* do RTS/CTS magic before sending */
-#define DESC_CTL2_WEP		0x40	/* encrypt this frame */
-#define DESC_CTL2_DUR		0x80	/* don't increase duration field */
-
-/***********************************************************************
-** BOM PCI structures
-*/
 
 
 /***********************************************************************
@@ -965,7 +860,6 @@ struct client {
 ** BOM Hardware structures
 */
 
-#ifdef DEFINED_DOUBLE
 /* An opaque typesafe helper type
  *
  * Some hardware fields are actually pointers,
@@ -981,6 +875,10 @@ struct client {
  * attempts to overflow an acx_ptr with value > 0xffffffff.
  *
  * Attempts to use acx_ptr without macros result in compile-time errors */
+
+typedef struct {
+	u32	v;
+} ACX_PACKED acx_ptr;
 
 #if ACX_DEBUG
 #define CHECK32(n) BUG_ON(sizeof(n)>4 && (long)(n)>0xffffff00)
@@ -1057,7 +955,6 @@ struct client {
 #define DESC_CTL2_WEP		0x40	/* encrypt this frame */
 #define DESC_CTL2_DUR		0x80	/* don't increase duration field */
 
-#endif
 
 /***********************************************************************
 ** BOM PCI structures
