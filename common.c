@@ -2613,7 +2613,7 @@ static void acx_s_select_opmode(acx_device_t *adev)
 	int changed = 0;
 	FN_ENTER;
 
-	if (adev->interface.operating) {
+	if (adev->vif_operating) {
 		switch (adev->vif_type) {
 		case NL80211_IFTYPE_AP:
 			if (adev->mode != ACX_MODE_3_AP) {
@@ -5466,10 +5466,10 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	}
 
 	else {
-		if (adev->interface.operating)
+		if (adev->vif_operating)
 			goto out_unlock;
 
-		adev->interface.operating = 1;
+		adev->vif_operating = 1;
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 		adev->vif = conf->vif;
 #else
@@ -5523,18 +5523,18 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 #endif
 		adev->vif_monitor--;
 	} else {
-		adev->interface.operating = 0;
+		adev->vif_operating = 0;
 		adev->vif=NULL;
 	}
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	log(L_DEBUG, "acx: %s: interface.operating=%d, conf->type=%d\n",
+	log(L_DEBUG, "acx: %s: vif_operating=%d, conf->type=%d\n",
 			__func__,
-			adev->interface.operating, conf->type);
+			adev->vif_operating, conf->type);
 #else
-	log(L_DEBUG, "acx: %s: interface.operating=%d, vif->type=%d\n",
+	log(L_DEBUG, "acx: %s: vif_operating=%d, vif->type=%d\n",
 			__func__,
-			adev->interface.operating, vif->type);
+			adev->vif_operating, vif->type);
 #endif
 
 	if (adev->initialized)
@@ -5692,7 +5692,7 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	logf1(L_DEBUG, "changed=%04X\n", changed);
 
-	if (!adev->interface.operating)
+	if (!adev->vif_operating)
 		goto end_sem_unlock;
 
 //	if (adev->initialized)
