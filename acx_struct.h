@@ -1017,83 +1017,6 @@ struct client {
 };
 
 
-/* Config Option structs */
-
-typedef struct co_antennas {
-	u8	type;
-	u8	len;
-	u8	list[2];
-} __attribute__ ((packed)) co_antennas_t;
-
-typedef struct co_powerlevels {
-	u8	type;
-	u8	len;
-	u16	list[8];
-} __attribute__ ((packed)) co_powerlevels_t;
-
-typedef struct co_datarates {
-	u8	type;
-	u8	len;
-	u8	list[8];
-} __attribute__ ((packed)) co_datarates_t;
-
-typedef struct co_domains {
-	u8	type;
-	u8	len;
-	u8	list[6];
-} __attribute__ ((packed)) co_domains_t;
-
-typedef struct co_product_id {
-	u8	type;
-	u8	len;
-	u8	list[128];
-} __attribute__ ((packed)) co_product_id_t;
-
-typedef struct co_manuf_id {
-	u8	type;
-	u8	len;
-	u8	list[128];
-} __attribute__ ((packed)) co_manuf_t;
-
-typedef struct co_fixed {
-	char	NVSv[8];
-/*	u16	NVS_vendor_offs;	ACX111-only */
-/*	u16	unknown;		ACX111-only */
-	u8	MAC[6];	/* ACX100-only */
-	u16	probe_delay;	/* ACX100-only */
-	u32	eof_memory;
-	u8	dot11CCAModes;
-	u8	dot11Diversity;
-	u8	dot11ShortPreambleOption;
-	u8	dot11PBCCOption;
-	u8	dot11ChannelAgility;
-	u8	dot11PhyType; /* FIXME: does 802.11 call it "dot11PHYType"? */
-	u8	dot11TempType;
-	u8	table_count;
-} __attribute__ ((packed)) co_fixed_t;
-
-typedef struct acx111_ie_configoption {
-	u16			type;
-	u16			len;
-/* Do not access below members directly, they are in fact variable length */
-	co_fixed_t		fixed;
-	co_antennas_t		antennas;
-	co_powerlevels_t	power_levels;
-	co_datarates_t		data_rates;
-	co_domains_t		domains;
-	co_product_id_t		product_id;
-	co_manuf_t		manufacturer;
-	u8			_padding[4];
-} __attribute__ ((packed)) acx111_ie_configoption_t;
-
-// Misc
-
-typedef struct shared_queueindicator {
-        u32     indicator;
-        u16     host_lock;
-        u16     fw_lock;
-} ACX_PACKED queueindicator_t;
-
 /***********************************************************************
 ** BOM Hardware structures
 */
@@ -1385,6 +1308,84 @@ typedef struct usb_rx {
 	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
 } usb_rx_t;
 #endif /* ACX_USB */
+
+
+/* BOM Config Option structs */
+
+typedef struct co_antennas {
+	u8	type;
+	u8	len;
+	u8	list[2];
+} ACX_PACKED co_antennas_t;
+
+typedef struct co_powerlevels {
+	u8	type;
+	u8	len;
+	u16	list[8];
+} ACX_PACKED co_powerlevels_t;
+
+typedef struct co_datarates {
+	u8	type;
+	u8	len;
+	u8	list[8];
+} ACX_PACKED co_datarates_t;
+
+typedef struct co_domains {
+	u8	type;
+	u8	len;
+	u8	list[6];
+} ACX_PACKED co_domains_t;
+
+typedef struct co_product_id {
+	u8	type;
+	u8	len;
+	u8	list[128];
+} ACX_PACKED co_product_id_t;
+
+typedef struct co_manuf_id {
+	u8	type;
+	u8	len;
+	u8	list[128];
+} ACX_PACKED co_manuf_t;
+
+typedef struct co_fixed {
+	char	NVSv[8];
+/*	u16	NVS_vendor_offs;	ACX111-only */
+/*	u16	unknown;		ACX111-only */
+	u8	MAC[6];	/* ACX100-only */
+	u16	probe_delay;	/* ACX100-only */
+	u32	eof_memory;
+	u8	dot11CCAModes;
+	u8	dot11Diversity;
+	u8	dot11ShortPreambleOption;
+	u8	dot11PBCCOption;
+	u8	dot11ChannelAgility;
+	u8	dot11PhyType; /* FIXME: does 802.11 call it "dot11PHYType"? */
+	u8	dot11TempType;
+	u8	table_count;
+} ACX_PACKED co_fixed_t;
+
+typedef struct acx111_ie_configoption {
+	u16			type;
+	u16			len;
+/* Do not access below members directly, they are in fact variable length */
+	co_fixed_t		fixed;
+	co_antennas_t		antennas;
+	co_powerlevels_t	power_levels;
+	co_datarates_t		data_rates;
+	co_domains_t		domains;
+	co_product_id_t		product_id;
+	co_manuf_t		manufacturer;
+	u8			_padding[4];
+} ACX_PACKED acx111_ie_configoption_t;
+
+// Misc TODO Move elsewhere
+typedef struct shared_queueindicator {
+        u32     indicator;
+        u16     host_lock;
+        u16     fw_lock;
+} ACX_PACKED queueindicator_t;
+
 
 /***********************************************************************
 ** BOM Main acx per-device data structure
