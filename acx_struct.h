@@ -2183,6 +2183,8 @@ typedef struct acx_ie_generic {
 	} ACX_PACKED m;
 } ACX_PACKED acx_ie_generic_t;
 
+// OW TODO This could be cleanup actually.
+// Code for WEP key setting in HW should be taken from 20080210 version.
 #define ACX_SEC_KEYSIZE                     16
 /* Security algorithms. */
 enum {
@@ -2194,6 +2196,7 @@ enum {
         ACX_SEC_ALGO_WEP104,
         ACX_SEC_ALGO_TKIP,
 };
+
 /***********************************************************************
 */
 #define CHECK_SIZEOF(type,size) { \
