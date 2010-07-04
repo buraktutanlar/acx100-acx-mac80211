@@ -1417,6 +1417,8 @@ struct acx_device {
 
 	/*** Virtual interface struct ***/
 	struct acx_interface interface;
+	// TODO FIXME Fields previously defined in acx_mac80211.h. Review usage what and how
+	int vif_type;
 
 	/*** Wireless network settings ***/
 	/* copy of the device address (ifconfig hw ether) that we actually use

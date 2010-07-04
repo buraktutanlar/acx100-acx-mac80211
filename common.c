@@ -2614,7 +2614,7 @@ static void acx_s_select_opmode(acx_device_t *adev)
 	FN_ENTER;
 
 	if (adev->interface.operating) {
-		switch (adev->interface.type) {
+		switch (adev->vif_type) {
 		case NL80211_IFTYPE_AP:
 			if (adev->mode != ACX_MODE_3_AP) {
 				adev->mode = ACX_MODE_3_AP;
@@ -2649,7 +2649,7 @@ static void acx_s_select_opmode(acx_device_t *adev)
 			break;
 		}
 	} else {
-		if (adev->interface.type == NL80211_IFTYPE_MONITOR) {
+		if (adev->vif_type == NL80211_IFTYPE_MONITOR) {
 			if (adev->mode != ACX_MODE_MONITOR) {
 				adev->mode = ACX_MODE_MONITOR;
 				changed = 1;
@@ -5457,6 +5457,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 #else
 	vif_type = vif->type;
 #endif
+	adev->vif_type = vif_type;
 	logf1(L_ANY, "vif_type=%04X\n", vif_type);
 
 
@@ -5471,10 +5472,8 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 		adev->interface.operating = 1;
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 		adev->vif = conf->vif;
-		adev->interface.type = conf->type;
 #else
 		adev->vif = vif;
-		adev->interface.type = vif->type;
 #endif
 	}
 
@@ -5487,10 +5486,10 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 	printk(KERN_INFO "acx: Virtual interface added "
 	       "(type: 0x%08X, MAC: %s)\n",
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	       conf->type,
+	       adev->vif_type,
 	       acx_print_mac(mac, conf->mac_addr)
 #else
-	       vif->type,
+	       adev->vif_type,
 	       acx_print_mac(mac, vif->addr)
 #endif
 	);
