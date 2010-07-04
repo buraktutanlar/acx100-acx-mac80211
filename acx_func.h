@@ -226,6 +226,18 @@ do { \
 #endif 
 //---
 
+#define TODO()  \
+        do {                                                                            \
+                printk(KERN_INFO "TODO: Incomplete code in %s() at %s:%d\n",        \
+                       __FUNCTION__, __FILE__, __LINE__);                               \
+        } while (0)
+
+#define FIXME()  \
+        do {                                                                            \
+                printk(KERN_INFO "FIXME: Possibly broken code in %s() at %s:%d\n",  \
+                       __FUNCTION__, __FILE__, __LINE__);                               \
+        } while (0)
+
 // BOM Data Access (Common)
 // -----
 
