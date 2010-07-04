@@ -1415,8 +1415,6 @@ struct acx_device {
 //	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
 #endif
 
-	/*** Virtual interface struct ***/
-	struct acx_interface interface;
 	// TODO FIXME Fields previously defined in acx_mac80211.h. Review usage what and how
 	int vif_type;
     /* Counter of active monitor interfaces. */
