@@ -1529,12 +1529,6 @@ struct acx_device {
 
 	key_struct_t	wep_key_struct[10];
 
-	/*** Encryption Replacement for mac80211 ***/
-	struct acx_key	key[54];
-	u16 security_offset;
-	u8 default_key_idx;
-
-
 	/*** Unknown ***/
 	u8		dtim_interval;
 
