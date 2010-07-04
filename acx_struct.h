@@ -2054,6 +2054,8 @@ typedef struct acx_template_proberesp {
 typedef struct acx_template_nullframe {
 	u16	size;
 	struct ieee80211_hdr hdr;
+	// OW, 20080210 code: 	struct wlan_hdr_a3 hdr;
+	// maybe better user: ieee80211_hdr_3addr
 } ACX_PACKED acx_template_nullframe_t;
 
 
