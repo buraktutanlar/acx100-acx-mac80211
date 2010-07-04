@@ -38,10 +38,13 @@
 #include <linux/rtnetlink.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
-#include <net/iw_handler.h>
 #include <linux/vmalloc.h>
 #include <linux/ethtool.h>
 #include <linux/workqueue.h>
+#include <linux/nl80211.h>
+
+#include <net/iw_handler.h>
+#include <net/mac80211.h>
 
 #include "acx.h"
 

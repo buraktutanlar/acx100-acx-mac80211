@@ -29,6 +29,9 @@
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/ethtool.h>
+#include <linux/nl80211.h>
+
+#include <net/mac80211.h>
 
 #include "acx.h"
 #include "wlan_compat.h"

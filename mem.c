@@ -56,13 +56,17 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/wireless.h>
-#include <net/iw_handler.h>
 #include <linux/netdevice.h>
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
 #include <linux/vmalloc.h>
 #include <linux/workqueue.h>
+#include <linux/nl80211.h>
+
+#include <net/iw_handler.h>
+#include <net/mac80211.h>
+
 #include <asm/io.h>
 
 #include "acx.h"

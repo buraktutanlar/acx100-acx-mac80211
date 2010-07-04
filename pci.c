@@ -34,7 +34,6 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/wireless.h>
-#include <net/iw_handler.h>
 #include <linux/netdevice.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -43,9 +42,13 @@
 #include <linux/ethtool.h>
 #include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
+#include <linux/nl80211.h>
 #ifdef CONFIG_VLYNQ
 #include <linux/vlynq.h>
 #endif
+
+#include <net/iw_handler.h>
+#include <net/mac80211.h>
 
 #include "acx.h"
 #include "wlan_compat.h"
