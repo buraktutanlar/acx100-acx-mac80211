@@ -5462,7 +5462,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 
 
 	if (vif_type == NL80211_IFTYPE_MONITOR) {
-		adev->interface.monitor++;
+		adev->vif_monitor++;
 	}
 
 	else {
@@ -5521,8 +5521,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 #else
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
 #endif
-		adev->interface.monitor--;
-//      assert(bcm->interface.monitor >= 0);
+		adev->vif_monitor--;
 	} else {
 		adev->interface.operating = 0;
 		adev->vif=NULL;

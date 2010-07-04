@@ -1419,6 +1419,10 @@ struct acx_device {
 	struct acx_interface interface;
 	// TODO FIXME Fields previously defined in acx_mac80211.h. Review usage what and how
 	int vif_type;
+    /* Counter of active monitor interfaces. */
+	// TODO FIXME Review if required / usage
+    int vif_monitor;
+
 
 	/*** Wireless network settings ***/
 	/* copy of the device address (ifconfig hw ether) that we actually use
