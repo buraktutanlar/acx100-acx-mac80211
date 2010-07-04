@@ -669,62 +669,6 @@ typedef struct {
 ** BOM PCI structures
 */
 
-/* Outside of "#ifdef PCI" because USB needs to know sizeof()
-** of txdesc and rxdesc: */
-struct txdesc {
-	acx_ptr	pNextDesc;	/* pointer to next txdesc */
-	acx_ptr	HostMemPtr;			/* 0x04 */
-	acx_ptr	AcxMemPtr;			/* 0x08 */
-	u32	tx_time;			/* 0x0c */
-	u16	total_length;			/* 0x10 */
-	u16	Reserved;			/* 0x12 */
-
-/* The following 16 bytes do not change when acx100 owns the descriptor */
-/* BUG: fw clears last byte of this area which is supposedly reserved
-** for driver use. amd64 blew up. We dare not use it now */
-	u32	dummy[4];
-
-	u8	Ctl_8;			/* 0x24, 8bit value */
-	u8	Ctl2_8;			/* 0x25, 8bit value */
-	u8	error;			/* 0x26 */
-	u8	ack_failures;		/* 0x27 */
-	u8	rts_failures;		/* 0x28 */
-	u8	rts_ok;			/* 0x29 */
-	union {
-		struct {
-			u8	rate;		/* 0x2a */
-			u8	queue_ctrl;	/* 0x2b */
-		} __attribute__ ((packed)) r1;
-		struct {
-			u16	rate111;	/* 0x2a */
-		} __attribute__ ((packed)) r2;
-	} __attribute__ ((packed)) u;
-	u32	queue_info;			/* 0x2c (acx100, reserved on acx111) */
-} __attribute__ ((packed));		/* size : 48 = 0x30 */
-/* NB: acx111 txdesc structure is 4 byte larger */
-/* All these 4 extra bytes are reserved. tx alloc code takes them into account */
-
-struct rxdesc {
-	acx_ptr	pNextDesc;			/* 0x00 */
-	acx_ptr	HostMemPtr;			/* 0x04 */
-	acx_ptr	ACXMemPtr;			/* 0x08 */
-	u32	rx_time;			/* 0x0c */
-	u16	total_length;			/* 0x10 */
-	u16	WEP_length;			/* 0x12 */
-	u32	WEP_ofs;			/* 0x14 */
-
-/* the following 16 bytes do not change when acx100 owns the descriptor */
-	u8	driverWorkspace[16];		/* 0x18 */
-
-	u8	Ctl_8;
-	u8	rate;
-	u8	error;
-	u8	SNR;				/* Signal-to-Noise Ratio */
-	u8	RxLevel;
-	u8	queue_ctrl;
-	u16	unknown;
-	u32	unknown2;
-} __attribute__ ((packed));		/* size 52 = 0x34 */
 
 /***********************************************************************
 ** BOM rxbuffer_t
@@ -1143,6 +1087,62 @@ struct client {
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */
+struct txdesc {
+	acx_ptr	pNextDesc;	/* pointer to next txdesc */
+	acx_ptr	HostMemPtr;			/* 0x04 */
+	acx_ptr	AcxMemPtr;			/* 0x08 */
+	u32	tx_time;			/* 0x0c */
+	u16	total_length;			/* 0x10 */
+	u16	Reserved;			/* 0x12 */
+
+/* The following 16 bytes do not change when acx100 owns the descriptor */
+/* BUG: fw clears last byte of this area which is supposedly reserved
+** for driver use. amd64 blew up. We dare not use it now */
+	u32	dummy[4];
+
+	u8	Ctl_8;			/* 0x24, 8bit value */
+	u8	Ctl2_8;			/* 0x25, 8bit value */
+	u8	error;			/* 0x26 */
+	u8	ack_failures;		/* 0x27 */
+	u8	rts_failures;		/* 0x28 */
+	u8	rts_ok;			/* 0x29 */
+	union {
+		struct {
+			u8	rate;		/* 0x2a */
+			u8	queue_ctrl;	/* 0x2b */
+		} ACX_PACKED r1;
+		struct {
+			u16	rate111;	/* 0x2a */
+		} ACX_PACKED r2;
+	} ACX_PACKED u;
+	u32	queue_info;			/* 0x2c (acx100, reserved on acx111) */
+} ACX_PACKED;		/* size : 48 = 0x30 */
+/* NB: acx111 txdesc structure is 4 byte larger */
+/* All these 4 extra bytes are reserved. tx alloc code takes them into account */
+
+struct rxdesc {
+	acx_ptr	pNextDesc;			/* 0x00 */
+	acx_ptr	HostMemPtr;			/* 0x04 */
+	acx_ptr	ACXMemPtr;			/* 0x08 */
+	u32	rx_time;			/* 0x0c */
+	u16	total_length;			/* 0x10 */
+	u16	WEP_length;			/* 0x12 */
+	u32	WEP_ofs;			/* 0x14 */
+
+/* the following 16 bytes do not change when acx100 owns the descriptor */
+	u8	driverWorkspace[16];		/* 0x18 */
+
+	u8	Ctl_8;
+	u8	rate;
+	u8	error;
+	u8	SNR;				/* Signal-to-Noise Ratio */
+	u8	RxLevel;
+	u8	queue_ctrl;
+	u16	unknown;
+	u32	unknown2;
+} ACX_PACKED;		/* size 52 = 0x34 */
+
+
 #if defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM)
 
 /* Register I/O offsets */
