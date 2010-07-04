@@ -70,19 +70,4 @@ struct acx_interface {
 #define ACX_MODE_NOTADHOC 0xFFFF
 #define ACX_MODE_PROMISC 0x5
 
-/** Rate values **/
-
-#define ACX_CCK_RATE_1MB            0
-#define ACX_CCK_RATE_2MB            1
-#define ACX_CCK_RATE_5MB            2
-#define ACX_CCK_RATE_11MB           3
-#define ACX_OFDM_RATE_6MB           4
-#define ACX_OFDM_RATE_9MB           5
-#define ACX_OFDM_RATE_12MB          6
-#define ACX_OFDM_RATE_18MB          7
-#define ACX_OFDM_RATE_24MB          8
-#define ACX_OFDM_RATE_36MB          9
-#define ACX_OFDM_RATE_48MB          10
-#define ACX_OFDM_RATE_54MB          11
-
 #endif /* _ACX_MAC80211_H_ */

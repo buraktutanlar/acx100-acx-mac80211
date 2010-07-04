@@ -3399,6 +3399,22 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 
 // TODO Verify these functions: translation rxbuffer.phy_plcp_signal to rate_idx
 #if 0
+
+/** Rate values **/
+
+#define ACX_CCK_RATE_1MB            0
+#define ACX_CCK_RATE_2MB            1
+#define ACX_CCK_RATE_5MB            2
+#define ACX_CCK_RATE_11MB           3
+#define ACX_OFDM_RATE_6MB           4
+#define ACX_OFDM_RATE_9MB           5
+#define ACX_OFDM_RATE_12MB          6
+#define ACX_OFDM_RATE_18MB          7
+#define ACX_OFDM_RATE_24MB          8
+#define ACX_OFDM_RATE_36MB          9
+#define ACX_OFDM_RATE_48MB          10
+#define ACX_OFDM_RATE_54MB          11
+
 static u8 acx_plcp_get_bitrate_cck(u8 plcp)
 {
         switch (plcp) {
