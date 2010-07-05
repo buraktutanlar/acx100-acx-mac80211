@@ -30,12 +30,11 @@
 #include <linux/firmware.h>
 #include <linux/ethtool.h>
 #include <linux/nl80211.h>
+#include <linux/ieee80211.h>
 
 #include <net/mac80211.h>
 
 #include "acx.h"
-#include "wlan_compat.h"
-#include "wlan_hdr.h"
 
 /*
  * BOM Config
@@ -3084,7 +3083,7 @@ acx_s_set_beacon_template(acx_device_t *adev, int len)
         int len2, result;
         FN_ENTER;
 
-        len2 = acx_fill_beacon_or_proberesp_template(adev, &bcn, len, WF_FSTYPE_BEACON);
+        len2 = acx_fill_beacon_or_proberesp_template(adev, &bcn, len, IEEE80211_STYPE_BEACON);
         result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len2);
 
         FN_EXIT1(result);
@@ -3101,7 +3100,7 @@ acx_s_set_probe_response_template(acx_device_t *adev)
 	FN_ENTER;
 
 	len1 = adev->beacon_skb->len;
-	len2 = acx_fill_beacon_or_proberesp_template(adev, &pr, len1, WF_FSTYPE_PROBERESP);
+	len2 = acx_fill_beacon_or_proberesp_template(adev, &pr, len1, IEEE80211_STYPE_PROBE_RESP);
 	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len2);
 
 	FN_EXIT1(result);
@@ -4350,7 +4349,7 @@ void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	buf_len = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	// For debugging
-	if (((WF_FC_FSTYPE & fc) != WF_FSTYPE_BEACON) &&
+	if (((IEEE80211_FCTL_STYPE & fc) != IEEE80211_STYPE_BEACON) &&
 		(acx_debug & (L_XFER|L_DATA))
 	){
 		printk_ratelimited(	"acx: rx: %s "
@@ -6012,24 +6011,24 @@ const char* acx_get_packet_type_string(u16 fc)
 		"DATA/CFPoll", "DATA/CFAck/CFPoll"
 	};
 	const char *str;
-	u8 fstype = (WF_FC_FSTYPE & fc) >> 4;
+	u8 fstype = (IEEE80211_FCTL_STYPE & fc) >> 4;
 	u8 ctl;
 
-	switch (WF_FC_FTYPE & fc) {
-	case WF_FTYPE_MGMT:
+	switch (IEEE80211_FCTL_FTYPE & fc) {
+	case IEEE80211_FTYPE_MGMT:
 		if (fstype < VEC_SIZE(mgmt_arr))
 			str = mgmt_arr[fstype];
 		else
 			str = "MGMT/UNKNOWN";
 		break;
-	case WF_FTYPE_CTL:
+	case IEEE80211_FTYPE_CTL:
 		ctl = fstype - 0x0a;
 		if (ctl < VEC_SIZE(ctl_arr))
 			str = ctl_arr[ctl];
 		else
 			str = "CTL/UNKNOWN";
 		break;
-	case WF_FTYPE_DATA:
+	case IEEE80211_FTYPE_DATA:
 		if (fstype < VEC_SIZE(data_arr))
 			str = data_arr[fstype];
 		else
