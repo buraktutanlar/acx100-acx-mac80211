@@ -20,9 +20,6 @@
 
 #include <linux/version.h>
 
-#include "wlan_compat.h"
-#include "wlan_hdr.h"
-
 /***********************************************************************
 ** BOM Forward declarations of types
 */
@@ -159,6 +156,34 @@ enum {
 /* 1B: radio in SafeCom SWLUT-54125 TNETW1450 USB adapter,
    label: G3 55ZCT27 TNETW3422 */
 #define RADIO_1B_TI_TNETW3422	0x1b
+
+/*
+ * BOM WLAN header constants previously in wlan_hdr.h
+ *
+ * They used in acx-device buffer-structure definitions.
+ * Keeping them as documenting elements of the previous driver.
+ */
+
+#define WLAN_HDR_A3_LEN			24
+#define WLAN_HDR_A4_LEN			30
+/* IV structure:
+** 3 bytes: Initialization Vector (24 bits)
+** 1 byte: 0..5: padding, must be 0; 6..7: key selector (0-3)
+*/
+#define WLAN_WEP_IV_LEN			4
+/* 802.11 says 2312 but looks like 2312 is a max size of _WEPed data_ */
+#define WLAN_DATA_MAXLEN		2304
+#define WLAN_WEP_ICV_LEN		4
+#define WLAN_FCS_LEN			4
+#define WLAN_A3FR_MAXLEN		(WLAN_HDR_A3_LEN + WLAN_DATA_MAXLEN)
+#define WLAN_A4FR_MAXLEN		(WLAN_HDR_A4_LEN + WLAN_DATA_MAXLEN)
+#define WLAN_A3FR_MAXLEN_FCS		(WLAN_HDR_A3_LEN + WLAN_DATA_MAXLEN + 4)
+#define WLAN_A4FR_MAXLEN_FCS		(WLAN_HDR_A4_LEN + WLAN_DATA_MAXLEN + 4)
+#define WLAN_A3FR_MAXLEN_WEP		(WLAN_A3FR_MAXLEN + 8)
+#define WLAN_A4FR_MAXLEN_WEP		(WLAN_A4FR_MAXLEN + 8)
+#define WLAN_A3FR_MAXLEN_WEP_FCS	(WLAN_A3FR_MAXLEN_FCS + 8)
+#define WLAN_A4FR_MAXLEN_WEP_FCS	(WLAN_A4FR_MAXLEN_FCS + 8)
+
 
 /* BOM Controller Commands
  * Can be found in the cmdTable table on the "Rev. 1.5.0" (FW150) firmware

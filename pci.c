@@ -51,8 +51,6 @@
 #include <net/mac80211.h>
 
 #include "acx.h"
-#include "wlan_compat.h"
-#include "wlan_hdr.h"
 
 /*
  * BOM Config
