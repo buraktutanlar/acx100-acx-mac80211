@@ -36,7 +36,6 @@
 #include "acx.h"
 #include "wlan_compat.h"
 #include "wlan_hdr.h"
-#include "wlan_mgmt.h"
 
 /*
  * BOM Config
