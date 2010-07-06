@@ -18,7 +18,7 @@
 #ifndef _ACX_STRUCT_DEV_H_
 #define _ACX_STRUCT_DEV_H_
 
-#include "acx_struct.h" 
+#include "acx_struct_hw.h"
 
 /*
  * BOM Debug / log functionality

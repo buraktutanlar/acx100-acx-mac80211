@@ -19,7 +19,7 @@
 #define _ACX_H_
 
 #include "acx_config.h"
-#include "acx_struct.h"
+#include "acx_struct_hw.h"
 #include "acx_struct_dev.h"
 #include "acx_func.h"
 

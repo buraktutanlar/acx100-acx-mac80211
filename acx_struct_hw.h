@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _ACX_STRUCT_H_
-#define _ACX_STRUCT_H_
+#ifndef _ACX_STRUCT_HW_H_
+#define _ACX_STRUCT_HW_H_
 
 #include <linux/version.h>
 
