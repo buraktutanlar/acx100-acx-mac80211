@@ -20,6 +20,7 @@
 
 #include "acx_config.h"
 #include "acx_struct.h"
+#include "acx_struct_dev.h"
 #include "acx_func.h"
 
 #endif /* _ACX_H_ */
