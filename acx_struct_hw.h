@@ -1737,19 +1737,4 @@ acx_struct_size_check(void)
 	CHECK_SIZEOF(acx111_ie_configoption_t, ACX111_IE_CONFIG_OPTIONS_LEN + 4);
 }
 
-
-/***********************************************************************
-** BOM Global data
-*/
-extern const u8 acx_bitpos2ratebyte[];
-extern const u8 acx_bitpos2rate100[];
-
-extern const u8 acx_reg_domain_ids[];
-extern const char * const acx_reg_domain_strings[];
-enum {
-	acx_reg_domain_ids_len = 8
-};
-
-//extern const struct iw_handler_def acx_ioctl_handler_def;
-
 #endif /* _ACX_STRUCT_H_ */

@@ -158,6 +158,19 @@ enum {
 #define ACX_TX_QUEUE_MAX_LENGTH 20
 
 /*
+ * BOM Global data
+ * ==================================================
+ */
+extern const u8 acx_bitpos2ratebyte[];
+extern const u8 acx_bitpos2rate100[];
+
+extern const u8 acx_reg_domain_ids[];
+extern const char * const acx_reg_domain_strings[];
+enum {
+	acx_reg_domain_ids_len = 8
+};
+
+/*
  * BOM Main acx per-device data structure
  * ==================================================
  */
