@@ -1,5 +1,8 @@
-1. Introduction
+acx-mac80211 INSTALL   
+====================
 
+I. Introduction
+---------------
 This document describes the steps required to build and install the acx driver
 in a Linux system.
 
@@ -8,12 +11,154 @@ of which only one of them must be chosen. The recommended way, because of its
 simplicity, is the out-of-tree installation, although it requires an installed
 set of kernel include headers in the system.
 
-The following sections describe each one of these two methods. Notice again
-that you should only pick one of them.
+Alternatively you may also consider a DKMS installation, see chapter III) 
+below.
 
-1. Inside the kernel tree 
+For hx4700 or rx1950 chapter V) is describing building and installation of 
+driver and platform modules.
 
-1.1 Copy the driver sources into the kernel tree
+II. As a module, outside the kernel tree
+----------------------------------------
+This is the recommended and most straight forward method for end-users for
+using the driver.
+
+1) Install the sources, e.g. from a tar-ball or a git repository:
+---
+tar -zxf acx-source.tar.gz
+
+git clone git:[repro]
+git checkout [branch] -b [branch]
+---
+
+2) Build the module: 
+
+The result will be the acx-mac80211.ko kernel module. The default build config will include pci and usb support.
+
+Make sure your kernel headers are installed and that the corresponding 'build' sym-link is set in '/lib/modules/[kernel]/build'.
+
+A simple make should compile the driver in 10secs.
+---
+make
+---
+
+3) Install the module:
+
+You can basically install the module a) fully in your kernels /lib/modules installation or b) keep just keep it locally and do the loading individually.
+
+3a) 
+---
+make install
+depmod
+---
+
+3b) ... or just use it in place. See usage below.
+
+4) Usage:
+
+The acx-mac80211 driver depends on the mac80211 module. So it should be loaded before. 
+
+4.1.a) Following a 3a) installation:
+
+Module dependency for mac80211 should have been updated by depmod, so a simple modprobe will load the driver:
+---
+modprobe acx-mac80211
+---
+
+4.1.b) Following a 3b) installation:
+---
+modprobe mac80211
+insmod ./acx-mac80211.ko
+--- 
+
+4.2) Firmware installation:
+
+If the firmware file is not yet installed, you will find following message in 'dmesg':
+---
+---
+=> See the README and wiki for more information on firmware installation.
+
+Install the corresponding firmware file [tiacx] into '/lib/firmware' and reload the driver:
+---
+rmmod acx-mac80211
+modprobe acx-mac80211 ... or ... insmod ./acx-mac80211.ko
+---
+
+5) That's it. A 'dmesg' should show the driver having probed devices. 
+
+Using 'iwconfig' you should see the corresponding the wlan[0-9] (depending on 
+how many wifi cards you have ;) interface now.
+
+A basic smoke test is performing a scan or two:
+---
+ifconfig wlan[0-9] up
+iwlist wlan[0-9] scan
+---
+
+6) Advanced build
+
+In case you need to specify configuration options other than the default PCI
+build (e.g. you need to build the USB driver, or you want to build against a
+special kernel version), you will first need to have a look at the Makefile in
+order to understand it.
+
+You will see that there is an EXTRA_KCONFIG variable, which you can modify
+directly on the file or define it on the command-line to suit your needs:
+
+   export EXTRA_KCONFIG="CONFIG_ACX_MAC80211=m CONFIG_ACX_MAC80211_USB=y" && make
+
+If you use this method (CLI), do not forget to either unset ('unset
+EXTRA_KCONFIG') or explicitly define EXTRA_KCONFIG for subsequent builds!
+
+You can also define the KERNELDIR variable in order to specify a different
+kernel directory other than that of the the currently running one.
+
+Note that you can also execute make with 'make V=1' in order to get verbose
+information during the build.
+
+
+III. DKMS installation
+----------------------
+
+For a DKMS installation, do the following
+
+1) Install the acx-mac80211 source into /usr/src in a directory with following form
+---
+/usr/src/acx-mac80211-[version]
+---
+
+Where [version] can e.g. also be "git", if it's the git repository
+---
+/usr/src/acx-mac80211-git
+---
+
+2) Then add the "acx-mac80211" driver module, and in this example version "git", to DKMS
+---
+dkms add -m acx-mac80211 -v git 
+---
+
+3) And build and install the module like this:
+---
+dkms build -m acx-mac80211 -v git 
+dkms install -m acx-mac80211 -v git 
+---
+
+4) Then the driver module can be loaded / unloaded with the usual means:
+---
+modprobe acx-mac80211
+rmmod acx-mac80211
+---
+
+5) To uninstall the driver from DKMS use the following
+---
+dkms uninstall -m acx-mac80211 -v git 
+dkms remove -m acx-mac80211 -v git --all 
+---
+
+
+VI. Inside the kernel tree 
+---------------------------
+
+1) Copy the driver sources into the kernel tree
 
   cd <linux-sources-path>
   cd drivers/net/wireless/
@@ -21,7 +166,7 @@ that you should only pick one of them.
   cd acx
   cp <acx-mac80211-sources-path>/* .
 
-1.2. Kernel build system preparation 
+2) Kernel build system preparation 
 
 Modify the file drivers/net/wireless/Makefile by adding the following line to
 it:
@@ -69,7 +214,7 @@ Device Drivers  --->
          [*]     TI acx100/acx111 802.11b/g PCI
          [ ]     TI acx100/acx111 802.11b/g USB (NEW)
 
-1.3. Build
+3) Build
 
 Issue a standard 'make' or 'make modules' command on the command line in order
 to start the compilation of the kernel. Depending on the kernel configuration
@@ -77,56 +222,38 @@ you have chosen, this might take some time.
 
 Refer to the kernel documentation for further information.
 
-1.4. Installation
+4) Installation
 
 TODO -> description of the standard kernel module installation and the 'make
 modules_install' target. Refer to the kernel documentation for now.
 
-2. Outside the kernel tree
+V) hx4700 or rx1950 installation
+--------------------------------
 
-2.1. Quick-start build
+The acx-mac80211 driver includes slave-memory and platform module support for
+the iPaq hx4700 and rx1950. 
 
-Assuming you have a set of installed kernel headers for the kernel against you
-are trying to build -and run- the driver, and you are building the PCI driver,
-you can simply issue the usual make command:
+Here some complementary instructions for build, install and usage.
 
-  make
+1) Select CONFIG_ACX_MAC80211_MEM and deselect CONFIG_ACX_MAC80211_PCI and 
+CONFIG_ACX_MAC80211_USB in the Makefile
 
-You can now skip to the 'Installation' section below.
+2) Build the driver module with your tool chain (no more details, since 
+probably at this point corresponding cross-building know-how is anyway present)
 
-2.2. Advanced build
+3) Build the platform module in the corresponding platform directory (cd platform-(hx4700|rx1950); make)
 
-In case you need to specify configuration options other than the default PCI
-build (e.g. you need to build the USB driver, or you want to build against a
-special kernel version), you will first need to have a look at the Makefile in
-order to understand it.
+4) Install the acx-mac80211.ko and (hx4700|rx1950)_acx.ko modules on your
+machine
 
-You will see that there is an EXTRA_KCONFIG variable, which you can modify
-directly on the file or define it on the command-line to suit your needs:
+5) Install firmware, see above 
 
-   export EXTRA_KCONFIG="CONFIG_ACX_MAC80211=m CONFIG_ACX_MAC80211_USB=y" && make
+6) First load acx-mac80211, then the platform module
 
-If you use this method (CLI), do not forget to either unset ('unset
-EXTRA_KCONFIG') or explicitly define EXTRA_KCONFIG for subsequent builds!
-
-You can also define the KERNELDIR variable in order to specify a different
-kernel directory other than that of the the currently running one.
-
-Note that you can also execute make with 'make V=1' in order to get verbose
-information during the build.
- 
-2.3. Installation
-
-TODO -> check the modules_install target (i.e. 'make modules_install' as root)
-
-If you have got any comments, questions or want to propose some improvement to
-these instructions, please either send an e-mail to the acx driver user's
-mailing list at <acx100-users@list.sourceforge.net> or post a message to the
-project's forum at http://sourceforge.net/forum/forum.php?forum_id=257272.
+7) Driver should probe and the wlan interface appear.
 
 -----
-
-Copyright (C) 2008 The ACX100 Open Source Project
+Copyright (C) 2008, 2010 The ACX100 Open Source Project
 <acx100-devel@lists.sourceforge.net>
 
 This program is free software: you can redistribute it and/or modify it under
@@ -143,3 +270,7 @@ this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Original author:
 	David Planella <david.planella AT gmail.com>
+
+Updated by: 
+  Oliver Winker <oliver AT oli1170.net>
+	
