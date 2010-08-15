@@ -3635,13 +3635,6 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (acx_proc_register_entries(ieee, 0) != OK)
 		goto fail_proc_register_entries;
 
-	/* Now we have our device, so make sure the kernel doesn't try
-	 * to send packets even though we're not associated to a network yet */
-
-	/* after register_netdev() userspace may start working with dev
-	 * (in particular, on other CPUs), we only need to up the sem */
-	/* acx_sem_unlock(adev); */
-
 	printk("acx: net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
