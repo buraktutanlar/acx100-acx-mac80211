@@ -1881,7 +1881,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	acx_proc_register_entries(ieee, 0);
 
-	printk("acx: USB module " ACX_RELEASE " loaded successfully\n");
+	printk("acx: USB module loaded successfully\n");
 
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
@@ -1989,7 +1989,7 @@ static void acxusb_e_disconnect(struct usb_interface *intf)
  */
 int __init acxusb_e_init_module(void)
 {
-	log(L_INIT, "acx: USB module " ACX_RELEASE " initialized, "
+	log(L_INIT, "acx: USB module initialized, "
 	    "probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }
@@ -2005,6 +2005,6 @@ int __init acxusb_e_init_module(void)
 void __exit acxusb_e_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
-	log(L_INIT, "acx: USB module " ACX_RELEASE " unloaded\n");
+	log(L_INIT, "acx: USB module unloaded\n");
 }
 
