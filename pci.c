@@ -3642,7 +3642,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(adev); */
 
-	printk("acx: acx " ACX_RELEASE ": net device %s, driver compiled "
+	printk("acx: net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
@@ -4248,7 +4248,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(adev); */
 
-	printk("acx: acx " ACX_RELEASE ": net device %s, driver compiled "
+	printk("acx: net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
@@ -4418,7 +4418,7 @@ int __init acxpci_e_init_module(void)
 #endif
 	log(L_INIT,
 	    "acx: " ENDIANNESS_STRING
-	    " PCI/VLYNQ module " ACX_RELEASE " initialized, "
+	    " PCI/VLYNQ module initialized, "
 	    "waiting for cards to probe...\n");
 
 #if defined(CONFIG_PCI)
@@ -4452,6 +4452,6 @@ void __exit acxpci_e_cleanup_module(void)
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
 	log(L_INIT,
-	    "acxpci: PCI module " ACX_RELEASE " unloaded\n");
+	    "acxpci: PCI module unloaded\n");
 	FN_EXIT0;
 }
