@@ -4069,7 +4069,8 @@ static struct vlynq_known vlynq_known_devices[] = {
 
 static struct vlynq_device_id acx_vlynq_id[] = {
 	{ CHIP_TNETW1130, vlynq_div_auto, 0 },
-	{ CHIP_TNETW1350, vlynq_div_auto, 1 },
+	// TNETW1350 not supported by the acx driver, therefore don't claim it anymore
+	// { CHIP_TNETW1350, vlynq_div_auto, 1 },
 	{ 0, 0, 0 },
 };
 
