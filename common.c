@@ -4034,13 +4034,16 @@ static int acx_e_proc_show_acx(struct seq_file *file, void *v)
 	acx_sem_lock(adev);
 
 	seq_printf(file,
-		     "acx driver version:\t\t" ACX_RELEASE "\n"
-		     "Wireless extension version:\t" STRING(WIRELESS_EXT) "\n"
+		     "acx driver version:\t\t%s (git: %s)\n"
+		     "Wireless extension version:\t%s\n"
 		     "chip name:\t\t\t%s (0x%08X)\n"
 		     "radio type:\t\t\t0x%02X\n"
 		     "form factor:\t\t\t0x%02X\n"
 		     "EEPROM version:\t\t\t0x%02X\n"
 		     "firmware version:\t\t%s (0x%08X)\n",
+		     ACX_RELEASE,
+		     strlen(ACX_GIT_VERSION) ? ACX_GIT_VERSION : "unknown",
+		     STRING(WIRELESS_EXT),
 		     adev->chip_name, adev->firmware_id,
 		     adev->radio_type,
 		     adev->form_factor,
@@ -6077,6 +6080,13 @@ static int __init acx_e_init_module(void)
 	int r1, r2, r3;
 
 	acx_struct_size_check();
+
+	printk("acx: acx-mac80211, version: %s (git: %s)\n",
+        ACX_RELEASE,
+        // ACX_GIT_VERSION can be an empty string, if something went wrong before on
+        // Makefile/shell level. We trap this here ... since trapping empty macro strings
+        // in cpp seems not possible (didn't find how ) !?
+        strlen(ACX_GIT_VERSION) ? ACX_GIT_VERSION : "unknown");
 
 	printk("acx: this driver is still EXPERIMENTAL\n"
 	       "acx: please read the README file and/or "
