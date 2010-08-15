@@ -18,7 +18,7 @@
 #ifndef _ACX_CONFIG_H_
 #define _ACX_CONFIG_H_
 
-#define ACX_RELEASE "v0.5.0"
+#define ACX_RELEASE "v0.6.0"
 
 /* set to 0 if you don't want any debugging code to be compiled in */
 /* set to 1 if you want some debugging */
