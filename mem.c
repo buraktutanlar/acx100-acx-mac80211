@@ -5168,9 +5168,9 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	 * (in particular, on other CPUs), we only need to up the sem */
 	/* acx_sem_unlock(adev); */
 
-	printk("acx "ACX_RELEASE": net device %s, driver compiled "
-	"against wireless extensions %d and Linux %s\n", wiphy_name(adev->ieee->wiphy),
-	WIRELESS_EXT,	UTS_RELEASE);
+	printk("acx: net device %s, driver compiled "
+        "against wireless extensions %d and Linux %s\n",
+        wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
 
@@ -5472,7 +5472,7 @@ int __init acxmem_e_init_module(void) {
 #endif
 	log(L_INIT,
 			ENDIANNESS_STRING
-			"acx: Slave-memory module " ACX_RELEASE " initialized, "
+			"acx: Slave-memory module initialized, "
 			"waiting for cards to probe...\n"
 	);
 
