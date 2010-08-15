@@ -5164,10 +5164,6 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 	acx_carrier_off(ndev, "on probe");
 #endif
 
-	/* after register_netdev() userspace may start working with dev
-	 * (in particular, on other CPUs), we only need to up the sem */
-	/* acx_sem_unlock(adev); */
-
 	printk("acx: net device %s, driver compiled "
         "against wireless extensions %d and Linux %s\n",
         wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
