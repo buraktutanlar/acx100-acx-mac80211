@@ -199,7 +199,7 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
-static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
+static inline client_t *acxmem_get_txc(acx_device_t *adev, txdesc_t* txdesc);
 static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
 
@@ -3396,7 +3396,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 }
 
 static inline client_t*
-get_txc(acx_device_t *adev, txdesc_t* txdesc) {
+acxmem_get_txc(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
