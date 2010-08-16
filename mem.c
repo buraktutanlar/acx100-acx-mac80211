@@ -194,7 +194,7 @@ void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
-static void init_acx_txbuf(acx_device_t *adev);
+static void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
@@ -2564,7 +2564,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	/*
 	 * Set up transmit buffer administration
 	 */
-	init_acx_txbuf(adev);
+	acxmem_init_acx_txbuf(adev);
 
 	acxmem_lock();
 	/*
@@ -3324,7 +3324,7 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
  * block.  The upper 13 bits are a control field, of which only 0x02000000 has any
  * meaning.  The lower 19 bits are the address of the next block divided by 32.
  */
-static void init_acx_txbuf(acx_device_t *adev) {
+static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
 	/*
 	 * acx100_s_init_memory_pools set up txbuf_start and txbuf_numblocks for us.
