@@ -197,7 +197,7 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
-static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
+static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
 static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
@@ -381,7 +381,7 @@ static void acxmem_log_txbuffer(acx_device_t *adev) {
 	for (i = 0; i < TX_CNT; i++) {
 		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 		printk("%02X ", Ctl_8);
-		txdesc = advance_txdesc(adev, txdesc, 1);
+		txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
 	}
 	printk("\n");
 }
@@ -1280,7 +1280,7 @@ static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start) 
 		for (i = 0; i < TX_CNT; i++) {
 			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 			/* reserve two (hdr desc and payload desc) */
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -2830,7 +2830,7 @@ int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 			}
 #endif
 
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
 		}
 	}
 
@@ -3376,7 +3376,7 @@ acxmem_get_txdesc(acx_device_t *adev, int index) {
 }
 
 static inline txdesc_t*
-advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
+acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
 }
 
@@ -4871,7 +4871,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 					txdesc->Ctl2_8,
 					txdesc->error,
 					txdesc->u.r1.rate);
-			txdesc = advance_txdesc(adev, txdesc, 1);
+			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
 		}
 
 		/* dump host tx descriptor ring buffer */
