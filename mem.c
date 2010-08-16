@@ -198,7 +198,7 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
-static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
+static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
 static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
@@ -3197,7 +3197,7 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 }
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
-	return get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
+	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
 }
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
@@ -3381,7 +3381,7 @@ acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 }
 
 static txhostdesc_t*
-get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
+acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
 		printk("bad txdesc ptr %p\n", txdesc);
@@ -3465,7 +3465,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = get_txhostdesc(adev, txdesc);
+	hostdesc1 = acxmem_get_txhostdesc(adev, txdesc);
 	wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
 
 	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
@@ -3724,7 +3724,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
 
-		hostdesc = get_txhostdesc(adev, txdesc);
+		hostdesc = acxmem_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
         if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && !(error & 0x30))
