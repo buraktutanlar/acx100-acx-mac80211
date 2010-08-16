@@ -192,7 +192,7 @@ void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
-static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count);
+static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
@@ -3213,7 +3213,7 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 /*
  * Return an acx pointer to the next transmit data block.
  */
-static u32 allocate_acx_txbuf_space(acx_device_t *adev, int count) {
+static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	u32 block, next, last_block;
 	int blocks_needed;
 
@@ -3550,7 +3550,7 @@ void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 * They don't necessarily map one to one with the transmit queue entries,
 		 * so search through them starting just after the last one used.
 		 */
-		addr = allocate_acx_txbuf_space(adev, len);
+		addr = acxmem_allocate_acx_txbuf_space(adev, len);
 		if (addr) {
 			acxmem_chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
 		} else {
