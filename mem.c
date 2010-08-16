@@ -200,7 +200,7 @@ static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *acxmem_get_txc(acx_device_t *adev, txdesc_t* txdesc);
-static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc);
+static inline u16 acxmem_get_txr(acx_device_t *adev, txdesc_t* txdesc);
 static inline void put_txcr(acx_device_t *adev, txdesc_t* txdesc, client_t* c, u16 r111);
 
 void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
@@ -3410,7 +3410,7 @@ acxmem_get_txc(acx_device_t *adev, txdesc_t* txdesc) {
 	return adev->txc[index];
 }
 
-static inline u16 get_txr(acx_device_t *adev, txdesc_t* txdesc) {
+static inline u16 acxmem_get_txr(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
 	index /= adev->txdesc_size;
 	return adev->txr[index];
