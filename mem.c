@@ -196,7 +196,7 @@ static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
-static inline txdesc_t *get_txdesc(acx_device_t *adev, int index);
+static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static inline client_t *get_txc(acx_device_t *adev, txdesc_t* txdesc);
@@ -3111,7 +3111,7 @@ tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
 	/*
 	 * txdesc points to ACX memory
 	 */
-	txdesc = get_txdesc(adev, head);
+	txdesc = acxmem_get_txdesc(adev, head);
 	ctl8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 
 	/*
@@ -3371,7 +3371,7 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 }
 
 static inline txdesc_t*
-get_txdesc(acx_device_t *adev, int index) {
+acxmem_get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
 }
 
@@ -3692,7 +3692,7 @@ unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		txdesc = get_txdesc(adev, finger);
+		txdesc = acxmem_get_txdesc(adev, finger);
 
 		/* If we allocated txdesc on tx path but then decided
 		 ** to NOT use it, then it will be left as a free "bubble"
@@ -3786,7 +3786,7 @@ void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txdesc = get_txdesc(adev, i);
+		txdesc = acxmem_get_txdesc(adev, i);
 
 		/* free it */
 		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
