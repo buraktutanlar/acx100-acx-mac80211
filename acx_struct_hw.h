@@ -25,7 +25,6 @@
 */
 typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
-typedef struct client client_t;
 typedef struct rxdesc rxdesc_t;
 typedef struct txdesc txdesc_t;
 typedef struct rxhostdesc rxhostdesc_t;
@@ -704,50 +703,6 @@ typedef struct key_struct {
 	u16	len;		/* 0x10 */
 	u8	key[29];	/* 0x12; is this long enough??? */
 } key_struct_t;			/* size = 276. FIXME: where is the remaining space?? */
-
-
-/*--- Client (peer) info -----------------------------------------------------*/
-/* adev->sta_list[] is used for:
-** accumulating and processing of scan results
-** keeping client info in AP mode
-** keeping AP info in STA mode (AP is the only one 'client')
-** keeping peer info in ad-hoc mode
-** non-firmware struct --> no packing necessary */
-enum {
-	CLIENT_EMPTY_SLOT_0 = 0,
-	CLIENT_EXIST_1 = 1,
-	CLIENT_AUTHENTICATED_2 = 2,
-	CLIENT_ASSOCIATED_3 = 3,
-	CLIENT_JOIN_CANDIDATE = 4
-};
-struct client {
-	/* most frequent access first */
-	u8	used;			/* misnamed, more like 'status' */
-	struct client*	next;
-	unsigned long	mtime;		/* last time we heard it, in jiffies */
-	size_t	essid_len;		/* length of ESSID (without '\0') */
-	u32	sir;			/* Standard IR */
-	u32	snr;			/* Signal to Noise Ratio */
-	u16	aid;			/* association ID */
-	u16	seq;			/* from client's auth req */
-	u16	auth_alg;		/* from client's auth req */
-	u16	cap_info;		/* from client's assoc req */
-	u16	rate_cap;		/* what client supports (all rates) */
-	u16	rate_bas;		/* what client supports (basic rates) */
-	u16	rate_cfg;		/* what is allowed (by iwconfig etc) */
-	u16	rate_cur;		/* currently used rate mask */
-	u8	rate_100;		/* currently used rate byte (acx100 only) */
-	u8	address[ETH_ALEN];
-	u8	bssid[ETH_ALEN];	/* ad-hoc hosts can have bssid != mac */
-	u8	channel;
-	u8	auth_step;
-	u8	ignore_count;
-	u8	fallback_count;
-	u8	stepup_count;
-	char	essid[IW_ESSID_MAX_SIZE + 1];	/* ESSID and trailing '\0'  */
-/* FIXME: this one is too damn big */
-	char	challenge_text[128]; /*WLAN_CHALLENGE_LEN*/
-};
 
 
 /***********************************************************************
