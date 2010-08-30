@@ -460,8 +460,6 @@ struct acx_device {
 	unsigned int	txhostdesc_area_size;
 
 	unsigned int	txdesc_size;	/* size of txdesc; ACX111 = ACX100 + 4 */
-	client_t	*txc[TX_CNT];
-	u16		txr[TX_CNT];
 
 	/* same for rx */
 	unsigned int	rx_tail;
