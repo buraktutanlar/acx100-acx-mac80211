@@ -152,7 +152,7 @@ int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 #ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
 #endif
-static inline void read_eeprom_area(acx_device_t *adev);
+static inline void acxmem_read_eeprom_area(acx_device_t *adev);
 int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static int acxmem_s_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
@@ -1617,7 +1617,7 @@ acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 }
 #endif /* UNUSED */
 
-static inline void read_eeprom_area(acx_device_t *adev) {
+static inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #if ACX_DEBUG > 1
 	int offs;
 	u8 tmp;
@@ -2481,7 +2481,7 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* test that EEPROM is readable */
-	read_eeprom_area(adev);
+	acxmem_read_eeprom_area(adev);
 
 	result = OK;
 	goto end;
