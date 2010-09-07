@@ -617,7 +617,7 @@ void __exit acxusb_e_cleanup_module(void);
  * ==================================================
  */
 // Data Access
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+int acxmem_create_hostdesc_queues(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 void acxmem_free_desc_queues(acx_device_t *adev);
 

@@ -136,7 +136,7 @@ static void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *sou
 static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8 *source, int count);
 static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
 
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev);
+int acxmem_create_hostdesc_queues(acx_device_t *adev);
 static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev);
 static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
@@ -987,7 +987,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 
 }
 
-int acxmem_s_create_hostdesc_queues(acx_device_t *adev) {
+int acxmem_create_hostdesc_queues(acx_device_t *adev) {
 	int result;
 	result = acxmem_s_create_tx_host_desc_queue(adev);
 	if (OK != result)
