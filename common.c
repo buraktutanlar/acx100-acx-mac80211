@@ -1545,7 +1545,7 @@ acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 	if (IS_USB(adev))
 		return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
 	if (IS_MEM(adev))
-		return acxmem_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+		return acxmem_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return (NOT_OK);

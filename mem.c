@@ -164,7 +164,7 @@ static void acx_show_card_eeprom_id(acx_device_t *adev);
 #endif
 
 // CMDs (Control Path)
-int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
+int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
 static inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 static u32 acxmem_read_cmd_type_status(acx_device_t *adev);
 static inline void acxmem_init_mboxes(acx_device_t *adev);
@@ -2084,7 +2084,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
-int acxmem_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
 
 	unsigned long start = jiffies;
