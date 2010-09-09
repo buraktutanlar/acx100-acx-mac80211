@@ -153,7 +153,7 @@ int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
 #endif
 static inline void acxmem_read_eeprom_area(acx_device_t *adev);
-int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static int acxmem_s_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_s_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
@@ -1638,7 +1638,7 @@ static inline void acxmem_read_eeprom_area(acx_device_t *adev) {
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
-int acxmem_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
+int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 	int result = NOT_OK;
 	int count;
 	acxmem_lock_flags;
