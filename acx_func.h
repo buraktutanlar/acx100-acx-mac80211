@@ -663,7 +663,7 @@ void acxmem_irq_work(struct work_struct *work);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Helpers
-void acxmem_l_power_led(acx_device_t *adev, int enable);
+void acxmem_power_led(acx_device_t *adev, int enable);
 
 // Ioctls
 //int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);

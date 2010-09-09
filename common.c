@@ -2272,7 +2272,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		if (IS_PCI(adev))
 			acxpci_l_power_led(adev, adev->led_power);
 		else if (IS_MEM(adev))
-			acxmem_l_power_led(adev, adev->led_power);
+			acxmem_power_led(adev, adev->led_power);
 
 		CLEAR_BIT(adev->set_mask, GETSET_LED_POWER);
 	}

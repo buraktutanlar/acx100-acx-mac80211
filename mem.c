@@ -221,7 +221,7 @@ static int acxmem_op_start(struct ieee80211_hw *hw);
 static void acxmem_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
-void acxmem_l_power_led(acx_device_t *adev, int enable);
+void acxmem_power_led(acx_device_t *adev, int enable);
 INLINE_IO int acxmem_adev_present(acx_device_t *adev);
 static char acxmem_printable(char c);
 //static void update_link_quality_led(acx_device_t *adev);
@@ -4532,7 +4532,7 @@ static void acxmem_op_stop(struct ieee80211_hw *hw)
  * ==================================================
  */
 
-void acxmem_l_power_led(acx_device_t *adev, int enable) {
+void acxmem_power_led(acx_device_t *adev, int enable) {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
 	/* A hack. Not moving message rate limiting to adev->xxx
@@ -4572,7 +4572,7 @@ static void update_link_quality_led(acx_device_t *adev) {
 
 	if (time_after(jiffies, adev->brange_time_last_state_change +
 			(HZ/2 - HZ/2 * (unsigned long)qual / adev->brange_max_quality ) )) {
-		acxmem_l_power_led(adev, (adev->brange_last_state == 0));
+		acxmem_power_led(adev, (adev->brange_last_state == 0));
 		adev->brange_last_state ^= 1; /* toggle */
 		adev->brange_time_last_state_change = jiffies;
 	}
@@ -5235,7 +5235,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
-		acxmem_l_power_led(adev, 0);
+		acxmem_power_led(adev, 0);
 
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
