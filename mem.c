@@ -180,7 +180,7 @@ static void acxmem_up(struct ieee80211_hw *hw);
 // Other (Control Path)
 
 // Proc, Debug
-int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 
 // Rx Path
@@ -2704,7 +2704,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * BOM Proc, Debug
  * ==================================================
  */
-int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
+int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
 	u8 Ctl_8;

@@ -639,7 +639,7 @@ int acxmem_reset_dev(acx_device_t *adev);
 // Other (Control Path)
 
 // Proc, Debug
-int acxmem_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 
 // Rx Path
