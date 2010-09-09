@@ -645,7 +645,7 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 // Rx Path
 
 // Tx Path
-tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
+tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);

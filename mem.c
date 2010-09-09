@@ -187,7 +187,7 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 static void acxmem_process_rxdesc(acx_device_t *adev);
 
 // Tx Path
-tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
+tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
@@ -3034,7 +3034,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
  * sufficiently many.
  */
  // OW TODO Align with pci.c
-tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len) {
+tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	struct txdesc *txdesc;
 	unsigned head;
 	u8 ctl8;
