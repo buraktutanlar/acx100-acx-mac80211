@@ -232,7 +232,7 @@ static char acxmem_printable(char c);
 
 // Driver, Module
 static int __devinit acxmem_probe(struct platform_device *pdev);
-static int __devexit acxmem_e_remove(struct platform_device *pdev);
+static int __devexit acxmem_remove(struct platform_device *pdev);
 #ifdef CONFIG_PM
 static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
 static int acxmem_e_resume(struct platform_device *pdev);
@@ -5195,7 +5195,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-static int __devexit acxmem_e_remove(struct platform_device *pdev) {
+static int __devexit acxmem_remove(struct platform_device *pdev) {
 
 	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
@@ -5393,7 +5393,7 @@ static struct platform_driver acxmem_drv_id = {
 				.name = "acx-mem",
 		},
 		.probe = acxmem_probe,
-		.remove = __devexit_p(acxmem_e_remove),
+		.remove = __devexit_p(acxmem_remove),
 
 		#ifdef CONFIG_PM
 		.suspend = acxmem_e_suspend,
