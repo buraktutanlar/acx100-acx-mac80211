@@ -6106,7 +6106,7 @@ static int __init acx_e_init_module(void)
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
-	r3 = acxmem_e_init_module();
+	r3 = acxmem_init_module();
 #else
 	r3 = -EINVAL;
 #endif

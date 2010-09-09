@@ -237,7 +237,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev);
 static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
 static int acxmem_e_resume(struct platform_device *pdev);
 #endif
-int __init acxmem_e_init_module(void);
+int __init acxmem_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
 
 /*
@@ -5407,7 +5407,7 @@ static struct platform_driver acxmem_drv_id = {
  *
  * Module initialization routine, called once at module load time
  */
-int __init acxmem_e_init_module(void) {
+int __init acxmem_init_module(void) {
 	int res;
 
 	FN_ENTER;

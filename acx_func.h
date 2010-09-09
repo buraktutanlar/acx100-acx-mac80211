@@ -669,7 +669,7 @@ void acxmem_power_led(acx_device_t *adev, int enable);
 //int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 //int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
-int __init acxmem_e_init_module(void);
+int __init acxmem_init_module(void);
 void __exit acxmem_e_cleanup_module(void);
 
 #endif /* _ACX_FUNC_H_ */
