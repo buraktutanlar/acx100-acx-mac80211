@@ -6134,7 +6134,7 @@ static void __exit acx_e_cleanup_module(void)
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
-	acxmem_e_cleanup_module();
+	acxmem_cleanup_module();
 #endif
 
 }

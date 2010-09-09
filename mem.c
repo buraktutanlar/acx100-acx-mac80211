@@ -238,7 +238,7 @@ static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
 static int acxmem_e_resume(struct platform_device *pdev);
 #endif
 int __init acxmem_init_module(void);
-void __exit acxmem_e_cleanup_module(void);
+void __exit acxmem_cleanup_module(void);
 
 /*
  * BOM Defines, static vars, etc.
@@ -5443,7 +5443,7 @@ int __init acxmem_init_module(void) {
  * Called at module unload time. This is our last chance to
  * clean up after ourselves.
  */
-void __exit acxmem_e_cleanup_module(void) {
+void __exit acxmem_cleanup_module(void) {
 	FN_ENTER;
 
 	printk("acxmem: cleanup_module\n");
