@@ -84,7 +84,7 @@ INLINE_IO void write_flush(acx_device_t * adev);
 
 int acxpci_create_hostdesc_queues(acx_device_t * adev);
 static int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
-static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev);
+static int acxpci_create_tx_host_desc_queue(acx_device_t * adev);
 
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
 static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
@@ -336,7 +336,7 @@ INLINE_IO void write_flush(acx_device_t * adev)
 int acxpci_create_hostdesc_queues(acx_device_t * adev)
 {
 	int result;
-	result = acxpci_s_create_tx_host_desc_queue(adev);
+	result = acxpci_create_tx_host_desc_queue(adev);
 	if (OK != result)
 		return result;
 	result = acxpci_create_rx_host_desc_queue(adev);
@@ -411,7 +411,7 @@ static int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 	return NOT_OK;
 }
 
-static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev)
+static int acxpci_create_tx_host_desc_queue(acx_device_t * adev)
 {
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
