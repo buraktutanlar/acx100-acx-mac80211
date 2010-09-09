@@ -212,7 +212,7 @@ int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static void acxmem_irq_enable(acx_device_t *adev);
 static void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_irq_work(struct work_struct *work);
-static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id);
+static irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 static void acxmem_handle_info_irq(acx_device_t *adev);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
@@ -4071,7 +4071,7 @@ void acxmem_irq_work(struct work_struct *work)
 }
 
 // OW TODO Copy of pci: possible merging.
-static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
+static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
@@ -4260,7 +4260,7 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 // OW FIXME Old interrupt handler
 // ---
 #if 0
-static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
+static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
@@ -5066,7 +5066,7 @@ static int __devinit acxmem_e_probe(struct platform_device *pdev) {
 
 	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
 	/* request shared IRQ handler */
-	if (request_irq(adev->irq, acxmem_i_interrupt,
+	if (request_irq(adev->irq, acxmem_interrupt,
 			IRQF_SHARED,
 			KBUILD_MODNAME,
 			adev)) {
