@@ -138,7 +138,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 
 int acxmem_create_hostdesc_queues(acx_device_t *adev);
 static int acxmem_create_rx_host_desc_queue(acx_device_t *adev);
-static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev);
+static int acxmem_create_tx_host_desc_queue(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
@@ -989,7 +989,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 
 int acxmem_create_hostdesc_queues(acx_device_t *adev) {
 	int result;
-	result = acxmem_s_create_tx_host_desc_queue(adev);
+	result = acxmem_create_tx_host_desc_queue(adev);
 	if (OK != result)
 		return result;
 	result = acxmem_create_rx_host_desc_queue(adev);
@@ -1061,7 +1061,7 @@ static int acxmem_create_rx_host_desc_queue(acx_device_t *adev) {
  * only use we have for the host descriptors is to store the packets
  * on the way out.
  */
-static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev) {
+static int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
 	int i;
