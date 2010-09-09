@@ -137,7 +137,7 @@ static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8
 static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
 
 int acxmem_create_hostdesc_queues(acx_device_t *adev);
-static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev);
+static int acxmem_create_rx_host_desc_queue(acx_device_t *adev);
 static int acxmem_s_create_tx_host_desc_queue(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
@@ -992,7 +992,7 @@ int acxmem_create_hostdesc_queues(acx_device_t *adev) {
 	result = acxmem_s_create_tx_host_desc_queue(adev);
 	if (OK != result)
 		return result;
-	result = acxmem_s_create_rx_host_desc_queue(adev);
+	result = acxmem_create_rx_host_desc_queue(adev);
 	return result;
 }
 
@@ -1002,7 +1002,7 @@ int acxmem_create_hostdesc_queues(acx_device_t *adev) {
  * the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end
  */
-static int acxmem_s_create_rx_host_desc_queue(acx_device_t *adev) {
+static int acxmem_create_rx_host_desc_queue(acx_device_t *adev) {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
 	int i;
