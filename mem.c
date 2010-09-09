@@ -157,7 +157,7 @@ int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 static int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
-static int acxmem_s_upload_fw(acx_device_t *adev);
+static int acxmem_upload_fw(acx_device_t *adev);
 
 #if defined(NONESSENTIAL_FEATURES)
 static void acx_show_card_eeprom_id(acx_device_t *adev);
@@ -1872,7 +1872,7 @@ static int acxmem_validate_fw(acx_device_t *adev,
 	return result;
 }
 
-static int acxmem_s_upload_fw(acx_device_t *adev) {
+static int acxmem_upload_fw(acx_device_t *adev) {
 	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
 	int try;
@@ -2452,7 +2452,7 @@ int acxmem_s_reset_dev(acx_device_t *adev) {
 
 	acxmem_unlock();
 	/* load the firmware */
-	if (OK != acxmem_s_upload_fw(adev))
+	if (OK != acxmem_upload_fw(adev))
 		goto end_fail;
 	acxmem_lock();
 
