@@ -83,7 +83,7 @@ INLINE_IO void write_reg8(acx_device_t * adev, unsigned int offset, u8 val);
 INLINE_IO void write_flush(acx_device_t * adev);
 
 int acxpci_create_hostdesc_queues(acx_device_t * adev);
-static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev);
+static int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
 static int acxpci_s_create_tx_host_desc_queue(acx_device_t * adev);
 
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
@@ -339,7 +339,7 @@ int acxpci_create_hostdesc_queues(acx_device_t * adev)
 	result = acxpci_s_create_tx_host_desc_queue(adev);
 	if (OK != result)
 		return result;
-	result = acxpci_s_create_rx_host_desc_queue(adev);
+	result = acxpci_create_rx_host_desc_queue(adev);
 	return result;
 }
 
@@ -349,7 +349,7 @@ int acxpci_create_hostdesc_queues(acx_device_t * adev)
  * the whole size of a data buffer (header plus data body)
  * plus 32 bytes safety offset at the end
  */
-static int acxpci_s_create_rx_host_desc_queue(acx_device_t * adev)
+static int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
