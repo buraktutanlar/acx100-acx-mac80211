@@ -184,7 +184,7 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
 
 // Rx Path
-static void acxmem_l_process_rxdesc(acx_device_t *adev);
+static void acxmem_process_rxdesc(acx_device_t *adev);
 
 // Tx Path
 tx_t *acxmem_l_alloc_tx(acx_device_t *adev, unsigned int len);
@@ -2908,7 +2908,7 @@ int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev) {
  *
  * Called directly and only from the IRQ handler
  */
-static void acxmem_l_process_rxdesc(acx_device_t *adev) {
+static void acxmem_process_rxdesc(acx_device_t *adev) {
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc;
 	unsigned count, tail;
@@ -4022,7 +4022,7 @@ void acxmem_irq_work(struct work_struct *work)
 		/* Rx processing */
 		if (irqmasked & HOST_INT_RX_DATA) {
 			log(L_IRQ, "acxmem: got Rx_Complete IRQ\n");
-			acxmem_l_process_rxdesc(adev);
+			acxmem_process_rxdesc(adev);
 		}
 
 		/* HOST_INT_INFO */
@@ -4323,7 +4323,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 		// then we are then not getting rx irqs anymore
 		if (irqtype & HOST_INT_RX_DATA) {
 			log(L_IRQ, "got Rx_Data IRQ\n");
-			acxmem_l_process_rxdesc(adev);
+			acxmem_process_rxdesc(adev);
 		}
 
 		if (irqtype & HOST_INT_TX_COMPLETE) {
