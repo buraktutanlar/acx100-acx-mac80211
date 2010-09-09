@@ -2516,7 +2516,7 @@ int acx_net_reset(struct ieee80211_hw *ieee)
 	if (IS_PCI(adev))
 		acxpci_s_reset_dev(adev);
 	if (IS_MEM(adev))
-		acxmem_s_reset_dev(adev);
+		acxmem_reset_dev(adev);
 	else
 		TODO();
 

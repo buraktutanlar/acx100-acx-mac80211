@@ -170,7 +170,7 @@ static u32 acxmem_read_cmd_type_status(acx_device_t *adev);
 static inline void acxmem_init_mboxes(acx_device_t *adev);
 
 // Init, Configure (Control Path)
-int acxmem_s_reset_dev(acx_device_t *adev);
+int acxmem_reset_dev(acx_device_t *adev);
 static int acxmem_s_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
 static void acxmem_l_reset_mac(acx_device_t *adev);
@@ -2362,7 +2362,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-int acxmem_s_reset_dev(acx_device_t *adev) {
+int acxmem_reset_dev(acx_device_t *adev) {
 	const char* msg = "";
 	int result = NOT_OK;
 	u16 hardware_info;
@@ -2540,7 +2540,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxmem_s_reset_dev(adev))
+	if (OK != acxmem_reset_dev(adev))
 		return -1;
 
 	acxmem_lock();
