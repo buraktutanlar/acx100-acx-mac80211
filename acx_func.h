@@ -656,7 +656,7 @@ unsigned int acxmem_clean_txdesc(acx_device_t *adev);
 void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
-int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Irq Handling, Timer
 void acxmem_irq_work(struct work_struct *work);
