@@ -218,7 +218,7 @@ void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops
 static int acxmem_op_start(struct ieee80211_hw *hw);
-static void acxmem_e_op_stop(struct ieee80211_hw *hw);
+static void acxmem_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
 void acxmem_l_power_led(acx_device_t *adev, int enable);
@@ -4447,7 +4447,7 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 		.remove_interface = acx_e_op_remove_interface,
 		.start = acxmem_op_start,
 		.configure_filter = acx_i_op_configure_filter,
-		.stop = acxmem_e_op_stop,
+		.stop = acxmem_op_stop,
 		.config = acx_e_op_config,
 		.bss_info_changed = acx_e_op_bss_info_changed,
 		.set_key = acx_e_op_set_key,
@@ -4490,7 +4490,7 @@ static int acxmem_op_start(struct ieee80211_hw *hw) {
 }
 
 
-static void acxmem_e_op_stop(struct ieee80211_hw *hw)
+static void acxmem_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
