@@ -231,7 +231,7 @@ static char acxmem_printable(char c);
 //int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
 // Driver, Module
-static int __devinit acxmem_e_probe(struct platform_device *pdev);
+static int __devinit acxmem_probe(struct platform_device *pdev);
 static int __devexit acxmem_e_remove(struct platform_device *pdev);
 #ifdef CONFIG_PM
 static int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
@@ -4936,7 +4936,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
-static int __devinit acxmem_e_probe(struct platform_device *pdev) {
+static int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	acx_device_t *adev = NULL;
 	const char *chip_name;
@@ -5392,7 +5392,7 @@ static struct platform_driver acxmem_drv_id = {
 		.driver = {
 				.name = "acx-mem",
 		},
-		.probe = acxmem_e_probe,
+		.probe = acxmem_probe,
 		.remove = __devexit_p(acxmem_e_remove),
 
 		#ifdef CONFIG_PM
