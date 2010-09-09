@@ -91,7 +91,7 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 
 void acxpci_free_desc_queues(acx_device_t * adev);
-static void acxpci_s_delete_dma_regions(acx_device_t * adev);
+static void acxpci_delete_dma_regions(acx_device_t * adev);
 static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
@@ -719,7 +719,7 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-static void acxpci_s_delete_dma_regions(acx_device_t * adev)
+static void acxpci_delete_dma_regions(acx_device_t * adev)
 {
 	FN_ENTER;
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
@@ -3816,7 +3816,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 	}
 
 	/* finally, clean up PCI bus state */
-	acxpci_s_delete_dma_regions(adev);
+	acxpci_delete_dma_regions(adev);
 	if (adev->iobase)
 		iounmap(adev->iobase);
 	if (adev->iobase2)
@@ -3873,7 +3873,7 @@ acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	acxpci_s_delete_dma_regions(adev);
+	acxpci_delete_dma_regions(adev);
 	pci_save_state(pdev);
 	pci_set_power_state(pdev, PCI_D3hot);
 
@@ -4351,7 +4351,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */
-	acxpci_s_delete_dma_regions(adev);
+	acxpci_delete_dma_regions(adev);
 	if (adev->iobase)
 		iounmap(adev->iobase);
 	if (adev->iobase2)
