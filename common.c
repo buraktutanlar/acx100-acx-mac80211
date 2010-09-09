@@ -4680,7 +4680,7 @@ static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 	if (IS_USB(adev))
 		acxusb_l_dealloc_tx(tx_opaque);
 	if (IS_MEM(adev))
-		acxmem_l_dealloc_tx (adev, tx_opaque);
+		acxmem_dealloc_tx (adev, tx_opaque);
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return;

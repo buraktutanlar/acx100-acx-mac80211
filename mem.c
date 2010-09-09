@@ -188,7 +188,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev);
 
 // Tx Path
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
-void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
+void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
@@ -3159,7 +3159,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
  * state and move the queue head pointer back.
  *
  */
-void acxmem_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
+void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
 	 */
