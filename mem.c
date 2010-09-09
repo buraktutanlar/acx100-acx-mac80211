@@ -202,7 +202,7 @@ static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxmem_clean_txdesc(acx_device_t *adev);
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
+void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 int acx100mem_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
@@ -3063,7 +3063,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 		} else {
 			txattempts = 0;
 			log(L_ANY, "acxmem: %s: flushing transmit queue.\n", __func__);
-			acxmem_l_clean_txdesc_emergency(adev);
+			acxmem_clean_txdesc_emergency(adev);
 		}
 		txdesc = NULL;
 		goto end;
@@ -3739,7 +3739,7 @@ unsigned int acxmem_clean_txdesc(acx_device_t *adev) {
 
 /* clean *all* Tx descriptors, and regardless of their previous state.
  * Used for brute-force reset handling. */
-void acxmem_l_clean_txdesc_emergency(acx_device_t *adev) {
+void acxmem_clean_txdesc_emergency(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	int i;
 
@@ -3933,7 +3933,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 		printk("%s: FAILED to free any of the many full tx buffers. "
 			"Switching to emergency freeing. "
 			"Please report!\n", ndev->name);
-		acxmem_l_clean_txdesc_emergency(adev);
+		acxmem_clean_txdesc_emergency(adev);
 	}
 
 	if (acx_queue_stopped(ndev) && (ACX_STATUS_4_ASSOCIATED == adev->status))
