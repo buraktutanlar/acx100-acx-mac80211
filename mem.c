@@ -200,7 +200,7 @@ static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
 void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
 
@@ -3402,7 +3402,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-void acxmem_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
 	/*
 	 * txdesc is the address on the ACX

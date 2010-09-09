@@ -4707,7 +4707,7 @@ static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	if (IS_USB(adev))
 		return acxusb_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_MEM(adev))
-		return acxmem_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return acxmem_tx_data(adev, tx_opaque, len, ieeectl, skb);
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return;
