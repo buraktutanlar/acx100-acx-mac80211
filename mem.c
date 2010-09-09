@@ -171,7 +171,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev);
 
 // Init, Configure (Control Path)
 int acxmem_reset_dev(acx_device_t *adev);
-static int acxmem_s_verify_init(acx_device_t *adev);
+static int acxmem_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
 static void acxmem_l_reset_mac(acx_device_t *adev);
 static void acxmem_s_up(struct ieee80211_hw *hw);
@@ -2470,7 +2470,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 
 	acxmem_unlock();
 	/* wait for eCPU bootup */
-	if (OK != acxmem_s_verify_init(adev)) {
+	if (OK != acxmem_verify_init(adev)) {
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
 	}
@@ -2498,7 +2498,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 	return result;
 }
 
-static int acxmem_s_verify_init(acx_device_t *adev) {
+static int acxmem_verify_init(acx_device_t *adev) {
 	int result = NOT_OK;
 	unsigned long timeout;
 	u32 irqstat;
