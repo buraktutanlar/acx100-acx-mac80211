@@ -955,7 +955,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 
 	if (IS_PCI(adev)) {
 		/* sets the beginning of the rx descriptor queue, after the tx descrs */
-		if (OK != acxpci_s_create_hostdesc_queues(adev))
+		if (OK != acxpci_create_hostdesc_queues(adev))
 			goto fail;
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
@@ -1019,7 +1019,7 @@ static int acx111_s_create_dma_regions(acx_device_t * adev)
 
 	/* Set up our host descriptor pool + data pool */
 	if (IS_PCI(adev)) {
-		if (OK != acxpci_s_create_hostdesc_queues(adev))
+		if (OK != acxpci_create_hostdesc_queues(adev))
 			goto fail;
 	}
 	else if (IS_MEM(adev)) {

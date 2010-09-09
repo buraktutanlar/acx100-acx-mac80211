@@ -520,7 +520,7 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 
 // Data Access
 
-int acxpci_s_create_hostdesc_queues(acx_device_t * adev);
+int acxpci_create_hostdesc_queues(acx_device_t * adev);
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
 void acxpci_free_desc_queues(acx_device_t * adev);
 
