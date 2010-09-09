@@ -155,7 +155,7 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charb
 static inline void acxmem_read_eeprom_area(acx_device_t *adev);
 int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-static int acxmem_s_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
+static int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_s_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_s_upload_fw(acx_device_t *adev);
 
@@ -1435,7 +1435,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 
 	for (try = 1; try <= 5; try++) {
 		acxmem_lock();
-		res = acxmem_s_write_fw(adev, radio_image, offset);
+		res = acxmem_write_fw(adev, radio_image, offset);
 		log(L_DEBUG|L_INIT, "acx: acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
 			res = acxmem_s_validate_fw(adev, radio_image, offset);
@@ -1729,7 +1729,7 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	1	firmware image corrupted
  *	0	success
  */
-static int acxmem_s_write_fw(acx_device_t *adev,
+static int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
 	int len, size, checkMismatch = -1;
 	u32 sum, v32, tmp, id;
@@ -1910,7 +1910,7 @@ static int acxmem_s_upload_fw(acx_device_t *adev) {
 	for (try = 1; try <= 5; try++) {
 
 		acxmem_lock();
-		res = acxmem_s_write_fw(adev, fw_image, 0);
+		res = acxmem_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx: acx_write_fw (main): %d\n", res);
 		if (OK == res) {
 			res = acxmem_s_validate_fw(adev, fw_image, 0);
