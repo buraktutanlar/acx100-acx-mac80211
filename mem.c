@@ -174,7 +174,7 @@ int acxmem_reset_dev(acx_device_t *adev);
 static int acxmem_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
 static void acxmem_reset_mac(acx_device_t *adev);
-static void acxmem_s_up(struct ieee80211_hw *hw);
+static void acxmem_up(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
 // Other (Control Path)
@@ -2630,7 +2630,7 @@ static void acxmem_reset_mac(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-static void acxmem_s_up(struct ieee80211_hw *hw) {
+static void acxmem_up(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
@@ -4469,7 +4469,7 @@ static int acxmem_e_op_start(struct ieee80211_hw *hw) {
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
 	/* ifup device */
-	acxmem_s_up(hw);
+	acxmem_up(hw);
 
 	/* We don't currently have to do anything else.
 	 * The setup of the MAC should be subsequently completed via
@@ -5364,7 +5364,7 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 
 	printk("acx: rsm: bringing up interface\n");
 	SET_BIT (adev->set_mask, GETSET_ALL);
-	acxmem_s_up(hw);
+	acxmem_up(hw);
 	printk("acx: rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before suspend,
