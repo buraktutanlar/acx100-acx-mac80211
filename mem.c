@@ -173,7 +173,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev);
 int acxmem_reset_dev(acx_device_t *adev);
 static int acxmem_verify_init(acx_device_t *adev);
 static int acxmem_complete_hw_reset(acx_device_t *adev);
-static void acxmem_l_reset_mac(acx_device_t *adev);
+static void acxmem_reset_mac(acx_device_t *adev);
 static void acxmem_s_up(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
@@ -2404,7 +2404,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 
 	/* end what Windows driver does */
 
-	acxmem_l_reset_mac(adev);
+	acxmem_reset_mac(adev);
 
 	ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
@@ -2592,7 +2592,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
  * MAC will be reset
  * Call context: reset_dev
  */
-static void acxmem_l_reset_mac(acx_device_t *adev) {
+static void acxmem_reset_mac(acx_device_t *adev) {
 	int count;
 	FN_ENTER;
 
@@ -5242,7 +5242,7 @@ static int __devexit acxmem_e_remove(struct platform_device *pdev) {
 			/* FIXME: does this actually keep halting the eCPU?
 			 * I don't think so...
 			 */
-			acxmem_l_reset_mac(adev);
+			acxmem_reset_mac(adev);
 		} else {
 			u16 temp;
 
