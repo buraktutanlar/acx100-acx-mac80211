@@ -190,7 +190,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev);
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
-void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
@@ -3193,7 +3193,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 
 }
 
-void *acxmem_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
+void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
 	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
 }
 
