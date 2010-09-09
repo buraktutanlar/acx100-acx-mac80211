@@ -201,7 +201,7 @@ static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txde
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev);
+unsigned int acxmem_clean_txdesc(acx_device_t *adev);
 void acxmem_l_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
@@ -3615,7 +3615,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * Everytime we get called we know where the next packet to be cleaned is.
  */
 // OW TODO Very similar with pci: possible merging.
-unsigned int acxmem_l_clean_txdesc(acx_device_t *adev) {
+unsigned int acxmem_clean_txdesc(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
 	unsigned finger;
@@ -3919,7 +3919,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_lock(adev, flags);
 
 	/* clean processed tx descs, they may have been completely full */
-	tx_num_cleaned = acxmem_l_clean_txdesc(adev);
+	tx_num_cleaned = acxmem_clean_txdesc(adev);
 
 	/* nothing cleaned, yet (almost) no free buffers available?
 	 * --> clean all tx descs, no matter which status!!
@@ -4007,7 +4007,7 @@ void acxmem_irq_work(struct work_struct *work)
 		/* Tx reporting */
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
 			log(L_IRQ, "acxmem: got Tx_Complete IRQ\n");
-				acxmem_l_clean_txdesc(adev);
+				acxmem_clean_txdesc(adev);
 
 				// Restart queue if stopped and enough tx-descr free
 				if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
@@ -4338,7 +4338,7 @@ static irqreturn_t acxmem_i_interrupt(int irq, void *dev_id)
 #if TX_CLEANUP_IN_SOFTIRQ
 				acx_schedule_task(adev, ACX_AFTER_IRQ_TX_CLEANUP);
 #else
-				acxmem_l_clean_txdesc(adev);
+				acxmem_clean_txdesc(adev);
 #endif
 			}
 		}
