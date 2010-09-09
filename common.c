@@ -2550,7 +2550,7 @@ int acx_s_init_mac(acx_device_t * adev)
 		/* try to load radio for both ACX100 and ACX111, since both
 		 * chips have at least some firmware versions making use of an
 		 * external radio module */
-		acxmem_s_upload_radio(adev);
+		acxmem_upload_radio(adev);
 	}
 	else {
 		adev->memblocksize = 128;
