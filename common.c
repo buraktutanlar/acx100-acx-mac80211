@@ -1524,7 +1524,7 @@ int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 	if (IS_USB(adev))
 		return acxusb_s_write_phy_reg(adev, reg, value);
 	if (IS_MEM(adev))
-		return acxmem_s_write_phy_reg(adev, reg, value);
+		return acxmem_write_phy_reg(adev, reg, value);
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return (NOT_OK);
