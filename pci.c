@@ -803,7 +803,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 		goto fail;
 	}
 
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
 		res = acxpci_write_fw(adev, radio_image, offset);
@@ -821,7 +821,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 		acx_s_mwait(1000);	/* better wait for a while... */
 	}
 
-	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 	radioinit.offset = cpu_to_le32(offset);
 	/* no endian conversion needed, remains in card CPU area: */
 	radioinit.len = radio_image->size;
@@ -832,7 +832,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 		goto fail;
 
 	/* will take a moment so let's have a big timeout */
-	acx_s_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
+	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
 			      &radioinit, sizeof(radioinit),
 			      CMD_TIMEOUT_MS(1000));
 
@@ -3768,8 +3768,8 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 
 		/* Disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 			adev->initialized = 0;
 		}
 
@@ -3777,7 +3777,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 		/* put the eCPU to sleep to save power
 		 * Halting is not possible currently,
 		 * since not supported by all firmware versions */
-		acx_s_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
+		acx_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
@@ -4330,8 +4330,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 			adev->initialized = 0;
 		}
 		/* disable power LED to save power :-) */

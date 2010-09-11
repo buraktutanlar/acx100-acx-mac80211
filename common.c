@@ -80,7 +80,7 @@ int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // CMDs (Control Path)
-int acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
 static int acx111_s_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
 static int acx111_s_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
@@ -877,7 +877,7 @@ acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	}
 
 	/* and tell the device to kick it into gear */
-	if (OK != acx_s_issue_cmd(adev, ACX100_CMD_INIT_MEMORY, NULL, 0)) {
+	if (OK != acx_issue_cmd(adev, ACX100_CMD_INIT_MEMORY, NULL, 0)) {
 		goto bad;
 	}
 
@@ -1537,7 +1537,7 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
  */
 
 int
-acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
+acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 		unsigned len, unsigned timeout, const char* cmdstr)
 {
 	if (IS_PCI(adev))
@@ -1572,7 +1572,7 @@ int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type,
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
+	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 
 	sprintf(msgbuf, "acx: %s: %s: type=0x%04X, typestr=%s, len=%u",
 			__func__, wiphy_name(adev->ieee->wiphy),
@@ -1715,7 +1715,7 @@ acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
+	res = acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		printk("acx: %s: %s: (type:%s) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
@@ -1810,7 +1810,7 @@ void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         tmp.essid_len = adev->essid_len;
 
         memcpy(tmp.essid, adev->essid, tmp.essid_len);
-        acx_s_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
+        acx_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
 
         log(L_ASSOC|L_DEBUG, "acx: BSS_Type = %u\n", tmp.macmode);
         acxlog_mac(L_ASSOC|L_DEBUG, "acx: JoinBSSID MAC:", adev->bssid, "\n");
@@ -2295,9 +2295,9 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		log(L_DEBUG, "acx: updating TX: %s\n",
 		    adev->tx_disabled ? "disable" : "enable");
 		if (adev->tx_disabled)
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 		else {
-			acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
+			acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
 					&adev->channel, 1);
 
 			/* OW 20091231:
@@ -2319,7 +2319,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		/* Enable Rx */
 		log(L_DEBUG, "acx: updating: enable Rx on channel: %u\n",
 		    adev->channel);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
+		acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_RX);
 	}
 
@@ -2393,8 +2393,8 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			break;
 		case ACX_MODE_OFF:
 			/* disable both Tx and Rx to shut radio down properly */
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 
 		default:
 			break;
@@ -2800,7 +2800,7 @@ acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
 
 	memset(&templ, 0, len);
 	templ.null.size = cpu_to_le16(len - 2);
-	res = acx_s_issue_cmd(adev, cmd, &templ, len);
+	res = acx_issue_cmd(adev, cmd, &templ, len);
 	return res;
 }
 
@@ -2927,7 +2927,7 @@ static int acx_s_set_tim_template(acx_device_t *adev)
 	/* - 2: do not count 'u16 size' field */
 	templ.size = cpu_to_le16(len - 2);
 
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
+	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
 	FN_EXIT1(result);
 	return result;
 }
@@ -2942,7 +2942,7 @@ static int acx_s_set_tim_template_off(acx_device_t *adev) {
 	memset(&templ, 0, sizeof(templ));
 	templ.size = cpu_to_le16(sizeof(templ) - 2);;
 
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
+	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
 
 	FN_EXIT1(result);
 	return result;
@@ -3068,7 +3068,7 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 	b.hdr.seq = 0;
 
 	result =
-	    acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
+	    acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA, &b, sizeof(b));
 
 	FN_EXIT1(result);
 	return result;
@@ -3084,7 +3084,7 @@ acx_s_set_beacon_template(acx_device_t *adev, int len)
         FN_ENTER;
 
         len2 = acx_fill_beacon_or_proberesp_template(adev, &bcn, len, IEEE80211_STYPE_BEACON);
-        result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len2);
+        result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len2);
 
         FN_EXIT1(result);
         return result;
@@ -3101,7 +3101,7 @@ acx_s_set_probe_response_template(acx_device_t *adev)
 
 	len1 = adev->beacon_skb->len;
 	len2 = acx_fill_beacon_or_proberesp_template(adev, &pr, len1, IEEE80211_STYPE_PROBE_RESP);
-	result = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len2);
+	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len2);
 
 	FN_EXIT1(result);
 	return result;
@@ -3118,7 +3118,7 @@ static int acx_s_set_probe_response_template_off(acx_device_t *adev) {
 	templ.size = cpu_to_le16(sizeof(templ) - 2);;
 
 	result=
-			acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &templ, sizeof(templ));
+			acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &templ, sizeof(templ));
 
 	FN_EXIT1(result);
 	return result;
@@ -3232,7 +3232,7 @@ acx_s_set_probe_request_template(acx_device_t *adev)
 	frame_len = p - (char*)&probereq;
 	probereq.size = cpu_to_le16(frame_len - 2);
 
-	res = acx_s_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
+	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, frame_len);
 	FN_EXIT0;
 	return res;
 }
@@ -3254,7 +3254,7 @@ static int acx_s_recalib_radio(acx_device_t *adev) {
 		/* automatic recalibration every 60 seconds (value in TUs)
 		 * I wonder what the firmware default here is? */
 		cal.interval = cpu_to_le32(58594);
-		return acx_s_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
+		return acx_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
 				&cal, sizeof(cal),
 				CMD_TIMEOUT_MS(100));
 	} else {
@@ -3263,8 +3263,8 @@ static int acx_s_recalib_radio(acx_device_t *adev) {
 		if (
 		/* (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0)) &&
 		 (OK == acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0)) && */
-		(acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1) == OK)
-				&& (acx_s_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1)
+		(acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1) == OK)
+				&& (acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1)
 						== OK))
 			return OK;
 
@@ -4920,7 +4920,7 @@ static void acx111_s_set_wepkey(acx_device_t * adev)
 
 			dk.defaultKeyNum = i;
 			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk,
+			acx_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk,
 					sizeof(dk));
 		}
 	}
@@ -5274,7 +5274,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 		// OW Scanning is done by mac80211
 #if 0
 		acx_unlock(adev, flags);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
+		acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
 		acx_lock(adev, flags);
 		/* HACK: set the IRQ bit, since we won't get a
 		 * scan complete IRQ any more on ACX111 (works on ACX100!),
@@ -6063,7 +6063,7 @@ void great_inquisitor(acx_device_t * adev)
 			type = 0x1000;
 		ie.type = cpu_to_le16(type);
 		ie.len = cpu_to_le16(sizeof(ie) - 4);
-		acx_s_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
+		acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
 	}
 	FN_EXIT0;
 }

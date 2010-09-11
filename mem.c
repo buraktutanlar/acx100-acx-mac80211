@@ -1431,7 +1431,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 		goto fail;
 	}
 
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
 		acxmem_lock();
@@ -1450,7 +1450,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 		acx_s_mwait(1000); /* better wait for a while... */
 	}
 
-	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 	radioinit.offset = cpu_to_le32(offset);
 
 	/* no endian conversion needed, remains in card CPU area: */
@@ -1462,7 +1462,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 		goto fail;
 
 	/* will take a moment so let's have a big timeout */
-	acx_s_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
+	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
 			&radioinit, sizeof(radioinit), CMD_TIMEOUT_MS(1000));
 
 	res = acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
@@ -5219,8 +5219,8 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 
 		/* disable both Tx and Rx to shut radio down properly */
 		if (adev->initialized) {
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-			acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 			adev->initialized = 0;
 		}
 
@@ -5228,7 +5228,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 		/* put the eCPU to sleep to save power
 		 * Halting is not possible currently,
 		 * since not supported by all firmware versions */
-		acx_s_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
+		acx_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
 
 		acxmem_lock();

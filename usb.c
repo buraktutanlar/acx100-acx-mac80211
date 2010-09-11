@@ -238,7 +238,7 @@ int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	mem.type = cpu_to_le16(0x82);
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
-	acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
+	acx_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
 	log(L_DEBUG, "acx: write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
@@ -1524,11 +1524,11 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	acx_stop_queue(adev->ieee, "on ifdown");
 
 	/* Make sure we don't get any more rx requests */
-	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-	acx_s_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 
 	/* Power down the device */
-	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	acx_sem_unlock(adev);
 	cancel_work_sync(&adev->irq_work);
@@ -1849,7 +1849,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	skb_queue_head_init(&adev->tx_queue);
 
 	/* put acx out of sleep mode and initialize it */
-	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	result = acx_s_init_mac(adev);
 	if (result)

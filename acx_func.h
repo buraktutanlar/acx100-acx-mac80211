@@ -258,11 +258,11 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // BOM CMDs (Common:Control Path)
 // -----
 
-int acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-#define acx_s_issue_cmd(adev,cmd,param,len) \
-	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
-#define acx_s_issue_cmd_timeo(adev,cmd,param,len,timeo) \
-	acx_s_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
+int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
+#define acx_issue_cmd(adev,cmd,param,len) \
+	acx_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
+#define acx_issue_cmd_timeo(adev,cmd,param,len,timeo) \
+	acx_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
 
 int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
 #define acx_s_configure(adev,pdr,type) \
