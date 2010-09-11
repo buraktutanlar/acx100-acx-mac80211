@@ -133,7 +133,7 @@ tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxpci_clean_txdesc(acx_device_t * adev);
-void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
+void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
@@ -2365,7 +2365,7 @@ unsigned int acxpci_clean_txdesc(acx_device_t * adev)
 
 /* clean *all* Tx descriptors, and regardless of their previous state.
  * Used for brute-force reset handling. */
-void acxpci_l_clean_txdesc_emergency(acx_device_t * adev)
+void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 {
 	txdesc_t *txdesc;
 	int i;
