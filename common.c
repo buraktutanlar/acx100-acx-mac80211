@@ -136,7 +136,7 @@ static void acx_after_interrupt_recalib(acx_device_t * adev);
 static u8 acx_plcp_get_bitrate_cck(u8 plcp);
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
 #endif
-static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set);
+static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set);
 static void acx111_s_sens_radio_16_17(acx_device_t * adev);
 static void acx_l_update_ratevector(acx_device_t * adev);
 
@@ -2097,7 +2097,7 @@ void acx_update_card_settings(acx_device_t *adev)
 		acx_interrogate(adev, &dom,
 				  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 		adev->reg_dom_id = dom.m.bytes[0];
-		acx_s_set_sane_reg_domain(adev, 0);
+		acx_set_sane_reg_domain(adev, 0);
 		log(L_INIT, "acx: got regulatory domain 0x%02X\n", adev->reg_dom_id);
 		CLEAR_BIT(adev->get_mask, GETSET_REG_DOMAIN);
 	}
@@ -2355,7 +2355,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	if (adev->set_mask & GETSET_REG_DOMAIN) {
 		log(L_INIT, "acx: updating the regulatory domain: 0x%02X\n",
 		    adev->reg_dom_id);
-		acx_s_set_sane_reg_domain(adev, 1);
+		acx_set_sane_reg_domain(adev, 1);
 		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
 	}
 
@@ -3460,7 +3460,7 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
 }
 #endif
 
-static void acx_s_set_sane_reg_domain(acx_device_t *adev, int do_set)
+static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 {
 	unsigned mask;
 
