@@ -76,7 +76,7 @@ void acx_get_firmware_version(acx_device_t * adev);
 void acx_display_hardware_details(acx_device_t * adev);
 firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
 void acx_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);
-int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // CMDs (Control Path)
@@ -1504,7 +1504,7 @@ acx_parse_configoption(acx_device_t * adev,
 */
 }
 
-int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
+int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
 	if (IS_PCI(adev))
 		return acxpci_read_phy_reg(adev, reg, charbuf);
@@ -2035,7 +2035,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		if ((RADIO_11_RFMD == adev->radio_type)
 		    || (RADIO_0D_MAXIM_MAX2820 == adev->radio_type)
 		    || (RADIO_15_RALINK == adev->radio_type)) {
-			acx_s_read_phy_reg(adev, 0x30, &adev->sensitivity);
+			acx_read_phy_reg(adev, 0x30, &adev->sensitivity);
 		} else {
 			log(L_INIT, "acx: don't know how to get sensitivity "
 			    "for radio type 0x%02X\n", adev->radio_type);
@@ -4117,7 +4117,7 @@ static int acx_e_proc_show_phy(struct seq_file *file, void *v)
 	 * all other registers remain the same. */
 	p = buf;
 	for (i = 0; i < 0x80; i++) {
-		acx_s_read_phy_reg(adev, i, p++);
+		acx_read_phy_reg(adev, i, p++);
 		seq_putc(file, *p);
 	}
 
