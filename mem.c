@@ -1425,7 +1425,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 	offset = le32_to_cpu(mm.CodeEnd);
 
 	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
-	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
+	radio_image = acx_read_fw(adev->bus_dev, filename, &size);
 	if (!radio_image) {
 		printk("acx: can't load radio module '%s'\n", filename);
 		goto fail;
@@ -1901,7 +1901,7 @@ static int acxmem_upload_fw(acx_device_t *adev) {
 	/* No combined image; tell common we need the radio firmware, too */
 	adev->need_radio_fw = 1;
 
-	fw_image = acx_s_read_fw(adev->bus_dev, filename, &file_size);
+	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
 	if (!fw_image) {
 		FN_EXIT1(NOT_OK);
 		return NOT_OK;

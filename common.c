@@ -74,7 +74,7 @@ static int acx111_create_dma_regions(acx_device_t * adev);
 // Firmware, EEPROM, Phy
 void acx_get_firmware_version(acx_device_t * adev);
 void acx_display_hardware_details(acx_device_t * adev);
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 * size);
+firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
 void acx_s_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);
 int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
@@ -1279,7 +1279,7 @@ void acx_display_hardware_details(acx_device_t * adev)
  *  0: 						unable to load file
  *  pointer to firmware:	success
  */
-firmware_image_t *acx_s_read_fw(struct device *dev, const char *file,
+firmware_image_t *acx_read_fw(struct device *dev, const char *file,
 				u32 * size)
 {
 	firmware_image_t *res;

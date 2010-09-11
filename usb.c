@@ -332,7 +332,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 	snprintf(filename, sizeof(filename), "tiacx1%02dusbc%02X",
 		 is_tnetw1450 * 11, *radio_type);
 
-	fw_image = acx_s_read_fw(&usbdev->dev, filename, &file_size);
+	fw_image = acx_read_fw(&usbdev->dev, filename, &file_size);
 	if (!fw_image) {
 		result = -EIO;
 		goto end;

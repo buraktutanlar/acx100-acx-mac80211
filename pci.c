@@ -797,7 +797,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 
 	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
 		 IS_ACX111(adev) * 11, adev->radio_type);
-	radio_image = acx_s_read_fw(adev->bus_dev, filename, &size);
+	radio_image = acx_read_fw(adev->bus_dev, filename, &size);
 	if (!radio_image) {
 		printk("acx: can't load radio module '%s'\n", filename);
 		goto fail;
@@ -1260,12 +1260,12 @@ static int acxpci_upload_fw(acx_device_t * adev)
 	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
 		 IS_ACX111(adev) * 11, adev->radio_type);
 
-	fw_image = acx_s_read_fw(adev->bus_dev, filename, &file_size);
+	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
 	if (!fw_image) {
 		adev->need_radio_fw = 1;
 		filename[sizeof("tiacx1NN") - 1] = '\0';
 		fw_image =
-		    acx_s_read_fw(adev->bus_dev, filename, &file_size);
+		    acx_read_fw(adev->bus_dev, filename, &file_size);
 		if (!fw_image) {
 			FN_EXIT1(NOT_OK);
 			return NOT_OK;
