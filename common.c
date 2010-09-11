@@ -152,7 +152,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v);
 static int acx_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_proc_show_phy(struct seq_file *file, void *v);
 static int acx_proc_show_debug(struct seq_file *file, void *v);
-static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_e_proc_open(struct inode *inode, struct file *file);
 static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove);
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
@@ -551,7 +551,7 @@ static acx_proc_write_t *const
 	acx_proc_write_diag,
 	NULL,
 	NULL,
-	acx_e_proc_write_debug,
+	acx_proc_write_debug,
 };
 
 static struct file_operations acx_e_proc_ops[5] ;
@@ -4141,7 +4141,7 @@ static int acx_proc_show_debug(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf,
+static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
