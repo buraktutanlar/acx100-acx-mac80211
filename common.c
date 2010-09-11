@@ -222,7 +222,7 @@ const char *acx_get_packet_type_string(u16 fc);
 
 // Driver, Module
 static int __init acx_init_module(void);
-static void __exit acx_e_cleanup_module(void);
+static void __exit acx_cleanup_module(void);
 
 
 /*
@@ -6121,7 +6121,7 @@ static int __init acx_init_module(void)
 	return 0;
 }
 
-static void __exit acx_e_cleanup_module(void)
+static void __exit acx_cleanup_module(void)
 {
 	// TODO Check, that interface isn't still up
 
@@ -6145,7 +6145,7 @@ static void __exit acx_e_cleanup_module(void)
  */
 
 module_init(acx_init_module)
-module_exit(acx_e_cleanup_module)
+module_exit(acx_cleanup_module)
 
 #if ACX_DEBUG
 /* will add __read_mostly later */
