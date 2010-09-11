@@ -5373,7 +5373,7 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 	/* - most settings updated in acxmem_s_up() */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
-		acx_s_update_card_settings(adev);
+		acx_update_card_settings(adev);
 		printk("acx: rsm: settings updated\n");
 	}
 

@@ -93,7 +93,7 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // Configuration (Control Path)
 void acx_set_defaults(acx_device_t * adev);
-void acx_s_update_card_settings(acx_device_t *adev);
+void acx_update_card_settings(acx_device_t *adev);
 void acx_s_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_s_init_mac(acx_device_t * adev);
@@ -1844,7 +1844,7 @@ void acx_set_defaults(acx_device_t * adev)
 		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
 
 	// OW FIXME - review locking
-	acx_s_update_card_settings(adev);
+	acx_update_card_settings(adev);
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
@@ -1983,7 +1983,7 @@ void acx_set_defaults(acx_device_t * adev)
  * Called by ioctl commit handler, acx_start, acx_set_defaults,
  * acx_s_after_interrupt_task (if IRQ_CMD_UPDATE_CARD_CFG),
  */
-void acx_s_update_card_settings(acx_device_t *adev)
+void acx_update_card_settings(acx_device_t *adev)
 {
 	int i, len;
 
@@ -2503,7 +2503,7 @@ void acx_s_start(acx_device_t * adev)
 			GETSET_RETRY | SET_MSDU_LIFETIME | SET_RATE_FALLBACK);
 
 	log(L_INIT, "acx: updating initial settings on iface activation\n");
-	acx_s_update_card_settings(adev);
+	acx_update_card_settings(adev);
 
 	FN_EXIT0;
 }
@@ -2667,7 +2667,7 @@ static void acx_s_select_opmode(acx_device_t *adev)
 
 	if (changed) {
 		SET_BIT(adev->set_mask, GETSET_MODE);
-		acx_s_update_card_settings(adev);
+		acx_update_card_settings(adev);
 		//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
@@ -5260,7 +5260,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	/* a poor interrupt code wanted to do update_card_settings() */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
 		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
-			acx_s_update_card_settings(adev);
+			acx_update_card_settings(adev);
 		}
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
@@ -5597,14 +5597,14 @@ int acx_e_op_config(struct ieee80211_hw *hw, u32 changed) {
 				conf->channel->center_freq);
 		adev->tx_disabled = 0;
 
-		acx_s_update_card_settings(adev);
+		acx_update_card_settings(adev);
 
 	}
 	change_channel_done:
 
 	// ---
 	if (adev->set_mask > 0) {
-		acx_s_update_card_settings(adev);
+		acx_update_card_settings(adev);
 	}
 
 	// ---
@@ -5733,7 +5733,7 @@ acx_e_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 	if (adev->set_mask != 0)
-		acx_s_update_card_settings(adev);
+		acx_update_card_settings(adev);
 
 	err = 0;
 
@@ -5843,7 +5843,7 @@ int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	if (adev->wep_enabled) {
 			SET_BIT(adev->set_mask, GETSET_WEP);
-			acx_s_update_card_settings(adev);
+			acx_update_card_settings(adev);
 			//acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
 	}
 
