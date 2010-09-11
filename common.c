@@ -129,7 +129,7 @@ static int acx_s_set_null_data_template(acx_device_t * adev);
 
 // Recalibration (Control Path)
 static int acx_recalib_radio(acx_device_t *adev);
-static void acx_s_after_interrupt_recalib(acx_device_t * adev);
+static void acx_after_interrupt_recalib(acx_device_t * adev);
 
 // Other (Control Path)
 #if 0
@@ -3272,7 +3272,7 @@ static int acx_recalib_radio(acx_device_t *adev) {
 	}
 }
 
-static void acx_s_after_interrupt_recalib(acx_device_t * adev)
+static void acx_after_interrupt_recalib(acx_device_t * adev)
 {
 	int res;
 
@@ -5254,7 +5254,7 @@ void acx_e_after_interrupt_task(acx_device_t *adev)
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
 		logf0(L_DEBUG, "Schedule CMD_RADIO_RECALIB\n");
-		acx_s_after_interrupt_recalib(adev);
+		acx_after_interrupt_recalib(adev);
 	}
 
 	/* a poor interrupt code wanted to do update_card_settings() */
