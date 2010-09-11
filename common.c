@@ -151,7 +151,7 @@ static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf, si
 static int acx_proc_show_acx(struct seq_file *file, void *v);
 static int acx_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_proc_show_phy(struct seq_file *file, void *v);
-static int acx_e_proc_show_debug(struct seq_file *file, void *v);
+static int acx_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_e_proc_open(struct inode *inode, struct file *file);
 static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove);
@@ -542,7 +542,7 @@ static acx_proc_show_t *const
 	acx_proc_show_diag,
 	acx_proc_show_eeprom,
 	acx_proc_show_phy,
-	acx_e_proc_show_debug,
+	acx_proc_show_debug,
 };
 
 static acx_proc_write_t *const
@@ -4129,7 +4129,7 @@ static int acx_proc_show_phy(struct seq_file *file, void *v)
 	return 0;
 }
 
-static int acx_e_proc_show_debug(struct seq_file *file, void *v)
+static int acx_proc_show_debug(struct seq_file *file, void *v)
 {
 	FN_ENTER;
 	// No sem locking required, since debug is global for all devices
