@@ -94,7 +94,7 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 // Configuration (Control Path)
 void acx_set_defaults(acx_device_t * adev);
 void acx_update_card_settings(acx_device_t *adev);
-void acx_s_start(acx_device_t * adev);
+void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_s_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
@@ -2486,7 +2486,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-void acx_s_start(acx_device_t * adev)
+void acx_start(acx_device_t * adev)
 {
 	FN_ENTER;
 

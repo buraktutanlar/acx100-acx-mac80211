@@ -1485,7 +1485,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	/* acx_s_start needs it */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	acx_s_start(adev);
+	acx_start(adev);
 
 	/* don't acx_start_queue() here, we need to associate first */
 

@@ -1829,7 +1829,7 @@ static void acxpci_up(struct ieee80211_hw *hw)
 	 ** timer won't be started by acx_set_status() */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
-	acx_s_start(adev);
+	acx_start(adev);
 
 	FN_EXIT0;
 }
