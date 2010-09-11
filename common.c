@@ -107,7 +107,7 @@ static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm);
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
 static int acx_set_beacon_template(acx_device_t *adev, int len);
-static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
+static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
 static int acx_s_init_max_null_data_template(acx_device_t * adev);
@@ -2786,7 +2786,7 @@ void acx_update_capabilities(acx_device_t * adev)
  */
 
 static int
-acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len,
+acx_init_max_template_generic(acx_device_t * adev, unsigned int len,
 				unsigned int cmd)
 {
 	int res;
@@ -2813,34 +2813,34 @@ static int acx_s_init_max_null_data_template(acx_device_t * adev)
 	 * diff with hh is struct ieee80211_hdr included in acx_template_nullframe_t,
 	 * which is bigger, thus size if bigger
 	 */
-	return acx_s_init_max_template_generic(adev,
+	return acx_init_max_template_generic(adev,
 			sizeof(acx_template_nullframe_t), ACX1xx_CMD_CONFIG_NULL_DATA);
 }
 
 
 static int acx_s_init_max_beacon_template(acx_device_t * adev)
 {
-	return acx_s_init_max_template_generic(adev,
+	return acx_init_max_template_generic(adev,
 					       sizeof(acx_template_beacon_t),
 					       ACX1xx_CMD_CONFIG_BEACON);
 }
 
 static int acx_s_init_max_tim_template(acx_device_t * adev)
 {
-	return acx_s_init_max_template_generic(adev, sizeof(acx_template_tim_t),
+	return acx_init_max_template_generic(adev, sizeof(acx_template_tim_t),
 					       ACX1xx_CMD_CONFIG_TIM);
 }
 
 static int acx_s_init_max_probe_response_template(acx_device_t * adev)
 {
-	return acx_s_init_max_template_generic(adev,
+	return acx_init_max_template_generic(adev,
 					       sizeof(acx_template_proberesp_t),
 					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
 }
 
 static int acx_s_init_max_probe_request_template(acx_device_t * adev)
 {
-	return acx_s_init_max_template_generic(adev,
+	return acx_init_max_template_generic(adev,
 					       sizeof(acx_template_probereq_t),
 					       ACX1xx_CMD_CONFIG_PROBE_REQUEST);
 }
