@@ -83,7 +83,7 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
 static int acx111_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
-static int acx111_s_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
+static int acx111_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
@@ -1620,7 +1620,7 @@ acx111_get_feature_config(acx_device_t * adev,
 
 
 static int
-acx111_s_set_feature_config(acx_device_t * adev,
+acx111_set_feature_config(acx_device_t * adev,
 			    u32 feature_options, u32 data_flow_options,
 			    unsigned int mode
 			    /* 0 == remove, 1 == add, 2 == set */ )
@@ -1684,15 +1684,15 @@ acx111_s_set_feature_config(acx_device_t * adev,
 
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d)
 {
-	return acx111_s_set_feature_config(adev, f, d, 0);
+	return acx111_set_feature_config(adev, f, d, 0);
 }
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d)
 {
-	return acx111_s_set_feature_config(adev, f, d, 1);
+	return acx111_set_feature_config(adev, f, d, 1);
 }
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
 {
-	return acx111_s_set_feature_config(adev, f, d, 2);
+	return acx111_set_feature_config(adev, f, d, 2);
 }
 
 int
