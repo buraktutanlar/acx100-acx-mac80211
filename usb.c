@@ -991,7 +991,7 @@ static void acxusb_complete_rx(struct urb *urb)
 				printk("acxusb: full trailing packet + 12 bytes:\n");
 				acx_dump_bytes(inbuf, tail_size + RXBUF_HDRSIZE);
 			}
-			acx_l_process_rxbuf(adev, ptr);
+			acx_process_rxbuf(adev, ptr);
 			adev->rxtruncsize = 0;
 			ptr = (rxbuffer_t *) (((char *)inbuf) + tail_size);
 			remsize -= tail_size;
@@ -1076,7 +1076,7 @@ static void acxusb_complete_rx(struct urb *urb)
 
 		/* packetsize <= remsize */
 		/* now handle the received data */
-		acx_l_process_rxbuf(adev, ptr);
+		acx_process_rxbuf(adev, ptr);
 
 		next:
 		ptr = (rxbuffer_t *) (((char *)ptr) + packetsize);

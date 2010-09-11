@@ -2000,7 +2000,7 @@ static void acxpci_process_rxdesc(acx_device_t * adev)
 		log(L_BUFR, "acx: rx: tail=%u Ctl_16=%04X Status=%08X\n",
 		    tail, hostdesc->Ctl_16, hostdesc->Status);
 
-		acx_l_process_rxbuf(adev, hostdesc->data);
+		acx_process_rxbuf(adev, hostdesc->data);
 		hostdesc->Status = 0;
 		/* flush all writes before adapter sees CTL_HOSTOWN change */
 		wmb();

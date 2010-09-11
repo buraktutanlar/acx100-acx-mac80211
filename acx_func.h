@@ -308,7 +308,7 @@ acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
 
 // BOM Rx Path (Common)
 // -----
-void acx_l_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
+void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 
 // BOM Tx Path (Common)

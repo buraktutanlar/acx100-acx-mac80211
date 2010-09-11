@@ -2981,7 +2981,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
 						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
 
-				acx_l_process_rxbuf(adev, hostdesc->data);
+				acx_process_rxbuf(adev, hostdesc->data);
 			}
 		} else {
 			log(L_ANY, "acxmem: %s: rx reclaim only!\n", __func__);

@@ -161,7 +161,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
 
 // Rx Path
 static void acx_initialize_rx_config(acx_device_t * adev);
-void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
+void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
@@ -4339,7 +4339,7 @@ static void acx_initialize_rx_config(acx_device_t * adev)
  *
  * NB: used by USB code also
  */
-void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
+void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 {
 	struct ieee80211_hdr *hdr;
 	u16 fc, buf_len;
