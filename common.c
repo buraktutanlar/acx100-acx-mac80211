@@ -69,7 +69,7 @@ const char *acx_cmd_status_str(unsigned int state);
 // Data Access
 static int acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt);
 static int acx100_create_dma_regions(acx_device_t * adev);
-static int acx111_s_create_dma_regions(acx_device_t * adev);
+static int acx111_create_dma_regions(acx_device_t * adev);
 
 // Firmware, EEPROM, Phy
 void acx_s_get_firmware_version(acx_device_t * adev);
@@ -1007,7 +1007,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
  * Note that this fn messes heavily with hardware, but we cannot
  * lock it (we need to sleep). Not a problem since IRQs can't happen
  */
-static int acx111_s_create_dma_regions(acx_device_t * adev)
+static int acx111_create_dma_regions(acx_device_t * adev)
 {
 	struct acx111_ie_memoryconfig memconf;
 	struct acx111_ie_queueconfig queueconf;
@@ -2564,7 +2564,7 @@ int acx_s_init_mac(acx_device_t * adev)
 		 */
 		if (OK != acx_s_init_packet_templates(adev))
 			goto fail;
-		if (OK != acx111_s_create_dma_regions(adev)) {
+		if (OK != acx111_create_dma_regions(adev)) {
 			printk("acx: %s: acx111_create_dma_regions FAILED\n",
 			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
