@@ -128,7 +128,7 @@ static void acxusb_complete_rx(struct urb *);
 static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
-static void acxusb_i_complete_tx(struct urb *urb);
+static void acxusb_complete_tx(struct urb *urb);
 tx_t *acxusb_l_alloc_tx(acx_device_t *adev);
 void acxusb_l_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
@@ -1163,7 +1163,7 @@ static void acxusb_i_set_rx_mode(struct net_device *ndev)
  *
  * This function is invoked upon termination of a USB transfer.
  */
-static void acxusb_i_complete_tx(struct urb *urb)
+static void acxusb_complete_tx(struct urb *urb)
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;
@@ -1373,7 +1373,7 @@ void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 
 	usb_fill_bulk_urb(txurb, usbdev, outpipe, txbuf,	/* dataptr */
 			  wlanpkt_len + USB_TXBUF_HDRSIZE,	/* size */
-			  acxusb_i_complete_tx,	/* handler */
+			  acxusb_complete_tx,	/* handler */
 			  tx	/* handler param */
 	    );
 
