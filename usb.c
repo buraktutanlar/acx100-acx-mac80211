@@ -1851,7 +1851,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* put acx out of sleep mode and initialize it */
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
-	result = acx_s_init_mac(adev);
+	result = acx_init_mac(adev);
 	if (result)
 		goto end;
 

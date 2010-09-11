@@ -2550,7 +2550,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	}
 	acxmem_unlock();
 
-	if (OK != acx_s_init_mac(adev))
+	if (OK != acx_init_mac(adev))
 		return -3;
 
 	if (IS_ACX111(adev)) {

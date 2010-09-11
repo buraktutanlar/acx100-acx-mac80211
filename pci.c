@@ -3611,7 +3611,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		memcpy_fromio(&co, adev->cmd_area, sizeof(co));
 	}
 
-	if (OK != acx_s_init_mac(adev))
+	if (OK != acx_init_mac(adev))
 		goto fail_init_mac;
 
 	if (IS_ACX111(adev)) {
@@ -3907,7 +3907,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	if (OK != acxpci_reset_dev(adev))
 		goto end_unlock;
 	printk("acx: rsm: device reset done\n");
-	if (OK != acx_s_init_mac(adev))
+	if (OK != acx_init_mac(adev))
 		goto end_unlock;
 	printk("acx: rsm: init MAC done\n");
 
@@ -4214,7 +4214,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	if (OK != acxpci_reset_dev(adev))
 		goto fail_vlynq_reset_dev;
 
-	if (OK != acx_s_init_mac(adev))
+	if (OK != acx_init_mac(adev))
 		goto fail_vlynq_init_mac;
 
 	acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
