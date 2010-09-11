@@ -115,7 +115,7 @@ static int acx_init_max_beacon_template(acx_device_t * adev);
 static int acx_init_max_tim_template(acx_device_t * adev);
 static int acx_init_max_probe_response_template(acx_device_t * adev);
 static int acx_init_max_probe_request_template(acx_device_t * adev);
-static int acx_s_set_probe_response_template(acx_device_t *adev);
+static int acx_set_probe_response_template(acx_device_t *adev);
 
 #ifdef UNUSED_BUT_USEFULL
 static int acx_s_set_probe_request_template(acx_device_t *adev);
@@ -2161,7 +2161,7 @@ void acx_update_card_settings(acx_device_t *adev)
 							 ** it should ignore 0x80 bit in ratevector from STA.
 							 ** We can 'fix' it by not using this template and
 							 ** sending probe responses by hand. TODO --vda */
-							acx_s_set_probe_response_template(adev);
+							acx_set_probe_response_template(adev);
 							//acx_s_set_probe_response_template_off(adev);
 
 							adev->beacon_ready=1;
@@ -3092,7 +3092,7 @@ acx_set_beacon_template(acx_device_t *adev, int len)
 
 
 static int
-acx_s_set_probe_response_template(acx_device_t *adev)
+acx_set_probe_response_template(acx_device_t *adev)
 {
 	struct acx_template_proberesp pr;
 	int len1, len2, result;
