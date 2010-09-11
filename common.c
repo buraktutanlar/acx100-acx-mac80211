@@ -109,7 +109,7 @@ static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_
 static int acx_set_beacon_template(acx_device_t *adev, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_set_tim_template(acx_device_t * adev);
-static int acx_s_init_packet_templates(acx_device_t * adev);
+static int acx_init_packet_templates(acx_device_t * adev);
 static int acx_s_init_max_null_data_template(acx_device_t * adev);
 static int acx_s_init_max_beacon_template(acx_device_t * adev);
 static int acx_s_init_max_tim_template(acx_device_t * adev);
@@ -2562,7 +2562,7 @@ int acx_init_mac(acx_device_t * adev)
 		   2. create station context and create dma regions
 		   3. init wep default keys
 		 */
-		if (OK != acx_s_init_packet_templates(adev))
+		if (OK != acx_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx111_create_dma_regions(adev)) {
 			printk("acx: %s: acx111_create_dma_regions FAILED\n",
@@ -2572,7 +2572,7 @@ int acx_init_mac(acx_device_t * adev)
 	} else {
 		if (OK != acx100_s_init_wep(adev))
 			goto fail;
-		if (OK != acx_s_init_packet_templates(adev))
+		if (OK != acx_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx100_create_dma_regions(adev)) {
 			printk("acx: %s: acx100_create_dma_regions FAILED\n",
@@ -3132,7 +3132,7 @@ static int acx_s_set_probe_response_template_off(acx_device_t *adev) {
  * init templates: max Probe Request (station mode), max NULL data,
  * max Beacon, max TIM, max Probe Response.
  */
-static int acx_s_init_packet_templates(acx_device_t * adev)
+static int acx_init_packet_templates(acx_device_t * adev)
 {
 	acx_ie_memmap_t mm;	/* ACX100 only */
 	int result = NOT_OK;
