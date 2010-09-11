@@ -82,7 +82,7 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 // CMDs (Control Path)
 int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
 int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
-static int acx111_s_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
+static int acx111_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
 static int acx111_s_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
@@ -1588,7 +1588,7 @@ int acx_configure_debug(acx_device_t *adev, void *pdr, int type,
 
 
 static int
-acx111_s_get_feature_config(acx_device_t * adev,
+acx111_get_feature_config(acx_device_t * adev,
 			    u32 * feature_options, u32 * data_flow_options)
 {
 	struct acx111_ie_feature_config feat;
@@ -1643,7 +1643,7 @@ acx111_s_set_feature_config(acx_device_t * adev,
 
 	if (mode != 2)	{
 		/* need to modify old data */
-		i = acx111_s_get_feature_config(adev, &feat.feature_options,
+		i = acx111_get_feature_config(adev, &feat.feature_options,
 				&feat.data_flow_options);
 		if (i != OK)
 		{
@@ -3516,7 +3516,7 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
 		adev->sensitivity = 1;
 	}
-	acx111_s_get_feature_config(adev, &feature1, &feature2);
+	acx111_get_feature_config(adev, &feature1, &feature2);
 	CLEAR_BIT(feature1, FEATURE1_LOW_RX | FEATURE1_EXTRA_LOW_RX);
 	if (adev->sensitivity > 1)
 		SET_BIT(feature1, FEATURE1_LOW_RX);
