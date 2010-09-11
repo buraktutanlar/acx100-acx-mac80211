@@ -175,7 +175,7 @@ int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
 static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
-static void *acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
@@ -4598,7 +4598,7 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
 		return (-EBUSY);
 	}
 
-	txbuf = acx_l_get_txbuf(adev, tx);
+	txbuf = acx_get_txbuf(adev, tx);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
@@ -4686,7 +4686,7 @@ static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 	return;
 }
 
-static void* acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
+static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_PCI(adev))
 		return acxpci_get_txbuf(adev, tx_opaque);
