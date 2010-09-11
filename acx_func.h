@@ -598,7 +598,7 @@ int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer
 // Tx Path
 tx_t *acxusb_alloc_tx(acx_device_t *adev);
 void acxusb_dealloc_tx(tx_t * tx_opaque);
-void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
+void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Irq Handling, Timer
