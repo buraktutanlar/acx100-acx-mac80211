@@ -138,7 +138,7 @@ static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
 #endif
 static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set);
 static void acx111_sens_radio_16_17(acx_device_t * adev);
-static void acx_l_update_ratevector(acx_device_t * adev);
+static void acx_update_ratevector(acx_device_t * adev);
 
 #if POWER_SAVE_80211
 static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
@@ -1919,7 +1919,7 @@ void acx_set_defaults(acx_device_t * adev)
 
 	/* Supported Rates element - the rates here are given in units of
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
-	acx_l_update_ratevector(adev);
+	acx_update_ratevector(adev);
 
 	/* set some more defaults */
 	if (IS_ACX111(adev)) {
@@ -3530,7 +3530,7 @@ static void acx111_sens_radio_16_17(acx_device_t * adev)
  *
  * Updates adev->rate_supported[_len] according to rate_{basic,oper}
  */
-static void acx_l_update_ratevector(acx_device_t * adev)
+static void acx_update_ratevector(acx_device_t * adev)
 {
 	u16 bcfg = adev->rate_basic;
 	u16 ocfg = adev->rate_oper;
