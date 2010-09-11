@@ -1507,7 +1507,7 @@ acx_s_parse_configoption(acx_device_t * adev,
 int acx_s_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
 	if (IS_PCI(adev))
-		return acxpci_s_read_phy_reg(adev, reg, charbuf);
+		return acxpci_read_phy_reg(adev, reg, charbuf);
 	if (IS_USB(adev))
 		return acxusb_s_read_phy_reg(adev, reg, charbuf);
 	if (IS_MEM(adev))
