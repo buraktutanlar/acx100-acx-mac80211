@@ -181,7 +181,7 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 
 // Crypto
 static void acx100_set_wepkey(acx_device_t * adev);
-static void acx111_s_set_wepkey(acx_device_t * adev);
+static void acx111_set_wepkey(acx_device_t * adev);
 static void acx_s_set_wepkey(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
 
@@ -4901,7 +4901,7 @@ static void acx100_set_wepkey(acx_device_t * adev)
 	}
 }
 
-static void acx111_s_set_wepkey(acx_device_t * adev)
+static void acx111_set_wepkey(acx_device_t * adev)
 {
 	acx111WEPDefaultKey_t dk;
 	int i;
@@ -4929,7 +4929,7 @@ static void acx111_s_set_wepkey(acx_device_t * adev)
 static void acx_s_set_wepkey(acx_device_t * adev)
 {
 	if (IS_ACX111(adev))
-		acx111_s_set_wepkey(adev);
+		acx111_set_wepkey(adev);
 	else
 		acx100_set_wepkey(adev);
 }
