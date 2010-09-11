@@ -2579,7 +2579,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 
 	acxmem_unlock();
 
-	acx_s_parse_configoption(adev, &co);
+	acx_parse_configoption(adev, &co);
 	acx_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
