@@ -139,7 +139,7 @@ void acxusb_irq_work(struct work_struct *work);
 
 // Mac80211 Ops
 static int acxusb_op_start(struct ieee80211_hw *);
-static void acxusb_e_stop(struct ieee80211_hw *);
+static void acxusb_op_stop(struct ieee80211_hw *);
 
 // Helpers
 static void acxusb_unlink_urb(struct urb *urb);
@@ -1450,7 +1450,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.remove_interface = acx_e_op_remove_interface,
 	.start = acxusb_op_start,
 	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxusb_e_stop,
+	.stop = acxusb_op_stop,
 	.config = acx_e_op_config,
 	.bss_info_changed = acx_e_op_bss_info_changed,
 	.set_key = acx_e_op_set_key,
@@ -1513,7 +1513,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
  * transfers, these are unlinked (asynchronously). The module in-use count
  * is also decreased in this function.
  */
-static void acxusb_e_stop(struct ieee80211_hw *hw)
+static void acxusb_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	int i;
