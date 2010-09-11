@@ -67,7 +67,7 @@ void acx_dump_bytes(const void *data, int num);
 const char *acx_cmd_status_str(unsigned int state);
 
 // Data Access
-static int acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt);
+static int acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt);
 static int acx100_s_create_dma_regions(acx_device_t * adev);
 static int acx111_s_create_dma_regions(acx_device_t * adev);
 
@@ -777,7 +777,7 @@ const char *acx_cmd_status_str(unsigned int state)
  */
 
 static int
-acx100_s_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
+acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 {
 	acx100_ie_memblocksize_t MemoryBlockSize;
 	acx100_ie_memconfigoption_t MemoryConfigOption;
@@ -982,7 +982,7 @@ static int acx100_s_create_dma_regions(acx_device_t * adev)
 		goto fail;
 	}
 
-	if (OK != acx100_s_init_memory_pools(adev, &memmap)) {
+	if (OK != acx100_init_memory_pools(adev, &memmap)) {
 		goto fail;
 	}
 
