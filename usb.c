@@ -109,7 +109,7 @@ static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_t
 static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
 
 // CMDs (Control Path)
-int acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
+int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
 
 // Init, Configure (Control Path)
 static int acxusb_s_fill_configoption(acx_device_t * adev);
@@ -551,7 +551,7 @@ int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
  * The data must not include 4 byte command header
  */
 int
-acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev,
+acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
 			       void *buffer,
 			       unsigned buflen,

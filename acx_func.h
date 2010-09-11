@@ -585,7 +585,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 
 // CMDs (Control Path)
-int acxusb_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
+int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
 
 // Init, Configure (Control Path)
 
