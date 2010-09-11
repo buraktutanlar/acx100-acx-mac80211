@@ -102,7 +102,7 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
 // Data Access
 
 // Firmware, EEPROM, Phy
-int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
+int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static void acxusb_s_read_eeprom_version(acx_device_t * adev);
 static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
@@ -207,7 +207,7 @@ void __exit acxusb_e_cleanup_module(void);
  * BOM Firmware, EEPROM, Phy
  * ==================================================
  */
-int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
+int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
 	/* mem_read_write_t mem; */
 

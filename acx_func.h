@@ -581,7 +581,7 @@ void __exit acxpci_cleanup_module(void);
 // Data Access
 
 // Firmware, EEPROM, Phy
-int acxusb_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
+int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 
 // CMDs (Control Path)
