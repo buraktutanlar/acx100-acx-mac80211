@@ -111,7 +111,7 @@ static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, 
 static int acx_set_tim_template(acx_device_t * adev);
 static int acx_init_packet_templates(acx_device_t * adev);
 static int acx_init_max_null_data_template(acx_device_t * adev);
-static int acx_s_init_max_beacon_template(acx_device_t * adev);
+static int acx_init_max_beacon_template(acx_device_t * adev);
 static int acx_s_init_max_tim_template(acx_device_t * adev);
 static int acx_s_init_max_probe_response_template(acx_device_t * adev);
 static int acx_s_init_max_probe_request_template(acx_device_t * adev);
@@ -2818,7 +2818,7 @@ static int acx_init_max_null_data_template(acx_device_t * adev)
 }
 
 
-static int acx_s_init_max_beacon_template(acx_device_t * adev)
+static int acx_init_max_beacon_template(acx_device_t * adev)
 {
 	return acx_init_max_template_generic(adev,
 					       sizeof(acx_template_beacon_t),
@@ -3147,7 +3147,7 @@ static int acx_init_packet_templates(acx_device_t * adev)
 	if (OK != acx_init_max_null_data_template(adev))
 		goto failed;
 
-	if (OK != acx_s_init_max_beacon_template(adev))
+	if (OK != acx_init_max_beacon_template(adev))
 		goto failed;
 
 	if (OK != acx_s_init_max_tim_template(adev))
