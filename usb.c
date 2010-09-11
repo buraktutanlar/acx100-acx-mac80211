@@ -129,7 +129,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
 static void acxusb_complete_tx(struct urb *urb);
-tx_t *acxusb_l_alloc_tx(acx_device_t *adev);
+tx_t *acxusb_alloc_tx(acx_device_t *adev);
 void acxusb_l_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
@@ -1246,7 +1246,7 @@ static void acxusb_complete_tx(struct urb *urb)
  * acxusb_l_alloc_tx
  * Actually returns a usb_tx_t* ptr
  */
-tx_t *acxusb_l_alloc_tx(acx_device_t *adev)
+tx_t *acxusb_alloc_tx(acx_device_t *adev)
 {
 	usb_tx_t *tx;
 	unsigned head;

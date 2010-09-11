@@ -4667,7 +4667,7 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
 	if (IS_PCI(adev))
 		return acxpci_alloc_tx(adev);
 	if (IS_USB(adev))
-		return acxusb_l_alloc_tx(adev);
+		return acxusb_alloc_tx(adev);
 	if (IS_MEM(adev))
 		return acxmem_alloc_tx(adev, len);
 
