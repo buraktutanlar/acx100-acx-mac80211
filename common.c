@@ -84,7 +84,7 @@ int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, uns
 int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
 static int acx111_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
 static int acx111_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
-static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
+static inline int acx111_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
 int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
@@ -1682,7 +1682,7 @@ acx111_set_feature_config(acx_device_t * adev,
 	return OK;
 }
 
-static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d)
+static inline int acx111_feature_off(acx_device_t * adev, u32 f, u32 d)
 {
 	return acx111_set_feature_config(adev, f, d, 0);
 }
