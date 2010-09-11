@@ -86,7 +86,7 @@ static int acx111_get_feature_config(acx_device_t * adev, u32 * feature_options,
 static int acx111_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d);
-static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
+static inline int acx111_feature_set(acx_device_t * adev, u32 f, u32 d);
 int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
 void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
@@ -1690,7 +1690,7 @@ static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d)
 {
 	return acx111_set_feature_config(adev, f, d, 1);
 }
-static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
+static inline int acx111_feature_set(acx_device_t * adev, u32 f, u32 d)
 {
 	return acx111_set_feature_config(adev, f, d, 2);
 }
@@ -3522,7 +3522,7 @@ static void acx111_s_sens_radio_16_17(acx_device_t * adev)
 		SET_BIT(feature1, FEATURE1_LOW_RX);
 	if (adev->sensitivity > 2)
 		SET_BIT(feature1, FEATURE1_EXTRA_LOW_RX);
-	acx111_s_feature_set(adev, feature1, feature2);
+	acx111_feature_set(adev, feature1, feature2);
 }
 
 /*
