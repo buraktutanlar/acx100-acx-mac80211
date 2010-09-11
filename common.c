@@ -114,7 +114,7 @@ static int acx_init_max_null_data_template(acx_device_t * adev);
 static int acx_init_max_beacon_template(acx_device_t * adev);
 static int acx_init_max_tim_template(acx_device_t * adev);
 static int acx_init_max_probe_response_template(acx_device_t * adev);
-static int acx_s_init_max_probe_request_template(acx_device_t * adev);
+static int acx_init_max_probe_request_template(acx_device_t * adev);
 static int acx_s_set_probe_response_template(acx_device_t *adev);
 
 #ifdef UNUSED_BUT_USEFULL
@@ -2838,7 +2838,7 @@ static int acx_init_max_probe_response_template(acx_device_t * adev)
 					       ACX1xx_CMD_CONFIG_PROBE_RESPONSE);
 }
 
-static int acx_s_init_max_probe_request_template(acx_device_t * adev)
+static int acx_init_max_probe_request_template(acx_device_t * adev)
 {
 	return acx_init_max_template_generic(adev,
 					       sizeof(acx_template_probereq_t),
@@ -3141,7 +3141,7 @@ static int acx_init_packet_templates(acx_device_t * adev)
 
 	log(L_DEBUG | L_INIT, "acx: initializing max packet templates\n");
 
-	if (OK != acx_s_init_max_probe_request_template(adev))
+	if (OK != acx_init_max_probe_request_template(adev))
 		goto failed;
 
 	if (OK != acx_init_max_null_data_template(adev))
