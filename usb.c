@@ -103,7 +103,7 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
 
 // Firmware, EEPROM, Phy
 int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
-int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
+int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static void acxusb_s_read_eeprom_version(acx_device_t * adev);
 static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
 static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
@@ -228,7 +228,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	return OK;
 }
 
-int acxusb_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
+int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	mem_read_write_t mem;
 
