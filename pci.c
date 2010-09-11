@@ -117,7 +117,7 @@ static inline void acxpci_init_mboxes(acx_device_t * adev);
 int acxpci_reset_dev(acx_device_t * adev);
 static int acxpci_verify_init(acx_device_t * adev);
 static void acxpci_reset_mac(acx_device_t * adev);
-static void acxpci_s_up(struct ieee80211_hw *hw);
+static void acxpci_up(struct ieee80211_hw *hw);
 
 // Other (Control Path)
 
@@ -1810,7 +1810,7 @@ static void acxpci_reset_mac(acx_device_t * adev)
  * - Enables on-card interrupt requests
  * - calls acx_s_start
  */
-static void acxpci_s_up(struct ieee80211_hw *hw)
+static void acxpci_up(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -2874,7 +2874,7 @@ static int acxpci_e_op_start(struct ieee80211_hw *hw)
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
 	/* ifup device */
-	acxpci_s_up(hw);
+	acxpci_up(hw);
 
 	/* We don't currently have to do anything else.
 	 * The setup of the MAC should be subsequently completed via
@@ -3911,7 +3911,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 		goto end_unlock;
 	printk("acx: rsm: init MAC done\n");
 
-	acxpci_s_up(hw);
+	acxpci_up(hw);
 	printk("acx: rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before suspend,
