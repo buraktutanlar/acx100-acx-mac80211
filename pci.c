@@ -143,7 +143,7 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static void acxpci_irq_enable(acx_device_t * adev);
 static void acxpci_irq_disable(acx_device_t * adev);
 void acxpci_irq_work(struct work_struct *work);
-static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id);
+static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
 static void acxpci_handle_info_irq(acx_device_t * adev);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
@@ -2654,7 +2654,7 @@ void acxpci_irq_work(struct work_struct *work)
 }
 
 
-static irqreturn_t acxpci_i_interrupt(int irq, void *dev_id)
+static irqreturn_t acxpci_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
@@ -3569,7 +3569,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* request shared IRQ handler */
-	if (request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME,
+	if (request_irq(adev->irq, acxpci_interrupt, IRQF_SHARED, KBUILD_MODNAME,
 			adev)) {
 		printk("acx: %s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
@@ -4184,7 +4184,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* request shared IRQ handler */
 	if (request_irq
-	    (adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
+	    (adev->irq, acxpci_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
 		printk("acx: %s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto done;
