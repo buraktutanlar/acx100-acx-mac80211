@@ -149,7 +149,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 static int acx_proc_show_diag(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_show_acx(struct seq_file *file, void *v);
-static int acx_e_proc_show_eeprom(struct seq_file *file, void *v);
+static int acx_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_e_proc_show_phy(struct seq_file *file, void *v);
 static int acx_e_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_e_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
@@ -540,7 +540,7 @@ static acx_proc_show_t *const
  acx_proc_show_funcs[] = {
 	acx_proc_show_acx,
 	acx_proc_show_diag,
-	acx_e_proc_show_eeprom,
+	acx_proc_show_eeprom,
 	acx_e_proc_show_phy,
 	acx_e_proc_show_debug,
 };
@@ -4055,7 +4055,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v)
 	return 0;
 }
 
-static int acx_e_proc_show_eeprom(struct seq_file *file, void *v)
+static int acx_proc_show_eeprom(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
