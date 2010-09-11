@@ -101,7 +101,7 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
-int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
+int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static int acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_upload_fw(acx_device_t * adev);
@@ -1047,7 +1047,7 @@ int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 }
 
 
-int acxpci_s_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
+int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	FN_ENTER;
 
@@ -2473,7 +2473,7 @@ int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	}
 	printk("acx: %s: changing radio power level to %u dBm (%u)\n",
 	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
-	acxpci_s_write_phy_reg(adev, 0x11, table[level_dbm]);
+	acxpci_write_phy_reg(adev, 0x11, table[level_dbm]);
 	return OK;
 }
 
