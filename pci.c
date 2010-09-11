@@ -102,7 +102,7 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
-static int acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
+static int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_s_upload_fw(acx_device_t * adev);
 // static void acx_show_card_eeprom_id(acx_device_t * adev);
@@ -806,7 +806,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 	acx_s_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
-		res = acxpci_s_write_fw(adev, radio_image, offset);
+		res = acxpci_write_fw(adev, radio_image, offset);
 		log(L_DEBUG | L_INIT, "acx: acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, radio_image, offset);
@@ -1083,7 +1083,7 @@ int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
  * Standard csum implementation + write to IO
  */
 static int
-acxpci_s_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
+acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		  u32 offset)
 {
 	int len, size;
@@ -1273,7 +1273,7 @@ static int acxpci_s_upload_fw(acx_device_t * adev)
 	}
 
 	for (try = 1; try <= 5; try++) {
-		res = acxpci_s_write_fw(adev, fw_image, 0);
+		res = acxpci_write_fw(adev, fw_image, 0);
 		log(L_DEBUG | L_INIT, "acx: acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
 			res = acxpci_s_validate_fw(adev, fw_image, 0);
