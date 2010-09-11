@@ -2737,7 +2737,7 @@ static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 		return acx111_s_set_tx_level(adev, level_dbm);
 	}
 	if (IS_PCI(adev)) {
-		return acx100pci_s_set_tx_level(adev, level_dbm);
+		return acx100pci_set_tx_level(adev, level_dbm);
 	}
 	if (IS_MEM(adev)) {
 		return acx100mem_set_tx_level(adev, level_dbm);

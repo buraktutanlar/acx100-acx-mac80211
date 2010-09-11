@@ -137,7 +137,7 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
-int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
+int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
 static void acxpci_irq_enable(acx_device_t * adev);
@@ -2422,7 +2422,7 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
 	return &adev->txhostdesc_start[index * 2];
 }
 
-int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
+int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
 	/* since it can be assumed that at least the Maxim radio has a
 	 * maximum power output of 20dBm and since it also can be

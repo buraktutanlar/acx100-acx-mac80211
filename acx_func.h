@@ -551,7 +551,7 @@ void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxpci_clean_txdesc(acx_device_t * adev);
 void acxpci_clean_txdesc_emergency(acx_device_t * adev);
-int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
+int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
 void acxpci_irq_work(struct work_struct *work);
