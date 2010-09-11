@@ -112,7 +112,7 @@ static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned i
 int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
 
 // Init, Configure (Control Path)
-static int acxusb_s_fill_configoption(acx_device_t * adev);
+static int acxusb_fill_configoption(acx_device_t * adev);
 
 // Other (Control Path)
 
@@ -728,7 +728,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
  * useful replacement values until we figure out how one manages to fetch
  * the configoption struct in the USB device case...
  */
-static int acxusb_s_fill_configoption(acx_device_t * adev)
+static int acxusb_fill_configoption(acx_device_t * adev)
 {
 	adev->cfgopt_probe_delay = 200;
 	adev->cfgopt_dot11CCAModes = 4;
@@ -1857,7 +1857,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* TODO: see similar code in pci.c */
 	acxusb_read_eeprom_version(adev);
-	acxusb_s_fill_configoption(adev);
+	acxusb_fill_configoption(adev);
 	acx_s_set_defaults(adev);
 	acx_s_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
