@@ -221,7 +221,7 @@ const char *acx_get_packet_type_string(u16 fc);
 //void great_inquisitor(acx_device_t * adev);
 
 // Driver, Module
-static int __init acx_e_init_module(void);
+static int __init acx_init_module(void);
 static void __exit acx_e_cleanup_module(void);
 
 
@@ -6075,7 +6075,7 @@ void great_inquisitor(acx_device_t * adev)
  * ==================================================
  */
 
-static int __init acx_e_init_module(void)
+static int __init acx_init_module(void)
 {
 	int r1, r2, r3;
 
@@ -6144,7 +6144,7 @@ static void __exit acx_e_cleanup_module(void)
  * ==================================================
  */
 
-module_init(acx_e_init_module)
+module_init(acx_init_module)
 module_exit(acx_e_cleanup_module)
 
 #if ACX_DEBUG
