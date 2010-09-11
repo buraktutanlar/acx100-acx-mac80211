@@ -4689,7 +4689,7 @@ static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 static void* acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_PCI(adev))
-		return acxpci_l_get_txbuf(adev, tx_opaque);
+		return acxpci_get_txbuf(adev, tx_opaque);
 	if (IS_USB(adev))
 		return acxusb_l_get_txbuf(adev, tx_opaque);
 	if (IS_MEM(adev))
