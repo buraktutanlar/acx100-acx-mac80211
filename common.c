@@ -89,7 +89,7 @@ static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_feature_set(acx_device_t * adev, u32 f, u32 d);
 int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
-void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
+void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // Configuration (Control Path)
 void acx_s_set_defaults(acx_device_t * adev);
@@ -1748,7 +1748,7 @@ static inline unsigned int acx_rate111to5bits(unsigned int rate)
  * Common code for both acx100 and acx111.
  */
 /* NB: does NOT match RATE100_nn but matches ACX[111]_SCAN_RATE_n */
-void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
+void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 {
         acx_joinbss_t tmp;
         int dtim_interval;
@@ -2171,7 +2171,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
                 /* Needed if generated frames are to be emitted at different tx rate now */
                 if (adev->beacon_ready){
                 	logf0(L_ANY, "redoing cmd_join_bssid() after template cfg\n");
-                	acx_s_cmd_join_bssid(adev, adev->bssid);
+                	acx_cmd_join_bssid(adev, adev->bssid);
                 }
                 CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
         }
@@ -2372,7 +2372,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 
 			if (adev->beacon_ready){
 				logf0(L_ANY, "Turning on AP beacons\n");
-				acx_s_cmd_join_bssid(adev, adev->bssid);
+				acx_cmd_join_bssid(adev, adev->bssid);
 			} else {
 				logf0(L_ANY, "Not turning on AP beacons. Beacon not ready.\n");
 			}

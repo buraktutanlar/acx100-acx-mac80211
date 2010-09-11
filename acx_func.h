@@ -272,7 +272,7 @@ int acx_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* s
 #define acx_interrogate(adev,pdr,type) \
 	acx_interrogate_debug(adev,pdr,type,#type)
 
-void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
+void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // BOM Configuration (Common:Control Path)
 // -----
