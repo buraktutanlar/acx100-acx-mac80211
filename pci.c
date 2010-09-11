@@ -104,7 +104,7 @@ int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 static int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 static int acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
-static int acxpci_s_upload_fw(acx_device_t * adev);
+static int acxpci_upload_fw(acx_device_t * adev);
 // static void acx_show_card_eeprom_id(acx_device_t * adev);
 
 // CMDs (Control Path)
@@ -1223,7 +1223,7 @@ acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
  *
  * Origin: Derived from FW dissection
  */
-static int acxpci_s_upload_fw(acx_device_t * adev)
+static int acxpci_upload_fw(acx_device_t * adev)
 {
 	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
@@ -1704,7 +1704,7 @@ int acxpci_s_reset_dev(acx_device_t * adev)
 	adev->radio_type = hardware_info >> 8;
 
 	/* load the firmware */
-	if (OK != acxpci_s_upload_fw(adev))
+	if (OK != acxpci_upload_fw(adev))
 		goto end_fail;
 
 	/* acx_s_mwait(10);    this one really shouldn't be required */
