@@ -1541,7 +1541,7 @@ acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 		unsigned len, unsigned timeout, const char* cmdstr)
 {
 	if (IS_PCI(adev))
-		return acxpci_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
+		return acxpci_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
 	if (IS_USB(adev))
 		return acxusb_s_issue_cmd_timeo_debug(adev, cmd, param, len, timeout, cmdstr);
 	if (IS_MEM(adev))

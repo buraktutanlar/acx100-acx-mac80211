@@ -108,7 +108,7 @@ static int acxpci_upload_fw(acx_device_t * adev);
 // static void acx_show_card_eeprom_id(acx_device_t * adev);
 
 // CMDs (Control Path)
-int acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
+int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
 static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
 static u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 static inline void acxpci_init_mboxes(acx_device_t * adev);
@@ -1384,7 +1384,7 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
  * 2) go to waitqueue based approach: wait, not poll!
  */
 int
-acxpci_s_issue_cmd_timeo_debug(acx_device_t * adev,
+acxpci_issue_cmd_timeo_debug(acx_device_t * adev,
 			       unsigned cmd,
 			       void *buffer,
 			       unsigned buflen,
