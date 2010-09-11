@@ -727,7 +727,7 @@ static void acxpci_delete_dma_regions(acx_device_t * adev)
 	 * longer possible here? */
 	write_reg16(adev, IO_ACX_ENABLE, 0);
 
-	acx_s_mwait(100);
+	acx_mwait(100);
 
 	/* NO locking for all parts of acxpci_free_desc_queues because:
 	 * while calling dma_free_coherent() interrupts need to be 'free'
@@ -818,7 +818,7 @@ int acxpci_upload_radio(acx_device_t * adev)
 			break;
 		printk("acx: radio firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_mwait(1000);	/* better wait for a while... */
+		acx_mwait(1000);	/* better wait for a while... */
 	}
 
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -1287,7 +1287,7 @@ static int acxpci_upload_fw(acx_device_t * adev)
 		}
 		printk("acx: firmware upload attempt #%d FAILED, "
 		       "retrying...\n", try);
-		acx_s_mwait(1000);	/* better wait for a while... */
+		acx_mwait(1000);	/* better wait for a while... */
 	}
 
 	vfree(fw_image);
@@ -1434,7 +1434,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mwait(8);
+			acx_mwait(8);
 		}
 	} while (likely(--counter));
 
@@ -1503,7 +1503,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev,
 				break;
 			}
 			/* we waited 8 iterations, no luck. Sleep 8 ms */
-			acx_s_mwait(8);
+			acx_mwait(8);
 		}
 	} while (likely(--counter));
 
@@ -1758,7 +1758,7 @@ static int acxpci_verify_init(acx_device_t * adev)
 		if (time_after(jiffies, timeout))
 			break;
 		/* Init may take up to ~0.5 sec total */
-		acx_s_mwait(50);
+		acx_mwait(50);
 	}
 
 	FN_EXIT1(result);

@@ -213,7 +213,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw, struct ieee80211_tx_queue_sta
 #endif
 
 // Helpers
-void acx_s_mwait(int ms);
+void acx_mwait(int ms);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
@@ -990,7 +990,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	goto end;
 
       fail:
-	acx_s_mwait(1000);	/* ? */
+	acx_mwait(1000);	/* ? */
 	if (IS_PCI(adev))
 		acxpci_free_desc_queues(adev);
 	else if (IS_MEM(adev))
@@ -3388,7 +3388,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	acx_configure(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	acx_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
-	acx_s_mwait(40);
+	acx_mwait(40);
 	acx_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	log(L_INIT, "acx: power save mode change %s\n",
@@ -5951,7 +5951,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 /*
  * Basically a mdelay/msleep with logging
  */
-void acx_s_mwait(int ms)
+void acx_mwait(int ms)
 {
 	FN_ENTER;
 	msleep(ms);

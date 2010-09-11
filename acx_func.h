@@ -378,7 +378,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_s
 // BOM Helpers (Common)
 // -----
 
-void acx_s_mwait(int ms);
+void acx_mwait(int ms);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
 // void great_inquisitor(acx_device_t *adev);
 
