@@ -176,7 +176,7 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
 static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
 // Crypto
@@ -4611,7 +4611,7 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
 
 	memcpy(txbuf, skb->data, skb->len);
 
-	acx_l_tx_data(adev, tx, skb->len, ctl, skb);
+	acx_tx_data(adev, tx, skb->len, ctl, skb);
 
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
@@ -4699,7 +4699,7 @@ static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 	return (NULL);
 }
 
-static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
 {
 	if (IS_PCI(adev))
