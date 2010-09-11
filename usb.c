@@ -124,7 +124,7 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd);
 #endif
 
 // Rx Path
-static void acxusb_i_complete_rx(struct urb *);
+static void acxusb_complete_rx(struct urb *);
 static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
@@ -873,7 +873,7 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd)
  * The received data is then committed to the network stack and the next
  * USB receive is triggered.
  */
-static void acxusb_i_complete_rx(struct urb *urb)
+static void acxusb_complete_rx(struct urb *urb)
 {
 	acx_device_t *adev;
 	rxbuffer_t *ptr;
@@ -1129,7 +1129,7 @@ static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 	rxurb->actual_length = 0;
 	usb_fill_bulk_urb(rxurb, usbdev, inpipe, &rx->bulkin,	/* dataptr */
 			  RXBUFSIZE,	/* size */
-			  acxusb_i_complete_rx,	/* handler */
+			  acxusb_complete_rx,	/* handler */
 			  rx	/* handler param */
 	    );
 	rxurb->transfer_flags = URB_ASYNC_UNLINK;
