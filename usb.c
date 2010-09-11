@@ -1454,7 +1454,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.config = acx_op_config,
 	.bss_info_changed = acx_op_bss_info_changed,
 	.set_key = acx_op_set_key,
-	.get_stats = acx_e_op_get_stats,
+	.get_stats = acx_op_get_stats,
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
 #endif
