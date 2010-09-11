@@ -2845,7 +2845,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 
 static const struct ieee80211_ops acxpci_hw_ops = {
 	.tx = acx_op_tx,
-	.conf_tx = acx_e_conf_tx,
+	.conf_tx = acx_conf_tx,
 	.add_interface = acx_e_op_add_interface,
 	.remove_interface = acx_e_op_remove_interface,
 	.start = acxpci_op_start,
