@@ -48,11 +48,11 @@
  */
 
 // Locking
+#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
 void acx_lock_unhold(void);
 void acx_sem_unhold(void);
 void acx_lock_debug(acx_device_t * adev, const char *where);
 void acx_unlock_debug(acx_device_t * adev, const char *where);
-#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
 static inline const char *acx_sanitize_str(const char *s);
 #endif
 
