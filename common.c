@@ -77,7 +77,7 @@ void acx_display_hardware_details(acx_device_t * adev);
 firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
 void acx_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);
 int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 // CMDs (Control Path)
 int acx_s_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
@@ -1517,7 +1517,7 @@ int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 	return (NOT_OK);
 }
 
-int acx_s_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
+int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 {
 	if (IS_PCI(adev))
 		return acxpci_write_phy_reg(adev, reg, value);
@@ -2207,7 +2207,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		case RADIO_0D_MAXIM_MAX2820:
 		case RADIO_11_RFMD:
 		case RADIO_15_RALINK:
-			acx_s_write_phy_reg(adev, 0x30, adev->sensitivity);
+			acx_write_phy_reg(adev, 0x30, adev->sensitivity);
 			break;
 		case RADIO_16_RADIA_RC2422:
 		case RADIO_17_UNKNOWN:
