@@ -6094,7 +6094,7 @@ static int __init acx_e_init_module(void)
 	       "further information\n");
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
-	r1 = acxpci_e_init_module();
+	r1 = acxpci_init_module();
 #else
 	r1 = -EINVAL;
 #endif

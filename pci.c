@@ -172,7 +172,7 @@ static int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
 static void vlynq_remove(struct vlynq_device *vdev);
 #endif
 
-int __init acxpci_e_init_module(void);
+int __init acxpci_init_module(void);
 void __exit acxpci_e_cleanup_module(void);
 
 
@@ -4387,7 +4387,7 @@ static struct vlynq_driver vlynq_acx = {
  *
  * Module initialization routine, called once at module load time
  */
-int __init acxpci_e_init_module(void)
+int __init acxpci_init_module(void)
 {
 	int res;
 
