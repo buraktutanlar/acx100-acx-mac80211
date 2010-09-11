@@ -4678,7 +4678,7 @@ tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
 static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_USB(adev))
-		acxusb_l_dealloc_tx(tx_opaque);
+		acxusb_dealloc_tx(tx_opaque);
 	if (IS_MEM(adev))
 		acxmem_dealloc_tx (adev, tx_opaque);
 

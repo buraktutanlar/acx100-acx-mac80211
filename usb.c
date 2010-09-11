@@ -130,7 +130,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 // Tx Path
 static void acxusb_complete_tx(struct urb *urb);
 tx_t *acxusb_alloc_tx(acx_device_t *adev);
-void acxusb_l_dealloc_tx(tx_t * tx_opaque);
+void acxusb_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
@@ -1277,7 +1277,7 @@ tx_t *acxusb_alloc_tx(acx_device_t *adev)
 /*
  * Used if alloc_tx()'ed buffer needs to be cancelled without doing tx
  */
-void acxusb_l_dealloc_tx(tx_t * tx_opaque)
+void acxusb_dealloc_tx(tx_t * tx_opaque)
 {
 	usb_tx_t *tx = (usb_tx_t *) tx_opaque;
 	tx->busy = 0;
