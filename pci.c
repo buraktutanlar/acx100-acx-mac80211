@@ -152,7 +152,7 @@ static int acxpci_op_start(struct ieee80211_hw *hw);
 static void acxpci_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
-void acxpci_l_power_led(acx_device_t * adev, int enable);
+void acxpci_power_led(acx_device_t * adev, int enable);
 INLINE_IO int acxpci_adev_present(acx_device_t *adev);
 
 // Ioctls
@@ -2932,7 +2932,7 @@ static void acxpci_op_stop(struct ieee80211_hw *hw)
  * ==================================================
  */
 
-void acxpci_l_power_led(acx_device_t * adev, int enable)
+void acxpci_power_led(acx_device_t * adev, int enable)
 {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
@@ -3781,7 +3781,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 #endif
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
-		acxpci_l_power_led(adev, 0);
+		acxpci_power_led(adev, 0);
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
 			/* FIXME: does this actually keep halting the eCPU?
@@ -4336,7 +4336,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		}
 		/* disable power LED to save power :-) */
 		log(L_INIT, "acx: switching off power LED to save power\n");
-		acxpci_l_power_led(adev, 0);
+		acxpci_power_led(adev, 0);
 
 		/* stop our eCPU */
 		// OW PCI still does something here (although also need to be reviewed).

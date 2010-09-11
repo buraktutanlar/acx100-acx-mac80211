@@ -560,7 +560,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev);
 // Mac80211 Ops
 
 // Helpers
-void acxpci_l_power_led(acx_device_t * adev, int enable);
+void acxpci_power_led(acx_device_t * adev, int enable);
 
 // Ioctls
 int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info *info, struct iw_param *vwrq, char *extra);

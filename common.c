@@ -2270,7 +2270,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		log(L_INIT, "acx: updating the power LED status: %u\n", adev->led_power);
 
 		if (IS_PCI(adev))
-			acxpci_l_power_led(adev, adev->led_power);
+			acxpci_power_led(adev, adev->led_power);
 		else if (IS_MEM(adev))
 			acxmem_power_led(adev, adev->led_power);
 
