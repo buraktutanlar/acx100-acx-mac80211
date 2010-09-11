@@ -321,7 +321,7 @@ void acx_tx_queue_flush(acx_device_t *adev);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
-tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
+tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
 //void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,

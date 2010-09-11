@@ -173,7 +173,7 @@ void acx_tx_queue_flush(acx_device_t *adev);
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
-tx_t *acx_l_alloc_tx(acx_device_t *adev, unsigned int len);
+tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
 static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
@@ -4591,7 +4591,7 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
 	struct ieee80211_tx_info *ctl;
 	ctl = IEEE80211_SKB_CB(skb);
 
-	tx = acx_l_alloc_tx(adev, skb->len);
+	tx = acx_alloc_tx(adev, skb->len);
 
 	if (unlikely(!tx)) {
 		logf0(L_BUFT, "No tx available\n");
@@ -4662,7 +4662,7 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
  * OW Included skb->len to check required blocks upfront in acx_l_alloc_tx
  * This should perhaps also go into pci and usb ?
  */ 
-tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
+tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len)
 {
 	if (IS_PCI(adev))
 		return acxpci_alloc_tx(adev);
