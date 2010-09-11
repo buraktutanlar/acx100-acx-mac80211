@@ -174,7 +174,7 @@ void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
-static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
+static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_l_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
@@ -4605,7 +4605,7 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
 		logf0(L_BUF, "Txbuf==NULL. (Card was removed ?!): Stop queue. Dealloc skb.\n");
 
 		// OW only USB implemented
-		acx_l_dealloc_tx(adev, tx);
+		acx_dealloc_tx(adev, tx);
 		return (-ENXIO);
 	}
 
@@ -4675,7 +4675,7 @@ tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len)
 	return (NULL);
 }
 
-static void acx_l_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
+static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 {
 	if (IS_USB(adev))
 		acxusb_dealloc_tx(tx_opaque);
