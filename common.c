@@ -154,7 +154,7 @@ static int acx_proc_show_phy(struct seq_file *file, void *v);
 static int acx_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_open(struct inode *inode, struct file *file);
-static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove);
+static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove);
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
 #endif
@@ -4176,7 +4176,7 @@ static int acx_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
 }
 
-static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
+static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	char procbuf[80];
@@ -4237,12 +4237,12 @@ static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
 
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num)
 {
-	return acx_manage_proc_entries(ieee, num, 0);
+	return acx_proc_manage_entries(ieee, num, 0);
 }
 
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
 {
-	return acx_manage_proc_entries(ieee, num, 1);
+	return acx_proc_manage_entries(ieee, num, 1);
 }
 
 
