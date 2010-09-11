@@ -138,7 +138,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct
 void acxusb_irq_work(struct work_struct *work);
 
 // Mac80211 Ops
-static int acxusb_e_start(struct ieee80211_hw *);
+static int acxusb_op_start(struct ieee80211_hw *);
 static void acxusb_e_stop(struct ieee80211_hw *);
 
 // Helpers
@@ -1448,7 +1448,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
 	.conf_tx = acx_e_conf_tx,
 	.add_interface = acx_e_op_add_interface,
 	.remove_interface = acx_e_op_remove_interface,
-	.start = acxusb_e_start,
+	.start = acxusb_op_start,
 	.configure_filter = acx_i_op_configure_filter,
 	.stop = acxusb_e_stop,
 	.config = acx_e_op_config,
@@ -1466,7 +1466,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
  * It initializes a management timer, sets up the USB card and starts
  * the network tx queue and USB receive.
  */
-static int acxusb_e_start(struct ieee80211_hw *hw)
+static int acxusb_op_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	int i;
