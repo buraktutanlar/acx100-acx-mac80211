@@ -540,7 +540,7 @@ int acxpci_reset_dev(acx_device_t * adev);
 // Other (Control Path)
 
 // Proc, Debug
-int acxpci_s_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
 
 // Rx Path

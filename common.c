@@ -3602,7 +3602,7 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 	acx_sem_lock(adev);
 
 	if (IS_PCI(adev))
-		acxpci_s_proc_diag_output(file, adev);
+		acxpci_proc_diag_output(file, adev);
 	else if (IS_MEM(adev))
 		acxmem_proc_diag_output(file, adev);
 
