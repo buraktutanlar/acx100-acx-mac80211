@@ -337,7 +337,7 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee
 // BOM Irq Handling, Timer (Common)
 // -----
 void acx_init_task_scheduler(acx_device_t *adev);
-void acx_e_after_interrupt_task(acx_device_t *adev);
+void acx_after_interrupt_task(acx_device_t *adev);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 void acx_log_irq(u16 irqtype);
 void acx_i_timer(unsigned long address);

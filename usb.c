@@ -1434,7 +1434,7 @@ void acxusb_irq_work(struct work_struct *work)
 			container_of(work, struct acx_device, irq_work);
 
 	if (adev->after_interrupt_jobs)
-		acx_e_after_interrupt_task(adev);
+		acx_after_interrupt_task(adev);
 }
 
 

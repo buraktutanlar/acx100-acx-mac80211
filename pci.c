@@ -2643,7 +2643,7 @@ void acxpci_irq_work(struct work_struct *work)
 
 	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
 	if (adev->after_interrupt_jobs){
-		acx_e_after_interrupt_task(adev);
+		acx_after_interrupt_task(adev);
 	}
 
 	acx_sem_unlock(adev);
