@@ -125,7 +125,7 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd);
 
 // Rx Path
 static void acxusb_complete_rx(struct urb *);
-static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx);
+static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
 static void acxusb_i_complete_tx(struct urb *urb);
@@ -914,7 +914,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	/* Send the URB that's waiting. */
 	log(L_USBRXTX, "acxusb: rxnum=%d, sending=%d\n",
 		rxnum, rxnum ^ 1);
-	acxusb_l_poll_rx(adev, &adev->usb_rx[rxnum ^ 1]);
+	acxusb_poll_rx(adev, &adev->usb_rx[rxnum ^ 1]);
 
 	if (unlikely(size > sizeof(rxbuffer_t)))
 		log(L_USBRXTX, "acxusb: rx too large: %d, please report\n", size);
@@ -1100,7 +1100,7 @@ static void acxusb_complete_rx(struct urb *urb)
  * acxusb_l_poll_rx
  * This function (re)initiates a bulk-in USB transfer on a given urb
  */
-static void acxusb_l_poll_rx(acx_device_t * adev, usb_rx_t * rx)
+static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 {
 	struct usb_device *usbdev;
 	struct urb *rxurb;
@@ -1492,7 +1492,7 @@ static int acxusb_e_start(struct ieee80211_hw *hw)
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
 		adev->usb_rx[i].urb->status = 0;
 	}
-	acxusb_l_poll_rx(adev, &adev->usb_rx[0]);
+	acxusb_poll_rx(adev, &adev->usb_rx[0]);
 
 	acx_wake_queue(adev->ieee, NULL);
 
