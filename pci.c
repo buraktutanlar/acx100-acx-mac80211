@@ -116,7 +116,7 @@ static inline void acxpci_init_mboxes(acx_device_t * adev);
 // Init, Configuration (Control Path)
 int acxpci_reset_dev(acx_device_t * adev);
 static int acxpci_verify_init(acx_device_t * adev);
-static void acxpci_l_reset_mac(acx_device_t * adev);
+static void acxpci_reset_mac(acx_device_t * adev);
 static void acxpci_s_up(struct ieee80211_hw *hw);
 
 // Other (Control Path)
@@ -1659,7 +1659,7 @@ int acxpci_reset_dev(acx_device_t * adev)
 	 * to upload the firmware correctly */
 
 #ifdef CONFIG_PCI
-	acxpci_l_reset_mac(adev);
+	acxpci_reset_mac(adev);
 #endif
 
 	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
@@ -1773,7 +1773,7 @@ static int acxpci_verify_init(acx_device_t * adev)
  *
  * Origin: Standard Read/Write to IO
  */
-static void acxpci_l_reset_mac(acx_device_t * adev)
+static void acxpci_reset_mac(acx_device_t * adev)
 {
 	u16 temp;
 
@@ -3787,7 +3787,7 @@ static void __devexit acxpci_e_remove(struct pci_dev *pdev)
 			/* FIXME: does this actually keep halting the eCPU?
 			 * I don't think so...
 			 */
-			acxpci_l_reset_mac(adev);
+			acxpci_reset_mac(adev);
 		} else {
 			u16 temp;
 			/* halt eCPU */
