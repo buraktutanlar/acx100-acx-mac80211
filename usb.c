@@ -132,7 +132,7 @@ static void acxusb_complete_tx(struct urb *urb);
 tx_t *acxusb_alloc_tx(acx_device_t *adev);
 void acxusb_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 
 // Irq Handling, Timer
 void acxusb_irq_work(struct work_struct *work);
@@ -1295,7 +1295,7 @@ void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
  * Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
  * Can be called from acx_i_start_xmit (data frames from net core).
  */
-void acxusb_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
+void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
 	struct usb_device *usbdev;
 	struct urb *txurb;
