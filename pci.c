@@ -96,7 +96,7 @@ static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void
 static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy
-int acxpci_s_upload_radio(acx_device_t * adev);
+int acxpci_upload_radio(acx_device_t * adev);
 int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 static inline void acxpci_read_eeprom_area(acx_device_t * adev);
@@ -776,7 +776,7 @@ static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
  *
  * Origin: Standard Read/Write to IO
  */
-int acxpci_s_upload_radio(acx_device_t * adev)
+int acxpci_upload_radio(acx_device_t * adev)
 {
 	acx_ie_memmap_t mm;
 	firmware_image_t *radio_image;

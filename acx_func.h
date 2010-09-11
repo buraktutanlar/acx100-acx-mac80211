@@ -525,7 +525,7 @@ void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_q
 void acxpci_free_desc_queues(acx_device_t * adev);
 
 // Firmware, EEPROM, Phy
-int acxpci_s_upload_radio(acx_device_t * adev);
+int acxpci_upload_radio(acx_device_t * adev);
 int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 int acxpci_s_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
