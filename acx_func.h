@@ -358,7 +358,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw* ieee,
 		struct ieee80211_vif *vif);
 #endif
 
-int acx_e_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
+int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		struct ieee80211_key_conf *key);
 int acx_op_config(struct ieee80211_hw *hw, u32 changed);
