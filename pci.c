@@ -160,7 +160,7 @@ int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info *info, 
 int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
 // Driver, Module
-static int __devinit acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id);
+static int __devinit acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void __devexit acxpci_e_remove(struct pci_dev *pdev);
 #ifdef CONFIG_PM
 static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state);
@@ -3389,7 +3389,7 @@ static const u16 IO_ACX111[] = {
 
 #ifdef CONFIG_PCI
 static int __devinit
-acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	acx111_ie_configoption_t co;
 	unsigned long mem_region1 = 0;
@@ -3974,7 +3974,7 @@ static struct pci_driver
  acxpci_drv_id = {
 	.name = "acx_pci",
 	.id_table = acxpci_id_tbl,
-	.probe = acxpci_e_probe,
+	.probe = acxpci_probe,
 	.remove = __devexit_p(acxpci_e_remove),
 #ifdef CONFIG_PM
 	.suspend = acxpci_e_suspend,
