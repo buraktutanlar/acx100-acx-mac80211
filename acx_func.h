@@ -609,7 +609,7 @@ void acxusb_irq_work(struct work_struct *work);
 // Helpers
 
 // Driver, Module
-int __init acxusb_e_init_module(void);
+int __init acxusb_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
 
 /*

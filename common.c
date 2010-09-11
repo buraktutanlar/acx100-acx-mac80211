@@ -6100,7 +6100,7 @@ static int __init acx_e_init_module(void)
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_USB)
-	r2 = acxusb_e_init_module();
+	r2 = acxusb_init_module();
 #else
 	r2 = -EINVAL;
 #endif

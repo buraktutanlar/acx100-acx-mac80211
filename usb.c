@@ -148,7 +148,7 @@ static void acxusb_unlink_urb(struct urb *urb);
 static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID);
 static void acxusb_disconnect(struct usb_interface *intf);
 
-int __init acxusb_e_init_module(void);
+int __init acxusb_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
 
  
@@ -1987,7 +1987,7 @@ static void acxusb_disconnect(struct usb_interface *intf)
  *
  * Returns: Errorcode on failure, 0 on success
  */
-int __init acxusb_e_init_module(void)
+int __init acxusb_init_module(void)
 {
 	log(L_INIT, "acx: USB module initialized, "
 	    "probing for devices...\n");
