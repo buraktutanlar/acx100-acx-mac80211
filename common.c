@@ -98,7 +98,7 @@ void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
-static void acx_s_select_opmode(acx_device_t *adev);
+static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
@@ -2609,7 +2609,7 @@ int acx_setup_modes(acx_device_t *adev)
 	return 0;
 }
 
-static void acx_s_select_opmode(acx_device_t *adev)
+static void acx_select_opmode(acx_device_t *adev)
 {
 	int changed = 0;
 	FN_ENTER;
@@ -5483,7 +5483,7 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 
 
 	if (adev->initialized)
-		acx_s_select_opmode(adev);
+		acx_select_opmode(adev);
 
 	err = 0;
 
@@ -5542,7 +5542,7 @@ void acx_e_op_remove_interface(struct ieee80211_hw *hw,
 #endif
 
 	if (adev->initialized)
-		acx_s_select_opmode(adev);
+		acx_select_opmode(adev);
 
 	log(L_ANY, "acx: Virtual interface removed: "
 	       "type=%d, MAC=%s\n",
