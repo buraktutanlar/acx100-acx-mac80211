@@ -264,9 +264,9 @@ int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, uns
 #define acx_issue_cmd_timeo(adev,cmd,param,len,timeo) \
 	acx_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
 
-int acx_s_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_configure(adev,pdr,type) \
-	acx_s_configure_debug(adev,pdr,type,#type)
+int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_configure(adev,pdr,type) \
+	acx_configure_debug(adev,pdr,type,#type)
 
 int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
 #define acx_s_interrogate(adev,pdr,type) \
