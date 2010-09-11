@@ -149,7 +149,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
 static int acxpci_op_start(struct ieee80211_hw *hw);
-static void acxpci_e_op_stop(struct ieee80211_hw *hw);
+static void acxpci_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
 void acxpci_l_power_led(acx_device_t * adev, int enable);
@@ -2850,7 +2850,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.remove_interface = acx_e_op_remove_interface,
 	.start = acxpci_op_start,
 	.configure_filter = acx_i_op_configure_filter,
-	.stop = acxpci_e_op_stop,
+	.stop = acxpci_op_stop,
 	.config = acx_e_op_config,
 	.bss_info_changed = acx_e_op_bss_info_changed,
 	.set_key = acx_e_op_set_key,
@@ -2892,7 +2892,7 @@ static int acxpci_op_start(struct ieee80211_hw *hw)
 	return result;
 }
 
-static void acxpci_e_op_stop(struct ieee80211_hw *hw)
+static void acxpci_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
