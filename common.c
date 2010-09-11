@@ -162,7 +162,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
 // Rx Path
 static void acx_initialize_rx_config(acx_device_t * adev);
 void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
-static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
+static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
@@ -4378,7 +4378,7 @@ void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 		acx_dump_bytes(hdr, buf_len);
 	}
 
-	acx_l_rx(adev, rxbuf);
+	acx_rx(adev, rxbuf);
 
 	/* Now check Rx quality level, AFTER processing packet.
 	 * I tried to figure out how to map these levels to dBm
@@ -4401,7 +4401,7 @@ void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
  * The end of the Rx path. Pulls data from a rxhostdesc into a socket
  * buffer and feeds it to the network stack via netif_rx().
  */
-static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
+static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 {
 
 	struct ieee80211_rx_status *status;
