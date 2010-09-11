@@ -104,7 +104,7 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
 // Firmware, EEPROM, Phy
 int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
-static void acxusb_s_read_eeprom_version(acx_device_t * adev);
+static void acxusb_read_eeprom_version(acx_device_t * adev);
 static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
 static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
 
@@ -246,7 +246,7 @@ int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 }
 
 /* FIXME: maybe merge it with usual eeprom reading, into common code? */
-static void acxusb_s_read_eeprom_version(acx_device_t * adev)
+static void acxusb_read_eeprom_version(acx_device_t * adev)
 {
 	u8 eeprom_ver[0x8];
 
@@ -1856,7 +1856,7 @@ acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		goto end;
 
 	/* TODO: see similar code in pci.c */
-	acxusb_s_read_eeprom_version(adev);
+	acxusb_read_eeprom_version(adev);
 	acxusb_s_fill_configoption(adev);
 	acx_s_set_defaults(adev);
 	acx_s_get_firmware_version(adev);
