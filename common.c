@@ -100,7 +100,7 @@ int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
-static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
+static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Templates (Control Path)
@@ -2703,7 +2703,7 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
  * Or maybe not, since the radio module probably has a function interface
  * instead which then manages Tx level programming :-\
  */
-static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
+static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
 	struct acx111_ie_tx_level tx_level;
 
@@ -2734,7 +2734,7 @@ static int acx111_s_set_tx_level(acx_device_t * adev, u8 level_dbm)
 static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
 {
 	if (IS_ACX111(adev)) {
-		return acx111_s_set_tx_level(adev, level_dbm);
+		return acx111_set_tx_level(adev, level_dbm);
 	}
 	if (IS_PCI(adev)) {
 		return acx100pci_set_tx_level(adev, level_dbm);
