@@ -1480,7 +1480,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_i_timer;
+	adev->mgmt_timer.function = acx_timer;
 	adev->mgmt_timer.data = (unsigned long)adev;
 
 	/* acx_s_start needs it */

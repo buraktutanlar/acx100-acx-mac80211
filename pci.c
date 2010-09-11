@@ -1822,7 +1822,7 @@ static void acxpci_up(struct ieee80211_hw *hw)
 	 ** used to use it. But we don't do that anymore, our OS
 	 ** has reliable software timers */
 	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_i_timer;
+	adev->mgmt_timer.function = acx_timer;
 	adev->mgmt_timer.data = (unsigned long)adev;
 
 	/* Need to set ACX_STATE_IFACE_UP first, or else

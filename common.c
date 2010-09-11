@@ -197,7 +197,7 @@ void acx_init_task_scheduler(acx_device_t *adev);
 void acx_after_interrupt_task(acx_device_t *adev);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 void acx_log_irq(u16 irqtype);
-void acx_i_timer(unsigned long address);
+void acx_timer(unsigned long address);
 void acx_set_timer(acx_device_t * adev, int timeout_us);
 
 // Mac80211 Ops
@@ -5396,7 +5396,7 @@ void acx_schedule_task(acx_device_t *adev, unsigned int set_flag) {
 /*
 * acx_i_timer
 */
-void acx_i_timer(unsigned long address)
+void acx_timer(unsigned long address)
 {
 	//acx_device_t *adev = (acx_device_t *) address;
 
