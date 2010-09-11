@@ -569,7 +569,7 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_
 // Driver, Module
 
 int __init acxpci_init_module(void);
-void __exit acxpci_e_cleanup_module(void);
+void __exit acxpci_cleanup_module(void);
 
 /*
  * BOM USB prototypes
