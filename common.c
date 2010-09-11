@@ -108,7 +108,7 @@ static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_
 
 static int acx_set_beacon_template(acx_device_t *adev, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
-static int acx_s_set_tim_template(acx_device_t * adev);
+static int acx_set_tim_template(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
 static int acx_s_init_max_null_data_template(acx_device_t * adev);
 static int acx_s_init_max_beacon_template(acx_device_t * adev);
@@ -2153,7 +2153,7 @@ void acx_update_card_settings(acx_device_t *adev)
 							// We need to set always a tim template, since otherwise the acx 
 							// is sending a not 100% well structured beacon (may not be 
 							// blocking though)
-							acx_s_set_tim_template(adev);
+							acx_set_tim_template(adev);
 
 							/* BTW acx111 firmware would not send probe responses
 							 ** if probe request does not have all basic rates flagged
@@ -2882,7 +2882,7 @@ static int acx_s_init_max_probe_request_template(acx_device_t * adev)
     00000000 00000000 01010101 01010101 01010101 00000000 00000000...
     (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
 */
-static int acx_s_set_tim_template(acx_device_t *adev)
+static int acx_set_tim_template(acx_device_t *adev)
 {
     /* For now, configure smallish test bitmap, all zero ("no pending data") */
 #if 0
@@ -3166,7 +3166,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 	/* ACX100 will have its TIM template set,
 	 * and we also need to update the memory map */
 
-	if (OK != acx_s_set_tim_template(adev))
+	if (OK != acx_set_tim_template(adev))
 		goto failed_acx100;
 
 	log(L_DEBUG, "acx: sizeof(memmap) = %d bytes\n", (int)sizeof(mm));
