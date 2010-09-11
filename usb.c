@@ -251,7 +251,7 @@ static void acxusb_read_eeprom_version(acx_device_t * adev)
 	u8 eeprom_ver[0x8];
 
 	memset(eeprom_ver, 0, sizeof(eeprom_ver));
-	acx_s_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
+	acx_interrogate(adev, &eeprom_ver, ACX1FF_IE_EEPROM_VER);
 
 	/* FIXME: which one of those values to take? */
 	adev->eeprom_version = eeprom_ver[5];

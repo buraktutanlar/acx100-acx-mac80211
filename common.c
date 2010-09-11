@@ -87,7 +87,7 @@ static int acx111_s_set_feature_config(acx_device_t * adev, u32 feature_options,
 static inline int acx111_s_feature_off(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
-int acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
+int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
 void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
@@ -916,7 +916,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	FN_ENTER;
 
 	/* read out the acx100 physical start address for the queues */
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
+	if (OK != acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -971,7 +971,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	}
 #endif
 
-	if (OK != acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
+	if (OK != acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -1075,7 +1075,7 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 		goto fail;
 	}
 
-	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+	acx_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
 
 	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
@@ -1126,7 +1126,7 @@ void acx_get_firmware_version(acx_device_t * adev)
 	FN_ENTER;
 
 	memset(fw.fw_id, 'E', FW_ID_SIZE);
-	acx_s_interrogate(adev, &fw, ACX1xx_IE_FWREV);
+	acx_interrogate(adev, &fw, ACX1xx_IE_FWREV);
 	memcpy(adev->firmware_version, fw.fw_id, FW_ID_SIZE);
 	adev->firmware_version[FW_ID_SIZE] = '\0';
 
@@ -1601,7 +1601,7 @@ acx111_s_get_feature_config(acx_device_t * adev,
 
 	memset(&feat, 0, sizeof(feat));
 
-	if (OK != acx_s_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
+	if (OK != acx_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
 		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
@@ -1696,7 +1696,7 @@ static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d)
 }
 
 int
-acx_s_interrogate_debug(acx_device_t * adev, void *pdr, int type,
+acx_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 			const char *typestr)
 {
 	u16 len;
@@ -2017,7 +2017,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
 		const u8 *paddr;
 
-		acx_s_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+		acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 		paddr = &stationID[4];
 //		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
 		for (i = 0; i < ETH_ALEN; i++) {
@@ -2050,7 +2050,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
 
 		memset(antenna, 0, sizeof(antenna));
-		acx_s_interrogate(adev, antenna,
+		acx_interrogate(adev, antenna,
 				  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 		adev->antenna = antenna[4];
 		log(L_INIT, "acx: got antenna value 0x%02X\n", adev->antenna);
@@ -2062,7 +2062,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
 
 			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_s_interrogate(adev, ed_threshold,
+			acx_interrogate(adev, ed_threshold,
 					  ACX100_IE_DOT11_ED_THRESHOLD);
 			adev->ed_threshold = ed_threshold[4];
 		} else {
@@ -2079,7 +2079,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
 
 			memset(cca, 0, sizeof(adev->cca));
-			acx_s_interrogate(adev, cca,
+			acx_interrogate(adev, cca,
 					  ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 			adev->cca = cca[4];
 		} else {
@@ -2094,7 +2094,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 	if (adev->get_mask & GETSET_REG_DOMAIN) {
 		acx_ie_generic_t dom;
 
-		acx_s_interrogate(adev, &dom,
+		acx_interrogate(adev, &dom,
 				  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 		adev->reg_dom_id = dom.m.bytes[0];
 		acx_s_set_sane_reg_domain(adev, 0);
@@ -3171,7 +3171,7 @@ static int acx_s_init_packet_templates(acx_device_t * adev)
 
 	log(L_DEBUG, "acx: sizeof(memmap) = %d bytes\n", (int)sizeof(mm));
 
-	if (OK != acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP))
+	if (OK != acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP))
 		goto failed_acx100;
 
 	mm.QueueStart = cpu_to_le32(le32_to_cpu(mm.PacketTemplateEnd) + 4);
@@ -3360,7 +3360,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 	    adev->ps_wakeup_cfg, adev->ps_listen_interval,
 	    adev->ps_options, adev->ps_hangover_period,
 	    adev->ps_enhanced_transition_time);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "acx: Previous PS mode settings: wakeup_cfg 0x%02X, "
 	    "listen interval %u, options 0x%02X, "
 	    "hangover period %u, "
@@ -3386,10 +3386,10 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 		    cpu_to_le16(adev->ps_enhanced_transition_time);
 	}
 	acx_configure(adev, &pm, ACX1xx_IE_POWER_MGMT);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	acx_s_mwait(40);
-	acx_s_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
+	acx_interrogate(adev, &pm, ACX1xx_IE_POWER_MGMT);
 	log(L_INIT, "acx: wakeup_cfg: 0x%02X\n", pm.acx111.wakeup_cfg);
 	log(L_INIT, "acx: power save mode change %s\n",
 	    (pm.acx111.
@@ -3663,7 +3663,7 @@ static int acx_e_proc_show_diag(struct seq_file *file, void *v)
 
 	part_str = "statistics query command";
 
-	if (OK != acx_s_interrogate(adev, st, ACX1xx_IE_FIRMWARE_STATISTICS))
+	if (OK != acx_interrogate(adev, st, ACX1xx_IE_FIRMWARE_STATISTICS))
 		goto fw_stats_end;
 
 	st += sizeof(u16);
@@ -4950,7 +4950,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 
 	FN_ENTER;
 
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+	if (OK != acx_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		goto fail;
 	}
 
@@ -5008,7 +5008,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 */
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
-	if (OK != acx_s_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
+	if (OK != acx_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		printk("acx: %s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;

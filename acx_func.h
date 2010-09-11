@@ -268,9 +268,9 @@ int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str
 #define acx_configure(adev,pdr,type) \
 	acx_configure_debug(adev,pdr,type,#type)
 
-int acx_s_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
-#define acx_s_interrogate(adev,pdr,type) \
-	acx_s_interrogate_debug(adev,pdr,type,#type)
+int acx_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char* str);
+#define acx_interrogate(adev,pdr,type) \
+	acx_interrogate_debug(adev,pdr,type,#type)
 
 void acx_s_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 

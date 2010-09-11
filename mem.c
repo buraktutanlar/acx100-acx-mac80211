@@ -1421,7 +1421,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 
 	FN_ENTER;
 
-	acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+	acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
 	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
@@ -1465,7 +1465,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
 			&radioinit, sizeof(radioinit), CMD_TIMEOUT_MS(1000));
 
-	res = acx_s_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+	res = acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
 
 	fail:
 	FN_EXIT1(res);
@@ -2555,7 +2555,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 
 	if (IS_ACX111(adev)) {
 		/* ACX111: configopt struct needs to be queried after full init */
-		acx_s_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
+		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
 
 	/*
@@ -4622,37 +4622,37 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 	/* BTW, fails with 12 (Write only) error code.
 	 ** Retained for easy testing of issue_cmd error handling :) */
 	printk("Interrogating queue config\n");
-	acx_s_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
+	acx_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
 	printk("done with queue config\n");
 
 	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0, sizeof(queueconf));
 	printk("Interrogating mem config options\n");
-	acx_s_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+	acx_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
 	printk("done with mem config options\n");
 
 	/* get Acx111 Memory Map */
 	memset(memmap, 0, sizeof(memmap));
 	printk("Interrogating mem map\n");
-	acx_s_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
+	acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
 	printk("done with mem map\n");
 
 	/* get Acx111 Rx Config */
 	memset(rxconfig, 0, sizeof(rxconfig));
 	printk("Interrogating rxconfig\n");
-	acx_s_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
+	acx_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
 	printk("done with queue rxconfig\n");
 
 	/* get Acx111 fcs error count */
 	memset(fcserror, 0, sizeof(fcserror));
 	printk("Interrogating fcs err count\n");
-	acx_s_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
+	acx_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
 	printk("done with err count\n");
 
 	/* get Acx111 rate fallback */
 	memset(ratefallback, 0, sizeof(ratefallback));
 	printk("Interrogating rate fallback\n");
-	acx_s_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
+	acx_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
 	printk("done with rate fallback\n");
 
 	/* force occurrence of a beacon interrupt */
