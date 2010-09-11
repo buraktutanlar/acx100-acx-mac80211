@@ -145,7 +145,7 @@ static void acxusb_op_stop(struct ieee80211_hw *);
 static void acxusb_unlink_urb(struct urb *urb);
 
 // Driver, Module
-static int acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID);
+static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID);
 static void acxusb_e_disconnect(struct usb_interface *intf);
 
 int __init acxusb_e_init_module(void);
@@ -1625,7 +1625,7 @@ static void acxusb_unlink_urb(struct urb *urb)
 static struct usb_driver
  acxusb_driver = {
 	.name = "acx_usb",
-	.probe = acxusb_e_probe,
+	.probe = acxusb_probe,
 	.disconnect = acxusb_e_disconnect,
 	.id_table = acxusb_ids
 };
@@ -1641,7 +1641,7 @@ static struct usb_driver
  * a non-null pointer to a driver context and thereby claims the device.
  */
 static int
-acxusb_e_probe(struct usb_interface *intf, const struct usb_device_id *devID)
+acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	acx_device_t *adev = NULL;
