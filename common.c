@@ -101,7 +101,7 @@ int acx_setup_modes(acx_device_t *adev);
 static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm);
-static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm);
+static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm);
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -1926,7 +1926,7 @@ void acx_set_defaults(acx_device_t * adev)
 		/* 30mW (15dBm) is default, at least in my acx111 card: */
 		adev->tx_level_dbm = 15;
 		conf->power_level = adev->tx_level_dbm;
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		acx_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
 	} else {
 		/* don't use max. level, since it might be dangerous
@@ -1934,7 +1934,7 @@ void acx_set_defaults(acx_device_t * adev)
 		 * excessive Tx power damage!) */
 		adev->tx_level_dbm = 18;
 		conf->power_level = adev->tx_level_dbm;
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		acx_set_tx_level(adev, adev->tx_level_dbm);
 		SET_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
 
@@ -2196,7 +2196,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	if (adev->set_mask & GETSET_TXPOWER) {
 		log(L_INIT, "acx: updating the transmit power: %u dBm\n",
 		    adev->tx_level_dbm);
-		acx_s_set_tx_level(adev, adev->tx_level_dbm);
+		acx_set_tx_level(adev, adev->tx_level_dbm);
 		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
 
@@ -2731,7 +2731,7 @@ static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	return acx_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
 }
 
-static int acx_s_set_tx_level(acx_device_t *adev, u8 level_dbm)
+static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm)
 {
 	if (IS_ACX111(adev)) {
 		return acx111_set_tx_level(adev, level_dbm);
