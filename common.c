@@ -146,7 +146,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 
 // Proc, Debug
 #ifdef CONFIG_PROC_FS
-static int acx_e_proc_show_diag(struct seq_file *file, void *v);
+static int acx_proc_show_diag(struct seq_file *file, void *v);
 static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_e_proc_show_acx(struct seq_file *file, void *v);
 static int acx_e_proc_show_eeprom(struct seq_file *file, void *v);
@@ -539,7 +539,7 @@ typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, l
 static acx_proc_show_t *const
  acx_proc_show_funcs[] = {
 	acx_e_proc_show_acx,
-	acx_e_proc_show_diag,
+	acx_proc_show_diag,
 	acx_e_proc_show_eeprom,
 	acx_e_proc_show_phy,
 	acx_e_proc_show_debug,
@@ -3576,7 +3576,7 @@ static u8 acx_rate111to100(u16 r)
 
 #ifdef CONFIG_PROC_FS
 
-static int acx_e_proc_show_diag(struct seq_file *file, void *v)
+static int acx_proc_show_diag(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
