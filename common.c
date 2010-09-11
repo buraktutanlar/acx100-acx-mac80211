@@ -160,7 +160,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
 #endif
 
 // Rx Path
-static void acx_s_initialize_rx_config(acx_device_t * adev);
+static void acx_initialize_rx_config(acx_device_t * adev);
 void acx_l_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
 static void acx_l_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
@@ -1971,7 +1971,7 @@ void acx_set_defaults(acx_device_t * adev)
 #endif
 	    ;
 
-	acx_s_initialize_rx_config(adev);
+	acx_initialize_rx_config(adev);
 
 	FN_EXIT0;
 }
@@ -2403,7 +2403,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_RXCONFIG) {
-		acx_s_initialize_rx_config(adev);
+		acx_initialize_rx_config(adev);
 		CLEAR_BIT(adev->set_mask, SET_RXCONFIG);
 	}
 
@@ -4252,7 +4252,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
  * BOM Rx Path
  * ==================================================
  */
-static void acx_s_initialize_rx_config(acx_device_t * adev)
+static void acx_initialize_rx_config(acx_device_t * adev)
 {
 	struct {
 		u16 id;
