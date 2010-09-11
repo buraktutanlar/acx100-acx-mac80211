@@ -3625,7 +3625,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
-	acx_s_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
 	/* Register the card, AFTER everything else has been set up,
@@ -4224,7 +4224,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	acx_s_parse_configoption(adev, &co);
 	acx_s_set_defaults(adev);
-	acx_s_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
 	/* Register the card, AFTER everything else has been set up,

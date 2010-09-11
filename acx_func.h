@@ -248,7 +248,7 @@ do { \
 
 // BOM Firmware, EEPROM, Phy (Common)
 // -----
-void acx_s_get_firmware_version(acx_device_t * adev);
+void acx_get_firmware_version(acx_device_t * adev);
 void acx_display_hardware_details(acx_device_t * adev);
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 * size);
 void acx_s_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);

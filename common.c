@@ -72,7 +72,7 @@ static int acx100_create_dma_regions(acx_device_t * adev);
 static int acx111_create_dma_regions(acx_device_t * adev);
 
 // Firmware, EEPROM, Phy
-void acx_s_get_firmware_version(acx_device_t * adev);
+void acx_get_firmware_version(acx_device_t * adev);
 void acx_display_hardware_details(acx_device_t * adev);
 firmware_image_t *acx_s_read_fw(struct device *dev, const char *file, u32 * size);
 void acx_s_parse_configoption(acx_device_t * adev, const acx111_ie_configoption_t * pcfg);
@@ -1115,7 +1115,7 @@ static int acx111_create_dma_regions(acx_device_t * adev)
  * ==================================================
  */
 
-void acx_s_get_firmware_version(acx_device_t * adev)
+void acx_get_firmware_version(acx_device_t * adev)
 {
 	fw_ver_t fw;
 	u8 hexarr[4] = { 0, 0, 0, 0 };
