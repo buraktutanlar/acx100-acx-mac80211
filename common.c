@@ -106,7 +106,7 @@ static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm);
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
-static int acx_s_set_beacon_template(acx_device_t *adev, int len);
+static int acx_set_beacon_template(acx_device_t *adev, int len);
 static int acx_s_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_s_set_tim_template(acx_device_t * adev);
 static int acx_s_init_packet_templates(acx_device_t * adev);
@@ -2149,7 +2149,7 @@ void acx_update_card_settings(acx_device_t *adev)
 					        else {
 					        	len = adev->beacon_skb->len;
 					        }
-							acx_s_set_beacon_template(adev, len);
+							acx_set_beacon_template(adev, len);
 							// We need to set always a tim template, since otherwise the acx 
 							// is sending a not 100% well structured beacon (may not be 
 							// blocking though)
@@ -3077,7 +3077,7 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 
 
 static int
-acx_s_set_beacon_template(acx_device_t *adev, int len)
+acx_set_beacon_template(acx_device_t *adev, int len)
 {
         struct acx_template_beacon bcn;
         int len2, result;
