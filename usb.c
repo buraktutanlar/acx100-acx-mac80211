@@ -1858,7 +1858,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* TODO: see similar code in pci.c */
 	acxusb_read_eeprom_version(adev);
 	acxusb_fill_configoption(adev);
-	acx_s_set_defaults(adev);
+	acx_set_defaults(adev);
 	acx_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
 

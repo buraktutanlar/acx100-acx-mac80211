@@ -3624,7 +3624,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_read_eeprom_byte;
 
 	acx_parse_configoption(adev, &co);
-	acx_s_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
+	acx_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
 	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
@@ -4223,7 +4223,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_read_eeprom_version;
 
 	acx_parse_configoption(adev, &co);
-	acx_s_set_defaults(adev);
+	acx_set_defaults(adev);
 	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 

@@ -5105,7 +5105,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	/*
 	 * Set up default things for most of the card settings.
 	 */
-	acx_s_set_defaults(adev);
+	acx_set_defaults(adev);
 
 	/* Register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
