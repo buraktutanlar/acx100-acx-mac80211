@@ -129,7 +129,7 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
 static void acxpci_process_rxdesc(acx_device_t * adev);
 
 // Tx Path
-tx_t *acxpci_l_alloc_tx(acx_device_t * adev);
+tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
@@ -2036,7 +2036,7 @@ static void acxpci_process_rxdesc(acx_device_t * adev)
  * after figuring out how many we need and whether we still have
  * sufficiently many.
  */
-tx_t* acxpci_l_alloc_tx(acx_device_t * adev)
+tx_t* acxpci_alloc_tx(acx_device_t * adev)
 {
 	struct txdesc *txdesc;
 	unsigned head;

@@ -4665,7 +4665,7 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 tx_t* acx_l_alloc_tx(acx_device_t *adev, unsigned int len)
 {
 	if (IS_PCI(adev))
-		return acxpci_l_alloc_tx(adev);
+		return acxpci_alloc_tx(adev);
 	if (IS_USB(adev))
 		return acxusb_l_alloc_tx(adev);
 	if (IS_MEM(adev))

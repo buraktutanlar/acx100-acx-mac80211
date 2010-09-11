@@ -546,7 +546,7 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
 // Rx Path
 
 // Tx Path
-tx_t *acxpci_l_alloc_tx(acx_device_t * adev);
+tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_l_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
