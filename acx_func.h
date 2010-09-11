@@ -365,7 +365,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed);
 void acx_op_bss_info_changed(struct ieee80211_hw *hw,
 		struct ieee80211_vif *vif, struct ieee80211_bss_conf *info, u32 changed);
 
-void acx_i_op_configure_filter(struct ieee80211_hw *hw,
+void acx_op_configure_filter(struct ieee80211_hw *hw,
 		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 int acx_e_conf_tx(struct ieee80211_hw* ieee, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
