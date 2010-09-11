@@ -147,7 +147,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 // Proc, Debug
 #ifdef CONFIG_PROC_FS
 static int acx_proc_show_diag(struct seq_file *file, void *v);
-static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_e_proc_show_acx(struct seq_file *file, void *v);
 static int acx_e_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_e_proc_show_phy(struct seq_file *file, void *v);
@@ -548,7 +548,7 @@ static acx_proc_show_t *const
 static acx_proc_write_t *const
  acx_proc_write_funcs[] = {
 	NULL,
-	acx_e_proc_write_diag,
+	acx_proc_write_diag,
 	NULL,
 	NULL,
 	acx_e_proc_write_debug,
@@ -3949,7 +3949,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 /*
  * A write on acx_diag executes different operations for debugging
  */
-static ssize_t acx_e_proc_write_diag(struct file *file, const char __user *buf,
+static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
 	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
