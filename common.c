@@ -110,7 +110,7 @@ static int acx_set_beacon_template(acx_device_t *adev, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_set_tim_template(acx_device_t * adev);
 static int acx_init_packet_templates(acx_device_t * adev);
-static int acx_s_init_max_null_data_template(acx_device_t * adev);
+static int acx_init_max_null_data_template(acx_device_t * adev);
 static int acx_s_init_max_beacon_template(acx_device_t * adev);
 static int acx_s_init_max_tim_template(acx_device_t * adev);
 static int acx_s_init_max_probe_response_template(acx_device_t * adev);
@@ -2804,7 +2804,7 @@ acx_init_max_template_generic(acx_device_t * adev, unsigned int len,
 	return res;
 }
 
-static int acx_s_init_max_null_data_template(acx_device_t * adev)
+static int acx_init_max_null_data_template(acx_device_t * adev)
 {
 	/* OW
 	 * hh version:       issue_cmd(cmd:cmd,buflen:26,timeout:50ms,type:0x0018)
@@ -3144,7 +3144,7 @@ static int acx_init_packet_templates(acx_device_t * adev)
 	if (OK != acx_s_init_max_probe_request_template(adev))
 		goto failed;
 
-	if (OK != acx_s_init_max_null_data_template(adev))
+	if (OK != acx_init_max_null_data_template(adev))
 		goto failed;
 
 	if (OK != acx_s_init_max_beacon_template(adev))
