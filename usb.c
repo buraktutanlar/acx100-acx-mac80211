@@ -149,7 +149,7 @@ static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *
 static void acxusb_disconnect(struct usb_interface *intf);
 
 int __init acxusb_init_module(void);
-void __exit acxusb_e_cleanup_module(void);
+void __exit acxusb_cleanup_module(void);
 
  
  /*
@@ -2002,7 +2002,7 @@ int __init acxusb_init_module(void)
  * This function is invoked as last step of the module unloading. It simply
  * deregisters this module at the kernel's USB subsystem.
  */
-void __exit acxusb_e_cleanup_module(void)
+void __exit acxusb_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
 	log(L_INIT, "acx: USB module unloaded\n");

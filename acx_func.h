@@ -610,7 +610,7 @@ void acxusb_irq_work(struct work_struct *work);
 
 // Driver, Module
 int __init acxusb_init_module(void);
-void __exit acxusb_e_cleanup_module(void);
+void __exit acxusb_cleanup_module(void);
 
 /*
  * BOM Mem prototypes

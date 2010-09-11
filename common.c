@@ -6130,7 +6130,7 @@ static void __exit acx_e_cleanup_module(void)
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_USB)
-	acxusb_e_cleanup_module();
+	acxusb_cleanup_module();
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
