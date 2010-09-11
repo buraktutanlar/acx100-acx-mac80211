@@ -153,7 +153,7 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_proc_show_phy(struct seq_file *file, void *v);
 static int acx_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
-static int acx_e_proc_open(struct inode *inode, struct file *file);
+static int acx_proc_open(struct inode *inode, struct file *file);
 static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove);
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
@@ -4164,7 +4164,7 @@ static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf,
 
 }
 
-static int acx_e_proc_open(struct inode *inode, struct file *file)
+static int acx_proc_open(struct inode *inode, struct file *file)
 {
 	int i;
 
@@ -4200,7 +4200,7 @@ static int acx_manage_proc_entries(struct ieee80211_hw *hw, int num, int remove)
 					remove ? "remov" : "creat", procbuf);
 
 			acx_e_proc_ops[i].owner = THIS_MODULE;
-			acx_e_proc_ops[i].open = acx_e_proc_open;
+			acx_e_proc_ops[i].open = acx_proc_open;
 			acx_e_proc_ops[i].read = seq_read;
 			acx_e_proc_ops[i].llseek = seq_lseek;
 			acx_e_proc_ops[i].release = single_release;
