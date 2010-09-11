@@ -183,7 +183,7 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 static void acx100_set_wepkey(acx_device_t * adev);
 static void acx111_set_wepkey(acx_device_t * adev);
 static void acx_set_wepkey(acx_device_t * adev);
-static int acx100_s_init_wep(acx_device_t * adev);
+static int acx100_init_wep(acx_device_t * adev);
 
 // // OW, 20100704, Obselete, TBC for cleanup
 #if 0
@@ -2570,7 +2570,7 @@ int acx_init_mac(acx_device_t * adev)
 			goto fail;
 		}
 	} else {
-		if (OK != acx100_s_init_wep(adev))
+		if (OK != acx100_init_wep(adev))
 			goto fail;
 		if (OK != acx_init_packet_templates(adev))
 			goto fail;
@@ -4941,7 +4941,7 @@ static void acx_set_wepkey(acx_device_t * adev)
  * management, but since we're also modifying the memory map layout here
  * due to the WEP key space we want, we should take care...
  */
-static int acx100_s_init_wep(acx_device_t * adev)
+static int acx100_init_wep(acx_device_t * adev)
 {
 	// acx100_ie_wep_options_t options;
 	// ie_dot11WEPDefaultKeyID_t dk;
