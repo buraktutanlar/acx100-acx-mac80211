@@ -4449,7 +4449,7 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 		.configure_filter = acx_i_op_configure_filter,
 		.stop = acxmem_op_stop,
 		.config = acx_op_config,
-		.bss_info_changed = acx_e_op_bss_info_changed,
+		.bss_info_changed = acx_op_bss_info_changed,
 		.set_key = acx_e_op_set_key,
 		.get_stats = acx_e_op_get_stats,
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
