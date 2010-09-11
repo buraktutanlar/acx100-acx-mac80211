@@ -146,7 +146,7 @@ static void acxusb_unlink_urb(struct urb *urb);
 
 // Driver, Module
 static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID);
-static void acxusb_e_disconnect(struct usb_interface *intf);
+static void acxusb_disconnect(struct usb_interface *intf);
 
 int __init acxusb_e_init_module(void);
 void __exit acxusb_e_cleanup_module(void);
@@ -1626,7 +1626,7 @@ static struct usb_driver
  acxusb_driver = {
 	.name = "acx_usb",
 	.probe = acxusb_probe,
-	.disconnect = acxusb_e_disconnect,
+	.disconnect = acxusb_disconnect,
 	.id_table = acxusb_ids
 };
 
@@ -1928,7 +1928,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
  * network devices have to be taken down and all allocated memory has
  * to be freed.
  */
-static void acxusb_e_disconnect(struct usb_interface *intf)
+static void acxusb_disconnect(struct usb_interface *intf)
 {
 	int i;
 	acx_device_t *adev = usb_get_intfdata(intf);
