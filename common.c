@@ -128,7 +128,7 @@ static int acx_s_set_null_data_template(acx_device_t * adev);
 #endif
 
 // Recalibration (Control Path)
-static int acx_s_recalib_radio(acx_device_t *adev);
+static int acx_recalib_radio(acx_device_t *adev);
 static void acx_s_after_interrupt_recalib(acx_device_t * adev);
 
 // Other (Control Path)
@@ -3244,7 +3244,7 @@ acx_s_set_probe_request_template(acx_device_t *adev)
  * ==================================================
  */
 
-static int acx_s_recalib_radio(acx_device_t *adev) {
+static int acx_recalib_radio(acx_device_t *adev) {
 
 	if (IS_ACX111(adev)) {
 		acx111_cmd_radiocalib_t cal;
@@ -3307,7 +3307,7 @@ static void acx_s_after_interrupt_recalib(acx_device_t * adev)
 
 	/* note that commands sometimes fail (card busy),
 	 * so only clear flag if we were fully successful */
-	res = acx_s_recalib_radio(adev);
+	res = acx_recalib_radio(adev);
 	if (res == OK) {
 		printk("acx: %s: successfully recalibrated radio\n",
 		       wiphy_name(adev->ieee->wiphy));
