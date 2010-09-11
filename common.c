@@ -137,7 +137,7 @@ static u8 acx_plcp_get_bitrate_cck(u8 plcp);
 static u8 acx_plcp_get_bitrate_ofdm(u8 plcp);
 #endif
 static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set);
-static void acx111_s_sens_radio_16_17(acx_device_t * adev);
+static void acx111_sens_radio_16_17(acx_device_t * adev);
 static void acx_l_update_ratevector(acx_device_t * adev);
 
 #if POWER_SAVE_80211
@@ -2212,7 +2212,7 @@ void acx_update_card_settings(acx_device_t *adev)
 		case RADIO_16_RADIA_RC2422:
 		case RADIO_17_UNKNOWN:
 		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
-			acx111_s_sens_radio_16_17(adev);
+			acx111_sens_radio_16_17(adev);
 			break;
 		default:
 			log(L_INIT, "acx: don't know how to modify the sensitivity "
@@ -3507,7 +3507,7 @@ static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 	}
 }
 
-static void acx111_s_sens_radio_16_17(acx_device_t * adev)
+static void acx111_sens_radio_16_17(acx_device_t * adev)
 {
 	u32 feature1, feature2;
 
