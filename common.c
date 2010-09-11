@@ -85,7 +85,7 @@ int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typ
 static int acx111_get_feature_config(acx_device_t * adev, u32 * feature_options, u32 * data_flow_options);
 static int acx111_set_feature_config(acx_device_t * adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_feature_off(acx_device_t * adev, u32 f, u32 d);
-static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d);
+static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_s_feature_set(acx_device_t * adev, u32 f, u32 d);
 int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
@@ -1686,7 +1686,7 @@ static inline int acx111_feature_off(acx_device_t * adev, u32 f, u32 d)
 {
 	return acx111_set_feature_config(adev, f, d, 0);
 }
-static inline int acx111_s_feature_on(acx_device_t * adev, u32 f, u32 d)
+static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d)
 {
 	return acx111_set_feature_config(adev, f, d, 1);
 }
@@ -2367,7 +2367,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 //			acx111_s_feature_off(adev, 0,
 //				    FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             if (IS_ACX111(adev)) {
-                    acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+                    acx111_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             }
 
 			if (adev->beacon_ready){
@@ -2388,7 +2388,7 @@ void acx_s_update_card_settings(acx_device_t *adev)
 			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
 			 */
 			if (IS_ACX111(adev)) {
-				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+				acx111_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
 			}
 			break;
 		case ACX_MODE_OFF:
