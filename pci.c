@@ -161,7 +161,7 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_
 
 // Driver, Module
 static int __devinit acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id);
-static void __devexit acxpci_e_remove(struct pci_dev *pdev);
+static void __devexit acxpci_remove(struct pci_dev *pdev);
 #ifdef CONFIG_PM
 static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state);
 static int acxpci_e_resume(struct pci_dev *pdev);
@@ -3744,7 +3744,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-static void __devexit acxpci_e_remove(struct pci_dev *pdev)
+static void __devexit acxpci_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
@@ -3975,7 +3975,7 @@ static struct pci_driver
 	.name = "acx_pci",
 	.id_table = acxpci_id_tbl,
 	.probe = acxpci_probe,
-	.remove = __devexit_p(acxpci_e_remove),
+	.remove = __devexit_p(acxpci_remove),
 #ifdef CONFIG_PM
 	.suspend = acxpci_e_suspend,
 	.resume = acxpci_e_resume
