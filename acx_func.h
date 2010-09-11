@@ -535,7 +535,7 @@ int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
 
 // Init, Configuration (Control Path)
-int acxpci_s_reset_dev(acx_device_t * adev);
+int acxpci_reset_dev(acx_device_t * adev);
 
 // Other (Control Path)
 

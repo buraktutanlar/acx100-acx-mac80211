@@ -114,7 +114,7 @@ static u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 static inline void acxpci_init_mboxes(acx_device_t * adev);
 
 // Init, Configuration (Control Path)
-int acxpci_s_reset_dev(acx_device_t * adev);
+int acxpci_reset_dev(acx_device_t * adev);
 static int acxpci_s_verify_init(acx_device_t * adev);
 static void acxpci_l_reset_mac(acx_device_t * adev);
 static void acxpci_s_up(struct ieee80211_hw *hw);
@@ -1645,7 +1645,7 @@ static inline void acxpci_init_mboxes(acx_device_t * adev)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-int acxpci_s_reset_dev(acx_device_t * adev)
+int acxpci_reset_dev(acx_device_t * adev)
 {
 	const char *msg = "";
 	int result = NOT_OK;
@@ -3603,7 +3603,7 @@ acxpci_e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_s_reset_dev(adev))
+	if (OK != acxpci_reset_dev(adev))
 		goto fail_reset_dev;
 
 	if (IS_ACX100(adev)) {
@@ -3904,7 +3904,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	pci_restore_state(pdev);
 	printk("acx: rsm: PCI state restored\n");
 
-	if (OK != acxpci_s_reset_dev(adev))
+	if (OK != acxpci_reset_dev(adev))
 		goto end_unlock;
 	printk("acx: rsm: device reset done\n");
 	if (OK != acx_s_init_mac(adev))
@@ -4211,7 +4211,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_s_reset_dev(adev))
+	if (OK != acxpci_reset_dev(adev))
 		goto fail_vlynq_reset_dev;
 
 	if (OK != acx_s_init_mac(adev))
