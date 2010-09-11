@@ -180,7 +180,7 @@ static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct iee
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
 
 // Crypto
-static void acx100_s_set_wepkey(acx_device_t * adev);
+static void acx100_set_wepkey(acx_device_t * adev);
 static void acx111_s_set_wepkey(acx_device_t * adev);
 static void acx_s_set_wepkey(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
@@ -4882,7 +4882,7 @@ static u16 rate100to111(u8 r)
  * BOM Crypto
  * ==================================================
  */
-static void acx100_s_set_wepkey(acx_device_t * adev)
+static void acx100_set_wepkey(acx_device_t * adev)
 {
 	ie_dot11WEPDefaultKey_t dk;
 	int i;
@@ -4931,7 +4931,7 @@ static void acx_s_set_wepkey(acx_device_t * adev)
 	if (IS_ACX111(adev))
 		acx111_s_set_wepkey(adev);
 	else
-		acx100_s_set_wepkey(adev);
+		acx100_set_wepkey(adev);
 }
 
 /*
@@ -4983,7 +4983,7 @@ static int acx100_s_init_wep(acx_device_t * adev)
 	log(L_ASSOC, "acx: writing WEP options\n");
 	acx_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
 
-	acx100_s_set_wepkey(adev);
+	acx100_set_wepkey(adev);
 
 	if (adev->wep_keys[adev->wep_current_index].size != 0) {
 		log(L_ASSOC, "acx: setting active default WEP key number: %d\n",
