@@ -182,7 +182,7 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 // Crypto
 static void acx100_set_wepkey(acx_device_t * adev);
 static void acx111_set_wepkey(acx_device_t * adev);
-static void acx_s_set_wepkey(acx_device_t * adev);
+static void acx_set_wepkey(acx_device_t * adev);
 static int acx100_s_init_wep(acx_device_t * adev);
 
 // // OW, 20100704, Obselete, TBC for cleanup
@@ -2431,7 +2431,7 @@ void acx_update_card_settings(acx_device_t *adev)
 #endif
 		log(L_INIT, "acx: updating WEP key settings\n");
 
-		acx_s_set_wepkey(adev);
+		acx_set_wepkey(adev);
 		if (adev->wep_enabled) {
 			dkey.KeyID = adev->wep_current_index;
 			log(L_INIT, "acx: setting WEP key %u as default\n",
@@ -4926,7 +4926,7 @@ static void acx111_set_wepkey(acx_device_t * adev)
 	}
 }
 
-static void acx_s_set_wepkey(acx_device_t * adev)
+static void acx_set_wepkey(acx_device_t * adev)
 {
 	if (IS_ACX111(adev))
 		acx111_set_wepkey(adev);
