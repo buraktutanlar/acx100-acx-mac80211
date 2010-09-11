@@ -132,7 +132,7 @@ static void acxpci_process_rxdesc(acx_device_t * adev);
 tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
+unsigned int acxpci_clean_txdesc(acx_device_t * adev);
 void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
@@ -2261,7 +2261,7 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * in filling new txdescs.
  * Everytime we get called we know where the next packet to be cleaned is.
  */
-unsigned int acxpci_l_clean_txdesc(acx_device_t * adev)
+unsigned int acxpci_clean_txdesc(acx_device_t * adev)
 {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -2577,7 +2577,7 @@ void acxpci_irq_work(struct work_struct *work)
 			 * directly on the tx status resolved this problem.
 			 * Now WPA assoc succeeds directly and robust.			 			 			 			 
 			 */			 
-			acxpci_l_clean_txdesc(adev);
+			acxpci_clean_txdesc(adev);
 
 			// Restart queue if stopped and enough tx-descr free
 			if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(

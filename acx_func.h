@@ -549,7 +549,7 @@ int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
 tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
+unsigned int acxpci_clean_txdesc(acx_device_t * adev);
 void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
 int acx100pci_s_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
