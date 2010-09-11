@@ -4703,7 +4703,7 @@ static void acx_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
                         struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
 {
 	if (IS_PCI(adev))
-		return acxpci_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return acxpci_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_USB(adev))
 		return acxusb_l_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_MEM(adev))

@@ -131,7 +131,7 @@ static void acxpci_process_rxdesc(acx_device_t * adev);
 // Tx Path
 tx_t *acxpci_alloc_tx(acx_device_t * adev);
 void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
-void acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 unsigned int acxpci_l_clean_txdesc(acx_device_t * adev);
 void acxpci_l_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
@@ -2099,7 +2099,7 @@ void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
  * CTL_xxx flags according to fragment number.
  */
 void
-acxpci_l_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 struct ieee80211_tx_info *ieeectl,struct sk_buff *skb)
 {
 	txdesc_t *txdesc = (txdesc_t *) tx_opaque;
