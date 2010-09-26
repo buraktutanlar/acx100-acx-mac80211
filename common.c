@@ -5765,27 +5765,53 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	 * TODO WEP hw support can still be added later, if required.
 	 */
 
-	switch (key->alg) {
-	case ALG_WEP:
-		if (key->keylen == 5) {
-			algorithm = ACX_SEC_ALGO_WEP;
-			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
-		} else {
-			algorithm = ACX_SEC_ALGO_WEP104;
-			log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
-		}
-		// OW Let's try WEP in mac80211 sw
-		err = -EOPNOTSUPP;
-		break;
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        switch (key->alg) {
+#else
+	switch (key->cipher) {
+#endif
 
-	case ALG_TKIP:
-		algorithm = ACX_SEC_ALGO_TKIP;
-		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
-		err = -EOPNOTSUPP;
-		break;
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        case ALG_WEP:
+                if (key->keylen == 5) {
+                    algorithm = ACX_SEC_ALGO_WEP;
+                    log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
+                } else {
+                    algorithm = ACX_SEC_ALGO_WEP104;
+                    log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
+                }
+                // OW Let's try WEP in mac80211 sw
+                err = -EOPNOTSUPP;
+                break;
+#else
+	case WLAN_CIPHER_SUITE_WEP40:
+	        algorithm = ACX_SEC_ALGO_WEP;
+                log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP");
+                err = -EOPNOTSUPP;
+                break;
 
-		break;
-	case ALG_CCMP:
+        case WLAN_CIPHER_SUITE_WEP104:
+                algorithm = ACX_SEC_ALGO_WEP104;
+                log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_WEP104");
+                err = -EOPNOTSUPP;
+                break;
+#endif
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        case ALG_TKIP:
+#else
+	case WLAN_CIPHER_SUITE_TKIP:
+#endif
+	        algorithm = ACX_SEC_ALGO_TKIP;
+	        log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_TKIP");
+	        err = -EOPNOTSUPP;
+	        break;
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        case ALG_CCMP:
+#else
+	case WLAN_CIPHER_SUITE_CCMP:
+#endif
 		algorithm = ACX_SEC_ALGO_AES;
 		log(L_INIT, "acx: %s: algorithm=%i: %s\n", __func__, algorithm, "ACX_SEC_ALGO_AES");
 		err = -EOPNOTSUPP;
