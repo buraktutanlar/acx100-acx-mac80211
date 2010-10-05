@@ -1320,8 +1320,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 	txbuf->rate = rate_100 ;
 
-	//	FIXME();	//This used to have | (clt - adev->ap_client)
-	txbuf->hostdata = (rate_100 << 16);
+	txbuf->hostdata = (u32) tx;
 
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == adev->preamble_cur)
