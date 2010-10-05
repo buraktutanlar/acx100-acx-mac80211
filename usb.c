@@ -1166,9 +1166,7 @@ static void acxusb_complete_tx(struct urb *urb)
 {
 	acx_device_t *adev;
 	usb_tx_t *tx;
-	int txnum;
-	struct ieee80211_tx_info *txstatus;
-	// unsigned long flags;
+	//unsigned long flags;
 
 	FN_ENTER;
 
@@ -1180,8 +1178,6 @@ static void acxusb_complete_tx(struct urb *urb)
 	// OW, 20100613: A urb call-back is done in_interrupt(), therefore
 	// I could image, that no locking is actually required
 	// spin_lock_irqsave(&adev->spinlock, flags);
-
-	txnum = tx - adev->usb_tx;
 
 	/*
 	 * If the iface isn't up, we don't have any right
@@ -1209,29 +1205,6 @@ static void acxusb_complete_tx(struct urb *urb)
 	default:
 		printk(KERN_ERR "acx: tx error, urb status=%d\n", urb->status);
 		/* FIXME: real error-handling code here please */
-	}
-
-	/* free the URB and check for more data */
-	tx->busy = 0;
-	adev->tx_free++;
-
-	txstatus = IEEE80211_SKB_CB(tx->skb);
-
-	// TODO OW 20100619 Is urb->status also the wireless tx status ? Not sure ...
-	if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && (urb->status == 0))
-	{
-		txstatus->flags |= IEEE80211_TX_STAT_ACK;
-		// Improvised ack count handling
-		txstatus->status.rates[0].count = 1;
-	}
-
-	ieee80211_tx_status_irqsafe(adev->ieee, tx->skb);
-
-	if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-		log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
-				adev->tx_free);
-		acx_wake_queue(adev->ieee, NULL);
-		ieee80211_queue_work(adev->ieee, &adev->tx_work);
 	}
 
     end_unlock:
