@@ -879,6 +879,9 @@ static void acxusb_complete_rx(struct urb *urb)
 	rxbuffer_t *inbuf;
 	usb_rx_t *rx;
 	int size, remsize, packetsize, rxnum;
+	usb_tx_t *tx;
+	struct sk_buff *skb;
+	struct ieee80211_tx_info *txstatus;
 	// unsigned long flags;
 
 	FN_ENTER;
@@ -1024,28 +1027,37 @@ static void acxusb_complete_rx(struct urb *urb)
 			usb_txstatus_t *stat = (void *)ptr;
 
 			log(L_USBRXTX,
-				"acx: tx: stat: mac_cnt_rcvd:%04X "
-				"queue_index:%02X mac_status:%02X "
-				"hostdata:%08X rate:%u ack_failures:%02X "
-				"rts_failures:%02X rts_ok:%02X\n",
-				stat->mac_cnt_rcvd, stat->queue_index,
-				stat->mac_status, stat->hostdata, stat->rate,
-				stat->ack_failures, stat->rts_failures,
-				stat->rts_ok);
-/*
-			if (adev->rate_auto && client_no < VEC_SIZE(adev->sta_list)) {
-				client_t *clt = &adev->sta_list[client_no];
-				u16 cur = stat->hostdata >> 16;
+					"acx: tx: stat: mac_cnt_rcvd:%04X "
+					"queue_index:%02X mac_status:%02X "
+					"hostdata:%08X rate:%u ack_failures:%02X "
+					"rts_failures:%02X rts_ok:%02X\n",
+					stat->mac_cnt_rcvd, stat->queue_index,
+					stat->mac_status, stat->hostdata, stat->rate,
+					stat->ack_failures, stat->rts_failures,
+					stat->rts_ok);
 
-				if (clt && clt->rate_cur == cur) {
-					acx_l_handle_txrate_auto(adev, clt,
-						cur, // intended rate
-						stat->rate, 0, // actually used rate
-						stat->mac_status, // error?
-						ACX_TX_URB_CNT - adev->tx_free);
-				}
-			}
-*/
+            tx = (usb_tx_t*) stat->hostdata;
+            skb = tx->skb;
+    		txstatus = IEEE80211_SKB_CB(skb);
+
+            if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK))
+    			txstatus->flags |= IEEE80211_TX_STAT_ACK;
+
+        	txstatus->status.rates[0].count = stat->ack_failures + 1;
+
+    		// report upstream
+    		ieee80211_tx_status(adev->ieee, skb);
+
+        	tx->busy = 0;
+    		adev->tx_free++;
+
+    		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+    			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
+    					adev->tx_free);
+    			acx_wake_queue(adev->ieee, NULL);
+    			ieee80211_queue_work(adev->ieee, &adev->tx_work);
+    		}
+
 			goto next;
 		}
 
