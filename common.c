@@ -4609,6 +4609,8 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb) {
 		return (-ENXIO);
 	}
 
+	// OW, 20100930: FIXME: Is this required for mem. txbuf is actually not containing to the data
+	// for the, but actually "addr = acxmem_allocate_acx_txbuf_space in acxmem_tx_data().
 	memcpy(txbuf, skb->data, skb->len);
 
 	acx_tx_data(adev, tx, skb->len, ctl, skb);
