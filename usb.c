@@ -1292,24 +1292,6 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 
 	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
 	    txnum, adev->tx_free, wlanpkt_len);
-/*
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-	case ACX_MODE_3_AP:
-		clt = acx_l_sta_list_get(adev, whdr->a1);
-		break;
-	case ACX_MODE_2_STA:
-//              clt = adev->ap_client;
-		break;
-	default:
-		clt = NULL;
-		break;
-	}
-	if (unlikely(clt && !clt->rate_cur)) {
-		printk("acx: driver bug! bad ratemask\n");
-		goto end;
-	}
-*/
 
 	/* fill the USB transfer header */
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
