@@ -128,7 +128,6 @@ static void acxusb_complete_rx(struct urb *);
 static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
-static void acxusb_complete_tx(struct urb *urb);
 tx_t *acxusb_alloc_tx(acx_device_t *adev);
 void acxusb_dealloc_tx(tx_t * tx_opaque);
 void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
