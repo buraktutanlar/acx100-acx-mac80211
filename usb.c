@@ -1036,7 +1036,7 @@ static void acxusb_complete_rx(struct urb *urb)
 					stat->ack_failures, stat->rts_failures,
 					stat->rts_ok);
 
-            tx = (usb_tx_t*) stat->hostdata;
+            tx = (usb_tx_t*) (adev->usb_tx + stat->hostdata);
             skb = tx->skb;
     		txstatus = IEEE80211_SKB_CB(skb);
 
@@ -1314,7 +1314,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
 	txbuf->rate = rate_100 ;
 
-	txbuf->hostdata = (u32) tx;
+	txbuf->hostdata = (u32) txnum;
 
 	txbuf->ctrl1 = DESC_CTL_FIRSTFRAG;
 	if (1 == adev->preamble_cur)
