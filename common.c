@@ -3000,7 +3000,7 @@ static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
 
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "adev->beacon_skb->data, len=%d, sizeof(acx_template_probereq_t)=%d:\n",
-				len, sizeof(acx_template_probereq_t));
+				len, (int32_t) sizeof(acx_template_probereq_t));
 		acx_dump_bytes(adev->beacon_skb->data, len);
 	}
 
