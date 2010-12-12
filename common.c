@@ -4299,10 +4299,10 @@ static void acx_initialize_rx_config(acx_device_t * adev)
 					   /* | RX_CFG1_RCV_MC_ADDR0       */
 					   /* | RX_CFG1_FILTER_ALL_MULTI   */
 					   /* | RX_CFG1_FILTER_BSSID       */
-					   /* | RX_CFG1_FILTER_MAC         */
-					    | RX_CFG1_RCV_PROMISCUOUS
-					   /* | RX_CFG1_INCLUDE_FCS */
-					   /* | RX_CFG1_INCLUDE_PHY_HDR   */
+					   | RX_CFG1_FILTER_MAC
+					   /* | RX_CFG1_RCV_PROMISCUOUS    */
+					   /* | RX_CFG1_INCLUDE_FCS        */
+					   /* | RX_CFG1_INCLUDE_PHY_HDR    */
 		    );
 		adev->rx_config_2 = (u16) (0
 					   | RX_CFG2_RCV_ASSOC_REQ
