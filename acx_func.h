@@ -656,7 +656,7 @@ void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxmem_clean_txdesc(acx_device_t *adev);
+unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
 void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);

@@ -200,8 +200,8 @@ static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
-void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxmem_clean_txdesc(acx_device_t *adev);
+void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
+unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
 void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
@@ -3403,14 +3403,14 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * CTL_xxx flags according to fragment number.
  */
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-			struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
+			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*
 	 * txdesc is the address on the ACX
 	 */
 	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
 	struct ieee80211_hdr *wireless_header;
 	txhostdesc_t *hostdesc1, *hostdesc2;
-	int rate;
+	int rateset;
 	u8 Ctl_8, Ctl2_8;
 	int wlhdr_len;
 	u32 addr;
@@ -3439,6 +3439,9 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	hostdesc2 = hostdesc1 + 1;
 
+	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
+	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
+
 	/* DON'T simply set Ctl field to 0 here globally,
 	 * it needs to maintain a consistent flag status (those are state flags!!),
 	 * otherwise it may lead to severe disruption. Only set or reset particular
@@ -3448,21 +3451,20 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	 * in case packet size exceeds threshold */
 
 	// if (len > adev->rts_threshold)
-	if (ieeectl->flags & IEEE80211_TX_RC_USE_RTS_CTS)
+	if (info->flags & IEEE80211_TX_RC_USE_RTS_CTS)
 		SET_BIT(Ctl2_8, DESC_CTL2_RTS);
 	else
 		CLEAR_BIT(Ctl2_8, DESC_CTL2_RTS);
 
-	rate = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
-
-	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
-	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
-
 	/* ACX111 */
 	if (IS_ACX111(adev)) {
+
+		// Build rateset for acx111
+		rateset=acx111_tx_build_rateset(adev, txdesc, info);
+
 		/* note that if !txdesc->do_auto, txrate->cur
 		 ** has only one nonzero bit */
-		txdesc->u.r2.rate111 = cpu_to_le16(rate);
+		txdesc->u.r2.rate111 = cpu_to_le16(rateset);
 
 		/* WARNING: I was never able to make it work with prism54 AP.
 		 ** It was falling down to 1Mbit where shortpre is not applicable,
@@ -3479,8 +3481,12 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	}
 	/* ACX100 */
 	else {
-		u8 rate_100 = rate;
-		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), rate_100);
+
+		// Get rate for acx100, single rate only for acx100
+		rateset = ieee80211_get_tx_rate(adev->ieee, info)->hw_value;
+		logf1(L_BUFT, "rateset=%u\n", rateset)
+
+		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), (u8) rateset);
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {
@@ -3615,7 +3621,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * Everytime we get called we know where the next packet to be cleaned is.
  */
 // OW TODO Very similar with pci: possible merging.
-unsigned int acxmem_clean_txdesc(acx_device_t *adev) {
+unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
 	unsigned finger;
@@ -3681,16 +3687,23 @@ unsigned int acxmem_clean_txdesc(acx_device_t *adev) {
 		r100 = read_slavemem8(adev, (u32) &(txdesc->u.r1.rate));
 		r111 = le16_to_cpu(read_slavemem16 (adev, (u32) &(txdesc->u.r2.rate111)));
 
+		log(L_BUFT,
+			"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r100=%u r111=%04X tx_free=%u\n",
+			finger, ack_failures, rts_failures, rts_ok, r100, r111, adev->tx_free);
+
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
-
 		hostdesc = acxmem_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
         if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && !(error & 0x30))
 			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-    	txstatus->status.rates[0].count = ack_failures + 1;
+    	if (IS_ACX111(adev)) {
+			acx111_tx_build_txstatus(adev, txstatus, r111, ack_failures);
+		} else {
+			txstatus->status.rates[0].count = ack_failures + 1;
+		}
 
 		/*
 		 * Free up the transmit data buffers
@@ -3713,16 +3726,6 @@ unsigned int acxmem_clean_txdesc(acx_device_t *adev) {
 		 * AFTER having done the work, it's faster */
 		if (unlikely(error))
 			acxpcimem_handle_tx_error(adev, error, finger, txstatus);
-
-		if (IS_ACX111(adev)) {
-			log(L_BUFT,
-					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r111=%04X tx_free=%u\n",
-					finger, ack_failures, rts_failures, rts_ok, r111, adev->tx_free);
-		} else {
-			log(L_BUFT,
-					"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u rate=%u tx_free=%u\n",
-					finger, ack_failures, rts_failures, rts_ok, r100, adev->tx_free);
-		}
 
 		/* And finally report upstream */
 		ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
@@ -3919,7 +3922,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_lock(adev, flags);
 
 	/* clean processed tx descs, they may have been completely full */
-	tx_num_cleaned = acxmem_clean_txdesc(adev);
+	tx_num_cleaned = acxmem_tx_clean_txdesc(adev);
 
 	/* nothing cleaned, yet (almost) no free buffers available?
 	 * --> clean all tx descs, no matter which status!!
@@ -4007,7 +4010,7 @@ void acxmem_irq_work(struct work_struct *work)
 		/* Tx reporting */
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
 			log(L_IRQ, "acxmem: got Tx_Complete IRQ\n");
-				acxmem_clean_txdesc(adev);
+				acxmem_tx_clean_txdesc(adev);
 
 				// Restart queue if stopped and enough tx-descr free
 				if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
@@ -4338,7 +4341,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 #if TX_CLEANUP_IN_SOFTIRQ
 				acx_schedule_task(adev, ACX_AFTER_IRQ_TX_CLEANUP);
 #else
-				acxmem_clean_txdesc(adev);
+				acxmem_tx_clean_txdesc(adev);
 #endif
 			}
 		}
