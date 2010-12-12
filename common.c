@@ -178,6 +178,10 @@ static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc, struct ieee80211_tx_info *info);
+void acx111_tx_build_txstatus(acx_device_t *adev,	struct ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures);
+u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
+int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 
 // Crypto
 static void acx100_set_wepkey(acx_device_t * adev);
@@ -526,6 +530,35 @@ const u8 acx_bitpos2rate100[] = {
 	RATE100_2,		/* 14, should not happen */
 	RATE100_2,		/* 15, should not happen */
 };
+
+int acx_rate111_hwvalue_to_rateindex(u16 hw_value)
+{
+	int i;
+	int r=-1;
+
+	for (i = 0; i < ARRAY_SIZE(acx111_rates); i++)
+	{
+		if (acx111_rates[i].hw_value == hw_value)
+		{
+			r = i;
+			break;
+		}
+	}
+
+	return (r);
+}
+
+u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value)
+{
+	int i;
+	u16 bitrate = -1;
+
+	i = acx_rate111_hwvalue_to_rateindex(hw_value);
+	if (i != -1)
+		bitrate = acx111_rates[i].bitrate;
+
+	return (bitrate);
+}
 
 // Proc
 #ifdef CONFIG_PROC_FS
@@ -4713,6 +4746,77 @@ static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	log(L_ANY, "acx: %s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return;
+}
+
+u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
+		struct ieee80211_tx_info *info) {
+
+	int i;
+
+	char tmpstr[256];
+	struct ieee80211_rate *tmpbitrate;
+	int tmpcount;
+
+	u16 rateset = 0;
+
+	int debug = acx_debug & L_BUFT;
+
+	if (debug) {
+		i = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
+		sprintf(tmpstr, "txdesc=%i: rates in info [bitrate,hw_value,count]: ",
+				i);
+	}
+
+	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+		if (info->control.rates[i].idx < 0)
+			break;
+
+		tmpbitrate
+				= &adev->ieee->wiphy->bands[info->band]->bitrates[info->control.rates[i].idx];
+		tmpcount = info->control.rates[i].count;
+
+		rateset |= tmpbitrate->hw_value;
+
+		if (debug) {
+			sprintf(tmpstr + strlen(tmpstr), "%i=[%i,0x%04X,%i]%s", i,
+					tmpbitrate->bitrate, tmpbitrate->hw_value, tmpcount, (i
+							< IEEE80211_TX_MAX_RATES - 1) ? ", " : "");
+		}
+	}
+
+	if (debug)
+		logf1(L_ANY, "%s: rateset=0x%04X\n", tmpstr, rateset);
+
+	return (rateset);
+}
+
+void acx111_tx_build_txstatus(acx_device_t *adev,
+		struct ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures) {
+
+	u16 rate_hwvalue;
+	u16 rate_bitrate;
+	int rate_index;
+	int j;
+
+	rate_hwvalue = 1 << highest_bit(r111 & RATE111_ALL);
+	rate_index = acx_rate111_hwvalue_to_rateindex(rate_hwvalue);
+
+	for (j = 0; j < IEEE80211_TX_MAX_RATES; j++) {
+		if (txstatus->status.rates[j].idx == rate_index) {
+			txstatus->status.rates[j].count = ack_failures + 1;
+			break;
+		}
+	}
+
+	if ((acx_debug & L_BUFT) && (ack_failures > 0)) {
+		rate_bitrate = acx_rate111_hwvalue_to_bitrate(rate_hwvalue);
+
+		logf1(L_ANY,
+				"sentrate(bitrate,hw_value)=(%d,0x%04X) status.rates[%d].count=%d\n",
+				rate_bitrate, rate_hwvalue,
+				j, (j<IEEE80211_TX_MAX_RATES) ? txstatus->status.rates[j].count : -1);
+	}
+
 }
 
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,

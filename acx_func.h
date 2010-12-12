@@ -323,6 +323,10 @@ int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger, struct ieee80211_tx_info *info);
+u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc, struct ieee80211_tx_info *info);
+void acx111_tx_build_txstatus(acx_device_t *adev,	struct ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures);
+u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
+int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 
 //void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
 //		u16 intended_rate, u8 rate100, u16 rate111, u8 error,
