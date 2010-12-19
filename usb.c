@@ -686,10 +686,10 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	cmd_status = le16_to_cpu(loc->status);
 	if (cmd_status != 1) {
-		printk("acx: %s: %s: cmd_status is not SUCCESS: %d (%s)\n",
-		       __func__, devname,
+		printk("acx: %s: %s: cmd %s is not SUCCESS: %d (%s)\n",
+		       __func__, devname, cmdstr,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		/* TODO: goto bad; ? */
+		goto bad;
 	}
 	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
@@ -705,8 +705,6 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
   bad:
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
-
-	printk("acx: %s: %s: cmd=%s: FAILED\n", __func__, devname, cmdstr);
 
 	//dump_stack();
 	kfree(loc);
