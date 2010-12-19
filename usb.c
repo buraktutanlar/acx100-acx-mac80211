@@ -1439,8 +1439,20 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	adev->initialized = 0;
 
+	/* Reset URBs status */
+	for (i = 0; i < ACX_RX_URB_CNT; i++) {
+		adev->usb_rx[i].urb->status = 0;
+		adev->usb_rx[i].busy = 0;
+	}
+
+	for (i = 0; i < ACX_TX_URB_CNT; i++) {
+		adev->usb_tx[i].urb->status = 0;
+		adev->usb_tx[i].busy = 0;
+	}
+	adev->tx_free = ACX_TX_URB_CNT;
+
 	/* put the ACX100 out of sleep mode */
-	//	acx_s_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	init_timer(&adev->mgmt_timer);
 	adev->mgmt_timer.function = acx_timer;
@@ -1450,11 +1462,6 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx_start(adev);
 
-	/* don't acx_start_queue() here, we need to associate first */
-
-	for (i = 0; i < ACX_RX_URB_CNT; i++) {
-		adev->usb_rx[i].urb->status = 0;
-	}
 	acxusb_poll_rx(adev, &adev->usb_rx[0]);
 
 	acx_wake_queue(adev->ieee, NULL);
