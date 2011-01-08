@@ -474,11 +474,11 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
  * ==================================================
  */
 
-/* OS I/O routines *always* be endianness-clean but having them doesn't hurt */
-#define acx_readl(v)	le32_to_cpu(readl((v)))
-#define acx_readw(v)	le16_to_cpu(readw((v)))
-#define acx_writew(v,r)	writew(le16_to_cpu((v)), r)
-#define acx_writel(v,r)	writel(le32_to_cpu((v)), r)
+/* Endianess: read[lw], write[lw] do little-endian conversion internally */
+#define acx_readl(v)	readl((v))
+#define acx_readw(v)	readw((v))
+#define acx_writel(v,r)	writel(v, r)
+#define acx_writew(v,r)	writew(v, r)
 
 #define ACXMEM_WARN_NOT_SPIN_LOCKED \
 do { \
