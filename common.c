@@ -93,6 +93,9 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // Configuration (Control Path)
 void acx_set_defaults(acx_device_t * adev);
+static void acx_get_sensitivity(acx_device_t *adev);
+static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity);
+static void acx_update_sensitivity(acx_device_t *adev);
 void acx_update_card_settings(acx_device_t *adev);
 void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
@@ -153,6 +156,8 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v);
 static int acx_proc_show_phy(struct seq_file *file, void *v);
 static int acx_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static int acx_proc_show_sensitivity(struct seq_file *file, void *v);
+static ssize_t acx_proc_write_sensitivity(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_open(struct inode *inode, struct file *file);
 static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove);
 int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
@@ -576,6 +581,7 @@ static acx_proc_show_t *const
 	acx_proc_show_eeprom,
 	acx_proc_show_phy,
 	acx_proc_show_debug,
+	acx_proc_show_sensitivity,
 };
 
 static acx_proc_write_t *const
@@ -585,6 +591,7 @@ static acx_proc_write_t *const
 	NULL,
 	NULL,
 	acx_proc_write_debug,
+	acx_proc_write_sensitivity,
 };
 
 static struct file_operations acx_e_proc_ops[5] ;
@@ -1870,14 +1877,15 @@ void acx_set_defaults(acx_device_t * adev)
 	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
 	 * query is REQUIRED, otherwise the card won't work correctly! */
 	adev->get_mask =
-	    GETSET_ANTENNA | GETSET_SENSITIVITY | GETSET_STATION_ID |
-	    GETSET_REG_DOMAIN;
+	    GETSET_ANTENNA | GETSET_STATION_ID | GETSET_REG_DOMAIN;
 	/* Only ACX100 supports ED and CCA */
 	if (IS_ACX100(adev))
 		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
 
 	// OW FIXME - review locking
 	acx_update_card_settings(adev);
+
+	acx_get_sensitivity(adev);
 
 	/* set our global interrupt mask */
 	if (IS_PCI(adev))
@@ -1972,9 +1980,11 @@ void acx_set_defaults(acx_device_t * adev)
 	}
 
 	/* adev->tx_level_auto = 1; */
+
+	// Sensitivity settings
 	if (IS_ACX111(adev)) {
-		/* start with sensitivity level 1 out of 3: */
-		adev->sensitivity = 1;
+		/* start with sensitivity level 2 out of 3: */
+		adev->sensitivity = 2;
 	}
 
 /* #define ENABLE_POWER_SAVE */
@@ -2007,6 +2017,58 @@ void acx_set_defaults(acx_device_t * adev)
 	acx_initialize_rx_config(adev);
 
 	FN_EXIT0;
+}
+
+static void acx_get_sensitivity(acx_device_t *adev)
+{
+
+	if ( (RADIO_11_RFMD == adev->radio_type) ||
+		 (RADIO_0D_MAXIM_MAX2820	== adev->radio_type) ||
+		 (RADIO_15_RALINK == adev->radio_type))
+	{
+		acx_read_phy_reg(adev, 0x30, &adev->sensitivity);
+	} else {
+		log(L_INIT, "acx: don't know how to get sensitivity "
+				"for radio type 0x%02X\n", adev->radio_type);
+		return;
+	}
+
+	log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
+}
+
+static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity)
+{
+	adev->sensitivity = sensitivity;
+	acx_update_sensitivity(adev);
+}
+
+
+static void acx_update_sensitivity(acx_device_t *adev)
+{
+
+	if (IS_USB(adev) && IS_ACX100(adev)){
+		log(L_ANY, "acx: Updating sensitivity on usb acx100 doesn't work yet.\n");
+		return;
+	}
+
+	log(L_INIT, "acx: updating sensitivity value: %u\n",
+			adev->sensitivity);
+	switch (adev->radio_type) {
+	case RADIO_0D_MAXIM_MAX2820:
+	case RADIO_11_RFMD:
+	case RADIO_15_RALINK:
+		acx_write_phy_reg(adev, 0x30, adev->sensitivity);
+		break;
+	case RADIO_16_RADIA_RC2422:
+	case RADIO_17_UNKNOWN:
+		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
+		acx111_sens_radio_16_17(adev);
+		break;
+	default:
+		log(L_INIT, "acx: don't know how to modify the sensitivity "
+				"for radio type 0x%02X\n", adev->radio_type);
+	}
+
 }
 
 /*
@@ -2062,21 +2124,6 @@ void acx_update_card_settings(acx_device_t *adev)
 		}
 		SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
 		CLEAR_BIT(adev->get_mask, GETSET_STATION_ID);
-	}
-
-	if (adev->get_mask & GETSET_SENSITIVITY) {
-		if ((RADIO_11_RFMD == adev->radio_type)
-		    || (RADIO_0D_MAXIM_MAX2820 == adev->radio_type)
-		    || (RADIO_15_RALINK == adev->radio_type)) {
-			acx_read_phy_reg(adev, 0x30, &adev->sensitivity);
-		} else {
-			log(L_INIT, "acx: don't know how to get sensitivity "
-			    "for radio type 0x%02X\n", adev->radio_type);
-			adev->sensitivity = 0;
-		}
-		log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
-
-		CLEAR_BIT(adev->get_mask, GETSET_SENSITIVITY);
 	}
 
 	if (adev->get_mask & GETSET_ANTENNA) {
@@ -2231,27 +2278,6 @@ void acx_update_card_settings(acx_device_t *adev)
 		    adev->tx_level_dbm);
 		acx_set_tx_level(adev, adev->tx_level_dbm);
 		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
-	}
-
-	if (adev->set_mask & GETSET_SENSITIVITY) {
-		log(L_INIT, "acx: updating sensitivity value: %u\n",
-		    adev->sensitivity);
-		switch (adev->radio_type) {
-		case RADIO_0D_MAXIM_MAX2820:
-		case RADIO_11_RFMD:
-		case RADIO_15_RALINK:
-			acx_write_phy_reg(adev, 0x30, adev->sensitivity);
-			break;
-		case RADIO_16_RADIA_RC2422:
-		case RADIO_17_UNKNOWN:
-		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
-			acx111_sens_radio_16_17(adev);
-			break;
-		default:
-			log(L_INIT, "acx: don't know how to modify the sensitivity "
-			    "for radio type 0x%02X\n", adev->radio_type);
-		}
-		CLEAR_BIT(adev->set_mask, GETSET_SENSITIVITY);
 	}
 
 	if (adev->set_mask & GETSET_ANTENNA) {
@@ -4196,6 +4222,55 @@ static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf,
 	return ret;
 
 }
+
+static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
+{
+	acx_device_t *adev = (acx_device_t *) file->private;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx_get_sensitivity(adev);
+	seq_printf(file, "acx_sensitivity: %d\n", adev->sensitivity);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+
+	return 0;
+}
+
+static ssize_t acx_proc_write_sensitivity(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	acx_device_t *adev = (acx_device_t *) PDE(file->f_path.dentry->d_inode)->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned long val;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count != size)
+		goto out;
+
+	ret = count;
+
+	acx_set_sensitivity(adev, val);
+	logf1(L_ANY, "acx_sensitivity=%d\n", adev->sensitivity);
+
+	out:
+		acx_sem_unlock(adev);
+		FN_EXIT0;
+
+	return ret;
+}
+
+
 
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
