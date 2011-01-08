@@ -3634,7 +3634,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 
-	if (acx_proc_register_entries(ieee, 0) != OK)
+	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_proc_register_entries;
 
 	printk("acx: net device %s, driver compiled "
@@ -3683,7 +3683,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	// acx_proc_register_entries(ieee, 0)
 	fail_proc_register_entries:
-		acx_proc_unregister_entries(ieee, 0);
+		acx_proc_unregister_entries(ieee);
 
 	// acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version)
 	fail_read_eeprom_byte:
@@ -3801,7 +3801,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	}
 
 	// Proc
-	acx_proc_unregister_entries(adev->ieee, 0);
+	acx_proc_unregister_entries(adev->ieee);
 
 	// IRQs
 	acxpci_irq_disable(adev);
@@ -4233,7 +4233,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 
-	if (acx_proc_register_entries(ieee, 0) != OK)
+	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_vlynq_proc_register_entries;
 
 	/* Now we have our device, so make sure the kernel doesn't try
@@ -4276,7 +4276,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	fail_vlynq_setup_modes:
 
 	fail_vlynq_proc_register_entries:
-		acx_proc_unregister_entries(ieee, 0);
+		acx_proc_unregister_entries(ieee);
 
     fail_vlynq_read_eeprom_version:
 
@@ -4345,7 +4345,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	}
 
 	// Proc
-	acx_proc_unregister_entries(adev->ieee, 0);
+	acx_proc_unregister_entries(adev->ieee);
 
 	// IRQs
 	acxpci_irq_disable(adev);

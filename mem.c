@@ -5114,7 +5114,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	 * since otherwise an ioctl could step on our feet due to
 	 * firmware operations happening in parallel or uninitialized data */
 
-	if (acx_proc_register_entries(ieee, 0) != OK)
+	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_proc_register_entries;
 
 	/* Now we have our device, so make sure the kernel doesn't try
@@ -5166,7 +5166,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	fail_acx_setup_modes:
 
 	fail_proc_register_entries:
-	acx_proc_unregister_entries(ieee, 0);
+	acx_proc_unregister_entries(ieee);
 
 	fail_complete_hw_reset:
 
@@ -5259,7 +5259,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	}
 
 	// Proc
-	acx_proc_unregister_entries(adev->ieee, 0);
+	acx_proc_unregister_entries(adev->ieee);
 
 	// IRQs
 	acxmem_lock();

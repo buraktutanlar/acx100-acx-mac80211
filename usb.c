@@ -1849,7 +1849,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		goto end_nomem;
 	}
 
-	acx_proc_register_entries(ieee, 0);
+	acx_proc_register_entries(ieee);
 
 	printk("acx: USB module loaded successfully\n");
 
@@ -1919,7 +1919,7 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	 * _close() will try to grab it as well if it's called,
 	 * deadlocking the machine.
 	 */
-	acx_proc_unregister_entries(adev->ieee, 0);
+	acx_proc_unregister_entries(adev->ieee);
 	ieee80211_unregister_hw(adev->ieee);
 
 	acx_sem_lock(adev);

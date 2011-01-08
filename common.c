@@ -161,9 +161,9 @@ static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, s
 static int acx_proc_show_sensitivity(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_sensitivity(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_open(struct inode *inode, struct file *file);
-static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove);
-int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
+static void acx_proc_init(void);
+int acx_proc_register_entries(struct ieee80211_hw *ieee);
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
 #endif
 
 // Rx Path
@@ -571,7 +571,7 @@ u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value)
 #ifdef CONFIG_PROC_FS
 
 static const char *const
- proc_files[] = { "acx", "acx_diag", "acx_eeprom", "acx_phy", "acx_debug" };
+ proc_files[] = { "info", "diag", "eeprom", "phy", "debug", "sensitivity" };
 
 typedef int acx_proc_show_t(struct seq_file *file, void *v);
 typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
@@ -596,7 +596,8 @@ static acx_proc_write_t *const
 	acx_proc_write_sensitivity,
 };
 
-static struct file_operations acx_e_proc_ops[5] ;
+static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)] ;
+
 #endif
 // -----
 
@@ -4063,7 +4064,6 @@ static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf,
 
 	if (count == size) {
 		ret = count;
-		acx_debug = val;
 	} else {
 		goto exit_unlock;
 	}
@@ -4320,8 +4320,23 @@ static int acx_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
 }
 
-static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove)
-{
+static void acx_proc_init(void) {
+
+	int i;
+
+	// acx_e_proc_ops init
+	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+		acx_e_proc_ops[i].owner = THIS_MODULE;
+		acx_e_proc_ops[i].open = acx_proc_open;
+		acx_e_proc_ops[i].read = seq_read;
+		acx_e_proc_ops[i].llseek = seq_lseek;
+		acx_e_proc_ops[i].release = single_release;
+		acx_e_proc_ops[i].write = acx_proc_write_funcs[i];
+	}
+
+}
+
+int acx_proc_register_entries(struct ieee80211_hw *hw) {
 	acx_device_t *adev = ieee2adev(hw);
 	char procbuf[80];
 	char procbuf2[80];
@@ -4331,47 +4346,36 @@ static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove)
 
 	FN_ENTER;
 
-	// Create a subdir for this acx instance
-	snprintf(procbuf2, sizeof(procbuf), "driver/acx%i", num);
 
-	if (!remove) {
+	// Sub-dir for this acx_phy[0-9] instance
 
-		ppe = proc_mkdir(procbuf2, NULL);
+	// I tried to create a /proc/driver/acx sub-dir in acx_proc_init()
+	// to put the phy[0-9] into, but for some bizarre reason the proc-fs
+	// refuses then to create the phy[0-9] dirs in /proc/driver/acx !?
+	// It only works, if /proc/driver/acx is created here in
+	// acx_proc_register_entries().
+	// ... Anyway, we should swap to sysfs.
+	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s", wiphy_name(
+			adev->ieee->wiphy));
 
-		for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-			snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
-			log(L_INIT, "acx: %sing /proc entry %s\n",
-					remove ? "remov" : "creat", procbuf);
+	ppe = proc_mkdir(procbuf2, NULL);
 
-			acx_e_proc_ops[i].owner = THIS_MODULE;
-			acx_e_proc_ops[i].open = acx_proc_open;
-			acx_e_proc_ops[i].read = seq_read;
-			acx_e_proc_ops[i].llseek = seq_lseek;
-			acx_e_proc_ops[i].release = single_release;
-			acx_e_proc_ops[i].write = acx_proc_write_funcs[i];
+	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+		snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
+		log(L_INIT, "acx: creating proc entry /proc/%s\n", procbuf);
 
-			// Read-only
-			if (acx_proc_write_funcs[i] == NULL)
-				pe = proc_create(procbuf, 0444, NULL, &acx_e_proc_ops[i]);
-			// Read-Write
-			else
-				pe = proc_create(procbuf, 0644, NULL, &acx_e_proc_ops[i]);
+		// Read-only
+		if (acx_proc_write_funcs[i] == NULL)
+			pe = proc_create(procbuf, 0444, NULL, &acx_e_proc_ops[i]);
+		// Read-Write
+		else
+			pe = proc_create(procbuf, 0644, NULL, &acx_e_proc_ops[i]);
 
-			if (!pe) {
-				printk("acx: cannot register /proc entry %s\n", procbuf);
-				return NOT_OK;
-			}
-			pe->data = adev;
-
+		if (!pe) {
+			printk("acx: cannot register proc entry /proc/%s\n", procbuf);
+			return NOT_OK;
 		}
-
-	} else {
-
-		for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-			snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
-			remove_proc_entry(procbuf, NULL);
-		}
-		remove_proc_entry(procbuf2, NULL);
+		pe->data = adev;
 
 	}
 
@@ -4379,14 +4383,28 @@ static int acx_proc_manage_entries(struct ieee80211_hw *hw, int num, int remove)
 	return OK;
 }
 
-int acx_proc_register_entries(struct ieee80211_hw *ieee, int num)
+int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 {
-	return acx_proc_manage_entries(ieee, num, 0);
-}
+	acx_device_t *adev = ieee2adev(hw);
+	char procbuf[80];
+	char procbuf2[80];
+	int i;
 
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num)
-{
-	return acx_proc_manage_entries(ieee, num, 1);
+	FN_ENTER;
+
+	// Subdir for this acx instance
+	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s", wiphy_name(
+			adev->ieee->wiphy));
+
+	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
+		snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
+		log(L_INIT, "acx: removing proc entry /proc/%s\n", procbuf);
+		remove_proc_entry(procbuf, NULL);
+	}
+	remove_proc_entry(procbuf2, NULL);
+
+	FN_EXIT0;
+	return OK;
 }
 
 
@@ -6363,6 +6381,9 @@ static int __init acx_init_module(void)
 		printk ("acx: r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
 		return -EINVAL;
 	}
+
+	// Init acx_e_proc_ops
+	acx_proc_init();
 
 	/* return success if at least one succeeded */
 	return 0;

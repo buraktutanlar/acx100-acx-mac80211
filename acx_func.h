@@ -297,8 +297,8 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 // BOM Proc, Debug (Common)
 // -----
 #ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(struct ieee80211_hw *ieee, int num);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee, int num);
+int acx_proc_register_entries(struct ieee80211_hw *ieee);
+int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
 #else
 static inline int
 acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
