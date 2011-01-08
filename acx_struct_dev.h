@@ -391,6 +391,7 @@ struct acx_device {
 	int		recalib_failure_count;
 	int		recalib_msg_ratelimit;
 	int		retry_errors_msg_ratelimit;
+	int 	recalib_auto;
 
 	unsigned long	brange_time_last_state_change;	/* time the power LED was last changed */
 	u8		brange_last_state;	/* last state of the LED */

@@ -131,6 +131,8 @@ static int acx_s_set_null_data_template(acx_device_t * adev);
 #endif
 
 // Recalibration (Control Path)
+static int acx111_set_recalib_auto(acx_device_t *adev, int enable);
+static int acx111_update_recalib_auto(acx_device_t *adev);
 static int acx_recalib_radio(acx_device_t *adev);
 static void acx_after_interrupt_recalib(acx_device_t * adev);
 
@@ -3303,20 +3305,43 @@ acx_s_set_probe_request_template(acx_device_t *adev)
  * ==================================================
  */
 
-static int acx_recalib_radio(acx_device_t *adev) {
+static int acx111_set_recalib_auto(acx_device_t *adev, int enable) {
+	adev->recalib_auto=enable;
+	return(acx111_update_recalib_auto(adev));
+}
 
-	if (IS_ACX111(adev)) {
-		acx111_cmd_radiocalib_t cal;
+static int acx111_update_recalib_auto(acx_device_t *adev) {
 
+	acx111_cmd_radiocalib_t cal;
+
+	if (!IS_ACX111(adev))
+	{
+		log(L_INIT, "acx: Firmware auto radio-recalibration not supported on acx100.\n");
+		return(-1);
+	}
+
+	if (adev->recalib_auto) {
+		log(L_INIT, "acx: Enabling firmware auto radio-recalibration.\n");
 		/* automatic recalibration, choose all methods: */
 		cal.methods = cpu_to_le32(0x8000000f);
 		/* automatic recalibration every 60 seconds (value in TUs)
 		 * I wonder what the firmware default here is? */
 		cal.interval = cpu_to_le32(58594);
-		return acx_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
-				&cal, sizeof(cal),
-				CMD_TIMEOUT_MS(100));
 	} else {
+		log(L_INIT, "acx: Disabling firmware auto radio-recalibration.\n");
+		cal.methods = 0;
+		cal.interval = 0;
+	}
+
+	return acx_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
+			&cal, sizeof(cal),
+			CMD_TIMEOUT_MS(100));
+}
+
+static int acx_recalib_radio(acx_device_t *adev) {
+
+	if (IS_ACX100(adev)) {
+		logf0(L_INIT, "acx100: Doing radio re-calibration.\n");
 		/* On ACX100, we need to recalibrate the radio
 		 * by issuing a GETSET_TX|GETSET_RX */
 		if (
@@ -3328,7 +3353,11 @@ static int acx_recalib_radio(acx_device_t *adev) {
 			return OK;
 
 		return NOT_OK;
+	} else {
+		logf0(L_INIT, "acx111: Enabling auto radio re-calibration.\n");
+		 return(acx111_set_recalib_auto(adev, 1));
 	}
+
 }
 
 static void acx_after_interrupt_recalib(acx_device_t * adev)
@@ -4037,7 +4066,7 @@ static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf,
 	// Execute operation
 	if (val == ACX_DIAG_OP_RECALIB) {
 		logf0(L_ANY, "ACX_DIAG_OP_RECALIB: Scheduling immediate radio recalib\n");
-		adev->recalib_time_last_success =- RECALIB_PAUSE * 60 * HZ;
+		adev->recalib_time_last_success = jiffies - RECALIB_PAUSE * 60 * HZ;
 		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 	} else
 	// Execute operation
@@ -4897,6 +4926,8 @@ void acx111_tx_build_txstatus(acx_device_t *adev,
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger,
 		struct ieee80211_tx_info *info)
 {
+	int log_level = L_INIT;
+
 	const char *err = "unknown error";
 
 	/* hmm, should we handle this as a mask
@@ -4925,11 +4956,13 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 		    "'iwconfig retry lifetime XXX'";
 /*		adev->wstats.discard.misc++; */
 		break;
+
 	case 0x20:
 		err = "excessive Tx retries due to either distance "
 		    "too high or unable to Tx or Tx frame error - "
 		    "try changing 'iwconfig txpower XXX' or "
 		    "'sens'itivity or 'retry'";
+		log_level = acx_debug & L_DEBUG;
 /*		adev->wstats.discard.retries++; */
 		/* Tx error 0x20 also seems to occur on
 		 * overheating, so I'm not sure whether we
@@ -4947,7 +4980,8 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 		 * --> less heat?) or 802.11 power save mode?
 		 *
 		 * ok, just do it. */
-		if (++adev->retry_errors_msg_ratelimit % 4 == 0) {
+		if ((++adev->retry_errors_msg_ratelimit % 4 == 0)) {
+
 			if (adev->retry_errors_msg_ratelimit <= 20) {
 
 				logf1(L_DEBUG, "%s: several excessive Tx "
@@ -4958,13 +4992,17 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 				       "before it's too late!\n",
 				       wiphy_name(adev->ieee->wiphy));
 
-				logf0(L_ANY, "Scheduling radio recalibration after high tx retries\n");
 				if (adev->retry_errors_msg_ratelimit == 20)
-					logf0(L_ANY, "Disabling above message\n");
+					logf0(L_DEBUG, "Disabling above message\n");
 			}
 
-			acx_schedule_task(adev,
+			// On the acx111, we would normally have auto radio-recalibration enabled
+			if (!adev->recalib_auto){
+				logf0(L_ANY, "Scheduling radio recalibration after high tx retries.\n");
+				acx_schedule_task(adev,
 					  ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
+			}
+
 		}
 
 		break;
@@ -4989,17 +5027,12 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int finger
 
 	adev->stats.tx_errors++;
 
-	switch (error) {
-	// Report an tx-error 0x20 in L_DEBUG only
-	case 0x20:
-		if (!(acx_debug & L_DEBUG))
-			break;
-
-	default:
-		if (adev->stats.tx_errors <= 20)
-			printk("acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
-					adev->ieee->wiphy), error, finger, err);
-	}
+	if (adev->stats.tx_errors <= 20)
+		log(log_level, "acx: %s: tx error 0x%02X, buf %02u! (%s)\n", wiphy_name(
+			adev->ieee->wiphy), error, finger, err);
+	else
+		log(log_level, "acx: %s: tx error 0x%02X, buf %02u!\n", wiphy_name(
+			adev->ieee->wiphy), error, finger);
 
 }
 
