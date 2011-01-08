@@ -2566,6 +2566,13 @@ void acx_start(acx_device_t * adev)
 	log(L_INIT, "acx: updating initial settings on iface activation\n");
 	acx_update_card_settings(adev);
 
+	// For the acx100, we leave the firmware sensitivity
+	// and it doesn't support auto recalib, so don't set it
+	if (IS_ACX111(adev)) {
+		acx_update_sensitivity(adev);
+		acx111_set_recalib_auto(adev, 1);
+	}
+
 	FN_EXIT0;
 }
 
