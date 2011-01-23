@@ -480,6 +480,10 @@ static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
 #define acx_writel(v,r)	writel(v, r)
 #define acx_writew(v,r)	writew(v, r)
 
+// This controls checking of spin-locking in the mem-interface
+#define ACXMEM_SPIN_CHECK 0
+
+#if ACXMEM_SPIN_CHECK
 #define ACXMEM_WARN_NOT_SPIN_LOCKED \
 do { \
 	if (!spin_is_locked(&adev->spinlock)){\
@@ -487,6 +491,9 @@ do { \
 		dump_stack(); \
 	}\
 } while (0)
+#else
+#define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
+#endif
 
 INLINE_IO u32 read_id_register(acx_device_t *adev) {
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
