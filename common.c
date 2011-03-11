@@ -96,6 +96,9 @@ void acx_set_defaults(acx_device_t * adev);
 static void acx_get_sensitivity(acx_device_t *adev);
 static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity);
 static void acx_update_sensitivity(acx_device_t *adev);
+static void acx_get_reg_domain(acx_device_t *adev);
+static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id);
+static void acx_update_reg_domain(acx_device_t *adev);
 void acx_update_card_settings(acx_device_t *adev);
 void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
@@ -2074,6 +2077,29 @@ static void acx_update_sensitivity(acx_device_t *adev)
 
 }
 
+static void acx_get_reg_domain(acx_device_t *adev)
+{
+	acx_ie_generic_t dom;
+
+	acx_interrogate(adev, &dom,
+			  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
+	adev->reg_dom_id = dom.m.bytes[0];
+	log(L_INIT, "acx: Got regulatory domain 0x%02X\n", adev->reg_dom_id);
+}
+
+static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id)
+{
+	adev->reg_dom_id = domain_id;
+	acx_update_reg_domain(adev);
+}
+
+static void acx_update_reg_domain(acx_device_t *adev)
+{
+	log(L_INIT, "acx: Updating the regulatory domain: 0x%02X\n",
+	    adev->reg_dom_id);
+	acx_set_sane_reg_domain(adev, 1);
+}
+
 /*
  * acx_s_update_card_settings
  *
@@ -2175,13 +2201,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->get_mask & GETSET_REG_DOMAIN) {
-		acx_ie_generic_t dom;
-
-		acx_interrogate(adev, &dom,
-				  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
-		adev->reg_dom_id = dom.m.bytes[0];
-		acx_set_sane_reg_domain(adev, 0);
-		log(L_INIT, "acx: got regulatory domain 0x%02X\n", adev->reg_dom_id);
+		acx_get_reg_domain(adev);
 		CLEAR_BIT(adev->get_mask, GETSET_REG_DOMAIN);
 	}
 
@@ -2415,9 +2435,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_REG_DOMAIN) {
-		log(L_INIT, "acx: updating the regulatory domain: 0x%02X\n",
-		    adev->reg_dom_id);
-		acx_set_sane_reg_domain(adev, 1);
+		acx_update_reg_domain(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_REG_DOMAIN);
 	}
 
@@ -3580,6 +3598,8 @@ static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 
 	if (do_set) {
 		acx_ie_generic_t dom;
+		memset(&dom, 0, sizeof(dom));
+
 		dom.m.bytes[0] = adev->reg_dom_id;
 		acx_configure(adev, &dom, ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
 	}
@@ -3592,7 +3612,7 @@ static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 		mask = 1;
 		for (i = 1; i <= 14; i++) {
 			if (adev->reg_dom_chanmask & mask) {
-				printk("acx: %s: adjusting the selected channel from %d "
+				printk("acx: %s: Adjusting the selected channel from %d "
 					"to %d due to the new regulatory domain\n",
 					wiphy_name(adev->ieee->wiphy), adev->channel, i);
 				adev->channel = i;
