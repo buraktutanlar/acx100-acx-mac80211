@@ -1349,11 +1349,14 @@ typedef struct acx111_ie_feature_config {
 	u32	data_flow_options;
 } ACX_PACKED acx111_ie_feature_config_t;
 
-typedef struct acx111_ie_tx_level {
+typedef struct acx1xx_ie_tx_level {
 	u16	type;
 	u16	len;
 	u8	level;
-} ACX_PACKED acx111_ie_tx_level_t;
+} ACX_PACKED acx1xx_ie_tx_level_t;
+
+#define TX_CFG_ACX100_NUM_POWER_LEVELS 2
+#define TX_CFG_ACX111_NUM_POWER_LEVELS 5
 
 #define PS_CFG_ENABLE		0x80
 #define PS_CFG_PENDING		0x40 /* status flag when entering PS */

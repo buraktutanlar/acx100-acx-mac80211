@@ -382,8 +382,8 @@ struct acx_device {
 	u8		preamble_cur;
 
 	u8		tx_disabled;
-	u8		tx_level_dbm;
-	/* u8		tx_level_val; */
+	int		tx_level_dbm;
+	u8		tx_level_val;
 	/* u8		tx_level_auto;		whether to do automatic power adjustment */
 
 	unsigned long	recalib_time_last_success;

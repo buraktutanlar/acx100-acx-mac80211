@@ -137,7 +137,6 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
-int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
 static void acxpci_irq_enable(acx_device_t * adev);
@@ -2422,61 +2421,6 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
 	FN_EXIT0;
 
 	return &adev->txhostdesc_start[index * 2];
-}
-
-int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
-{
-	/* since it can be assumed that at least the Maxim radio has a
-	 * maximum power output of 20dBm and since it also can be
-	 * assumed that these values drive the DAC responsible for
-	 * setting the linear Tx level, I'd guess that these values
-	 * should be the corresponding linear values for a dBm value,
-	 * in other words: calculate the values from that formula:
-	 * Y [dBm] = 10 * log (X [mW])
-	 * then scale the 0..63 value range onto the 1..100mW range (0..20 dBm)
-	 * and you're done...
-	 * Hopefully that's ok, but you never know if we're actually
-	 * right... (especially since Windows XP doesn't seem to show
-	 * actual Tx dBm values :-P) */
-
-	/* NOTE: on Maxim, value 30 IS 30mW, and value 10 IS 10mW - so the
-	 * values are EXACTLY mW!!! Not sure about RFMD and others,
-	 * though... */
-	static const u8 dbm2val_maxim[21] = {
-		63, 63, 63, 62,
-		61, 61, 60, 60,
-		59, 58, 57, 55,
-		53, 50, 47, 43,
-		38, 31, 23, 13,
-		0
-	};
-	static const u8 dbm2val_rfmd[21] = {
-		0, 0, 0, 1,
-		2, 2, 3, 3,
-		4, 5, 6, 8,
-		10, 13, 16, 20,
-		25, 32, 41, 50,
-		63
-	};
-	const u8 *table;
-
-	switch (adev->radio_type) {
-	case RADIO_0D_MAXIM_MAX2820:
-		table = &dbm2val_maxim[0];
-		break;
-	case RADIO_11_RFMD:
-	case RADIO_15_RALINK:
-		table = &dbm2val_rfmd[0];
-		break;
-	default:
-		printk("acx: %s: unknown/unsupported radio type, "
-		       "cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
-		return NOT_OK;
-	}
-	printk("acx: %s: changing radio power level to %u dBm (%u)\n",
-	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
-	acxpci_write_phy_reg(adev, 0x11, table[level_dbm]);
-	return OK;
 }
 
 

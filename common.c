@@ -106,8 +106,13 @@ int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
-static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm);
-static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm);
+
+static int acx1xx_set_tx_level_dbm(acx_device_t *adev, int level_dbm);
+static int acx1xx_update_tx_level_dbm(acx_device_t *adev);
+static int acx1xx_get_tx_level(acx_device_t * adev);
+static int acx1xx_set_tx_level(acx_device_t * adev, u8 level_val);
+static int acx1xx_update_tx_level(acx_device_t *adev);
+
 static int acx1xx_get_antenna(acx_device_t *adev);
 static int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1);
 static int acx1xx_update_antenna(acx_device_t *adev);
@@ -261,6 +266,9 @@ static void __exit acx_cleanup_module(void);
 
 /* minutes to wait until next radio recalibration: */
 #define RECALIB_PAUSE	5
+
+// Maximum tx_power assumed from ieee80211_ops->config / IEEE80211_CONF_CHANGE_POWER
+#define TX_CFG_MAX_DBM_POWER	20
 
 /* Please keep acx_reg_domain_ids_len in sync... */
 const u8 acx_reg_domain_ids[acx_reg_domain_ids_len] =
@@ -1879,8 +1887,6 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 
 void acx_set_defaults(acx_device_t * adev)
 {
-	struct ieee80211_conf *conf = &adev->ieee->conf;
-
 	FN_ENTER;
 
 	/* do it before getting settings, prevent bogus channel 0 warning */
@@ -1975,24 +1981,8 @@ void acx_set_defaults(acx_device_t * adev)
 	 * 500 kbit/s, plus 0x80 added. See 802.11-1999.pdf item 7.3.2.2 */
 	acx_update_ratevector(adev);
 
-	/* set some more defaults */
-	if (IS_ACX111(adev)) {
-		/* 30mW (15dBm) is default, at least in my acx111 card: */
-		adev->tx_level_dbm = 15;
-		conf->power_level = adev->tx_level_dbm;
-		acx_set_tx_level(adev, adev->tx_level_dbm);
-		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-	} else {
-		/* don't use max. level, since it might be dangerous
-		 * (e.g. WRT54G people experience
-		 * excessive Tx power damage!) */
-		adev->tx_level_dbm = 18;
-		conf->power_level = adev->tx_level_dbm;
-		acx_set_tx_level(adev, adev->tx_level_dbm);
-		SET_BIT(adev->set_mask, GETSET_TXPOWER);
-	}
-
-	/* adev->tx_level_auto = 1; */
+	// Get current tx-power setting
+	acx1xx_get_tx_level(adev);
 
 	// Sensitivity settings
 	if (IS_ACX111(adev)) {
@@ -2019,8 +2009,6 @@ void acx_set_defaults(acx_device_t * adev)
 	/* These settings will be set in fw on ifup */
 	adev->set_mask = 0 | GETSET_RETRY | SET_MSDU_LIFETIME
 	    /* configure card to do rate fallback when in auto rate mode */
-	    | SET_RATE_FALLBACK | SET_RXCONFIG | GETSET_TXPOWER
-	    /* better re-init the antenna value we got above */
 	    | SET_RATE_FALLBACK | SET_RXCONFIG
 #if POWER_SAVE_80211
 	    | GETSET_POWER_80211
@@ -2298,9 +2286,9 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_TXPOWER) {
-		log(L_INIT, "acx: updating the transmit power: %u dBm\n",
-		    adev->tx_level_dbm);
-		acx_set_tx_level(adev, adev->tx_level_dbm);
+		log(L_INIT, "acx: updating the transmit power level: %d\n",
+		    adev->tx_level_val);
+		acx1xx_update_tx_level(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
 
@@ -2776,6 +2764,132 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 	return result;
 }
 
+static int acx1xx_set_tx_level_dbm(acx_device_t *adev, int level_dbm)
+{
+	adev->tx_level_dbm = level_dbm;
+	return acx1xx_update_tx_level_dbm(adev);
+}
+
+static int acx1xx_update_tx_level_dbm(acx_device_t *adev) {
+
+	u8 level_val;
+	// Number of level of device
+	int numl;
+	// Dbm per level
+	int dpl;
+	// New level reverse
+	int nlr;
+	//  Helper for modulo dpl, ...
+	int helper;
+
+	/* The acx is working with power levels, which shift the tx-power
+	 * in partitioned steps and also depending on the configured regulatory
+	 * domain.
+	 *
+	 * The acx111 has five tx_power levels, the acx100 we assume two.
+	 *
+	 * The acx100 also displays them in co_powerlevels_t config options. We
+	 * could use this info for a more precise matching, but for the time being,
+	 * we assume there two levels by default.
+	 *
+	 * The approach here to set the corresponding tx-power level here, is to
+	 * translate the requested tx-power in dbm onto a scale of 0-20dbm, with an
+	 * assumed maximum of 20dbm. The maximum would normally vary depending on
+	 * the regulatory domain.
+	 *
+	 * The the value on the 0-20dbm scale is then matched onto the available
+	 * levels.
+	 */
+
+	if (adev->tx_level_dbm > TX_CFG_MAX_DBM_POWER) {
+		logf1(L_ANY, "Err: Setting tx-power > %d dbm not supported\n", TX_CFG_MAX_DBM_POWER);
+		return (NOT_OK);
+	}
+
+	if (IS_ACX111(adev)) {
+		numl = TX_CFG_ACX111_NUM_POWER_LEVELS;
+	} else if (IS_ACX100(adev)) {
+		numl = TX_CFG_ACX100_NUM_POWER_LEVELS;
+	} else {
+		return (NOT_OK);
+	}
+
+	dpl = TX_CFG_MAX_DBM_POWER / numl;
+
+	// Find closest match
+	nlr = adev->tx_level_dbm / dpl;
+	helper = adev->tx_level_dbm % dpl;
+	if (helper > dpl - helper)
+		nlr++;
+
+	// Adjust to boundaries (level zero doesn't exists, adjust to 1)
+	if (nlr < 1)
+		nlr = 1;
+	if (nlr > numl)
+		nlr = numl;
+
+	// Translate to final level_val
+	level_val = numl - nlr + 1;
+
+	// Inform of adjustments
+	if (nlr * dpl != adev->tx_level_dbm) {
+		helper = adev->tx_level_dbm;
+		adev->tx_level_dbm = nlr * dpl;
+		log(L_ANY, "acx: Tx-power adjusted from %d to %d dbm (tx-power-level: %d)\n", helper, adev->tx_level_dbm, level_val);
+	}
+
+	return acx1xx_set_tx_level(adev, level_val);
+}
+
+
+static int acx1xx_get_tx_level(acx_device_t *adev)
+{
+	struct acx1xx_ie_tx_level tx_level;
+
+	FN_ENTER;
+
+	if (IS_USB(adev)) {
+		logf0(L_ANY, "Get tx-level not yet supported on usb\n");
+		goto end;
+	}
+
+	memset(&tx_level, 0, sizeof(tx_level));
+
+	if (OK != acx_interrogate(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL)) {
+		FN_EXIT1(NOT_OK);
+		return NOT_OK;
+	}
+	adev->tx_level_val= tx_level.level;
+	log(L_ANY, "acx: Got tx-power-level: %d\n", adev->tx_level_val);
+
+	end:
+	FN_EXIT0;
+	return OK;
+}
+
+static int acx1xx_set_tx_level(acx_device_t *adev, u8 level_val)
+{
+	adev->tx_level_val=level_val;
+	return acx1xx_update_tx_level(adev);
+}
+
+static int acx1xx_update_tx_level(acx_device_t *adev)
+{
+	struct acx1xx_ie_tx_level tx_level;
+
+	if (IS_USB(adev)) {
+		logf0(L_ANY, "Update tx-level not yet supported on usb\n");
+		return OK;
+	}
+
+	log(L_ANY, "acx: Updating tx-power-level to: %d\n", adev->tx_level_val);
+	memset(&tx_level, 0, sizeof(tx_level));
+	tx_level.level=adev->tx_level_val;
+	return acx_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
+}
+
+// OW: Previously included tx-power related functions, kept for documentation
+#if 0
 /*
  * FIXME: this should be solved in a general way for all radio types
  * by decoding the radio firmware module,
@@ -2784,7 +2898,7 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
  * Or maybe not, since the radio module probably has a function interface
  * instead which then manages Tx level programming :-\
  */
-static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm)
+int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
 	struct acx111_ie_tx_level tx_level;
 
@@ -2812,16 +2926,81 @@ static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	return acx_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
 }
 
-static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm)
+int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 {
-	if (IS_ACX111(adev)) {
-		return acx111_set_tx_level(adev, level_dbm);
+	/* since it can be assumed that at least the Maxim radio has a
+	 * maximum power output of 20dBm and since it also can be
+	 * assumed that these values drive the DAC responsible for
+	 * setting the linear Tx level, I'd guess that these values
+	 * should be the corresponding linear values for a dBm value,
+	 * in other words: calculate the values from that formula:
+	 * Y [dBm] = 10 * log (X [mW])
+	 * then scale the 0..63 value range onto the 1..100mW range (0..20 dBm)
+	 * and you're done...
+	 * Hopefully that's ok, but you never know if we're actually
+	 * right... (especially since Windows XP doesn't seem to show
+	 * actual Tx dBm values :-P) */
+
+	/* NOTE: on Maxim, value 30 IS 30mW, and value 10 IS 10mW - so the
+	 * values are EXACTLY mW!!! Not sure about RFMD and others,
+	 * though... */
+	static const u8 dbm2val_maxim[21] = {
+		63, 63, 63, 62,
+		61, 61, 60, 60,
+		59, 58, 57, 55,
+		53, 50, 47, 43,
+		38, 31, 23, 13,
+		0
+	};
+	static const u8 dbm2val_rfmd[21] = {
+		0, 0, 0, 1,
+		2, 2, 3, 3,
+		4, 5, 6, 8,
+		10, 13, 16, 20,
+		25, 32, 41, 50,
+		63
+	};
+	const u8 *table;
+
+	switch (adev->radio_type) {
+	case RADIO_0D_MAXIM_MAX2820:
+		table = &dbm2val_maxim[0];
+		break;
+	case RADIO_11_RFMD:
+	case RADIO_15_RALINK:
+		table = &dbm2val_rfmd[0];
+		break;
+	default:
+		printk("acx: %s: unknown/unsupported radio type, "
+		       "cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
+		return NOT_OK;
 	}
-	if (IS_PCI(adev)) {
-		return acx100pci_set_tx_level(adev, level_dbm);
-	}
-	if (IS_MEM(adev)) {
-		return acx100mem_set_tx_level(adev, level_dbm);
+	printk("acx: %s: changing radio power level to %u dBm (%u)\n",
+	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
+	acxpci_write_phy_reg(adev, 0x11, table[level_dbm]);
+	return OK;
+}
+
+// Comment int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm)
+// Otherwise equal with int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
+/*
+ * The hx4700 EEPROM, at least, only supports 1 power setting.  The configure
+ * routine matches the PA bias with the gain, so just use its default value.
+ * The values are: 0x2b for the gain and 0x03 for the PA bias.  The firmware
+ * writes the gain level to the Tx gain control DAC and the PA bias to the Maxim
+ * radio's PA bias register.  The firmware limits itself to 0 - 64 when writing to the
+ * gain control DAC.
+ *
+ * Physically between the ACX and the radio, higher Tx gain control DAC values result
+ * in less power output; 0 volts to the Maxim radio results in the highest output power
+ * level, which I'm assuming matches up with 0 in the Tx Gain DAC register.
+ *
+ * Although there is only the 1 power setting, one of the radio firmware functions adjusts
+ * the transmit power level up and down.  That function is called by the ACX FIQ handler
+ * under certain conditions.
+ */
+#endif
+
 static int acx1xx_get_antenna(acx_device_t *adev) {
 
 	int res;
@@ -3870,12 +4049,12 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	seq_printf(file, "tx_queue len: %d\n", skb_queue_len(&adev->tx_queue));
 
 	seq_printf(file, "\n" "** PHY status **\n"
-		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
+		     "tx_disabled %d, tx_level_dbm %d, tx_level_val %d,\n "/* "tx_level_auto %d\n" */
 		     "sensitivity %d, antenna[0,1] 0x%02X 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
 		     "rate_basic 0x%04X, rate_oper 0x%04X\n"
 		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
 		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
-		     adev->tx_disabled, adev->tx_level_dbm,	/* adev->tx_level_val, adev->tx_level_auto, */
+		     adev->tx_disabled, adev->tx_level_dbm,	adev->tx_level_val, /* adev->tx_level_auto, */
 		     adev->sensitivity, adev->antenna[0], adev->antenna[1], adev->ed_threshold,
 		     adev->cca, adev->preamble_mode, adev->rate_basic, adev->rate_oper, adev->rts_threshold,
 		     adev->frag_threshold, adev->short_retry, adev->long_retry,
@@ -5961,9 +6140,11 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed) {
 
 	logf1(L_DEBUG, "changed=%08X\n", changed);
 
-	// IEEE80211_CONF_CHANGE_POWER
+	// Tx-Power
+	// power_level: requested transmit power (in dBm)
 	if (changed & IEEE80211_CONF_CHANGE_POWER) {
-		logf0(L_ANY, "IEEE80211_CONF_CHANGE_POWER not implemented\n");
+		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_POWER: %d\n", conf->power_level);
+		acx1xx_set_tx_level_dbm(adev, conf->power_level);
 	}
 
 	// IEEE80211_CONF_CHANGE_CHANNEL
