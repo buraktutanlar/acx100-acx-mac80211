@@ -398,7 +398,7 @@ struct acx_device {
 	u8		brange_max_quality;	/* maximum quality that equates to full speed */
 
 	u8		sensitivity;
-	u8		antenna;		/* antenna settings */
+	u8		antenna[2];		/* antenna settings */
 	u8		ed_threshold;		/* energy detect threshold */
 	u8		cca;			/* clear channel assessment */
 

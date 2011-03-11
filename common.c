@@ -108,6 +108,13 @@ static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 static int acx111_set_tx_level(acx_device_t * adev, u8 level_dbm);
 static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm);
+static int acx1xx_get_antenna(acx_device_t *adev);
+static int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1);
+static int acx1xx_update_antenna(acx_device_t *adev);
+#if 0
+static int acx100_set_rx_antenna(acx_device_t *adev, u8 val);
+static int acx100_set_tx_antenna(acx_device_t *adev, u8 val);
+#endif
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -2014,7 +2021,7 @@ void acx_set_defaults(acx_device_t * adev)
 	    /* configure card to do rate fallback when in auto rate mode */
 	    | SET_RATE_FALLBACK | SET_RXCONFIG | GETSET_TXPOWER
 	    /* better re-init the antenna value we got above */
-	    | GETSET_ANTENNA
+	    | SET_RATE_FALLBACK | SET_RXCONFIG
 #if POWER_SAVE_80211
 	    | GETSET_POWER_80211
 #endif
@@ -2156,13 +2163,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->get_mask & GETSET_ANTENNA) {
-		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
-
-		memset(antenna, 0, sizeof(antenna));
-		acx_interrogate(adev, antenna,
-				  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
-		adev->antenna = antenna[4];
-		log(L_INIT, "acx: got antenna value 0x%02X\n", adev->antenna);
+		acx1xx_get_antenna(adev);
 		CLEAR_BIT(adev->get_mask, GETSET_ANTENNA);
 	}
 
@@ -2304,14 +2305,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_ANTENNA) {
-		/* antenna */
-		u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
-
-		memset(antenna, 0, sizeof(antenna));
-		antenna[4] = adev->antenna;
-		log(L_INIT, "acx: updating antenna value: 0x%02X\n", adev->antenna);
-		acx_configure(adev, &antenna,
-				ACX1xx_IE_DOT11_CURRENT_ANTENNA);
+		acx1xx_update_antenna(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_ANTENNA);
 	}
 
@@ -2828,11 +2822,140 @@ static int acx_set_tx_level(acx_device_t *adev, u8 level_dbm)
 	}
 	if (IS_MEM(adev)) {
 		return acx100mem_set_tx_level(adev, level_dbm);
-	}
+static int acx1xx_get_antenna(acx_device_t *adev) {
 
-	return OK;
+	int res;
+	u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+
+	FN_ENTER;
+
+	memset(antenna, 0, sizeof(antenna));
+	res=acx_interrogate(adev, antenna,
+			  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
+	adev->antenna[0] = antenna[4];
+	adev->antenna[1] = antenna[5];
+	log(L_INIT, "acx: Got antenna[0,1]: 0x%02X 0x%02X\n", adev->antenna[0], adev->antenna[1]);
+
+	FN_EXIT0;
+
+	return res;
+
 }
 
+
+static int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1) {
+
+	int res;
+
+	FN_ENTER;
+
+	adev->antenna[0] = val0;
+	adev->antenna[1] = val1;
+	res=acx1xx_update_antenna(adev);
+
+	FN_EXIT0;
+
+	return res;
+
+}
+
+static int acx1xx_update_antenna(acx_device_t *adev) {
+
+	int res;
+	u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating antenna[0,1]: 0x%02X 0x%02X\n", adev->antenna[0], adev->antenna[1]);
+	memset(antenna, 0, sizeof(antenna));
+	antenna[4] = adev->antenna[0];
+	antenna[5] = adev->antenna[1];
+	res=acx_configure(adev, &antenna,
+			ACX1xx_IE_DOT11_CURRENT_ANTENNA);
+
+	FN_EXIT0;
+
+	return res;
+}
+
+// OW: Transfered from the acx-20080210 ioctl calls, but didn't test of verify
+#if 0
+/*
+ * 0 = antenna1; 1 = antenna2; 2 = full diversity; 3 = partial diversity
+ */
+static int acx100_set_rx_antenna(acx_device_t *adev, u8 val) {
+
+	int result;
+
+	FN_ENTER;
+
+	if (val > 3) {
+		result = -EINVAL;
+		goto end;
+	}
+
+	logf1(L_ANY, "old antenna value: 0x%02X\n", adev->antenna[0]);
+
+	acx_sem_lock(adev);
+
+	adev->antenna[0] &= 0x3f;
+	SET_BIT(adev->antenna[0], (val << 6));
+	logf1(L_ANY, "new antenna value: 0x%02X\n", adev->antenna[0]);
+
+	result = acx1xx_update_antenna(adev);
+
+	acx_sem_unlock(adev);
+
+	end:
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * Arguments: 0 == antenna1; 1 == antenna2;
+ * Could anybody test which antenna is the external one?
+ */
+static int acx100_set_tx_antenna(acx_device_t *adev, u8 val) {
+
+	int result;
+	u8 val2;
+
+	FN_ENTER;
+
+	if (val > 1) {
+		result = -EINVAL;
+		goto end;
+	}
+
+	logf1(L_ANY, "old antenna value: 0x%02X\n", adev->antenna[0]);
+
+	acx_sem_lock(adev);
+
+	// swap antenna 1/2 values
+	switch (val) {
+	case 0:
+		val2 = 1;
+		break;
+	case 1:
+		val2 = 0;
+		break;
+	default:
+		val2=val;
+	}
+	logf1(L_ANY, "val2=%02d\n", val2);
+
+	adev->antenna[0] &= ~0x30;
+	SET_BIT(adev->antenna[0], ((val2 & 0x01) << 5));
+	logf1(L_ANY, "new antenna value: 0x%02X\n", adev->antenna[0]);
+
+	result = acx1xx_update_antenna(adev);
+
+	acx_sem_unlock(adev);
+	end:
+	FN_EXIT1(result);
+	return result;
+}
+#endif
 
 #ifdef UNUSED
 void acx_update_capabilities(acx_device_t * adev)
@@ -3748,12 +3871,12 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 
 	seq_printf(file, "\n" "** PHY status **\n"
 		     "tx_disabled %d, tx_level_dbm %d\n"	/* "tx_level_val %d, tx_level_auto %d\n" */
-		     "sensitivity %d, antenna 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
+		     "sensitivity %d, antenna[0,1] 0x%02X 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
 		     "rate_basic 0x%04X, rate_oper 0x%04X\n"
 		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
 		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
 		     adev->tx_disabled, adev->tx_level_dbm,	/* adev->tx_level_val, adev->tx_level_auto, */
-		     adev->sensitivity, adev->antenna, adev->ed_threshold,
+		     adev->sensitivity, adev->antenna[0], adev->antenna[1], adev->ed_threshold,
 		     adev->cca, adev->preamble_mode, adev->rate_basic, adev->rate_oper, adev->rts_threshold,
 		     adev->frag_threshold, adev->short_retry, adev->long_retry,
 		     adev->msdu_lifetime, adev->listen_interval,
