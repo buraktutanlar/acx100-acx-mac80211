@@ -1429,6 +1429,12 @@ acx_parse_configoption(acx_device_t * adev,
 	memcpy(adev->cfgopt_NVSv, pEle, sizeof(adev->cfgopt_NVSv));
 	pEle += sizeof(adev->cfgopt_NVSv);
 
+	printk("acx: NVSv: ");
+	for (i = 0; i < sizeof(adev->cfgopt_NVSv); i++) {
+		printk("%02X ", adev->cfgopt_NVSv[i]);
+	}
+	printk("\n");
+
 	if (is_acx111) {
 		adev->cfgopt_NVS_vendor_offs = le16_to_cpu(*(u16 *) pEle);
 		pEle += sizeof(adev->cfgopt_NVS_vendor_offs);
