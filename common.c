@@ -175,6 +175,12 @@ static int acx_proc_show_debug(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_show_sensitivity(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_sensitivity(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static int acx_proc_show_tx_level(struct seq_file *file, void *v);
+static ssize_t acx111_proc_write_tx_level(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static int acx_proc_show_reg_domain(struct seq_file *file, void *v);
+static ssize_t acx_proc_write_reg_domain(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static int acx_proc_show_antenna(struct seq_file *file, void *v);
+static ssize_t acx_proc_write_antenna(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_open(struct inode *inode, struct file *file);
 static void acx_proc_init(void);
 int acx_proc_register_entries(struct ieee80211_hw *ieee);
@@ -589,7 +595,7 @@ u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value)
 #ifdef CONFIG_PROC_FS
 
 static const char *const
- proc_files[] = { "info", "diag", "eeprom", "phy", "debug", "sensitivity" };
+ proc_files[] = { "info", "diag", "eeprom", "phy", "debug", "sensitivity", "tx_level", "antenna", "reg_domain",};
 
 typedef int acx_proc_show_t(struct seq_file *file, void *v);
 typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
@@ -602,6 +608,9 @@ static acx_proc_show_t *const
 	acx_proc_show_phy,
 	acx_proc_show_debug,
 	acx_proc_show_sensitivity,
+	acx_proc_show_tx_level,
+	acx_proc_show_antenna,
+	acx_proc_show_reg_domain,
 };
 
 static acx_proc_write_t *const
@@ -612,6 +621,9 @@ static acx_proc_write_t *const
 	NULL,
 	acx_proc_write_debug,
 	acx_proc_write_sensitivity,
+	acx111_proc_write_tx_level,
+	acx_proc_write_antenna,
+	acx_proc_write_reg_domain,
 };
 
 static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)] ;
@@ -4629,6 +4641,149 @@ static ssize_t acx_proc_write_sensitivity(struct file *file, const char __user *
 }
 
 
+static int acx_proc_show_tx_level(struct seq_file *file, void *v)
+{
+	acx_device_t *adev = (acx_device_t *) file->private;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx1xx_get_tx_level(adev);
+	seq_printf(file, "tx_level_dbm: %d\n", adev->tx_level_dbm);
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+
+	return 0;
+}
+
+static ssize_t acx111_proc_write_tx_level(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	acx_device_t *adev = (acx_device_t *) PDE(file->f_path.dentry->d_inode)->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned long val;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count != size)
+		goto out;
+
+	ret = count;
+
+	logf1(L_ANY, "tx_level_val=%d\n", adev->tx_level_val);
+	acx1xx_set_tx_level(adev, val);
+
+	out:
+		acx_sem_unlock(adev);
+		FN_EXIT0;
+
+	return ret;
+}
+
+static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
+{
+	acx_device_t *adev = (acx_device_t *) file->private;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx_get_reg_domain(adev);
+	seq_printf(file, "reg_dom_id: 0x%02x\n", adev->reg_dom_id);
+
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return 0;
+}
+
+static ssize_t acx_proc_write_reg_domain(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	acx_device_t *adev = (acx_device_t *) PDE(file->f_path.dentry->d_inode)->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned long val;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count != size)
+		goto out;
+
+	ret = count;
+
+	acx_set_reg_domain(adev, val);
+
+	out:
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return ret;
+}
+
+
+static int acx_proc_show_antenna(struct seq_file *file, void *v)
+{
+	acx_device_t *adev = (acx_device_t *) file->private;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx1xx_get_antenna(adev);
+	seq_printf(file, "antenna[0,1]: 0x%02x 0x%02x\n", adev->antenna[0], adev->antenna[1]);
+
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return 0;
+}
+
+static ssize_t acx_proc_write_antenna(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
+{
+	acx_device_t *adev = (acx_device_t *) PDE(file->f_path.dentry->d_inode)->data;
+
+	ssize_t ret = -EINVAL;
+	char *after;
+	unsigned long val;
+	u8 val0, val1;
+	size_t size;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	val = simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
+
+	if (count != size)
+		goto out;
+
+	ret = count;
+
+	val0 = (u8) (val & 0xFF);
+	val1 = (u8) ((val >> 8) & 0xFF);
+	acx1xx_set_antenna(adev, val0, val1);
+
+	out:
+		acx_sem_unlock(adev);
+
+	FN_EXIT0;
+
+	return ret;
+}
 
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
