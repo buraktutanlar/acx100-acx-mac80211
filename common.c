@@ -2250,20 +2250,32 @@ void acx_update_card_settings(acx_device_t *adev)
                 case ACX_MODE_3_AP:
 						if (adev->beacon_skb != NULL) {
 
+							// OW 20110310: ACX100 vs ACX111 template handling
+							// This code is a terrible mess - need to urgently clean this up
+							// ... (within the general configuration setting changes)
+							//
+							// The TIM template handling between ACX100 and ACX111 is different:
+							// * ACX111: Needs TIM in dedicated template via ACX1xx_CMD_CONFIG_TIM
+							// * ACX100: Needs TIM included into the beacon, however space for TIM template
+							// needs to be configured during memory-map setup
+
 					        // If beacon_tim is set, we only fill the acx beacon template until the tim IE
 					        // the tim IE will be configured using acx_fill_beacon_or_proberesp_template
-					        if (adev->beacon_tim){
+					        if (IS_ACX111(adev) && adev->beacon_tim){
 					        	len = adev->beacon_tim - adev->beacon_skb->data;
 					        }
 					        // else we fill the complete beacon_skb
 					        else {
 					        	len = adev->beacon_skb->len;
 					        }
+
 							acx_set_beacon_template(adev, len);
 							// We need to set always a tim template, since otherwise the acx 
 							// is sending a not 100% well structured beacon (may not be 
 							// blocking though)
-							acx_set_tim_template(adev);
+							if (IS_ACX111(adev)){
+								acx_set_tim_template(adev);
+							}
 
 							/* BTW acx111 firmware would not send probe responses
 							 ** if probe request does not have all basic rates flagged
@@ -3318,6 +3330,7 @@ static int acx_set_tim_template(acx_device_t *adev)
 	if (adev->beacon_skb != NULL && adev->beacon_tim != NULL) {
 		len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
 	}
+
 	// We need to set always a tim template, even with len=0, 
 	// since otherwise the acx is sending a not 100% well structured beacon 
 	// (this may not be blocking though, but it's better like this)
