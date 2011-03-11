@@ -1203,7 +1203,7 @@ void acx_get_firmware_version(acx_device_t * adev)
 	memcpy(adev->firmware_version, fw.fw_id, FW_ID_SIZE);
 	adev->firmware_version[FW_ID_SIZE] = '\0';
 
-	log(L_DEBUG, "acx: fw_ver: fw_id='%s' hw_id=%08X\n",
+	log(L_INIT, "acx: Firmware: firmware_version='%s' hw_id=%08X\n",
 	    adev->firmware_version, fw.hw_id);
 
 	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
