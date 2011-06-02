@@ -3430,6 +3430,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* enable busmastering (required for CardBus) */
 	pci_set_master(pdev);
 
+	/* Specify DMA mask 30-bit. Problem was triggered from >=2.6.33 on x86_64 */
+	adev->bus_dev->coherent_dma_mask = DMA_BIT_MASK(30);
 
 	/* chiptype is u8 but id->driver_data is ulong
 	 ** Works for now (possible values are 1 and 2) */
