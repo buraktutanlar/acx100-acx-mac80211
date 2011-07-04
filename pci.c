@@ -2101,7 +2101,7 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 struct ieee80211_tx_info *info, struct sk_buff *skb)
 {
 	txdesc_t *txdesc = (txdesc_t *) tx_opaque;
-	struct ieee80211_hdr *wireless_header;
+	// FIXME Cleanup?: struct ieee80211_hdr *wireless_header;
 	txhostdesc_t *hostdesc1, *hostdesc2;
 	u16 rateset;
 	u8 Ctl_8, Ctl2_8;
@@ -2115,7 +2115,7 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	 */
 
 	hostdesc1 = acxpci_get_txhostdesc(adev, txdesc);
-	wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
+	// FIXME Cleanup?: wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
 
 	//wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
 	wlhdr_len = WLAN_HDR_A3_LEN;
