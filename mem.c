@@ -5020,7 +5020,11 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
 	set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
+	#else
+	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
+	#endif
 	log(L_ANY, "acx: request_irq %d successful\n", adev->irq);
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
 	acxmem_lock();
