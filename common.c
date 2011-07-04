@@ -4838,7 +4838,6 @@ int acx_proc_register_entries(struct ieee80211_hw *hw) {
 	char procbuf2[80];
 	int i;
 	struct proc_dir_entry *pe;
-	struct proc_dir_entry *ppe;
 
 	FN_ENTER;
 
@@ -4854,7 +4853,7 @@ int acx_proc_register_entries(struct ieee80211_hw *hw) {
 	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s", wiphy_name(
 			adev->ieee->wiphy));
 
-	ppe = proc_mkdir(procbuf2, NULL);
+	proc_mkdir(procbuf2, NULL);
 
 	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
 		snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2, proc_files[i]);
