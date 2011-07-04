@@ -1284,7 +1284,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	usb_tx_t *tx;
 	usb_txbuffer_t *txbuf;
 	//	client_t *clt;
-	struct ieee80211_hdr *whdr;
+	// FIXME Cleanup ?: struct ieee80211_hdr *whdr;
 	unsigned int outpipe;
 	int ucode, txnum;
 	u8 rate_100;
@@ -1297,7 +1297,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 
 	txurb = tx->urb;
 	txbuf = &tx->bulkout;
-	whdr = (struct ieee80211_hdr *) txbuf->data;
+	// FIXME Cleanup ?: whdr = (struct ieee80211_hdr *) txbuf->data;
 	txnum = tx - adev->usb_tx;
 
 	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
