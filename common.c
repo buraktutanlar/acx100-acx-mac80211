@@ -31,6 +31,9 @@
 #include <linux/ethtool.h>
 #include <linux/nl80211.h>
 #include <linux/ieee80211.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+#include <linux/ratelimit.h>
+#endif
 
 #include <net/mac80211.h>
 
