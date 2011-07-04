@@ -193,7 +193,12 @@ void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
 static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // Tx Path
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+#else
+void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+#endif
+
 void acx_tx_work(struct work_struct *work);
 void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
@@ -5165,7 +5170,11 @@ out:
  * ==================================================
  */
 
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+#else
+void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+#endif
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -5176,7 +5185,11 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
 		acx_stop_queue(adev->ieee, NULL);
 
+	#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
 	return NETDEV_TX_OK;
+	#else
+	return;
+	#endif
 }
 
 void acx_tx_work(struct work_struct *work) {

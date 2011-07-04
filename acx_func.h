@@ -313,7 +313,12 @@ void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 // BOM Tx Path (Common)
 // -----
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+#else
+void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+#endif
+
 void acx_tx_work(struct work_struct *work);
 void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
