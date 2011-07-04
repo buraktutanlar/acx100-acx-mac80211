@@ -5066,7 +5066,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	struct ieee80211_hdr *w_hdr;
 	struct sk_buff *skb;
 	int buflen;
-	int level, noise;
+	int level;
 
 	FN_ENTER;
 
@@ -5097,7 +5097,8 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	status->mactime = rxbuf->time;
 
 	level = acx_signal_to_winlevel(rxbuf->phy_level);
-	noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+	// FIXME cleanup ?: noise = acx_signal_to_winlevel(rxbuf->phy_snr);
+
 	//status->signal = acx_signal_determine_quality(level, noise);
 	// TODO OW 20100619 On ACX100 seem to be always zero (seen during hx4700 tests ?!) 
 	status->signal = level;
