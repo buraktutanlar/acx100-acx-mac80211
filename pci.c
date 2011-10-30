@@ -43,12 +43,13 @@
 #include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
 #include <linux/nl80211.h>
+#include <linux/interrupt.h>
+#include <net/iw_handler.h>
+#include <net/mac80211.h>
+
 #ifdef CONFIG_VLYNQ
 #include <linux/vlynq.h>
 #endif
-
-#include <net/iw_handler.h>
-#include <net/mac80211.h>
 
 #include "acx.h"
 
