@@ -3936,6 +3936,8 @@ static struct pci_driver
 /*
  * VLYNQ support
  */
+// TODO Check section mismatch warning vlynq
+// TODO Check set_irq_type LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 
 #ifdef CONFIG_VLYNQ
 struct vlynq_reg_config {
