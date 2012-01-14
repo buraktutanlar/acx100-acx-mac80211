@@ -5338,7 +5338,7 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 #endif /* CONFIG_PM */
 
 
-static struct platform_driver acxmem_drv_id = {
+static struct platform_driver acxmem_driver = {
 		.driver = {
 				.name = "acx-mem",
 		},
@@ -5382,7 +5382,7 @@ int __init acxmem_init_module(void) {
 			"waiting for cards to probe...\n"
 	);
 
-	res = platform_driver_register(&acxmem_drv_id);
+	res = platform_driver_register(&acxmem_driver);
 	FN_EXIT1(res);
 	return res;
 }
@@ -5397,7 +5397,7 @@ void __exit acxmem_cleanup_module(void) {
 	FN_ENTER;
 
 	printk("acxmem: cleanup_module\n");
-	platform_driver_unregister(&acxmem_drv_id);
+	platform_driver_unregister(&acxmem_driver);
 
 	FN_EXIT0;
 }
