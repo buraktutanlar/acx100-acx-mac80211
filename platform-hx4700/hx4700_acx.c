@@ -10,7 +10,7 @@
  * 28-March-2006          Todd Blumer <todd@sdgsystems.com>
  */
 
-
+#include <linux/version.h>
 #include <linux/kernel.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
