@@ -12,6 +12,11 @@
 
 
 #include <linux/kernel.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+#include <linux/module.h>
+#endif
+
 #include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/leds.h>
