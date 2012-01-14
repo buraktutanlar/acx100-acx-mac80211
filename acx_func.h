@@ -376,8 +376,14 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw,
 
 void acx_op_configure_filter(struct ieee80211_hw *hw,
 		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
-int acx_conf_tx(struct ieee80211_hw* ieee, u16 queue,
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
+#else
+int acx_conf_tx(struct ieee80211_hw *hw, u16 queue, const struct ieee80211_tx_queue_params *params);
+#endif
+
 int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
