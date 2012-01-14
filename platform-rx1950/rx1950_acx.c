@@ -9,7 +9,7 @@
  * Copyright (c) 2010 Vasily Khoruzhick <anarsoul at gmail.com>
  */
 
-
+#include <linux/version.h>
 #include <linux/kernel.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
