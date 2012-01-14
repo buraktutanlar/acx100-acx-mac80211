@@ -1,6 +1,6 @@
 config ACX_MAC80211
 	tristate "TI acx100/acx111 802.11b/g wireless chipsets"
-	depends on WLAN_80211 && MAC80211 && EXPERIMENTAL && (USB || PCI)
+	depends on WLAN && MAC80211 && EXPERIMENTAL
 	select FW_LOADER
 	---help---
 	A driver for 802.11b/g wireless cards based on
@@ -46,7 +46,7 @@ config ACX_MAC80211_PCI
 
 config ACX_MAC80211_USB
 	bool "TI acx100/acx111 802.11b/g USB"
-	depends on ACX_MAC80211 && (USB=y || USB=ACX_MAC80211)
+	depends on ACX_MAC80211 && USB
 	---help---
 	Include USB support in acx.
 
@@ -67,5 +67,4 @@ config ACX_MAC80211_MEM
 	depends on ACX_MAC80211
 	---help---
 	Include MEM slave memory support in acx.
-	
-		
+
