@@ -3920,7 +3920,7 @@ static const struct pci_device_id acxpci_id_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
 
 static struct pci_driver
- acxpci_drv_id = {
+ acxpci_driver = {
 	.name = "acx_pci",
 	.id_table = acxpci_id_tbl,
 	.probe = acxpci_probe,
@@ -4364,7 +4364,7 @@ int __init acxpci_init_module(void)
 	    "waiting for cards to probe...\n");
 
 #if defined(CONFIG_PCI)
-	res = pci_register_driver(&acxpci_drv_id);
+	res = pci_register_driver(&acxpci_driver);
 #elif defined(CONFIG_VLYNQ)
 	res = vlynq_register_driver(&vlynq_acx);
 #endif
@@ -4389,7 +4389,7 @@ void __exit acxpci_cleanup_module(void)
 	FN_ENTER;
 
 #if defined(CONFIG_PCI)
-	pci_unregister_driver(&acxpci_drv_id);
+	pci_unregister_driver(&acxpci_driver);
 #elif defined(CONFIG_VLYNQ)
 	vlynq_unregister_driver(&vlynq_acx);
 #endif
