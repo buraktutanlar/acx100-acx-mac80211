@@ -3937,7 +3937,6 @@ static struct pci_driver
  * VLYNQ support
  */
 // TODO Check section mismatch warning vlynq
-// TODO Check set_irq_type LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 
 #ifdef CONFIG_VLYNQ
 struct vlynq_reg_config {
@@ -4090,7 +4089,11 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	vlynq_set_local_mapping(vdev, vdev->mem_start, mapping);
 	vlynq_set_remote_mapping(vdev, 0, match->rx_mapping);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
 	set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
+#else
+	irq_set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
+#endif
 
 	addr = (u32)ioremap(vdev->mem_start, 0x1000);
 	if (!addr) {
