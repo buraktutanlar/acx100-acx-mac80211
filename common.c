@@ -36,12 +36,11 @@
 #include <linux/ratelimit.h>
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
-#include <net/iw_handler.h>
-#endif
 #include <net/mac80211.h>
 
 #include "acx.h"
+
+
 
 /*
  * BOM Config
@@ -250,7 +249,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd, struct ieee80211_vif *vif, struct ieee80211_sta *sta, struct ieee80211_key_conf *key);
 void acx_op_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
 int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif, u16 queue, const struct ieee80211_tx_queue_params *params);
 #else
 int acx_conf_tx(struct ieee80211_hw *hw, u16 queue, const struct ieee80211_tx_queue_params *params);
@@ -6683,7 +6682,7 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 
 	FN_EXIT0;
 }
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
 int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif, u16 queue,
 		const struct ieee80211_tx_queue_params *params)
 #else

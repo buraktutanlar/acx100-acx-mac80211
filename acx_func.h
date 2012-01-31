@@ -20,13 +20,6 @@
 
 #include <linux/version.h>
 
-/*
- * BOM Config
- * ==================================================
- */
-#define CMD_TIMEOUT_MS(n)	(n)
-#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
-
 // CONFIG_ACX_MAC80211_VERSION allows to specify the version of the used
 // wireless mac80211 api, in case it is different of the used kernel.
 // OpenWRT e.g. uses a version of compat-wireless, which is ahead of
@@ -38,6 +31,17 @@
 #ifndef CONFIG_ACX_MAC80211_VERSION
 	#define CONFIG_ACX_MAC80211_VERSION LINUX_VERSION_CODE
 #endif
+
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
+#include <net/iw_handler.h>
+#endif
+
+/*
+ * BOM Config
+ * ==================================================
+ */
+#define CMD_TIMEOUT_MS(n)	(n)
+#define ACX_CMD_TIMEOUT_DEFAULT	CMD_TIMEOUT_MS(50)
 
 // Define ACX_GIT_VERSION with "undef" value, if undefined for some reason
 #ifndef ACX_GIT_VERSION
@@ -377,7 +381,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw,
 void acx_op_configure_filter(struct ieee80211_hw *hw,
 		unsigned int changed_flags, unsigned int *total_flags, u64 multicast);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
 int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 #else
