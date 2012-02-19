@@ -3588,9 +3588,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	       "against wireless extensions %d and Linux %s\n",
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
-	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
-
-/** done with board specific setup **/
+	/** done with board specific setup **/
 
 	/* need to be able to restore PCI state after a suspend */
 #ifdef CONFIG_PM
@@ -4199,9 +4197,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	       "against wireless extensions %d and Linux %s\n",
 	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
-	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
-
-/** done with board specific setup **/
+	/** done with board specific setup **/
 
 	result = acx_setup_modes(adev);
 	if (result) {
