@@ -6253,6 +6253,8 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	int err = -EOPNOTSUPP;
+
+	u8 *mac_vif;
 	char mac[] = MACSTR; // approximate max length
 
 	int vif_type;
@@ -6269,25 +6271,37 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	logf1(L_ANY, "vif_type=%04X\n", vif_type);
 
 
-	if (vif_type == NL80211_IFTYPE_MONITOR) {
+	if (vif_type == NL80211_IFTYPE_MONITOR)
+	{
 		adev->vif_monitor++;
 	}
-
-	else {
-		if (adev->vif_operating)
-			goto out_unlock;
-
-		adev->vif_operating = 1;
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-		adev->vif = conf->vif;
-#else
-		adev->vif = vif;
-#endif
+	else if (adev->vif_operating)
+	{
+		goto out_unlock;
 	}
 
+	adev->vif_operating = 1;
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
+	adev->vif = conf->vif;
+	mac_vif = conf->mac_addr;
+#else
+	adev->vif = vif;
+	mac_vif = vif->addr;
+#endif
 
-	if (adev->initialized)
+	if (adev->initialized) {
+
+		// Reconfigure mac-address globally, affecting all vifs
+		if ( !mac_is_equal(mac_vif, adev->dev_addr)  )
+		{
+			acx1xx_set_station_id(adev, mac_vif);
+			SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+		}
+
+		// TODO Move interface and card setup code (gradually) nearer
+		// to the corresponding mac80211 config callbacks
 		acx_select_opmode(adev);
+	}
 
 	err = 0;
 
