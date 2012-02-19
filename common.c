@@ -127,6 +127,10 @@ static int acx100_set_rx_antenna(acx_device_t *adev, u8 val);
 static int acx100_set_tx_antenna(acx_device_t *adev, u8 val);
 #endif
 
+static int acx1xx_update_station_id(acx_device_t *adev);
+static int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr);
+static int acx1xx_get_station_id(acx_device_t *adev);
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2139,7 +2143,7 @@ static void acx_update_reg_domain(acx_device_t *adev)
  */
 void acx_update_card_settings(acx_device_t *adev)
 {
-	int i, len;
+	int len;
 
 	FN_ENTER;
 
@@ -2168,19 +2172,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	/* Apply settings */
 
 	if (adev->get_mask & GETSET_STATION_ID) {
-		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
-		const u8 *paddr;
-
-		acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
-		paddr = &stationID[4];
-//		memcpy(adev->dev_addr, adev->ndev->dev_addr, ETH_ALEN);
-		for (i = 0; i < ETH_ALEN; i++) {
-			/* we copy the MAC address (reversed in
-			 * the card) to the netdevice's MAC
-			 * address, and on ifup it will be
-			 * copied into iwadev->dev_addr */
-			adev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
-		}
+		acx1xx_get_station_id(adev);
 		SET_IEEE80211_PERM_ADDR(adev->ieee,adev->dev_addr);
 		CLEAR_BIT(adev->get_mask, GETSET_STATION_ID);
 	}
@@ -2230,19 +2222,8 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_STATION_ID) {
-		u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
-		u8 *paddr;
-
-		paddr = &stationID[4];
 		MAC_COPY(adev->dev_addr, adev->ieee->wiphy->perm_addr);
-		for (i = 0; i < ETH_ALEN; i++) {
-			/* copy the MAC address we obtained when we noticed
-			 * that the ethernet iface's MAC changed
-			 * to the card (reversed in
-			 * the card!) */
-			paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
-		}
-		acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+		acx1xx_update_station_id(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_STATION_ID);
 	}
 
@@ -3215,6 +3196,69 @@ void acx_update_capabilities(acx_device_t * adev)
 	adev->capabilities = cap;
 }
 #endif
+
+
+static int acx1xx_get_station_id(acx_device_t *adev)
+{
+	u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+	const u8 *paddr;
+	int i, res;
+
+	FN_ENTER;
+
+	res=acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+	paddr = &stationID[4];
+	for (i = 0; i < ETH_ALEN; i++) {
+		/* we copy the MAC address (reversed in
+		 * the card) to the netdevice's MAC
+		 * address, and on ifup it will be
+		 * copied into iwadev->dev_addr */
+		adev->dev_addr[ETH_ALEN - 1 - i] = paddr[i];
+	}
+
+	log(L_INIT, "acx: Got station_id: " MACSTR "\n", MAC(adev->dev_addr));
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr)
+{
+	int res;
+
+	FN_ENTER;
+
+	MAC_COPY(adev->dev_addr, new_addr);
+	res=acx1xx_update_station_id(adev);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_update_station_id(acx_device_t *adev)
+{
+	u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+	u8 *paddr;
+	int i, res;
+
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating station_id to: " MACSTR "\n", MAC(adev->dev_addr));
+
+	paddr = &stationID[4];
+	for (i = 0; i < ETH_ALEN; i++) {
+		/* copy the MAC address we obtained when we noticed
+		 * that the ethernet iface's MAC changed
+		 * to the card (reversed in
+		 * the card!) */
+		paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
+	}
+	res=acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+
+	FN_EXIT0;
+	return res;
+}
+
 
 /*
  * BOM Templates (Control Path)
