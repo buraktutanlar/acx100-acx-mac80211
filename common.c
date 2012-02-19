@@ -6200,10 +6200,10 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
  */
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-int acx_e_op_add_interface(struct ieee80211_hw *ieee,
+int acx_op_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_if_init_conf *conf)
 #else
-int acx_e_op_add_interface(struct ieee80211_hw *ieee,
+int acx_op_add_interface(struct ieee80211_hw *ieee,
 		      struct ieee80211_vif *vif)
 #endif
 {
@@ -6266,10 +6266,10 @@ int acx_e_op_add_interface(struct ieee80211_hw *ieee,
 }
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-void acx_e_op_remove_interface(struct ieee80211_hw *hw,
+void acx_op_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_if_init_conf *conf)
 #else
-void acx_e_op_remove_interface(struct ieee80211_hw *hw,
+void acx_op_remove_interface(struct ieee80211_hw *hw,
 			  struct ieee80211_vif *vif)
 #endif
 {
