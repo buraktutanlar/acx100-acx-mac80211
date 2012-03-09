@@ -45,15 +45,29 @@ else
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=y,%,$(filter %=y,$(EXTRA_KCONFIG))))
 	
 	PWD := $(shell pwd)
+
 	# Get the current git HEAD short version. In case something goes wrong here, ACX_GIT_VERSION 
 	# will be empty. This will then be handled in the source files.  
 	ACX_GIT_VERSION ?= $(shell (test -d .git) && (git show --format="%h" HEAD |head -1))
 
 	KVERSION ?= $(shell uname -r)
 	KERNELDIR ?= /lib/modules/$(KVERSION)/build
+
+	# Uncomment following two lines to configure a build against a compat-wireless tree
+	#COMPAT_WIRELESS ?= "/path/to/compat-wireless"
+	#LINUX_KARCH ?= $(shell make -pn -C $(KERNELDIR) asm-generic |grep SRCARCH |head -1 |awk '{print $$3}')
 	
 all:
+ifndef COMPAT_WIRELESS
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) $(EXTRA_KCONFIG) EXTRA_CFLAGS="$(EXTRA_CFLAGS) -DACX_GIT_VERSION=\\\"$(ACX_GIT_VERSION)\\\"" modules
+else
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) $(EXTRA_KCONFIG) EXTRA_CFLAGS="$(EXTRA_CFLAGS) -DACX_GIT_VERSION=\\\"$(ACX_GIT_VERSION)\\\"" \
+		LINUXINCLUDE="-I$(COMPAT_WIRELESS)/include -I$(KERNELDIR)/include \
+			-Iarch/$(LINUX_KARCH)/include \
+			-include generated/autoconf.h \
+			-include linux/compat.h" \
+		modules
+endif
 
 install:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules_install
