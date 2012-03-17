@@ -153,6 +153,13 @@ static int acx1xx_get_rate_fallback(acx_device_t *adev);
 static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto);
 #endif
 
+static int acx1xx_update_tx(acx_device_t *adev);
+#ifdef UNUSED
+static int acx1xx_set_channel(acx_device_t *adev, u8 channel);
+static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
+#endif
+
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2354,26 +2361,8 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_TX) {
-		/* set Tx */
-		log(L_DEBUG, "acx: updating TX: %s\n",
-		    adev->tx_disabled ? "disable" : "enable");
-		if (adev->tx_disabled)
-			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
-		else {
-			acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX,
-					&adev->channel, 1);
-
-			/* OW 20091231:
-			 * For the acx111 encryption needs to be turned off
-			 * using FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER.
-			 * Maybe redundant with GETSET_MODE below.
-			 */
-//			if (IS_ACX111(adev)) {
-//				acx111_s_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-//			}
-
-			acx_wake_queue(adev->ieee, NULL);
-		}
+		acx1xx_update_tx(adev);
+		acx_wake_queue(adev->ieee, NULL);
 		CLEAR_BIT(adev->set_mask, GETSET_TX);
 	}
 
@@ -3434,6 +3423,45 @@ static int acx1xx_update_rate_fallback(acx_device_t *adev)
 	return res;
 }
 
+#ifdef UNUSED
+static int acx1xx_set_channel(acx_device_t *adev, u8 channel)
+{
+	int res;
+	FN_ENTER;
+	adev->channel = channel;
+	res = acx1xx_update_tx(adev);
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled)
+{
+	int res;
+	FN_ENTER;
+	adev->tx_enabled = tx_enabled;
+	res = acx1xx_update_tx(adev);
+	FN_EXIT0;
+	return res;
+}
+#endif
+
+static int acx1xx_update_tx(acx_device_t *adev)
+{
+	int res;
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating TX: %s, channel=%d\n",
+		adev->tx_enabled ? "enable" : "disable", adev->channel);
+
+	if (adev->tx_enabled)
+		res = acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1);
+	else
+		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+
+	FN_EXIT0;
+	return res;
+}
+
 
 
 /*
@@ -4317,12 +4345,12 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	seq_printf(file, "tx_queue len: %d\n", skb_queue_len(&adev->tx_queue));
 
 	seq_printf(file, "\n" "** PHY status **\n"
-		     "tx_disabled %d, tx_level_dbm %d, tx_level_val %d,\n "/* "tx_level_auto %d\n" */
+		     "tx_enabled %d, tx_level_dbm %d, tx_level_val %d,\n "/* "tx_level_auto %d\n" */
 		     "sensitivity %d, antenna[0,1] 0x%02X 0x%02X, ed_threshold %d, cca %d, preamble_mode %d\n"
 		     "rate_basic 0x%04X, rate_oper 0x%04X\n"
 		     "rts_threshold %d, frag_threshold %d, short_retry %d, long_retry %d\n"
 		     "msdu_lifetime %d, listen_interval %d, beacon_interval %d\n",
-		     adev->tx_disabled, adev->tx_level_dbm,	adev->tx_level_val, /* adev->tx_level_auto, */
+		     adev->tx_enabled, adev->tx_level_dbm,	adev->tx_level_val, /* adev->tx_level_auto, */
 		     adev->sensitivity, adev->antenna[0], adev->antenna[1], adev->ed_threshold,
 		     adev->cca, adev->preamble_mode, adev->rate_basic, adev->rate_oper, adev->rts_threshold,
 		     adev->frag_threshold, adev->short_retry, adev->long_retry,
@@ -6591,7 +6619,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed) {
 
 		acx_selectchannel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
-		adev->tx_disabled = 0;
+		adev->tx_enabled = 1;
 
 		acx_update_card_settings(adev);
 
