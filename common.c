@@ -131,6 +131,14 @@ static int acx1xx_update_station_id(acx_device_t *adev);
 static int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr);
 static int acx1xx_get_station_id(acx_device_t *adev);
 
+static int acx1xx_get_ed_threshold(acx_device_t *adev);
+static int acx100_get_ed_threshold(acx_device_t *adev);
+static int acx100_update_ed_threshold(acx_device_t *adev);
+static int acx1xx_update_ed_threshold(acx_device_t *adev);
+#ifdef UNUSED
+static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold);
+#endif
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2183,19 +2191,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->get_mask & GETSET_ED_THRESH) {
-		if (IS_ACX100(adev)) {
-			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
-
-			memset(ed_threshold, 0, sizeof(ed_threshold));
-			acx_interrogate(adev, ed_threshold,
-					  ACX100_IE_DOT11_ED_THRESHOLD);
-			adev->ed_threshold = ed_threshold[4];
-		} else {
-			log(L_INIT, "acx: acx111 doesn't support ED\n");
-			adev->ed_threshold = 0;
-		}
-		log(L_INIT, "acx: got Energy Detect (ED) threshold %u\n",
-		    adev->ed_threshold);
+		acx1xx_get_ed_threshold(adev);
 		CLEAR_BIT(adev->get_mask, GETSET_ED_THRESH);
 	}
 
@@ -2327,17 +2323,7 @@ void acx_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_ED_THRESH) {
 		/* ed_threshold */
-		log(L_INIT, "acx: pdating the Energy Detect (ED) threshold: %u\n",
-		    adev->ed_threshold);
-		if (IS_ACX100(adev)) {
-			u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
-
-			memset(ed_threshold, 0, sizeof(ed_threshold));
-			ed_threshold[4] = adev->ed_threshold;
-			acx_configure(adev, &ed_threshold,
-					ACX100_IE_DOT11_ED_THRESHOLD);
-		} else
-			log(L_INIT, "acx: acx111 doesn't support ED\n");
+		acx1xx_update_ed_threshold(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
 	}
 
@@ -3258,6 +3244,89 @@ static int acx1xx_update_station_id(acx_device_t *adev)
 	FN_EXIT0;
 	return res;
 }
+
+static int acx1xx_get_ed_threshold(acx_device_t *adev)
+{
+	int res=NOT_OK;
+
+	FN_ENTER;
+
+	if (IS_ACX100(adev)) {
+		res=acx100_get_ed_threshold(adev);
+	} else {
+		log(L_INIT, "acx: acx111 doesn't support ED\n");
+		adev->ed_threshold = 0;
+	}
+
+	log(L_INIT, "acx: Got Energy Detect (ED) threshold %u\n",
+	    adev->ed_threshold);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx100_get_ed_threshold(acx_device_t *adev)
+{
+	int res;
+	u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+
+	FN_ENTER;
+	memset(ed_threshold, 0, sizeof(ed_threshold));
+	res=acx_interrogate(adev, ed_threshold,
+			  ACX100_IE_DOT11_ED_THRESHOLD);
+	adev->ed_threshold = ed_threshold[4];
+
+	FN_EXIT0;
+	return res;
+}
+
+#ifdef UNUSED
+static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold)
+{
+	int res;
+
+	FN_ENTER;
+	adev->ed_threshold=ed_threshold;
+	res=acx1xx_update_ed_threshold(adev);
+
+	FN_EXIT0;
+	return res;
+}
+#endif
+
+static int acx1xx_update_ed_threshold(acx_device_t *adev)
+{
+	int res=NOT_OK;
+
+	FN_ENTER;
+	log(L_INIT, "acx: Updating the Energy Detect (ED) threshold: %u\n",
+	    adev->ed_threshold);
+
+	if (IS_ACX100(adev)) {
+		res=acx100_update_ed_threshold(adev);
+	} else {
+		log(L_INIT, "acx: acx111 doesn't support ED threshold\n");
+	}
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx100_update_ed_threshold(acx_device_t *adev)
+{
+	int res;
+	u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+
+	FN_ENTER;
+	memset(ed_threshold, 0, sizeof(ed_threshold));
+	ed_threshold[4] = adev->ed_threshold;
+	res=acx_configure(adev, &ed_threshold,
+			ACX100_IE_DOT11_ED_THRESHOLD);
+
+	FN_EXIT0;
+	return res;
+}
+
 
 
 /*
