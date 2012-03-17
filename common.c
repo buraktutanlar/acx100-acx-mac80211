@@ -139,6 +139,14 @@ static int acx1xx_update_ed_threshold(acx_device_t *adev);
 static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold);
 #endif
 
+static int acx1xx_get_cca(acx_device_t *adev);
+static int acx100_get_cca(acx_device_t *adev);
+static int acx1xx_update_cca(acx_device_t *adev);
+static int acx100_update_cca(acx_device_t *adev);
+#ifdef UNUSED
+static int acx1xx_set_cca(acx_device_t *adev, u8 cca);
+#endif
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2196,19 +2204,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->get_mask & GETSET_CCA) {
-		if (IS_ACX100(adev)) {
-			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
-
-			memset(cca, 0, sizeof(adev->cca));
-			acx_interrogate(adev, cca,
-					  ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
-			adev->cca = cca[4];
-		} else {
-			log(L_INIT, "acx: acx111 doesn't support CCA\n");
-			adev->cca = 0;
-		}
-		log(L_INIT, "acx: got Channel Clear Assessment (CCA) value %u\n",
-		    adev->cca);
+		acx1xx_get_cca(adev);
 		CLEAR_BIT(adev->get_mask, GETSET_CCA);
 	}
 
@@ -2329,17 +2325,7 @@ void acx_update_card_settings(acx_device_t *adev)
 
 	if (adev->set_mask & GETSET_CCA) {
 		/* CCA value */
-		log(L_INIT, "acx: updating the Channel Clear Assessment "
-		    "(CCA) value: 0x%02X\n", adev->cca);
-		if (IS_ACX100(adev)) {
-			u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
-
-			memset(cca, 0, sizeof(cca));
-			cca[4] = adev->cca;
-			acx_configure(adev, &cca,
-					ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
-		} else
-			log(L_INIT, "acx: acx111 doesn't support CCA\n");
+		acx1xx_update_cca(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_CCA);
 	}
 
@@ -3322,6 +3308,86 @@ static int acx100_update_ed_threshold(acx_device_t *adev)
 	ed_threshold[4] = adev->ed_threshold;
 	res=acx_configure(adev, &ed_threshold,
 			ACX100_IE_DOT11_ED_THRESHOLD);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_get_cca(acx_device_t *adev)
+{
+	int res = NOT_OK;
+
+	FN_ENTER;
+	if (IS_ACX100(adev)) {
+		acx100_get_cca(adev);
+	} else {
+		log(L_INIT, "acx: acx111 doesn't support CCA\n");
+		adev->cca = 0;
+	}log(
+	                L_INIT,
+	                "acx: Got Channel Clear Assessment (CCA) value %u\n", adev->cca);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx100_get_cca(acx_device_t *adev)
+{
+	int res;
+	u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+	FN_ENTER;
+
+	memset(cca, 0, sizeof(cca));
+	res = acx_interrogate(adev, cca,
+			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
+	adev->cca = cca[4];
+	FN_EXIT0;
+
+	return res;
+}
+
+#ifdef UNUSED
+static int acx1xx_set_cca(acx_device_t *adev, u8 cca)
+{
+	int res;
+
+	FN_ENTER;
+
+	adev->cca=cca;
+	res=acx1xx_update_cca(adev);
+
+	FN_EXIT0;
+	return res;
+}
+#endif
+
+static int acx1xx_update_cca(acx_device_t *adev)
+{
+	int res = NOT_OK;
+
+	FN_ENTER;
+	log(L_INIT, "acx: updating the Channel Clear Assessment "
+	"(CCA) value: 0x%02X\n", adev->cca);
+	if (IS_ACX100(adev)) {
+		res = acx100_update_cca(adev);
+	} else
+		log(L_INIT, "acx: acx111 doesn't support CCA\n");
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx100_update_cca(acx_device_t *adev)
+{
+	int res;
+	u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+
+	FN_ENTER;
+
+	memset(cca, 0, sizeof(cca));
+	cca[4] = adev->cca;
+	res = acx_configure(adev, &cca,
+			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 
 	FN_EXIT0;
 	return res;
