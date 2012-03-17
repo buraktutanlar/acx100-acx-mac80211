@@ -147,6 +147,12 @@ static int acx100_update_cca(acx_device_t *adev);
 static int acx1xx_set_cca(acx_device_t *adev, u8 cca);
 #endif
 
+static int acx1xx_update_rate_fallback(acx_device_t *adev);
+#ifdef UNUSED
+static int acx1xx_get_rate_fallback(acx_device_t *adev);
+static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto);
+#endif
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2294,14 +2300,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_RATE_FALLBACK) {
-		u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
-
-		/* configure to not do fallbacks when not in auto rate mode */
-		rate[4] =
-		    (adev->
-		     rate_auto) ? /* adev->txrate_fallback_retries */ 1 : 0;
-		log(L_INIT, "acx: updating Tx fallback to %u retries\n", rate[4]);
-		acx_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
+		acx1xx_update_rate_fallback(adev);
 		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
 	}
 
@@ -3389,6 +3388,48 @@ static int acx100_update_cca(acx_device_t *adev)
 	res = acx_configure(adev, &cca,
 			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 
+	FN_EXIT0;
+	return res;
+}
+
+#ifdef UNUSED
+static int acx1xx_get_rate_fallback(acx_device_t *adev)
+{
+	int res=NOT_OK;
+	u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
+
+	FN_ENTER;
+	memset(rate, 0, sizeof(rate));
+	res=acx_interrogate(adev, &rate,
+			ACX1xx_IE_RATE_FALLBACK);
+	adev->rate_auto = rate[4];
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto)
+{
+	int res;
+	FN_ENTER;
+	adev->rate_auto = rate_auto;
+	res=acx1xx_update_rate_fallback(adev);
+	FN_EXIT0;
+	return res;
+}
+#endif
+
+static int acx1xx_update_rate_fallback(acx_device_t *adev)
+{
+	int res;
+	u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
+
+	FN_ENTER;
+	/* configure to not do fallbacks when not in auto rate mode */
+	rate[4] = (adev->rate_auto) ? /* adev->txrate_fallback_retries */1 : 0;
+	log(L_INIT, "acx: Updating Tx fallback to %u retries\n", rate[4]);
+
+	res = acx_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
 	FN_EXIT0;
 	return res;
 }
