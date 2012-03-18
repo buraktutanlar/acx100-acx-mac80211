@@ -165,6 +165,8 @@ static int acx_update_rx_config(acx_device_t *adev);
 static int acx1xx_update_retry(acx_device_t *adev);
 static int acx1xx_update_msdu_lifetime(acx_device_t *adev);
 
+static int acx_update_wep(acx_device_t *adev);
+
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -2451,32 +2453,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_WEP) {
-		/* encode */
-
-		ie_dot11WEPDefaultKeyID_t dkey;
-#ifdef DEBUG_WEP
-		struct {
-			u16 type;
-			u16 len;
-			u8 val;
-		} ACX_PACKED keyindic;
-#endif
-		log(L_INIT, "acx: updating WEP key settings\n");
-
-		acx_set_wepkey(adev);
-		if (adev->wep_enabled) {
-			dkey.KeyID = adev->wep_current_index;
-			log(L_INIT, "acx: setting WEP key %u as default\n",
-			    dkey.KeyID);
-			acx_configure(adev, &dkey,
-					ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
-#ifdef DEBUG_WEP
-			keyindic.val = 3;
-			acx_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
-#endif
-		}
-
-//		start_scan = 1;
+		acx_update_wep(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_WEP);
 	}
 
@@ -3587,6 +3564,38 @@ static int acx_update_rx_config(acx_device_t *adev)
 
 	FN_EXIT0;
 
+	return res;
+}
+
+static int acx_update_wep(acx_device_t *adev)
+{
+	int res=NOT_OK;
+	ie_dot11WEPDefaultKeyID_t dkey;
+
+	FN_ENTER;
+
+#ifdef DEBUG_WEP
+	struct {
+		u16 type;
+		u16 len;
+		u8 val;
+	} ACX_PACKED keyindic;
+#endif
+	log(L_INIT, "acx: updating WEP key settings\n");
+
+	acx_set_wepkey(adev);
+	if (adev->wep_enabled) {
+		dkey.KeyID = adev->wep_current_index;
+		log(L_INIT, "acx: setting WEP key %u as default\n", dkey.KeyID);
+		res = acx_configure(adev, &dkey,
+				ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
+#ifdef DEBUG_WEP
+		keyindic.val = 3;
+		acx_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
+#endif
+	}
+
+	FN_EXIT0;
 	return res;
 }
 
