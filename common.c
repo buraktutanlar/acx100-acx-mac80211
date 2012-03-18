@@ -160,9 +160,11 @@ static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 #endif
 
 static int acx1xx_update_rx(acx_device_t *adev);
+static int acx_update_rx_config(acx_device_t *adev);
 
 static int acx1xx_update_retry(acx_device_t *adev);
 static int acx1xx_update_msdu_lifetime(acx_device_t *adev);
+
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -231,7 +233,6 @@ int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
 #endif
 
 // Rx Path
-static void acx_initialize_rx_config(acx_device_t * adev);
 void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf);
 static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
@@ -2087,7 +2088,7 @@ void acx_set_defaults(acx_device_t * adev)
 #endif
 	    ;
 
-	acx_initialize_rx_config(adev);
+	acx_update_rx_config(adev);
 
 	FN_EXIT0;
 }
@@ -2434,7 +2435,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_RXCONFIG) {
-		acx_initialize_rx_config(adev);
+		acx_update_rx_config(adev);
 		CLEAR_BIT(adev->set_mask, SET_RXCONFIG);
 	}
 
@@ -3493,6 +3494,99 @@ static int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 	res=acx_configure(adev, &xmt_msdu_lifetime,
 	                ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
 	FN_EXIT0;
+	return res;
+}
+
+static int acx_update_rx_config(acx_device_t *adev)
+{
+	int res;
+	struct {
+		u16 id;
+		u16 len;
+		u16 rx_cfg1;
+		u16 rx_cfg2;
+	} ACX_PACKED cfg;
+
+	FN_ENTER;
+
+	switch (adev->mode) {
+	case ACX_MODE_MONITOR:
+		adev->rx_config_1 = (u16) (0
+		   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
+		   /* | RX_CFG1_FILTER_SSID        */
+		   /* | RX_CFG1_FILTER_BCAST       */
+		   /* | RX_CFG1_RCV_MC_ADDR1       */
+		   /* | RX_CFG1_RCV_MC_ADDR0       */
+		   /* | RX_CFG1_FILTER_ALL_MULTI   */
+		   /* | RX_CFG1_FILTER_BSSID       */
+		   /* | RX_CFG1_FILTER_MAC         */
+		   | RX_CFG1_RCV_PROMISCUOUS
+		   | RX_CFG1_INCLUDE_FCS
+		   /* | RX_CFG1_INCLUDE_PHY_HDR    */
+		   );
+		adev->rx_config_2 = (u16) (0
+		   | RX_CFG2_RCV_ASSOC_REQ
+		   | RX_CFG2_RCV_AUTH_FRAMES
+		   | RX_CFG2_RCV_BEACON_FRAMES
+		   | RX_CFG2_RCV_CONTENTION_FREE
+		   | RX_CFG2_RCV_CTRL_FRAMES
+		   | RX_CFG2_RCV_DATA_FRAMES
+		   | RX_CFG2_RCV_BROKEN_FRAMES
+		   | RX_CFG2_RCV_MGMT_FRAMES
+		   | RX_CFG2_RCV_PROBE_REQ
+		   | RX_CFG2_RCV_PROBE_RESP
+		   | RX_CFG2_RCV_ACK_FRAMES
+		   | RX_CFG2_RCV_OTHER
+		   );
+		break;
+	default:
+		adev->rx_config_1 = (u16) (0
+		   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
+		   /* | RX_CFG1_FILTER_SSID        */
+		   /* | RX_CFG1_FILTER_BCAST       */
+		   /* | RX_CFG1_RCV_MC_ADDR1       */
+		   /* | RX_CFG1_RCV_MC_ADDR0       */
+		   /* | RX_CFG1_FILTER_ALL_MULTI   */
+		   /* | RX_CFG1_FILTER_BSSID       */
+		   | RX_CFG1_FILTER_MAC
+		   /* | RX_CFG1_RCV_PROMISCUOUS    */
+		   /* | RX_CFG1_INCLUDE_FCS        */
+		   /* | RX_CFG1_INCLUDE_PHY_HDR    */
+		   );
+		adev->rx_config_2 = (u16) (0
+		   | RX_CFG2_RCV_ASSOC_REQ
+		   | RX_CFG2_RCV_AUTH_FRAMES
+		   | RX_CFG2_RCV_BEACON_FRAMES
+		   | RX_CFG2_RCV_CONTENTION_FREE
+		   | RX_CFG2_RCV_CTRL_FRAMES
+		   | RX_CFG2_RCV_DATA_FRAMES
+		   /*| RX_CFG2_RCV_BROKEN_FRAMES   */
+		   | RX_CFG2_RCV_MGMT_FRAMES
+		   | RX_CFG2_RCV_PROBE_REQ
+		   | RX_CFG2_RCV_PROBE_RESP
+		   /*| RX_CFG2_RCV_ACK_FRAMES*/
+		   | RX_CFG2_RCV_OTHER
+		   );
+		break;
+	}
+
+	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
+
+	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR)
+	                || (adev->firmware_numver >= 0x02000000))
+		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
+	else
+		adev->phy_header_len = 0;
+
+	log(L_INIT, "acx: Updating RXconfig to mode=0x%04X, rx_config_1:2=%04X:%04X\n",
+	    adev->mode, adev->rx_config_1, adev->rx_config_2);
+
+	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
+	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
+	res = acx_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
+
+	FN_EXIT0;
+
 	return res;
 }
 
@@ -5209,87 +5303,6 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
  * BOM Rx Path
  * ==================================================
  */
-static void acx_initialize_rx_config(acx_device_t * adev)
-{
-	struct {
-		u16 id;
-		u16 len;
-		u16 rx_cfg1;
-		u16 rx_cfg2;
-	} ACX_PACKED cfg;
-
-	switch (adev->mode) {
-	case ACX_MODE_MONITOR:
-		adev->rx_config_1 = (u16) (0
-					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
-					   /* | RX_CFG1_FILTER_SSID        */
-					   /* | RX_CFG1_FILTER_BCAST       */
-					   /* | RX_CFG1_RCV_MC_ADDR1       */
-					   /* | RX_CFG1_RCV_MC_ADDR0       */
-					   /* | RX_CFG1_FILTER_ALL_MULTI   */
-					   /* | RX_CFG1_FILTER_BSSID       */
-					   /* | RX_CFG1_FILTER_MAC         */
-					   | RX_CFG1_RCV_PROMISCUOUS
-					   | RX_CFG1_INCLUDE_FCS
-					   /* | RX_CFG1_INCLUDE_PHY_HDR    */
-		    );
-		adev->rx_config_2 = (u16) (0
-					   | RX_CFG2_RCV_ASSOC_REQ
-					   | RX_CFG2_RCV_AUTH_FRAMES
-					   | RX_CFG2_RCV_BEACON_FRAMES
-					   | RX_CFG2_RCV_CONTENTION_FREE
-					   | RX_CFG2_RCV_CTRL_FRAMES
-					   | RX_CFG2_RCV_DATA_FRAMES
-					   | RX_CFG2_RCV_BROKEN_FRAMES
-					   | RX_CFG2_RCV_MGMT_FRAMES
-					   | RX_CFG2_RCV_PROBE_REQ
-					   | RX_CFG2_RCV_PROBE_RESP
-					   | RX_CFG2_RCV_ACK_FRAMES
-					   | RX_CFG2_RCV_OTHER);
-		break;
-	default:
-		adev->rx_config_1 = (u16) (0
-					   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
-					   /* | RX_CFG1_FILTER_SSID        */
-					   /* | RX_CFG1_FILTER_BCAST       */
-					   /* | RX_CFG1_RCV_MC_ADDR1       */
-					   /* | RX_CFG1_RCV_MC_ADDR0       */
-					   /* | RX_CFG1_FILTER_ALL_MULTI   */
-					   /* | RX_CFG1_FILTER_BSSID       */
-					   | RX_CFG1_FILTER_MAC
-					   /* | RX_CFG1_RCV_PROMISCUOUS    */
-					   /* | RX_CFG1_INCLUDE_FCS        */
-					   /* | RX_CFG1_INCLUDE_PHY_HDR    */
-		    );
-		adev->rx_config_2 = (u16) (0
-					   | RX_CFG2_RCV_ASSOC_REQ
-					   | RX_CFG2_RCV_AUTH_FRAMES
-					   | RX_CFG2_RCV_BEACON_FRAMES
-					   | RX_CFG2_RCV_CONTENTION_FREE
-					   | RX_CFG2_RCV_CTRL_FRAMES
-					   | RX_CFG2_RCV_DATA_FRAMES
-					   /*| RX_CFG2_RCV_BROKEN_FRAMES   */
-					   | RX_CFG2_RCV_MGMT_FRAMES
-					   | RX_CFG2_RCV_PROBE_REQ
-					   | RX_CFG2_RCV_PROBE_RESP
-					   /*| RX_CFG2_RCV_ACK_FRAMES*/
-					   | RX_CFG2_RCV_OTHER);
-		break;
-	}
-	adev->rx_config_1 |= RX_CFG1_INCLUDE_RXBUF_HDR;
-
-	if ((adev->rx_config_1 & RX_CFG1_INCLUDE_PHY_HDR)
-	    || (adev->firmware_numver >= 0x02000000))
-		adev->phy_header_len = IS_ACX111(adev) ? 8 : 4;
-	else
-		adev->phy_header_len = 0;
-
-	log(L_DEBUG, "acx: setting RXconfig to %04X:%04X\n",
-	    adev->rx_config_1, adev->rx_config_2);
-	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
-	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
-	acx_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
-}
 
 /*
  * acx_l_process_rxbuf
