@@ -161,6 +161,8 @@ static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 
 static int acx1xx_update_rx(acx_device_t *adev);
 
+static int acx1xx_update_retry(acx_device_t *adev);
+
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
@@ -2373,18 +2375,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_RETRY) {
-		u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
-		u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
-
-		log(L_INIT,
-		    "acx: updating the short retry limit: %u, long retry limit: %u\n",
-		    adev->short_retry, adev->long_retry);
-		short_retry[0x4] = adev->short_retry;
-		long_retry[0x4] = adev->long_retry;
-		acx_configure(adev, &short_retry,
-				ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT);
-		acx_configure(adev, &long_retry,
-				ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
+		acx1xx_update_retry(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_RETRY);
 	}
 
@@ -3471,6 +3462,27 @@ static int acx1xx_update_rx(acx_device_t *adev)
 		res = acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
 	else
 		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_update_retry(acx_device_t *adev)
+{
+	int res;
+	u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
+	u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
+
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating the short retry limit: %u, long retry limit: %u\n",
+			adev->short_retry, adev->long_retry);
+	short_retry[0x4] = adev->short_retry;
+	long_retry[0x4] = adev->long_retry;
+	res = acx_configure(adev, &short_retry,
+			ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT);
+	res += acx_configure(adev, &long_retry,
+			ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
 
 	FN_EXIT0;
 	return res;
