@@ -162,6 +162,7 @@ static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 static int acx1xx_update_rx(acx_device_t *adev);
 
 static int acx1xx_update_retry(acx_device_t *adev);
+static int acx1xx_update_msdu_lifetime(acx_device_t *adev);
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -2380,15 +2381,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_MSDU_LIFETIME) {
-		u8 xmt_msdu_lifetime[4 +
-				     ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
-
-		log(L_INIT, "acx: updating the tx MSDU lifetime: %u\n",
-		    adev->msdu_lifetime);
-		*(u32 *) & xmt_msdu_lifetime[4] =
-		    cpu_to_le32((u32) adev->msdu_lifetime);
-		acx_configure(adev, &xmt_msdu_lifetime,
-				ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
+		acx1xx_update_msdu_lifetime(adev);
 		CLEAR_BIT(adev->set_mask, SET_MSDU_LIFETIME);
 	}
 
@@ -3487,6 +3480,22 @@ static int acx1xx_update_retry(acx_device_t *adev)
 	FN_EXIT0;
 	return res;
 }
+
+static int acx1xx_update_msdu_lifetime(acx_device_t *adev)
+{
+	int res=NOT_OK;
+	u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating the tx MSDU lifetime: %u\n", adev->msdu_lifetime);
+
+	*(u32 *) &xmt_msdu_lifetime[4] = cpu_to_le32((u32) adev->msdu_lifetime);
+	res=acx_configure(adev, &xmt_msdu_lifetime,
+	                ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
+	FN_EXIT0;
+	return res;
+}
+
 
 
 
