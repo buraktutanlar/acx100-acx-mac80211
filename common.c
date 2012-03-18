@@ -166,7 +166,8 @@ static int acx1xx_update_retry(acx_device_t *adev);
 static int acx1xx_update_msdu_lifetime(acx_device_t *adev);
 
 static int acx_update_wep(acx_device_t *adev);
-
+static int acx_update_wep_options(acx_device_t *adev);
+static int acx100_update_wep_options(acx_device_t *adev);
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -2458,29 +2459,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & SET_WEP_OPTIONS) {
-		acx100_ie_wep_options_t options;
-
-		if (IS_ACX111(adev)) {
-			log(L_DEBUG,
-			    "acx: setting WEP Options for acx111 is not supported\n");
-		} else {
-			log(L_INIT, "acx: setting WEP Options\n");
-
-			/* let's choose maximum setting: 4 default keys,
-			 * plus 10 other keys: */
-			options.NumKeys =
-			    cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
-			/* don't decrypt default key only,
-			 * don't override decryption: */
-			options.WEPOption = 0;
-			if (adev->mode == ACX_MODE_3_AP) {
-				/* don't decrypt default key only,
-				 * override decryption mechanism: */
-				options.WEPOption = 2;
-			}
-
-			acx_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
-		}
+		acx_update_wep_options(adev);
 		CLEAR_BIT(adev->set_mask, SET_WEP_OPTIONS);
 	}
 
@@ -3599,6 +3578,47 @@ static int acx_update_wep(acx_device_t *adev)
 	return res;
 }
 
+static int acx_update_wep_options(acx_device_t *adev)
+{
+	int res=NOT_OK;
+
+	FN_ENTER;
+
+	if (IS_ACX111(adev))
+		log(L_DEBUG, "acx: setting WEP Options for acx111 is not supported\n");
+	else
+		res = acx100_update_wep_options(adev);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx100_update_wep_options(acx_device_t *adev)
+{
+	int res=NOT_OK;
+	acx100_ie_wep_options_t options;
+
+	FN_ENTER;
+	log(L_INIT, "acx100: setting WEP Options\n");
+
+	/* let's choose maximum setting: 4 default keys,
+	 * plus 10 other keys: */
+	options.NumKeys =
+	    cpu_to_le16(DOT11_MAX_DEFAULT_WEP_KEYS + 10);
+	/* don't decrypt default key only,
+	 * don't override decryption: */
+	options.WEPOption = 0;
+	if (adev->mode == ACX_MODE_3_AP) {
+		/* don't decrypt default key only,
+		 * override decryption mechanism: */
+		options.WEPOption = 2;
+	}
+
+	res = acx_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
+
+	FN_EXIT0;
+	return res;
+}
 
 
 
