@@ -159,6 +159,7 @@ static int acx1xx_set_channel(acx_device_t *adev, u8 channel);
 static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 #endif
 
+static int acx1xx_update_rx(acx_device_t *adev);
 
 // Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
@@ -2367,11 +2368,7 @@ void acx_update_card_settings(acx_device_t *adev)
 	}
 
 	if (adev->set_mask & GETSET_RX) {
-		// OW TODO Add Disable Rx
-		/* Enable Rx */
-		log(L_DEBUG, "acx: updating: enable Rx on channel: %u\n",
-		    adev->channel);
-		acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
+		acx1xx_update_rx(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_RX);
 	}
 
@@ -3457,6 +3454,23 @@ static int acx1xx_update_tx(acx_device_t *adev)
 		res = acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_TX, &adev->channel, 1);
 	else
 		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+
+	FN_EXIT0;
+	return res;
+}
+
+static int acx1xx_update_rx(acx_device_t *adev)
+{
+	int res;
+	FN_ENTER;
+
+	log(L_INIT, "acx: Updating RX: %s, channel=%d\n",
+		adev->rx_enabled ? "enable" : "disable", adev->channel);
+
+	if (adev->rx_enabled)
+		res = acx_issue_cmd(adev, ACX1xx_CMD_ENABLE_RX, &adev->channel, 1);
+	else
+		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 
 	FN_EXIT0;
 	return res;
@@ -6620,6 +6634,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed) {
 		acx_selectchannel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
 		adev->tx_enabled = 1;
+		adev->rx_enabled = 1;
 
 		acx_update_card_settings(adev);
 
