@@ -99,12 +99,6 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // Configuration (Control Path)
 void acx_set_defaults(acx_device_t * adev);
-static void acx_get_sensitivity(acx_device_t *adev);
-static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity);
-static void acx_update_sensitivity(acx_device_t *adev);
-static void acx_get_reg_domain(acx_device_t *adev);
-static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id);
-static void acx_update_reg_domain(acx_device_t *adev);
 void acx_update_card_settings(acx_device_t *adev);
 void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
@@ -112,6 +106,13 @@ int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 static void acx_select_opmode(acx_device_t *adev);
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
+
+static void acx_get_sensitivity(acx_device_t *adev);
+static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity);
+static void acx_update_sensitivity(acx_device_t *adev);
+static void acx_get_reg_domain(acx_device_t *adev);
+static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id);
+static void acx_update_reg_domain(acx_device_t *adev);
 
 static int acx1xx_set_tx_level_dbm(acx_device_t *adev, int level_dbm);
 static int acx1xx_update_tx_level_dbm(acx_device_t *adev);
@@ -2096,80 +2097,6 @@ void acx_set_defaults(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-static void acx_get_sensitivity(acx_device_t *adev)
-{
-
-	if ( (RADIO_11_RFMD == adev->radio_type) ||
-		 (RADIO_0D_MAXIM_MAX2820	== adev->radio_type) ||
-		 (RADIO_15_RALINK == adev->radio_type))
-	{
-		acx_read_phy_reg(adev, 0x30, &adev->sensitivity);
-	} else {
-		log(L_INIT, "acx: don't know how to get sensitivity "
-				"for radio type 0x%02X\n", adev->radio_type);
-		return;
-	}
-
-	log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
-}
-
-static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity)
-{
-	adev->sensitivity = sensitivity;
-	acx_update_sensitivity(adev);
-}
-
-
-static void acx_update_sensitivity(acx_device_t *adev)
-{
-
-	if (IS_USB(adev) && IS_ACX100(adev)){
-		log(L_ANY, "acx: Updating sensitivity on usb acx100 doesn't work yet.\n");
-		return;
-	}
-
-	log(L_INIT, "acx: updating sensitivity value: %u\n",
-			adev->sensitivity);
-	switch (adev->radio_type) {
-	case RADIO_0D_MAXIM_MAX2820:
-	case RADIO_11_RFMD:
-	case RADIO_15_RALINK:
-		acx_write_phy_reg(adev, 0x30, adev->sensitivity);
-		break;
-	case RADIO_16_RADIA_RC2422:
-	case RADIO_17_UNKNOWN:
-		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
-		acx111_sens_radio_16_17(adev);
-		break;
-	default:
-		log(L_INIT, "acx: don't know how to modify the sensitivity "
-				"for radio type 0x%02X\n", adev->radio_type);
-	}
-
-}
-
-static void acx_get_reg_domain(acx_device_t *adev)
-{
-	acx_ie_generic_t dom;
-
-	acx_interrogate(adev, &dom,
-			  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
-	adev->reg_dom_id = dom.m.bytes[0];
-	log(L_INIT, "acx: Got regulatory domain 0x%02X\n", adev->reg_dom_id);
-}
-
-static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id)
-{
-	adev->reg_dom_id = domain_id;
-	acx_update_reg_domain(adev);
-}
-
-static void acx_update_reg_domain(acx_device_t *adev)
-{
-	log(L_INIT, "acx: Updating the regulatory domain: 0x%02X\n",
-	    adev->reg_dom_id);
-	acx_set_sane_reg_domain(adev, 1);
-}
 
 /*
  * acx_s_update_card_settings
@@ -2688,6 +2615,81 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 
 	FN_EXIT1(result);
 	return result;
+}
+
+static void acx_get_sensitivity(acx_device_t *adev)
+{
+
+	if ( (RADIO_11_RFMD == adev->radio_type) ||
+		 (RADIO_0D_MAXIM_MAX2820	== adev->radio_type) ||
+		 (RADIO_15_RALINK == adev->radio_type))
+	{
+		acx_read_phy_reg(adev, 0x30, &adev->sensitivity);
+	} else {
+		log(L_INIT, "acx: don't know how to get sensitivity "
+				"for radio type 0x%02X\n", adev->radio_type);
+		return;
+	}
+
+	log(L_INIT, "acx: got sensitivity value %u\n", adev->sensitivity);
+}
+
+static void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity)
+{
+	adev->sensitivity = sensitivity;
+	acx_update_sensitivity(adev);
+}
+
+
+static void acx_update_sensitivity(acx_device_t *adev)
+{
+
+	if (IS_USB(adev) && IS_ACX100(adev)){
+		log(L_ANY, "acx: Updating sensitivity on usb acx100 doesn't work yet.\n");
+		return;
+	}
+
+	log(L_INIT, "acx: updating sensitivity value: %u\n",
+			adev->sensitivity);
+	switch (adev->radio_type) {
+	case RADIO_0D_MAXIM_MAX2820:
+	case RADIO_11_RFMD:
+	case RADIO_15_RALINK:
+		acx_write_phy_reg(adev, 0x30, adev->sensitivity);
+		break;
+	case RADIO_16_RADIA_RC2422:
+	case RADIO_17_UNKNOWN:
+		/* TODO: check whether RADIO_1B (ex-Radia!) has same behaviour */
+		acx111_sens_radio_16_17(adev);
+		break;
+	default:
+		log(L_INIT, "acx: don't know how to modify the sensitivity "
+				"for radio type 0x%02X\n", adev->radio_type);
+	}
+
+}
+
+static void acx_get_reg_domain(acx_device_t *adev)
+{
+	acx_ie_generic_t dom;
+
+	acx_interrogate(adev, &dom,
+			  ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN);
+	adev->reg_dom_id = dom.m.bytes[0];
+	log(L_INIT, "acx: Got regulatory domain 0x%02X\n", adev->reg_dom_id);
+}
+
+static void acx_set_reg_domain(acx_device_t *adev, u8 domain_id)
+{
+	adev->reg_dom_id = domain_id;
+	acx_update_reg_domain(adev);
+}
+
+static void acx_update_reg_domain(acx_device_t *adev)
+{
+	log(L_INIT, "acx: Updating the regulatory domain: 0x%02X\n",
+	    adev->reg_dom_id);
+	acx_set_sane_reg_domain(adev, 1);
 }
 
 static int acx1xx_set_tx_level_dbm(acx_device_t *adev, int level_dbm)
