@@ -170,12 +170,12 @@ static int acx_update_wep(acx_device_t *adev);
 static int acx_update_wep_options(acx_device_t *adev);
 static int acx100_update_wep_options(acx_device_t *adev);
 
-// Templates (Control Path)
 static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
+// Templates
 static int acx_set_beacon_template(acx_device_t *adev, int len);
+static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
-static int acx_set_tim_template(acx_device_t * adev);
 static int acx_init_packet_templates(acx_device_t * adev);
 static int acx_init_max_null_data_template(acx_device_t * adev);
 static int acx_init_max_beacon_template(acx_device_t * adev);
@@ -3690,7 +3690,7 @@ static int acx_init_max_probe_request_template(acx_device_t * adev)
 }
 
 /*
- * acx_s_set_tim_template
+ * acx_set_tim_template
  *
  * FIXME: In full blown driver we will regularly update partial virtual bitmap
  * by calling this function
@@ -3726,55 +3726,30 @@ static int acx_init_max_probe_request_template(acx_device_t * adev)
     00000000 00000000 01010101 01010101 01010101 00000000 00000000...
     (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
 */
-static int acx_set_tim_template(acx_device_t *adev)
+static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 {
-    /* For now, configure smallish test bitmap, all zero ("no pending data") */
-#if 0
-	enum { bitmap_size = 5 };
-#endif
-
 	acx_template_tim_t templ;
-	int result;
-
-	int len;
-	u8 *p;
+	int res;
 
 	FN_ENTER;
 
-	memset(&templ, 0, sizeof(templ));
-#if 0
-	templ.size = 5 + bitmap_size;	/* eid+len+count+period+bmap_ctrl + bmap */
-	templ.tim_eid = WLAN_EID_TIM;
-	templ.len = 3 + bitmap_size;	/* count+period+bmap_ctrl + bmap */
-#endif
-
-	p = (u8*) &templ.tim_eid;
-
-	// Handle not yet configured beacon template
-	len = 0;
-	if (adev->beacon_skb != NULL && adev->beacon_tim != NULL) {
-		len = adev->beacon_skb->len - (adev->beacon_tim - adev->beacon_skb->data);
-	}
-
-	// We need to set always a tim template, even with len=0, 
-	// since otherwise the acx is sending a not 100% well structured beacon 
-	// (this may not be blocking though, but it's better like this)
-			
 	if (acx_debug & L_DEBUG) {
-		logf1(L_ANY, "adev->beacon_tim, len=%d:\n", len);
-		acx_dump_bytes(adev->beacon_tim, len);
+		logf1(L_ANY, "data, len=%d:\n", len);
+		acx_dump_bytes(data, len);
 	}
 
-	memcpy(p, adev->beacon_tim, len);
-	p += len;
+	/* We need to set always a tim template, even with len=0,
+	* since otherwise the acx is sending a not 100% well structured beacon
+	* (this may not be blocking though, but it's better like this)
+	*/
+	memset(&templ, 0, sizeof(templ));
+	if (data)
+		memcpy((u8*) &templ.tim_eid, data, len);
+	templ.size = cpu_to_le16(len);
 
-	len = p - (u8*) &templ;
-	/* - 2: do not count 'u16 size' field */
-	templ.size = cpu_to_le16(len - 2);
-
-	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
-	FN_EXIT1(result);
-	return result;
+	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ, sizeof(templ));
+	FN_EXIT1(res);
+	return res;
 }
 
 #ifdef UNUSED_BUT_USEFULL
@@ -4011,7 +3986,7 @@ static int acx_init_packet_templates(acx_device_t * adev)
 	/* ACX100 will have its TIM template set,
 	 * and we also need to update the memory map */
 
-	if (OK != acx_set_tim_template(adev))
+	if (OK != acx_set_tim_template(adev, NULL, 0))
 		goto failed_acx100;
 
 	log(L_DEBUG, "acx: sizeof(memmap) = %d bytes\n", (int)sizeof(mm));
