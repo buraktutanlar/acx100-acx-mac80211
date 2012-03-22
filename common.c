@@ -172,6 +172,7 @@ static int acx100_update_wep_options(acx_device_t *adev);
 
 
 // Templates
+static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon);
 static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_probe_response_template(acx_device_t *adev, u8* data, int len);
@@ -3620,6 +3621,60 @@ static int acx100_update_wep_options(acx_device_t *adev)
 	res = acx_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
 
 	FN_EXIT0;
+	return res;
+}
+
+static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
+{
+	int res;
+	u8 *tim_pos;
+	int len_wo_tim;
+	int len_tim;
+
+	/* The TIM template handling between ACX100 and ACX111 is different:
+	 * ACX111: Needs TIM in dedicated template via ACX1xx_CMD_CONFIG_TIM
+	 * ACX100: Needs TIM included into the beacon, however space for TIM template
+	 * 	needs to be configured during memory-map setup
+	 */
+	tim_pos = acx_beacon_find_tim(beacon);
+	if (tim_pos == NULL)
+		logf0(L_DEBUG, "No tim contained in beacon skb");
+
+	/* ACX111: If beacon contains tim, only configure beacon-template until tim */
+	if (IS_ACX111(adev) && tim_pos)
+		len_wo_tim = tim_pos - beacon->data;
+	else
+		len_wo_tim = beacon->len;
+
+	res = acx_set_beacon_template(adev, beacon->data, len_wo_tim);
+	if (res)
+		goto out;
+
+	/* We need to set always a tim template, even if length it null,
+	 * since otherwise the acx is not sending fully correct structured beacons.
+	 */
+	if (IS_ACX111(adev))
+	{
+		len_tim = beacon->len - len_wo_tim;
+		acx_set_tim_template(adev, tim_pos, len_tim);
+	}
+
+	/* BTW acx111 firmware would not send probe responses
+	 ** if probe request does not have all basic rates flagged
+	 ** by 0x80! Thus firmware does not conform to 802.11,
+	 ** it should ignore 0x80 bit in ratevector from STA.
+	 ** We can 'fix' it by not using this template and
+	 ** sending probe responses by hand. TODO --vda */
+	res = acx_set_probe_response_template(adev, beacon->data, len_wo_tim);
+	if (res)
+		goto out;
+	//acx_s_set_probe_response_template_off(adev);
+
+	/* Needed if generated frames are to be emitted at different tx rate now */
+	logf0(L_ANY, "Redoing cmd_join_bssid() following template cfg\n");
+	res = acx_cmd_join_bssid(adev, adev->bssid);
+
+	out:
 	return res;
 }
 
