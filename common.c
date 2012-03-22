@@ -95,7 +95,7 @@ static inline int acx111_feature_on(acx_device_t * adev, u32 f, u32 d);
 static inline int acx111_feature_set(acx_device_t * adev, u32 f, u32 d);
 int acx_interrogate_debug(acx_device_t * adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
-void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
+int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 // Configuration (Control Path)
 void acx_set_defaults(acx_device_t * adev);
@@ -1888,14 +1888,15 @@ static inline unsigned int acx_rate111to5bits(unsigned int rate)
  * Common code for both acx100 and acx111.
  */
 /* NB: does NOT match RATE100_nn but matches ACX[111]_SCAN_RATE_n */
-void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
+int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 {
+	int res;
         acx_joinbss_t tmp;
         int dtim_interval;
         int i;
 
         if (mac_is_zero(bssid))
-                return;
+                return OK;
 
         FN_ENTER;
 
@@ -1950,13 +1951,14 @@ void acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         tmp.essid_len = adev->essid_len;
 
         memcpy(tmp.essid, adev->essid, tmp.essid_len);
-        acx_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
+        res = acx_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
 
         log(L_ASSOC|L_DEBUG, "acx: BSS_Type = %u\n", tmp.macmode);
         acxlog_mac(L_ASSOC|L_DEBUG, "acx: JoinBSSID MAC:", adev->bssid, "\n");
 
 /*        acx_update_capabilities(adev); */
         FN_EXIT0;
+        return res;
 }
 
 /*
