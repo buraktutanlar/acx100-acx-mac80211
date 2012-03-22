@@ -170,7 +170,6 @@ static int acx_update_wep(acx_device_t *adev);
 static int acx_update_wep_options(acx_device_t *adev);
 static int acx100_update_wep_options(acx_device_t *adev);
 
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev, struct acx_template_beacon *templ, int len, u16 fc);
 
 // Templates
 static int acx_set_beacon_template(acx_device_t *adev, int len);
@@ -3768,105 +3767,6 @@ static int acx_s_set_tim_template_off(acx_device_t *adev) {
 	return result;
 }
 #endif
-
-/*
- * acx_fill_beacon_or_proberesp_template
- *
- * For frame format info, please see 802.11-1999.pdf item 7.2.3.9 and below!!
- *
- * NB: we use the fact that
- * struct acx_template_proberesp and struct acx_template_beacon are the same
- * (well, almost...)
- *
- * [802.11] Beacon's body consist of these IEs:
- * 1 Timestamp
- * 2 Beacon interval
- * 3 Capability information
- * 4 SSID
- * 5 Supported rates (up to 8 rates)
- * 6 FH Parameter Set (frequency-hopping PHYs only)
- * 7 DS Parameter Set (direct sequence PHYs only)
- * 8 CF Parameter Set (only if PCF is supported)
- * 9 IBSS Parameter Set (ad-hoc only)
- *
- * Beacon only:
- * 10 TIM (AP only) (see 802.11 7.3.2.6)
- * 11 Country Information (802.11d)
- * 12 FH Parameters (802.11d)
- * 13 FH Pattern Table (802.11d)
- * ... (?!! did not yet find relevant PDF file... --vda)
- * 19 ERP Information (extended rate PHYs)
- * 20 Extended Supported Rates (if more than 8 rates)
- *
- * Proberesp only:
- * 10 Country information (802.11d)
- * 11 FH Parameters (802.11d)
- * 12 FH Pattern Table (802.11d)
- * 13-n Requested information elements (802.11d)
- * ????
- * 18 ERP Information (extended rate PHYs)
- * 19 Extended Supported Rates (if more than 8 rates)
- */
-static int acx_fill_beacon_or_proberesp_template(acx_device_t *adev,
-		struct acx_template_beacon *templ, int len, u16 fc /* in host order! */)
-{
-	u8 *p;
-
-	FN_ENTER;
-
-	memset(templ, 0, sizeof(*templ));
-
-	p = (u8*) &templ->fc;
-
-	if (acx_debug & L_DEBUG) {
-		logf1(L_ANY, "adev->beacon_skb->data, len=%d, sizeof(acx_template_probereq_t)=%d:\n",
-				len, (int32_t) sizeof(acx_template_probereq_t));
-		acx_dump_bytes(adev->beacon_skb->data, len);
-	}
-
-	memcpy(p, adev->beacon_skb->data, len);
-	p += len;
-
-#if 0
-	MAC_BCAST(templ->da);
-	MAC_COPY(templ->sa, adev->dev_addr);
-	MAC_COPY(templ->bssid, adev->bssid);
-
-	templ->beacon_interval = cpu_to_le16(adev->beacon_interval);
-	acx_update_capabilities(adev);
-	templ->cap = cpu_to_le16(adev->capabilities);
-
-	p = templ->variable;
-
-	p = wlan_fill_ie_ssid(p, adev->essid_len, adev->essid);
-	p = wlan_fill_ie_rates(p, adev->rate_supported_len, adev->rate_supported);
-	p = wlan_fill_ie_ds_parms(p, adev->channel);
-	/* NB: should go AFTER tim, but acx seem to keep tim last always */
-	p = wlan_fill_ie_rates_ext(p, adev->rate_supported_len, adev->rate_supported);
-#endif
-
-#if 0
-	switch (adev->mode) {
-	case ACX_MODE_0_ADHOC:
-		/* ATIM window */
-		p = wlan_fill_ie_ibss_parms(p, 0); break;
-	case ACX_MODE_3_AP:
-		/* TIM IE is set up as separate template */
-		break;
-	}
-#endif
-
-#if 0
-	templ->fc = cpu_to_le16(WF_FTYPE_MGMT | fc);
-#endif
-
-	len = p - (u8*) templ;
-	/* - 2: do not count 'u16 size' field */
-	templ->size = cpu_to_le16(len - 2);
-
-	FN_EXIT1(len);
-	return len;
-}
 
 
 #if POWER_SAVE_80211
