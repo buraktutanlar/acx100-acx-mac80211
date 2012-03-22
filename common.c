@@ -174,6 +174,7 @@ static int acx100_update_wep_options(acx_device_t *adev);
 // Templates
 static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
+static int acx_set_probe_response_template(acx_device_t *adev, u8* data, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_init_packet_templates(acx_device_t * adev);
 static int acx_init_max_null_data_template(acx_device_t * adev);
@@ -181,7 +182,6 @@ static int acx_init_max_beacon_template(acx_device_t * adev);
 static int acx_init_max_tim_template(acx_device_t * adev);
 static int acx_init_max_probe_response_template(acx_device_t * adev);
 static int acx_init_max_probe_request_template(acx_device_t * adev);
-static int acx_set_probe_response_template(acx_device_t *adev);
 
 #ifdef UNUSED_BUT_USEFULL
 static int acx_s_set_probe_request_template(acx_device_t *adev);
@@ -3820,20 +3820,24 @@ static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 }
 
 
-static int
-acx_set_probe_response_template(acx_device_t *adev)
+static int acx_set_probe_response_template(acx_device_t *adev, u8* data, int len)
 {
-	struct acx_template_proberesp pr;
-	int len1, len2, result;
+	struct acx_template_proberesp templ;
+	int res;
 
 	FN_ENTER;
 
-	len1 = adev->beacon_skb->len;
-	len2 = acx_fill_beacon_or_proberesp_template(adev, &pr, len1, IEEE80211_STYPE_PROBE_RESP);
-	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &pr, len2);
+	memcpy((u8*) &templ.fc, data, len);
+	templ.fc =
+		cpu_to_le16(IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_PROBE_RESP);
 
-	FN_EXIT1(result);
-	return result;
+	templ.size = cpu_to_le16(len);
+
+	res =
+		acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE, &templ, len+2);
+
+	FN_EXIT1(res);
+	return res;
 }
 
 #ifdef UNUSED_BUT_USEFULL
