@@ -175,6 +175,8 @@ static int acx100_update_wep_options(acx_device_t *adev);
 static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_probe_response_template(acx_device_t *adev, u8* data, int len);
+static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb);
+
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_init_packet_templates(acx_device_t * adev);
 static int acx_init_max_null_data_template(acx_device_t * adev);
