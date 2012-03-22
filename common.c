@@ -2111,8 +2111,6 @@ void acx_set_defaults(acx_device_t * adev)
  */
 void acx_update_card_settings(acx_device_t *adev)
 {
-	int len;
-
 	FN_ENTER;
 
 	log(L_DEBUG, "acx: %s: get_mask 0x%08X, set_mask 0x%08X\n",
@@ -2190,53 +2188,9 @@ void acx_update_card_settings(acx_device_t *adev)
 #endif
                         /* fall through */
                 case ACX_MODE_3_AP:
-						if (adev->beacon_skb != NULL) {
-
-							// OW 20110310: ACX100 vs ACX111 template handling
-							// This code is a terrible mess - need to urgently clean this up
-							// ... (within the general configuration setting changes)
-							//
-							// The TIM template handling between ACX100 and ACX111 is different:
-							// * ACX111: Needs TIM in dedicated template via ACX1xx_CMD_CONFIG_TIM
-							// * ACX100: Needs TIM included into the beacon, however space for TIM template
-							// needs to be configured during memory-map setup
-
-					        // If beacon_tim is set, we only fill the acx beacon template until the tim IE
-					        // the tim IE will be configured using acx_fill_beacon_or_proberesp_template
-					        if (IS_ACX111(adev) && adev->beacon_tim){
-					        	len = adev->beacon_tim - adev->beacon_skb->data;
-					        }
-					        // else we fill the complete beacon_skb
-					        else {
-					        	len = adev->beacon_skb->len;
-					        }
-
-							acx_set_beacon_template(adev, len);
-							// We need to set always a tim template, since otherwise the acx 
-							// is sending a not 100% well structured beacon (may not be 
-							// blocking though)
-							if (IS_ACX111(adev)){
-								acx_set_tim_template(adev);
-							}
-
-							/* BTW acx111 firmware would not send probe responses
-							 ** if probe request does not have all basic rates flagged
-							 ** by 0x80! Thus firmware does not conform to 802.11,
-							 ** it should ignore 0x80 bit in ratevector from STA.
-							 ** We can 'fix' it by not using this template and
-							 ** sending probe responses by hand. TODO --vda */
-							acx_set_probe_response_template(adev);
-							//acx_s_set_probe_response_template_off(adev);
-
-							adev->beacon_ready=1;
-						}
-
+                	break;
                 }
-                /* Needed if generated frames are to be emitted at different tx rate now */
-                if (adev->beacon_ready){
-                	logf0(L_ANY, "redoing cmd_join_bssid() after template cfg\n");
-                	acx_cmd_join_bssid(adev, adev->bssid);
-                }
+
                 CLEAR_BIT(adev->set_mask, SET_TEMPLATES);
         }
 
@@ -2336,12 +2290,14 @@ void acx_update_card_settings(acx_device_t *adev)
                     acx111_feature_on(adev, 0, FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
             }
 
+#if 0
 			if (adev->beacon_ready){
 				logf0(L_ANY, "Turning on AP beacons\n");
 				acx_cmd_join_bssid(adev, adev->bssid);
 			} else {
 				logf0(L_ANY, "Not turning on AP beacons. Beacon not ready.\n");
 			}
+#endif
 			break;
 		case ACX_MODE_MONITOR:
 			SET_BIT(adev->set_mask, SET_RXCONFIG | SET_WEP_OPTIONS);
