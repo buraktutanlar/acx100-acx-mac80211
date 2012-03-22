@@ -172,7 +172,7 @@ static int acx100_update_wep_options(acx_device_t *adev);
 
 
 // Templates
-static int acx_set_beacon_template(acx_device_t *adev, int len);
+static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_init_packet_templates(acx_device_t * adev);
@@ -3796,18 +3796,27 @@ static int acx_s_set_null_data_template(acx_device_t * adev)
 #endif
 
 
-static int
-acx_set_beacon_template(acx_device_t *adev, int len)
+static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 {
-        struct acx_template_beacon bcn;
-        int len2, result;
-        FN_ENTER;
+	struct acx_template_beacon templ;
+	int res;
 
-        len2 = acx_fill_beacon_or_proberesp_template(adev, &bcn, len, IEEE80211_STYPE_BEACON);
-        result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &bcn, len2);
+	FN_ENTER;
 
-        FN_EXIT1(result);
-        return result;
+	if (acx_debug & L_DEBUG) {
+		logf1(L_ANY, "data, len=%d, sizeof(struct acx_template_beacon)=%d:\n",
+			len, sizeof(struct acx_template_beacon));
+		acx_dump_bytes(data, len);
+	}
+
+	memcpy((u8*) &templ.fc, data, len);
+	templ.size = cpu_to_le16(len);
+
+	/* +2: include 'u16 size' field */
+	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &templ, len+2);
+
+	FN_EXIT1(res);
+	return res;
 }
 
 
