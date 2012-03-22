@@ -6696,7 +6696,7 @@ acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	int err = -ENODEV;
 
-	struct sk_buff *skb_tmp;
+	struct sk_buff *beacon;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
@@ -6718,21 +6718,17 @@ acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	// BOM BSS_CHANGED_BEACON
 	if (changed & BSS_CHANGED_BEACON) {
 
-		skb_tmp = ieee80211_beacon_get(hw, vif);
-		if (skb_tmp != NULL) {
-
-			// Free previous beacon, if changed
-			if (adev->beacon_skb != NULL)
-				dev_kfree_skb(adev->beacon_skb);
-
-			adev->beacon_skb = skb_tmp;
-			adev->beacon_tim = acx_beacon_find_tim(adev->beacon_skb);
-			if (adev->beacon_tim == NULL)
-				logf0(L_DEBUG, "Beacon contained no tim");
-
+		beacon = ieee80211_beacon_get(hw, vif);
+		if (!beacon)
+		{
+			logf0(L_ANY, "Error: BSS_CHANGED_BEACON: skb_tmp==NULL");
+			return;
 		}
 
+		acx_set_beacon(adev, beacon);
 		adev->beacon_interval = info->beacon_int;
+
+		dev_kfree_skb(beacon);
 
 		SET_BIT(adev->set_mask, SET_TEMPLATES);
 		SET_BIT(adev->set_mask, GETSET_CHANNEL);
