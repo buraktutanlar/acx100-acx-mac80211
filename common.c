@@ -6894,32 +6894,15 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 
 	acx_sem_lock(adev);
 
-	changed_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
-			| FIF_CONTROL | FIF_OTHER_BSS);
+	logf1(L_DEBUG, "1: changed_flags=0x%08x, *total_flags=0x%08x\n", changed_flags, *total_flags);
+
+	// OWI TODO: Set also FIF_PROBE_REQ ?
 	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
 			| FIF_CONTROL | FIF_OTHER_BSS);
-	/*        if ((changed_flags & (FIF_PROMISC_IN_BSS | FIF_ALLMULTI)) == 0)
-	 return; */
 
-	if (*total_flags) {
-		SET_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-		/* let kernel know in case *we* needed to set promiscuous */
-	} else {
-		CLEAR_BIT(adev->rx_config_1, RX_CFG1_RCV_PROMISCUOUS);
-		SET_BIT(adev->rx_config_1, RX_CFG1_FILTER_ALL_MULTI);
-		SET_BIT(adev->set_mask, SET_RXCONFIG);
-	}
-
-	/* cannot update card settings directly here, atomic context */
-
-	// TODO This is one point to check for better cmd and interrupt handling
-	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	//acx_s_update_card_settings(adev);
+	logf1(L_DEBUG, "2: *total_flags=0x%08x\n", *total_flags);
 
 	acx_sem_unlock(adev);
-
 
 	FN_EXIT0;
 }
