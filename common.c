@@ -6247,15 +6247,6 @@ void acx_after_interrupt_task(acx_device_t *adev)
 		acx_after_interrupt_recalib(adev);
 	}
 
-	/* a poor interrupt code wanted to do update_card_settings() */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_CARD_CFG) {
-		if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
-			acx_update_card_settings(adev);
-		}
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	}
-
 	/* 1) we detected that no Scan_Complete IRQ came from fw, or
 	 ** 2) we found too many STAs */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
