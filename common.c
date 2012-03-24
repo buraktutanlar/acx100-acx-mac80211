@@ -2539,7 +2539,7 @@ static int acx_update_mode(acx_device_t *adev)
 
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 {
-	int result;
+	int res = 0;
 
 	FN_ENTER;
 
@@ -2548,14 +2548,17 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 
 	adev->channel = channel;
 
-	/* hmm, the following code part is strange, but this is how
-	 * it was being done before... */
-	log(L_IOCTL, "acx: Changing to channel %d\n", channel);
-	SET_BIT(adev->set_mask, GETSET_CHANNEL);
-	result = -EINPROGRESS;	/* need to call commit handler */
+	adev->tx_enabled = 1;
+	adev->rx_enabled = 1;
 
-	FN_EXIT1(result);
-	return result;
+	res += acx1xx_update_tx(adev);
+	res += acx1xx_update_rx(adev);
+
+	acx_wake_queue(adev->ieee, NULL);
+
+	FN_EXIT0;
+
+	return res ? NOT_OK : OK;
 }
 
 static void acx_get_sensitivity(acx_device_t *adev)
