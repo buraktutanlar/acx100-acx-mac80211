@@ -104,7 +104,10 @@ void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
-static void acx_select_opmode(acx_device_t *adev);
+
+static int acx_set_mode(acx_device_t *adev, u16 mode);
+static int acx_update_mode(acx_device_t *adev);
+
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
 
 static void acx_get_sensitivity(acx_device_t *adev);
@@ -2486,69 +2489,51 @@ int acx_setup_modes(acx_device_t *adev)
 	return 0;
 }
 
-static void acx_select_opmode(acx_device_t *adev)
+
+static int acx_set_mode(acx_device_t *adev, u16 mode)
 {
-	int changed = 0;
+	adev->mode = mode;
+	return acx_update_mode(adev);
+
+}
+
+static int acx_update_mode(acx_device_t *adev)
+{
+	int res = 0;
 	FN_ENTER;
 
-	if (adev->vif_operating) {
-		switch (adev->vif_type) {
-		case NL80211_IFTYPE_AP:
-			if (adev->mode != ACX_MODE_3_AP) {
-				adev->mode = ACX_MODE_3_AP;
-				changed = 1;
-			}
-			logf0(L_ANY, "NL80211_IFTYPE_AP\n");
-			break;
-		case NL80211_IFTYPE_ADHOC:
-			if (adev->mode != ACX_MODE_0_ADHOC) {
-				adev->mode = ACX_MODE_0_ADHOC;
-				changed = 1;
-			}
-			logf0(L_ANY, "NL80211_IFTYPE_ADHOC\n");
-			break;
-		case NL80211_IFTYPE_STATION:
-			if (adev->mode != ACX_MODE_2_STA) {
-				adev->mode = ACX_MODE_2_STA;
-				changed = 1;
-			}
-			logf0(L_ANY, "NL80211_IFTYPE_STATION\n");
-			break;
+	log(L_INIT, "acx: Updating to mode=0x%04x\n", adev->mode);
 
-		case NL80211_IFTYPE_WDS:
-			logf0(L_ANY, "NL80211_IFTYPE_WDS\n");
-
-		default:
-			if (adev->mode != ACX_MODE_OFF) {
-				adev->mode = ACX_MODE_OFF;
-				changed = 1;
-			}
-			logf0(L_ANY, "default\n");
-			break;
+	switch (adev->mode) {
+	case ACX_MODE_2_STA:
+	case ACX_MODE_0_ADHOC:
+	case ACX_MODE_3_AP:
+		if (IS_ACX111(adev)) {
+			res += acx111_feature_on(adev, 0,
+					FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
 		}
-	} else {
-		if (adev->vif_type == NL80211_IFTYPE_MONITOR) {
-			if (adev->mode != ACX_MODE_MONITOR) {
-				adev->mode = ACX_MODE_MONITOR;
-				changed = 1;
-			}
-			logf0(L_ANY, "NL80211_IFTYPE_MONITOR\n");
-		} else {
-			if (adev->mode != ACX_MODE_OFF) {
-				adev->mode = ACX_MODE_OFF;
-				changed = 1;
-			}
-			logf0(L_ANY, "NL80211_IFTYPE_MONITOR else\n");
-		}
-	}
+		res += acx_update_rx_config(adev);
 
-	if (changed) {
-		SET_BIT(adev->set_mask, GETSET_MODE);
-		acx_update_card_settings(adev);
-		//	acx_schedule_task(adev,	ACX_AFTER_IRQ_UPDATE_CARD_CFG);
+		acx1xx_set_rx_enable(adev, 1);
+		acx1xx_set_tx_enable(adev, 1);
+
+		break;
+	case ACX_MODE_MONITOR:
+		break;
+	case ACX_MODE_OFF:
+		res += acx1xx_set_tx_enable(adev, 0);
+		res += acx1xx_set_rx_enable(adev, 0);
+		break;
+
+	default:
+		logf1(L_INIT, "acx: Error: Undefined mode=0x%04x\n",
+				adev->mode);
+		return NOT_OK;
 	}
 
 	FN_EXIT0;
+
+	return res ? NOT_OK : OK;
 }
 
 int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
