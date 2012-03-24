@@ -6458,32 +6458,60 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	mac_vif = vif->addr;
 #endif
 
-	if (adev->initialized) {
 
-		// Reconfigure mac-address globally, affecting all vifs
-		if ( !mac_is_equal(mac_vif, adev->dev_addr)  )
-		{
-			acx1xx_set_station_id(adev, mac_vif);
-			SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
-		}
+	switch (adev->vif_type) {
+		case NL80211_IFTYPE_AP:
+		logf0(L_ANY, "NL80211_IFTYPE_AP\n");
+		adev->mode = ACX_MODE_3_AP;
+		break;
 
-		// TODO Move interface and card setup code (gradually) nearer
-		// to the corresponding mac80211 config callbacks
-		acx_select_opmode(adev);
+		case NL80211_IFTYPE_ADHOC:
+		logf0(L_ANY, "NL80211_IFTYPE_ADHOC\n");
+		adev->mode = ACX_MODE_0_ADHOC;
+		break;
+
+		case NL80211_IFTYPE_STATION:
+		logf0(L_ANY, "NL80211_IFTYPE_STATION\n");
+		adev->mode = ACX_MODE_2_STA;
+		break;
+
+		case NL80211_IFTYPE_MONITOR:
+		logf0(L_ANY, "NL80211_IFTYPE_MONITOR\n");
+		break;
+
+		case NL80211_IFTYPE_WDS:
+		logf0(L_ANY, "NL80211_IFTYPE_WDS: Not implemented\n");
+		goto out_unlock;
+
+		default:
+		logf1(L_ANY, "Unknown adev->vif_type=%d\n", adev->vif_type);
+
+		goto out_unlock;
+		break;
 	}
 
-	err = 0;
+	// Reconfigure mac-address globally, affecting all vifs
+	if ( !mac_is_equal(mac_vif, adev->dev_addr) )
+	{
+		acx1xx_set_station_id(adev, mac_vif);
+		SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+	}
+
+	acx_update_mode(adev);
 
 	printk(KERN_INFO "acx: Virtual interface added "
-	       "(type: 0x%08X, MAC: %s)\n",
+			"(type: 0x%08X, MAC: %s)\n",
+
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	       adev->vif_type,
-	       acx_print_mac(mac, conf->mac_addr)
+			adev->vif_type,
+			acx_print_mac(mac, conf->mac_addr)
 #else
-	       adev->vif_type,
-	       acx_print_mac(mac, vif->addr)
+			adev->vif_type,
+			acx_print_mac(mac, vif->addr)
 #endif
 	);
+
+	err = 0;
 
     out_unlock:
 	acx_sem_unlock(adev);
