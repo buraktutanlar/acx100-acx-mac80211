@@ -163,6 +163,7 @@ static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 static int acx1xx_set_channel(acx_device_t *adev, u8 channel);
 #endif
 
+static int acx1xx_set_rx_enable(acx_device_t *adev, u8 rx_enabled);
 static int acx1xx_update_rx(acx_device_t *adev);
 static int acx_update_rx_config(acx_device_t *adev);
 
@@ -3341,6 +3342,17 @@ static int acx1xx_update_tx(acx_device_t *adev)
 	FN_EXIT0;
 	return res;
 }
+
+static int acx1xx_set_rx_enable(acx_device_t *adev, u8 rx_enabled)
+{
+	int res;
+	FN_ENTER;
+	adev->rx_enabled = rx_enabled;
+	res = acx1xx_update_rx(adev);
+	FN_EXIT0;
+	return res;
+}
+
 
 static int acx1xx_update_rx(acx_device_t *adev)
 {
