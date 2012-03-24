@@ -6546,6 +6546,8 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 		adev->vif=NULL;
 	}
 
+	acx_set_mode(adev, ACX_MODE_OFF);
+
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	log(L_DEBUG, "acx: %s: vif_operating=%d, conf->type=%d\n",
 			__func__,
@@ -6555,9 +6557,6 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 			__func__,
 			adev->vif_operating, vif->type);
 #endif
-
-	if (adev->initialized)
-		acx_select_opmode(adev);
 
 	log(L_ANY, "acx: Virtual interface removed: "
 	       "type=%d, MAC=%s\n",
@@ -6569,9 +6568,6 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 	       );
 
 	acx_sem_unlock(adev);
-
-	// OW 20100131 Flush of mac80211 normally done by mac80211
-	// flush_scheduled_work();
 
 	FN_EXIT0;
 }
