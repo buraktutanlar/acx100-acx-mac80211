@@ -2100,6 +2100,7 @@ void acx_set_defaults(acx_device_t * adev)
 	FN_EXIT0;
 }
 
+void acx_start(acx_device_t * adev)
 
 /*
  * acx_s_update_card_settings
@@ -2112,6 +2113,7 @@ void acx_update_card_settings(acx_device_t *adev)
 {
 	FN_ENTER;
 
+	log(L_INIT, "acx: Updating initial settings\n");
 	log(L_DEBUG, "acx: %s: get_mask 0x%08X, set_mask 0x%08X\n",
 	    __func__, adev->get_mask, adev->set_mask);
 
@@ -2203,6 +2205,7 @@ void acx_update_card_settings(acx_device_t *adev)
 		CLEAR_BIT(adev->set_mask, SET_RATE_FALLBACK);
 	}
 
+	acx1xx_update_station_id(adev);
 	if (adev->set_mask & GETSET_TXPOWER) {
 		log(L_INIT, "acx: updating the transmit power level: %d\n",
 		    adev->tx_level_val);
@@ -2210,17 +2213,24 @@ void acx_update_card_settings(acx_device_t *adev)
 		CLEAR_BIT(adev->set_mask, GETSET_TXPOWER);
 	}
 
+	acx1xx_update_rate_fallback(adev);
+	acx1xx_update_tx_level(adev);
+	acx1xx_update_antenna(adev);
 	if (adev->set_mask & GETSET_ANTENNA) {
 		acx1xx_update_antenna(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_ANTENNA);
 	}
 
+	acx1xx_update_ed_threshold(adev);
+	acx1xx_update_cca(adev);
 	if (adev->set_mask & GETSET_ED_THRESH) {
 		/* ed_threshold */
 		acx1xx_update_ed_threshold(adev);
 		CLEAR_BIT(adev->set_mask, GETSET_ED_THRESH);
 	}
 
+	acx1xx_update_tx(adev);
+	acx1xx_update_rx(adev);
 	if (adev->set_mask & GETSET_CCA) {
 		/* CCA value */
 		acx1xx_update_cca(adev);
@@ -2360,24 +2370,11 @@ void acx_update_card_settings(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-void acx_start(acx_device_t * adev)
-{
-	FN_ENTER;
+	acx1xx_update_retry(adev);
+	acx1xx_update_msdu_lifetime(adev);
+	acx_update_reg_domain(adev);
 
-	/*
-	 * Ok, now we do everything that can possibly be done with ioctl
-	 * calls to make sure that when it was called before the card
-	 * was up we get the changes asked for
-	 */
-
-	SET_BIT(adev->set_mask, SET_TEMPLATES | SET_STA_LIST | GETSET_WEP |
-			GETSET_TXPOWER | GETSET_ANTENNA | GETSET_ED_THRESH |
-			GETSET_CCA | GETSET_REG_DOMAIN | GETSET_MODE | GETSET_CHANNEL |
-			GETSET_TX | GETSET_RX | GETSET_STATION_ID |
-			GETSET_RETRY | SET_MSDU_LIFETIME | SET_RATE_FALLBACK);
-
-	log(L_INIT, "acx: updating initial settings on iface activation\n");
-	acx_update_card_settings(adev);
+	acx_update_mode(adev);
 
 	// For the acx100, we leave the firmware sensitivity
 	// and it doesn't support auto recalib, so don't set it
