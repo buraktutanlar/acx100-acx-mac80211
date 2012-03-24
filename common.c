@@ -272,9 +272,11 @@ u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 
 // Crypto
+#ifdef UNUSED
 static void acx100_set_wepkey(acx_device_t * adev);
 static void acx111_set_wepkey(acx_device_t * adev);
 static void acx_set_wepkey(acx_device_t * adev);
+#endif
 static int acx100_init_wep(acx_device_t * adev);
 
 // // OW, 20100704, Obselete, TBC for cleanup
@@ -5615,6 +5617,7 @@ static u16 rate100to111(u8 r)
  * BOM Crypto
  * ==================================================
  */
+#ifdef UNUSED
 static void acx100_set_wepkey(acx_device_t * adev)
 {
 	ie_dot11WEPDefaultKey_t dk;
@@ -5666,6 +5669,7 @@ static void acx_set_wepkey(acx_device_t * adev)
 	else
 		acx100_set_wepkey(adev);
 }
+#endif
 
 /*
  * acx100_s_init_wep
