@@ -6673,13 +6673,8 @@ acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	if (!adev->vif_operating)
 		goto end_sem_unlock;
 
-//	if (adev->initialized)
-//		acx_s_select_opmode(adev);
-
 	if (changed & BSS_CHANGED_BSSID) {
 		MAC_COPY(adev->bssid, info->bssid);
-		// TODO FIXME Check if and what needs to be done exactly with essid
-		SET_BIT(adev->set_mask, SET_TEMPLATES);
 	}
 
 	// BOM BSS_CHANGED_BEACON
@@ -6696,14 +6691,7 @@ acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		adev->beacon_interval = info->beacon_int;
 
 		dev_kfree_skb(beacon);
-
-		SET_BIT(adev->set_mask, SET_TEMPLATES);
-		SET_BIT(adev->set_mask, GETSET_CHANNEL);
-
 	}
-
-	if (adev->set_mask != 0)
-		acx_update_card_settings(adev);
 
 	err = 0;
 
