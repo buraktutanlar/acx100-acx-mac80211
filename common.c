@@ -170,10 +170,11 @@ static int acx_update_rx_config(acx_device_t *adev);
 static int acx1xx_update_retry(acx_device_t *adev);
 static int acx1xx_update_msdu_lifetime(acx_device_t *adev);
 
+#ifdef UNUSED
 static int acx_update_wep(acx_device_t *adev);
 static int acx_update_wep_options(acx_device_t *adev);
 static int acx100_update_wep_options(acx_device_t *adev);
-
+#endif
 
 // Templates
 static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon);
@@ -3248,6 +3249,7 @@ static int acx_update_rx_config(acx_device_t *adev)
 	return res;
 }
 
+#ifdef UNUSED
 static int acx_update_wep(acx_device_t *adev)
 {
 	int res=NOT_OK;
@@ -3321,6 +3323,7 @@ static int acx100_update_wep_options(acx_device_t *adev)
 	FN_EXIT0;
 	return res;
 }
+#endif
 
 static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 {
