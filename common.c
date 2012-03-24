@@ -6608,20 +6608,10 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed) {
 
 		acx_selectchannel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
-		adev->tx_enabled = 1;
-		adev->rx_enabled = 1;
-
-		acx_update_card_settings(adev);
 
 	}
 	change_channel_done:
 
-	// ---
-	if (adev->set_mask > 0) {
-		acx_update_card_settings(adev);
-	}
-
-	// ---
 	if (changed_not_done) {
 		logf1(L_DEBUG, "changed_not_done=%08X\n", changed_not_done);
 	}
@@ -6632,36 +6622,6 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed) {
 	FN_EXIT0;
 
 	return 0;
-
-	// Kept for documentation
-#if 0
-	/*
-	 if (conf->short_slot_time != adev->short_slot) {
-	 //                assert(phy->type == BCM43xx_PHYTYPE_G);
-	 if (conf->short_slot_time)
-	 acx_short_slot_timing_enable(adev);
-	 else
-	 acx_short_slot_timing_disable(adev);
-	 acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	 }
-	 */
-
-	// OW FIXME mac80211 depreciates radio_enabled. Perhaps related to rfkill changes ?
-	//adev->tx_disabled = !conf->radio_enabled;
-
-	/*	if (conf->power_level != 0){
-	 adev->tx_level_dbm = conf->power_level;
-	 acx_s_set_tx_level(adev, adev->tx_level_dbm);
-	 SET_BIT(adev->set_mask,GETSET_TXPOWER);
-	 //acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG);
-	 }
-	 */
-	//FIXME: This does not seem to wake up:
-
-	//TODO: phymode
-	//TODO: antennas
-#endif
-
 }
 
 // Find position of TIM IE
