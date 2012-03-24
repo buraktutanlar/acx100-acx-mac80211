@@ -1976,14 +1976,20 @@ void acx_set_defaults(acx_device_t * adev)
 	/* query some settings from the card.
 	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
 	 * query is REQUIRED, otherwise the card won't work correctly! */
-	adev->get_mask =
-	    GETSET_ANTENNA | GETSET_STATION_ID | GETSET_REG_DOMAIN;
+
+	acx1xx_get_antenna(adev);
+
+	acx1xx_get_station_id(adev);
+	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+
+	acx_get_reg_domain(adev);
+
 	/* Only ACX100 supports ED and CCA */
 	if (IS_ACX100(adev))
-		adev->get_mask |= GETSET_CCA | GETSET_ED_THRESH;
-
-	// OW FIXME - review locking
-	acx_update_card_settings(adev);
+	{
+		acx1xx_get_cca(adev);
+		acx1xx_get_ed_threshold(adev);
+	}
 
 	acx_get_sensitivity(adev);
 
@@ -2086,17 +2092,6 @@ void acx_set_defaults(acx_device_t * adev)
 	adev->ps_hangover_period = 0;
 	adev->ps_enhanced_transition_time = 0;
 #endif
-
-	/* These settings will be set in fw on ifup */
-	adev->set_mask = 0 | GETSET_RETRY | SET_MSDU_LIFETIME
-	    /* configure card to do rate fallback when in auto rate mode */
-	    | SET_RATE_FALLBACK | SET_RXCONFIG
-#if POWER_SAVE_80211
-	    | GETSET_POWER_80211
-#endif
-	    ;
-
-	acx_update_rx_config(adev);
 
 	FN_EXIT0;
 }
