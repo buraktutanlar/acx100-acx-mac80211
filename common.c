@@ -158,9 +158,9 @@ static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto);
 #endif
 
 static int acx1xx_update_tx(acx_device_t *adev);
+static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 #ifdef UNUSED
 static int acx1xx_set_channel(acx_device_t *adev, u8 channel);
-static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled);
 #endif
 
 static int acx1xx_update_rx(acx_device_t *adev);
@@ -3313,6 +3313,7 @@ static int acx1xx_set_channel(acx_device_t *adev, u8 channel)
 	FN_EXIT0;
 	return res;
 }
+#endif
 
 static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled)
 {
@@ -3323,7 +3324,6 @@ static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled)
 	FN_EXIT0;
 	return res;
 }
-#endif
 
 static int acx1xx_update_tx(acx_device_t *adev)
 {
