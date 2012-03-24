@@ -281,7 +281,6 @@ int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 // BOM Configuration (Common:Control Path)
 // -----
 void acx_set_defaults(acx_device_t * adev);
-void acx_update_card_settings(acx_device_t *adev);
 void acx_start(acx_device_t * adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_init_mac(acx_device_t * adev);

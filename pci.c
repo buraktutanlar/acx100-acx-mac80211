@@ -3865,7 +3865,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	 * and possibly be back in the network again already :-) */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
-		acx_update_card_settings(adev);
+		//acx_update_card_settings(adev);
 		printk("acx: rsm: settings updated\n");
 	}
 	ieee80211_register_hw(hw);
