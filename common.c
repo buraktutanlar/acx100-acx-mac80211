@@ -3235,8 +3235,8 @@ static int acx1xx_update_cca(acx_device_t *adev)
 	int res = NOT_OK;
 
 	FN_ENTER;
-	log(L_INIT, "acx: updating the Channel Clear Assessment "
-	"(CCA) value: 0x%02X\n", adev->cca);
+	log(L_INIT, "acx: Updating the Channel Clear Assessment (CCA) value: "
+			"0x%02X\n", adev->cca);
 	if (IS_ACX100(adev)) {
 		res = acx100_update_cca(adev);
 	} else
