@@ -1175,7 +1175,7 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 	memset(&memconf, 0, sizeof(memconf));
 	/* the number of STAs (STA contexts) to support
 	 ** NB: was set to 1 and everything seemed to work nevertheless... */
-	memconf.no_of_stations = 1;	//cpu_to_le16(VEC_SIZE(adev->sta_list));
+	memconf.no_of_stations = 1;	//cpu_to_le16(ARRAY_SIZE(adev->sta_list));
 	/* specify the memory block size. Default is 256 */
 	memconf.memory_block_size = cpu_to_le16(adev->memblocksize);
 	/* let's use 50%/50% for tx/rx (specify percentage, units of 5%) */
@@ -6735,20 +6735,20 @@ const char* acx_get_packet_type_string(u16 fc)
 
 	switch (IEEE80211_FCTL_FTYPE & fc) {
 	case IEEE80211_FTYPE_MGMT:
-		if (fstype < VEC_SIZE(mgmt_arr))
+		if (fstype < ARRAY_SIZE(mgmt_arr))
 			str = mgmt_arr[fstype];
 		else
 			str = "MGMT/UNKNOWN";
 		break;
 	case IEEE80211_FTYPE_CTL:
 		ctl = fstype - 0x0a;
-		if (ctl < VEC_SIZE(ctl_arr))
+		if (ctl < ARRAY_SIZE(ctl_arr))
 			str = ctl_arr[ctl];
 		else
 			str = "CTL/UNKNOWN";
 		break;
 	case IEEE80211_FTYPE_DATA:
-		if (fstype < VEC_SIZE(data_arr))
+		if (fstype < ARRAY_SIZE(data_arr))
 			str = data_arr[fstype];
 		else
 			str = "DATA/UNKNOWN";

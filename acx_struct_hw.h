@@ -36,8 +36,6 @@ typedef struct txhostdesc txhostdesc_t;
 */
 #define ACX_PACKED __attribute__ ((packed))
 
-#define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
-
 /***********************************************************************
 ** BOM Constants
 */
