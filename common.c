@@ -4170,15 +4170,11 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 		     "please report if you suspect wrong parsing!\n"
 		     "\n" "version \"%s\"\n", adev->firmware_version);
 
-	/* TODO: may replace kmalloc/memset with kzalloc once
-	 * Linux 2.6.14 is widespread */
-	fw_stats = kmalloc(sizeof(*fw_stats), GFP_KERNEL);
+	fw_stats = kzalloc(sizeof(*fw_stats), GFP_KERNEL);
 	if (!fw_stats) {
 		FN_EXIT1(0);
 		return 0;
 	}
-	memset(fw_stats, 0, sizeof(*fw_stats));
-
 	st = (u8 *) fw_stats;
 
 	part_str = "statistics query command";
