@@ -197,7 +197,7 @@ const char *acx_cmd_status_str(unsigned int state);
 #define log(chan, args...) \
 	do { \
 		if (acx_debug & (chan)) \
-			printk(args); \
+			pr_notice(args);	\
 	} while (0)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
