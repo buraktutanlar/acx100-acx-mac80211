@@ -580,50 +580,6 @@ int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
 /*
- * BOM USB prototypes
- * ==================================================
- */
-
-// Logging
-
-// Data Access
-
-#if 0
-// Firmware, EEPROM, Phy
-int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
-int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
-
-// CMDs (Control Path)
-int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
-
-// Init, Configure (Control Path)
-
-// Other (Control Path)
-
-// Proc, Debug
-
-// Rx Path
-
-// Tx Path
-tx_t *acxusb_alloc_tx(acx_device_t *adev);
-void acxusb_dealloc_tx(tx_t * tx_opaque);
-void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
-void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-
-// Irq Handling, Timer
-void acxusb_irq_work(struct work_struct *work);
-
-// Mac80211 Ops
-
-// Helpers
-
-// Driver, Module
-int __init acxusb_init_module(void);
-void __exit acxusb_cleanup_module(void);
-
-#endif
-
-/*
  * BOM Mem prototypes
  * ==================================================
  */
