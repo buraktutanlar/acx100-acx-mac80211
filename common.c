@@ -628,6 +628,8 @@ const u8 acx_bitpos2rate100[] = {
 	[14] = RATE100_2,	/* should not happen */
 	[15] = RATE100_2,	/* should not happen */
 };
+BUILD_BUG_DECL(Rates, ARRAY_SIZE(acx_bitpos2rate100)
+		   != ARRAY_SIZE(bitpos2genframe_txrate));
 
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value)
 {
@@ -692,6 +694,8 @@ static acx_proc_write_t *const
 	acx_proc_write_antenna,
 	acx_proc_write_reg_domain,
 };
+BUILD_BUG_DECL(SHOW, ARRAY_SIZE(acx_proc_show_funcs)
+		  != ARRAY_SIZE(acx_proc_write_funcs));
 
 static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)] ;
 

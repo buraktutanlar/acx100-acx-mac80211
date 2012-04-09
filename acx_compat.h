@@ -13,4 +13,10 @@ do { \
 
 #endif
 
-
+// may get into 3.4
+#ifndef BUILD_BUG_DECL
+#define BUILD_BUG_DECL(name, condition)					\
+       static __initdata struct {					\
+               int BUILD_BUG_DECL_ ##name[1 - 2*!!(condition)];		\
+       } BUILD_BUG_DECL_ ##name[0] __attribute__((unused))
+#endif
