@@ -4580,34 +4580,26 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v)
 	acx_device_t *adev = (acx_device_t *) file->private;
 
 	int length;
-	char *buf, *buf2;
-	// OW Hopefully enough
-	const int buf_size = 1024*64;
+	char *buf, *p;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	buf = kmalloc(buf_size, GFP_KERNEL);
-
-	/* fill buf */
-	length = 0;
 	if (IS_PCI(adev))
-		length = acxpci_proc_eeprom_output(buf, adev);
+		buf = acxpci_proc_eeprom_output(&length, adev);
 	else if (IS_MEM(adev))
-		length = acxmem_proc_eeprom_output(buf, adev);
+		buf = acxmem_proc_eeprom_output(&length, adev);
 	else
 		goto out;
 
-	for (buf2 = buf; buf2 < buf + length; seq_putc(file, *(buf2++)))
-		;
+	for (p = buf; p < buf + length; p++)
+	     seq_putc(file, *p);
 
-	out:
 	kfree(buf);
-
+out:
 	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
-
 }
 
 static int acx_proc_show_phy(struct seq_file *file, void *v)

@@ -549,7 +549,7 @@ int acxpci_reset_dev(acx_device_t * adev);
 
 // Proc, Debug
 int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
+char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
 
 // Rx Path
 
@@ -607,7 +607,7 @@ int acxmem_reset_dev(acx_device_t *adev);
 
 // Proc, Debug
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxmem_proc_eeprom_output(char *buf, acx_device_t *adev);
+char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
 
 // Rx Path
 

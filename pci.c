@@ -126,7 +126,7 @@ static void acxpci_up(struct ieee80211_hw *hw);
 
 // Proc, Debug
 int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev);
+char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
 
 // Rx Path
 static void acxpci_process_rxdesc(acx_device_t * adev);
@@ -1940,19 +1940,21 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	return 0;
 }
 
-int acxpci_proc_eeprom_output(char *buf, acx_device_t * adev)
+char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev)
 {
-	char *p = buf;
 	int i;
+	char *p, *buf;
 
 	FN_ENTER;
 
+	p = buf = kmalloc(0x400, GFP_KERNEL);
 	for (i = 0; i < 0x400; i++) {
 		acxpci_read_eeprom_byte(adev, i, p++);
 	}
+	*len = i;
 
 	FN_EXIT1(p - buf);
-	return p - buf;
+	return buf;
 }
 
 
