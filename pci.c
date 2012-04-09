@@ -923,11 +923,6 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 
 	FN_ENTER;
 
-	data_verify = kmalloc(len, GFP_KERNEL);
-	if (!data_verify) {
-		goto end;
-	}
-
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
 	 * to be able to write to the EEPROM.
 	 * NOTE: an EEPROM writing success has been reported,
@@ -961,6 +956,10 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
 	write_flush(adev);
 
+	data_verify = kmalloc(len, GFP_KERNEL);
+	if (!data_verify)
+		goto end;
+
 	/* now start a verification run */
 	for (i = 0; i < len; i++) {
 		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
@@ -983,8 +982,8 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 	if (0 == memcmp(charbuf, data_verify, len))
 		result = OK;	/* read data matches, success */
 
-      end:
 	kfree(data_verify);
+end:
 	FN_EXIT1(result);
 	return result;
 }
