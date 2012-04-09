@@ -7,7 +7,9 @@
  * ==================================================
  */
 
-#ifdef ACX_MAC80211_USB // by Makefile, Kbuild
+#if defined CONFIG_ACX_MAC80211_USB // by Makefile, Kbuild
+
+#include <linux/usb.h>
 
 // Logging
 
@@ -16,15 +18,15 @@
 // Firmware, EEPROM, Phy
 int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
-static void acxusb_read_eeprom_version(acx_device_t * adev);
-static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
-static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
+// static void acxusb_read_eeprom_version(acx_device_t * adev);
+// static int acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type);
+// static inline int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen);
 
 // CMDs (Control Path)
 int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned timeout, const char *cmdstr);
 
 // Init, Configure (Control Path)
-static int acxusb_fill_configoption(acx_device_t * adev);
+// static int acxusb_fill_configoption(acx_device_t * adev);
 
 // Other (Control Path)
 
@@ -36,8 +38,8 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd);
 #endif
 
 // Rx Path
-static void acxusb_complete_rx(struct urb *);
-static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
+// static void acxusb_complete_rx(struct urb *);
+// static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 
 // Tx Path
 tx_t *acxusb_alloc_tx(acx_device_t *adev);
@@ -49,20 +51,20 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len, struct
 void acxusb_irq_work(struct work_struct *work);
 
 // Mac80211 Ops
-static int acxusb_op_start(struct ieee80211_hw *);
-static void acxusb_op_stop(struct ieee80211_hw *);
+// static int acxusb_op_start(struct ieee80211_hw *);
+// static void acxusb_op_stop(struct ieee80211_hw *);
 
 // Helpers
-static void acxusb_unlink_urb(struct urb *urb);
+// static void acxusb_unlink_urb(struct urb *urb);
 
 // Driver, Module
-static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID);
-static void acxusb_disconnect(struct usb_interface *intf);
+// static int acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID);
+// static void acxusb_disconnect(struct usb_interface *intf);
 
 int __init acxusb_init_module(void);
 void __exit acxusb_cleanup_module(void);
 
-#else  // !ACX_MAC80211_USB stubs
+#else  // !CONFIG_ACX_MAC80211_USB stubs
 
 static inline int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
