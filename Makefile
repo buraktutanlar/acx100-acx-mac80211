@@ -25,25 +25,27 @@ ifneq ($(KERNELRELEASE),)
 # and can use its language (this variable can only be set only from the top
 # level Makefile of the source tree). We simply have to declare the modules and
 # leave the rest to the kernel build system.
+	BUILD_KIND="invoked from in-tree make"
 	obj-$(CONFIG_ACX_MAC80211) += acx-mac80211.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_PCI) += pci.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
 	acx-mac80211-objs := common.o $(acx-mac80211-obj-y)
-	
+
 else
 # Otherwise we were called directly from the command line: the kernel build
 # system must be explicitly invoked.
+	BUILD_KIND="standalone build"
 	EXTRA_KCONFIG?= \
 		CONFIG_ACX_MAC80211=m \
 		CONFIG_ACX_MAC80211_PCI=y \
 		CONFIG_ACX_MAC80211_USB=y \
-		CONFIG_ACX_MAC80211_MEM=n
+		CONFIG_ACX_MAC80211_MEM=y
 
 	EXTRA_CFLAGS:= \
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=m,%,$(filter %=m,$(EXTRA_KCONFIG)))) \
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=y,%,$(filter %=y,$(EXTRA_KCONFIG))))
-	
+
 	PWD := $(shell pwd)
 
 	# Get the current git HEAD short version. In case something goes wrong here, ACX_GIT_VERSION 
@@ -56,8 +58,9 @@ else
 	# Uncomment following two lines to configure a build against a compat-wireless tree
 	#COMPAT_WIRELESS ?= "/path/to/compat-wireless"
 	#LINUX_KARCH ?= $(shell make -pn -C $(KERNELDIR) asm-generic |grep SRCARCH |head -1 |awk '{print $$3}')
-	
+
 all:
+	echo "make is $(BUILD_KIND)"
 ifndef COMPAT_WIRELESS
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) $(EXTRA_KCONFIG) EXTRA_CFLAGS="$(EXTRA_CFLAGS) -DACX_GIT_VERSION=\\\"$(ACX_GIT_VERSION)\\\"" modules
 else
