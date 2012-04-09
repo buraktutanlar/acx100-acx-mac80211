@@ -348,18 +348,19 @@ const u8 acx_reg_domain_ids[acx_reg_domain_ids_len] =
 static const u16 reg_domain_channel_masks[acx_reg_domain_ids_len] =
     { 0x07ff, 0x07ff, 0x1fff, 0x0600, 0x1e00, 0x2000, 0x3fff, 0x01fc };
 
+// in crda ??
 const char *const
- acx_reg_domain_strings[] = {
-	/* 0 */ " 1-11 FCC (USA)",
-	/* 1 */ " 1-11 DOC/IC (Canada)",
+acx_reg_domain_strings[] = {
+	[0] = " 1-11 FCC (USA)",
+	[1] = " 1-11 DOC/IC (Canada)",
 	/* BTW: WLAN use in ETSI is regulated by ETSI standard EN 300 328-2 V1.1.2 */
-	/* 2 */ " 1-13 ETSI (Europe)",
-	/* 3 */ "10-11 Spain",
-	/* 4 */ "10-13 France",
-	/* 5 */ "   14 MKK (Japan)",
-	/* 6 */ " 1-14 MKK1",
-	/* 7 */ "  3-9 Israel (not all firmware versions)",
-	NULL			/* needs to remain as last entry */
+	[2] = " 1-13 ETSI (Europe)",
+	[3] = "10-11 Spain",
+	[4] = "10-13 France",
+	[5] = "   14 MKK (Japan)",
+	[6] = " 1-14 MKK1",
+	[7] = "  3-9 Israel (not all firmware versions)",
+	[8] = NULL,	/* needs to remain as last entry */
 };
 
 /* FIXME: the lengths given here probably aren't always correct.
@@ -575,22 +576,22 @@ static struct ieee80211_supported_band acx111_band_2GHz = {
 };
 
 static const u8 bitpos2genframe_txrate[] = {
-	10,			/*  0.  1 Mbit/s */
-	20,			/*  1.  2 Mbit/s */
-	55,			/*  2.  5.5 Mbit/s */
-	0x0B,			/*  3.  6 Mbit/s */
-	0x0F,			/*  4.  9 Mbit/s */
-	110,			/*  5. 11 Mbit/s */
-	0x0A,			/*  6. 12 Mbit/s */
-	0x0E,			/*  7. 18 Mbit/s */
-	220,			/*  8. 22 Mbit/s */
-	0x09,			/*  9. 24 Mbit/s */
-	0x0D,			/* 10. 36 Mbit/s */
-	0x08,			/* 11. 48 Mbit/s */
-	0x0C,			/* 12. 54 Mbit/s */
-	10,			/* 13.  1 Mbit/s, should never happen */
-	10,			/* 14.  1 Mbit/s, should never happen */
-	10,			/* 15.  1 Mbit/s, should never happen */
+	[0] = 10,		/*  1 Mbit/s */
+	[1] = 20,		/*  2 Mbit/s */
+	[2] = 55,		/*  5*5 Mbit/s */
+	[3] = 0x0B,		/*  6 Mbit/s */
+	[4] = 0x0F,		/*  9 Mbit/s */
+	[5] = 110,		/* 11 Mbit/s */
+	[6] = 0x0A,		/* 12 Mbit/s */
+	[7] = 0x0E,		/* 18 Mbit/s */
+	[8] = 220,		/* 22 Mbit/s */
+	[9] = 0x09,		/* 24 Mbit/s */
+	[10] = 0x0D,		/* 36 Mbit/s */
+	[11] = 0x08,		/* 48 Mbit/s */
+	[12] = 0x0C,		/* 54 Mbit/s */
+	[13] = 10,		/*  1 Mbit/s, should never happen */
+	[14] = 10,		/*  1 Mbit/s, should never happen */
+	[15] = 10,		/*  1 Mbit/s, should never happen */
 };
 
 const u8 acx_bitpos2ratebyte[] = {
@@ -610,22 +611,22 @@ const u8 acx_bitpos2ratebyte[] = {
 };
 
 const u8 acx_bitpos2rate100[] = {
-	RATE100_1,		/* 0 */
-	RATE100_2,		/* 1 */
-	RATE100_5,		/* 2 */
-	RATE100_2,		/* 3, should not happen */
-	RATE100_2,		/* 4, should not happen */
-	RATE100_11,		/* 5 */
-	RATE100_2,		/* 6, should not happen */
-	RATE100_2,		/* 7, should not happen */
-	RATE100_22,		/* 8 */
-	RATE100_2,		/* 9, should not happen */
-	RATE100_2,		/* 10, should not happen */
-	RATE100_2,		/* 11, should not happen */
-	RATE100_2,		/* 12, should not happen */
-	RATE100_2,		/* 13, should not happen */
-	RATE100_2,		/* 14, should not happen */
-	RATE100_2,		/* 15, should not happen */
+	[0] = RATE100_1,
+	[1] = RATE100_2,
+	[2] = RATE100_5,
+	[3] = RATE100_2,	/* should not happen */
+	[4] = RATE100_2,	/* should not happen */
+	[5] = RATE100_11,	
+	[6] = RATE100_2,	/* should not happen */
+	[7] = RATE100_2,	/* should not happen */
+	[8] = RATE100_22,		
+	[9] = RATE100_2,	/* should not happen */
+	[10] = RATE100_2,	/* should not happen */
+	[11] = RATE100_2,	/* should not happen */
+	[12] = RATE100_2,	/* should not happen */
+	[13] = RATE100_2,	/* should not happen */
+	[14] = RATE100_2,	/* should not happen */
+	[15] = RATE100_2,	/* should not happen */
 };
 
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value)
