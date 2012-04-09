@@ -17,6 +17,8 @@
  */
 #define ACX_MAC80211_PCI 1
 
+#include "acx_debug.h"
+
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)

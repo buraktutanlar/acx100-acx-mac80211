@@ -15,6 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "acx_debug.h"
+
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

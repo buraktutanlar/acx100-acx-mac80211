@@ -28,6 +28,8 @@
  */
 #define ACX_MAC80211_USB 1
 
+#include "acx_debug.h"
+
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/module.h>
