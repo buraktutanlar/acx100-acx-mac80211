@@ -2111,7 +2111,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "acxmem: %s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
+	log(L_CTL, "%s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
 			__func__, cmdstr, cmd, buflen, cmd_timeout,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
@@ -2205,14 +2205,14 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* Timed out! */
 	if (counter == 0) {
 
-		log(L_ANY, "acxmem: %s: %s: Timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "%s: %s: Timed out %s for CMD_COMPLETE. "
 				"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 				"cmd_status:%d (%s)\n",
 		       __func__, devname,
 		       (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
-		log(L_ANY, "acxmem: %s: "
+		log(L_ANY, "%s: "
 				"timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
 				__func__,
 				counter, cmd_timeout, cmd_timeout - counter);
@@ -2223,7 +2223,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		}
 
 	} else if (cmd_timeout - counter > 30) { /* if waited >30ms... */
-		log(L_CTL|L_DEBUG, "acxmem: %s: "
+		log(L_CTL|L_DEBUG, "%s: "
 				"%s for CMD_COMPLETE %dms. count:%d. Please report\n",
 				__func__,
 				(adev->irqs_active) ? "waited" : "polled",
@@ -2269,7 +2269,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
 		acxmem_copy_from_slavemem(adev, buffer, (u32) (adev->cmd_area + 4), buflen);
 		if (acx_debug & L_DEBUG) {
-			log(L_ANY, "acxmem: %s: output buffer (len=%u): ", __func__, buflen);
+			log(L_ANY, "%s: output buffer (len=%u): ", __func__, buflen);
 			acx_dump_bytes(buffer, buflen);
 		}
 	}
@@ -2315,7 +2315,7 @@ static u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
-	log(L_DEBUG, "acxmem: %s: "
+	log(L_DEBUG, "%s: "
 			"cmd_type:%04X cmd_status:%04X [%s]\n",
 			__func__,
 			cmd_type, cmd_status,
@@ -2955,7 +2955,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
-		log(L_BUFR, "acxmem: %s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
+		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
 		/*
 		 * If the ACX has CTL_RECLAIM set on this descriptor there
 		 * is no buffer associated; it just wants us to tell it to
@@ -2981,7 +2981,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 				 * get that now and then - try to trap it for debug.
 				 */
 				if (addr & 0xffff0000) {
-					log(L_ANY, "acxmem: %s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
+					log(L_ANY, "%s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
@@ -2991,7 +2991,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
 		} else {
-			log(L_ANY, "acxmem: %s: rx reclaim only!\n", __func__);
+			log(L_ANY, "%s: rx reclaim only!\n", __func__);
 		}
 
 		hostdesc->Status = 0;
@@ -3053,7 +3053,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	acxmem_lock();
 
 	if (unlikely(!adev->tx_free)) {
-		log(L_ANY, "acxmem: %s: BUG: no free txdesc left\n", __func__);
+		log(L_ANY, "%s: BUG: no free txdesc left\n", __func__);
 		/*
 		 * Probably the ACX ignored a transmit attempt and now there's a packet
 		 * sitting in the queue we think should be transmitting but the ACX doesn't
@@ -3064,12 +3064,12 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 		 */
 		if (txattempts < 10) {
 			txattempts++;
-			log(L_ANY, "acxmem: %s: trying to wake up ACX\n", __func__);
+			log(L_ANY, "%s: trying to wake up ACX\n", __func__);
 			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 			write_flush(adev);
 		} else {
 			txattempts = 0;
-			log(L_ANY, "acxmem: %s: flushing transmit queue.\n", __func__);
+			log(L_ANY, "%s: flushing transmit queue.\n", __func__);
 			acxmem_clean_txdesc_emergency(adev);
 		}
 		txdesc = NULL;
@@ -3102,7 +3102,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
 	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
 		txdesc = NULL;
-		log(L_BUFT, "acxmem: %s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
+		log(L_BUFT, "%s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
 				"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
 				"Stopping queue.\n",
 				__func__,
@@ -3131,7 +3131,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
-		log(L_ANY, "acxmem: %s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
+		log(L_ANY, "%s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
 			__func__,
 			head, ctl8);
 		txdesc = NULL;
@@ -3142,7 +3142,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
 
 	adev->tx_free--;
-	log(L_BUFT, "acxmem: %s: tx: got desc %u, %u remain\n",
+	log(L_BUFT, "%s: tx: got desc %u, %u remain\n",
 			__func__, head, adev->tx_free);
 
 	/* returning current descriptor, so advance to next free one */
@@ -3945,19 +3945,19 @@ void acxmem_irq_work(struct work_struct *work)
 
 		/* HOST_INT_CMD_COMPLETE handling */
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
-			log(L_IRQ, "acxmem: got Command_Complete IRQ\n");
+			log(L_IRQ, "got Command_Complete IRQ\n");
 			/* save the state for the running issue_cmd() */
 			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
 		/* Tx reporting */
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
-			log(L_IRQ, "acxmem: got Tx_Complete IRQ\n");
+			log(L_IRQ, "got Tx_Complete IRQ\n");
 				acxmem_tx_clean_txdesc(adev);
 
 				// Restart queue if stopped and enough tx-descr free
 				if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-					log(L_BUF, "acxmem: tx: wake queue (avail. Tx desc %u)\n",
+					log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
 							adev->tx_free);
 					acx_wake_queue(adev->ieee, NULL);
 					ieee80211_queue_work(adev->ieee, &adev->tx_work);
@@ -3967,7 +3967,7 @@ void acxmem_irq_work(struct work_struct *work)
 
 		/* Rx processing */
 		if (irqmasked & HOST_INT_RX_DATA) {
-			log(L_IRQ, "acxmem: got Rx_Complete IRQ\n");
+			log(L_IRQ, "got Rx_Complete IRQ\n");
 			acxmem_process_rxdesc(adev);
 		}
 
@@ -3978,7 +3978,7 @@ void acxmem_irq_work(struct work_struct *work)
 
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
-			log(L_IRQ, "acxmem: got Scan_Complete IRQ\n");
+			log(L_IRQ, "got Scan_Complete IRQ\n");
 			/* need to do that in process context */
 			/* remember that fw is not scanning anymore */
 			SET_BIT(adev->irq_status,
@@ -4041,13 +4041,13 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	 */
 	irqreason = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
 	irqmasked = irqreason & ~adev->irq_mask;
-	log(L_IRQ, "acxmem: irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
+	log(L_IRQ, "irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
 
 	if (unlikely(irqreason == 0xffff)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "acxmem: irqstatus=FFFF: Device removed?: IRQ_NONE\n");
+		log(L_IRQ, "irqstatus=FFFF: Device removed?: IRQ_NONE\n");
 		goto none;
 	}
 
@@ -4056,7 +4056,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	 */
 	if (!irqmasked) {
 		/* We are on a shared IRQ line and it wasn't our IRQ */
-		log(L_IRQ, "acxmem: irqmasked zero: IRQ_NONE\n");
+		log(L_IRQ, "irqmasked zero: IRQ_NONE\n");
 		goto none;
 	}
 
@@ -5160,7 +5160,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	}
 
 	// Unregister ieee80211 device
-	log(L_INIT, "acxmem: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 

@@ -2485,7 +2485,7 @@ void acxpci_irq_work(struct work_struct *work)
 	 */
 	irqreason = read_reg16(adev, IO_ACX_IRQ_REASON);
 	irqmasked = irqreason & ~adev->irq_mask;
-	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
+	log(L_IRQ, "irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
 
 #if IRQ_ITERATE
 	if (!irqmasked) break;
@@ -2493,7 +2493,7 @@ void acxpci_irq_work(struct work_struct *work)
 
 		/* HOST_INT_CMD_COMPLETE handling */
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
-			log(L_IRQ, "acxpci: got Command_Complete IRQ\n");
+			log(L_IRQ, "got Command_Complete IRQ\n");
 
 			/* save the state for the running issue_cmd() */
 			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
@@ -2542,7 +2542,7 @@ void acxpci_irq_work(struct work_struct *work)
 
 		/* Now do Rx processing */
 		if (irqmasked & HOST_INT_RX_COMPLETE) {
-			log(L_IRQ, "acxpci: got Rx_Complete IRQ\n");
+			log(L_IRQ, "got Rx_Complete IRQ\n");
 			acxpci_process_rxdesc(adev);
 		}
 
@@ -2562,7 +2562,7 @@ void acxpci_irq_work(struct work_struct *work)
 
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
-			log(L_IRQ, "acxpci: got Scan_Complete IRQ\n");
+			log(L_IRQ, "got Scan_Complete IRQ\n");
 			/* need to do that in process context */
 			/* remember that fw is not scanning anymore */
 			SET_BIT(adev->irq_status,
@@ -2627,13 +2627,13 @@ static irqreturn_t acxpci_interrupt(int irq, void *dev_id)
 	 */
 	irqreason = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
 	irqmasked = irqreason & ~adev->irq_mask;
-	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
+	log(L_IRQ, "irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
 
 	if (unlikely(irqreason == 0xffff)) {
 		/* 0xffff value hints at missing hardware,
 		 * so don't do anything.
 		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "acxpci: irqstatus=FFFF: Device removed?: IRQ_NONE\n");
+		log(L_IRQ, "irqstatus=FFFF: Device removed?: IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2642,7 +2642,7 @@ static irqreturn_t acxpci_interrupt(int irq, void *dev_id)
 	 */
 	if (!irqmasked) {
 		/* We are on a shared IRQ line and it wasn't our IRQ */
-		log(L_IRQ, "acxpci: irqmasked zero: IRQ_NONE\n");
+		log(L_IRQ, "irqmasked zero: IRQ_NONE\n");
 		goto none;
 	}
 
@@ -2869,7 +2869,7 @@ static void acxpci_op_stop(struct ieee80211_hw *hw)
 
 	adev->initialized = 0;
 
-	log(L_INIT, "acxpci: closed device\n");
+	log(L_INIT, "closed device\n");
 
 	acx_sem_unlock(adev);
 	FN_EXIT0;
@@ -3708,7 +3708,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	}
 
 	// Unregister ieee80211 device
-	log(L_INIT, "acxpci: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
@@ -4273,7 +4273,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 
 
 	// Unregister ieee80211 device
-	log(L_INIT, "acxpci: removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
