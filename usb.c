@@ -199,6 +199,14 @@ static void acxusb_read_eeprom_version(acx_device_t * adev)
 	adev->eeprom_version = eeprom_ver[5];
 }
 
+static inline
+int acxusb_fw_needs_padding(firmware_image_t *fw_image,
+			unsigned int usb_maxlen)
+{
+	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
+	return ((num_xfers % 2) == 0);
+}
+
 /*
  * acxusb_boot()
  * Inputs:
@@ -472,13 +480,6 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 }
 
 
-static inline
-int acxusb_fw_needs_padding(firmware_image_t *fw_image, unsigned int usb_maxlen)
-{
-	unsigned int num_xfers = ((fw_image->size - 1) / usb_maxlen) + 1;
-
-	return ((num_xfers % 2) == 0);
-}
 
 /*
  * BOM CMDs (Control Path)
@@ -813,6 +814,7 @@ static void dump_device_descriptor(struct usb_device_descriptor *dd)
  * The received data is then committed to the network stack and the next
  * USB receive is triggered.
  */
+static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx);
 static void acxusb_complete_rx(struct urb *urb)
 {
 	acx_device_t *adev;
@@ -1349,22 +1351,6 @@ void acxusb_irq_work(struct work_struct *work)
  * ==================================================
  */
 
-static const struct ieee80211_ops acxusb_hw_ops = {
-	.tx = acx_op_tx,
-	.conf_tx = acx_conf_tx,
-	.add_interface = acx_op_add_interface,
-	.remove_interface = acx_op_remove_interface,
-	.start = acxusb_op_start,
-	.configure_filter = acx_op_configure_filter,
-	.stop = acxusb_op_stop,
-	.config = acx_op_config,
-	.bss_info_changed = acx_op_bss_info_changed,
-	.set_key = acx_op_set_key,
-	.get_stats = acx_op_get_stats,
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	.get_tx_stats = acx_e_op_get_tx_stats,
-#endif
-};
 
 /*
  * acxusb_e_start()
@@ -1426,6 +1412,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
  * transfers, these are unlinked (asynchronously). The module in-use count
  * is also decreased in this function.
  */
+static void acxusb_unlink_urb(struct urb *urb);
 static void acxusb_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -1475,6 +1462,22 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	FN_EXIT0;
 }
 
+static const struct ieee80211_ops acxusb_hw_ops = {
+	.tx = acx_op_tx,
+	.conf_tx = acx_conf_tx,
+	.add_interface = acx_op_add_interface,
+	.remove_interface = acx_op_remove_interface,
+	.start = acxusb_op_start,
+	.configure_filter = acx_op_configure_filter,
+	.stop = acxusb_op_stop,
+	.config = acx_op_config,
+	.bss_info_changed = acx_op_bss_info_changed,
+	.set_key = acx_op_set_key,
+	.get_stats = acx_op_get_stats,
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
+	.get_tx_stats = acx_e_op_get_tx_stats,
+#endif
+};
 
 /*
  * BOM Helpers
@@ -1533,16 +1536,6 @@ static void acxusb_unlink_urb(struct urb *urb)
  * BOM Driver, Module
  * ==================================================
  */
-
-/* USB driver data structure as required by the kernel's USB core */
-static struct usb_driver
- acxusb_driver = {
-	.name = "acx_usb",
-	.probe = acxusb_probe,
-	.disconnect = acxusb_disconnect,
-	.id_table = acxusb_ids
-};
-
 
 /*
  * acxusb_e_probe()
@@ -1891,6 +1884,15 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	end:
 	FN_EXIT0;
 }
+
+/* USB driver data structure as required by the kernel's USB core */
+static struct usb_driver
+ acxusb_driver = {
+	.name = "acx_usb",
+	.probe = acxusb_probe,
+	.disconnect = acxusb_disconnect,
+	.id_table = acxusb_ids
+};
 
 /*
  * init_module()
