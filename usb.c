@@ -93,6 +93,8 @@ static const struct usb_device_id acxusb_ids[] = {
 };
 MODULE_DEVICE_TABLE(usb, acxusb_ids);
 
+#include "usb.h"
+#if 0 
 /*
  * BOM Prototypes
  * ... static and also none-static for overview reasons (maybe not best practice ...)
@@ -152,7 +154,7 @@ static void acxusb_disconnect(struct usb_interface *intf);
 int __init acxusb_init_module(void);
 void __exit acxusb_cleanup_module(void);
 
- 
+#endif
  /*
  * BOM Defines, static vars, etc.
  * ==================================================
