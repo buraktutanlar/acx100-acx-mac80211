@@ -3,24 +3,25 @@ acx-mac80211 INSTALL
 
 I. Introduction
 ---------------
-This document describes the steps required to build and install the acx driver
-in a Linux system.
+This document describes the steps required to build and install the
+acx driver in a Linux system.
 
-Two alternative methods are described, referred to as in-tree and out-of-tree,
-of which only one of them must be chosen. The recommended way, because of its
-simplicity, is the out-of-tree installation, although it requires an installed
-set of kernel include headers in the system.
+Two alternative methods are described, referred to as in-tree and
+out-of-tree, of which only one of them must be chosen. The recommended
+way, because of its simplicity, is the out-of-tree installation,
+although it requires an installed set of kernel include headers in the
+system.
 
-Alternatively you may also consider a DKMS installation, see chapter III) 
-below.
+Alternatively you may also consider a DKMS installation, see chapter
+III) below.
 
-For hx4700 or rx1950 chapter V) is describing building and installation of 
-driver and platform modules.
+For hx4700 or rx1950 chapter V) is describing building and
+installation of driver and platform modules.
 
 II. As a module, outside the kernel tree
 ----------------------------------------
-This is the recommended and most straight forward method for end-users for
-using the driver.
+This is the recommended and most straight forward method for end-users
+for using the driver.
 
 1) Install the sources, e.g. from a tar-ball or a git repository:
 ---
@@ -32,9 +33,11 @@ git checkout [branch] -b [branch]
 
 2) Build the module: 
 
-The result will be the acx-mac80211.ko kernel module. The default build config will include pci and usb support.
+The result will be the acx-mac80211.ko kernel module. The default
+build config will include pci and usb support.
 
-Make sure your kernel headers are installed and that the corresponding 'build' sym-link is set in '/lib/modules/[kernel]/build'.
+Make sure your kernel headers are installed and that the corresponding
+'build' sym-link is set in '/lib/modules/[kernel]/build'.
 
 A simple make should compile the driver in 10secs.
 ---
@@ -43,7 +46,9 @@ make
 
 3) Install the module:
 
-You can basically install the module a) fully in your kernels /lib/modules installation or b) keep just keep it locally and do the loading individually.
+You can basically install the module a) fully in your kernels
+/lib/modules installation or b) keep just keep it locally and do the
+loading individually.
 
 3a) 
 ---
@@ -55,11 +60,13 @@ depmod
 
 4) Usage:
 
-The acx-mac80211 driver depends on the mac80211 module. So it should be loaded before. 
+The acx-mac80211 driver depends on the mac80211 module. So it should
+be loaded before.
 
 4.1.a) Following a 3a) installation:
 
-Module dependency for mac80211 should have been updated by depmod, so a simple modprobe will load the driver:
+Module dependency for mac80211 should have been updated by depmod, so
+a simple modprobe will load the driver:
 ---
 modprobe acx-mac80211
 ---
@@ -72,12 +79,14 @@ insmod ./acx-mac80211.ko
 
 4.2) Firmware installation:
 
-If the firmware file is not yet installed, you will find following message in 'dmesg':
+If the firmware file is not yet installed, you will find following
+message in 'dmesg':
 ---
 ---
 => See the README and wiki for more information on firmware installation.
 
-Install the corresponding firmware file [tiacx] into '/lib/firmware' and reload the driver:
+Install the corresponding firmware file [tiacx] into '/lib/firmware'
+and reload the driver:
 ---
 rmmod acx-mac80211
 modprobe acx-mac80211 ... or ... insmod ./acx-mac80211.ko
@@ -85,8 +94,8 @@ modprobe acx-mac80211 ... or ... insmod ./acx-mac80211.ko
 
 5) That's it. A 'dmesg' should show the driver having probed devices. 
 
-Using 'iwconfig' you should see the corresponding the wlan[0-9] (depending on 
-how many wifi cards you have ;) interface now.
+Using 'iwconfig' you should see the corresponding the wlan[0-9]
+(depending on how many wifi cards you have ;) interface now.
 
 A basic smoke test is performing a scan or two:
 ---
@@ -96,24 +105,27 @@ iwlist wlan[0-9] scan
 
 6) Advanced build
 
-In case you need to specify configuration options other than the default PCI
-build (e.g. you need to build the USB driver, or you want to build against a
-special kernel version), you will first need to have a look at the Makefile in
-order to understand it.
+In case you need to specify configuration options other than the
+default PCI build (e.g. you need to build the USB driver, or you want
+to build against a special kernel version), you will first need to
+have a look at the Makefile in order to understand it.
 
-You will see that there is an EXTRA_KCONFIG variable, which you can modify
-directly on the file or define it on the command-line to suit your needs:
+You will see that there is an EXTRA_KCONFIG variable, which you can
+modify directly on the file or define it on the command-line to suit
+your needs:
 
    export EXTRA_KCONFIG="CONFIG_ACX_MAC80211=m CONFIG_ACX_MAC80211_USB=y" && make
 
 If you use this method (CLI), do not forget to either unset ('unset
-EXTRA_KCONFIG') or explicitly define EXTRA_KCONFIG for subsequent builds!
+EXTRA_KCONFIG') or explicitly define EXTRA_KCONFIG for subsequent
+builds!
 
-You can also define the KERNELDIR variable in order to specify a different
-kernel directory other than that of the the currently running one.
+You can also define the KERNELDIR variable in order to specify a
+different kernel directory other than that of the the currently
+running one.
 
-Note that you can also execute make with 'make V=1' in order to get verbose
-information during the build.
+Note that you can also execute make with 'make V=1' in order to get
+verbose information during the build.
 
 
 III. DKMS installation
@@ -121,7 +133,8 @@ III. DKMS installation
 
 For a DKMS installation, do the following
 
-1) Install the acx-mac80211 source into /usr/src in a directory with following form
+1) Install the acx-mac80211 source into /usr/src in a directory with
+following form
 ---
 /usr/src/acx-mac80211-[version]
 ---
@@ -131,7 +144,8 @@ Where [version] can e.g. also be "git", if it's the git repository
 /usr/src/acx-mac80211-git
 ---
 
-2) Then add the "acx-mac80211" driver module, and in this example version "git", to DKMS
+2) Then add the "acx-mac80211" driver module, and in this example
+version "git", to DKMS
 ---
 dkms add -m acx-mac80211 -v git 
 ---
@@ -168,13 +182,13 @@ VI. Inside the kernel tree
 
 2) Kernel build system preparation 
 
-Modify the file drivers/net/wireless/Makefile by adding the following line to
-it:
+Modify the file drivers/net/wireless/Makefile by adding the following
+line to it:
 
   obj-$(CONFIG_ACX_MAC80211)      += acx/
 
-Modify the file drivers/net/wireless/Kconfig by adding the following line to
-it:
+Modify the file drivers/net/wireless/Kconfig by adding the following
+line to it:
 
   source "drivers/net/wireless/acx/Kconfig"
 
@@ -184,10 +198,10 @@ Start the kernel configuration menu as usual:
 
 (or any similar method, e.g. with graphical interface)
 
-Now you can simply configure the kernel in the usual way, making sure that the
-CONFIG_ACX_MAC80211 option and at least one of the CONFIG_ACX_MAC80211_PCI or
-CONFIG_ACX_MAC80211_USB options are set in the .config file, as described
-below.
+Now you can simply configure the kernel in the usual way, making sure
+that the CONFIG_ACX_MAC80211 option and at least one of the
+CONFIG_ACX_MAC80211_PCI or CONFIG_ACX_MAC80211_USB options are set in
+the .config file, as described below.
 
 Note: you will have to first select the mac80211 stack in the kernel
 configuration menu:
@@ -216,35 +230,38 @@ Device Drivers  --->
 
 3) Build
 
-Issue a standard 'make' or 'make modules' command on the command line in order
-to start the compilation of the kernel. Depending on the kernel configuration
-you have chosen, this might take some time.
+Issue a standard 'make' or 'make modules' command on the command line
+in order to start the compilation of the kernel. Depending on the
+kernel configuration you have chosen, this might take some time.
 
 Refer to the kernel documentation for further information.
 
 4) Installation
 
-TODO -> description of the standard kernel module installation and the 'make
-modules_install' target. Refer to the kernel documentation for now.
+TODO -> description of the standard kernel module installation and the
+'make modules_install' target. Refer to the kernel documentation for
+now.
 
 V) hx4700 or rx1950 installation
 --------------------------------
 
-The acx-mac80211 driver includes slave-memory and platform module support for
-the iPaq hx4700 and rx1950. 
+The acx-mac80211 driver includes slave-memory and platform module
+support for the iPaq hx4700 and rx1950.
 
 Here some complementary instructions for build, install and usage.
 
-1) Select CONFIG_ACX_MAC80211_MEM and deselect CONFIG_ACX_MAC80211_PCI and 
-CONFIG_ACX_MAC80211_USB in the Makefile
+1) Select CONFIG_ACX_MAC80211_MEM and deselect CONFIG_ACX_MAC80211_PCI
+and CONFIG_ACX_MAC80211_USB in the Makefile
 
-2) Build the driver module with your tool chain (no more details, since 
-probably at this point corresponding cross-building know-how is anyway present)
+2) Build the driver module with your tool chain (no more details,
+since probably at this point corresponding cross-building know-how is
+anyway present)
 
-3) Build the platform module in the corresponding platform directory (cd platform-(hx4700|rx1950); make)
+3) Build the platform module in the corresponding platform directory
+(cd platform-(hx4700|rx1950); make)
 
-4) Install the acx-mac80211.ko and (hx4700|rx1950)_acx.ko modules on your
-machine
+4) Install the acx-mac80211.ko and (hx4700|rx1950)_acx.ko modules on
+your machine
 
 5) Install firmware, see above 
 
@@ -256,17 +273,18 @@ machine
 Copyright (C) 2008, 2010 The ACX100 Open Source Project
 <acx100-devel@lists.sourceforge.net>
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 2 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or (at
+your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with
-this program.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 Original author:
 	David Planella <david.planella AT gmail.com>
