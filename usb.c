@@ -1306,6 +1306,48 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	FN_EXIT0;
 }
 
+/*
+ * USB helper
+ *
+ * ldd3 ch13 says:
+ * When the function is usb_kill_urb, the urb lifecycle is stopped. This
+ * function is usually used when the device is disconnected from the system,
+ * in the disconnect callback. For some drivers, the usb_unlink_urb function
+ * should be used to tell the USB core to stop an urb. This function does not
+ * wait for the urb to be fully stopped before returning to the caller.
+ * This is useful for stoppingthe urb while in an interrupt handler or when
+ * a spinlock is held, as waiting for a urb to fully stop requires the ability
+ * for the USB core to put the calling process to sleep. This function requires
+ * that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
+ * to be stopped in order to work properly.
+ *
+ * (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
+ * asynchronous while usb_kill_urb is synchronous and should be called
+ * directly (drivers/usb/core/urb.c))
+ *
+ * In light of this, timeout is just for paranoid reasons...
+ *
+ * Actually, it's useful for debugging. If we reach timeout, we're doing
+ * something wrong with the urbs.
+ */
+static void acxusb_unlink_urb(struct urb *urb)
+{
+	if (!urb)
+		return;
+
+	if (urb->status == -EINPROGRESS) {
+		int timeout = 10;
+
+		usb_unlink_urb(urb);
+		while (--timeout && urb->status == -EINPROGRESS) {
+			mdelay(1);
+		}
+		if (!timeout) {
+			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
+		}
+	}
+}
+
 #ifdef HAVE_TX_TIMEOUT
 /*
 void acxusb_i_tx_timeout(struct net_device *ndev)
@@ -1339,7 +1381,7 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 void acxusb_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev =
-			container_of(work, struct acx_device, irq_work);
+		container_of(work, struct acx_device, irq_work);
 
 	if (adev->after_interrupt_jobs)
 		acx_after_interrupt_task(adev);
@@ -1412,7 +1454,6 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
  * transfers, these are unlinked (asynchronously). The module in-use count
  * is also decreased in this function.
  */
-static void acxusb_unlink_urb(struct urb *urb);
 static void acxusb_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -1484,47 +1525,6 @@ static const struct ieee80211_ops acxusb_hw_ops = {
  * ==================================================
  */
 
-/*
- * USB helper
- *
- * ldd3 ch13 says:
- * When the function is usb_kill_urb, the urb lifecycle is stopped. This
- * function is usually used when the device is disconnected from the system,
- * in the disconnect callback. For some drivers, the usb_unlink_urb function
- * should be used to tell the USB core to stop an urb. This function does not
- * wait for the urb to be fully stopped before returning to the caller.
- * This is useful for stoppingthe urb while in an interrupt handler or when
- * a spinlock is held, as waiting for a urb to fully stop requires the ability
- * for the USB core to put the calling process to sleep. This function requires
- * that the URB_ASYNC_UNLINK flag value be set in the urb that is being asked
- * to be stopped in order to work properly.
- *
- * (URB_ASYNC_UNLINK is obsolete, usb_unlink_urb will always be
- * asynchronous while usb_kill_urb is synchronous and should be called
- * directly (drivers/usb/core/urb.c))
- *
- * In light of this, timeout is just for paranoid reasons...
- *
- * Actually, it's useful for debugging. If we reach timeout, we're doing
- * something wrong with the urbs.
- */
-static void acxusb_unlink_urb(struct urb *urb)
-{
-	if (!urb)
-		return;
-
-	if (urb->status == -EINPROGRESS) {
-		int timeout = 10;
-
-		usb_unlink_urb(urb);
-		while (--timeout && urb->status == -EINPROGRESS) {
-			mdelay(1);
-		}
-		if (!timeout) {
-			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
-		}
-	}
-}
 
 
 /*
