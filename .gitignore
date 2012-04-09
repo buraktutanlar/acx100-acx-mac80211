@@ -1,0 +1,10 @@
+
+# suppress git status noise
+*.o
+*.cmd
+*.mod.c
+*.ko
+Module.symvers
+modules.order
+*~
+*.patch
