@@ -1,3 +1,27 @@
 TODO
 
+---------
+in acx_proc_show_eeprom(struct seq_file *file, void *v)
+	// OW Hopefully enough. TODO see if eeprom fns can size it
+	const int buf_size = 1024*64;
 
+large malloc.  can push sizing down to callees, and return *buf
+
+acxpci_proc_eeprom_output(buf, adev);
+  only uses 0x400, so yes, here.
+
+acxmem_proc_eeprom_output(buf, adev);
+  uses 0xffff
+
+---------
+acx_proc_show_eeprom(struct seq_file *file, void *v)
+
+does seq_putc for buf, prbly a better/faster way.
+
+---------
+acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u32 len,
+
+add cpu-burn counter to assess wait-loop,
+recode wait-loop to helper, replace multiple uses.
+
+---------
