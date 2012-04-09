@@ -37,7 +37,7 @@
 #include <net/mac80211.h>
 
 #include "acx.h"
-
+#include "usb.h"
 
 
 /*

@@ -1,9 +1,14 @@
+
+// usb.h - included directly by common.c
+
 /*
  * BOM Prototypes
  * ... static and also none-static for overview reasons (maybe not best practice ...)
  * ==================================================
  */
- 
+
+#ifdef ACX_MAC80211_USB // by Makefile, Kbuild
+
 // Logging
 
 // Data Access
@@ -56,4 +61,52 @@ static void acxusb_disconnect(struct usb_interface *intf);
 
 int __init acxusb_init_module(void);
 void __exit acxusb_cleanup_module(void);
+
+#else  // !ACX_MAC80211_USB stubs
+
+static inline int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
+{
+	return 0;
+}
+static inline int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
+{
+	return 0;
+}
+
+static inline int acxusb_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
+					void *buffer, unsigned buflen,
+					unsigned timeout, const char *cmdstr)
+{
+	return 0;
+}
+
+static inline tx_t *acxusb_alloc_tx(acx_device_t *adev)
+{
+	return (tx_t*) NULL;
+}
+
+static inline void acxusb_dealloc_tx(tx_t * tx_opaque)
+{}
+
+static inline void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
+{
+	return (void*) NULL;
+}
+
+static inline void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
+				struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
+{}
+
+static inline void acxusb_irq_work(struct work_struct *work)
+{}
+
+static inline int __init acxusb_init_module(void)
+{
+	return 0;
+}
+
+static inline void __exit acxusb_cleanup_module(void)
+{}
+
+#endif
 

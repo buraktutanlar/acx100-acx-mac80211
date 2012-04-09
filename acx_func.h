@@ -588,6 +588,7 @@ void __exit acxpci_cleanup_module(void);
 
 // Data Access
 
+#if 0
 // Firmware, EEPROM, Phy
 int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
@@ -619,6 +620,8 @@ void acxusb_irq_work(struct work_struct *work);
 // Driver, Module
 int __init acxusb_init_module(void);
 void __exit acxusb_cleanup_module(void);
+
+#endif
 
 /*
  * BOM Mem prototypes
