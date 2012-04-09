@@ -18,6 +18,7 @@
 #ifndef _ACX_H_
 #define _ACX_H_
 
+#include "acx_compat.h"
 #include "acx_config.h"
 #include "acx_struct_hw.h"
 #include "acx_struct_dev.h"

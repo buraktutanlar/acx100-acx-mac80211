@@ -34,10 +34,6 @@
 #include <linux/nl80211.h>
 #include <linux/ieee80211.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) || LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 40)
-#include <linux/ratelimit.h>
-#endif
-
 #include <net/mac80211.h>
 
 #include "acx.h"

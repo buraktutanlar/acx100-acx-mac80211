@@ -45,10 +45,6 @@
 #include <linux/workqueue.h>
 #include <linux/nl80211.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) || LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 40)
-#include <linux/ratelimit.h>
-#endif
-
 #include <net/iw_handler.h>
 #include <net/mac80211.h>
 
