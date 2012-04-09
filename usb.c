@@ -226,7 +226,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	   mem.len = cpu_to_le32(4);
 	   acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
 	   *charbuf = mem.data;
-	   log(L_DEBUG, "acx: read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
+	   log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
 	 */
 
 	FN_EXIT1(OK);
@@ -244,7 +244,7 @@ int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	mem.len = cpu_to_le32(4);
 	mem.data = value;
 	acx_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
-	log(L_DEBUG, "acx: write radio PHY[0x%04X]=0x%02X\n", reg, value);
+	log(L_DEBUG, "write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -342,7 +342,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		result = -EIO;
 		goto end;
 	}
-	log(L_INIT, "acx: firmware size: %d bytes\n", file_size);
+	log(L_INIT, "firmware size: %d bytes\n", file_size);
 
 	img_checksum = le32_to_cpu(fw_image->chksum);
 
@@ -587,7 +587,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "acx: %s: cmd=%s, buflen=%u, type=0x%04X\n",
+	log(L_CTL, "%s: cmd=%s, buflen=%u, type=0x%04X\n",
 	    __func__,
 	    cmdstr, buflen,
 	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
@@ -632,8 +632,8 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	/* obtain the I/O pipes */
 	outpipe = usb_sndctrlpipe(usbdev, 0);
 	inpipe = usb_rcvctrlpipe(usbdev, 0);
-	log(L_CTL, "acx: trl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
-	log(L_CTL, "acx: sending USB control msg (out) (blocklen=%d)\n", blocklen);
+	log(L_CTL, "trl inpipe=0x%X outpipe=0x%X\n", inpipe, outpipe);
+	log(L_CTL, "sending USB control msg (out) (blocklen=%d)\n", blocklen);
 	if (acx_debug & L_DATA)
 		acx_dump_bytes(loc, blocklen);
 
@@ -647,17 +647,17 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	    );
 
 	if (result == -ENODEV) {
-		log(L_CTL, "acx: no device present (unplug?)\n");
+		log(L_CTL, "no device present (unplug?)\n");
 		goto good;
 	}
 
-	log(L_CTL, "acx: wrote %d bytes\n", result);
+	log(L_CTL, "wrote %d bytes\n", result);
 	if (result < 0) {
 		goto bad;
 	}
 
 	/* check for device acknowledge */
-	log(L_CTL, "acx: sending USB control msg (in) (acklen=%d)\n", acklen);
+	log(L_CTL, "sending USB control msg (in) (acklen=%d)\n", acklen);
 	loc->status = 0;	/* delete old status flag -> set to IDLE */
 	/* shall we zero out the rest? */
 	result = usb_control_msg(usbdev, inpipe, ACX_USB_REQ_CMD,	/* request */
@@ -699,7 +699,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	}
 	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {
 		memcpy(buffer, loc->data, buflen);
-		log(L_CTL, "acx: response frame: cmd=0x%04X status=%d\n",
+		log(L_CTL, "response frame: cmd=0x%04X status=%d\n",
 		    le16_to_cpu(loc->cmd), cmd_status);
 	}
 
@@ -1056,7 +1056,7 @@ static void acxusb_complete_rx(struct urb *urb)
     		adev->tx_free++;
 
     		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-    			log(L_BUF, "acx: tx: wake queue (avail. Tx desc %u)\n",
+    			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
     					adev->tx_free);
     			acx_wake_queue(adev->ieee, NULL);
     			ieee80211_queue_work(adev->ieee, &adev->tx_work);
@@ -1138,7 +1138,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 		 */
 		usb_unlink_urb(rxurb);
 	} else if (unlikely(rxurb->status == -ECONNRESET)) {
-		log(L_USBRXTX, "acx: _poll_rx: connection reset\n");
+		log(L_USBRXTX, "_poll_rx: connection reset\n");
 		goto end;
 	}
 	rxurb->actual_length = 0;
@@ -1306,7 +1306,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	// FIXME Cleanup ?: whdr = (struct ieee80211_hdr *) txbuf->data;
 	txnum = tx - adev->usb_tx;
 
-	log(L_DEBUG, "acx: using buf#%d free=%d len=%d\n",
+	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
 	    txnum, adev->tx_free, wlanpkt_len);
 
 	/* fill the USB transfer header */
@@ -1348,7 +1348,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 
 	txurb->transfer_flags = URB_ASYNC_UNLINK | URB_ZERO_PACKET;
 	ucode = usb_submit_urb(txurb, GFP_ATOMIC);
-	log(L_USBRXTX, "acx: SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
+	log(L_USBRXTX, "SUBMIT TX (%d): outpipe=0x%X buf=%p txsize=%d "
 	    "rate=%u errcode=%d\n", txnum, outpipe, txbuf,
 	    wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
@@ -1743,7 +1743,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	ifdesc = &intf->altsetting->desc;
 	numep = ifdesc->bNumEndpoints;
-	log(L_DEBUG, "acx: # of endpoints: %d\n", numep);
+	log(L_DEBUG, "# of endpoints: %d\n", numep);
 
 	if (is_tnetw1450) {
 		adev->bulkoutep = 1;
@@ -1769,11 +1769,11 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 			}
 		}
 	}
-	log(L_DEBUG, "acx: bulkout ep: 0x%X\n", adev->bulkoutep);
-	log(L_DEBUG, "acx: bulkin ep: 0x%X\n", adev->bulkinep);
+	log(L_DEBUG, "bulkout ep: 0x%X\n", adev->bulkoutep);
+	log(L_DEBUG, "bulkin ep: 0x%X\n", adev->bulkinep);
 
 	/* already done by memset: adev->rxtruncsize = 0; */
-	log(L_DEBUG, "acx: TXBUFSIZE=%d RXBUFSIZE=%d\n",
+	log(L_DEBUG, "TXBUFSIZE=%d RXBUFSIZE=%d\n",
 	    (int)TXBUFSIZE, (int)RXBUFSIZE);
 
 	/* Allocate the RX/TX containers. */
@@ -1847,7 +1847,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 
 	/* Register the network device */
-	log(L_INIT, "acx: registering network device\n");
+	log(L_INIT, "registering network device\n");
 	result = ieee80211_register_hw(adev->ieee);
 	if (result) {
 		msg = "acx: failed to register USB network device "
@@ -1965,7 +1965,7 @@ static void acxusb_disconnect(struct usb_interface *intf)
  */
 int __init acxusb_init_module(void)
 {
-	log(L_INIT, "acx: USB module initialized, "
+	log(L_INIT, "USB module initialized, "
 	    "probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }
@@ -1981,6 +1981,6 @@ int __init acxusb_init_module(void)
 void __exit acxusb_cleanup_module(void)
 {
 	usb_deregister(&acxusb_driver);
-	log(L_INIT, "acx: USB module unloaded\n");
+	log(L_INIT, "USB module unloaded\n");
 }
 

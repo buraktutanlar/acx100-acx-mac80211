@@ -1214,7 +1214,7 @@ static void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start) 
 
 		rxdesc = adev->rxdesc_start;
 		for (i = 0; i < RX_CNT; i++) {
-			log(L_DEBUG, "acx: rx descriptor %d @ 0x%p\n", i, rxdesc);
+			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 			rxdesc = adev->rxdesc_start = (rxdesc_t *) acx2cpu(rxdesc->pNextDesc);
 		}
 	} else {
@@ -1269,7 +1269,7 @@ static void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start) 
 	 */
 	adev->txdesc_start = (txdesc_t *) tx_queue_start;
 
-	log(L_DEBUG, "acx: adev->txdesc_start=%p\n",
+	log(L_DEBUG, "adev->txdesc_start=%p\n",
 			adev->txdesc_start);
 
 	adev->tx_free = TX_CNT;
@@ -1391,7 +1391,7 @@ acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *ms
 	*phy = (dma_addr_t) NULL;
 
 	if (ptr) {
-		log(L_DEBUG, "acx: %s sz=%d adr=0x%p phy=0x%08llx\n",
+		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
 				msg, (int)size, ptr, (unsigned long long)*phy);
 		memset(ptr, 0, size);
 		return ptr;
@@ -1443,10 +1443,10 @@ int acxmem_upload_radio(acx_device_t *adev) {
 	for (try = 1; try <= 5; try++) {
 		acxmem_lock();
 		res = acxmem_write_fw(adev, radio_image, offset);
-		log(L_DEBUG|L_INIT, "acx: acx_write_fw (radio): %d\n", res);
+		log(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
 			res = acxmem_validate_fw(adev, radio_image, offset);
-			log(L_DEBUG|L_INIT, "acx: acx_validate_fw (radio): %d\n", res);
+			log(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
 		}
 		acxmem_unlock();
 
@@ -1520,7 +1520,7 @@ int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
 	}
 
 	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
-	log(L_DEBUG, "acx: EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
+	log(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
 	result = OK;
 
 	fail:
@@ -1672,10 +1672,10 @@ int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 		cpu_relax();
 	}
 
-	log(L_DEBUG, "acx: the count was %u\n", count);
+	log(L_DEBUG, "the count was %u\n", count);
 	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
 
-	log(L_DEBUG, "acx: radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
+	log(L_DEBUG, "radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
 	result = OK;
 	goto fail; /* silence compiler warning */
 	fail:
@@ -1715,7 +1715,7 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 		cpu_relax();
 	}
 
-	log(L_DEBUG, "acx: radio PHY write 0x%02X at 0x%04X\n", value, reg);
+	log(L_DEBUG, "radio PHY write 0x%02X at 0x%04X\n", value, reg);
 	fail:
 
 	acxmem_unlock();
@@ -1791,7 +1791,7 @@ static int acxmem_write_fw(acx_device_t *adev,
 			checkMismatch = 0;
 		}
 	}
-	log(L_DEBUG, "acx: firmware written, size:%d sum1:%x sum2:%x\n",
+	log(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
 			size, sum, le32_to_cpu(fw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
@@ -1918,10 +1918,10 @@ static int acxmem_upload_fw(acx_device_t *adev) {
 
 		acxmem_lock();
 		res = acxmem_write_fw(adev, fw_image, 0);
-		log(L_DEBUG|L_INIT, "acx: acx_write_fw (main): %d\n", res);
+		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
 		if (OK == res) {
 			res = acxmem_validate_fw(adev, fw_image, 0);
-			log(L_DEBUG|L_INIT, "acx: acx_validate_fw "
+			log(L_DEBUG|L_INIT, "acx_validate_fw "
 					"(main): %d\n", res);
 		}
 		acxmem_unlock();
@@ -1952,7 +1952,7 @@ static int acxmem_upload_fw(acx_device_t *adev) {
 
 		offset = read_slavemem32(adev, 0x950c);
 
-		log (L_DEBUG, "acx: patching in at 0x%04x\n", offset);
+		log (L_DEBUG, "patching in at 0x%04x\n", offset);
 
 		for (i = 0; i < sizeof(patch) / sizeof(patch[0]); i++) {
 			write_slavemem32(adev, offset, patch[i]);
@@ -2143,7 +2143,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 				__func__, devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
-		log(L_CTL|L_DEBUG, "acx: %s: waited for IDLE %dms. Please report\n",
+		log(L_CTL|L_DEBUG, "%s: waited for IDLE %dms. Please report\n",
 				__func__, 199 - counter);
 	}
 
@@ -2247,7 +2247,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			/*
 			 * 388 is maximum command length
 			 */
-			log(L_ANY, "acx: %s: invalid length 0x%08x\n",
+			log(L_ANY, "%s: invalid length 0x%08x\n",
 					__func__, buflen);
 			buflen = 388;
 		}
@@ -2275,7 +2275,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	}
 
 	/* ok: */
-	log(L_DEBUG, "acx: %s: %s: took %ld jiffies to complete\n",
+	log(L_DEBUG, "%s: %s: took %ld jiffies to complete\n",
 	    __func__, cmdstr, jiffies - start);
 
 	acxmem_unlock();
@@ -2339,7 +2339,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
 	/*
 	 log(L_DEBUG, "iobase2=%p\n"
 	 */
-	log(L_DEBUG, "acx: cmd_mbox_offset=%X cmd_area=%p\n"
+	log(L_DEBUG, "cmd_mbox_offset=%X cmd_area=%p\n"
 			"acx: info_mbox_offset=%X info_area=%p\n",
 			cmd_offs, adev->cmd_area,
 			info_offs, adev->info_area);
@@ -2467,7 +2467,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 
 	/* now start eCPU by clearing bit */
 	clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
-	log(L_DEBUG, "acx: booted eCPU up and waiting for completion...\n");
+	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
 	/* Windows driver clears bit 0x200 in register 0x2A0 here */
 	clear_regbits(adev, 0x2A0, 0x200);
@@ -2609,7 +2609,7 @@ static void acxmem_reset_mac(acx_device_t *adev) {
 
 	/* now do soft reset of eCPU, set bit */
 	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-	log(L_DEBUG, "acx: %s: enable soft reset...\n", __func__);
+	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
 
 	/* Windows driver sleeps here for a while with this sequence */
 	for (count = 0; count < 200; count++) {
@@ -2617,7 +2617,7 @@ static void acxmem_reset_mac(acx_device_t *adev) {
 	}
 
 	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "acx: %s: disable soft reset and go to init mode...\n", __func__);
+	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n", __func__);
 	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
 
 	/* now start a burst read from initial EEPROM */
@@ -3654,7 +3654,7 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	if (unlikely(acx_debug & L_DEBUG))
 		acxmem_log_txbuffer(adev);
 
-	log(L_BUFT, "acx: tx: cleaning up bufs from %u\n", adev->tx_tail);
+	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx_tail);
 
 	/* We know first descr which is not free yet. We advance it as far
 	 ** as we see correct bits set in following descs (if next desc
@@ -3678,7 +3678,7 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 		// OW FIXME Check against pci.c
 		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
 			//if (unlikely(!num_cleaned)) { /* maybe remove completely */
-			log(L_BUFT, "acx: clean_txdesc: tail isn't free. "
+			log(L_BUFT, "clean_txdesc: tail isn't free. "
 				"finger=%d, tail=%d, head=%d\n", finger, adev->tx_tail,
 					adev->tx_head);
 			//}
@@ -4147,7 +4147,7 @@ static void acxmem_handle_info_irq(acx_device_t *adev) {
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
 	write_flush(adev);
 
-	log(L_IRQ|L_CTL, "acx: got Info IRQ: status %04X type %04X: %s\n",
+	log(L_IRQ|L_CTL, "got Info IRQ: status %04X type %04X: %s\n",
 			info_status, info_type,
 			info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
 			0 : info_type]
@@ -4486,7 +4486,7 @@ void acxmem_power_led(acx_device_t *adev, int enable) {
 	static int rate_limit = 0;
 
 	if (rate_limit++ < 3)
-		log(L_IOCTL, "acx: Please report in case toggling the power "
+		log(L_IOCTL, "Please report in case toggling the power "
 				"LED doesn't work for your card!\n");
 	if (enable)
 		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
@@ -4852,7 +4852,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 			(gpio_old & 0xf8ff)	| ((u16) *extra << 8));
 	acx_unlock(adev, flags);
 
-	log(L_DEBUG, "acx: gpio_old: 0x%04X\n", gpio_old);
+	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
 	printk("acx: %s: PHY power amplifier bias: old:%d, new:%d\n",
 			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
 
@@ -4995,7 +4995,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 		return i;
 	adev->irq = i;
 
-	log(L_ANY, "acx: found an %s-based wireless network card, "
+	log(L_ANY, "found an %s-based wireless network card, "
 			"irq:%d, "
 			"membase:0x%p, mem_size:%ld, "
 			"iobase:0x%p",
@@ -5003,14 +5003,14 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 			adev->irq,
 			adev->membase, addr_size,
 			adev->iobase);
-	log(L_ANY, "acx: the initial debug setting is 0x%04X\n", acx_debug);
+	log(L_ANY, "the initial debug setting is 0x%04X\n", acx_debug);
 
 	if (adev->irq == 0) {
 		printk("acx: can't use IRQ 0\n");
 		goto fail_request_irq;
 	}
 
-	log(L_IRQ | L_INIT, "acx: using IRQ %d\n", adev->irq);
+	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 	/* request shared IRQ handler */
 	if (request_irq(adev->irq, acxmem_interrupt,
 			IRQF_SHARED,
@@ -5025,7 +5025,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	#else
 	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 	#endif
-	log(L_ANY, "acx: request_irq %d successful\n", adev->irq);
+	log(L_ANY, "request_irq %d successful\n", adev->irq);
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
 	acxmem_lock();
 	acxmem_irq_disable(adev);
@@ -5154,7 +5154,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	FN_ENTER;
 
 	if (!hw) {
-		log(L_DEBUG, "acx: %s: card is unused. Skipping any release code\n",
+		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
 		    __func__);
 		goto end_no_lock;
 	}
@@ -5184,7 +5184,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 		acxmem_lock();
 
 		/* disable power LED to save power :-) */
-		log(L_INIT, "acx: switching off power LED to save power\n");
+		log(L_INIT, "switching off power LED to save power\n");
 		acxmem_power_led(adev, 0);
 
 		/* stop our eCPU */
