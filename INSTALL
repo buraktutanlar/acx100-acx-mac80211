@@ -6,11 +6,12 @@ I. Introduction
 This document describes the steps required to build and install the
 acx driver in a Linux system.
 
-Two alternative methods are described, referred to as in-tree and
-out-of-tree, of which only one of them must be chosen. The recommended
-way, because of its simplicity, is the out-of-tree installation,
-although it requires an installed set of kernel include headers in the
-system.
+Two alternative methods are described, referred to as out-of-tree
+(chapter II) and in-tree (chapter IV).
+
+The recommended way, because of its simplicity, is the out-of-tree
+installation described in chapter II), although it requires an
+installed set of kernel include headers in the system.
 
 Alternatively you may also consider a DKMS installation, see chapter
 III) below.
