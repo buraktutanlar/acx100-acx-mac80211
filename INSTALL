@@ -15,7 +15,10 @@ system.
 Alternatively you may also consider a DKMS installation, see chapter
 III) below.
 
-For hx4700 or rx1950 chapter V) is describing building and
+The acx hardware required firmware in order to operate. Chapter V)
+described the firmware image installation in more detail.
+
+For hx4700 or rx1950 chapter VI) is describing building and
 installation of driver and platform modules.
 
 II. As a module, outside the kernel tree
@@ -242,7 +245,26 @@ TODO -> description of the standard kernel module installation and the
 'make modules_install' target. Refer to the kernel documentation for
 now.
 
-V) hx4700 or rx1950 installation
+V) Firmware Images
+------------------
+
+The driver will try to load the following images via hotplug
+(hotplug firmware directory location varies for different distros,
+try /lib/firmware or /usr/lib/hotplug/firmware):
+
+PCI driver: 'tiacxNNNcMM' (NNN=100/111, MM=radio module ID (in
+uppercase hex)): combined firmware for specified chipset and radio.
+Failing that, it will try to load images named 'tiacxNNN' (main
+firmware for specified chipset) and 'tiacxNNNrMM' (corresponding
+radio module). For example, my firmware is in file named
+'tiacx111c16'. Alternatively, I may remove it and use pair of files
+'tiacx111' and 'tiacx111r16' instead.
+
+USB driver: image is named 'tiacxNNNusbcMM'
+
+=> See also the wiki for more info
+
+VI) hx4700 or rx1950 installation
 --------------------------------
 
 The acx-mac80211 driver includes slave-memory and platform module
@@ -291,4 +313,3 @@ Original author:
 
 Updated by: 
   Oliver Winker <oliver AT oli1170.net>
-	
