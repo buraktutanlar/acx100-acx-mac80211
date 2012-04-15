@@ -76,6 +76,10 @@ static int acx100_create_dma_regions(acx_device_t * adev);
 static int acx111_create_dma_regions(acx_device_t * adev);
 
 // Firmware, EEPROM, Phy
+MODULE_FIRMWARE("tiacx111");
+MODULE_FIRMWARE("tiacx111c16");
+MODULE_FIRMWARE("tiacx111r16");
+
 void acx_get_firmware_version(acx_device_t * adev);
 void acx_display_hardware_details(acx_device_t * adev);
 firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
