@@ -241,8 +241,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 
 	usbbuf = kmalloc(USB_RWMEM_MAXLEN, GFP_KERNEL);
 	if (!usbbuf) {
-		printk(KERN_ERR
-		       "acx: no memory for USB transfer buffer (%d bytes)\n",
+		pr_err("no memory for USB transfer buffer (%d bytes)\n",
 		       USB_RWMEM_MAXLEN);
 		result = -ENOMEM;
 		goto end;
@@ -433,7 +432,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			    );
 			offset += blk_len;
 			if (result < 0) {
-				printk(KERN_ERR "acx: error %d while uploading "
+				pr_err("error %d while uploading "
 				       "the firmware, aborting\n", result);
 				goto end;
 			}
@@ -448,7 +447,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 					 3000	/* timeout in ms */
 		    );
 		if (result < 0) {
-			printk(KERN_ERR "acx: error %d during tx of checksum, "
+			pr_err("error %d during tx of checksum, "
 			       "aborting\n", result);
 			goto end;
 		}
@@ -459,12 +458,12 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 					 3000	/* timeout in ms */
 		    );
 		if (result < 0) {
-			printk(KERN_ERR "acx: error %d during ACK of checksum, "
+			pr_err("error %d during ACK of checksum, "
 			       "aborting\n", result);
 			goto end;
 		}
 		if (*usbbuf != 0x10) {
-			printk(KERN_ERR "acx: invalid checksum?\n");
+			pr_err("invalid checksum?\n");
 			result = -EINVAL;
 			goto end;
 		}
@@ -869,7 +868,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	case 0:		/* No error */
 		break;
 	case -EOVERFLOW:
-		printk(KERN_ERR "acx: rx data overrun\n");
+		pr_err("rx data overrun\n");
 		adev->rxtruncsize = 0;	/* Not valid anymore. */
 		goto end_unlock;
 	case -ECONNRESET:
@@ -1070,8 +1069,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 
 	inpipe = usb_rcvbulkpipe(usbdev, adev->bulkinep);
 	if (unlikely(rxurb->status == -EINPROGRESS)) {
-		printk(KERN_ERR
-		       "acx: error, rx triggered while rx urb in progress\n");
+		pr_err("error, rx triggered while rx urb in progress\n");
 		/* FIXME: this is nasty, receive is being cancelled by this code
 		 * on the other hand, this should not happen anyway...
 		 */
@@ -1158,7 +1156,7 @@ static void acxusb_complete_tx(struct urb *urb)
 		break;
 		/* FIXME: real error-handling code here please */
 	default:
-		printk(KERN_ERR "acx: tx error, urb status=%d\n", urb->status);
+		pr_err("tx error, urb status=%d\n", urb->status);
 		/* FIXME: real error-handling code here please */
 	}
 
@@ -1292,7 +1290,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	    wlanpkt_len + USB_TXBUF_HDRSIZE, txbuf->rate, ucode);
 
 	if (unlikely(ucode)) {
-		printk(KERN_ERR "acx: submit_urb() error=%d txsize=%d\n",
+		pr_err("submit_urb() error=%d txsize=%d\n",
 		       ucode, wlanpkt_len + USB_TXBUF_HDRSIZE);
 
 		/* on error, just mark the frame as done and update
@@ -1343,7 +1341,7 @@ static void acxusb_unlink_urb(struct urb *urb)
 			mdelay(1);
 		}
 		if (!timeout) {
-			printk(KERN_ERR "acx_usb: urb unlink timeout!\n");
+			pr_err("urb unlink timeout!\n");
 		}
 	}
 }
