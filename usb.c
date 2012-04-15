@@ -256,7 +256,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 		outpipe = usb_sndbulkpipe(usbdev, 1);
 		inpipe = usb_rcvbulkpipe(usbdev, 2);
 
-		printk(KERN_DEBUG "acx: wait for device ready\n");
+		pr_debug("wait for device ready\n");
 		for (i = 0; i <= 2; i++) {
 			result = usb_bulk_msg(usbdev, inpipe,
 					      usbbuf,
@@ -363,7 +363,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			offset += blk_len;
 		}
 		if (need_padding) {
-			printk(KERN_DEBUG "acx: send padding\n");
+			pr_debug("send padding\n");
 			memset(usbbuf, 0, 4);
 			result =
 			    usb_bulk_msg(usbdev, outpipe, usbbuf, 4,
@@ -371,7 +371,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 			if ((result < 0) || (num_processed != 4))
 				goto fw_end;
 		}
-		printk(KERN_DEBUG "acx: read firmware upload result\n");
+		pr_debug("read firmware upload result\n");
 		memset(cmdbuf, 0, 20);	/* additional memset */
 		result =
 		    usb_bulk_msg(usbdev, inpipe, cmdbuf, 20, &num_processed,
@@ -769,9 +769,9 @@ static void dump_config_descriptor(struct usb_config_descriptor *cd)
 
 static void dump_device_descriptor(struct usb_device_descriptor *dd)
 {
-	printk("Device Descriptor:\n");
+	pr_acx("Device Descriptor:\n");
 	if (!dd) {
-		printk("NULL\n");
+		pr_acx("NULL\n");
 		return;
 	}
 	pr_acx(" bLength: %d (0x%X)\n", dd->bLength, dd->bLength);
@@ -1274,8 +1274,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	}
 
 	if (unlikely(txurb->status == -EINPROGRESS)) {
-		printk
-		    ("acx: trying to submit tx urb while already in progress\n");
+		pr_acx("trying to submit tx urb while already in progress\n");
 	}
 
 	/* now schedule the USB transfer */
