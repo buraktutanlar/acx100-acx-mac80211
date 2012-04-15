@@ -21,12 +21,6 @@
 
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
-#include <linux/utsrelease.h>
-#else
-#include <generated/utsrelease.h>
-#endif
-
 #include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/module.h>

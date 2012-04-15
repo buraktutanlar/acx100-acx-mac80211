@@ -20,3 +20,11 @@ do { \
                int BUILD_BUG_DECL_ ##name[1 - 2*!!(condition)];		\
        } BUILD_BUG_DECL_ ##name[0] __attribute__((unused))
 #endif
+
+
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+#include <linux/utsrelease.h>
+#else
+#include <generated/utsrelease.h>
+#endif
