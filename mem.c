@@ -1782,7 +1782,7 @@ static int acxmem_write_fw(acx_device_t *adev,
 		 */
 		tmp = read_slavemem32(adev, offset + len - 4);
 		if (checkMismatch && (tmp != v32)) {
-			printk("first data mismatch at 0x%08x good 0x%08x"
+			pr_info("first data mismatch at 0x%08x good 0x%08x"
 				" bad 0x%08x id 0x%08x\n",
 				offset + len - 4, v32, tmp, id);
 			checkMismatch = 0;
@@ -3192,7 +3192,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	 * be able to set the head back to this descriptor.
 	 */
 	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
-	printk("acx_dealloc: moving head from %d to %d\n",
+	pr_info("acx_dealloc: moving head from %d to %d\n",
 		adev->tx_head, index);
 	adev->tx_head = index;
 
@@ -3388,12 +3388,12 @@ static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
-		printk("bad txdesc ptr %p\n", txdesc);
+		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 	index /= adev->txdesc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
-		printk("bad txdesc ptr %p\n", txdesc);
+		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
 	return &adev->txhostdesc_start[index * 2];
@@ -3538,7 +3538,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			 * back to this entry.
 			 */
 			 // OW FIXME Logging
-			printk("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
+			pr_info("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
 			hostdesc1->length = 0;
 			hostdesc2->length = 0;
 			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
@@ -3876,7 +3876,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	 * TODO: it's best to simply reset & reinit hw from scratch...
 	 */
 	if ((adev->tx_free <= TX_EMERG_CLEAN) && (tx_num_cleaned == 0)) {
-		printk("%s: FAILED to free any of the many full tx buffers. "
+		pr_info("%s: FAILED to free any of the many full tx buffers. "
 			"Switching to emergency freeing. "
 			"Please report!\n", ndev->name);
 		acxmem_clean_txdesc_emergency(adev);
@@ -3889,7 +3889,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
 
 	/* do unimportant work last */
-	printk("%s: tx timeout!\n", ndev->name);
+	pr_info("%s: tx timeout!\n", ndev->name);
 	adev->stats.tx_errors++;
 
 	acx_unlock(adev, flags);
@@ -4567,39 +4567,39 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 	memset(&memconf, 0, sizeof(memconf));
 	/* BTW, fails with 12 (Write only) error code.
 	 ** Retained for easy testing of issue_cmd error handling :) */
-	printk("Interrogating queue config\n");
+	pr_info("Interrogating queue config\n");
 	acx_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
-	printk("done with queue config\n");
+	pr_info("done with queue config\n");
 
 	/* get Acx111 Queue Configuration */
 	memset(&queueconf, 0, sizeof(queueconf));
-	printk("Interrogating mem config options\n");
+	pr_info("Interrogating mem config options\n");
 	acx_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
-	printk("done with mem config options\n");
+	pr_info("done with mem config options\n");
 
 	/* get Acx111 Memory Map */
 	memset(memmap, 0, sizeof(memmap));
-	printk("Interrogating mem map\n");
+	pr_info("Interrogating mem map\n");
 	acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
-	printk("done with mem map\n");
+	pr_info("done with mem map\n");
 
 	/* get Acx111 Rx Config */
 	memset(rxconfig, 0, sizeof(rxconfig));
-	printk("Interrogating rxconfig\n");
+	pr_info("Interrogating rxconfig\n");
 	acx_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
-	printk("done with queue rxconfig\n");
+	pr_info("done with queue rxconfig\n");
 
 	/* get Acx111 fcs error count */
 	memset(fcserror, 0, sizeof(fcserror));
-	printk("Interrogating fcs err count\n");
+	pr_info("Interrogating fcs err count\n");
 	acx_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
-	printk("done with err count\n");
+	pr_info("done with err count\n");
 
 	/* get Acx111 rate fallback */
 	memset(ratefallback, 0, sizeof(ratefallback));
-	printk("Interrogating rate fallback\n");
+	pr_info("Interrogating rate fallback\n");
 	acx_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
-	printk("done with rate fallback\n");
+	pr_info("done with rate fallback\n");
 
 	/* force occurrence of a beacon interrupt */
 	/* TODO: comment why is this necessary */
@@ -5257,7 +5257,7 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
 	 */
 
 	adev = ieee2adev(hw);
-	printk("sus: adev %p\n", adev);
+	pr_info("sus: adev %p\n", adev);
 
 	acx_sem_lock(adev);
 
