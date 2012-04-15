@@ -755,7 +755,7 @@ static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 		memset(ptr, 0, size);
 		return ptr;
 	}
-	printk(KERN_ERR "acx: %s allocation FAILED (%d bytes)\n",
+	pr_err("%s allocation FAILED (%d bytes)\n",
 	       msg, (int)size);
 	return NULL;
 }
@@ -3461,7 +3461,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 	err = pci_request_region(pdev, mem_region1, "acx_1");
 	if (err) {
-		printk(KERN_WARNING "acx: pci_request_region (1/2) FAILED!"
+		pr_warn("pci_request_region (1/2) FAILED!"
 			"No cardbus support in kernel?\n");
 		goto fail_request_mem_region1;
 	}
@@ -3470,7 +3470,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = pci_request_region(pdev, mem_region2, "acx_2");
 	if (err) {
-		printk(KERN_WARNING "acx: pci_request_region (2/2) FAILED!\n");
+		pr_warn("pci_request_region (2/2) FAILED!\n");
 		goto fail_request_mem_region2;
 	}
 
@@ -3485,13 +3485,13 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	mem1 = pci_iomap(pdev, mem_region1, 0);
 	if (!mem1) {
-		printk(KERN_WARNING "acx: ioremap() FAILED\n");
+		pr_warn("ioremap() FAILED\n");
 		goto fail_iomap1;
 	}
 
 	mem2 = pci_iomap(pdev, mem_region2, 0);
 	if (!mem2) {
-		printk(KERN_WARNING "acx: ioremap() #2 FAILED\n");
+		pr_warn("ioremap() #2 FAILED\n");
 		goto fail_iomap2;
 	}
 
@@ -4093,7 +4093,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	addr = (u32)ioremap(vdev->mem_start, 0x1000);
 	if (!addr) {
-		printk(KERN_ERR "acx: %s: failed to remap io memory\n",
+		pr_err("%s: failed to remap io memory\n",
 		       dev_name(&vdev->dev));
 		result = -ENXIO;
 		goto fail_vlynq_ioremap1;
@@ -4369,7 +4369,7 @@ int __init acxpci_init_module(void)
 #endif
 
 	if (res) {
-		printk(KERN_ERR "acx_pci: can't register pci/vlynq driver\n");
+		pr_err("can't register pci/vlynq driver\n");
 	}
 
 	FN_EXIT1(res);
