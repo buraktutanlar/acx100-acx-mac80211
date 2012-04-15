@@ -880,7 +880,7 @@ static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8
 				destination);
 	}
 	if (count > sizeof aligned_source) {
-		printk(KERN_ERR "chaincopy_to_slavemem overflow!\n");
+		pr_err("chaincopy_to_slavemem overflow!\n");
 		count = sizeof aligned_source;
 	}
 	if ((u32) source & 3) {
@@ -947,7 +947,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 		//printk ("acx chaincopy: data destination not word aligned!\n");
 		data = (u32 *) aligned_destination;
 		if (count > sizeof aligned_destination) {
-			printk(KERN_ERR "chaincopy_from_slavemem overflow!\n");
+			pr_err("chaincopy_from_slavemem overflow!\n");
 			count = sizeof aligned_destination;
 		}
 	}
@@ -1393,7 +1393,7 @@ acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *ms
 		memset(ptr, 0, size);
 		return ptr;
 	}
-	printk(KERN_ERR "acx: %s allocation FAILED (%d bytes)\n", msg, (int) size);
+	pr_err("acx: %s allocation FAILED (%d bytes)\n", msg, (int) size);
 	return NULL;
 }
 
@@ -4339,7 +4339,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 			break;
 
 		if (unlikely(++adev->irq_loops_this_jiffy> MAX_IRQLOOPS_PER_JIFFY)) {
-			printk(KERN_ERR "acx: too many interrupts per jiffy!\n");
+			pr_err("acx: too many interrupts per jiffy!\n");
 			/* Looks like card floods us with IRQs! Try to stop that */
 			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 			/* This will short-circuit all future attempts to handle IRQ.
