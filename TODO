@@ -1,17 +1,72 @@
 TODO
 
+These are in in priority order, top is highest.
+Once they're DONE, move to bottom, and edit or delete.
+
 ---------
-in acx_proc_show_eeprom(struct seq_file *file, void *v)
-	// OW Hopefully enough. TODO see if eeprom fns can size it
-	const int buf_size = 1024*64;
+finish printk cleanup
 
-large malloc.  can push sizing down to callees, and return *buf
+most now converted, at least partly:
+- printk("acx: ...")		to pr_acx("...")	[1]
+- printk("acxusb: ...")		to pr_acxusb("...")	[1]
+- printk("acxmem: ...")		to pr_acxmem("...")	[1]
+- printk("...")			to pr_info("...")
 
-acxpci_proc_eeprom_output(buf, adev);
-  only uses 0x400, so yes, here.
+[1] these defined to pr_info separately, allowing separate treatment
 
-acxmem_proc_eeprom_output(buf, adev);
-  uses 0xffff
+---------
+de-duplicate pci.c & mem.c
+
+diff -wbB --ifdef=FOO pci.c mem.c > uni-pci-mem.c
+produces an ugly but possibly usable file.
+
+jimc@chumly:~/projects/lx/acx-mac80211$ diff mem.c pci.c |wc
+   6775   28665  206590
+jimc@chumly:~/projects/lx/acx-mac80211$ diff -wb mem.c pci.c |wc
+   5730   23760  170424
+jimc@chumly:~/projects/lx/acx-mac80211$ diff -wbB mem.c pci.c |wc
+   5642   23672  169865
+jimc@chumly:~/projects/lx/acx-mac80211$ diff -wbBE mem.c pci.c |wc
+   5642   23672  169865
+
+sdiff -WbBE -w150 -l pci.c mem.c  # shows it more clearly:
+overlaps in top-down order:
+
+// Data Access - whitespace
+static void acxpci_log_rxbuffer(const acx_device_t * adev)
+static void acxpci_log_txbuffer(const acx_device_t * adev)
+
+BOM Data Access
+INLINE_IO - mem has additional blocks.
+
+delete_dma_regions()
+acx(pci|mem)_upload_radio()
+acx(pci|mem)_read_eeprom_byte()
+acx(pci|mem)_write_eeprom_byte()  (UNUSED)
+acx(pci|mem)_read_phy_reg()
+	define acxdev_lock() mem ? acxmem_lock " void 0
+acx(pci|mem)_write_phy_reg()
+acx(pci|mem)_s_write_fw()
+acx(pci|mem)_s_vaidate_fw()
+acx_show_card_eeprom_id()
+acx(pci|mem)_issue_cmd_timeo_debug() fair divergence
+acx(pci|mem)_init_mboxes()
+acx(pci|mem)_reset_dev()
+acx(pci|mem)_verify_init()
+acx(pci|mem)_up()
+acx(pci|mem)_proc_eeprom_output()
+acx(pci|mem)_process_rxdesc()
+acx(pci|mem)_tx_data()
+acx(pci|mem)_irq_disable()
+acx(pci|mem)_irq_work()
+acx(pci|mem)_interrupt()   (comment diffs)
+acx(pci|mem)_handle_info_irq()   (comment diffs)
+acx(pci|mem)_set_interrupt_mask() (whitespace diffs)
+acx(pci|mem)_op_start()
+acx111(pci|mem)_ioctl_info() (extra printks in mem
+
+---------
+move or copy (tbd) all proc files to debugfs
 
 ---------
 acx_proc_show_eeprom(struct seq_file *file, void *v)
@@ -25,3 +80,22 @@ add cpu-burn counter to assess wait-loop,
 recode wait-loop to helper, replace multiple uses.
 
 ---------
+compare load-firmware code to in-tree uses.
+pci & mem both do this (see above)
+
+
+DONE
+---------
+in acx_proc_show_eeprom(struct seq_file *file, void *v)
+	// OW Hopefully enough. TODO see if eeprom fns can size it
+	const int buf_size = 1024*64;
+
+large malloc.  can push sizing down to callees, and return *buf
+
+acxpci_proc_eeprom_output(buf, adev);
+  only uses 0x400, so yes, here.
+
+acxmem_proc_eeprom_output(buf, adev);
+  uses 0xffff
+
+
