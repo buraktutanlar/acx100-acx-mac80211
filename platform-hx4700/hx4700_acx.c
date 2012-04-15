@@ -79,8 +79,6 @@ static struct resource acx_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= gpio_to_irq(GPIO14_HX4700_nWLAN_IRQ),
-		.end	= gpio_to_irq(GPIO14_HX4700_nWLAN_IRQ),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -98,6 +96,9 @@ static int __init
 hx4700_wlan_init( void )
 {
 	int res;
+
+	acx_resources[1].start	= gpio_to_irq(GPIO14_HX4700_nWLAN_IRQ);
+	acx_resources[1].end	= gpio_to_irq(GPIO14_HX4700_nWLAN_IRQ);
 
 	hx4700_wlan_start();
 
