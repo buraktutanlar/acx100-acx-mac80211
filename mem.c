@@ -774,8 +774,7 @@ static void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 s
 	 * I'd better check.
 	 */
 	if ((u32) destination & 3) {
-		printk(
-				"acx copy_from_slavemem: warning!  destination not word-aligned!\n");
+		pr_acx("copy_from_slavemem: warning!  destination not word-aligned!\n");
 	}
 
 	while (count >= 4) {
@@ -820,7 +819,7 @@ static void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination, u8 *sou
 	 * buffer.  Someday rewrite to avoid the extra copy.
 	 */
 	if (count > sizeof(src)) {
-		printk("acx copy_to_slavemem: Warning! buffer overflow!\n");
+		pr_acx("copy_to_slavemem: Warning! buffer overflow!\n");
 		count = sizeof(src);
 	}
 	memcpy(src, source, count);
@@ -877,8 +876,8 @@ static void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination, u8
 	 * it if it does.
 	 */
 	if ((destination & 0x00ffffe0) != destination) {
-		printk("acx chaincopy: destination block 0x%04x not aligned!\n",
-				destination);
+		pr_acx("chaincopy: destination block 0x%04x not aligned!\n",
+			destination);
 	}
 	if (count > sizeof aligned_source) {
 		pr_err("chaincopy_to_slavemem overflow!\n");
@@ -941,7 +940,7 @@ static void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination, 
 	 * copying to the ACX.
 	 */
 	if ((source & 0x00ffffe0) != source) {
-		printk("acx chaincopy: source block 0x%04x not aligned!\n", source);
+		pr_acx("chaincopy: source block 0x%04x not aligned!\n", source);
 		acxmem_dump_mem(adev, 0, 0x10000);
 	}
 	if ((u32) destination & 3) {
@@ -1783,9 +1782,9 @@ static int acxmem_write_fw(acx_device_t *adev,
 		 */
 		tmp = read_slavemem32(adev, offset + len - 4);
 		if (checkMismatch && (tmp != v32)) {
-			printk(
-					"first data mismatch at 0x%08x good 0x%08x bad 0x%08x id 0x%08x\n",
-					offset + len - 4, v32, tmp, id);
+			printk("first data mismatch at 0x%08x good 0x%08x"
+				" bad 0x%08x id 0x%08x\n",
+				offset + len - 4, v32, tmp, id);
 			checkMismatch = 0;
 		}
 	}
@@ -3193,7 +3192,8 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	 * be able to set the head back to this descriptor.
 	 */
 	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
-	printk("acx_dealloc: moving head from %d to %d\n", adev->tx_head, index);
+	printk("acx_dealloc: moving head from %d to %d\n",
+		adev->tx_head, index);
 	adev->tx_head = index;
 
 	acxmem_unlock();
