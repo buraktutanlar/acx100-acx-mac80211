@@ -38,7 +38,8 @@
 
 #define ACX_MAC80211_MEM 1
 
-#define pr_acx	pr_info
+#define pr_acx		pr_info
+#define pr_acxmem	pr_info
 
 #include <linux/version.h>
 
@@ -2113,13 +2114,13 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		printk("acxmem: %s: %s: firmware is not loaded yet, cannot execute commands!\n",
+		pr_acxmem("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
 				__func__, devname);
 		goto bad;
 	}
 
 	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_INTERROGATE)) {
-		printk("acxmem: input buffer (len=%u):\n", buflen);
+		pr_acxmem("input buffer (len=%u):\n", buflen);
 		acx_dump_bytes(buffer, buflen);
 	}
 
@@ -2136,7 +2137,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	if (counter == 0) {
 		/* the card doesn't get idle, we're in trouble */
-		printk("acxmem: %s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
+		pr_acxmem("%s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
 				__func__, devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
@@ -5229,7 +5230,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	printk("acxmem: %s done\n", __func__);
+	pr_acxmem("%s done\n", __func__);
 
 	end_no_lock:
 	FN_EXIT0;
@@ -5395,7 +5396,7 @@ int __init acxmem_init_module(void) {
 void __exit acxmem_cleanup_module(void) {
 	FN_ENTER;
 
-	printk("acxmem: cleanup_module\n");
+	pr_acxmem("cleanup_module\n");
 	platform_driver_unregister(&acxmem_driver);
 
 	FN_EXIT0;
