@@ -3341,18 +3341,21 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 	int len_wo_tim;
 	int len_tim;
 
-	/* The TIM template handling between ACX100 and ACX111 is
-	 * different: ACX111: Needs TIM in dedicated template via
-	 * ACX1xx_CMD_CONFIG_TIM ACX100: Needs TIM included into the
-	 * beacon, however space for TIM template needs to be
-	 * configured during memory-map setup
+	/* The TIM template handling between ACX100 and ACX111 works
+	 * differently:
+	 *
+	 * ACX111: Needs TIM in dedicated template via ACX1xx_CMD_CONFIG_TIM
+	 *
+	 * ACX100: Needs TIM included into the beacon, however space for TIM
+	 * template needs to be configured during memory-map setup
 	 */
 	tim_pos = acx_beacon_find_tim(beacon);
 	if (tim_pos == NULL)
 		logf0(L_DEBUG, "No tim contained in beacon skb");
 
-	/* ACX111: If beacon contains tim, only configure
-	 * beacon-template until tim */
+	/* ACX111: If beacon contains tim, only configure beacon-template
+	 * until tim
+	 */
 	if (IS_ACX111(adev) && tim_pos)
 		len_wo_tim = tim_pos - beacon->data;
 	else
