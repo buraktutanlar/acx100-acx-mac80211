@@ -221,3 +221,51 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
         return result;
 }
 
+
+void acx_log_rxbuffer(const acx_device_t *adev)
+{
+	register const struct rxhostdesc *rxhostdesc;
+	int i;
+	/* no FN_ENTER here, we don't want that */
+
+	pr_debug("entry\n");
+
+	rxhostdesc = adev->rxhostdesc_start;
+	if (unlikely(!rxhostdesc))
+		return;
+
+	for (i = 0; i < RX_CNT; i++) {
+		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			pr_acx("rx: buf %d full\n", i);
+		rxhostdesc++;
+	}
+}
+
+void acx_log_txbuffer(acx_device_t *adev)
+{
+	txdesc_t *txdesc;
+	int i;
+	u8 Ctl_8;
+
+	/* no FN_ENTER here, we don't want that */
+	/* no locks here, since it's entirely non-critical code */
+
+	pr_debug("entry\n");
+
+	txdesc = adev->txdesc_start;
+	if (unlikely(!txdesc))
+			return;
+
+	pr_acx("tx: desc->Ctl8's: ");
+	for (i = 0; i < TX_CNT; i++) {
+		Ctl_8 = (IS_MEM(adev))
+			? read_slavemem8(adev, (u32) &(txdesc->Ctl_8))
+			: txdesc->Ctl_8;
+		printk("%02X ", Ctl_8);
+		txdesc = (IS_MEM(adev))
+			? acxmem_advance_txdesc(adev, txdesc, 1)
+			: acxpci_advance_txdesc(adev, txdesc, 1);
+	}
+	printk("\n");
+}

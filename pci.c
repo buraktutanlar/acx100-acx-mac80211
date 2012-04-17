@@ -50,6 +50,7 @@
 #endif
 
 #include "acx.h"
+#include "merge.h"
 
 /*
  * BOM Config
@@ -69,8 +70,8 @@
  */
 
 // Logging
-static void acxpci_log_rxbuffer(const acx_device_t * adev);
-static void acxpci_log_txbuffer(acx_device_t * adev);
+// static void acxpci_log_rxbuffer(const acx_device_t * adev);
+// static void acxpci_log_txbuffer(acx_device_t * adev);
 
 // Data Access
 #if 0
@@ -140,7 +141,8 @@ void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee802
 unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
 void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
-static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
+// static inline 
+txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
 
 // Irq Handling, Timer
@@ -235,7 +237,7 @@ void __exit acxpci_cleanup_module(void);
  * BOM Logging
  * ==================================================
  */
-
+#if 0
 static void acxpci_log_rxbuffer(const acx_device_t * adev)
 {
 	register const struct rxhostdesc *rxhostdesc;
@@ -271,6 +273,7 @@ static void acxpci_log_txbuffer(acx_device_t * adev)
 	}
 	pr_acx("\n");
 }
+#endif
 
 #include "pci-inlines.h"
 
@@ -1926,7 +1929,7 @@ static void acxpci_process_rxdesc(acx_device_t * adev)
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_BUFR))
-		acxpci_log_rxbuffer(adev);
+		acx_log_rxbuffer(adev);
 
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
@@ -2227,7 +2230,7 @@ unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev)
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_DEBUG))
-		acxpci_log_txbuffer(adev);
+		acx_log_txbuffer(adev);
 
 	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx_tail);
 
@@ -2348,8 +2351,9 @@ static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index)
 			     index * adev->txdesc_size);
 }
 
-static inline txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
-				       int inc)
+// static inline 
+txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc,
+				int inc)
 {
 	return (txdesc_t *) (((u8 *) txdesc) + inc * adev->txdesc_size);
 }

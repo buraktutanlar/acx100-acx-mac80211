@@ -68,6 +68,7 @@
 #include <asm/io.h>
 
 #include "acx.h"
+#include "merge.h"
 
 /*
  * BOM Config
@@ -106,8 +107,8 @@
  */
 
 // Logging
-static void acxmem_log_rxbuffer(const acx_device_t *adev);
-static void acxmem_log_txbuffer(acx_device_t *adev);
+// static void acxmem_log_rxbuffer(const acx_device_t *adev);
+// static void acxmem_log_txbuffer(acx_device_t *adev);
 #if DUMP_MEM_DEFINED > 0
 static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
 #endif
@@ -201,7 +202,8 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 static inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
-static inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
+// static inline 
+txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 static txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
@@ -348,6 +350,9 @@ static const u16 IO_ACX111[] = { 0x0000, /* IO_ACX_SOFT_RESET */
  * ==================================================
  */
 
+#include "mem-inlines.h"
+
+#if 0
 static void acxmem_log_rxbuffer(const acx_device_t *adev) {
 	register const struct rxhostdesc *rxhostdesc;
 	int i;
@@ -362,8 +367,6 @@ static void acxmem_log_rxbuffer(const acx_device_t *adev) {
 		rxhostdesc++;
 	}
 }
-
-#include "mem-inlines.h"
 
 static void acxmem_log_txbuffer(acx_device_t *adev) {
 	txdesc_t *txdesc;
@@ -383,6 +386,7 @@ static void acxmem_log_txbuffer(acx_device_t *adev) {
 	}
 	printk("\n");
 }
+#endif
 
 #if DUMP_MEM_DEFINED > 0
 static void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
@@ -2589,7 +2593,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 	FN_ENTER;
 
 	if (unlikely(acx_debug & L_BUFR))
-		acxmem_log_rxbuffer(adev);
+		acx_log_rxbuffer(adev);
 
 	/* First, have a loop to determine the first descriptor that's
 	 * full, just in case there's a mismatch between our current
@@ -3044,7 +3048,8 @@ acxmem_get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
 }
 
-static inline txdesc_t*
+// static inline 
+txdesc_t*
 acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
 }
@@ -3317,7 +3322,7 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	tmptxdesc.u.r1.rate = 0x0a;
 
 	if (unlikely(acx_debug & L_DEBUG))
-		acxmem_log_txbuffer(adev);
+		acx_log_txbuffer(adev);
 
 	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx_tail);
 
