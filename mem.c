@@ -155,8 +155,10 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charb
 static inline void acxmem_read_eeprom_area(acx_device_t *adev);
 int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-static int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
-static int acxmem_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
+//static 
+int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
+//static
+int acxmem_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 static int acxmem_upload_fw(acx_device_t *adev);
 
 #if defined(NONESSENTIAL_FEATURES)
@@ -1054,6 +1056,7 @@ acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *ms
  * ==================================================
  */
 
+#if 0 // now in merge.c
 /*
  * acxmem_s_upload_radio
  *
@@ -1126,6 +1129,7 @@ int acxmem_upload_radio(acx_device_t *adev) {
 	FN_EXIT1(res);
 	return res;
 }
+#endif
 
 /*
  * acxmem_read_eeprom_byte
@@ -1171,10 +1175,9 @@ int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
 	log(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
 	result = OK;
 
-	fail:
+fail:
 	FN_EXIT1(result);
 	return result;
-
 }
 
 /*
@@ -1287,6 +1290,7 @@ static inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
+#if 1 // port soon to merge.c
 /*
  * acxmem_s_read_phy_reg
  *
@@ -1370,6 +1374,7 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	FN_EXIT1(OK);
 	return OK;
 }
+#endif
 
 /*
  * acxmem_s_write_fw
@@ -1384,7 +1389,8 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	1	firmware image corrupted
  *	0	success
  */
-static int acxmem_write_fw(acx_device_t *adev,
+// static 
+int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
 	int len, size, checkMismatch = -1;
 	u32 sum, v32, tmp, id;
@@ -1461,7 +1467,8 @@ static int acxmem_write_fw(acx_device_t *adev,
  *	NOT_OK	firmware image corrupted or not correctly written
  *	OK	success
  */
-static int acxmem_validate_fw(acx_device_t *adev,
+// static 
+int acxmem_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
 	u32 sum, v32, w32;
 	int len, size;

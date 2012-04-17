@@ -1,3 +1,5 @@
+#include "acx_debug.h"
+
 #include <linux/version.h>
 
 #include <linux/compiler.h>
@@ -21,10 +23,11 @@
 
 #include <net/iw_handler.h>
 #include <net/mac80211.h>
-
 #include <asm/io.h>
 
-/* this will be problematic when combined with PCI macro.
+#define pr_acx	pr_info
+
+/* this will be problematic when combined with the *_PCI macro.
    acx_struct_dev.h defines iobase field 2x, with different types, for
    MEM and PCI includes.  Punt for now..
 */
@@ -33,6 +36,13 @@
 
 #include "acx.h"
 #include "mem-inlines.h"
+
+// merge adaptation help
+#include "pci.h"
+#include "mem.h"
+
+// from mem.c:98
+#define FW_NO_AUTO_INCREMENT 1
 
 // identical from pci.c, mem.c
 irqreturn_t acx_interrupt(int irq, void *dev_id)
@@ -92,7 +102,99 @@ none:
 	return IRQ_NONE;
 }
 
-irqreturn_t acxmem_interrupt(int irq, void *dev_id)
+/*
+ * modified from acxmem_s_upload_radio, and wrapped below
+ */
+static int acx_upload_radio(acx_device_t *adev, char *filename)
 {
-	return acx_interrupt(irq, dev_id);
+	acx_ie_memmap_t mm;
+	firmware_image_t *radio_image;
+	acx_cmd_radioinit_t radioinit;
+	int res = NOT_OK;
+	int try;
+	u32 offset;
+	u32 size;
+
+	acxmem_lock_flags;
+
+	if (!adev->need_radio_fw)
+		return OK;
+
+	FN_ENTER;
+
+	acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+	offset = le32_to_cpu(mm.CodeEnd);
+
+	radio_image = acx_read_fw(adev->bus_dev, filename, &size);
+	if (!radio_image) {
+		pr_acx("can't load radio module '%s'\n", filename);
+		goto fail;
+	}
+
+	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
+
+	for (try = 1; try <= 5; try++) {
+		// JC: merge mem vs pci here.
+		acxmem_lock();
+		if (IS_MEM(adev))
+			res = acxmem_write_fw(adev, radio_image, offset);
+		else if (IS_PCI(adev))
+			res = acxpci_write_fw(adev, radio_image, offset);
+		else BUG();
+
+		log(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
+		if (OK == res) {
+			// JC: merge mem vs pci here.
+			if (IS_MEM(adev))
+				res = acxmem_validate_fw(adev, radio_image, offset);
+			else if (IS_PCI(adev))
+				res = acxpci_validate_fw(adev, radio_image, offset);
+			else BUG();
+			log(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
+		}
+		acxmem_unlock();
+
+		if (OK == res)
+			break;
+		pr_acx("radio firmware upload attempt #%d FAILED, "
+			"retrying...\n", try);
+		acx_mwait(1000); /* better wait for a while... */
+	}
+
+	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
+	radioinit.offset = cpu_to_le32(offset);
+
+	/* no endian conversion needed, remains in card CPU area: */
+	radioinit.len = radio_image->size;
+
+	vfree(radio_image);
+
+	if (OK != res)
+		goto fail;
+
+	/* will take a moment so let's have a big timeout */
+	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT, &radioinit,
+			sizeof(radioinit), CMD_TIMEOUT_MS(1000));
+
+	res = acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
+
+fail:
+	FN_EXIT1(res);
+	return res;
 }
+
+int acxmem_upload_radio(acx_device_t *adev)
+{
+	char filename[sizeof("RADIONN.BIN")];
+	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
+	return acx_upload_radio(adev, filename);
+}
+
+int acxpci_upload_radio(acx_device_t *adev)
+{
+        char filename[sizeof("tiacx1NNrNN")];
+        snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
+		IS_ACX111(adev) * 11, adev->radio_type);
+	return acx_upload_radio(adev, filename);
+}
+
