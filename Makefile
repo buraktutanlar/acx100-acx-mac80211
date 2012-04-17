@@ -30,7 +30,7 @@ ifneq ($(KERNELRELEASE),)
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_PCI) += pci.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
-	acx-mac80211-objs := common.o $(acx-mac80211-obj-y)
+	acx-mac80211-objs := common.o $(acx-mac80211-obj-y) merge.o
 
 else
 # Otherwise we were called directly from the command line: the kernel build

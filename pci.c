@@ -143,7 +143,8 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
 static void acxpci_irq_enable(acx_device_t * adev);
 static void acxpci_irq_disable(acx_device_t * adev);
 void acxpci_irq_work(struct work_struct *work);
-static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
+// static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
+irqreturn_t acx_interrupt(int irq, void *dev_id);
 static void acxpci_handle_info_irq(acx_device_t * adev);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
@@ -2537,67 +2538,6 @@ void acxpci_irq_work(struct work_struct *work)
 
 }
 
-
-static irqreturn_t acxpci_interrupt(int irq, void *dev_id)
-{
-	acx_device_t *adev = dev_id;
-	unsigned long flags;
-	u16 irqreason;
-	u16 irqmasked;
-
-	if (!adev)
-		return IRQ_NONE;
-
-	// On a shared irq line, irqs should only be for us, when enabled them
-	if (!adev->irqs_active)
-		return IRQ_NONE;
-
-	FN_ENTER;
-
-	spin_lock_irqsave(&adev->spinlock, flags);
-
-	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
-	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
-	 * IO_ACX_IRQ_STATUS_NON_DES
-	 */
-	irqreason = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
-	irqmasked = irqreason & ~adev->irq_mask;
-	log(L_IRQ, "irqstatus=%04X, irqmasked=%04X,\n", irqreason, irqmasked);
-
-	if (unlikely(irqreason == 0xffff)) {
-		/* 0xffff value hints at missing hardware,
-		 * so don't do anything.
-		 * Not very clean, but other drivers do the same... */
-		log(L_IRQ, "irqstatus=FFFF: Device removed?: IRQ_NONE\n");
-		goto none;
-	}
-
-	/* Our irq-signals are the ones, that were triggered by the IO_ACX_IRQ_MASK
-	 * unmasked irqs.
-	 */
-	if (!irqmasked) {
-		/* We are on a shared IRQ line and it wasn't our IRQ */
-		log(L_IRQ, "irqmasked zero: IRQ_NONE\n");
-		goto none;
-	}
-
-	// Mask all irqs, until we handle them. We will unmask them later in the tasklet.
-	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
-	write_flush(adev);
-	acx_schedule_task(adev, 0);
-
-	spin_unlock_irqrestore(&adev->spinlock, flags);
-	FN_EXIT0;
-	return IRQ_HANDLED;
-
-	none:
-
-	spin_unlock_irqrestore(&adev->spinlock, flags);
-	FN_EXIT0;
-	return IRQ_NONE;
-
-}
-
 /*
  * acxpci_handle_info_irq
  */
@@ -3456,7 +3396,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* request shared IRQ handler */
-	if (request_irq(adev->irq, acxpci_interrupt, IRQF_SHARED, KBUILD_MODNAME,
+	if (request_irq(adev->irq, acx_interrupt, IRQF_SHARED, KBUILD_MODNAME,
 			adev)) {
 		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
@@ -4074,7 +4014,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* request shared IRQ handler */
 	if (request_irq
-	    (adev->irq, acxpci_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
+	    (adev->irq, acx_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
 		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto done;
