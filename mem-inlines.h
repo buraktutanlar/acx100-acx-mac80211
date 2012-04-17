@@ -63,10 +63,10 @@
 #define acxmem_unlock()			spin_unlock_irqrestore(&adev->spinlock, flags)
 
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
-#define acx_readl(v)	readl((v))
-#define acx_readw(v)	readw((v))
-#define acx_writel(v,r)	writel(v, r)
-#define acx_writew(v,r)	writew(v, r)
+#define acx_readl(v)		readl((v))
+#define acx_readw(v)		readw((v))
+#define acx_writel(v, r)	writel((v), (r))
+#define acx_writew(v, r)	writew((v), (r))
 
 // This controls checking of spin-locking in the mem-interface
 #define ACXMEM_SPIN_CHECK 0
@@ -74,22 +74,24 @@
 #if ACXMEM_SPIN_CHECK
 #define ACXMEM_WARN_NOT_SPIN_LOCKED \
 do { \
-	if (!spin_is_locked(&adev->spinlock)){\
-		logf0(L_ANY, "mem: warning: data access not locked!\n");\
+	if (!spin_is_locked(&adev->spinlock)){ \
+		logf0(L_ANY, "mem: warning: data access not locked!\n"); \
 		dump_stack(); \
-	}\
+	} \
 } while (0)
 #else
 #define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
 #endif
 
-INLINE_IO u32 read_id_register(acx_device_t *adev) {
+INLINE_IO u32 read_id_register(acx_device_t *adev)
+{
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-	acx_writel (0x24, &adev->iobase[ACX_SLV_REG_ADDR]);
-	return acx_readl (&adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(0x24, &adev->iobase[ACX_SLV_REG_ADDR]);
+	return acx_readl(&adev->iobase[ACX_SLV_REG_DATA]);
 }
 
-INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset) {
+INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
+{
 	u32 val;
 	u32 addr;
 
@@ -101,16 +103,17 @@ INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset) {
 		addr = adev->io[offset];
 
 	if (addr < 0x20) {
-		return acx_readl(((u8*)adev->iobase) + addr);
+		return acx_readl(((u8 *) adev->iobase) + addr);
 	}
 
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	val = acx_readl( &adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	val = acx_readl(&adev->iobase[ACX_SLV_REG_DATA]);
 
 	return val;
 }
 
-INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset) {
+INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset)
+{
 	u16 lo;
 	u32 addr;
 
@@ -125,13 +128,14 @@ INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset) {
 		return acx_readw(((u8 *) adev->iobase) + addr);
 	}
 
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	lo = acx_readw( (u16 *)&adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	lo = acx_readw((u16 *) &adev->iobase[ACX_SLV_REG_DATA]);
 
 	return lo;
 }
 
-INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset) {
+INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
+{
 	u8 lo;
 	u32 addr;
 
@@ -143,15 +147,16 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset) {
 		addr = adev->io[offset];
 
 	if (addr < 0x20)
-		return readb(((u8 *)adev->iobase) + addr);
+		return readb(((u8 *) adev->iobase) + addr);
 
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	lo = acx_readw( (u8 *)&adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	lo = acx_readw((u8 *) &adev->iobase[ACX_SLV_REG_DATA]);
 
 	return (u8) lo;
 }
 
-INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val) {
+INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
+{
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -162,15 +167,16 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val) {
 		addr = adev->io[offset];
 
 	if (addr < 0x20) {
-		acx_writel(val, ((u8*)adev->iobase) + addr);
+		acx_writel(val, ((u8 *) adev->iobase) + addr);
 		return;
 	}
 
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	acx_writel( val, &adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	acx_writel(val, &adev->iobase[ACX_SLV_REG_DATA]);
 }
 
-INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val) {
+INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
+{
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -181,14 +187,15 @@ INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val) {
 		addr = adev->io[offset];
 
 	if (addr < 0x20) {
-		acx_writew(val, ((u8 *)adev->iobase) + addr);
+		acx_writew(val, ((u8 *) adev->iobase) + addr);
 		return;
 	}
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	acx_writew( val, (u16 *) &adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	acx_writew(val, (u16 *) &adev->iobase[ACX_SLV_REG_DATA]);
 }
 
-INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val) {
+INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
+{
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -202,8 +209,8 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val) {
 		writeb(val, ((u8 *) adev->iobase) + addr);
 		return;
 	}
-	acx_writel( addr, &adev->iobase[ACX_SLV_REG_ADDR] );
-	writeb( val, (u8 *)&adev->iobase[ACX_SLV_REG_DATA] );
+	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
+	writeb(val, (u8 *) &adev->iobase[ACX_SLV_REG_DATA]);
 }
 
 /* Handle PCI posting properly:
@@ -211,7 +218,8 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val) {
  * *before* the next write, by reading a random (and safely accessible) register.
  * This call has to be made if there is no read following (which would flush the data
  * to the adapter), yet the written data has to reach the adapter immediately. */
-INLINE_IO void write_flush(acx_device_t *adev) {
+INLINE_IO void write_flush(acx_device_t *adev)
+{
 	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
 	/* faster version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should also be safe): */
@@ -219,7 +227,8 @@ INLINE_IO void write_flush(acx_device_t *adev) {
 	(void) acx_readl(adev->iobase);
 }
 
-INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
+INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
+{
 	u32 tmp;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -230,7 +239,8 @@ INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
 	write_flush(adev);
 }
 
-INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits) {
+INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
+{
 	u32 tmp;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -245,16 +255,18 @@ INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits) 
  * Copy from PXA memory to the ACX memory.  This assumes both the PXA and ACX
  * addresses are 32 bit aligned.  Count is in bytes.
  */
-INLINE_IO void write_slavemem32(acx_device_t *adev, u32 slave_address, u32 val) {
+INLINE_IO void write_slavemem32(acx_device_t *adev, u32 slave_address, u32 val)
+{
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 
 	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0x0);
 	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, slave_address);
-	udelay (10);
+	udelay(10);
 	write_reg32(adev, IO_ACX_SLV_MEM_DATA, val);
 }
 
-INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address) {
+INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address)
+{
 	u32 val;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
@@ -267,7 +279,8 @@ INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address) {
 	return val;
 }
 
-INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val) {
+INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val)
+{
 	u32 data;
 	u32 base;
 	int offset;
@@ -286,7 +299,8 @@ INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val) {
 	write_slavemem32(adev, base, data);
 }
 
-INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address) {
+INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address)
+{
 	u8 val;
 	u32 base;
 	u32 data;
@@ -307,7 +321,8 @@ INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address) {
 /*
  * doesn't split across word boundaries
  */
-INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val) {
+INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val)
+{
 	u32 data;
 	u32 base;
 	int offset;
@@ -329,7 +344,8 @@ INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val) 
 /*
  * doesn't split across word boundaries
  */
-INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address) {
+INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address)
+{
 	u16 val;
 	u32 base;
 	u32 data;
