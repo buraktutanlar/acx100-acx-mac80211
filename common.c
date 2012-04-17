@@ -6950,7 +6950,7 @@ module_exit(acx_cleanup_module)
 /* will add __read_mostly later */
 unsigned int acx_debug = ACX_DEFAULT_MSG;
 /* parameter is 'debug', corresponding var is acx_debug */
-module_param_named(debug, acx_debug, uint, 0);
+module_param_named(debug, acx_debug, uint, 0644);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 #endif
 
