@@ -38,7 +38,7 @@
 
 #include "acx.h"
 #include "usb.h"
-
+#include "merge.h"
 
 /*
  * BOM Config
@@ -1102,7 +1102,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 
 	if (IS_PCI(adev)) {
 		/* sets the beginning of the rx descriptor queue, after the tx descrs */
-		if (OK != acxpci_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev))
 			goto fail;
 		acxpci_create_desc_queues(adev, tx_queue_start, rx_queue_start);
 	}
@@ -1111,7 +1111,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 		/* sets the beginning of the rx descriptor queue, after the tx descrs */
 		adev->acx_queue_indicator = (queueindicator_t *) le32_to_cpu (queueconf.QueueEnd);
 
-		if (OK != acxmem_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev))
 			goto fail;
 
 		acxmem_create_desc_queues(adev, tx_queue_start, rx_queue_start);
@@ -1166,11 +1166,11 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 
 	/* Set up our host descriptor pool + data pool */
 	if (IS_PCI(adev)) {
-		if (OK != acxpci_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev))
 			goto fail;
 	}
 	else if (IS_MEM(adev)) {
-		if (OK != acxmem_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev))
 			goto fail;
 	}
 

@@ -1,3 +1,5 @@
+
+#define pr_fmt(fmt) "acx.%s: " fmt, __func__
 #include "acx_debug.h"
 
 #include <linux/version.h>
@@ -122,6 +124,8 @@ static int acx_upload_radio(acx_device_t *adev, char *filename)
 
 	FN_ENTER;
 
+	pr_notice("firmware: %s\n", filename);
+
 	acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
@@ -186,6 +190,7 @@ fail:
 int acxmem_upload_radio(acx_device_t *adev)
 {
 	char filename[sizeof("RADIONN.BIN")];
+
 	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
 	return acx_upload_radio(adev, filename);
 }
@@ -193,8 +198,26 @@ int acxmem_upload_radio(acx_device_t *adev)
 int acxpci_upload_radio(acx_device_t *adev)
 {
         char filename[sizeof("tiacx1NNrNN")];
+
         snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
 		IS_ACX111(adev) * 11, adev->radio_type);
 	return acx_upload_radio(adev, filename);
+}
+
+int acx_create_hostdesc_queues(acx_device_t *adev)
+{
+        int result;
+
+	pr_notice("notice IS_PCI(%p): %d\n", adev, IS_PCI(adev));
+
+	result = (IS_MEM(adev))
+		? acxmem_create_tx_host_desc_queue(adev)
+		: acxpci_create_tx_host_desc_queue(adev);
+        if (OK != result)
+                return result;
+        result = (IS_MEM(adev))
+		? acxmem_create_rx_host_desc_queue(adev)
+		: acxpci_create_rx_host_desc_queue(adev);
+        return result;
 }
 
