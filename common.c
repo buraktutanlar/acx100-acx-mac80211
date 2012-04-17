@@ -6947,11 +6947,47 @@ module_init(acx_init_module)
 module_exit(acx_cleanup_module)
 
 #if ACX_DEBUG
+
 /* will add __read_mostly later */
 unsigned int acx_debug = ACX_DEFAULT_MSG;
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0644);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
+
+static const char *flag_names[] = {
+	"L_LOCK", "L_INIT", "L_IRQ", "L_ASSOC", "L_FUNC", "L_XFER",
+	"L_DATA", "L_DEBUG", "L_IOCTL", "L_CTL", "L_BUFR", "L_XFER_BEACON",
+	"L_BUFT", "L_USBRXTX", "L_BUF",
+};
+
+static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
+{
+	int i, len;
+	char *p = buf; // 1 page preallocated (I think - it didnt crash !!)
+
+	for (i = 0; i < ARRAY_SIZE(flag_names); i++) {
+		if (acx_debug & 1 << i)
+			len = sprintf(p, "bit %d:%s = 1\n", i, flag_names[i]);
+		else
+			len = sprintf(p, "bit %d:%s = 0\n", i, flag_names[i]);
+		pr_info("%s", p);
+		p += len;
+	}
+	return p - buf;
+}
+static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
+{
+        TODO();
+	return 0;
+}
+
+static struct kernel_param_ops acx_debug_flag_ops = {
+        .get = acx_debug_flag_get,
+        .set = acx_debug_flag_set,
+};
+
+module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
+
 #endif
 
 #ifdef MODULE_LICENSE
