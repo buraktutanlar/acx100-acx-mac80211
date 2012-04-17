@@ -57,10 +57,12 @@
 * 
 */
 
-
-#define acxmem_lock_flags		unsigned long flags
-#define acxmem_lock()			spin_lock_irqsave(&adev->spinlock, flags)
-#define acxmem_unlock()			spin_unlock_irqrestore(&adev->spinlock, flags)
+/* These are used in many mem.c funcs, including those which should be
+ * merged with their pci counterparts.
+ */
+#define acxmem_lock_flags	unsigned long flags
+#define acxmem_lock()		spin_lock_irqsave(&adev->spinlock, flags)
+#define acxmem_unlock()		spin_unlock_irqrestore(&adev->spinlock, flags)
 
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
 #define acx_readl(v)		readl((v))
@@ -82,6 +84,14 @@ do { \
 #else
 #define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
 #endif
+
+typedef enum {
+	ACX_SOFT_RESET = 0,
+	ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA, ACX_SLV_REG_ADATA,
+	ACX_SLV_MEM_CP, ACX_SLV_MEM_ADDR, ACX_SLV_MEM_DATA, ACX_SLV_MEM_CTL,
+} acxreg_t;
+
+#define INLINE_IO static inline
 
 INLINE_IO u32 read_id_register(acx_device_t *adev)
 {

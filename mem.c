@@ -251,12 +251,6 @@ void __exit acxmem_cleanup_module(void);
 // This is the vendor id on the HX4700, anyway
 #define ACX_VENDOR_ID 0x8400104c
 
-typedef enum {
-	ACX_SOFT_RESET = 0,
-	ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA, ACX_SLV_REG_ADATA,
-	ACX_SLV_MEM_CP, ACX_SLV_MEM_ADDR, ACX_SLV_MEM_DATA, ACX_SLV_MEM_CTL,
-} acxreg_t;
-
 //OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4)
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
