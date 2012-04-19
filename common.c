@@ -6060,18 +6060,12 @@ void acx_after_interrupt_task(acx_device_t *adev)
 			  ACX_AFTER_IRQ_COMPLETE_SCAN);
 	}
 
-	/* STA auth or assoc timed out, start over again */
-
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
 		log(L_IRQ, "sending a start_scan cmd...\n");
 		CLEAR_BIT(adev->after_interrupt_jobs,
 			  ACX_AFTER_IRQ_RESTART_SCAN);
 	}
 
-	/* whee, we got positive assoc response! 8) */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_ASSOCIATE) {
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_ASSOCIATE);
 	}
 
 	/* others */
