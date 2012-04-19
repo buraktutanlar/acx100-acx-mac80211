@@ -383,6 +383,8 @@ int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *
 int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee, struct ieee80211_tx_queue_stats *stats);
 #endif
 
+int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set);
+
 // BOM Helpers (Common)
 // -----
 

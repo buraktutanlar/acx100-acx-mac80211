@@ -310,6 +310,9 @@ int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw, struct ieee80211_tx_queue_stats *stats);
 #endif
 
+int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set);
+static int acx_do_job_update_tim(acx_device_t *adev);
+
 // Helpers
 void acx_mwait(int ms);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
@@ -3349,6 +3352,8 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 	 * ACX100: Needs TIM included into the beacon, however space for TIM
 	 * template needs to be configured during memory-map setup
 	 */
+
+	// TODO Use pos provided by ieee80211_beacon_get_tim instead
 	tim_pos = acx_beacon_find_tim(beacon);
 	if (tim_pos == NULL)
 		logf0(L_DEBUG, "No tim contained in beacon skb");
@@ -6066,6 +6071,10 @@ void acx_after_interrupt_task(acx_device_t *adev)
 			  ACX_AFTER_IRQ_RESTART_SCAN);
 	}
 
+	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_TIM) {
+		log(L_IRQ, "ACX_AFTER_IRQ_UPDATE_TIM\n");
+		acx_do_job_update_tim(adev);
+		CLEAR_BIT(adev->after_interrupt_jobs, ACX_AFTER_IRQ_UPDATE_TIM);
 	}
 
 	/* others */
@@ -6452,6 +6461,7 @@ acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	// BOM BSS_CHANGED_BEACON
 	if (changed & BSS_CHANGED_BEACON) {
 
+		// TODO Use ieee80211_beacon_get_tim instead
 		beacon = ieee80211_beacon_get(hw, vif);
 		if (!beacon) {
 			logf0(L_ANY,
@@ -6670,6 +6680,41 @@ int acx_op_get_stats(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set)
+{
+	acx_device_t *adev = ieee2adev(hw);
+
+	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_TIM);
+
+	return 0;
+}
+
+static int acx_do_job_update_tim(acx_device_t *adev)
+{
+	int ret;
+	struct sk_buff *beacon;
+	u16 tim_offset;
+	u16 tim_length;
+
+	beacon = ieee80211_beacon_get_tim(adev->ieee, adev->vif, &tim_offset,
+			&tim_length);
+
+	if (!beacon) {
+		logf0(L_ANY, "Error: beacon==NULL");
+		return NOT_OK;
+	}
+
+	if (IS_ACX111(adev)) {
+		ret = acx_set_tim_template(adev, beacon->data + tim_offset,
+				tim_length);
+	}
+
+	dev_kfree_skb(beacon);
+
+	return (ret);
+}
+
+
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
@@ -6689,6 +6734,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 	return err;
 }
 #endif
+
 
 /*
  * BOM Helpers
