@@ -2808,6 +2808,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
 #endif
+	.set_tim = acx_op_set_tim,
 };
 
 
