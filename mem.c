@@ -38,6 +38,8 @@
 
 #define ACX_MAC80211_MEM 1
 
+#include "acx_debug.h"
+
 #define pr_acx		pr_info
 #define pr_acxmem	pr_info
 
