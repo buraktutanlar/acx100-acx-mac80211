@@ -100,11 +100,6 @@ STATick int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state);
 STATick int acxpci_e_resume(struct pci_dev *pdev);
 #endif
 
-#ifdef CONFIG_VLYNQ
-STATick int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
-STATick void vlynq_remove(struct vlynq_device *vdev);
-#endif
-
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
