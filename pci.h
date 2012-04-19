@@ -4,7 +4,7 @@
  * from pci.c, and changes them from static to public to suppress 
  * warnings like:
 
- warning: ‘acxpci_op_stop’ declared ‘static’ but never defined [-Wunused-function]
+ warning: 'acxpci_op_stop' declared 'static' but never defined [-Wunused-function]
  Later, we'll drop it.
 */
 
