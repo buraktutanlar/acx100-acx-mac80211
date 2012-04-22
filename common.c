@@ -6710,7 +6710,7 @@ static int acx_do_job_update_tim(acx_device_t *adev)
 
 	if (IS_ACX111(adev)) {
 		ret = acx_set_tim_template(adev, beacon->data + tim_offset,
-				tim_length);
+				beacon->len - tim_offset);
 	}
 
 	dev_kfree_skb(beacon);
