@@ -182,11 +182,8 @@ static int acx100_update_wep_options(acx_device_t *adev);
 static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon);
 static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
 static int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
-static int acx_set_probe_response_template_off(acx_device_t *adev);
-static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb);
-#ifdef UNUSED_BUT_USEFULL
 static int acx_set_probe_response_template(acx_device_t *adev, u8* data, int len);
-#endif
+static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb);
 
 static int acx_init_max_template_generic(acx_device_t * adev, unsigned int len, unsigned int cmd);
 static int acx_init_packet_templates(acx_device_t * adev);
@@ -3393,10 +3390,10 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 	 ** 0x80 bit in ratevector from STA.  We can 'fix' it by not
 	 ** using this template and sending probe responses by
 	 ** hand. TODO --vda */
-	//res = acx_set_probe_response_template(adev, beacon->data, len_wo_tim);
-	res = acx_set_probe_response_template_off(adev);
+	res = acx_set_probe_response_template(adev, beacon->data, len_wo_tim);
 	if (res)
 		goto out;
+	//acx_s_set_probe_response_template_off(adev);
 
 	/* Needed if generated frames are to be emitted at different
 	 * tx rate now */
@@ -3610,9 +3607,8 @@ static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 	return res;
 }
 
-#ifdef UNUSED_BUT_USEFULL
-static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
-		int len)
+static int
+acx_set_probe_response_template(acx_device_t *adev, u8* data, int len)
 {
 	struct acx_template_proberesp templ;
 	int res;
@@ -3620,8 +3616,8 @@ static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
 	FN_ENTER;
 
 	memcpy((u8*) &templ.fc, data, len);
-	templ.fc = cpu_to_le16(
-			IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_PROBE_RESP);
+	templ.fc = cpu_to_le16(IEEE80211_FTYPE_MGMT
+			| IEEE80211_STYPE_PROBE_RESP);
 
 	templ.size = cpu_to_le16(len);
 
@@ -3631,9 +3627,9 @@ static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
 	FN_EXIT1(res);
 	return res;
 }
-#endif
 
-static int acx_set_probe_response_template_off(acx_device_t *adev) {
+#ifdef UNUSED_BUT_USEFULL
+static int acx_s_set_probe_response_template_off(acx_device_t *adev) {
 
 	acx_template_nullframe_t templ;
 	int result;
@@ -3648,6 +3644,7 @@ static int acx_set_probe_response_template_off(acx_device_t *adev) {
 	FN_EXIT1(result);
 	return result;
 }
+#endif
 
 /*
  * acx_s_init_packet_templates()
