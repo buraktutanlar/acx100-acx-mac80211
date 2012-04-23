@@ -145,7 +145,7 @@ void acxpci_irq_work(struct work_struct *work);
 // static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 //= static void acxpci_handle_info_irq(acx_device_t * adev);
-void acxpci_set_interrupt_mask(acx_device_t * adev);
+//= void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
 // static int acxpci_op_start(struct ieee80211_hw *hw);
@@ -2230,6 +2230,7 @@ more bytes may follow
     after we set it once. Let's hope this will be fixed in firmware someday
 */
 
+#if 0 // merged - acx_set_interrupt_mask()
 #include "interrupt-masks.h"
 void acxpci_set_interrupt_mask(acx_device_t * adev)
 {
@@ -2281,6 +2282,7 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 	}
 	pr_notice("adev->irq_mask: actual: %d\n", adev->irq_mask);
 }
+#endif // acxpci_set_interrupt_mask()
 
 /*
  * BOM Mac80211 Ops

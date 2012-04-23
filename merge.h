@@ -30,3 +30,5 @@ int acx_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 char *acx_proc_eeprom_output(int *length, acx_device_t *adev);
 
 void acx_up(struct ieee80211_hw *hw);
+
+void acx_set_interrupt_mask(acx_device_t * adev);

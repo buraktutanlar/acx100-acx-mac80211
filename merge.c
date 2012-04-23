@@ -3352,53 +3352,18 @@ void acx_handle_info_irq(acx_device_t *adev)
 		);
 }
 
-void acxmem_set_interrupt_mask(acx_device_t *adev) {
-
+#include "interrupt-masks.h"
+void acx_set_interrupt_mask(acx_device_t *adev)
+{
 	FN_ENTER;
 
-	if (IS_ACX111(adev)) {
-		adev->irq_mask = (u16) ~(0
-		| HOST_INT_RX_DATA
-		| HOST_INT_TX_COMPLETE
-		/* | HOST_INT_TX_XFER        */
-		/* | HOST_INT_RX_COMPLETE    */
-		/* | HOST_INT_DTIM           */
-		/* | HOST_INT_BEACON         */
-		/* | HOST_INT_TIMER          */
-		/* | HOST_INT_KEY_NOT_FOUND  */
-		| HOST_INT_IV_ICV_FAILURE
-		| HOST_INT_CMD_COMPLETE
-		| HOST_INT_INFO
-		| HOST_INT_OVERFLOW
-		/* | HOST_INT_PROCESS_ERROR  */
-		| HOST_INT_SCAN_COMPLETE
-		| HOST_INT_FCS_THRESHOLD
-		| HOST_INT_UNKNOWN);
+	pr_notice("adev->irq_mask: before: %d devtype:%d chiptype:%d tobe: %d\n",
+		adev->irq_mask, (adev)->dev_type, (adev)->chip_type,
+		interrupt_masks[(adev)->dev_type][(adev)->chip_type]);
 
-	} else {
-		adev->irq_mask = (u16) ~(0
-		| HOST_INT_RX_DATA
-		| HOST_INT_TX_COMPLETE
-		/* | HOST_INT_TX_XFER        */
-		/* | HOST_INT_RX_COMPLETE    */
-		/* | HOST_INT_DTIM           */
-		/* | HOST_INT_BEACON         */
-		/* | HOST_INT_TIMER          */
-		/* | HOST_INT_KEY_NOT_FOUND  */
-		/* | HOST_INT_IV_ICV_FAILURE */
-		| HOST_INT_CMD_COMPLETE
-		| HOST_INT_INFO
-		| HOST_INT_OVERFLOW
-		| HOST_INT_PROCESS_ERROR
-		| HOST_INT_SCAN_COMPLETE
-		/* | HOST_INT_FCS_THRESHOLD  */
-		/* | HOST_INT_BEACON_MISSED        */
-		);
-
-	}
+	adev->irq_mask = interrupt_masks[(adev)->dev_type][(adev)->chip_type];
 
 	FN_EXIT0;
-
 }
 
 // OW FIXME Old interrupt handler

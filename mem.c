@@ -209,7 +209,7 @@ void acxmem_irq_work(struct work_struct *work);
 // STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 //= STATick void acxmem_handle_info_irq(acx_device_t *adev);
-void acxmem_set_interrupt_mask(acx_device_t *adev);
+//= void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops
 STATick int acxmem_op_start(struct ieee80211_hw *hw);
@@ -4507,7 +4507,7 @@ STATick int acxmem_e_resume(struct platform_device *pdev) {
 	/*
 	 * done by acx_s_set_defaults for initial startup
 	 */
-	acxmem_set_interrupt_mask(adev);
+	acx_set_interrupt_mask(adev);
 
 	pr_acx("rsm: bringing up interface\n");
 	SET_BIT (adev->set_mask, GETSET_ALL);
