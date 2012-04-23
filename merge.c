@@ -3731,6 +3731,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
+#if 0 // non-trivial diffs vs pci
 static int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	acx_device_t *adev = NULL;
@@ -3985,6 +3986,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	FN_EXIT1(result);
 	return result;
 }
+#endif
 
 /*
  * acxmem_e_remove
@@ -3994,9 +3996,11 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-static int __devexit acxmem_remove(struct platform_device *pdev) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+#if 0 // close, but defer merge
+static int __devexit acxmem_remove(struct platform_device *pdev)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
@@ -4086,6 +4090,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 
 	return(0);
 }
+#endif
 
 #if 0 // til-end
 /*
