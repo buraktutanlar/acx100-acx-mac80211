@@ -2953,24 +2953,24 @@ void acx_handle_info_irq(acx_device_t *adev)
 {
 #if ACX_DEBUG
 	static const char * const info_type_msg[] = {
-			"(unknown)",
-			"scan complete",
-			"WEP key not found",
-			"internal watchdog reset was done",
-			"failed to send powersave (NULL frame) notification to AP",
-			"encrypt/decrypt on a packet has failed",
-			"TKIP tx keys disabled",
-			"TKIP rx keys disabled",
-			"TKIP rx: key ID not found",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"TKIP IV value exceeds thresh"
-			};
+		"(unknown)",
+		"scan complete",
+		"WEP key not found",
+		"internal watchdog reset was done",
+		"failed to send powersave (NULL frame) notification to AP",
+		"encrypt/decrypt on a packet has failed",
+		"TKIP tx keys disabled",
+		"TKIP rx keys disabled",
+		"TKIP rx: key ID not found",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"???",
+		"TKIP IV value exceeds thresh"
+	};
 #endif
 	u32 info_type, info_status;
 
@@ -2989,10 +2989,10 @@ void acx_handle_info_irq(acx_device_t *adev)
 	write_flush(adev);
 
 	log(L_IRQ|L_CTL, "got Info IRQ: status %04X type %04X: %s\n",
-			info_status, info_type,
-			info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
+		info_status, info_type,
+		info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
 			0 : info_type]
-	);
+		);
 }
 
 void acxmem_set_interrupt_mask(acx_device_t *adev) {
