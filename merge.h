@@ -10,3 +10,5 @@ int acx_create_hostdesc_queues(acx_device_t *adev);
 void acx_log_rxbuffer(acx_device_t *adev);
 void acx_log_txbuffer(acx_device_t *adev);
 
+void acx_op_stop(struct ieee80211_hw *hw);
+int acx_op_start(struct ieee80211_hw *hw);

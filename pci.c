@@ -155,8 +155,8 @@ static void acxpci_handle_info_irq(acx_device_t * adev);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
-static int acxpci_op_start(struct ieee80211_hw *hw);
-static void acxpci_op_stop(struct ieee80211_hw *hw);
+// static int acxpci_op_start(struct ieee80211_hw *hw);
+// static void acxpci_op_stop(struct ieee80211_hw *hw);
 
 // Helpers
 void acxpci_power_led(acx_device_t * adev, int enable);
@@ -2685,24 +2685,26 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
  */
 
 static const struct ieee80211_ops acxpci_hw_ops = {
-	.tx = acx_op_tx,
-	.conf_tx = acx_conf_tx,
-	.add_interface = acx_op_add_interface,
-	.remove_interface = acx_op_remove_interface,
-	.start = acxpci_op_start,
-	.configure_filter = acx_op_configure_filter,
-	.stop = acxpci_op_stop,
-	.config = acx_op_config,
-	.bss_info_changed = acx_op_bss_info_changed,
-	.set_key = acx_op_set_key,
-	.get_stats = acx_op_get_stats,
+	.tx		= acx_op_tx,
+	.conf_tx	= acx_conf_tx,
+	.start		= acx_op_start,
+	.stop		= acx_op_stop,
+	.config		= acx_op_config,
+	.set_key	= acx_op_set_key,
+	.get_stats	= acx_op_get_stats,
+
+	.add_interface		= acx_op_add_interface,
+	.remove_interface	= acx_op_remove_interface,
+	.configure_filter	= acx_op_configure_filter,
+	.bss_info_changed	= acx_op_bss_info_changed,
+
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
 #endif
 	.set_tim = acx_op_set_tim,
 };
 
-
+#if 0
 static int acxpci_op_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -2767,7 +2769,7 @@ static void acxpci_op_stop(struct ieee80211_hw *hw)
 	acx_sem_unlock(adev);
 	FN_EXIT0;
 }
-
+#endif
 
 /*
  * BOM Helpers

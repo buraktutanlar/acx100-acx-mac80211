@@ -3201,7 +3201,9 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 #endif
 		};
 
-static int acx_op_start(struct ieee80211_hw *hw) {
+// static
+int acx_op_start(struct ieee80211_hw *hw)
+{
 	acx_device_t *adev = ieee2adev(hw);
 	int result = OK;
 
@@ -3234,7 +3236,8 @@ static int acx_op_start(struct ieee80211_hw *hw) {
 }
 
 // trivial diffs mem/pci
-static void acx_op_stop(struct ieee80211_hw *hw)
+// static
+void acx_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
