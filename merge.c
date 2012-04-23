@@ -3178,3 +3178,1031 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 #endif
 // ---
 
+
+/*
+ * BOM Mac80211 Ops
+ * ==================================================
+ */
+
+static const struct ieee80211_ops acxmem_hw_ops = {
+		.tx = acx_op_tx,
+		.conf_tx = acx_conf_tx,
+		.add_interface = acx_op_add_interface,
+		.remove_interface = acx_op_remove_interface,
+		.start = acxmem_op_start,
+		.configure_filter = acx_op_configure_filter,
+		.stop = acxmem_op_stop,
+		.config = acx_op_config,
+		.bss_info_changed = acx_op_bss_info_changed,
+		.set_key = acx_op_set_key,
+		.get_stats = acx_op_get_stats,
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
+		.get_tx_stats = acx_e_op_get_tx_stats,
+#endif
+		};
+
+static int acx_op_start(struct ieee80211_hw *hw) {
+	acx_device_t *adev = ieee2adev(hw);
+	int result = OK;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	adev->initialized = 0;
+
+	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+
+	/* ifup device */
+	acxmem_up(hw);  // vs pci ??
+
+	/* We don't currently have to do anything else.
+	 * The setup of the MAC should be subsequently completed via
+	 * the mlme commands.
+	 * Higher layers know we're ready from dev->start==1 and
+	 * dev->tbusy==0.  Our rx path knows to pass up received/
+	 * frames because of dev->flags&IFF_UP is true.
+	 */
+
+	ieee80211_wake_queues(adev->ieee);
+
+	adev->initialized = 1;
+
+	acx_sem_unlock(adev);
+	FN_EXIT1(result);
+
+	return result;
+}
+
+// trivial diffs mem/pci
+static void acx_op_stop(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
+
+	FN_ENTER;
+	acx_sem_lock(adev);
+
+	acx_stop_queue(adev->ieee, "on ifdown");
+
+	/* disable all IRQs, release shared IRQ handler */
+	acxmem_lock();			// null in pci
+	acxmem_irq_disable(adev);	// pci
+	acxmem_unlock();		//
+	synchronize_irq(adev->irq);
+
+	acx_sem_unlock(adev);
+	cancel_work_sync(&adev->irq_work);
+	cancel_work_sync(&adev->tx_work);
+	acx_sem_lock(adev);
+
+	acx_tx_queue_flush(adev);
+
+	del_timer_sync(&adev->mgmt_timer);
+
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
+
+	adev->initialized = 0;
+
+	log(L_INIT, "acxpci: closed device\n");
+
+	acx_sem_unlock(adev);
+	FN_EXIT0;
+}
+
+/*
+ * BOM Helpers
+ * ==================================================
+ */
+# if 0 // defer
+void acxmem_power_led(acx_device_t *adev, int enable) {
+	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
+
+	/* A hack. Not moving message rate limiting to adev->xxx
+	 * (it's only a debug message after all) */
+	static int rate_limit = 0;
+
+	if (rate_limit++ < 3)
+		log(L_IOCTL, "Please report in case toggling the power "
+				"LED doesn't work for your card!\n");
+	if (enable)
+		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
+				& ~gpio_pled);
+	else
+		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
+				| gpio_pled);
+}
+#endif
+
+// identical
+INLINE_IO int acxmem_adev_present(acx_device_t *adev)
+{
+	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
+	 * which should be safe): */
+	return acx_readl(adev->iobase) != 0xffffffff;
+}
+
+static char acxmem_printable(char c) {
+	return ((c >= 20) && (c < 127)) ? c : '.';
+}
+
+// OW TODO
+#if 0
+static void update_link_quality_led(acx_device_t *adev) {
+	int qual;
+
+	qual = acx_signal_determine_quality(adev->wstats.qual.level,
+			adev->wstats.qual.noise);
+	if (qual > adev->brange_max_quality)
+		qual = adev->brange_max_quality;
+
+	if (time_after(jiffies, adev->brange_time_last_state_change +
+			(HZ/2 - HZ/2 * (unsigned long)qual / adev->brange_max_quality ) )) {
+		acxmem_power_led(adev, (adev->brange_last_state == 0));
+		adev->brange_last_state ^= 1; /* toggle */
+		adev->brange_time_last_state_change = jiffies;
+	}
+}
+#endif
+
+
+/*
+ * BOM Ioctls
+ * ==================================================
+ */
+
+// OW TODO Not used in pci either !?
+#if 0
+int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
+		struct iw_param *vwrq, char *extra) {
+#if ACX_DEBUG > 1
+
+	acx_device_t *adev = ieee2adev(hw);
+	rxdesc_t *rxdesc;
+	txdesc_t *txdesc;
+	rxhostdesc_t *rxhostdesc;
+	txhostdesc_t *txhostdesc;
+	struct acx111_ie_memoryconfig memconf;
+	struct acx111_ie_queueconfig queueconf;
+	unsigned long flags;
+	int i;
+	char memmap[0x34];
+	char rxconfig[0x8];
+	char fcserror[0x8];
+	char ratefallback[0x5];
+
+	if (!(acx_debug & (L_IOCTL | L_DEBUG)))
+		return OK;
+	/* using printk() since we checked debug flag already */
+
+	acx_sem_lock(adev);
+
+	if (!IS_ACX111(adev)) {
+		pr_acx("acx111-specific function called "
+			"with non-acx111 chip, aborting\n");
+		goto end_ok;
+	}
+
+	/* get Acx111 Memory Configuration */
+	memset(&memconf, 0, sizeof(memconf));
+	/* BTW, fails with 12 (Write only) error code.
+	 ** Retained for easy testing of issue_cmd error handling :) */
+	pr_info("Interrogating queue config\n");
+	acx_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
+	pr_info("done with queue config\n");
+
+	/* get Acx111 Queue Configuration */
+	memset(&queueconf, 0, sizeof(queueconf));
+	pr_info("Interrogating mem config options\n");
+	acx_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+	pr_info("done with mem config options\n");
+
+	/* get Acx111 Memory Map */
+	memset(memmap, 0, sizeof(memmap));
+	pr_info("Interrogating mem map\n");
+	acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP);
+	pr_info("done with mem map\n");
+
+	/* get Acx111 Rx Config */
+	memset(rxconfig, 0, sizeof(rxconfig));
+	pr_info("Interrogating rxconfig\n");
+	acx_interrogate(adev, &rxconfig, ACX1xx_IE_RXCONFIG);
+	pr_info("done with queue rxconfig\n");
+
+	/* get Acx111 fcs error count */
+	memset(fcserror, 0, sizeof(fcserror));
+	pr_info("Interrogating fcs err count\n");
+	acx_interrogate(adev, &fcserror, ACX1xx_IE_FCS_ERROR_COUNT);
+	pr_info("done with err count\n");
+
+	/* get Acx111 rate fallback */
+	memset(ratefallback, 0, sizeof(ratefallback));
+	pr_info("Interrogating rate fallback\n");
+	acx_interrogate(adev, &ratefallback, ACX1xx_IE_RATE_FALLBACK);
+	pr_info("done with rate fallback\n");
+
+	/* force occurrence of a beacon interrupt */
+	/* TODO: comment why is this necessary */
+	write_reg16(adev, IO_ACX_HINT_TRIG, HOST_INT_BEACON);
+
+	/* dump Acx111 Mem Configuration */
+	pr_acx("dump mem config:\n"
+		"data read: %d, struct size: %d\n"
+		"Number of stations: %1X\n"
+		"Memory block size: %1X\n"
+		"tx/rx memory block allocation: %1X\n"
+		"count rx: %X / tx: %X queues\n"
+		"options %1X\n"
+		"fragmentation %1X\n"
+		"Rx Queue 1 Count Descriptors: %X\n"
+		"Rx Queue 1 Host Memory Start: %X\n"
+		"Tx Queue 1 Count Descriptors: %X\n"
+		"Tx Queue 1 Attributes: %X\n",
+		  memconf.len, (int) sizeof(memconf),
+			memconf.no_of_stations,
+			memconf.memory_block_size,
+			memconf.tx_rx_memory_block_allocation,
+			memconf.count_rx_queues, memconf.count_tx_queues,
+			memconf.options,
+			memconf.fragmentation,
+			memconf.rx_queue1_count_descs,
+			acx2cpu(memconf.rx_queue1_host_rx_start),
+			memconf.tx_queue1_count_descs, memconf.tx_queue1_attributes);
+
+	/* dump Acx111 Queue Configuration */
+	pr_acx("dump queue head:\n"
+		"data read: %d, struct size: %d\n"
+		"tx_memory_block_address (from card): %X\n"
+		"rx_memory_block_address (from card): %X\n"
+		"rx1_queue address (from card): %X\n"
+		"tx1_queue address (from card): %X\n"
+		"tx1_queue attributes (from card): %X\n",
+			queueconf.len, (int) sizeof(queueconf),
+			queueconf.tx_memory_block_address,
+			queueconf.rx_memory_block_address,
+			queueconf.rx1_queue_address,
+			queueconf.tx1_queue_address, queueconf.tx1_attributes);
+
+	/* dump Acx111 Mem Map */
+	pr_acx("dump mem map:\n"
+		"data read: %d, struct size: %d\n"
+		"Code start: %X\n"
+		"Code end: %X\n"
+		"WEP default key start: %X\n"
+		"WEP default key end: %X\n"
+		"STA table start: %X\n"
+		"STA table end: %X\n"
+		"Packet template start: %X\n"
+		"Packet template end: %X\n"
+		"Queue memory start: %X\n"
+		"Queue memory end: %X\n"
+		"Packet memory pool start: %X\n"
+		"Packet memory pool end: %X\n"
+		"iobase: %p\n"
+		"iobase2: %p\n",
+			*((u16 *) &memmap[0x02]), (int) sizeof(memmap),
+			*((u32 *) &memmap[0x04]),
+			*((u32 *) &memmap[0x08]),
+			*((u32 *) &memmap[0x0C]),
+			*((u32 *) &memmap[0x10]),
+			*((u32 *) &memmap[0x14]),
+			*((u32 *) &memmap[0x18]),
+			*((u32 *) &memmap[0x1C]),
+			*((u32 *) &memmap[0x20]),
+			*((u32 *) &memmap[0x24]),
+			*((u32 *) &memmap[0x28]),
+			*((u32 *) &memmap[0x2C]),
+			*((u32 *) &memmap[0x30]), adev->iobase,
+			adev->iobase2);
+
+	/* dump Acx111 Rx Config */
+	pr_acx("dump rx config:\n"
+		"data read: %d, struct size: %d\n"
+		"rx config: %X\n"
+		"rx filter config: %X\n",
+			*((u16 *) &rxconfig[0x02]),	(int) sizeof(rxconfig),
+			*((u16 *) &rxconfig[0x04]),	*((u16 *) &rxconfig[0x06]));
+
+	/* dump Acx111 fcs error */
+	pr_acx("dump fcserror:\n"
+		"data read: %d, struct size: %d\n"
+		"fcserrors: %X\n",
+			*((u16 *) &fcserror[0x02]), (int) sizeof(fcserror),
+			*((u32 *) &fcserror[0x04]));
+
+	/* dump Acx111 rate fallback */
+	pr_acx("dump rate fallback:\n"
+		"data read: %d, struct size: %d\n"
+		"ratefallback: %X\n",
+			*((u16 *) &ratefallback[0x02]),
+			(int) sizeof(ratefallback),
+			*((u8 *) &ratefallback[0x04]));
+
+	/* protect against IRQ */
+	acx_lock(adev, flags);
+
+	/* dump acx111 internal rx descriptor ring buffer */
+	rxdesc = adev->rxdesc_start;
+
+	/* loop over complete receive pool */
+	if (rxdesc)
+		for (i = 0; i < RX_CNT; i++) {
+			pr_acx("\ndump internal rxdesc %d:\n"
+				"mem pos %p\n"
+				"next 0x%X\n"
+				"acx mem pointer (dynamic) 0x%X\n"
+				"CTL (dynamic) 0x%X\n"
+				"Rate (dynamic) 0x%X\n"
+				"RxStatus (dynamic) 0x%X\n"
+				"Mod/Pre (dynamic) 0x%X\n",
+				i,
+				rxdesc,
+				acx2cpu(rxdesc->pNextDesc),
+				acx2cpu(rxdesc->ACXMemPtr),
+				rxdesc->Ctl_8, rxdesc->rate,	rxdesc->error, rxdesc->SNR);
+			rxdesc++;
+		}
+
+		/* dump host rx descriptor ring buffer */
+
+		rxhostdesc = adev->rxhostdesc_start;
+
+		/* loop over complete receive pool */
+		if (rxhostdesc)
+		for (i = 0; i < RX_CNT; i++) {
+			pr_acx("\ndump host rxdesc %d:\n"
+					"mem pos %p\n"
+					"buffer mem pos 0x%X\n"
+					"buffer mem offset 0x%X\n"
+					"CTL 0x%X\n"
+					"Length 0x%X\n"
+					"next 0x%X\n"
+					"Status 0x%X\n",
+					i,
+					rxhostdesc,
+					acx2cpu(rxhostdesc->data_phy),
+					rxhostdesc->data_offset,
+					le16_to_cpu(rxhostdesc->Ctl_16),
+					le16_to_cpu(rxhostdesc->length),
+					acx2cpu(rxhostdesc->desc_phy_next),
+					rxhostdesc->Status);
+			rxhostdesc++;
+		}
+
+		/* dump acx111 internal tx descriptor ring buffer */
+		txdesc = adev->txdesc_start;
+
+		/* loop over complete transmit pool */
+		if (txdesc)
+		for (i = 0; i < TX_CNT; i++) {
+			pr_acx("\ndump internal txdesc %d:\n"
+					"size 0x%X\n"
+					"mem pos %p\n"
+					"next 0x%X\n"
+					"acx mem pointer (dynamic) 0x%X\n"
+					"host mem pointer (dynamic) 0x%X\n"
+					"length (dynamic) 0x%X\n"
+					"CTL (dynamic) 0x%X\n"
+					"CTL2 (dynamic) 0x%X\n"
+					"Status (dynamic) 0x%X\n"
+					"Rate (dynamic) 0x%X\n",
+					i,
+					(int) sizeof(struct txdesc),
+					txdesc,
+					acx2cpu(txdesc->pNextDesc),
+					acx2cpu(txdesc->AcxMemPtr),
+					acx2cpu(txdesc->HostMemPtr),
+					le16_to_cpu(txdesc->total_length),
+					txdesc->Ctl_8,
+					txdesc->Ctl2_8,
+					txdesc->error,
+					txdesc->u.r1.rate);
+			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
+		}
+
+		/* dump host tx descriptor ring buffer */
+
+		txhostdesc = adev->txhostdesc_start;
+
+		/* loop over complete host send pool */
+		if (txhostdesc)
+		for (i = 0; i < TX_CNT * 2; i++) {
+			pr_acx("\ndump host txdesc %d:\n"
+					"mem pos %p\n"
+					"buffer mem pos 0x%X\n"
+					"buffer mem offset 0x%X\n"
+					"CTL 0x%X\n"
+					"Length 0x%X\n"
+					"next 0x%X\n"
+					"Status 0x%X\n",
+					i,
+					txhostdesc,
+					acx2cpu(txhostdesc->data_phy),
+					txhostdesc->data_offset,
+					le16_to_cpu(txhostdesc->Ctl_16),
+					le16_to_cpu(txhostdesc->length),
+					acx2cpu(txhostdesc->desc_phy_next),
+					le32_to_cpu(txhostdesc->Status));
+			txhostdesc++;
+		}
+
+		/* write_reg16(adev, 0xb4, 0x4); */
+
+		acx_unlock(adev, flags);
+		end_ok:
+
+		acx_sem_unlock(adev);
+#endif /* ACX_DEBUG */
+	return OK;
+}
+
+/***********************************************************************
+ */
+int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
+		struct iw_request_info *info,
+		struct iw_param *vwrq, char *extra) {
+	// OW
+	acx_device_t *adev = ieee2adev(hw);
+	unsigned long flags;
+	u16 gpio_old;
+
+	if (!IS_ACX100(adev)) {
+		/* WARNING!!!
+		 * Removing this check *might* damage
+		 * hardware, since we're tweaking GPIOs here after all!!!
+		 * You've been warned...
+		 * WARNING!!! */
+		pr_acx("sorry, setting bias level for non-acx100 "
+			"is not supported yet\n");
+		return OK;
+	}
+
+	if (*extra > 7) {
+		pr_acx("invalid bias parameter, range is 0-7\n");
+		return -EINVAL;
+	}
+
+	acx_sem_lock(adev);
+
+	/* Need to lock accesses to [IO_ACX_GPIO_OUT]:
+	 * IRQ handler uses it to update LED */
+	acx_lock(adev, flags);
+	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
+	write_reg16(adev, IO_ACX_GPIO_OUT,
+			(gpio_old & 0xf8ff)	| ((u16) *extra << 8));
+	acx_unlock(adev, flags);
+
+	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
+	pr_acx("%s: PHY power amplifier bias: old:%d, new:%d\n",
+			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
+
+	acx_sem_unlock(adev);
+
+	return OK;
+}
+#endif
+
+
+/*
+ * BOM Driver, Module
+ * ==================================================
+ */
+
+/*
+ * acxmem_e_probe
+ *
+ * Probe routine called when a PCI device w/ matching ID is found.
+ * Here's the sequence:
+ *   - Allocate the PCI resources.
+ *   - Read the PCMCIA attribute memory to make sure we have a WLAN card
+ *   - Reset the MAC
+ *   - Initialize the dev and wlan data
+ *   - Initialize the MAC
+ *
+ * pdev	- ptr to pci device structure containing info about pci configuration
+ * id	- ptr to the device id entry that matched this device
+ */
+static int __devinit acxmem_probe(struct platform_device *pdev) {
+
+	acx_device_t *adev = NULL;
+	const char *chip_name;
+	int result = -EIO;
+	int err;
+	int i;
+
+	struct resource *iomem;
+	unsigned long addr_size = 0;
+	u8 chip_type;
+
+	acxmem_lock_flags;
+
+	struct ieee80211_hw *ieee;
+
+	FN_ENTER;
+
+	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
+	if (!ieee) {
+		pr_acx("could not allocate ieee80211 structure %s\n", pdev->name);
+		goto fail_ieee80211_alloc_hw;
+	}
+	SET_IEEE80211_DEV(ieee, &pdev->dev);
+	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	/* TODO: mainline doesn't support the following flags yet */
+	/*
+	 ~IEEE80211_HW_MONITOR_DURING_OPER &
+	 ~IEEE80211_HW_WEP_INCLUDE_IV;
+	 */
+	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+					| BIT(NL80211_IFTYPE_ADHOC);
+	ieee->queues = 1;
+	// OW TODO Check if RTS/CTS threshold can be included here
+
+	/* TODO: although in the original driver the maximum value was 100,
+	 * the OpenBSD driver assigns maximum values depending on the type of
+	 * radio transceiver (i.e. Radia, Maxim, etc.). This value is always a
+	 * positive integer which most probably indicates the gain of the AGC
+	 * in the rx path of the chip, in dB steps (0.625 dB, for example?).
+	 * The mapping of this rssi value to dBm is still unknown, but it can
+	 * nevertheless be used as a measure of relative signal strength. The
+	 * other two values, i.e. max_signal and max_noise, do not seem to be
+	 * supported on my acx111 card (they are always 0), although iwconfig
+	 * reports them (in dBm) when using ndiswrapper with the Windows XP
+	 * driver. The GPL-licensed part of the AVM FRITZ!WLAN USB Stick
+	 * driver sources (for the TNETW1450, though) seems to also indicate
+	 * that only the RSSI is supported. In conclusion, the max_signal and
+	 * max_noise values will not be initialised by now, as they do not
+	 * seem to be supported or how to acquire them is still unknown. */
+
+	// We base signal quality on winlevel approach of previous driver
+	// TODO OW 20100615 This should into a common init code
+	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	ieee->max_signal = 100;
+
+	adev = ieee2adev(ieee);
+
+	memset(adev, 0, sizeof(*adev));
+	/** Set up our private interface **/
+	spin_lock_init(&adev->spinlock); /* initial state: unlocked */
+	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
+	mutex_init(&adev->mutex);
+	/* since nobody can see new netdev yet, we can as well
+	 ** just _presume_ that we're under sem (instead of actually taking it): */
+	/* acx_sem_lock(adev); */
+	adev->ieee = ieee;
+	adev->pdev = pdev;
+	adev->bus_dev = &pdev->dev;
+	adev->dev_type = DEVTYPE_MEM;
+
+	/** Finished with private interface **/
+
+
+	/** begin board specific inits **/
+	platform_set_drvdata(pdev, ieee);
+
+	/* chiptype is u8 but id->driver_data is ulong
+	 ** Works for now (possible values are 1 and 2) */
+	chip_type = CHIPTYPE_ACX100;
+	/* acx100 and acx111 have different PCI memory regions */
+	if (chip_type == CHIPTYPE_ACX100) {
+		chip_name = "ACX100";
+	} else if (chip_type == CHIPTYPE_ACX111) {
+		chip_name = "ACX111";
+	} else {
+		pr_acx("unknown chip type 0x%04X\n", chip_type);
+		goto fail_unknown_chiptype;
+	}
+
+	pr_acx("found %s-based wireless network card\n", chip_name);
+	log(L_ANY, "initial debug setting is 0x%04X\n", acx_debug);
+
+	adev->dev_type = DEVTYPE_MEM;
+	adev->chip_type = chip_type;
+	adev->chip_name = chip_name;
+	adev->io = (CHIPTYPE_ACX100 == chip_type) ? IO_ACX100 : IO_ACX111;
+
+	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	addr_size = iomem->end - iomem->start + 1;
+	adev->membase = (volatile u32 *) iomem->start;
+	adev->iobase = (volatile u32 *) ioremap_nocache(iomem->start, addr_size);
+	if (!adev->iobase) {
+		result = -ENOMEM;
+		dev_err(adev->bus_dev, "Couldn't ioremap\n");
+		goto fail_ioremap;
+	}
+
+	i = platform_get_irq(pdev, 0);
+	if (i < 0)
+		return i;
+	adev->irq = i;
+
+	log(L_ANY, "found an %s-based wireless network card, "
+			"irq:%d, "
+			"membase:0x%p, mem_size:%ld, "
+			"iobase:0x%p",
+			chip_name,
+			adev->irq,
+			adev->membase, addr_size,
+			adev->iobase);
+	log(L_ANY, "the initial debug setting is 0x%04X\n", acx_debug);
+
+	if (adev->irq == 0) {
+		pr_acx("can't use IRQ 0\n");
+		goto fail_request_irq;
+	}
+
+	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
+	/* request shared IRQ handler */
+	if (request_irq(adev->irq, acx_interrupt,
+			IRQF_SHARED,
+			KBUILD_MODNAME,
+			adev)) {
+		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		result = -EAGAIN;
+		goto fail_request_irq;
+	}
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+	set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
+	#else
+	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
+	#endif
+	log(L_ANY, "request_irq %d successful\n", adev->irq);
+	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	acxmem_lock();
+	acxmem_irq_disable(adev);
+	acxmem_unlock();
+
+	/* to find crashes due to weird driver access
+	 * to unconfigured interface (ifup) */
+	adev->mgmt_timer.function = (void(*)(unsigned long)) 0x0000dead;
+
+#if defined(NONESSENTIAL_FEATURES)
+	acx_show_card_eeprom_id(adev);
+#endif /* NONESSENTIAL_FEATURES */
+
+	/* Device setup is finished, now start initializing the card */
+	// ---
+
+	acx_init_task_scheduler(adev);
+
+	// Mac80211 Tx_queue
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
+
+	// OK init parts from pci.c are done in acxmem_complete_hw_reset(adev)
+	if (OK != acxmem_complete_hw_reset(adev))
+		goto fail_complete_hw_reset;
+
+	/*
+	 * Set up default things for most of the card settings.
+	 */
+	acx_set_defaults(adev);
+
+	/* Register the card, AFTER everything else has been set up,
+	 * since otherwise an ioctl could step on our feet due to
+	 * firmware operations happening in parallel or uninitialized data */
+
+	if (acx_proc_register_entries(ieee) != OK)
+		goto fail_proc_register_entries;
+
+	/* Now we have our device, so make sure the kernel doesn't try
+	 * to send packets even though we're not associated to a network yet */
+
+// OW FIXME Check if acx_stop_queue, acx_carrier_off should be included
+// OW Rest can be cleaned up
+#if 0
+	acx_stop_queue(ndev, "on probe");
+	acx_carrier_off(ndev, "on probe");
+#endif
+
+	pr_acx("net device %s, driver compiled "
+        "against wireless extensions %d and Linux %s\n",
+        wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+
+	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
+
+	/** done with board specific setup **/
+
+	/* need to be able to restore PCI state after a suspend */
+#ifdef CONFIG_PM
+			// pci_save_state(pdev);
+#endif
+
+	err = acx_setup_modes(adev);
+	if (err) {
+		pr_acx("can't setup hwmode\n");
+		goto fail_acx_setup_modes;
+	}
+
+	err = ieee80211_register_hw(ieee);
+	if (OK != err) {
+		pr_acx("ieee80211_register_hw() FAILED: %d\n", err);
+		goto fail_ieee80211_register_hw;
+	}
+
+#if CMD_DISCOVERY
+	great_inquisitor(adev);
+#endif
+
+	result = OK;
+	goto done;
+
+
+	/* error paths: undo everything in reverse order... */
+	fail_ieee80211_register_hw:
+
+	fail_acx_setup_modes:
+
+	fail_proc_register_entries:
+	acx_proc_unregister_entries(ieee);
+
+	fail_complete_hw_reset:
+
+	fail_request_irq:
+	free_irq(adev->irq, adev);
+
+	fail_ioremap:
+	if (adev->iobase)
+		iounmap((void *)adev->iobase);
+
+	fail_unknown_chiptype:
+
+	fail_ieee80211_alloc_hw:
+	acxmem_delete_dma_regions(adev);
+	platform_set_drvdata(pdev, NULL);
+	ieee80211_free_hw(ieee);
+
+	done:
+
+	FN_EXIT1(result);
+	return result;
+}
+
+/*
+ * acxmem_e_remove
+ *
+ * Shut device down (if not hot unplugged)
+ * and deallocate PCI resources for the acx chip.
+ *
+ * pdev - ptr to PCI device structure containing info about pci configuration
+ */
+static int __devexit acxmem_remove(struct platform_device *pdev) {
+
+	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
+
+	FN_ENTER;
+
+	if (!hw) {
+		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
+		    __func__);
+		goto end_no_lock;
+	}
+
+	// Unregister ieee80211 device
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
+	ieee80211_unregister_hw(adev->ieee);
+	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	/* If device wasn't hot unplugged... */
+	if (acxmem_adev_present(adev)) {
+
+		/* disable both Tx and Rx to shut radio down properly */
+		if (adev->initialized) {
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
+			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
+			adev->initialized = 0;
+		}
+
+#ifdef REDUNDANT
+		/* put the eCPU to sleep to save power
+		 * Halting is not possible currently,
+		 * since not supported by all firmware versions */
+		acx_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
+#endif
+
+		acxmem_lock();
+
+		/* disable power LED to save power :-) */
+		log(L_INIT, "switching off power LED to save power\n");
+		acxmem_power_led(adev, 0);
+
+		/* stop our eCPU */
+		if (IS_ACX111(adev)) {
+			/* FIXME: does this actually keep halting the eCPU?
+			 * I don't think so...
+			 */
+			acxmem_reset_mac(adev);
+		} else {
+			u16 temp;
+
+			/* halt eCPU */
+			temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
+			write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
+			write_flush(adev);
+		}
+
+		acxmem_unlock();
+	}
+
+	// Proc
+	acx_proc_unregister_entries(adev->ieee);
+
+	// IRQs
+	acxmem_lock();
+	acxmem_irq_disable(adev);
+	acxmem_unlock();
+
+	synchronize_irq(adev->irq);
+	free_irq(adev->irq, adev);
+
+	/* finally, clean up PCI bus state */
+	acxmem_delete_dma_regions(adev);
+	if (adev->iobase)
+		iounmap(adev->iobase);
+
+	/* remove dev registration */
+	platform_set_drvdata(pdev, NULL);
+
+	/* Free netdev (quite late,
+	 * since otherwise we might get caught off-guard
+	 * by a netdev timeout handler execution
+	 * expecting to see a working dev...) */
+	ieee80211_free_hw(adev->ieee);
+
+	pr_acxmem("%s done\n", __func__);
+
+	end_no_lock:
+	FN_EXIT0;
+
+	return(0);
+}
+
+/*
+ * TODO: PM code needs to be fixed / debugged / tested.
+ */
+#ifdef CONFIG_PM
+static int
+acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
+
+	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+	acx_device_t *adev;
+
+	FN_ENTER;
+	pr_acx("suspend handler is experimental!\n");
+	pr_acx("sus: dev %p\n", hw);
+
+	/*	if (!netif_running(ndev))
+	 goto end;
+	 */
+
+	adev = ieee2adev(hw);
+	pr_info("sus: adev %p\n", adev);
+
+	acx_sem_lock(adev);
+
+	ieee80211_unregister_hw(hw); /* this one cannot sleep */
+	acxmem_s_down(hw);
+	/* down() does not set it to 0xffff, but here we really want that */
+	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	acxmem_delete_dma_regions(adev);
+
+	/*
+	 * Turn the ACX chip off.
+	 */
+	// This should be done by the corresponding platform module, e.g. hx4700_acx.c
+	// hwdata->stop_hw();
+
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return OK;
+}
+
+static int acxmem_e_resume(struct platform_device *pdev) {
+
+	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+	acx_device_t *adev;
+
+	FN_ENTER;
+
+	pr_acx("resume handler is experimental!\n");
+	pr_acx("rsm: got dev %p\n", hw);
+
+	/*	if (!netif_running(ndev))
+	 return;
+	 */
+
+	adev = ieee2adev(hw);
+	pr_acx("rsm: got adev %p\n", adev);
+
+	acx_sem_lock(adev);
+
+	/*
+	 * Turn on the ACX.
+	 */
+	// This should be done by the corresponding platform module, e.g. hx4700_acx.c
+	// hwdata->start_hw();
+
+	acxmem_complete_hw_reset(adev);
+
+	/*
+	 * done by acx_s_set_defaults for initial startup
+	 */
+	acxmem_set_interrupt_mask(adev);
+
+	pr_acx("rsm: bringing up interface\n");
+	SET_BIT (adev->set_mask, GETSET_ALL);
+	acxmem_up(hw);
+	pr_acx("rsm: acx up done\n");
+
+	/* now even reload all card parameters as they were before suspend,
+	 * and possibly be back in the network again already :-)
+	 */
+	/* - most settings updated in acxmem_s_up() */
+	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
+		adev->set_mask = GETSET_ALL;
+		acx_update_card_settings(adev);
+		pr_acx("rsm: settings updated\n");
+	}
+
+	ieee80211_register_hw(hw);
+	pr_acx("rsm: device attached\n");
+
+	acx_sem_unlock(adev);
+
+	FN_EXIT0;
+	return OK;
+}
+#endif /* CONFIG_PM */
+
+
+static struct platform_driver acxmem_driver = {
+		.driver = {
+				.name = "acx-mem",
+		},
+		.probe = acxmem_probe,
+		.remove = __devexit_p(acxmem_remove),
+
+		#ifdef CONFIG_PM
+		.suspend = acxmem_e_suspend,
+		.resume = acxmem_e_resume
+		#endif /* CONFIG_PM */
+
+};
+
+/*
+ * acxmem_e_init_module
+ *
+ * Module initialization routine, called once at module load time
+ */
+int __init acxmem_init_module(void) {
+	int res;
+
+	FN_ENTER;
+
+#if (ACX_IO_WIDTH==32)
+	pr_acx("compiled to use 32bit I/O access. "
+		"I/O timing issues might occur, such as "
+		"non-working firmware upload. Report them\n");
+#else
+	pr_acx("compiled to use 16bit I/O access only "
+			"(compatibility mode)\n");
+#endif
+
+#ifdef __LITTLE_ENDIAN
+#define ENDIANNESS_STRING "acx: running on a little-endian CPU\n"
+#else
+#define ENDIANNESS_STRING "acx: running on a BIG-ENDIAN CPU\n"
+#endif
+	log(L_INIT,
+			ENDIANNESS_STRING
+			"acx: Slave-memory module initialized, "
+			"waiting for cards to probe...\n"
+	);
+
+	res = platform_driver_register(&acxmem_driver);
+	FN_EXIT1(res);
+	return res;
+}
+
+/*
+ * acxmem_e_cleanup_module
+ *
+ * Called at module unload time. This is our last chance to
+ * clean up after ourselves.
+ */
+void __exit acxmem_cleanup_module(void) {
+	FN_ENTER;
+
+	pr_acxmem("cleanup_module\n");
+	platform_driver_unregister(&acxmem_driver);
+
+	FN_EXIT0;
+}
+
+MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );
+MODULE_DESCRIPTION( "ACX Slave Memory Driver" );
+MODULE_LICENSE( "GPL" );
