@@ -167,7 +167,7 @@ int acxmem_reset_dev(acx_device_t *adev);
 STATick int acxmem_verify_init(acx_device_t *adev);
 STATick int acxmem_complete_hw_reset(acx_device_t *adev);
 STATick void acxmem_reset_mac(acx_device_t *adev);
-STATick void acxmem_up(struct ieee80211_hw *hw);
+//= STATick void acxmem_up(struct ieee80211_hw *hw);
 //static void acxmem_i_set_multicast_list(struct net_device *ndev);
 
 // Other (Control Path)
@@ -1989,7 +1989,9 @@ STATick void acxmem_reset_mac(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-STATick void acxmem_up(struct ieee80211_hw *hw) {
+#if 0 // merge
+STATick void acxmem_up(struct ieee80211_hw *hw)
+{
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
@@ -2014,7 +2016,7 @@ STATick void acxmem_up(struct ieee80211_hw *hw) {
 
 	FN_EXIT0;
 }
-
+#endif // acxmem_up()
 
 /***********************************************************************
  ** acxmem_i_set_multicast_list
@@ -4509,7 +4511,7 @@ STATick int acxmem_e_resume(struct platform_device *pdev) {
 
 	pr_acx("rsm: bringing up interface\n");
 	SET_BIT (adev->set_mask, GETSET_ALL);
-	acxmem_up(hw);
+	acx_up(hw);
 	pr_acx("rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before suspend,

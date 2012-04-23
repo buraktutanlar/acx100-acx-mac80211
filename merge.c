@@ -1588,6 +1588,8 @@ static int acxmem_verify_init(acx_device_t *adev) {
  * ==================================================
  */
 
+
+
 /*
  * acxmem_l_reset_mac
  *
@@ -1633,6 +1635,33 @@ static void acxmem_reset_mac(acx_device_t *adev)
 	FN_EXIT0;
 }
 #endif // acxmem_reset_mac()
+
+void acx_up(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	acxmem_lock_flags;
+
+	FN_ENTER;
+
+	acxmem_lock();
+	acx_irq_enable(adev);
+	acxmem_unlock();
+
+	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
+	 ** used to use it. But we don't do that anymore, our OS
+	 ** has reliable software timers */
+	init_timer(&adev->mgmt_timer);
+	adev->mgmt_timer.function = acx_timer;
+	adev->mgmt_timer.data = (unsigned long) adev;
+
+	/* Need to set ACX_STATE_IFACE_UP first, or else
+	 ** timer won't be started by acx_set_status() */
+	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	acx_start(adev);
+
+	FN_EXIT0;
+}
 
 /*
  * acxmem_s_reset_dev

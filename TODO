@@ -39,10 +39,6 @@ static void acxpci_log_txbuffer(const acx_device_t * adev)
 BOM Data Access
 INLINE_IO - mem has additional blocks.
 
-acx(pci|mem)_delete_dma_regions():
-	whitespace, comment diffs
-	called 2x from #if0d merge.c:acxmem_probe()
-	
 acx(pci|mem)_upload_radio(): DONE
 	filename diffs only, #if0d in pci|mem, done
 	called from common.c:acx_init_mac
@@ -54,11 +50,22 @@ acx(pci|mem)_read_phy_reg(): DONE
 
 acx(pci|mem)_irq_(enable|disable): DONE
 
-STATUS: #if1d in mem.c, pending proper merging
+acx(pci|mem)_op_(start|stop): DONE
+
+acx(pci|mem)_read_eeprom_byte(): DONE
+acx(pci|mem)_proc_eeprom_output(): DONE
+
+DONE: #if1d in mem.c, #if0d in merge.c pending proper merging
   int acxmem_write_fw(acx_device_t *adev,
   acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
   int acxmem_reset_dev(acx_device_t *adev)
 
+acx(pci|mem)_up(): DONE
+
+acx(pci|mem)_delete_dma_regions():
+	whitespace, comment diffs
+	called 2x from #if0d merge.c:acxmem_probe()
+	
 acxmem_tx_data():
   extra locking
   acx(pci|mem)_get_txhostdesc() usage
@@ -105,16 +112,12 @@ acx(pci|mem)_issue_cmd_timeo_debug() fair divergence
 acx(pci|mem)_init_mboxes()
 acx(pci|mem)_reset_dev()
 acx(pci|mem)_verify_init()
-acx(pci|mem)_up()
-acx(pci|mem)_proc_eeprom_output()
 acx(pci|mem)_process_rxdesc()
 acx(pci|mem)_tx_data()
-acx(pci|mem)_irq_disable()
 acx(pci|mem)_irq_work()
 acx(pci|mem)_interrupt()   (comment diffs)
 acx(pci|mem)_handle_info_irq()   (comment diffs)
 acx(pci|mem)_set_interrupt_mask() (whitespace diffs)
-acx(pci|mem)_op_start()
 acx111(pci|mem)_ioctl_info() (extra printks in mem
 
 ---------
