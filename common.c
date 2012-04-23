@@ -752,7 +752,7 @@ void acx_lock_debug(acx_device_t * adev, const char *where)
 		cpu_relax();
 	}
 	if (!count) {
-		printk(KERN_EMERG "acx: LOCKUP: already taken at %s!\n",
+		pr_emerg("LOCKUP: already taken at %s!\n",
 		       adev->last_lock);
 		BUG();
 	}
@@ -765,7 +765,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #ifdef SMP
 	if (!spin_is_locked(&adev->spinlock)) {
 		where = acx_sanitize_str(where);
-		printk(KERN_EMERG "acx: STRAY UNLOCK at %s!\n", where);
+		pr_emerg("STRAY UNLOCK at %s!\n", where);
 		BUG();
 	}
 #endif
@@ -774,7 +774,7 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 		diff -= adev->lock_time;
 		if (diff > max_lock_time) {
 			where = acx_sanitize_str(where);
-			printk("acx: max lock hold time %ld CPU ticks from %s "
+			pr_notice("max lock hold time %ld CPU ticks from %s "
 			       "to %s\n", diff, adev->last_lock, where);
 			max_lock_time = diff;
 		}
@@ -804,8 +804,9 @@ void log_fn_enter(const char *funcname)
 	if (indent >= sizeof(acx_debug_spaces))
 		indent = sizeof(acx_debug_spaces) - 1;
 
-	printk("%08ld %s==> %s\n",
-	       d % 100000000, acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname);
+	pr_info("%08ld %s==> %s\n", d % 100000000,
+		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
+		funcname);
 
 	acx_debug_func_indent += ACX_DEBUG_FUNC_INDENT_INCREMENT;
 }
@@ -824,8 +825,9 @@ void log_fn_exit(const char *funcname)
 	if (indent >= sizeof(acx_debug_spaces))
 		indent = sizeof(acx_debug_spaces) - 1;
 
-	printk("%08ld %s<== %s\n",
-	       d % 100000000, acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname);
+	pr_info("%08ld %s<== %s\n", d % 100000000,
+		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
+		funcname);
 }
 void log_fn_exit_v(const char *funcname, int v)
 {
@@ -838,9 +840,9 @@ void log_fn_exit_v(const char *funcname, int v)
 	if (indent >= sizeof(acx_debug_spaces))
 		indent = sizeof(acx_debug_spaces) - 1;
 
-	printk("%08ld %s<== %s: %08X\n",
-	       d % 100000000,
-	       acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent, funcname, v);
+	pr_info("%08ld %s<== %s: %08X\n", d % 100000000,
+		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
+		funcname, v);
 }
 #endif /* ACX_DEBUG > 1 */
 
@@ -852,7 +854,7 @@ char* acx_print_mac(char *buf, const u8 *mac)
 
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail)
 {
-	printk("acx: %s" MACSTR "%s", head, MAC(mac), tail);
+	pr_info("%s" MACSTR "%s", head, MAC(mac), tail);
 }
 
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
@@ -1274,8 +1276,8 @@ void acx_get_firmware_version(acx_device_t * adev)
 	    adev->firmware_version, fw.hw_id);
 
 	if (strncmp(fw.fw_id, "Rev ", 4) != 0) {
-		printk("acx: strange firmware version string "
-		       "'%s', please report\n", adev->firmware_version);
+		pr_info("strange firmware version string "
+			"'%s', please report\n", adev->firmware_version);
 		adev->firmware_numver = 0x01090407;	/* assume 1.9.4.7 */
 	} else {
 		num = &fw.fw_id[4];
@@ -1303,8 +1305,8 @@ void acx_get_firmware_version(acx_device_t * adev)
 	if (IS_ACX111(adev)) {
 		if (adev->firmware_numver == 0x00010011) {
 			/* This one does not survive floodpinging */
-			printk("acx: firmware '%s' is known to be buggy, "
-			       "please upgrade\n", adev->firmware_version);
+			pr_info("firmware '%s' is known to be buggy, "
+				"please upgrade\n", adev->firmware_version);
 		}
 	}
 
@@ -1327,8 +1329,8 @@ void acx_get_firmware_version(acx_device_t * adev)
 		adev->chip_name = "TNETW1450";
 		break;
 	default:
-		printk("acx: unknown chip ID 0x%08X, "
-		       "please report\n", adev->firmware_id);
+		pr_info("unknown chip ID 0x%08X, "
+			"please report\n", adev->firmware_id);
 		break;
 	}
 
@@ -1401,7 +1403,7 @@ void acx_display_hardware_details(acx_device_t * adev)
 		break;
 	}
 
-	printk("acx: chipset %s, radio type 0x%02X (%s), "
+	pr_info("chipset %s, radio type 0x%02X (%s), "
 	       "form factor 0x%02X (%s), EEPROM version 0x%02X, "
 	       "uploaded firmware '%s'\n",
 	       adev->chip_name, adev->radio_type, radio_str,
@@ -1432,15 +1434,15 @@ firmware_image_t *acx_read_fw(struct device *dev, const char *file,
 		if (fw_entry->size >= 8)
 			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
 		if (fw_entry->size != *size) {
-			printk("acx: firmware size does not match "
-			       "firmware header: %d != %d, "
-			       "aborting fw upload\n",
-			       (int)fw_entry->size, (int)*size);
+			pr_info("firmware size does not match "
+				"firmware header: %d != %d, "
+				"aborting fw upload\n",
+				(int)fw_entry->size, (int)*size);
 			goto release_ret;
 		}
 		res = vmalloc(*size);
 		if (!res) {
-			printk("acx: no memory for firmware "
+			pr_info("no memory for firmware "
 			       "(%u bytes)\n", *size);
 			goto release_ret;
 		}
@@ -1449,7 +1451,7 @@ firmware_image_t *acx_read_fw(struct device *dev, const char *file,
 		release_firmware(fw_entry);
 		return res;
 	}
-	printk("acx: firmware image '%s' was not provided. "
+	pr_info("firmware image '%s' was not provided. "
 	       "Check your hotplug scripts\n", file);
 
 	/* checksum will be verified in write_fw, so don't bother here */
@@ -1471,7 +1473,7 @@ acx_parse_configoption(acx_device_t * adev,
 	int is_acx111 = IS_ACX111(adev);
 
 	if (acx_debug & L_DEBUG) {
-		printk("acx: configoption struct content:\n");
+		pr_info("configoption struct content:\n");
 		acx_dump_bytes(pcfg, sizeof(*pcfg));
 	}
 
@@ -1480,7 +1482,7 @@ acx_parse_configoption(acx_device_t * adev,
 	    || (!is_acx111 && (adev->eeprom_version == 5))) {
 		/* these versions are known to be supported */
 	} else {
-		printk("acx: unknown chip and EEPROM version combination (%s, v%d), "
+		pr_info("unknown chip and EEPROM version combination (%s, v%d), "
 		       "don't know how to parse config options yet. "
 		       "Please report\n", is_acx111 ? "ACX111" : "ACX100",
 		       adev->eeprom_version);
@@ -1496,7 +1498,7 @@ acx_parse_configoption(acx_device_t * adev,
 	memcpy(adev->cfgopt_NVSv, pEle, sizeof(adev->cfgopt_NVSv));
 	pEle += sizeof(adev->cfgopt_NVSv);
 
-	printk("acx: NVSv: ");
+	pr_info("NVSv: ");
 	for (i = 0; i < sizeof(adev->cfgopt_NVSv); i++) {
 		printk("%02X ", adev->cfgopt_NVSv[i]);
 	}
@@ -1516,7 +1518,7 @@ acx_parse_configoption(acx_device_t * adev,
 		pEle += sizeof(adev->cfgopt_probe_delay);
 		if ((adev->cfgopt_probe_delay < 100)
 		    || (adev->cfgopt_probe_delay > 500)) {
-			printk("acx: strange probe_delay value %d, "
+			pr_info("strange probe_delay value %d, "
 			       "tweaking to 200\n", adev->cfgopt_probe_delay);
 			adev->cfgopt_probe_delay = 200;
 		}
@@ -1525,7 +1527,7 @@ acx_parse_configoption(acx_device_t * adev,
 	adev->cfgopt_eof_memory = le32_to_cpu(*(u32 *) pEle);
 	pEle += sizeof(adev->cfgopt_eof_memory);
 
-	printk("acx: NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
+	pr_info("NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
 	       adev->cfgopt_NVS_vendor_offs,
 	       adev->cfgopt_probe_delay, adev->cfgopt_eof_memory);
 
@@ -1536,7 +1538,7 @@ acx_parse_configoption(acx_device_t * adev,
 	adev->cfgopt_dot11ChannelAgility = *pEle++;
 	adev->cfgopt_dot11PhyType = *pEle++;
 	adev->cfgopt_dot11TempType = *pEle++;
-	printk("acx: CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
+	pr_info("CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
 	       "PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
 	       adev->cfgopt_dot11CCAModes,
 	       adev->cfgopt_dot11Diversity,
@@ -1565,7 +1567,7 @@ acx_parse_configoption(acx_device_t * adev,
 
 	adev->cfgopt_antennas.type = pEle[0];
 	adev->cfgopt_antennas.len = pEle[1];
-	printk("acx: AntennaID:%02X Len:%02X Data:",
+	pr_info("AntennaID:%02X Len:%02X Data:",
 	       adev->cfgopt_antennas.type, adev->cfgopt_antennas.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_antennas.list[i] = pEle[i + 2];
@@ -1576,7 +1578,7 @@ acx_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] + 2;
 	adev->cfgopt_power_levels.type = pEle[0];
 	adev->cfgopt_power_levels.len = pEle[1];
-	printk("acx: PowerLevelID:%02X Len:%02X Data:",
+	pr_info("PowerLevelID:%02X Len:%02X Data:",
 	       adev->cfgopt_power_levels.type, adev->cfgopt_power_levels.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_power_levels.list[i] =
@@ -1588,7 +1590,7 @@ acx_parse_configoption(acx_device_t * adev,
 	pEle += pEle[1] * 2 + 2;
 	adev->cfgopt_data_rates.type = pEle[0];
 	adev->cfgopt_data_rates.len = pEle[1];
-	printk("acx: DataRatesID:%02X Len:%02X Data:",
+	pr_info("DataRatesID:%02X Len:%02X Data:",
 	       adev->cfgopt_data_rates.type, adev->cfgopt_data_rates.len);
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_data_rates.list[i] = pEle[i + 2];
@@ -1612,7 +1614,7 @@ acx_parse_configoption(acx_device_t * adev,
 		adev->cfgopt_domains.len++;
 	}
 
-	printk("acx: DomainID:%02X Len:%02X Data:",
+	pr_info("DomainID:%02X Len:%02X Data:",
 	       adev->cfgopt_domains.type, adev->cfgopt_domains.len);
 	for (i = 0; i < adev->cfgopt_domains.len; i++) {
 		adev->cfgopt_domains.list[i] = pEle[i + 2];
@@ -1626,7 +1628,7 @@ acx_parse_configoption(acx_device_t * adev,
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_product_id.list[i] = pEle[i + 2];
 	}
-	printk("acx: ProductID:%02X Len:%02X Data:%.*s\n",
+	pr_info("ProductID:%02X Len:%02X Data:%.*s\n",
 	       adev->cfgopt_product_id.type, adev->cfgopt_product_id.len,
 	       adev->cfgopt_product_id.len,
 	       (char *)adev->cfgopt_product_id.list);
@@ -1637,12 +1639,12 @@ acx_parse_configoption(acx_device_t * adev,
 	for (i = 0; i < pEle[1]; i++) {
 		adev->cfgopt_manufacturer.list[i] = pEle[i + 2];
 	}
-	printk("acx: ManufacturerID:%02X Len:%02X Data:%.*s\n",
+	pr_info("ManufacturerID:%02X Len:%02X Data:%.*s\n",
 	       adev->cfgopt_manufacturer.type, adev->cfgopt_manufacturer.len,
 	       adev->cfgopt_manufacturer.len,
 	       (char *)adev->cfgopt_manufacturer.list);
 /*
-	printk("acx: EEPROM part:\n");
+	pr_info("EEPROM part:\n");
 	for (i=0; i<58; i++) {
 		printk("%02X =======>  0x%02X\n",
 			i, (u8 *)adev->cfgopt_NVSv[i-2]);
@@ -1862,10 +1864,10 @@ acx_interrogate_debug(acx_device_t * adev, void *pdr, int type,
 	res = acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		printk("acx: %s: %s: (type:%s) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
+		pr_info("%s: %s: (type:%s) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
 		       typestr);
 #else
-		printk("acx: %s: %s: (type:0x%X) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
+		pr_info("%s: %s: (type:0x%X) FAILED\n", __func__, wiphy_name(adev->ieee->wiphy),
 		       type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
@@ -2188,7 +2190,7 @@ int acx_init_mac(acx_device_t * adev)
 		if (OK != acx_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx111_create_dma_regions(adev)) {
-			printk("acx: %s: acx111_create_dma_regions FAILED\n",
+			pr_info("%s: acx111_create_dma_regions FAILED\n",
 			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
@@ -2198,7 +2200,7 @@ int acx_init_mac(acx_device_t * adev)
 		if (OK != acx_init_packet_templates(adev))
 			goto fail;
 		if (OK != acx100_create_dma_regions(adev)) {
-			printk("acx: %s: acx100_create_dma_regions FAILED\n",
+			pr_info("%s: acx100_create_dma_regions FAILED\n",
 			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
@@ -2209,7 +2211,7 @@ int acx_init_mac(acx_device_t * adev)
 
       fail:
 	if (result)
-		printk("acx: init_mac() FAILED\n");
+		pr_info("init_mac() FAILED\n");
 	FN_EXIT1(result);
 	return result;
 }
@@ -2585,11 +2587,11 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 		table = &dbm2val_rfmd[0];
 		break;
 	default:
-		printk("acx: %s: unknown/unsupported radio type, "
+		pr_info("%s: unknown/unsupported radio type, "
 		       "cannot modify tx power level yet!\n", wiphy_name(adev->ieee->wiphy));
 		return NOT_OK;
 	}
-	printk("acx: %s: changing radio power level to %u dBm (%u)\n",
+	pr_info("%s: changing radio power level to %u dBm (%u)\n",
 	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
 	acxpci_write_phy_reg(adev, 0x11, table[level_dbm]);
 	return OK;
@@ -3709,7 +3711,7 @@ static int acx_init_packet_templates(acx_device_t * adev)
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
       failed:
-	printk("acx: %s: %s() FAILED\n",
+	pr_info("%s: %s() FAILED\n",
 		wiphy_name(adev->ieee->wiphy), __func__);
 
       success:
@@ -3849,7 +3851,7 @@ static void acx_after_interrupt_recalib(acx_device_t * adev)
 	 * so only clear flag if we were fully successful */
 	res = acx_recalib_radio(adev);
 	if (res == OK) {
-		printk("acx: %s: successfully recalibrated radio\n",
+		pr_info("%s: successfully recalibrated radio\n",
 		       wiphy_name(adev->ieee->wiphy));
 		adev->recalib_time_last_success = jiffies;
 		adev->recalib_failure_count = 0;
@@ -4038,7 +4040,7 @@ static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 		mask = 1;
 		for (i = 1; i <= 14; i++) {
 			if (adev->reg_dom_chanmask & mask) {
-				printk("acx: %s: Adjusting the selected channel from %d "
+				pr_info("%s: Adjusting the selected channel from %d "
 					"to %d due to the new regulatory domain\n",
 					wiphy_name(adev->ieee->wiphy), adev->channel, i);
 				adev->channel = i;
@@ -4054,7 +4056,7 @@ static void acx111_sens_radio_16_17(acx_device_t * adev)
 	u32 feature1, feature2;
 
 	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
-		printk("acx: %s: invalid sensitivity setting (1..3), "
+		pr_info("%s: invalid sensitivity setting (1..3), "
 		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
 		adev->sensitivity = 1;
 	}
@@ -4095,7 +4097,7 @@ static void acx_update_ratevector(acx_device_t * adev)
 	}
 	adev->rate_supported_len = supp - adev->rate_supported;
 	if (acx_debug & L_ASSOC) {
-		printk("acx: new ratevector: ");
+		pr_info("new ratevector: ");
 		acx_dump_bytes(adev->rate_supported, adev->rate_supported_len);
 	}
 	FN_EXIT0;
@@ -4632,7 +4634,7 @@ static int acx_proc_show_phy(struct seq_file *file, void *v)
 	buf = kmalloc(buf_size, GFP_KERNEL);
 	/*
 	   if (RADIO_11_RFMD != adev->radio_type) {
-	   printk("acx: sorry, not yet adapted for radio types "
+	   pr_info("sorry, not yet adapted for radio types "
 	   "other than RFMD, please verify "
 	   "PHY size etc. first!\n");
 	   goto end;
@@ -4958,7 +4960,7 @@ int acx_proc_register_entries(struct ieee80211_hw *hw) {
 					&acx_e_proc_ops[i]);
 
 		if (!pe) {
-			printk("acx: cannot register proc entry /proc/%s\n",
+			pr_info("cannot register proc entry /proc/%s\n",
 				procbuf);
 			return NOT_OK;
 		}
@@ -5040,7 +5042,7 @@ void acx_process_rxbuf(acx_device_t * adev, rxbuffer_t * rxbuf)
 	}
 
 	if (unlikely(acx_debug & L_DATA)) {
-		printk("acx: rx: 802.11 buf[%u]: \n", buf_len);
+		pr_info("rx: 802.11 buf[%u]: \n", buf_len);
 		acx_dump_bytes(hdr, buf_len);
 	}
 
@@ -5080,7 +5082,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	FN_ENTER;
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
-		printk("acx: asked to receive a packet but the interface is down??\n");
+		pr_info("asked to receive a packet but the interface is down??\n");
 		goto out;
 	}
 
@@ -5092,7 +5094,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	 */
 	skb = dev_alloc_skb(buflen + 2);
 	if (!skb) {
-		printk("acx: skb allocation FAILED\n");
+		pr_info("skb allocation FAILED\n");
 		goto out;
 	}
 
@@ -5630,7 +5632,7 @@ static u16 rate100to111(u8 r)
 	case RATE100_22:
 		return RATE111_22;
 	default:
-		printk("acx: unexpected acx100 txrate: %u! "
+		pr_info("unexpected acx100 txrate: %u! "
 		       "Please report\n", r);
 		return RATE111_1;
 	}
@@ -5773,7 +5775,7 @@ static int acx100_init_wep(acx_device_t * adev)
 
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		printk("acx: %s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
+		pr_info("%s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
@@ -5784,7 +5786,7 @@ static int acx100_init_wep(acx_device_t * adev)
 	pt.PacketTemplateStart = pt.WEPCacheEnd;
 
 	if (OK != acx_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
-		printk("acx: %s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
+		pr_info("%s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
 		       wiphy_name(adev->ieee->wiphy));
 		goto fail;
 	}
@@ -6070,7 +6072,7 @@ void acx_after_interrupt_task(acx_device_t *adev)
 	/* others */
 	if(adev->after_interrupt_jobs)
 	{
-		printk("acx: %s: Jobs still to be run: 0x%02X\n",
+		pr_info("%s: Jobs still to be run: 0x%02X\n",
 			__func__, adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
@@ -6082,57 +6084,57 @@ void acx_after_interrupt_task(acx_device_t *adev)
 
 void acx_log_irq(u16 irqtype)
 {
-	printk("acx: %s: got: ", __func__);
+	pr_info("%s: got: ", __func__);
 
 	if (irqtype & HOST_INT_RX_DATA)
-		printk("Rx_Data,");
+		pr_info("Rx_Data,");
 
 	if (irqtype & HOST_INT_TX_COMPLETE)
-		printk("Tx_Complete,");
+		pr_info("Tx_Complete,");
 
 	if (irqtype & HOST_INT_TX_XFER)
-		printk("Tx_Xfer,");
+		pr_info("Tx_Xfer,");
 
 	if (irqtype & HOST_INT_RX_COMPLETE)
-		printk("Rx_Complete,");
+		pr_info("Rx_Complete,");
 
 	if (irqtype & HOST_INT_DTIM)
-		printk("DTIM,");
+		pr_info("DTIM,");
 
 	if (irqtype & HOST_INT_BEACON)
-		printk("Beacon,");
+		pr_info("Beacon,");
 
 	if (irqtype & HOST_INT_TIMER)
 		log(L_IRQ, "Timer,");
 
 	if (irqtype & HOST_INT_KEY_NOT_FOUND)
-		printk("Key_Not_Found,");
+		pr_info("Key_Not_Found,");
 
 	if (irqtype & HOST_INT_IV_ICV_FAILURE)
-		printk("IV_ICV_Failure (crypto),");
+		pr_info("IV_ICV_Failure (crypto),");
 
 	if (irqtype & HOST_INT_CMD_COMPLETE)
-		printk("Cmd_Complete,");
+		pr_info("Cmd_Complete,");
 
 	if (irqtype & HOST_INT_INFO)
-		printk("Info,");
+		pr_info("Info,");
 
 	if (irqtype & HOST_INT_OVERFLOW)
-		printk("Overflow,");
+		pr_info("Overflow,");
 
 	if (irqtype & HOST_INT_PROCESS_ERROR)
-		printk("Process_Error,");
+		pr_info("Process_Error,");
 
 	if (irqtype & HOST_INT_SCAN_COMPLETE)
-		printk("Scan_Complete,");
+		pr_info("Scan_Complete,");
 
 	if (irqtype & HOST_INT_FCS_THRESHOLD)
-		printk("FCS_Threshold,");
+		pr_info("FCS_Threshold,");
 
 	if (irqtype & HOST_INT_UNKNOWN)
-		printk("Unknown,");
+		pr_info("Unknown,");
 
-	printk(": IRQ(s)\n");
+	pr_info(": IRQ(s)\n");
 }
 
 
@@ -6174,7 +6176,7 @@ void acx_set_timer(acx_device_t * adev, int timeout_us)
 
 	log(L_DEBUG | L_IRQ, "%s(%u ms)\n", __func__, timeout_us / 1000);
 	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		printk("acx: attempt to set the timer "
+		pr_info("attempt to set the timer "
 		       "when the card interface is not up!\n");
 		goto end;
 	}
@@ -6276,9 +6278,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 
 	acx_update_mode(adev);
 
-	printk(KERN_INFO "acx: Virtual interface added "
-		"(type: 0x%08X, MAC: %s)\n",
-
+	pr_info("Virtual interface added (type: 0x%08X, MAC: %s)\n",
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 		adev->vif_type, acx_print_mac(mac, conf->mac_addr)
 #else
@@ -6864,14 +6864,14 @@ static int __init acx_init_module(void)
 
 	acx_struct_size_check();
 
-	printk("acx: acx-mac80211, version: %s (git: %s)\n",
+	pr_info("acx-mac80211, version: %s (git: %s)\n",
         ACX_RELEASE,
         // ACX_GIT_VERSION can be an empty string, if something went wrong before on
         // Makefile/shell level. We trap this here ... since trapping empty macro strings
         // in cpp seems not possible (didn't find how ) !?
         strlen(ACX_GIT_VERSION) ? ACX_GIT_VERSION : "unknown");
 
-	printk("acx: this driver is still EXPERIMENTAL\n"
+	pr_info("this driver is still EXPERIMENTAL\n"
 	       "acx: please read the README file and/or "
 	       "go to http://acx100.sourceforge.net/wiki for "
 	       "further information\n");
@@ -6895,7 +6895,7 @@ static int __init acx_init_module(void)
 #endif
 
 	if (r3 && r2 && r1) {		/* all three failed! */
-		printk ("acx: r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
+		pr_info("r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
 		return -EINVAL;
 	}
 
