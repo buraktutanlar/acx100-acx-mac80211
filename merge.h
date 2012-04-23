@@ -26,3 +26,4 @@ int acxx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 void acx_irq_enable(acx_device_t * adev);
 void acx_irq_disable(acx_device_t * adev);
 
+int acx_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);

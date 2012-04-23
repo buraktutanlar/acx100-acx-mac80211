@@ -93,7 +93,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_a
 
 // Firmware, EEPROM, Phy
 int acxpci_upload_radio(acx_device_t * adev);
-int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
+//=int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 //int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
@@ -453,6 +453,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  *	charbuf		ptr to a char. This is where the read octet
  *			will be stored
  */
+#if 0 // 2 versions same, merged
 int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 {
 	int result;
@@ -488,7 +489,7 @@ int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
 	FN_EXIT1(result);
 	return result;
 }
-
+#endif // acxpci_read_eeprom_byte()
 
 /*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
@@ -593,7 +594,7 @@ static inline void acxpci_read_eeprom_area(acx_device_t * adev)
 	FN_ENTER;
 
 	for (offs = 0x8c; offs < 0xb9; offs++)
-		acxpci_read_eeprom_byte(adev, offs, &tmp);
+		acx_read_eeprom_byte(adev, offs, &tmp);
 
 	FN_EXIT0;
 #endif
@@ -936,9 +937,9 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (OK != acxpci_read_eeprom_byte(adev,
-						  ACX100_EEPROM_ID_OFFSET + i,
-						  &buffer[i])) {
+		if (OK != acx_read_eeprom_byte(adev,
+						ACX100_EEPROM_ID_OFFSET + i,
+						&buffer[i])) {
 			pr_acx("reading EEPROM FAILED\n");
 			break;
 		}
@@ -1545,7 +1546,7 @@ char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev)
 
 	p = buf = kmalloc(0x400, GFP_KERNEL);
 	for (i = 0; i < 0x400; i++) {
-		acxpci_read_eeprom_byte(adev, i, p++);
+		acx_read_eeprom_byte(adev, i, p++);
 	}
 	*len = i;
 
@@ -2991,7 +2992,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
-	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_read_eeprom_byte;
 
 	acx_parse_configoption(adev, &co);
@@ -3593,7 +3594,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
-	if (OK != acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_vlynq_read_eeprom_version;
 
 	acx_parse_configoption(adev, &co);

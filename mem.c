@@ -139,7 +139,7 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev);
 
 // Firmware, EEPROM, Phy
 //= int acxmem_upload_radio(acx_device_t *adev);
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+//= int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 #ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
 #endif
@@ -828,6 +828,7 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
  *	charbuf		ptr to a char. This is where the read octet
  *			will be stored
  */
+#if 0 // same in both, merged
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
 	int result;
 	int count;
@@ -862,6 +863,7 @@ fail:
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acxmem_read_eeprom_byte()
 
 /*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
@@ -966,7 +968,7 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 	FN_ENTER;
 
 	for (offs = 0x8c; offs < 0xb9; offs++)
-		acxmem_read_eeprom_byte(adev, offs, &tmp);
+		acx_read_eeprom_byte(adev, offs, &tmp);
 
 	FN_EXIT0;
 
@@ -1380,7 +1382,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		if (OK != acxmem_read_eeprom_byte(adev,
+		if (OK != acx_read_eeprom_byte(adev,
 						ACX100_EEPROM_ID_OFFSET + i,
 						&buffer[i])) {
 			pr_acx("reading EEPROM FAILED\n");
@@ -1931,7 +1933,7 @@ STATick int acxmem_complete_hw_reset(acx_device_t *adev) {
 	}
 
 	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
-	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		return -2;
 
 	acxmem_unlock();
@@ -2251,7 +2253,7 @@ char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
 
 	p = buf = kmalloc(0x400, GFP_KERNEL);
 	for (i = 0; i < 0x400; i++) {
-		acxmem_read_eeprom_byte(adev, i, p++);
+		acx_read_eeprom_byte(adev, i, p++);
 	}
 	*length = i;
 

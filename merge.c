@@ -581,8 +581,6 @@ void acx_log_txbuffer(acx_device_t *adev)
 
 //#######################################################################
 
-
-
 /*
  * acx_read_eeprom_byte
  *
@@ -638,6 +636,7 @@ fail:
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
 // unused in mem, used in pci
+#if 0 //
 int acx_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 			const u8 *charbuf)
 {
@@ -724,6 +723,7 @@ end:
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acx_s_write_eeprom()
 
 static inline void acx_read_eeprom_area(acx_device_t *adev)
 {
@@ -733,12 +733,9 @@ static inline void acx_read_eeprom_area(acx_device_t *adev)
 
 	FN_ENTER;
 
-	if (IS_MEM(adev))
+	if (IS_MEM(adev) || IS_PCI(adev))
 		for (offs = 0x8c; offs < 0xb9; offs++)
-			acxmem_read_eeprom_byte(adev, offs, &tmp);
-	else if (IS_PCI(adev))
-		for (offs = 0x8c; offs < 0xb9; offs++)
-			acxpci_read_eeprom_byte(adev, offs, &tmp);
+			acx_read_eeprom_byte(adev, offs, &tmp);
 	else BUG();
 
 	FN_EXIT0;
@@ -1167,13 +1164,13 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
-		rc = (IS_MEM(adev))
-			? acxmem_read_eeprom_byte(adev,
-						ACX100_EEPROM_ID_OFFSET + i,
-						&buffer[i])
-			: acxpci_read_eeprom_byte(adev,
+		if (IS_MEM(adev) || IS_PCI(adev))
+			rc = acx_read_eeprom_byte(adev,
 						ACX100_EEPROM_ID_OFFSET + i,
 						&buffer[i]);
+		else
+			rc = NOT_OK; // in USB case
+
 		if (rc != OK) {
 			pr_acx("reading EEPROM FAILED\n");
 			break;
@@ -1846,7 +1843,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 
 	/* TODO: merge them into one function, they are called just
 	 * once and are the same for pci & usb */
-	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
+	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		return -2;
 
 	acxmem_unlock();
