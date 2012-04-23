@@ -2230,8 +2230,15 @@ more bytes may follow
     after we set it once. Let's hope this will be fixed in firmware someday
 */
 
+#include "interrupt-masks.h"
 void acxpci_set_interrupt_mask(acx_device_t * adev)
 {
+	pr_notice("adev->irq_mask: before: %d devtype:%d chiptype:%d tobe: %d\n",
+		adev->irq_mask, (adev)->dev_type, (adev)->chip_type,
+		interrupt_masks[(adev)->dev_type][(adev)->chip_type]);
+
+	adev->irq_mask = interrupt_masks[(adev)->dev_type][(adev)->chip_type];
+
 	if (IS_ACX111(adev)) {
 		adev->irq_mask = (u16) ~ (0
 					  /* | HOST_INT_RX_DATA        */
@@ -2271,8 +2278,8 @@ void acxpci_set_interrupt_mask(acx_device_t * adev)
 					  /* | HOST_INT_FCS_THRESHOLD  */
 					  /* | HOST_INT_UNKNOWN        */
 		    );
-
 	}
+	pr_notice("adev->irq_mask: actual: %d\n", adev->irq_mask);
 }
 
 /*
