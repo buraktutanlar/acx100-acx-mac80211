@@ -301,6 +301,141 @@ int acx_create_rx_host_desc_queue(acx_device_t * adev)
 	return NOT_OK;
 }
 
+static
+int acx_create_tx_host_desc_queue(acx_device_t * adev)
+{
+	txhostdesc_t *hostdesc;
+	u8 *txbuf;
+	dma_addr_t hostdesc_phy;
+	dma_addr_t txbuf_phy;
+	int i;
+
+	FN_ENTER;
+
+	/* allocate TX buffer */
+	/* OW 20100513 adev->txbuf_area_size = TX_CNT
+	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
+	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
+	adev->txbuf_start
+		= acx_allocate(adev, adev->txbuf_area_size,
+			&adev->txbuf_startphy, "txbuf_start");
+	if (!adev->txbuf_start)
+		goto fail;
+
+	/* allocate the TX host descriptor queue pool */
+	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
+	adev->txhostdesc_start
+		= acx_allocate(adev, adev->txhostdesc_area_size,
+			&adev->txhostdesc_startphy,
+			"txhostdesc_start");
+	if (!adev->txhostdesc_start)
+		goto fail;
+	/* check for proper alignment of TX host descriptor pool */
+	if ((long)adev->txhostdesc_start & 3) {
+		pr_acx("driver bug: dma alloc returns unaligned address\n");
+		goto fail;
+	}
+
+	hostdesc = adev->txhostdesc_start;
+	hostdesc_phy = adev->txhostdesc_startphy;
+	txbuf = adev->txbuf_start;
+	txbuf_phy = adev->txbuf_startphy;
+
+#if 0
+/* Each tx buffer is accessed by hardware via
+** txdesc -> txhostdesc(s) -> txbuffer(s).
+** We use only one txhostdesc per txdesc, but it looks like
+** acx111 is buggy: it accesses second txhostdesc
+** (via hostdesc.desc_phy_next field) even if
+** txdesc->length == hostdesc->length and thus
+** entire packet was placed into first txhostdesc.
+** Due to this bug acx111 hangs unless second txhostdesc
+** has le16_to_cpu(hostdesc.length) = 3 (or larger)
+** Storing NULL into hostdesc.desc_phy_next
+** doesn't seem to help.
+**
+** Update: although it worked on Xterasys XN-2522g
+** with len=3 trick, WG311v2 is even more bogus, doesn't work.
+** Keeping this code (#ifdef'ed out) for documentational purposes.
+*/
+	for (i = 0; i < TX_CNT * 2; i++) {
+		hostdesc_phy += sizeof(*hostdesc);
+		if (!(i & 1)) {
+			hostdesc->data_phy = cpu2acx(txbuf_phy);
+			/* hostdesc->data_offset = ... */
+			/* hostdesc->reserved = ... */
+			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+			/* hostdesc->length = ... */
+			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+			hostdesc->pNext = ptr2acx(NULL);
+			/* hostdesc->Status = ... */
+			/* below: non-hardware fields */
+			hostdesc->data = txbuf;
+
+			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS;
+			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS;
+		} else {
+			/* hostdesc->data_phy = ... */
+			/* hostdesc->data_offset = ... */
+			/* hostdesc->reserved = ... */
+			/* hostdesc->Ctl_16 = ... */
+			hostdesc->length = cpu_to_le16(3);	/* bug workaround */
+			/* hostdesc->desc_phy_next = ... */
+			/* hostdesc->pNext = ... */
+			/* hostdesc->Status = ... */
+			/* below: non-hardware fields */
+			/* hostdesc->data = ... */
+		}
+		hostdesc++;
+	}
+#endif
+	/* We initialize two hostdescs so that they point to adjacent
+	 * memory areas. Thus txbuf is really just a contiguous memory
+	 * area */
+	for (i = 0; i < TX_CNT * 2; i++) {
+		hostdesc_phy += sizeof(*hostdesc);
+
+		hostdesc->data_phy = cpu2acx(txbuf_phy);
+		/* done by memset(0): hostdesc->data_offset = 0; */
+		/* hostdesc->reserved = ... */
+		hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+		/* hostdesc->length = ... */
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
+		/* hostdesc->Status = ... */
+		/* ->data is a non-hardware field: */
+		hostdesc->data = txbuf;
+
+		if (!(i & 1)) {
+			/* OW 20100513 txbuf += 24 // WLAN_HDR_A3_LEN */
+			/* OW 20100513 txbuf_phy += 24 // WLAN_HDR_A3_LEN */
+			txbuf += WLAN_HDR_A3_LEN;
+			txbuf_phy += WLAN_HDR_A3_LEN;
+		} else {
+			/* OW 20100513 txbuf += 30 + 2132 + 4 - 24 //
+			 * WLAN_A4FR_MAXLEN_WEP_FCS -
+			 * WLAN_HDR_A3_LEN */;
+			/* OW 20100513 txbuf_phy += 30 + 2132 + 4 -
+			 * 24 // WLAN_A4FR_MAXLEN_WEP_FCS -
+			 * WLAN_HDR_A3_LEN */;
+			txbuf +=  WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
+			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS
+				- WLAN_HDR_A3_LEN;
+		}
+		hostdesc++;
+	}
+	hostdesc--;
+	hostdesc->desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
+
+	FN_EXIT1(OK);
+	return OK;
+fail:
+	pr_acx("create_tx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
 int acx_create_hostdesc_queues(acx_device_t *adev)
 {
         int result;
@@ -308,8 +443,8 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
 	pr_notice("notice IS_PCI(%p): %d\n", adev, IS_PCI(adev));
 
 	result = (IS_MEM(adev))
-		? acxmem_create_tx_host_desc_queue(adev)
-		: acxpci_create_tx_host_desc_queue(adev);
+		? acx_create_tx_host_desc_queue(adev)
+		: acx_create_tx_host_desc_queue(adev);
         if (OK != result)
                 return result;
         result = (IS_MEM(adev))

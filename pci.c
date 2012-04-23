@@ -363,6 +363,7 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 }
 #endif
 
+#if 0
 // static 
 int acxpci_create_tx_host_desc_queue(acx_device_t * adev)
 {
@@ -375,18 +376,21 @@ int acxpci_create_tx_host_desc_queue(acx_device_t * adev)
 	FN_ENTER;
 
 	/* allocate TX buffer */
-	// OW 20100513 adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
+	/* OW 20100513 adev->txbuf_area_size = TX_CNT
+	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
 	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	adev->txbuf_start = acx_allocate(adev, adev->txbuf_area_size,
-				     &adev->txbuf_startphy, "txbuf_start");
+	adev->txbuf_start
+		= acx_allocate(adev, adev->txbuf_area_size,
+			&adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
 	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->txhostdesc_start = acx_allocate(adev, adev->txhostdesc_area_size,
-					  &adev->txhostdesc_startphy,
-					  "txhostdesc_start");
+	adev->txhostdesc_start
+		= acx_allocate(adev, adev->txhostdesc_area_size,
+			&adev->txhostdesc_startphy,
+			"txhostdesc_start");
 	if (!adev->txhostdesc_start)
 		goto fail;
 	/* check for proper alignment of TX host descriptor pool */
@@ -482,13 +486,13 @@ int acxpci_create_tx_host_desc_queue(acx_device_t * adev)
 
 	FN_EXIT1(OK);
 	return OK;
-      fail:
+fail:
 	pr_acx("create_tx_host_desc_queue FAILED\n");
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
-
+#endif
 
 
 void

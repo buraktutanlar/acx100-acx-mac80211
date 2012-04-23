@@ -660,6 +660,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	return NOT_OK;
 }
 
+#if 0
 /*
  * In the generic slave memory access mode, most of the stuff in
  * the txhostdesc_t is unused.  It's only here because the rest of
@@ -669,7 +670,8 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
  * on the way out.
  */
 //static
-int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
+int acxmem_create_tx_host_desc_queue(acx_device_t *adev)
+{
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
 	int i;
@@ -680,7 +682,8 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* WLAN_A4FR_MAXLEN_WEP_FCS */
 	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
 
-	adev->txbuf_start = acx_allocate(adev, adev->txbuf_area_size,
+	adev->txbuf_start
+		= acx_allocate(adev, adev->txbuf_area_size,
 			&adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
 		goto fail;
@@ -688,7 +691,8 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* allocate the TX host descriptor queue pool */
 	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
 
-	adev->txhostdesc_start = acx_allocate(adev, adev->txhostdesc_area_size,
+	adev->txhostdesc_start
+		= acx_allocate(adev, adev->txhostdesc_area_size,
 			&adev->txhostdesc_startphy, "txhostdesc_start");
 	if (!adev->txhostdesc_start)
 		goto fail;
@@ -752,7 +756,7 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 #endif
 
 	/* We initialize two hostdescs so that they point to adjacent
-	 ** memory areas. Thus txbuf is really just a contiguous memory area */
+	 * memory areas. Thus txbuf is really just a contiguous memory area */
 	for (i = 0; i < TX_CNT * 2; i++) {
 		/* ->data is a non-hardware field: */
 		hostdesc->data = txbuf;
@@ -769,14 +773,15 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	FN_EXIT1(OK);
 	return OK;
 
-	fail:
-		// OW FIXME Logging
-		pr_acx("create_tx_host_desc_queue FAILED\n");
-		/* dealloc will be done by free function on error case */
+fail:
+	// OW FIXME Logging
+	pr_acx("create_tx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
 
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
+#endif
 
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 		u32 rx_queue_start) {
