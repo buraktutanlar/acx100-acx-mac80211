@@ -97,7 +97,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 void acxpci_free_desc_queues(acx_device_t * adev);
 static void acxpci_delete_dma_regions(acx_device_t * adev);
 static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
-static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
+//= static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy
 int acxpci_upload_radio(acx_device_t * adev);
@@ -377,14 +377,14 @@ int acxpci_create_tx_host_desc_queue(acx_device_t * adev)
 	/* allocate TX buffer */
 	// OW 20100513 adev->txbuf_area_size = TX_CNT * /*WLAN_A4FR_MAXLEN_WEP_FCS*/ (30 + 2312 + 4);
 	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	adev->txbuf_start = acxpci_allocate(adev, adev->txbuf_area_size,
+	adev->txbuf_start = acx_allocate(adev, adev->txbuf_area_size,
 				     &adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
 	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->txhostdesc_start = acxpci_allocate(adev, adev->txhostdesc_area_size,
+	adev->txhostdesc_start = acx_allocate(adev, adev->txhostdesc_area_size,
 					  &adev->txhostdesc_startphy,
 					  "txhostdesc_start");
 	if (!adev->txhostdesc_start)
@@ -698,6 +698,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 			size, vaddr, dma_handle);
 }
 
+#if 0 // to merge.c
 static
 void *acxpci_allocate(acx_device_t * adev, size_t size,
 		dma_addr_t * phy, const char *msg)
@@ -716,6 +717,7 @@ void *acxpci_allocate(acx_device_t * adev, size_t size,
 		msg, (int)size);
 	return NULL;
 }
+#endif
 
 /*
  * BOM Firmware, EEPROM, Phy

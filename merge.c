@@ -206,8 +206,7 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
-static
-void *acxpci_allocate(acx_device_t * adev, size_t size,
+void *acx_allocate(acx_device_t * adev, size_t size,
 		dma_addr_t * phy, const char *msg)
 {
 	void *ptr;
@@ -238,7 +237,7 @@ void *acxpci_allocate(acx_device_t * adev, size_t size,
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 static
-int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
+int acx_create_rx_host_desc_queue(acx_device_t * adev)
 {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
@@ -250,9 +249,11 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 
 	/* allocate the RX host descriptor queue pool */
 	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rxhostdesc_start = acxpci_allocate(adev,
-		adev->rxhostdesc_area_size,
-		 &adev->rxhostdesc_startphy, "rxhostdesc_start");
+	adev->rxhostdesc_start
+		= acx_allocate(adev,
+			adev->rxhostdesc_area_size,
+			&adev->rxhostdesc_startphy,
+			"rxhostdesc_start");
 	if (!adev->rxhostdesc_start)
 		goto fail;
 	/* check for proper alignment of RX host descriptor pool */
@@ -265,8 +266,8 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 	 * to store the whole content of the received frames in it */
 	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
 	adev->rxbuf_start
-		= acxpci_allocate(adev, adev->rxbuf_area_size,
-				&adev->rxbuf_startphy, "rxbuf_start");
+		= acx_allocate(adev, adev->rxbuf_area_size,
+			&adev->rxbuf_startphy, "rxbuf_start");
 	if (!adev->rxbuf_start)
 		goto fail;
 
@@ -312,8 +313,8 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
         if (OK != result)
                 return result;
         result = (IS_MEM(adev))
-		? acxmem_create_rx_host_desc_queue(adev)
-		: acxpci_create_rx_host_desc_queue(adev);
+		? acx_create_rx_host_desc_queue(adev)
+		: acx_create_rx_host_desc_queue(adev);
         return result;
 }
 

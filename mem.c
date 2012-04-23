@@ -153,7 +153,7 @@ STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 void acxmem_free_desc_queues(acx_device_t *adev);
 STATick void acxmem_delete_dma_regions(acx_device_t *adev);
-STATick void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
+//= STATick void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
 //= int acxmem_upload_radio(acx_device_t *adev);
@@ -617,7 +617,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	/* allocate the RX host descriptor queue pool */
 	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
 
-	adev->rxhostdesc_start = acxmem_allocate(adev,
+	adev->rxhostdesc_start = acx_allocate(adev,
 		adev->rxhostdesc_area_size,
 		&adev->rxhostdesc_startphy, "rxhostdesc_start");
 	if (!adev->rxhostdesc_start)
@@ -634,7 +634,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
 
 	adev->rxbuf_start
-		= acxmem_allocate(adev,	adev->rxbuf_area_size,
+		= acx_allocate(adev, adev->rxbuf_area_size,
 				&adev->rxbuf_startphy, "rxbuf_start");
 	if (!adev->rxbuf_start)
 		goto fail;
@@ -680,7 +680,7 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* WLAN_A4FR_MAXLEN_WEP_FCS */
 	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
 
-	adev->txbuf_start = acxmem_allocate(adev, adev->txbuf_area_size,
+	adev->txbuf_start = acx_allocate(adev, adev->txbuf_area_size,
 			&adev->txbuf_startphy, "txbuf_start");
 	if (!adev->txbuf_start)
 		goto fail;
@@ -688,7 +688,7 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev) {
 	/* allocate the TX host descriptor queue pool */
 	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
 
-	adev->txhostdesc_start = acxmem_allocate(adev, adev->txhostdesc_area_size,
+	adev->txhostdesc_start = acx_allocate(adev, adev->txhostdesc_area_size,
 			&adev->txhostdesc_startphy, "txhostdesc_start");
 	if (!adev->txhostdesc_start)
 		goto fail;
@@ -981,6 +981,7 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
+#if 0
 STATick 
 void* acxmem_allocate(acx_device_t *adev, size_t size,
 		dma_addr_t *phy, const char *msg)
@@ -1003,7 +1004,7 @@ void* acxmem_allocate(acx_device_t *adev, size_t size,
 		msg, (int) size);
 	return NULL;
 }
-
+#endif
 
 /*
  * BOM Firmware, EEPROM, Phy

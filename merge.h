@@ -13,4 +13,9 @@ void acx_log_txbuffer(acx_device_t *adev);
 void acx_op_stop(struct ieee80211_hw *hw);
 int acx_op_start(struct ieee80211_hw *hw);
 
-void acx_handle_info_irq(acx_device_t * adev);
+void acx_handle_info_irq(acx_device_t *adev);
+
+// temporary ?? may go static after all users are in merge.c
+void *acx_allocate(acx_device_t *adev, size_t size,
+		dma_addr_t *phy, const char *msg);
+
