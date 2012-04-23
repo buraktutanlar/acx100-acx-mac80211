@@ -660,7 +660,6 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	return NOT_OK;
 }
 
-#if 0
 /*
  * In the generic slave memory access mode, most of the stuff in
  * the txhostdesc_t is unused.  It's only here because the rest of
@@ -669,6 +668,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
  * only use we have for the host descriptors is to store the packets
  * on the way out.
  */
+#if 0
 //static
 int acxmem_create_tx_host_desc_queue(acx_device_t *adev)
 {
@@ -952,7 +952,6 @@ void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	FN_EXIT0;
 }
 
-#if 0
 /*
  * acxmem_free_desc_queues
  *
@@ -960,6 +959,7 @@ void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
  * others have been initialised to NULL so this
  * function can be used if only part of the queues were allocated.
  */
+#if 0
 void acxmem_free_desc_queues(acx_device_t *adev)
 {
 
@@ -1040,12 +1040,12 @@ void* acxmem_allocate(acx_device_t *adev, size_t size,
  * ==================================================
  */
 
-#if 0 // now in merge.c
 /*
  * acxmem_s_upload_radio
  *
  * Uploads the appropriate radio module firmware into the card.
  */
+#if 0 // now in merge.c
 int acxmem_upload_radio(acx_device_t *adev) {
 	acx_ie_memmap_t mm;
 	firmware_image_t *radio_image;
@@ -1274,13 +1274,13 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
-#if 0 // port soon to merge.c
 /*
  * acxmem_s_read_phy_reg
  *
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
+#if 0 // port soon to merge.c
 int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 	int result = NOT_OK;
 	int count;
@@ -2311,11 +2311,11 @@ STATick void acxmem_up(struct ieee80211_hw *hw) {
 }
 
 
-#if 0
 /***********************************************************************
  ** acxmem_i_set_multicast_list
  ** FIXME: most likely needs refinement
  */
+#if 0
 STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -3007,7 +3007,6 @@ STATick void acxmem_init_acx_txbuf(acx_device_t *adev) {
 /* Re-initialize tx-buffer list
  */
 #if 0
-
 void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 
 	int i;
@@ -3281,8 +3280,6 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 }
 #endif
 
-#if 0
-
 /*
  * acxmem_l_clean_txdesc
  *
@@ -3294,6 +3291,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * Everytime we get called we know where the next packet to be cleaned is.
  */
 // OW TODO Very similar with pci: possible merging.
+#if 0
 unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -3516,12 +3514,12 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
 #endif
 
 // OW TODO See if this is usable with mac80211
-#if 0
 /***********************************************************************
  ** acxmem_i_tx_timeout
  **
  ** Called from network core. Must not sleep!
  */
+#if 0
 STATick void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -3699,6 +3697,7 @@ void acxmem_irq_work(struct work_struct *work)
 #define INFO_PS_FAIL            0x0004
 /* encryption/decryption process on a packet failed */
 #define INFO_IV_ICV_FAILURE     0x0005
+#endif
 
 /* Info mailbox format:
  2 bytes: type
@@ -3721,7 +3720,9 @@ void acxmem_irq_work(struct work_struct *work)
  after we set it once. Let's hope this will be fixed in firmware someday
  */
 
-STATick void acxmem_handle_info_irq(acx_device_t *adev) {
+#if 0
+STATick void acxmem_handle_info_irq(acx_device_t *adev)
+{
 #if ACX_DEBUG
 	static const char * const info_type_msg[] = {
 			"(unknown)",
@@ -3764,8 +3765,8 @@ STATick void acxmem_handle_info_irq(acx_device_t *adev) {
 #endif
 
 #if 0
-void acxmem_set_interrupt_mask(acx_device_t *adev) {
-
+void acxmem_set_interrupt_mask(acx_device_t *adev)
+{
 	FN_ENTER;
 
 	if (IS_ACX111(adev)) {
@@ -4017,7 +4018,8 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 };
 
 #if 0
-STATick int acxmem_op_start(struct ieee80211_hw *hw) {
+STATick int acxmem_op_start(struct ieee80211_hw *hw)
+{
 	acx_device_t *adev = ieee2adev(hw);
 	int result = OK;
 
@@ -4123,7 +4125,8 @@ STATick char acxmem_printable(char c) {
 
 // OW TODO
 #if 0
-STATick void update_link_quality_led(acx_device_t *adev) {
+STATick void update_link_quality_led(acx_device_t *adev)
+{
 	int qual;
 
 	qual = acx_signal_determine_quality(adev->wstats.qual.level,
@@ -4148,8 +4151,10 @@ STATick void update_link_quality_led(acx_device_t *adev) {
 
 // OW TODO Not used in pci either !?
 #if 0
-int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
-		struct iw_param *vwrq, char *extra) {
+int acx111pci_ioctl_info(struct ieee80211_hw *hw,
+			struct iw_request_info *info,
+			struct iw_param *vwrq, char *extra)
+{
 #if ACX_DEBUG > 1
 
 	acx_device_t *adev = ieee2adev(hw);

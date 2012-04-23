@@ -644,7 +644,6 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev,
 	FN_EXIT0;
 }
 
-#if 0
 /*
  * acxpci_free_desc_queues
  *
@@ -652,6 +651,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev,
  * others have been initialised to NULL so this
  * function can be used if only part of the queues were allocated.
  */
+#if 0
 void acxpci_free_desc_queues(acx_device_t * adev)
 {
 
@@ -735,8 +735,6 @@ void *acxpci_allocate(acx_device_t * adev, size_t size,
  * ==================================================
  */
 
-#if 0
-
 /*
  * acxpci_s_upload_radio
  *
@@ -744,6 +742,7 @@ void *acxpci_allocate(acx_device_t * adev, size_t size,
  *
  * Origin: Standard Read/Write to IO
  */
+#if 0
 int acxpci_upload_radio(acx_device_t * adev)
 {
 	acx_ie_memmap_t mm;
@@ -2588,7 +2587,7 @@ void acxpci_irq_work(struct work_struct *work)
 #define INFO_PS_FAIL            0x0004
 /* encryption/decryption process on a packet failed */
 #define INFO_IV_ICV_FAILURE     0x0005
-
+#endif
 /* Info mailbox format:
 2 bytes: type
 2 bytes: status
@@ -2609,7 +2608,7 @@ more bytes may follow
     it does NOT clear bit 0x0001, and this bit will probably stay forever set
     after we set it once. Let's hope this will be fixed in firmware someday
 */
-
+#if 0
 static void acxpci_handle_info_irq(acx_device_t * adev)
 {
 #if ACX_DEBUG
