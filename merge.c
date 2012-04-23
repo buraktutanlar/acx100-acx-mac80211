@@ -848,6 +848,7 @@ fail:
  *	0	success
  */
 // static 
+#if 0 // needs work
 int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset)
 {
@@ -916,6 +917,7 @@ int acxmem_write_fw(acx_device_t *adev,
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
 	return (sum != le32_to_cpu(fw_image->chksum));
 }
+#endif
 
 /*
  * acxmem_s_validate_fw
@@ -932,6 +934,7 @@ int acxmem_write_fw(acx_device_t *adev,
  *	OK	success
  */
 // static 
+#if 0 // needs work
 int acxmem_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) 
 {
@@ -1002,6 +1005,7 @@ int acxmem_validate_fw(acx_device_t *adev,
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acxmem_validate_fw()
 
 #if 0 // defer, 
 static int acxmem_upload_fw(acx_device_t *adev, char *filename)
@@ -1217,6 +1221,7 @@ void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
         FN_EXIT0;
 }
 
+#if 0 // slavemem resolve before merge
 static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
@@ -1237,6 +1242,7 @@ static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
+#endif // acxmem_read_cmd_type_status()
 
 static inline void acxmem_init_mboxes(acx_device_t *adev)
 {
@@ -1284,6 +1290,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
+#if 0 // needs work
 int
 acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
@@ -1517,10 +1524,12 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
+#endif // acxmem_issue_cmd_timeo_debug()
 
 #define REG_ACX_VENDOR_ID 0x900
 #define ACX_VENDOR_ID 0x8400104c
 
+#if 0 // unused yet, review before #if1
 static int acxmem_verify_init(acx_device_t *adev) {
 	int result = NOT_OK;
 	unsigned long timeout;
@@ -1553,6 +1562,7 @@ static int acxmem_verify_init(acx_device_t *adev) {
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acxmem_verify_init()
 
 /*
  * BOM Init, Configure (Control Path)
@@ -1565,6 +1575,7 @@ static int acxmem_verify_init(acx_device_t *adev) {
  * MAC will be reset
  * Call context: reset_dev
  */
+#if 0 // review before restoring
 static void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
@@ -1602,6 +1613,7 @@ static void acxmem_reset_mac(acx_device_t *adev)
 
 	FN_EXIT0;
 }
+#endif // acxmem_reset_mac()
 
 /*
  * acxmem_s_reset_dev
@@ -1619,6 +1631,7 @@ static void acxmem_reset_mac(acx_device_t *adev)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
+#if 0 // needs work
 int acxmem_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
@@ -1754,6 +1767,7 @@ end:
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acxmem_reset_dev()
 
 /*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
@@ -1941,6 +1955,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
+#if 0 // needs work
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
@@ -2127,7 +2142,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	FN_EXIT0;
 	return 0;
 }
+#endif // acxmem_proc_diag_output()
 
+#if 0 // needs acx_read_eeprom_byte
 char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
 	char *p, *buf;
 	int i;
@@ -2146,6 +2163,7 @@ char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
 	FN_EXIT1(p - buf);
 	return buf;
 }
+#endif // acxmem_proc_eeprom_output()
 
 /*
  * BOM Rx Path

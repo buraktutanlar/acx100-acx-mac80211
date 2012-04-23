@@ -54,7 +54,10 @@ acx(pci|mem)_read_phy_reg(): DONE
 
 acx(pci|mem)_irq_(enable|disable): DONE
 
-mem.c #if0s:
+STATUS: #if1d in mem.c, pending proper merging
+  int acxmem_write_fw(acx_device_t *adev,
+  acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+  int acxmem_reset_dev(acx_device_t *adev)
 
 acxmem_tx_data():
   extra locking
@@ -86,11 +89,11 @@ acxmem_reset_dev():
 
 acxpci_init_mboxes():
 
-acxmem_proc_diag_output():.  latter 2 are #if0d, maybe wrongly
+acxmem_proc_diag_output():
   grody diffs
 
 acx(pci|mem)_write_phy_reg()
-	copied from mem.c, but needs work before use
+  copied from mem.c, but needs work before use
 
 acx(pci|mem)_read_eeprom_byte()
 acx(pci|mem)_write_eeprom_byte()  (UNUSED)

@@ -1073,8 +1073,8 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	0	success
  */
 
-#if 0 // copied to merge
-// static 
+#if 1 // copied to merge, but needs work
+// static - probly could restore, but..
 int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
 	int len, size, checkMismatch = -1;
@@ -1154,7 +1154,8 @@ int acxmem_write_fw(acx_device_t *adev,
  */
 // static 
 int acxmem_validate_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset) {
+		const firmware_image_t *fw_image, u32 offset)
+{
 	u32 sum, v32, w32;
 	int len, size;
 	int result = OK;
@@ -1433,7 +1434,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
-#if 0 // copied to merge
+#if 1 // copied to merge, but needs work
 int
 acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
@@ -1715,7 +1716,7 @@ STATick inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-#if 0 // copied to merge
+#if 1 // copied to merge, but needs work
 int acxmem_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
@@ -1852,7 +1853,7 @@ int acxmem_reset_dev(acx_device_t *adev)
 	FN_EXIT1(result);
 	return result;
 }
-#endif
+#endif // acxmem_reset_dev()
 
 STATick int acxmem_verify_init(acx_device_t *adev) {
 	int result = NOT_OK;
@@ -2060,7 +2061,7 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * BOM Proc, Debug
  * ==================================================
  */
-#if 0 // copied to merge
+#if 1 // copied to merge, but needs work
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
