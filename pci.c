@@ -152,7 +152,7 @@ static void acxpci_irq_disable(acx_device_t * adev);
 void acxpci_irq_work(struct work_struct *work);
 // static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
-static void acxpci_handle_info_irq(acx_device_t * adev);
+//= static void acxpci_handle_info_irq(acx_device_t * adev);
 void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Mac80211 Ops
@@ -2512,7 +2512,7 @@ void acxpci_irq_work(struct work_struct *work)
 
 		/* HOST_INT_INFO */
 		if (irqmasked & HOST_INT_INFO) {
-			acxpci_handle_info_irq(adev);
+			acx_handle_info_irq(adev);
 		}
 
 		/* HOST_INT_SCAN_COMPLETE */
@@ -2560,7 +2560,7 @@ void acxpci_irq_work(struct work_struct *work)
 /*
  * acxpci_handle_info_irq
  */
-
+#if 0
 /* scan is complete. all frames now on the receive queue are valid */
 #define INFO_SCAN_COMPLETE      0x0001
 #define INFO_WEP_KEY_NOT_FOUND  0x0002
@@ -2635,6 +2635,7 @@ static void acxpci_handle_info_irq(acx_device_t * adev)
 			  0 : info_type]
 	    );
 }
+#endif // handle-info-irq
 
 void acxpci_set_interrupt_mask(acx_device_t * adev)
 {

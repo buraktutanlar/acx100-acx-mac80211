@@ -2817,6 +2817,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
  * ==================================================
  */
 
+void acx_handle_info_irq(acx_device_t *adev); // reorder later
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
 void acxmem_irq_work(struct work_struct *work)
@@ -2869,7 +2870,7 @@ void acxmem_irq_work(struct work_struct *work)
 
 		/* HOST_INT_INFO */
 		if (irqmasked & HOST_INT_INFO) {
-			acxmem_handle_info_irq(adev);
+			acx_handle_info_irq(adev);
 		}
 
 		/* HOST_INT_SCAN_COMPLETE */
@@ -2913,7 +2914,7 @@ void acxmem_irq_work(struct work_struct *work)
 }
 
 /*
- * acxmem_handle_info_irq
+ * acx_handle_info_irq
  */
 
 /* scan is complete. all frames now on the receive queue are valid */
@@ -2948,7 +2949,8 @@ void acxmem_irq_work(struct work_struct *work)
  after we set it once. Let's hope this will be fixed in firmware someday
  */
 
-static void acx_handle_info_irq(acx_device_t *adev) {
+void acx_handle_info_irq(acx_device_t *adev)
+{
 #if ACX_DEBUG
 	static const char * const info_type_msg[] = {
 			"(unknown)",
@@ -3137,7 +3139,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 				SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 			}
 			if (irqtype & HOST_INT_INFO) {
-				acxmem_handle_info_irq(adev);
+				acx_handle_info_irq(adev);
 			}
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
 				log(L_IRQ, "got Scan_Complete IRQ\n");

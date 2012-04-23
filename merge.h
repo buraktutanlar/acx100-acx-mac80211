@@ -12,3 +12,5 @@ void acx_log_txbuffer(acx_device_t *adev);
 
 void acx_op_stop(struct ieee80211_hw *hw);
 int acx_op_start(struct ieee80211_hw *hw);
+
+void acx_handle_info_irq(acx_device_t * adev);

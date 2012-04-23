@@ -226,7 +226,7 @@ STATick void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_irq_work(struct work_struct *work);
 // STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
-STATick void acxmem_handle_info_irq(acx_device_t *adev);
+//= STATick void acxmem_handle_info_irq(acx_device_t *adev);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
 // Mac80211 Ops
@@ -3605,7 +3605,7 @@ void acxmem_irq_work(struct work_struct *work)
 
 		/* HOST_INT_INFO */
 		if (irqmasked & HOST_INT_INFO) {
-			acxmem_handle_info_irq(adev);
+			acx_handle_info_irq(adev);
 		}
 
 		/* HOST_INT_SCAN_COMPLETE */
@@ -3652,7 +3652,7 @@ void acxmem_irq_work(struct work_struct *work)
 /*
  * acxmem_handle_info_irq
  */
-
+#if 0
 /* scan is complete. all frames now on the receive queue are valid */
 #define INFO_SCAN_COMPLETE      0x0001
 #define INFO_WEP_KEY_NOT_FOUND  0x0002
@@ -3725,6 +3725,7 @@ STATick void acxmem_handle_info_irq(acx_device_t *adev) {
 			0 : info_type]
 	);
 }
+#endif
 
 #if 0
 void acxmem_set_interrupt_mask(acx_device_t *adev) {
@@ -3872,7 +3873,7 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 				SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 			}
 			if (irqtype & HOST_INT_INFO) {
-				acxmem_handle_info_irq(adev);
+				acx_handle_info_irq(adev);
 			}
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
 				log(L_IRQ, "got Scan_Complete IRQ\n");
