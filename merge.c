@@ -206,6 +206,36 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
+static
+void *acxpci_allocate(acx_device_t * adev, size_t size,
+		dma_addr_t * phy, const char *msg)
+{
+	void *ptr;
+
+	if (IS_PCI(adev))
+		ptr = dma_alloc_coherent(adev->bus_dev,
+					size, phy, GFP_KERNEL);
+	else {
+		ptr = kmalloc(size, GFP_KERNEL);
+		/*
+		 * The ACX can't use the physical address, so we'll
+		 * have to fa later and it might be handy to have the
+		 * virtual address.
+		 */
+		*phy = (dma_addr_t) NULL;
+	}
+
+	if (ptr) {
+		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
+			msg, (int)size, ptr, (unsigned long long)*phy);
+		memset(ptr, 0, size);
+		return ptr;
+	}
+	pr_err("%s allocation FAILED (%d bytes)\n",
+		msg, (int)size);
+	return NULL;
+}
+
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 static
 int acxpci_create_rx_host_desc_queue(acx_device_t * adev)

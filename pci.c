@@ -690,16 +690,17 @@ static void acxpci_delete_dma_regions(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-static inline void
-acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
-	      void *vaddr, dma_addr_t dma_handle)
+static inline 
+void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
+			void *vaddr, dma_addr_t dma_handle)
 {
-	dma_free_coherent(hwdev == NULL ? NULL : &hwdev->dev,
-			  size, vaddr, dma_handle);
+	dma_free_coherent(hwdev == NULL	? NULL : &hwdev->dev,
+			size, vaddr, dma_handle);
 }
 
-static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
-		      const char *msg)
+static
+void *acxpci_allocate(acx_device_t * adev, size_t size,
+		dma_addr_t * phy, const char *msg)
 {
 	void *ptr;
 
@@ -707,12 +708,12 @@ static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy,
 
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
-		    msg, (int)size, ptr, (unsigned long long)*phy);
+			msg, (int)size, ptr, (unsigned long long)*phy);
 		memset(ptr, 0, size);
 		return ptr;
 	}
 	pr_err("%s allocation FAILED (%d bytes)\n",
-	       msg, (int)size);
+		msg, (int)size);
 	return NULL;
 }
 

@@ -635,8 +635,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 
 	adev->rxbuf_start
 		= acxmem_allocate(adev,	adev->rxbuf_area_size,
-				&adev->rxbuf_startphy,
-				"rxbuf_start");
+				&adev->rxbuf_startphy, "rxbuf_start");
 	if (!adev->rxbuf_start)
 		goto fail;
 
@@ -982,8 +981,10 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-STATick void*
-acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg) {
+STATick 
+void* acxmem_allocate(acx_device_t *adev, size_t size,
+		dma_addr_t *phy, const char *msg)
+{
 	void *ptr;
 	ptr = kmalloc(size, GFP_KERNEL);
 	/*
@@ -994,11 +995,12 @@ acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *ms
 
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
-				msg, (int)size, ptr, (unsigned long long)*phy);
+			msg, (int)size, ptr, (unsigned long long)*phy);
 		memset(ptr, 0, size);
 		return ptr;
 	}
-	pr_err("acx: %s allocation FAILED (%d bytes)\n", msg, (int) size);
+	pr_err("acx: %s allocation FAILED (%d bytes)\n",
+		msg, (int) size);
 	return NULL;
 }
 
