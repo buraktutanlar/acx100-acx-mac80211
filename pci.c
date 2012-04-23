@@ -299,6 +299,7 @@ int acxpci_create_hostdesc_queues(acx_device_t * adev)
  * plus 32 bytes safety offset at the end
  */
 //static 
+#if 0
 int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 {
 	rxhostdesc_t *hostdesc;
@@ -311,9 +312,9 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 
 	/* allocate the RX host descriptor queue pool */
 	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rxhostdesc_start = acxpci_allocate(adev, adev->rxhostdesc_area_size,
-					  &adev->rxhostdesc_startphy,
-					  "rxhostdesc_start");
+	adev->rxhostdesc_start = acxpci_allocate(adev,
+		adev->rxhostdesc_area_size,
+		 &adev->rxhostdesc_startphy, "rxhostdesc_start");
 	if (!adev->rxhostdesc_start)
 		goto fail;
 	/* check for proper alignment of RX host descriptor pool */
@@ -325,8 +326,9 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
 	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rxbuf_start = acxpci_allocate(adev, adev->rxbuf_area_size,
-				     &adev->rxbuf_startphy, "rxbuf_start");
+	adev->rxbuf_start
+		= acxpci_allocate(adev, adev->rxbuf_area_size,
+				&adev->rxbuf_startphy, "rxbuf_start");
 	if (!adev->rxbuf_start)
 		goto fail;
 
@@ -359,6 +361,7 @@ int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
+#endif
 
 // static 
 int acxpci_create_tx_host_desc_queue(acx_device_t * adev)

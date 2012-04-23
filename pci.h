@@ -16,7 +16,7 @@ STATick void acxpci_log_rxbuffer(const acx_device_t * adev);
 STATick void acxpci_log_txbuffer(acx_device_t * adev);
 
 int acxpci_create_hostdesc_queues(acx_device_t * adev);
-STATick int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
+//= STATick int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
 STATick int acxpci_create_tx_host_desc_queue(acx_device_t * adev);
 
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);

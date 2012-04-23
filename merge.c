@@ -206,6 +206,70 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+static
+int acxpci_create_rx_host_desc_queue(acx_device_t * adev)
+{
+	rxhostdesc_t *hostdesc;
+	rxbuffer_t *rxbuf;
+	dma_addr_t hostdesc_phy;
+	dma_addr_t rxbuf_phy;
+	int i;
+
+	FN_ENTER;
+
+	/* allocate the RX host descriptor queue pool */
+	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
+	adev->rxhostdesc_start = acxpci_allocate(adev,
+		adev->rxhostdesc_area_size,
+		 &adev->rxhostdesc_startphy, "rxhostdesc_start");
+	if (!adev->rxhostdesc_start)
+		goto fail;
+	/* check for proper alignment of RX host descriptor pool */
+	if ((long)adev->rxhostdesc_start & 3) {
+		pr_acx("driver bug: dma alloc returns unaligned address\n");
+		goto fail;
+	}
+
+	/* allocate Rx buffer pool which will be used by the acx
+	 * to store the whole content of the received frames in it */
+	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
+	adev->rxbuf_start
+		= acxpci_allocate(adev, adev->rxbuf_area_size,
+				&adev->rxbuf_startphy, "rxbuf_start");
+	if (!adev->rxbuf_start)
+		goto fail;
+
+	rxbuf = adev->rxbuf_start;
+	rxbuf_phy = adev->rxbuf_startphy;
+	hostdesc = adev->rxhostdesc_start;
+	hostdesc_phy = adev->rxhostdesc_startphy;
+
+	/* don't make any popular C programming pointer arithmetic mistakes
+	 * here, otherwise I'll kill you...
+	 * (and don't dare asking me why I'm warning you about that...) */
+	for (i = 0; i < RX_CNT; i++) {
+		hostdesc->data = rxbuf;
+		hostdesc->data_phy = cpu2acx(rxbuf_phy);
+		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
+		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		rxbuf++;
+		rxbuf_phy += sizeof(*rxbuf);
+		hostdesc_phy += sizeof(*hostdesc);
+		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		hostdesc++;
+	}
+	hostdesc--;
+	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
+	FN_EXIT1(OK);
+	return OK;
+      fail:
+	pr_acx("create_rx_host_desc_queue FAILED\n");
+	/* dealloc will be done by free function on error case */
+	FN_EXIT1(NOT_OK);
+	return NOT_OK;
+}
+
 int acx_create_hostdesc_queues(acx_device_t *adev)
 {
         int result;
