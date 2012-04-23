@@ -3227,24 +3227,6 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
  * ==================================================
  */
 
-static const struct ieee80211_ops acxmem_hw_ops = {
-		.tx = acx_op_tx,
-		.conf_tx = acx_conf_tx,
-		.add_interface = acx_op_add_interface,
-		.remove_interface = acx_op_remove_interface,
-		.start = acxmem_op_start,
-		.configure_filter = acx_op_configure_filter,
-		.stop = acxmem_op_stop,
-		.config = acx_op_config,
-		.bss_info_changed = acx_op_bss_info_changed,
-		.set_key = acx_op_set_key,
-		.get_stats = acx_op_get_stats,
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-		.get_tx_stats = acx_e_op_get_tx_stats,
-#endif
-		};
-
-// static
 int acx_op_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
@@ -3278,10 +3260,6 @@ int acx_op_start(struct ieee80211_hw *hw)
 	return result;
 }
 
-
-
-// trivial diffs mem/pci
-// static
 void acx_op_stop(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = ieee2adev(hw);
