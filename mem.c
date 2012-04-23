@@ -187,8 +187,8 @@ void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
-STATick void acxmem_init_acx_txbuf(acx_device_t *adev);
-void acxmem_init_acx_txbuf2(acx_device_t *adev);
+static void acxmem_init_acx_txbuf(acx_device_t *adev);
+//= static void acxmem_init_acx_txbuf2(acx_device_t *adev);
 STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 // static inline 
 txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
@@ -2689,8 +2689,8 @@ STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
  * block.  The upper 13 bits are a control field, of which only 0x02000000 has any
  * meaning.  The lower 19 bits are the address of the next block divided by 32.
  */
-STATick void acxmem_init_acx_txbuf(acx_device_t *adev) {
-
+static void acxmem_init_acx_txbuf(acx_device_t *adev)
+{
 	/*
 	 * acx100_s_init_memory_pools set up txbuf_start and txbuf_numblocks for us.
 	 * All we need to do is reset the rest of the bookeeping.
@@ -2710,9 +2710,9 @@ STATick void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
 /* Re-initialize tx-buffer list
  */
-#if 0 // copied to merge
-void acxmem_init_acx_txbuf2(acx_device_t *adev) {
-
+#if 1 // copied to merge, inappropriately
+void acxmem_init_acx_txbuf2(acx_device_t *adev)
+{
 	int i;
 	u32 adr, next_adr;
 

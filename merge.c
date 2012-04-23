@@ -1735,7 +1735,7 @@ end:
  * control field, of which only 0x02000000 has any meaning.  The lower
  * 19 bits are the address of the next block divided by 32.
  */
-
+#if 0 // none in pci
 static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
 	/*
@@ -1755,10 +1755,12 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 	 * reset, so the ACX memory is in the state we want.
 	 */
 }
+#endif
 
 /*
  * Most of the acx specific pieces of hardware reset.
  */
+#if 0 // none in pci.c, doesnt belong here
 static int acxmem_complete_hw_reset(acx_device_t *adev)
 {
 	acx111_ie_configoption_t co;
@@ -1815,6 +1817,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 
 	return 0;
 }
+#endif
 
 static void acxmem_irq_enable(acx_device_t *adev) {
 	FN_ENTER;
@@ -2542,6 +2545,7 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 
 /* Re-initialize tx-buffer list
  */
+#if 0 // none in pci, doesnt belong here
 void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 
 	int i;
@@ -2566,7 +2570,7 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
 
 }
-
+#endif
 
 // static inline 
 txdesc_t*
