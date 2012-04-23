@@ -440,58 +440,6 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  */
 
 /*
- * acxpci_read_eeprom_byte
- *
- * Function called to read an octet in the EEPROM.
- *
- * This function is used by acxpci_e_probe to check if the
- * connected card is a legal one or not.
- *
- * Arguments:
- *	adev		ptr to acx_device structure
- *	addr		address to read in the EEPROM
- *	charbuf		ptr to a char. This is where the read octet
- *			will be stored
- */
-#if 0 // 2 versions same, merged
-int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf)
-{
-	int result;
-	int count;
-
-	FN_ENTER;
-
-	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
-
-	count = 0xffff;
-	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			pr_acx("%s: timeout waiting for EEPROM read\n",
-			       wiphy_name(adev->ieee->wiphy));
-			result = NOT_OK;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
-	log(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
-	result = OK;
-
-      fail:
-	FN_EXIT1(result);
-	return result;
-}
-#endif // acxpci_read_eeprom_byte()
-
-/*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
@@ -599,51 +547,6 @@ static inline void acxpci_read_eeprom_area(acx_device_t * adev)
 	FN_EXIT0;
 #endif
 }
-
-/*
- * acxpci_s_read_phy_reg
- *
- * Messing with rx/tx disabling and enabling here
- * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
- */
-#if 0 // in merge.c
-int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
-{
-	int result = NOT_OK;
-	int count;
-
-	FN_ENTER;
-
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 2);
-
-	count = 0xffff;
-	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			pr_acx("%s: timeout waiting for phy read\n",
-			       wiphy_name(adev->ieee->wiphy));
-			*charbuf = 0;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	log(L_DEBUG, "the count was %u\n", count);
-	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
-
-	log(L_DEBUG, "radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
-	result = OK;
-	goto fail;		/* silence compiler warning */
-      fail:
-	FN_EXIT1(result);
-	return result;
-}
-#endif
 
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
@@ -1400,41 +1303,6 @@ static void acxpci_reset_mac(acx_device_t * adev)
 }
 
 /*
- * acxpci_s_up
- *
- * This function is called by acxpci_e_open (when ifconfig sets the device as up)
- *
- * Side effects:
- * - Enables on-card interrupt requests
- * - calls acx_s_start
- */
-#if 0 // merged
-static void acxpci_up(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-
-	FN_ENTER;
-
-	acx_irq_enable(adev);
-
-	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
-	 ** used to use it. But we don't do that anymore, our OS
-	 ** has reliable software timers */
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_timer;
-	adev->mgmt_timer.data = (unsigned long)adev;
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	acx_start(adev);
-
-	FN_EXIT0;
-}
-#endif
-
-/*
  * BOM Other (Control Path)
  * ==================================================
  */
@@ -1538,25 +1406,6 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	FN_EXIT0;
 	return 0;
 }
-
-#if 0 // merged mem.c version
-char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev)
-{
-	int i;
-	char *p, *buf;
-
-	FN_ENTER;
-
-	p = buf = kmalloc(0x400, GFP_KERNEL);
-	for (i = 0; i < 0x400; i++) {
-		acx_read_eeprom_byte(adev, i, p++);
-	}
-	*len = i;
-
-	FN_EXIT1(p - buf);
-	return buf;
-}
-#endif // acxpci_proc_eeprom_output()
 
 /*
  * BOM Rx Path
@@ -2034,30 +1883,6 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
  * ==================================================
  */
 
-#if 0 // to merge.c
-static void acxpci_irq_enable(acx_device_t * adev)
-{
-	FN_ENTER;
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x8000);
-	write_flush(adev);
-	adev->irqs_active = 1;
-	FN_EXIT0;
-}
-
-
-static void acxpci_irq_disable(acx_device_t * adev)
-{
-	FN_ENTER;
-
-	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	write_flush(adev);
-	adev->irqs_active = 0;
-
-	FN_EXIT0;
-}
-#endif
 
 /* Interrupt handler bottom-half */
 #define IRQ_ITERATE 0
@@ -2229,60 +2054,6 @@ more bytes may follow
     it does NOT clear bit 0x0001, and this bit will probably stay forever set
     after we set it once. Let's hope this will be fixed in firmware someday
 */
-
-#if 0 // merged - acx_set_interrupt_mask()
-#include "interrupt-masks.h"
-void acxpci_set_interrupt_mask(acx_device_t * adev)
-{
-	pr_notice("adev->irq_mask: before: %d devtype:%d chiptype:%d tobe: %d\n",
-		adev->irq_mask, (adev)->dev_type, (adev)->chip_type,
-		interrupt_masks[(adev)->dev_type][(adev)->chip_type]);
-
-	adev->irq_mask = interrupt_masks[(adev)->dev_type][(adev)->chip_type];
-
-	if (IS_ACX111(adev)) {
-		adev->irq_mask = (u16) ~ (0
-					  /* | HOST_INT_RX_DATA        */
-					  | HOST_INT_TX_COMPLETE
-					  /* | HOST_INT_TX_XFER        */
-					  | HOST_INT_RX_COMPLETE
-					  /* | HOST_INT_DTIM           */
-					  /* | HOST_INT_BEACON         */
-					  /* | HOST_INT_TIMER          */
-					  /* | HOST_INT_KEY_NOT_FOUND  */
-					  | HOST_INT_IV_ICV_FAILURE
-					  | HOST_INT_CMD_COMPLETE
-					  | HOST_INT_INFO
-					  /* | HOST_INT_OVERFLOW       */
-					  /* | HOST_INT_PROCESS_ERROR  */
-					  | HOST_INT_SCAN_COMPLETE
-					  | HOST_INT_FCS_THRESHOLD
-					  /* | HOST_INT_UNKNOWN        */
-		    );
-
-	} else {
-		adev->irq_mask = (u16) ~ (0
-					  /* | HOST_INT_RX_DATA        */
-					  | HOST_INT_TX_COMPLETE
-					  /* | HOST_INT_TX_XFER        */
-					  | HOST_INT_RX_COMPLETE
-					  /* | HOST_INT_DTIM           */
-					  /* | HOST_INT_BEACON         */
-					  /* | HOST_INT_TIMER          */
-					  /* | HOST_INT_KEY_NOT_FOUND  */
-					  /* | HOST_INT_IV_ICV_FAILURE */
-					  | HOST_INT_CMD_COMPLETE
-					  | HOST_INT_INFO
-					  /* | HOST_INT_OVERFLOW       */
-					  /* | HOST_INT_PROCESS_ERROR  */
-					  | HOST_INT_SCAN_COMPLETE
-					  /* | HOST_INT_FCS_THRESHOLD  */
-					  /* | HOST_INT_UNKNOWN        */
-		    );
-	}
-	pr_notice("adev->irq_mask: actual: %d\n", adev->irq_mask);
-}
-#endif // acxpci_set_interrupt_mask()
 
 /*
  * BOM Mac80211 Ops

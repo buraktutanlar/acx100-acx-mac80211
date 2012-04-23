@@ -815,57 +815,6 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
  */
 
 /*
- * acxmem_read_eeprom_byte
- *
- * Function called to read an octet in the EEPROM.
- *
- * This function is used by acxmem_e_probe to check if the
- * connected card is a legal one or not.
- *
- * Arguments:
- *	adev		ptr to acx_device structure
- *	addr		address to read in the EEPROM
- *	charbuf		ptr to a char. This is where the read octet
- *			will be stored
- */
-#if 0 // same in both, merged
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf) {
-	int result;
-	int count;
-
-	FN_ENTER;
-
-	write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-	write_reg32(adev, IO_ACX_EEPROM_ADDR, addr);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
-
-	count = 0xffff;
-	while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			pr_acx("%s: timeout waiting for EEPROM read\n", wiphy_name(
-					adev->ieee->wiphy));
-			result = NOT_OK;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	*charbuf = read_reg8(adev, IO_ACX_EEPROM_DATA);
-	log(L_DEBUG, "EEPROM at 0x%04X = 0x%02X\n", addr, *charbuf);
-	result = OK;
-
-fail:
-	FN_EXIT1(result);
-	return result;
-}
-#endif // acxmem_read_eeprom_byte()
-
-/*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
@@ -975,53 +924,7 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
-/*
- * acxmem_s_read_phy_reg
- *
- * Messing with rx/tx disabling and enabling here
- * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
- */
 #if 0 // copied to merge.c
-int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
-	int result = NOT_OK;
-	int count;
-	acxmem_lock_flags;
-
-	FN_ENTER;
-	acxmem_lock();
-
-	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
-	write_flush(adev);
-	write_reg32(adev, IO_ACX_PHY_CTL, 2);
-
-	count = 0xffff;
-	while (read_reg32(adev, IO_ACX_PHY_CTL)) {
-		/* scheduling away instead of CPU burning loop
-		 * doesn't seem to work here at all:
-		 * awful delay, sometimes also failure.
-		 * Doesn't matter anyway (only small delay). */
-		if (unlikely(!--count)) {
-			pr_acx("%s: timeout waiting for phy read\n", wiphy_name(
-					adev->ieee->wiphy));
-			*charbuf = 0;
-			goto fail;
-		}
-		cpu_relax();
-	}
-
-	log(L_DEBUG, "the count was %u\n", count);
-	*charbuf = read_reg8(adev, IO_ACX_PHY_DATA);
-
-	log(L_DEBUG, "radio PHY at 0x%04X = 0x%02X\n", *charbuf, reg);
-	result = OK;
-	goto fail; /* silence compiler warning */
-	fail:
-
-	acxmem_unlock();
-	FN_EXIT1(result);
-	return result;
-}
-
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	int count;
 	acxmem_lock_flags;
@@ -1989,35 +1892,6 @@ STATick void acxmem_reset_mac(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-#if 0 // merge
-STATick void acxmem_up(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	acxmem_lock_flags;
-
-	FN_ENTER;
-
-	acxmem_lock();
-	acx_irq_enable(adev);
-	acxmem_unlock();
-
-	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
-	 ** used to use it. But we don't do that anymore, our OS
-	 ** has reliable software timers */
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_timer;
-	adev->mgmt_timer.data = (unsigned long) adev;
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	acx_start(adev);
-
-	FN_EXIT0;
-}
-#endif // acxmem_up()
-
 /***********************************************************************
  ** acxmem_i_set_multicast_list
  ** FIXME: most likely needs refinement
@@ -2246,28 +2120,6 @@ int acxmem_proc_diag_output(struct seq_file *file,
 }
 #endif // acxmem_proc_diag_output()
 
-#if 0 //
-char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev)
-{
-	char *p, *buf;
-	int i;
-	acxmem_lock_flags;
-
-	FN_ENTER;
-	acxmem_lock();
-
-	p = buf = kmalloc(0x400, GFP_KERNEL);
-	for (i = 0; i < 0x400; i++) {
-		acx_read_eeprom_byte(adev, i, p++);
-	}
-	*length = i;
-
-	acxmem_unlock();
-	FN_EXIT1(p - buf);
-	return buf;
-}
-#endif // acxmem_proc_eeprom_output()
-
 /*
  * BOM Rx Path
  * ==================================================
@@ -2394,183 +2246,6 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
  * BOM Tx Path
  * ==================================================
  */
-
-/*
- * acxmem_l_alloc_tx
- * Actually returns a txdesc_t* ptr
- *
- * FIXME: in case of fragments, should allocate multiple descrs
- * after figuring out how many we need and whether we still have
- * sufficiently many.
- */
- // OW TODO Align with pci.c
-#if 0 // copied to merge
-tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
-	struct txdesc *txdesc;
-	unsigned head;
-	u8 ctl8;
-	static int txattempts = 0;
-	int blocks_needed;
-	acxmem_lock_flags;
-
-	FN_ENTER;
-	acxmem_lock();
-
-	if (unlikely(!adev->tx_free)) {
-		log(L_ANY, "%s: BUG: no free txdesc left\n", __func__);
-		/*
-		 * Probably the ACX ignored a transmit attempt and now there's a packet
-		 * sitting in the queue we think should be transmitting but the ACX doesn't
-		 * know about.
-		 * On the first pass, send the ACX a TxProc interrupt to try moving
-		 * things along, and if that doesn't work (ie, we get called again) completely
-		 * flush the transmit queue.
-		 */
-		if (txattempts < 10) {
-			txattempts++;
-			log(L_ANY, "%s: trying to wake up ACX\n", __func__);
-			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
-			write_flush(adev);
-		} else {
-			txattempts = 0;
-			log(L_ANY, "%s: flushing transmit queue.\n", __func__);
-			acxmem_clean_txdesc_emergency(adev);
-		}
-		txdesc = NULL;
-		goto end;
-	}
-
-	/*
-	 * Make a quick check to see if there is transmit buffer space on
-	 * the ACX.  This can't guarantee there is enough space for the packet
-	 * since we don't yet know how big it is, but it will prevent at least some
-	 * annoyances.
-	 */
-
-	/* OW 20090815
-	 * Make a detailed check of required tx_buf blocks, to avoid 'out of tx_buf' situation.
-	 *
-	 * The empty tx_buf and reuse trick in acxmem_l_tx_data doen't wotk well.
-	 * I think it confused mac80211, that was supposing the packet was send,
-	 * but actually it was dropped.	According to mac80211 dropping should not happen,
-	 * altough a bit of dropping seemed to be ok.
-	 *
-	 * What we do now is simpler and clean I think:
-	 * - first check the number of required blocks
-	 * - and if there are not enough: Stop the queue and report NOT_OK.
-	 *
-	 * Reporting NOT_OK here shouldn't be done neither according to mac80211,
-	 * but it seems to work better here.
-   	*/
-
-	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
-	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
-		txdesc = NULL;
-		log(L_BUFT, "%s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
-				"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
-				"Stopping queue.\n",
-				__func__,
-				len, blocks_needed, adev->acx_txbuf_blocks_free);
-		acx_stop_queue(adev->ieee, NULL);
-		goto end;
-	}
-
-	head = adev->tx_head;
-	/*
-	 * txdesc points to ACX memory
-	 */
-	txdesc = acxmem_get_txdesc(adev, head);
-	ctl8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-
-	/*
-	 * If we don't own the buffer (HOSTOWN) it is certainly not free; however,
-	 * we may have previously thought we had enough memory to send
-	 * a packet, allocated the buffer then gave up when we found not enough
-	 * transmit buffer space on the ACX. In that case, HOSTOWN and
-	 * ACXDONE will both be set.
-	 */
-
-	// TODO OW Check if this is correct
-	// TODO 20100115 Changed to DESC_CTL_ACXDONE_HOSTOWN like in pci.c
-	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
-		/* whoops, descr at current index is not free, so probably
-		 * ring buffer already full */
-		log(L_ANY, "%s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
-			__func__,
-			head, ctl8);
-		txdesc = NULL;
-		goto end;
-	}
-
-	/* Needed in case txdesc won't be eventually submitted for tx */
-	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
-
-	adev->tx_free--;
-	log(L_BUFT, "%s: tx: got desc %u, %u remain\n",
-			__func__, head, adev->tx_free);
-
-	/* returning current descriptor, so advance to next free one */
-	adev->tx_head = (head + 1) % TX_CNT;
-
-	end:
-
-	acxmem_unlock();
-	FN_EXIT0;
-
-	return (tx_t*) txdesc;
-}
-#endif
-
-/*
- * acxmem_l_dealloc_tx
- *
- * Clears out a previously allocatedvoid acxmem_l_dealloc_tx(tx_t *tx_opaque);
- * transmit descriptor.
- * The ACX can get confused if we skip transmit descriptors in the queue,
- * so when we don't need a descriptor return it to its original
- * state and move the queue head pointer back.
- *
- */
-#if 0 // copied to merge
-void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
-	/*
-	 * txdesc is the address of the descriptor on the ACX.
-	 */
-	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
-	txdesc_t tmptxdesc;
-	int index;
-
-	acxmem_lock_flags;
-	acxmem_lock();
-
-	memset (&tmptxdesc, 0, sizeof(tmptxdesc));
-	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
-	tmptxdesc.u.r1.rate = 0x0a;
-
-	/*
-	 * Clear out all of the transmit descriptor except for the next pointer
-	 */
-	acxmem_copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
-			(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
-					- sizeof(tmptxdesc.pNextDesc));
-
-	/*
-	 * This is only called immediately after we've allocated, so we should
-	 * be able to set the head back to this descriptor.
-	 */
-	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
-	pr_info("acx_dealloc: moving head from %d to %d\n",
-		adev->tx_head, index);
-	adev->tx_head = index;
-
-	acxmem_unlock();
-
-}
-
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
-	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
-}
-#endif
 
 STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	int blocks_needed;
@@ -3267,30 +2942,6 @@ STATick void acxmem_i_tx_timeout(struct net_device *ndev) {
 }
 #endif
 
-
-/*
- * BOM Irq Handling, Timer
- * ==================================================
- */
-#if 0 // merged pci version
-STATick void acxmem_irq_enable(acx_device_t *adev) {
-	FN_ENTER;
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x8000);
-	adev->irqs_active = 1;
-	FN_EXIT0;
-}
-
-STATick void acxmem_irq_disable(acx_device_t *adev) {
-	FN_ENTER;
-
-	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	adev->irqs_active = 0;
-	FN_EXIT0;
-}
-#endif
-
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
 #if 0 // copied to merge
@@ -3412,57 +3063,6 @@ void acxmem_irq_work(struct work_struct *work)
  it does NOT clear bit 0x0001, and this bit will probably stay forever set
  after we set it once. Let's hope this will be fixed in firmware someday
  */
-
-#if 0 // copied to merge
-void acxmem_set_interrupt_mask(acx_device_t *adev)
-{
-	FN_ENTER;
-
-	if (IS_ACX111(adev)) {
-		adev->irq_mask = (u16) ~(0
-		| HOST_INT_RX_DATA
-		| HOST_INT_TX_COMPLETE
-		/* | HOST_INT_TX_XFER        */
-		/* | HOST_INT_RX_COMPLETE    */
-		/* | HOST_INT_DTIM           */
-		/* | HOST_INT_BEACON         */
-		/* | HOST_INT_TIMER          */
-		/* | HOST_INT_KEY_NOT_FOUND  */
-		| HOST_INT_IV_ICV_FAILURE
-		| HOST_INT_CMD_COMPLETE
-		| HOST_INT_INFO
-		| HOST_INT_OVERFLOW
-		/* | HOST_INT_PROCESS_ERROR  */
-		| HOST_INT_SCAN_COMPLETE
-		| HOST_INT_FCS_THRESHOLD
-		| HOST_INT_UNKNOWN);
-
-	} else {
-		adev->irq_mask = (u16) ~(0
-		| HOST_INT_RX_DATA
-		| HOST_INT_TX_COMPLETE
-		/* | HOST_INT_TX_XFER        */
-		/* | HOST_INT_RX_COMPLETE    */
-		/* | HOST_INT_DTIM           */
-		/* | HOST_INT_BEACON         */
-		/* | HOST_INT_TIMER          */
-		/* | HOST_INT_KEY_NOT_FOUND  */
-		/* | HOST_INT_IV_ICV_FAILURE */
-		| HOST_INT_CMD_COMPLETE
-		| HOST_INT_INFO
-		| HOST_INT_OVERFLOW
-		| HOST_INT_PROCESS_ERROR
-		| HOST_INT_SCAN_COMPLETE
-		/* | HOST_INT_FCS_THRESHOLD  */
-		/* | HOST_INT_BEACON_MISSED        */
-		);
-
-	}
-
-	FN_EXIT0;
-
-}
-#endif
 
 // OW FIXME Old interrupt handler
 // ---
