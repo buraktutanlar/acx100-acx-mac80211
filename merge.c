@@ -719,14 +719,14 @@ static inline void acx_read_eeprom_area(acx_device_t *adev)
 #endif
 }
 
-#if 1 // port soon to merge.c
 /*
- * acxmem_s_read_phy_reg
+ * acxx_read_phy_reg - from mem.c, has locking which looks harmless for pci.c
  *
+ * common.c has acx_read_phy_reg too, called (pci|mem|usb), now (usb|x)
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
-int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) 
+int acxx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) 
 {
 	int result = NOT_OK;
 	int count;
@@ -806,7 +806,6 @@ fail:
 	FN_EXIT1(OK);  // FN_EXIT0 in pci
 	return OK;
 }
-#endif  // port soon
 
 /*
  * acxmem_s_write_fw

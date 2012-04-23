@@ -96,7 +96,7 @@ int acxpci_upload_radio(acx_device_t * adev);
 int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 static inline void acxpci_read_eeprom_area(acx_device_t * adev);
-int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
+//int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 // static 
 int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
@@ -605,6 +605,7 @@ static inline void acxpci_read_eeprom_area(acx_device_t * adev)
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
+#if 0 // in merge.c
 int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
 	int result = NOT_OK;
@@ -641,7 +642,7 @@ int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	FN_EXIT1(result);
 	return result;
 }
-
+#endif
 
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {

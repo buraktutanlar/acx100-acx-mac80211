@@ -1652,12 +1652,10 @@ acx_parse_configoption(acx_device_t * adev,
 
 int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
-	if (IS_PCI(adev))
-		return acxpci_read_phy_reg(adev, reg, charbuf);
+	if (IS_PCI(adev) || IS_MEM(adev))
+		return acxx_read_phy_reg(adev, reg, charbuf);
 	if (IS_USB(adev))
 		return acxusb_read_phy_reg(adev, reg, charbuf);
-	if (IS_MEM(adev))
-		return acxmem_read_phy_reg(adev, reg, charbuf);
 
 	log(L_ANY, "%s: Unsupported dev_type=%i\n",  __func__, (adev)->dev_type);
 	return (NOT_OK);
