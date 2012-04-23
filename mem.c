@@ -184,7 +184,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
+static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
 STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 static void acxmem_init_acx_txbuf(acx_device_t *adev);
@@ -924,7 +924,7 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
-#if 0 // copied to merge.c
+#if 1 // copied to merge.c
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	int count;
 	acxmem_lock_flags;
@@ -2247,7 +2247,12 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
  * ==================================================
  */
 
-STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
+void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
+	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
+}
+
+static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len)
+{
 	int blocks_needed;
 
 	blocks_needed = len / (adev->memblocksize - 4);
@@ -2268,7 +2273,7 @@ STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	 * Take 4 off the memory block size to account for the reserved word at the start of
 	 * the block.
 	 */
-	blocks_needed=acxmem_get_txbuf_space_needed(adev, count);
+	blocks_needed = acxmem_get_txbuf_space_needed(adev, count);
 
 	if (blocks_needed <= adev->acx_txbuf_blocks_free) {
 		/*
@@ -2449,7 +2454,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 0 // copied to merge, pci version unmerged.
+#if 1 // copied to merge, pci version unmerged.
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*

@@ -815,6 +815,7 @@ fail:
 	return result;
 }
 
+#if 0 // use mem.c til later
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	int count;
 	acxmem_lock_flags;
@@ -854,6 +855,7 @@ fail:
 	FN_EXIT1(OK);  // FN_EXIT0 in pci
 	return OK;
 }
+#endif // acxmem_write_phy_reg()
 
 /*
  * acxmem_s_write_fw
@@ -2615,9 +2617,10 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-// pci version unmerged.
+#if 0 // pci version unmerged.
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-			struct ieee80211_tx_info *info, struct sk_buff *skb) {
+		struct ieee80211_tx_info *info, struct sk_buff *skb)
+{
 	/*
 	 * txdesc is the address on the ACX
 	 */
@@ -2822,10 +2825,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	FN_EXIT0;
 }
-
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
-	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
-}
+#endif // acxmem_tx_data()
 
 /*
  * acxmem_l_clean_txdesc
