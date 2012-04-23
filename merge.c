@@ -442,14 +442,11 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
 
 	pr_notice("notice IS_PCI(%p): %d\n", adev, IS_PCI(adev));
 
-	result = (IS_MEM(adev))
-		? acx_create_tx_host_desc_queue(adev)
-		: acx_create_tx_host_desc_queue(adev);
+	result = acx_create_tx_host_desc_queue(adev);
         if (OK != result)
                 return result;
-        result = (IS_MEM(adev))
-		? acx_create_rx_host_desc_queue(adev)
-		: acx_create_rx_host_desc_queue(adev);
+
+        result = acx_create_rx_host_desc_queue(adev);
         return result;
 }
 
