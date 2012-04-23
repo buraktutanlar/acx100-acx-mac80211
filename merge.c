@@ -188,6 +188,7 @@ fail:
 	return res;
 }
 
+// exported wrapper for acx_upload_radio()
 int acxmem_upload_radio(acx_device_t *adev)
 {
 	char filename[sizeof("RADIONN.BIN")];
@@ -197,6 +198,7 @@ int acxmem_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
+// exported wrapper for acx_upload_radio()
 int acxpci_upload_radio(acx_device_t *adev)
 {
         char filename[sizeof("tiacx1NNrNN")];
@@ -1223,23 +1225,6 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * ==================================================
  */
 
-static inline void
-acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
-{
-        FN_ENTER;
-        acx_writel(type | (status << 16), adev->cmd_area);
-        write_flush(adev);
-        FN_EXIT0;
-}
-static inline
-void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
-                u16 status) {
-        FN_ENTER;
-        write_slavemem32(adev, (u32) adev->cmd_area, type | (status << 16));
-        write_flush(adev);
-        FN_EXIT0;
-}
-
 #if 0 // slavemem resolve before merge
 static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
 {
@@ -1263,6 +1248,7 @@ static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
 }
 #endif // acxmem_read_cmd_type_status()
 
+#if 0 //
 static inline void acxmem_init_mboxes(acx_device_t *adev)
 {
 	u32 cmd_offs, info_offs;
@@ -1285,7 +1271,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev)
 
 	FN_EXIT0;
 }
-
+#endif
 
 /*
  * acxmem_s_issue_cmd_timeo
@@ -1310,8 +1296,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev)
  *
  */
 #if 0 // needs work
-int
-acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
 			unsigned cmd_timeout, const char *cmdstr)
 {
@@ -1907,51 +1892,6 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 	return 0;
 }
 #endif
-
-static void acxmem_irq_enable(acx_device_t *adev) {
-	FN_ENTER;
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x8000);
-	adev->irqs_active = 1;
-	FN_EXIT0;
-}
-
-static void acxmem_irq_disable(acx_device_t *adev) {
-	FN_ENTER;
-
-	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	adev->irqs_active = 0;
-	FN_EXIT0;
-}
-
-static void acxmem_up(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	acxmem_lock_flags;
-
-	FN_ENTER;
-
-	acxmem_lock();
-	acxmem_irq_enable(adev);
-	acxmem_unlock();
-
-	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
-	 ** used to use it. But we don't do that anymore, our OS
-	 ** has reliable software timers */
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_timer;
-	adev->mgmt_timer.data = (unsigned long) adev;
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	acx_start(adev);
-
-	FN_EXIT0;
-}
-
 
 #if 0
 /***********************************************************************
@@ -3562,7 +3502,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
 	/* ifup device */
-	acxmem_up(hw);  // vs pci ??
+	acx_up(hw);
 
 	/* We don't currently have to do anything else.
 	 * The setup of the MAC should be subsequently completed via
@@ -3594,7 +3534,7 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	/* disable all IRQs, release shared IRQ handler */
 	acxmem_lock();			// null in pci
-	acxmem_irq_disable(adev);	// pci
+	acx_irq_disable(adev);
 	acxmem_unlock();		//
 	synchronize_irq(adev->irq);
 
