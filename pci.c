@@ -139,8 +139,8 @@ txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc)
 static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
 
 // Irq Handling, Timer
-static void acxpci_irq_enable(acx_device_t * adev);
-static void acxpci_irq_disable(acx_device_t * adev);
+//= static void acxpci_irq_enable(acx_device_t * adev);
+//= static void acxpci_irq_disable(acx_device_t * adev);
 void acxpci_irq_work(struct work_struct *work);
 // static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -1413,7 +1413,7 @@ static void acxpci_up(struct ieee80211_hw *hw)
 
 	FN_ENTER;
 
-	acxpci_irq_enable(adev);
+	acx_irq_enable(adev);
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
 	 ** used to use it. But we don't do that anymore, our OS
@@ -2030,6 +2030,7 @@ static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdes
  * ==================================================
  */
 
+#if 0 // to merge.c
 static void acxpci_irq_enable(acx_device_t * adev)
 {
 	FN_ENTER;
@@ -2052,6 +2053,7 @@ static void acxpci_irq_disable(acx_device_t * adev)
 
 	FN_EXIT0;
 }
+#endif
 
 /* Interrupt handler bottom-half */
 #define IRQ_ITERATE 0
@@ -2947,7 +2949,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	log(L_IRQ | L_INIT, "using IRQ %d: OK\n", pdev->irq);
 
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
-	acxpci_irq_disable(adev);
+	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -3169,7 +3171,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	acx_proc_unregister_entries(adev->ieee);
 
 	// IRQs
-	acxpci_irq_disable(adev);
+	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 
@@ -3564,7 +3566,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
-	acxpci_irq_disable(adev);
+	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
 	 * to unconfigured interface (ifup) */
@@ -3716,7 +3718,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	acx_proc_unregister_entries(adev->ieee);
 
 	// IRQs
-	acxpci_irq_disable(adev);
+	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 

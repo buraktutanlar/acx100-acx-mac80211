@@ -52,6 +52,8 @@ acx(pci|mem)_read_phy_reg(): DONE
 	Note: define acxdev_lock() mem ? acxmem_lock " void 0
 	Later: look at acxusb_read_phy_reg()
 
+acx(pci|mem)_irq_(enable|disable): DONE
+
 mem.c #if0s:
 
 acxmem_tx_data():

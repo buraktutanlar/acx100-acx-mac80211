@@ -203,8 +203,8 @@ int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
 //static void acxmem_i_tx_timeout(struct net_device *ndev);
 
 // Irq Handling, Timer
-STATick void acxmem_irq_enable(acx_device_t *adev);
-STATick void acxmem_irq_disable(acx_device_t *adev);
+//= STATick void acxmem_irq_enable(acx_device_t *adev);
+//= STATick void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_irq_work(struct work_struct *work);
 // STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -1993,7 +1993,7 @@ STATick void acxmem_up(struct ieee80211_hw *hw) {
 	FN_ENTER;
 
 	acxmem_lock();
-	acxmem_irq_enable(adev);
+	acx_irq_enable(adev);
 	acxmem_unlock();
 
 	/* acx fw < 1.9.3.e has a hardware timer, and older drivers
@@ -3265,7 +3265,7 @@ STATick void acxmem_i_tx_timeout(struct net_device *ndev) {
  * BOM Irq Handling, Timer
  * ==================================================
  */
-
+#if 0 // merged pci version
 STATick void acxmem_irq_enable(acx_device_t *adev) {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -3282,6 +3282,7 @@ STATick void acxmem_irq_disable(acx_device_t *adev) {
 	adev->irqs_active = 0;
 	FN_EXIT0;
 }
+#endif
 
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
@@ -4217,7 +4218,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 	log(L_ANY, "request_irq %d successful\n", adev->irq);
 	// Acx irqs shall be off and are enabled later in acxpci_s_up
 	acxmem_lock();
-	acxmem_irq_disable(adev);
+	acx_irq_disable(adev);
 	acxmem_unlock();
 
 	/* to find crashes due to weird driver access
@@ -4399,7 +4400,7 @@ STATick int __devexit acxmem_remove(struct platform_device *pdev) {
 
 	// IRQs
 	acxmem_lock();
-	acxmem_irq_disable(adev);
+	acx_irq_disable(adev);
 	acxmem_unlock();
 
 	synchronize_irq(adev->irq);

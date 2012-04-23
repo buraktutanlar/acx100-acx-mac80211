@@ -22,3 +22,7 @@ void *acx_allocate(acx_device_t *adev, size_t size,
 void acx_free_desc_queues(acx_device_t *adev);
 
 int acxx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+
+void acx_irq_enable(acx_device_t * adev);
+void acx_irq_disable(acx_device_t * adev);
+

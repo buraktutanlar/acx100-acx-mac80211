@@ -501,6 +501,33 @@ void acx_free_desc_queues(acx_device_t *adev)
 }
 
 //##########################################
+/* irq stuff */
+
+void acx_irq_enable(acx_device_t * adev)
+{
+	FN_ENTER;
+	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
+	write_reg16(adev, IO_ACX_FEMR, 0x8000);
+	if (IS_PCI(adev))  // need if ?
+		write_flush(adev);
+	adev->irqs_active = 1;
+	FN_EXIT0;
+}
+
+
+void acx_irq_disable(acx_device_t * adev)
+{
+	FN_ENTER;
+
+	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	write_flush(adev);
+	adev->irqs_active = 0;
+
+	FN_EXIT0;
+}
+
+//##########################################
 /* logging stuff */
 
 void acx_log_rxbuffer(const acx_device_t *adev)
@@ -2603,6 +2630,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
+// pci version unmerged.
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*
