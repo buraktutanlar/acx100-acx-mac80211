@@ -1434,9 +1434,11 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  *
  */
 #if 0 // copied to merge
-int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
-		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
-
+int
+acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+			void *buffer, unsigned buflen,
+			unsigned cmd_timeout, const char *cmdstr)
+{
 	unsigned long start = jiffies;
 	const char *devname;
 	unsigned counter;
@@ -1455,8 +1457,8 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		devname = "acx";
 
 	log(L_CTL, "%s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
-			__func__, cmdstr, cmd, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
+		__func__, cmdstr, cmd, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		pr_acxmem("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
@@ -1714,7 +1716,8 @@ STATick inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	as well as uploads and verifies the firmware to the card
  */
 #if 0 // copied to merge
-int acxmem_reset_dev(acx_device_t *adev) {
+int acxmem_reset_dev(acx_device_t *adev)
+{
 	const char* msg = "";
 	int result = NOT_OK;
 	u16 hardware_info;
@@ -2058,7 +2061,9 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * ==================================================
  */
 #if 0 // copied to merge
-int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
+int acxmem_proc_diag_output(struct seq_file *file,
+			acx_device_t *adev)
+{
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
 	u8 Ctl_8;

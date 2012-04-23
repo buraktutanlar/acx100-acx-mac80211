@@ -982,11 +982,9 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
  * 2) go to waitqueue based approach: wait, not poll!
  */
 int
-acxpci_issue_cmd_timeo_debug(acx_device_t * adev,
-			       unsigned cmd,
-			       void *buffer,
-			       unsigned buflen,
-			       unsigned cmd_timeout, const char *cmdstr)
+acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
+			void *buffer, unsigned buflen,
+			unsigned cmd_timeout, const char *cmdstr)
 {
 	unsigned long start = jiffies;
 	const char *devname;
@@ -1002,8 +1000,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev,
 		devname = "acx";
 
 	log(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X\n",
-	    __func__, cmdstr, buflen, cmd_timeout,
-	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
+		__func__, cmdstr, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		pr_acx("%s: %s: firmware is not loaded yet, "

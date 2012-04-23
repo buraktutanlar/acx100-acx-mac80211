@@ -822,7 +822,8 @@ fail:
  */
 // static 
 int acxmem_write_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset) {
+		const firmware_image_t *fw_image, u32 offset)
+{
 	int len, size;
 	u32 sum, v32;
 	// mem.c ars
@@ -1256,11 +1257,11 @@ static inline void acxmem_init_mboxes(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
-int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
-				void *buffer, unsigned buflen,
-				unsigned cmd_timeout, const char* cmdstr)
+int
+acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+			void *buffer, unsigned buflen,
+			unsigned cmd_timeout, const char *cmdstr)
 {
-
 	unsigned long start = jiffies;
 	const char *devname;
 	unsigned counter;
@@ -1280,8 +1281,8 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		devname = "acx";
 
 	log(L_CTL, "%s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
-			__func__, cmdstr, cmd, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
+		__func__, cmdstr, cmd, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		pr_acx("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
@@ -1910,7 +1911,8 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev)
+int acxmem_proc_diag_output(struct seq_file *file,
+			acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
