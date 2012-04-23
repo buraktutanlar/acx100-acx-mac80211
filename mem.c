@@ -2767,7 +2767,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 0 // copied to merge
+#if 0 // copied to merge, pci version unmerged.
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*

@@ -39,13 +39,60 @@ static void acxpci_log_txbuffer(const acx_device_t * adev)
 BOM Data Access
 INLINE_IO - mem has additional blocks.
 
-delete_dma_regions()
-acx(pci|mem)_upload_radio()
+acx(pci|mem)_delete_dma_regions():
+	whitespace, comment diffs
+	called 2x from #if0d merge.c:acxmem_probe()
+	
+acx(pci|mem)_upload_radio(): DONE
+	filename diffs only, #if0d in pci|mem, done
+	called from common.c:acx_init_mac
+	calls acx(pci|mem)_write_fw - TODO		     
+
+acx(pci|mem)_read_phy_reg(): DONE
+	Note: define acxdev_lock() mem ? acxmem_lock " void 0
+	Later: look at acxusb_read_phy_reg()
+
+mem.c #if0s:
+
+acxmem_tx_data():
+  extra locking
+  acx(pci|mem)_get_txhostdesc() usage
+  slave_mem - need wrappers 
+
+acxmem_tx_clean_txdesc():
+  extra tmpdesc stuff
+  acx(pci|mem)_get_txdesc - look at it.
+  slave-mem
+
+acxmem_tx_clean_txdesc_emergency():
+  acx(pci|mem)_get_txdesc - look at it.
+  slave-mem
+  maybe make a helper for above.
+  grody diffs
+
+OTHERS
+
+acxmem_issue_cmd_timeo_debug():
+  has locking adds
+  counter goofiness, cruft
+  copy-to-slave
+  acxpci_write_cmd_type_status(adev, 0, 0);
+    VS acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+
+
+acxmem_reset_dev():
+
+acxpci_init_mboxes():
+
+acxmem_proc_diag_output():.  latter 2 are #if0d, maybe wrongly
+  grody diffs
+
+acx(pci|mem)_write_phy_reg()
+	copied from mem.c, but needs work before use
+
 acx(pci|mem)_read_eeprom_byte()
 acx(pci|mem)_write_eeprom_byte()  (UNUSED)
-acx(pci|mem)_read_phy_reg()
-	define acxdev_lock() mem ? acxmem_lock " void 0
-acx(pci|mem)_write_phy_reg()
+
 acx(pci|mem)_s_write_fw()
 acx(pci|mem)_s_vaidate_fw()
 acx_show_card_eeprom_id()
@@ -64,6 +111,12 @@ acx(pci|mem)_handle_info_irq()   (comment diffs)
 acx(pci|mem)_set_interrupt_mask() (whitespace diffs)
 acx(pci|mem)_op_start()
 acx111(pci|mem)_ioctl_info() (extra printks in mem
+
+---------
+refactor struct acx_device
+
+move (tx|rx)(host)?desc to sub-structure.
+this will allow simplification of code doing buffer allocs and frees.
 
 ---------
 move or copy (tbd) all proc files to debugfs
