@@ -42,7 +42,8 @@ STATick int acxpci_upload_fw(acx_device_t * adev);
 
 // CMDs (Control Path)
 int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
-STATick inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
+// coplied to merge.c
+// STATick inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
 STATick u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 STATick inline void acxpci_init_mboxes(acx_device_t * adev);
 

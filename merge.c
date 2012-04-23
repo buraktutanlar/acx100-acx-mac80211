@@ -42,6 +42,7 @@
 // merge adaptation help
 #include "pci.h"
 #include "mem.h"
+#include "io-acx.h"
 
 // from mem.c:98
 #define FW_NO_AUTO_INCREMENT 1
@@ -191,7 +192,8 @@ int acxmem_upload_radio(acx_device_t *adev)
 {
 	char filename[sizeof("RADIONN.BIN")];
 
-	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
+	snprintf(filename, sizeof(filename), "RADIO%02x.BIN",
+		adev->radio_type);
 	return acx_upload_radio(adev, filename);
 }
 
@@ -276,7 +278,7 @@ void acx_log_txbuffer(acx_device_t *adev)
 
 
 /*
- * acxmem_read_eeprom_byte
+ * acx_read_eeprom_byte
  *
  * Function called to read an octet in the EEPROM.
  *
@@ -289,7 +291,7 @@ void acx_log_txbuffer(acx_device_t *adev)
  *	charbuf		ptr to a char. This is where the read octet
  *			will be stored
  */
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf)
+int acx_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf)
 {
 	int result;
 	int count;
@@ -330,33 +332,27 @@ fail:
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
 // unused in mem, used in pci
-int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
+int acx_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 			const u8 *charbuf)
 {
 	u8 *data_verify = NULL;
-	unsigned long flags;
+	// unsigned long flags; // block warn unused
 	int count, i;
 	int result = NOT_OK;
 	u16 gpio_orig;
 
 	pr_acx("WARNING! I would write to EEPROM now. "
-			"Since I really DON'T want to unless you know "
-			"what you're doing (THIS CODE WILL PROBABLY "
-			"NOT WORK YET!), I will abort that now. And "
-			"definitely make sure to make a "
-			"/proc/driver/acx_wlan0_eeprom backup copy first!!! "
-			"(the EEPROM content includes the PCI config header!! "
-			"If you kill important stuff, then you WILL "
-			"get in trouble and people DID get in trouble already)\n");
+		"Since I really DON'T want to unless you know "
+		"what you're doing (THIS CODE WILL PROBABLY "
+		"NOT WORK YET!), I will abort that now. And "
+		"definitely make sure to make a "
+		"/proc/driver/acx_wlan0_eeprom backup copy first!!! "
+		"(the EEPROM content includes the PCI config header!! "
+		"If you kill important stuff, then you WILL "
+		"get in trouble and people DID get in trouble already)\n");
 	return OK;
 
 	FN_ENTER;
-
-	// TODO - move malloc down
-	data_verify = kmalloc(len, GFP_KERNEL);
-	if (!data_verify) {
-		goto end;
-	}
 
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
 	 * to be able to write to the EEPROM.
@@ -380,7 +376,7 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
 			if (unlikely(!--count)) {
 				pr_acx("WARNING, DANGER!!! "
-						"Timeout waiting for EEPROM write\n");
+				       "Timeout waiting for EEPROM write\n");
 				goto end;
 			}
 			cpu_relax();
@@ -392,7 +388,9 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 	write_flush(adev);
 
 	/* now start a verification run */
-	// kmalloc here.
+	data_verify = kmalloc(len, GFP_KERNEL);
+	if (!data_verify)
+		goto end;
 	
 	for (i = 0; i < len; i++) {
 		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
@@ -412,16 +410,16 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
 	}
 
-	if (0 == memcmp(charbuf, data_verify, len))
-	result = OK; /* read data matches, success */
+	if (!memcmp(charbuf, data_verify, len))
+		result = OK; /* read data matches, success */
 
-	end:
 	kfree(data_verify);
+end:
 	FN_EXIT1(result);
 	return result;
 }
 
-static inline void acxmem_read_eeprom_area(acx_device_t *adev)
+static inline void acx_read_eeprom_area(acx_device_t *adev)
 {
 #if ACX_DEBUG > 1
 	int offs;
@@ -896,6 +894,68 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * ==================================================
  */
 
+static inline void
+acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
+{
+        FN_ENTER;
+        acx_writel(type | (status << 16), adev->cmd_area);
+        write_flush(adev);
+        FN_EXIT0;
+}
+static inline
+void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
+                u16 status) {
+        FN_ENTER;
+        write_slavemem32(adev, (u32) adev->cmd_area, type | (status << 16));
+        write_flush(adev);
+        FN_EXIT0;
+}
+
+static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
+{
+	u32 cmd_type, cmd_status;
+
+	FN_ENTER;
+
+	cmd_type = read_slavemem32(adev, (u32) adev->cmd_area);
+
+	cmd_status = (cmd_type >> 16);
+	cmd_type = (u16) cmd_type;
+
+	log(L_DEBUG, "%s: "
+		"cmd_type:%04X cmd_status:%04X [%s]\n",
+		__func__,
+		cmd_type, cmd_status,
+		acx_cmd_status_str(cmd_status));
+	
+	FN_EXIT1(cmd_status);
+	return cmd_status;
+}
+
+static inline void acxmem_init_mboxes(acx_device_t *adev)
+{
+	u32 cmd_offs, info_offs;
+
+	FN_ENTER;
+
+	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
+	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
+	adev->cmd_area = (u8*) cmd_offs;
+	adev->info_area = (u8*) info_offs;
+
+	// OW iobase2 not used in mem.c, in pci.c it is
+	/*
+	 log(L_DEBUG, "iobase2=%p\n"
+	 */
+	log(L_DEBUG, "cmd_mbox_offset=%X cmd_area=%p\n"
+		"acx: info_mbox_offset=%X info_area=%p\n",
+		cmd_offs, adev->cmd_area,
+		info_offs, adev->info_area);
+
+	FN_EXIT0;
+}
+
+
 /*
  * acxmem_s_issue_cmd_timeo
  *
@@ -946,13 +1006,13 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		pr_acxmem("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
+		pr_acx("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
 				__func__, devname);
 		goto bad;
 	}
 
 	if ((acx_debug & L_DEBUG) && (cmd != ACX1xx_CMD_INTERROGATE)) {
-		pr_acxmem("input buffer (len=%u):\n", buflen);
+		pr_acx("input buffer (len=%u):\n", buflen);
 		acx_dump_bytes(buffer, buflen);
 	}
 
@@ -977,7 +1037,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	if (counter == 0) {
 		/* the card doesn't get idle, we're in trouble */
-		pr_acxmem("%s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
+		pr_acx("%s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
 				__func__, devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
@@ -1032,7 +1092,8 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	do {
 		irqtype = read_reg16(adev, IO_ACX_IRQ_STATUS_NON_DES);
 		if (irqtype & HOST_INT_CMD_COMPLETE) {
-			write_reg16(adev, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
+			write_reg16(adev, IO_ACX_IRQ_ACK,
+				HOST_INT_CMD_COMPLETE);
 			break;
 		}
 
@@ -1051,55 +1112,56 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* put the card in IDLE state */
 	(IS_MEM(adev))
 		? acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0)
-		? acxpci_write_cmd_type_status(adev, 0, 0)
+		: acxpci_write_cmd_type_status(adev, 0, 0);
 
 	/* Timed out! */
 	if (counter == 0) {
 
 		log(L_ANY, "%s: %s: Timed out %s for CMD_COMPLETE. "
-				"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
-				"cmd_status:%d (%s)\n",
-		       __func__, devname,
-		       (adev->irqs_active) ? "waiting" : "polling",
-		       irqtype, adev->irq_status, cmd_timeout,
-		       cmd_status, acx_cmd_status_str(cmd_status));
+			"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
+			"cmd_status:%d (%s)\n",
+			__func__, devname,
+			(adev->irqs_active) ? "waiting" : "polling",
+			irqtype, adev->irq_status, cmd_timeout,
+			cmd_status, acx_cmd_status_str(cmd_status));
 		log(L_ANY, "%s: "
-				"timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
-				__func__,
-				counter, cmd_timeout, cmd_timeout - counter);
+			"timeout: counter:%d cmd_timeout:%d "
+			"cmd_timeout-counter:%d\n",
+			__func__,
+			counter, cmd_timeout, cmd_timeout - counter);
 
 		if (read_reg16(adev, IO_ACX_IRQ_MASK) == 0xffff) {
-			log(L_ANY,"acxmem: firmware probably hosed - reloading: FIXME: Not implmemented\n");
+			log(L_ANY, "acxmem: firmware probably hosed -"
+				" reloading: FIXME: Not implmemented\n");
 			FIXME();
 		}
 
 	} else if (cmd_timeout - counter > 30) { /* if waited >30ms... */
 		log(L_CTL|L_DEBUG, "%s: "
-				"%s for CMD_COMPLETE %dms. count:%d. Please report\n",
-				__func__,
-				(adev->irqs_active) ? "waited" : "polled",
-				cmd_timeout - counter, counter);
+			"%s for CMD_COMPLETE %dms. count:%d. Please report\n",
+			__func__,
+			(adev->irqs_active) ? "waited" : "polled",
+			cmd_timeout - counter, counter);
 	}
 
 	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+		devname, cmdstr, buflen, cmd_timeout,
+		(buffer 
+			? le16_to_cpu(((acx_ie_generic_t *) buffer)->type)
+			: -1),
+		acx_cmd_status_str(cmd_status)
 	);
 
 	if (cmd_status != 1) { /* it is not a 'Success' */
 
 		/* zero out result buffer
-		 * WARNING: this will trash stack in case of illegally large input
-		 * length! */
+		 * WARNING: this will trash stack in case of illegally
+		 * large input length! */
 
 		if (buflen > 388) {
-			/*
-			 * 388 is maximum command length
-			 */
+			/* 388 is maximum command length */
 			log(L_ANY, "%s: invalid length 0x%08x\n",
-					__func__, buflen);
+				__func__, buflen);
 			buflen = 388;
 		}
 		p = (u8 *) buffer;
@@ -1118,16 +1180,18 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	/* read in result parameters if needed */
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
-		acxmem_copy_from_slavemem(adev, buffer, (u32) (adev->cmd_area + 4), buflen);
+		acxmem_copy_from_slavemem(adev, buffer,
+					(u32) (adev->cmd_area + 4), buflen);
 		if (acx_debug & L_DEBUG) {
-			log(L_ANY, "%s: output buffer (len=%u): ", __func__, buflen);
+			log(L_ANY, "%s: output buffer (len=%u): ",
+				__func__, buflen);
 			acx_dump_bytes(buffer, buflen);
 		}
 	}
 
 	/* ok: */
 	log(L_DEBUG, "%s: %s: took %ld jiffies to complete\n",
-	    __func__, cmdstr, jiffies - start);
+		__func__, cmdstr, jiffies - start);
 
 	acxmem_unlock();
 	FN_EXIT1(OK);
@@ -1137,10 +1201,10 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* Give enough info so that callers can avoid
 	 ** printing their own diagnostic messages */
 	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+		devname, cmdstr, buflen, cmd_timeout,
+		(buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type)
+			: -1),
+		acx_cmd_status_str(cmd_status)
 	);
 
 	acxmem_unlock();
@@ -1148,61 +1212,90 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	return NOT_OK;
 }
 
-static inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
-		u16 status) {
-	FN_ENTER;
-	write_slavemem32(adev, (u32) adev->cmd_area, type | (status << 16));
-	write_flush(adev);
-	FN_EXIT0;
-}
+#define REG_ACX_VENDOR_ID 0x900
+#define ACX_VENDOR_ID 0x8400104c
 
-static u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
-	u32 cmd_type, cmd_status;
+static int acxmem_verify_init(acx_device_t *adev) {
+	int result = NOT_OK;
+	unsigned long timeout;
+	u32 irqstat;
 
-	FN_ENTER;
-
-	cmd_type = read_slavemem32(adev, (u32) adev->cmd_area);
-
-	cmd_status = (cmd_type >> 16);
-	cmd_type = (u16) cmd_type;
-
-	log(L_DEBUG, "%s: "
-			"cmd_type:%04X cmd_status:%04X [%s]\n",
-			__func__,
-			cmd_type, cmd_status,
-			acx_cmd_status_str(cmd_status));
-
-	FN_EXIT1(cmd_status);
-	return cmd_status;
-}
-
-static inline void acxmem_init_mboxes(acx_device_t *adev) {
-	u32 cmd_offs, info_offs;
+	acxmem_lock_flags;
 
 	FN_ENTER;
 
-	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
-	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
-	adev->cmd_area = (u8*) cmd_offs;
-	adev->info_area = (u8*) info_offs;
+	timeout = jiffies + 2 * HZ;
+	for (;;) {
+		acxmem_lock();
+		irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
+		if ((irqstat != 0xFFFFFFFF)
+			&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
+			result = OK;
+			write_reg32(adev, IO_ACX_IRQ_ACK,
+				HOST_INT_FCS_THRESHOLD);
+			acxmem_unlock();
+			break;
+		}
+		acxmem_unlock();
 
-	// OW iobase2 not used in mem.c, in pci.c it is
-	/*
-	 log(L_DEBUG, "iobase2=%p\n"
-	 */
-	log(L_DEBUG, "cmd_mbox_offset=%X cmd_area=%p\n"
-			"acx: info_mbox_offset=%X info_area=%p\n",
-			cmd_offs, adev->cmd_area,
-			info_offs, adev->info_area);
+		if (time_after(jiffies, timeout))
+			break;
+		/* Init may take up to ~0.5 sec total */
+		acx_mwait(50);
+	}
 
-	FN_EXIT0;
+	FN_EXIT1(result);
+	return result;
 }
-
 
 /*
  * BOM Init, Configure (Control Path)
  * ==================================================
  */
+
+/*
+ * acxmem_l_reset_mac
+ *
+ * MAC will be reset
+ * Call context: reset_dev
+ */
+static void acxmem_reset_mac(acx_device_t *adev)
+{
+	int count;
+	FN_ENTER;
+
+	// OW Bit setting done differently in pci.c
+	/* halt eCPU */
+	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+
+	/* now do soft reset of eCPU, set bit */
+	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
+
+	/* Windows driver sleeps here for a while with this sequence */
+	for (count = 0; count < 200; count++) {
+		udelay (50);
+	}
+
+	/* now clear bit again: deassert eCPU reset */
+	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n",
+		__func__);
+	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+
+	/* now start a burst read from initial EEPROM */
+	set_regbits(adev, IO_ACX_EE_START, 0x1);
+
+	/* Windows driver sleeps here for a while with this sequence */
+	for (count = 0; count < 200; count++) {
+		udelay (50);
+	}
+
+	/* Windows driver writes 0x10000 to register 0x808 here */
+
+	write_reg32(adev, 0x808, 0x10000);
+
+	FN_EXIT0;
+}
 
 /*
  * acxmem_s_reset_dev
@@ -1220,7 +1313,8 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-int acxmem_reset_dev(acx_device_t *adev) {
+int acxmem_reset_dev(acx_device_t *adev)
+{
 	const char* msg = "";
 	int result = NOT_OK;
 	u16 hardware_info;
@@ -1280,7 +1374,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 	/* check sense on reset flags */
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
 		pr_acx("%s: eCPU did not start after boot (SOR), "
-				"is this fatal?\n", adev->ndev->name);
+			"is this fatal?\n", adev->ndev->name);
 	}
 #endif
 
@@ -1339,58 +1433,55 @@ int acxmem_reset_dev(acx_device_t *adev) {
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* test that EEPROM is readable */
-	acxmem_read_eeprom_area(adev);
+	//= acxmem_read_eeprom_area(adev);
+	acx_read_eeprom_area(adev);
 
 	result = OK;
 	goto end;
 
 	/* Finish error message. Indicate which function failed */
-	end_fail:
-
+end_fail:
 	pr_acx("%sreset_dev() FAILED\n", msg);
 
-	end:
-
+end:
 	acxmem_unlock();
 	FN_EXIT1(result);
 	return result;
 }
 
-static int acxmem_verify_init(acx_device_t *adev) {
-	int result = NOT_OK;
-	unsigned long timeout;
-	u32 irqstat;
+/*
+ * Initialize the pieces managing the transmit buffer pool on the ACX.
+ * The transmit buffer is a circular queue with one 32 bit word
+ * reserved at the beginning of each block.  The upper 13 bits are a
+ * control field, of which only 0x02000000 has any meaning.  The lower
+ * 19 bits are the address of the next block divided by 32.
+ */
 
-	acxmem_lock_flags;
+static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
-	FN_ENTER;
+	/*
+	 * acx100_s_init_memory_pools set up txbuf_start and
+	 * txbuf_numblocks for us.  All we need to do is reset the
+	 * rest of the bookeeping.
+	 */
 
-	timeout = jiffies + 2 * HZ;
-	for (;;) {
-		acxmem_lock();
-		irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if ((irqstat != 0xFFFFFFFF) && (irqstat & HOST_INT_FCS_THRESHOLD)) {
-			result = OK;
-			write_reg32(adev, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
-			acxmem_unlock();
-			break;
-		}
-		acxmem_unlock();
+	adev->acx_txbuf_free = adev->acx_txbuf_start;
+	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
 
-		if (time_after(jiffies, timeout))
-			break;
-		/* Init may take up to ~0.5 sec total */
-		acx_mwait(50);
-	}
-
-	FN_EXIT1(result);
-	return result;
+	/*
+	 * Initialization leaves the last transmit pool block without
+	 * a pointer back to the head of the list, but marked as the
+	 * end of the list.  That's how we want to see it, too, so
+	 * leave it alone.  This is only ever called after a firmware
+	 * reset, so the ACX memory is in the state we want.
+	 */
 }
 
 /*
  * Most of the acx specific pieces of hardware reset.
  */
-static int acxmem_complete_hw_reset(acx_device_t *adev) {
+static int acxmem_complete_hw_reset(acx_device_t *adev)
+{
 	acx111_ie_configoption_t co;
 	acxmem_lock_flags;
 
@@ -1404,7 +1495,8 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 	acxmem_lock();
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly after reset */
-		acxmem_copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
+		acxmem_copy_from_slavemem(adev, (u8*) &co,
+			(u32) adev->cmd_area, sizeof(co));
 	}
 	acxmem_unlock();
 
@@ -1416,79 +1508,54 @@ static int acxmem_complete_hw_reset(acx_device_t *adev) {
 		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
 
-	/*
-	 * Set up transmit buffer administration
-	 */
+	/* Set up transmit buffer administration */
 	acxmem_init_acx_txbuf(adev);
 
 	acxmem_lock();
-	/*
-	 * Windows driver writes 0x01000000 to register 0x288, RADIO_CTL, if the form factor
-	 * is 3.  It also write protects the EEPROM by writing 1<<9 to GPIO_OUT
+
+	/* Windows driver writes 0x01000000 to register 0x288,
+	 * RADIO_CTL, if the form factor is 3.  It also write protects
+	 * the EEPROM by writing 1<<9 to GPIO_OUT
 	 */
 	if (adev->form_factor == 3) {
 		set_regbits(adev, 0x288, 0x01000000);
 		set_regbits(adev, 0x298, 1 << 9);
 	}
 
-	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+	/* TODO: merge them into one function, they are called just
+	 * once and are the same for pci & usb */
 	if (OK != acxmem_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		return -2;
 
 	acxmem_unlock();
 
 	acx_parse_configoption(adev, &co);
-	acx_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev);
+	/* needs to be after acx_s_init_mac() */
 	acx_display_hardware_details(adev);
 
 	return 0;
 }
 
-/*
- * acxmem_l_reset_mac
- *
- * MAC will be reset
- * Call context: reset_dev
- */
-static void acxmem_reset_mac(acx_device_t *adev) {
-	int count;
+static void acxmem_irq_enable(acx_device_t *adev) {
 	FN_ENTER;
-
-	// OW Bit setting done differently in pci.c
-	/* halt eCPU */
-	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
-
-	/* now do soft reset of eCPU, set bit */
-	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
-
-	/* Windows driver sleeps here for a while with this sequence */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
-	}
-
-	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n", __func__);
-	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-
-	/* now start a burst read from initial EEPROM */
-	set_regbits(adev, IO_ACX_EE_START, 0x1);
-
-	/*
-	 * Windows driver sleeps here for a while with this sequence
-	 */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
-	}
-
-	/* Windows driver writes 0x10000 to register 0x808 here */
-
-	write_reg32(adev, 0x808, 0x10000);
-
+	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
+	write_reg16(adev, IO_ACX_FEMR, 0x8000);
+	adev->irqs_active = 1;
 	FN_EXIT0;
 }
 
-static void acxmem_up(struct ieee80211_hw *hw) {
+static void acxmem_irq_disable(acx_device_t *adev) {
+	FN_ENTER;
+
+	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
+	write_reg16(adev, IO_ACX_FEMR, 0x0);
+	adev->irqs_active = 0;
+	FN_EXIT0;
+}
+
+static void acxmem_up(struct ieee80211_hw *hw)
+{
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
@@ -1520,7 +1587,8 @@ static void acxmem_up(struct ieee80211_hw *hw) {
  ** acxmem_i_set_multicast_list
  ** FIXME: most likely needs refinement
  */
-static void acxmem_i_set_multicast_list(struct net_device *ndev) {
+static void acxmem_i_set_multicast_list(struct net_device *ndev)
+{
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
@@ -1558,11 +1626,14 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * ==================================================
  */
 
+#define DUMP_MEM_DURING_DIAG 0
+
 /*
  * BOM Proc, Debug
  * ==================================================
  */
-int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
+int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev)
+{
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
 	u8 Ctl_8;
@@ -1595,25 +1666,26 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 
 			//seq_printf(file, "\n");
 
-			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (u32) rxdesc, sizeof(rxd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &rxd,
+						(u32) rxdesc, sizeof(rxd));
 			seq_printf(file,
-						 "%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
-							(u32) rxdesc,
-							rxd.pNextDesc.v,
-							rxd.HostMemPtr.v,
-							rxd.ACXMemPtr.v,
-							rxd.rx_time,
-							rxd.total_length,
-							rxd.WEP_length,
-							rxd.WEP_ofs,
-							rxd.Ctl_8,
-							rxd.rate,
-							rxd.error,
-							rxd.SNR,
-							rxd.RxLevel,
-							rxd.queue_ctrl,
-							rxd.unknown,
-							rxd.unknown2);
+				"%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
+				(u32) rxdesc,
+				rxd.pNextDesc.v,
+				rxd.HostMemPtr.v,
+				rxd.ACXMemPtr.v,
+				rxd.rx_time,
+				rxd.total_length,
+				rxd.WEP_length,
+				rxd.WEP_ofs,
+				rxd.Ctl_8,
+				rxd.rate,
+				rxd.error,
+				rxd.SNR,
+				rxd.RxLevel,
+				rxd.queue_ctrl,
+				rxd.unknown,
+				rxd.unknown2);
 			rxdesc++;
 		}
 
@@ -1622,16 +1694,17 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 					: "Running");
 
 	seq_printf(file,
-			"** Tx buf %d blocks total, %d available, free list head %04x\n",
-			adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
-			adev->acx_txbuf_free);
+		"** Tx buf %d blocks total, %d available, free list head %04x\n",
+		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
+		adev->acx_txbuf_free);
 
 	txdesc = adev->txdesc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx_tail) ? " [tail]" : "";
-			acxmem_copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
+						(u32) txdesc, sizeof(txd));
 
 			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
@@ -1642,23 +1715,26 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 				seq_printf(file, "%02u busy          (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
 
 			seq_printf(file,
-						 "%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
-						 "%02x %02x %02x %02x %04x: ", (u32) txdesc,
-						 txd.pNextDesc.v, txd.HostMemPtr.v, txd.AcxMemPtr.v,
-						 txd.tx_time, txd.total_length, txd.Reserved,
-						 txd.dummy[0], txd.dummy[1], txd.dummy[2],
-						 txd.dummy[3], txd.Ctl_8, txd.Ctl2_8, txd.error,
-						 txd.ack_failures, txd.rts_failures,
-						 txd.rts_ok, txd.u.r1.rate,
-						 txd.u.r1.queue_ctrl, txd.queue_info);
-
-			tmp = read_slavemem32(adev, (u32) & (txdesc->AcxMemPtr));
+				"%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
+				"%02x %02x %02x %02x %04x: ", (u32) txdesc,
+				txd.pNextDesc.v, txd.HostMemPtr.v,
+				txd.AcxMemPtr.v,
+				txd.tx_time, txd.total_length, txd.Reserved,
+				txd.dummy[0], txd.dummy[1], txd.dummy[2],
+				txd.dummy[3], txd.Ctl_8, txd.Ctl2_8, txd.error,
+				txd.ack_failures, txd.rts_failures,
+				txd.rts_ok, txd.u.r1.rate,
+				txd.u.r1.queue_ctrl, txd.queue_info);
+			
+			tmp = read_slavemem32(adev,
+					(u32) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
 			// Output allocated tx-buffer chain
 #if 1
 			if (tmp) {
-				while ((tmp2 = read_slavemem32(adev, (u32) tmp)) != 0x02000000) {
+				while ((tmp2 = read_slavemem32(adev,
+ (u32) tmp)) != 0x02000000) {
 					tmp2 = tmp2 << 5;
 					seq_printf(file, "%04x=%04x,", tmp, tmp2);
 					tmp = tmp2;
@@ -1673,7 +1749,8 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 			int j, k;
 
 			if (txd.AcxMemPtr.v) {
-				acxmem_copy_from_slavemem(adev, buf, txd.AcxMemPtr.v, sizeof(buf));
+				acxmem_copy_from_slavemem(adev, buf,
+ txd.AcxMemPtr.v, sizeof(buf));
 				for (j = 0; (j < txd.total_length) && (j < (sizeof(buf) - 4)); j
 						+= 16) {
 					seq_printf(file, "    ");
@@ -1695,13 +1772,15 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	seq_printf(file, "* Tx-buffer list dump\n");
 	seq_printf(file, "acx_txbuf_numblocks=%d, acx_txbuf_blocks_free=%d, \n"
 		"acx_txbuf_start==%04x, acx_txbuf_free=%04x, memblocksize=%d\n",
-			adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
-			adev->acx_txbuf_start, adev->acx_txbuf_free, adev->memblocksize);
+		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
+		adev->acx_txbuf_start, adev->acx_txbuf_free,
+		adev->memblocksize);
 
 	tmp = adev->acx_txbuf_start;
 	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {
 		tmp2 = read_slavemem32(adev, (u32) tmp);
-		seq_printf(file, "%02d: %04x=%04x,%04x\n", i, tmp, tmp2, tmp2 << 5);
+		seq_printf(file, "%02d: %04x=%04x,%04x\n",
+			i, tmp, tmp2, tmp2 << 5);
 
 		tmp += adev->memblocksize;
 	}
@@ -1885,6 +1964,23 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
  * ==================================================
  */
 
+static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
+	int blocks_needed;
+
+	blocks_needed = len / (adev->memblocksize - 4);
+	if (len % (adev->memblocksize - 4))
+		blocks_needed++;
+
+	return (blocks_needed);
+}
+
+static inline
+txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
+{
+	return (txdesc_t*) (((u8*) adev->txdesc_start)
+			+ index * adev->txdesc_size);
+}
+
 /*
  * acxmem_l_alloc_tx
  * Actually returns a txdesc_t* ptr
@@ -2054,19 +2150,6 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 
 }
 
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
-	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
-}
-
-static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
-	int blocks_needed;
-
-	blocks_needed = len / (adev->memblocksize - 4);
-	if (len % (adev->memblocksize - 4))
-		blocks_needed++;
-
-	return (blocks_needed);
-}
 
 /*
  * Return an acx pointer to the next transmit data block.
@@ -2176,30 +2259,6 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 
 }
 
-/*
- * Initialize the pieces managing the transmit buffer pool on the ACX.  The transmit
- * buffer is a circular queue with one 32 bit word reserved at the beginning of each
- * block.  The upper 13 bits are a control field, of which only 0x02000000 has any
- * meaning.  The lower 19 bits are the address of the next block divided by 32.
- */
-static void acxmem_init_acx_txbuf(acx_device_t *adev) {
-
-	/*
-	 * acx100_s_init_memory_pools set up txbuf_start and txbuf_numblocks for us.
-	 * All we need to do is reset the rest of the bookeeping.
-	 */
-
-	adev->acx_txbuf_free = adev->acx_txbuf_start;
-	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
-
-	/*
-	 * Initialization leaves the last transmit pool block without a pointer back to
-	 * the head of the list, but marked as the end of the list.  That's how we want
-	 * to see it, too, so leave it alone.  This is only ever called after a firmware
-	 * reset, so the ACX memory is in the state we want.
-	 */
-
-}
 
 /* Re-initialize tx-buffer list
  */
@@ -2228,10 +2287,6 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 
 }
 
-static inline txdesc_t*
-acxmem_get_txdesc(acx_device_t *adev, int index) {
-	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
-}
 
 // static inline 
 txdesc_t*
@@ -2471,6 +2526,9 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	FN_EXIT0;
 }
 
+void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
+	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
+}
 
 /*
  * acxmem_l_clean_txdesc
@@ -2758,23 +2816,6 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
  * BOM Irq Handling, Timer
  * ==================================================
  */
-
-static void acxmem_irq_enable(acx_device_t *adev) {
-	FN_ENTER;
-	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
-	write_reg16(adev, IO_ACX_FEMR, 0x8000);
-	adev->irqs_active = 1;
-	FN_EXIT0;
-}
-
-static void acxmem_irq_disable(acx_device_t *adev) {
-	FN_ENTER;
-
-	write_reg16(adev, IO_ACX_IRQ_MASK, HOST_INT_MASK_ALL);
-	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	adev->irqs_active = 0;
-	FN_EXIT0;
-}
 
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
@@ -3234,6 +3275,8 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	return result;
 }
+
+
 
 // trivial diffs mem/pci
 // static
@@ -4034,7 +4077,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	pr_acxmem("%s done\n", __func__);
+	pr_acx("%s done\n", __func__);
 
 	end_no_lock:
 	FN_EXIT0;
@@ -4042,15 +4085,17 @@ static int __devexit acxmem_remove(struct platform_device *pdev) {
 	return(0);
 }
 
+#if 0 // til-end
 /*
  * TODO: PM code needs to be fixed / debugged / tested.
  */
 #ifdef CONFIG_PM
 static int
-acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+acxmem_e_suspend(struct platform_device *pdev, pm_message_t state)
+{
 	acx_device_t *adev;
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 
 	FN_ENTER;
 	pr_acx("suspend handler is experimental!\n");
@@ -4084,9 +4129,10 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
 	return OK;
 }
 
-static int acxmem_e_resume(struct platform_device *pdev) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+static int acxmem_e_resume(struct platform_device *pdev)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 	acx_device_t *adev;
 
 	FN_ENTER;
@@ -4103,17 +4149,14 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 
 	acx_sem_lock(adev);
 
-	/*
-	 * Turn on the ACX.
-	 */
-	// This should be done by the corresponding platform module, e.g. hx4700_acx.c
-	// hwdata->start_hw();
+	/* Turn on the ACX */
+
+	/* This should be done by the corresponding platform module,
+	   e.g. hx4700_acx.c hwdata->start_hw(); */
 
 	acxmem_complete_hw_reset(adev);
 
-	/*
-	 * done by acx_s_set_defaults for initial startup
-	 */
+	/* done by acx_s_set_defaults for initial startup */
 	acxmem_set_interrupt_mask(adev);
 
 	pr_acx("rsm: bringing up interface\n");
@@ -4143,17 +4186,16 @@ static int acxmem_e_resume(struct platform_device *pdev) {
 
 
 static struct platform_driver acxmem_driver = {
-		.driver = {
-				.name = "acx-mem",
-		},
-		.probe = acxmem_probe,
-		.remove = __devexit_p(acxmem_remove),
-
-		#ifdef CONFIG_PM
-		.suspend = acxmem_e_suspend,
-		.resume = acxmem_e_resume
-		#endif /* CONFIG_PM */
-
+	.driver = {
+		.name = "acx-mem",
+	},
+	.probe = acxmem_probe,
+	.remove = __devexit_p(acxmem_remove),
+	
+#ifdef CONFIG_PM
+	.suspend = acxmem_e_suspend,
+	.resume = acxmem_e_resume
+#endif /* CONFIG_PM */
 };
 
 /*
@@ -4200,7 +4242,7 @@ int __init acxmem_init_module(void) {
 void __exit acxmem_cleanup_module(void) {
 	FN_ENTER;
 
-	pr_acxmem("cleanup_module\n");
+	pr_acx("cleanup_module\n");
 	platform_driver_unregister(&acxmem_driver);
 
 	FN_EXIT0;
@@ -4209,3 +4251,5 @@ void __exit acxmem_cleanup_module(void) {
 MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );
 MODULE_DESCRIPTION( "ACX Slave Memory Driver" );
 MODULE_LICENSE( "GPL" );
+
+#endif // til-end

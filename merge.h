@@ -1,7 +1,7 @@
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 
-int acx_upload_radio(acx_device_t *adev);
+// static int acx_upload_radio(acx_device_t *adev);
 int acxmem_upload_radio(acx_device_t *adev);
 int acxpci_upload_radio(acx_device_t *adev);
 

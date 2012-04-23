@@ -152,7 +152,7 @@ static void acxmem_delete_dma_regions(acx_device_t *adev);
 static void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
-int acxmem_upload_radio(acx_device_t *adev);
+//= int acxmem_upload_radio(acx_device_t *adev);
 int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 #ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
@@ -1222,7 +1222,7 @@ static inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
-#if 1 // port soon to merge.c
+#if 0 // port soon to merge.c
 /*
  * acxmem_s_read_phy_reg
  *
@@ -1321,6 +1321,8 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	1	firmware image corrupted
  *	0	success
  */
+
+#if 0
 // static 
 int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
@@ -1465,6 +1467,8 @@ int acxmem_validate_fw(acx_device_t *adev,
 	FN_EXIT1(result);
 	return result;
 }
+
+#endif
 
 static int acxmem_upload_fw(acx_device_t *adev) {
 	firmware_image_t *fw_image = NULL;
@@ -1678,6 +1682,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
+#if 0
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
 
@@ -1883,6 +1888,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
+#endif
 
 static inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
 		u16 status) {
@@ -1956,6 +1962,7 @@ static inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
+#if 0
 int acxmem_reset_dev(acx_device_t *adev) {
 	const char* msg = "";
 	int result = NOT_OK;
@@ -2091,6 +2098,7 @@ int acxmem_reset_dev(acx_device_t *adev) {
 	FN_EXIT1(result);
 	return result;
 }
+#endif
 
 static int acxmem_verify_init(acx_device_t *adev) {
 	int result = NOT_OK;
@@ -2298,6 +2306,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * BOM Proc, Debug
  * ==================================================
  */
+#if 0
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
@@ -2494,6 +2503,8 @@ char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
 	return buf;
 }
 
+#endif
+
 /*
  * BOM Rx Path
  * ==================================================
@@ -2630,6 +2641,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
  * sufficiently many.
  */
  // OW TODO Align with pci.c
+#if 0
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	struct txdesc *txdesc;
 	unsigned head;
@@ -2744,6 +2756,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 
 	return (tx_t*) txdesc;
 }
+#endif
 
 /*
  * acxmem_l_dealloc_tx
@@ -2755,6 +2768,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
  * state and move the queue head pointer back.
  *
  */
+#if 0
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
@@ -2793,6 +2807,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
 	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
 }
+#endif
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	int blocks_needed;
@@ -2939,6 +2954,8 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
 /* Re-initialize tx-buffer list
  */
+#if 0
+
 void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 
 	int i;
@@ -2963,17 +2980,20 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
 
 }
+#endif
 
 static inline txdesc_t*
 acxmem_get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
 }
 
+#if 0
 // static inline 
 txdesc_t*
 acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
 }
+#endif
 
 static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
@@ -3000,6 +3020,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
+#if 0
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*
@@ -3206,7 +3227,9 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	FN_EXIT0;
 }
+#endif
 
+#if 0
 
 /*
  * acxmem_l_clean_txdesc
@@ -3438,6 +3461,7 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
 	local_irq_restore (flags);
 #endif
 }
+#endif
 
 // OW TODO See if this is usable with mac80211
 #if 0
@@ -3514,6 +3538,7 @@ static void acxmem_irq_disable(acx_device_t *adev) {
 
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
+#if 0
 void acxmem_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
@@ -3606,6 +3631,7 @@ void acxmem_irq_work(struct work_struct *work)
 	return;
 
 }
+#endif
 
 /*
  * acxmem_handle_info_irq
@@ -3684,6 +3710,7 @@ static void acxmem_handle_info_irq(acx_device_t *adev) {
 	);
 }
 
+#if 0
 void acxmem_set_interrupt_mask(acx_device_t *adev) {
 
 	FN_ENTER;
@@ -3732,6 +3759,7 @@ void acxmem_set_interrupt_mask(acx_device_t *adev) {
 	FN_EXIT0;
 
 }
+#endif
 
 // OW FIXME Old interrupt handler
 // ---

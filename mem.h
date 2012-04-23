@@ -54,16 +54,19 @@ STATick void acx_show_card_eeprom_id(acx_device_t *adev);
 
 // CMDs (Control Path)
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
-STATick inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
-STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev);
-STATick inline void acxmem_init_mboxes(acx_device_t *adev);
+
+// STATick inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
+
+//= copied to merge.c
+//= STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev);
+//= STATick inline void acxmem_init_mboxes(acx_device_t *adev);
 
 // Init, Configure (Control Path)
-int acxmem_reset_dev(acx_device_t *adev);
-STATick int acxmem_verify_init(acx_device_t *adev);
-STATick int acxmem_complete_hw_reset(acx_device_t *adev);
-STATick void acxmem_reset_mac(acx_device_t *adev);
-STATick void acxmem_up(struct ieee80211_hw *hw);
+//= int acxmem_reset_dev(acx_device_t *adev);
+//= STATick int acxmem_verify_init(acx_device_t *adev);
+// STATick int acxmem_complete_hw_reset(acx_device_t *adev);
+// STATick void acxmem_reset_mac(acx_device_t *adev);
+// STATick void acxmem_up(struct ieee80211_hw *hw);
 //STATick void acxmem_i_set_multicast_list(struct net_device *ndev);
 
 // Other (Control Path)
@@ -73,21 +76,21 @@ int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
 
 // Rx Path
-STATick void acxmem_process_rxdesc(acx_device_t *adev);
+//= STATick void acxmem_process_rxdesc(acx_device_t *adev);
 
 // Tx Path
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
 void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
-STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
-STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
-STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
-STATick void acxmem_init_acx_txbuf(acx_device_t *adev);
+//= STATick int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len);
+//= STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
+//= STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
+//= STATick void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
-STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
+//= STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 STATick inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
-STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
+//= STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
@@ -98,8 +101,8 @@ int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
 //STATick void acxmem_i_tx_timeout(struct net_device *ndev);
 
 // Irq Handling, Timer
-STATick void acxmem_irq_enable(acx_device_t *adev);
-STATick void acxmem_irq_disable(acx_device_t *adev);
+//= STATick void acxmem_irq_enable(acx_device_t *adev);
+//= STATick void acxmem_irq_disable(acx_device_t *adev);
 void acxmem_irq_work(struct work_struct *work);
 // STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -113,7 +116,7 @@ STATick void acxmem_op_stop(struct ieee80211_hw *hw);
 // Helpers
 void acxmem_power_led(acx_device_t *adev, int enable);
 // INLINE_IO int acxmem_adev_present(acx_device_t *adev);
-STATick char acxmem_printable(char c);
+//= STATick char acxmem_printable(char c);
 //STATick void update_link_quality_led(acx_device_t *adev);
 
 // Ioctls
@@ -121,11 +124,11 @@ STATick char acxmem_printable(char c);
 //int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
 
 // Driver, Module
-STATick int __devinit acxmem_probe(struct platform_device *pdev);
-STATick int __devexit acxmem_remove(struct platform_device *pdev);
+//= STATick int __devinit acxmem_probe(struct platform_device *pdev);
+//= STATick int __devexit acxmem_remove(struct platform_device *pdev);
 #ifdef CONFIG_PM
-STATick int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
-STATick int acxmem_e_resume(struct platform_device *pdev);
+//= STATick int acxmem_e_suspend(struct platform_device *pdev, pm_message_t state);
+//= STATick int acxmem_e_resume(struct platform_device *pdev);
 #endif
 int __init acxmem_init_module(void);
 void __exit acxmem_cleanup_module(void);
