@@ -174,7 +174,7 @@ STATick void acxmem_up(struct ieee80211_hw *hw);
 
 // Proc, Debug
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
+//= char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
 
 // Rx Path
 STATick void acxmem_process_rxdesc(acx_device_t *adev);
@@ -2242,8 +2242,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	FN_EXIT0;
 	return 0;
 }
+#endif // acxmem_proc_diag_output()
 
-char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
+#if 0 //
+char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev)
+{
 	char *p, *buf;
 	int i;
 	acxmem_lock_flags;
@@ -2261,8 +2264,7 @@ char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
 	FN_EXIT1(p - buf);
 	return buf;
 }
-
-#endif
+#endif // acxmem_proc_eeprom_output()
 
 /*
  * BOM Rx Path

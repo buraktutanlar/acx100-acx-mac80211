@@ -4605,10 +4605,8 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v)
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-	if (IS_PCI(adev))
-		buf = acxpci_proc_eeprom_output(&length, adev);
-	else if (IS_MEM(adev))
-		buf = acxmem_proc_eeprom_output(&length, adev);
+	if (IS_PCI(adev) || IS_MEM(adev))
+		buf = acx_proc_eeprom_output(&length, adev);
 	else
 		goto out;
 

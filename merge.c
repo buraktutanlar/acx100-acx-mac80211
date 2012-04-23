@@ -631,6 +631,28 @@ fail:
 	return result;
 }
 
+#if 1 // from mem.c, has extra locking, apparently harmless
+char *acx_proc_eeprom_output(int *length, acx_device_t *adev)
+{
+	char *p, *buf;
+	int i;
+	acxmem_lock_flags;
+
+	FN_ENTER;
+	acxmem_lock();
+
+	p = buf = kmalloc(0x400, GFP_KERNEL);
+	for (i = 0; i < 0x400; i++) {
+		acx_read_eeprom_byte(adev, i, p++);
+	}
+	*length = i;
+
+	acxmem_unlock();
+	FN_EXIT1(p - buf);
+	return buf;
+}
+#endif // acx_proc_eeprom_output()
+
 /*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
  * Note: this function sleeps only because of GFP_KERNEL alloc
@@ -2140,27 +2162,6 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	return 0;
 }
 #endif // acxmem_proc_diag_output()
-
-#if 0 // needs acx_read_eeprom_byte
-char *acxmem_proc_eeprom_output(int *length, acx_device_t *adev) {
-	char *p, *buf;
-	int i;
-	acxmem_lock_flags;
-
-	FN_ENTER;
-	acxmem_lock();
-
-	p = buf = kmalloc(0x400, GFP_KERNEL);
-	for (i = 0; i < 0x400; i++) {
-		acxmem_read_eeprom_byte(adev, i, p++);
-	}
-	*length = i;
-
-	acxmem_unlock();
-	FN_EXIT1(p - buf);
-	return buf;
-}
-#endif // acxmem_proc_eeprom_output()
 
 /*
  * BOM Rx Path

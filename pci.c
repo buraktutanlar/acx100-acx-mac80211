@@ -122,7 +122,7 @@ static void acxpci_up(struct ieee80211_hw *hw);
 
 // Proc, Debug
 int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
+//=char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
 
 // Rx Path
 static void acxpci_process_rxdesc(acx_device_t * adev);
@@ -1537,6 +1537,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	return 0;
 }
 
+#if 0 // merged mem.c version
 char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev)
 {
 	int i;
@@ -1553,7 +1554,7 @@ char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev)
 	FN_EXIT1(p - buf);
 	return buf;
 }
-
+#endif // acxpci_proc_eeprom_output()
 
 /*
  * BOM Rx Path
