@@ -116,24 +116,6 @@ void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
 #endif
 
 // Data Access
-#if 0
-INLINE_IO u32 read_id_register(acx_device_t *adev);
-INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset);
-INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset);
-INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset);
-INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val);
-INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val);
-INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val);
-INLINE_IO void write_flush(acx_device_t *adev);
-INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits);
-INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits);
-INLINE_IO void write_slavemem32(acx_device_t *adev, u32 slave_address, u32 val);
-INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address);
-INLINE_IO void write_slavemem8(acx_device_t *adev, u32 slave_address, u8 val);
-INLINE_IO u8 read_slavemem8(acx_device_t *adev, u32 slave_address);
-INLINE_IO void write_slavemem16(acx_device_t *adev, u32 slave_address, u16 val);
-INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address);
-#endif
 //= static
 void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, int count);
 //= static
@@ -276,42 +258,6 @@ void __exit acxmem_cleanup_module(void);
  */
 
 #include "mem-inlines.h"
-
-#if 0
-static void acxmem_log_rxbuffer(const acx_device_t *adev) {
-	register const struct rxhostdesc *rxhostdesc;
-	int i;
-	/* no FN_ENTER here, we don't want that */
-
-	rxhostdesc = adev->rxhostdesc_start;
-	if (unlikely(!rxhostdesc)) return;
-	for (i = 0; i < RX_CNT; i++) {
-		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
-			pr_acx("rx: buf %d full\n", i);
-		rxhostdesc++;
-	}
-}
-
-static void acxmem_log_txbuffer(acx_device_t *adev) {
-	txdesc_t *txdesc;
-	int i;
-	u8 Ctl_8;
-
-	/* no FN_ENTER here, we don't want that */
-	/* no locks here, since it's entirely non-critical code */
-	txdesc = adev->txdesc_start;
-	if (unlikely(!txdesc))
-			return;
-	pr_acx("tx: desc->Ctl8's: ");
-	for (i = 0; i < TX_CNT; i++) {
-		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
-		printk("%02X ", Ctl_8);
-		txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
-	}
-	printk("\n");
-}
-#endif
 
 #if DUMP_MEM_DEFINED > 0
 //= static 
@@ -587,18 +533,6 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 	}
 }
 
-#if 0
-int acxmem_create_hostdesc_queues(acx_device_t *adev)
-{
-	int result;
-	result = acxmem_create_tx_host_desc_queue(adev);
-	if (OK != result)
-		return result;
-	result = acxmem_create_rx_host_desc_queue(adev);
-	return result;
-}
-#endif
-
 /*
  * acxmem_s_create_rx_host_desc_queue
  *
@@ -668,120 +602,6 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
  * only use we have for the host descriptors is to store the packets
  * on the way out.
  */
-#if 0
-//static
-int acxmem_create_tx_host_desc_queue(acx_device_t *adev)
-{
-	txhostdesc_t *hostdesc;
-	u8 *txbuf;
-	int i;
-
-	FN_ENTER;
-
-	/* allocate TX buffer */
-	/* WLAN_A4FR_MAXLEN_WEP_FCS */
-	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-
-	adev->txbuf_start
-		= acx_allocate(adev, adev->txbuf_area_size,
-			&adev->txbuf_startphy, "txbuf_start");
-	if (!adev->txbuf_start)
-		goto fail;
-
-	/* allocate the TX host descriptor queue pool */
-	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-
-	adev->txhostdesc_start
-		= acx_allocate(adev, adev->txhostdesc_area_size,
-			&adev->txhostdesc_startphy, "txhostdesc_start");
-	if (!adev->txhostdesc_start)
-		goto fail;
-
-	/* check for proper alignment of TX host descriptor pool */
-	if ((long) adev->txhostdesc_start & 3) {
-		pr_acx("driver bug: dma alloc returns unaligned address\n");
-		goto fail;
-	}
-
-	hostdesc = adev->txhostdesc_start;
-	txbuf = adev->txbuf_start;
-
-#if 0
-	/* Each tx buffer is accessed by hardware via
-	 ** txdesc -> txhostdesc(s) -> txbuffer(s).
-	 ** We use only one txhostdesc per txdesc, but it looks like
-	 ** acx111 is buggy: it accesses second txhostdesc
-	 ** (via hostdesc.desc_phy_next field) even if
-	 ** txdesc->length == hostdesc->length and thus
-	 ** entire packet was placed into first txhostdesc.
-	 ** Due to this bug acx111 hangs unless second txhostdesc
-	 ** has le16_to_cpu(hostdesc.length) = 3 (or larger)
-	 ** Storing NULL into hostdesc.desc_phy_next
-	 ** doesn't seem to help.
-	 **
-	 ** Update: although it worked on Xterasys XN-2522g
-	 ** with len=3 trick, WG311v2 is even more bogus, doesn't work.
-	 ** Keeping this code (#ifdef'ed out) for documentational purposes.
-	 */
-	for (i = 0; i < TX_CNT*2; i++) {
-		hostdesc_phy += sizeof(*hostdesc);
-		if (!(i & 1)) {
-			hostdesc->data_phy = cpu2acx(txbuf_phy);
-			/* hostdesc->data_offset = ... */
-			/* hostdesc->reserved = ... */
-			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-			/* hostdesc->length = ... */
-			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
-			hostdesc->pNext = ptr2acx(NULL);
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			hostdesc->data = txbuf;
-
-			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS;
-			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS;
-		} else {
-			/* hostdesc->data_phy = ... */
-			/* hostdesc->data_offset = ... */
-			/* hostdesc->reserved = ... */
-			/* hostdesc->Ctl_16 = ... */
-			hostdesc->length = cpu_to_le16(3); /* bug workaround */
-			/* hostdesc->desc_phy_next = ... */
-			/* hostdesc->pNext = ... */
-			/* hostdesc->Status = ... */
-			/* below: non-hardware fields */
-			/* hostdesc->data = ... */
-		}
-		hostdesc++;
-	}
-#endif
-
-	/* We initialize two hostdescs so that they point to adjacent
-	 * memory areas. Thus txbuf is really just a contiguous memory area */
-	for (i = 0; i < TX_CNT * 2; i++) {
-		/* ->data is a non-hardware field: */
-		hostdesc->data = txbuf;
-
-		if (!(i & 1)) {
-			txbuf += WLAN_HDR_A3_LEN;
-		} else {
-			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
-		}
-		hostdesc++;
-	}
-	hostdesc--;
-
-	FN_EXIT1(OK);
-	return OK;
-
-fail:
-	// OW FIXME Logging
-	pr_acx("create_tx_host_desc_queue FAILED\n");
-	/* dealloc will be done by free function on error case */
-
-	FN_EXIT1(NOT_OK);
-	return NOT_OK;
-}
-#endif
 
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 			u32 rx_queue_start)
@@ -959,34 +779,6 @@ void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
  * others have been initialised to NULL so this
  * function can be used if only part of the queues were allocated.
  */
-#if 0
-void acxmem_free_desc_queues(acx_device_t *adev)
-{
-
-#define ACX_FREE_QUEUE(size, ptr, phyaddr) \
-        if (ptr) { \
-                kfree(ptr); \
-                ptr = NULL; \
-                size = 0; \
-        }
-
-	FN_ENTER;
-
-	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start,
-		adev->txhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
-		adev->txbuf_startphy);
-	adev->txdesc_start = NULL;
-
-	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
-		adev->rxhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
-		adev->rxbuf_startphy);
-	adev->rxdesc_start = NULL;
-
-	FN_EXIT0;
-}
-#endif
 
 STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 
@@ -1010,30 +802,6 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 	FN_EXIT0;
 }
 
-#if 0
-STATick 
-void* acxmem_allocate(acx_device_t *adev, size_t size,
-		dma_addr_t *phy, const char *msg)
-{
-	void *ptr;
-	ptr = kmalloc(size, GFP_KERNEL);
-	/*
-	 * The ACX can't use the physical address, so we'll have to fake it
-	 * later and it might be handy to have the virtual address.
-	 */
-	*phy = (dma_addr_t) NULL;
-
-	if (ptr) {
-		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
-			msg, (int)size, ptr, (unsigned long long)*phy);
-		memset(ptr, 0, size);
-		return ptr;
-	}
-	pr_err("acx: %s allocation FAILED (%d bytes)\n",
-		msg, (int) size);
-	return NULL;
-}
-#endif
 
 /*
  * BOM Firmware, EEPROM, Phy
@@ -1045,75 +813,6 @@ void* acxmem_allocate(acx_device_t *adev, size_t size,
  *
  * Uploads the appropriate radio module firmware into the card.
  */
-#if 0 // now in merge.c
-int acxmem_upload_radio(acx_device_t *adev) {
-	acx_ie_memmap_t mm;
-	firmware_image_t *radio_image;
-	acx_cmd_radioinit_t radioinit;
-	int res = NOT_OK;
-	int try;
-	u32 offset;
-	u32 size;
-	char filename[sizeof("RADIONN.BIN")];
-
-	acxmem_lock_flags;
-
-	if (!adev->need_radio_fw)
-		return OK;
-
-	FN_ENTER;
-
-	acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
-	offset = le32_to_cpu(mm.CodeEnd);
-
-	snprintf(filename, sizeof(filename), "RADIO%02x.BIN", adev->radio_type);
-	radio_image = acx_read_fw(adev->bus_dev, filename, &size);
-	if (!radio_image) {
-		pr_acx("can't load radio module '%s'\n", filename);
-		goto fail;
-	}
-
-	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
-
-	for (try = 1; try <= 5; try++) {
-		acxmem_lock();
-		res = acxmem_write_fw(adev, radio_image, offset);
-		log(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
-		if (OK == res) {
-			res = acxmem_validate_fw(adev, radio_image, offset);
-			log(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
-		}
-		acxmem_unlock();
-
-		if (OK == res)
-			break;
-		pr_acx("radio firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
-		acx_mwait(1000); /* better wait for a while... */
-	}
-
-	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
-	radioinit.offset = cpu_to_le32(offset);
-
-	/* no endian conversion needed, remains in card CPU area: */
-	radioinit.len = radio_image->size;
-
-	vfree(radio_image);
-
-	if (OK != res)
-		goto fail;
-
-	/* will take a moment so let's have a big timeout */
-	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT,
-			&radioinit, sizeof(radioinit), CMD_TIMEOUT_MS(1000));
-
-	res = acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
-
-	fail:
-	FN_EXIT1(res);
-	return res;
-}
-#endif
 
 /*
  * acxmem_read_eeprom_byte
@@ -3038,14 +2737,6 @@ acxmem_get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
 }
 
-#if 0
-// STATick inline 
-txdesc_t*
-acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
-	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
-}
-#endif
-
 STATick txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
@@ -3686,18 +3377,6 @@ void acxmem_irq_work(struct work_struct *work)
 /*
  * acxmem_handle_info_irq
  */
-#if 0
-/* scan is complete. all frames now on the receive queue are valid */
-#define INFO_SCAN_COMPLETE      0x0001
-#define INFO_WEP_KEY_NOT_FOUND  0x0002
-/* hw has been reset as the result of a watchdog timer timeout */
-#define INFO_WATCH_DOG_RESET    0x0003
-/* failed to send out NULL frame from PS mode notification to AP */
-/* recommended action: try entering 802.11 PS mode again */
-#define INFO_PS_FAIL            0x0004
-/* encryption/decryption process on a packet failed */
-#define INFO_IV_ICV_FAILURE     0x0005
-#endif
 
 /* Info mailbox format:
  2 bytes: type
@@ -3719,50 +3398,6 @@ void acxmem_irq_work(struct work_struct *work)
  it does NOT clear bit 0x0001, and this bit will probably stay forever set
  after we set it once. Let's hope this will be fixed in firmware someday
  */
-
-#if 0
-STATick void acxmem_handle_info_irq(acx_device_t *adev)
-{
-#if ACX_DEBUG
-	static const char * const info_type_msg[] = {
-			"(unknown)",
-			"scan complete",
-			"WEP key not found",
-			"internal watchdog reset was done",
-			"failed to send powersave (NULL frame) notification to AP",
-			"encrypt/decrypt on a packet has failed",
-			"TKIP tx keys disabled",
-			"TKIP rx keys disabled",
-			"TKIP rx: key ID not found",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"???",
-			"TKIP IV value exceeds thresh"
-			};
-#endif
-	u32 info_type, info_status;
-
-	info_type = read_slavemem32(adev, (u32) adev->info_area);
-
-	info_status = (info_type >> 16);
-	info_type = (u16) info_type;
-
-	/* inform fw that we have read this info message */
-	write_slavemem32(adev, (u32) adev->info_area, info_type | 0x00010000);
-	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_INFOACK);
-	write_flush(adev);
-
-	log(L_IRQ|L_CTL, "got Info IRQ: status %04X type %04X: %s\n",
-			info_status, info_type,
-			info_type_msg[(info_type >= ARRAY_SIZE(info_type_msg)) ?
-			0 : info_type]
-	);
-}
-#endif
 
 #if 0
 void acxmem_set_interrupt_mask(acx_device_t *adev)
@@ -4017,78 +3652,6 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 #endif
 };
 
-#if 0
-STATick int acxmem_op_start(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	int result = OK;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	adev->initialized = 0;
-
-	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
-
-	/* ifup device */
-	acxmem_up(hw);
-
-	/* We don't currently have to do anything else.
-	 * The setup of the MAC should be subsequently completed via
-	 * the mlme commands.
-	 * Higher layers know we're ready from dev->start==1 and
-	 * dev->tbusy==0.  Our rx path knows to pass up received/
-	 * frames because of dev->flags&IFF_UP is true.
-	 */
-
-	ieee80211_wake_queues(adev->ieee);
-
-	adev->initialized = 1;
-
-	acx_sem_unlock(adev);
-	FN_EXIT1(result);
-
-	return result;
-}
-
-
-STATick void acxmem_op_stop(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	acxmem_lock_flags;
-
-	FN_ENTER;
-	acx_sem_lock(adev);
-
-	acx_stop_queue(adev->ieee, "on ifdown");
-
-	/* disable all IRQs, release shared IRQ handler */
-	acxmem_lock();
-	acxmem_irq_disable(adev);
-	acxmem_unlock();
-	synchronize_irq(adev->irq);
-
-	acx_sem_unlock(adev);
-	cancel_work_sync(&adev->irq_work);
-	cancel_work_sync(&adev->tx_work);
-	acx_sem_lock(adev);
-
-	acx_tx_queue_flush(adev);
-
-	del_timer_sync(&adev->mgmt_timer);
-
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
-
-	adev->initialized = 0;
-
-	log(L_INIT, "acxpci: closed device\n");
-
-	acx_sem_unlock(adev);
-	FN_EXIT0;
-}
-#endif
 
 /*
  * BOM Helpers
