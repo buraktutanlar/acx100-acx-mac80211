@@ -979,7 +979,7 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
-#if 0 // port soon to merge.c
+#if 0 // copied to merge.c
 int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) {
 	int result = NOT_OK;
 	int count;
@@ -1073,7 +1073,7 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	0	success
  */
 
-#if 0
+#if 0 // copied to merge
 // static 
 int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
@@ -1433,7 +1433,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
-#if 0
+#if 0 // copied to merge
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr) {
 
@@ -1713,7 +1713,7 @@ STATick inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-#if 0
+#if 0 // copied to merge
 int acxmem_reset_dev(acx_device_t *adev) {
 	const char* msg = "";
 	int result = NOT_OK;
@@ -2014,7 +2014,7 @@ STATick void acxmem_up(struct ieee80211_hw *hw) {
  ** acxmem_i_set_multicast_list
  ** FIXME: most likely needs refinement
  */
-#if 0
+#if 0 // or mem.c:2019:2: error: implicit declaration of function 'ndev2adev'
 STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -2057,7 +2057,7 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
  * BOM Proc, Debug
  * ==================================================
  */
-#if 0
+#if 0 // copied to merge
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev) {
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
@@ -2392,7 +2392,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
  * sufficiently many.
  */
  // OW TODO Align with pci.c
-#if 0
+#if 0 // copied to merge
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	struct txdesc *txdesc;
 	unsigned head;
@@ -2519,7 +2519,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
  * state and move the queue head pointer back.
  *
  */
-#if 0
+#if 0 // copied to merge
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
@@ -2705,7 +2705,7 @@ STATick void acxmem_init_acx_txbuf(acx_device_t *adev) {
 
 /* Re-initialize tx-buffer list
  */
-#if 0
+#if 0 // copied to merge
 void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 
 	int i;
@@ -2762,7 +2762,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 0
+#if 0 // copied to merge
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*
@@ -2982,7 +2982,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * Everytime we get called we know where the next packet to be cleaned is.
  */
 // OW TODO Very similar with pci: possible merging.
-#if 0
+#if 0 // copied to merge
 unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -3210,7 +3210,8 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
  **
  ** Called from network core. Must not sleep!
  */
-#if 0
+#if 0 // or mem.c:3242:3: warning: passing argument 1 of 'acx_wake_queue'
+      // from incompatible pointer type [enabled by default]
 STATick void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -3279,7 +3280,7 @@ STATick void acxmem_irq_disable(acx_device_t *adev) {
 
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
-#if 0
+#if 0 // copied to merge
 void acxmem_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
@@ -3399,7 +3400,7 @@ void acxmem_irq_work(struct work_struct *work)
  after we set it once. Let's hope this will be fixed in firmware someday
  */
 
-#if 0
+#if 0 // copied to merge
 void acxmem_set_interrupt_mask(acx_device_t *adev)
 {
 	FN_ENTER;
@@ -3452,7 +3453,7 @@ void acxmem_set_interrupt_mask(acx_device_t *adev)
 
 // OW FIXME Old interrupt handler
 // ---
-#if 0
+#if 0 // or mem.c:3579:4: error: implicit declaration of function 'acxmem_log_unusual_irq'
 STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
@@ -3687,7 +3688,7 @@ STATick char acxmem_printable(char c) {
 }
 
 // OW TODO
-#if 0
+#if 0 // or mem.c:3695:42: error: 'acx_device_t' has no member named 'wstats'
 STATick void update_link_quality_led(acx_device_t *adev)
 {
 	int qual;
@@ -3713,7 +3714,7 @@ STATick void update_link_quality_led(acx_device_t *adev)
  */
 
 // OW TODO Not used in pci either !?
-#if 0
+#if 0 // or mem.c:3717:5: error: conflicting types for 'acx111pci_ioctl_info'
 int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 			struct iw_request_info *info,
 			struct iw_param *vwrq, char *extra)
