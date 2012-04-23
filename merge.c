@@ -3351,10 +3351,6 @@ INLINE_IO int acxmem_adev_present(acx_device_t *adev)
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
-static char acxmem_printable(char c) {
-	return ((c >= 20) && (c < 127)) ? c : '.';
-}
-
 // OW TODO
 #if 0
 static void update_link_quality_led(acx_device_t *adev) {
