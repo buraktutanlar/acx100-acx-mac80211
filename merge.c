@@ -206,6 +206,9 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
+//##########################################
+/* host desc queue stuff */
+
 void *acx_allocate(acx_device_t * adev, size_t size,
 		dma_addr_t * phy, const char *msg)
 {
@@ -450,6 +453,55 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
         return result;
 }
 
+//##########################################
+/* host desc queue stuff */
+
+//##########################################
+/* free desc queue stuff */
+
+/*
+ * acx_free_desc_queues
+ *
+ * Releases the queues that have been allocated, the
+ * others have been initialised to NULL so this
+ * function can be used if only part of the queues were allocated.
+ */
+void acx_free_desc_queues(acx_device_t *adev)
+{
+
+#define ACX_FREE_QUEUE(adev, size, ptr, phyaddr) \
+	if (ptr) { \
+		if (IS_PCI(adev)) \
+			acxpci_free_coherent(NULL, size, ptr, phyaddr); \
+		else \
+			kfree(ptr); \
+		ptr = NULL; \
+		size = 0; \
+	}
+
+	FN_ENTER;
+
+	ACX_FREE_QUEUE(adev, adev->txhostdesc_area_size,
+		adev->txhostdesc_start, adev->txhostdesc_startphy);
+
+	ACX_FREE_QUEUE(adev, adev->txbuf_area_size,
+		adev->txbuf_start, adev->txbuf_startphy);
+
+	adev->txdesc_start = NULL;
+
+	ACX_FREE_QUEUE(adev, adev->rxhostdesc_area_size,
+		adev->rxhostdesc_start, adev->rxhostdesc_startphy);
+
+	ACX_FREE_QUEUE(adev, adev->rxbuf_area_size,
+		adev->rxbuf_start, adev->rxbuf_startphy);
+
+	adev->rxdesc_start = NULL;
+
+	FN_EXIT0;
+}
+
+//##########################################
+/* logging stuff */
 
 void acx_log_rxbuffer(const acx_device_t *adev)
 {

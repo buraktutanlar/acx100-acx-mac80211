@@ -151,7 +151,7 @@ int acxmem_create_tx_host_desc_queue(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
 STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
-void acxmem_free_desc_queues(acx_device_t *adev);
+//= void acxmem_free_desc_queues(acx_device_t *adev);
 STATick void acxmem_delete_dma_regions(acx_device_t *adev);
 //= STATick void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
@@ -784,7 +784,8 @@ fail:
 #endif
 
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-		u32 rx_queue_start) {
+			u32 rx_queue_start)
+{
 	u32 *p;
 	int i;
 
@@ -802,7 +803,9 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 
 }
 
-STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start) {
+STATick
+void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
+{
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
 	int i;
@@ -821,19 +824,24 @@ STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		rxdesc = adev->rxdesc_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
-			rxdesc = adev->rxdesc_start = (rxdesc_t *) acx2cpu(rxdesc->pNextDesc);
+			rxdesc = adev->rxdesc_start
+				= (rxdesc_t *) acx2cpu(rxdesc->pNextDesc);
 		}
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
-		adev->rxdesc_start = (rxdesc_t *) ((u8 *) adev->txdesc_start + (TX_CNT
-		* sizeof(txdesc_t)));
+		adev->rxdesc_start = (rxdesc_t *)
+			((u8 *) adev->txdesc_start
+				+ (TX_CNT * sizeof(txdesc_t)));
+					
 		/* NB: sizeof(txdesc_t) above is valid because we know
-		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
-		 ** acx111's txdesc is larger! */
+		 ** we are in the if (acx100) block. Beware of
+		 ** cut-n-pasting elsewhere!  acx111's txdesc is
+		 ** larger! */
 
 		mem_offs = (u32) adev->rxdesc_start;
-		while (mem_offs < (u32) adev->rxdesc_start + (RX_CNT * sizeof(*rxdesc))) {
+		while (mem_offs < (u32) adev->rxdesc_start
+			+ (RX_CNT * sizeof(*rxdesc))) {
 			write_slavemem32(adev, mem_offs, 0);
 			mem_offs += 4;
 		}
@@ -844,7 +852,8 @@ STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
 			/* point to next rxdesc */
 			write_slavemem32(adev, (u32) &(rxdesc->pNextDesc),
-					(u32) cpu_to_le32 ((u8 *) rxdesc + sizeof(*rxdesc)));
+					(u32) cpu_to_le32 ((u8 *) rxdesc
+							+ sizeof(*rxdesc)));
 			/* go to the next one */
 			rxdesc++;
 		}
@@ -852,12 +861,15 @@ STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		rxdesc--;
 
 		/* and point to the first making it a ring buffer */
-		write_slavemem32(adev, (u32) &(rxdesc->pNextDesc), (u32) cpu_to_le32 (rx_queue_start));
+		write_slavemem32(adev, (u32) &(rxdesc->pNextDesc),
+				(u32) cpu_to_le32 (rx_queue_start));
 	}
 	FN_EXIT0;
 }
 
-STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start) {
+STATick 
+void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
+{
 	txdesc_t *txdesc;
 	u32 clr;
 	int i;
@@ -876,7 +888,7 @@ STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	adev->txdesc_start = (txdesc_t *) tx_queue_start;
 
 	log(L_DEBUG, "adev->txdesc_start=%p\n",
-			adev->txdesc_start);
+		adev->txdesc_start);
 
 	adev->tx_free = TX_CNT;
 	/* done by memset: adev->tx_head = 0; */
@@ -894,14 +906,16 @@ STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
-		/* clear whole send pool. sizeof is safe here (we are acx100) */
+		/* clear whole send pool. sizeof is safe here (we are
+		 * acx100) */
 
 		/*
-		 * adev->txdesc_start refers to device memory, so we can't write
-		 * directly to it.
+		 * adev->txdesc_start refers to device memory, so we
+		 * can't write directly to it.
 		 */
 		clr = (u32) adev->txdesc_start;
-		while (clr < (u32) adev->txdesc_start + (TX_CNT * sizeof(*txdesc))) {
+		while (clr < (u32) adev->txdesc_start
+			+ (TX_CNT * sizeof(*txdesc))) {
 			write_slavemem32(adev, clr, 0);
 			clr += 4;
 		}
@@ -909,19 +923,21 @@ STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
 			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
-					"size: 0x%X\n", txdesc, adev->txdesc_size);
+				"size: 0x%X\n", txdesc, adev->txdesc_size);
 
 			/* initialise ctl */
 			/*
 			 * No auto DMA here
 			 */
 			write_slavemem8(adev, (u32) &(txdesc->Ctl_8),
-					(u8) (DESC_CTL_HOSTOWN| DESC_CTL_FIRSTFRAG));
+					(u8) (DESC_CTL_HOSTOWN |
+						DESC_CTL_FIRSTFRAG));
 			/* done by memset(0): txdesc->Ctl2_8 = 0; */
 
 			/* point to next txdesc */
 			write_slavemem32(adev, (u32) &(txdesc->pNextDesc),
-					(u32) cpu_to_le32 ((u8 *) txdesc + adev->txdesc_size));
+					(u32) cpu_to_le32 ((u8 *) txdesc
+							+ adev->txdesc_size));
 
 			/* go to the next one */
 			/* ++ is safe here (we are acx100) */
@@ -930,11 +946,13 @@ STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* go back to the last one */
 		txdesc--;
 		/* and point to the first making it a ring buffer */
-		write_slavemem32(adev, (u32) &(txdesc->pNextDesc), (u32) cpu_to_le32 (tx_queue_start));
+		write_slavemem32(adev, (u32) &(txdesc->pNextDesc),
+				(u32) cpu_to_le32 (tx_queue_start));
 	}
 	FN_EXIT0;
 }
 
+#if 0
 /*
  * acxmem_free_desc_queues
  *
@@ -942,7 +960,8 @@ STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
  * others have been initialised to NULL so this
  * function can be used if only part of the queues were allocated.
  */
-void acxmem_free_desc_queues(acx_device_t *adev) {
+void acxmem_free_desc_queues(acx_device_t *adev)
+{
 
 #define ACX_FREE_QUEUE(size, ptr, phyaddr) \
         if (ptr) { \
@@ -953,16 +972,21 @@ void acxmem_free_desc_queues(acx_device_t *adev) {
 
 	FN_ENTER;
 
-	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start, adev->txhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start, adev->txbuf_startphy);
+	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start,
+		adev->txhostdesc_startphy);
+	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
+		adev->txbuf_startphy);
 	adev->txdesc_start = NULL;
 
-	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start, adev->rxhostdesc_startphy);
-	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start, adev->rxbuf_startphy);
+	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
+		adev->rxhostdesc_startphy);
+	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
+		adev->rxbuf_startphy);
 	adev->rxdesc_start = NULL;
 
 	FN_EXIT0;
 }
+#endif
 
 STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 
@@ -981,7 +1005,7 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 
 	acx_mwait(100);
 
-	acxmem_free_desc_queues(adev);
+	acx_free_desc_queues(adev);
 
 	FN_EXIT0;
 }

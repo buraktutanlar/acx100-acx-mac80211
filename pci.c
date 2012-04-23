@@ -94,9 +94,10 @@ void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_q
 static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
 static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 
-void acxpci_free_desc_queues(acx_device_t * adev);
+//= void acxpci_free_desc_queues(acx_device_t * adev);
 static void acxpci_delete_dma_regions(acx_device_t * adev);
-static inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+//=static inline
+void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 //= static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy
@@ -497,13 +498,14 @@ fail:
 
 void
 acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
-			  u32 rx_queue_start)
+			u32 rx_queue_start)
 {
 	acxpci_create_tx_desc_queue(adev, tx_queue_start);
 	acxpci_create_rx_desc_queue(adev, rx_queue_start);
 }
 
-static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+static void acxpci_create_rx_desc_queue(acx_device_t * adev,
+					u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
@@ -525,13 +527,14 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 			rxdesc = adev->rxdesc_start = (rxdesc_t *)
-			    (adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
+				(adev->iobase2 + acx2cpu(rxdesc->pNextDesc));
 		}
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
 		adev->rxdesc_start = (rxdesc_t *)
-		    ((u8 *) adev->txdesc_start + (TX_CNT * sizeof(txdesc_t)));
+			((u8 *) adev->txdesc_start
+				+ (TX_CNT * sizeof(txdesc_t)));
 		/* NB: sizeof(txdesc_t) above is valid because we know
 		 ** we are in if (acx100) block. Beware of cut-n-pasting elsewhere!
 		 ** acx111's txdesc is larger! */
@@ -545,7 +548,8 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
 			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 			/* point to next rxdesc */
-			rxdesc->pNextDesc = cpu2acx(mem_offs + sizeof(*rxdesc));
+			rxdesc->pNextDesc
+				= cpu2acx(mem_offs + sizeof(*rxdesc));
 			/* go to the next one */
 			mem_offs += sizeof(*rxdesc);
 			rxdesc++;
@@ -559,7 +563,8 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 	FN_EXIT0;
 }
 
-static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
+static void acxpci_create_tx_desc_queue(acx_device_t * adev,
+					u32 tx_queue_start)
 {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -578,9 +583,9 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 	adev->txdesc_start = (txdesc_t *) (adev->iobase2 + tx_queue_start);
 
 	log(L_DEBUG, "adev->iobase2=%p\n"
-	    "acx: tx_queue_start=%08X\n"
-	    "acx: adev->txdesc_start=%p\n",
-	    adev->iobase2, tx_queue_start, adev->txdesc_start);
+		"acx: tx_queue_start=%08X\n"
+		"acx: adev->txdesc_start=%p\n",
+		adev->iobase2, tx_queue_start, adev->txdesc_start);
 
 	adev->tx_free = TX_CNT;
 	/* done by memset: adev->tx_head = 0; */
@@ -610,14 +615,15 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
 			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
-			    "size: 0x%X\n", txdesc, adev->txdesc_size);
+				"size: 0x%X\n", txdesc, adev->txdesc_size);
 
 			/* pointer to hostdesc memory */
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
 			/* initialise ctl */
 			txdesc->Ctl_8 = (DESC_CTL_HOSTOWN | DESC_CTL_RECLAIM
-					 | DESC_CTL_AUTODMA |
-					 DESC_CTL_FIRSTFRAG);
+					| DESC_CTL_AUTODMA
+					| DESC_CTL_FIRSTFRAG);
+					
 			/* done by memset(0): txdesc->Ctl2_8 = 0; */
 			/* point to next txdesc */
 			txdesc->pNextDesc =
@@ -638,7 +644,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 	FN_EXIT0;
 }
 
-
+#if 0
 /*
  * acxpci_free_desc_queues
  *
@@ -659,21 +665,22 @@ void acxpci_free_desc_queues(acx_device_t * adev)
 	FN_ENTER;
 
 	ACX_FREE_QUEUE(adev->txhostdesc_area_size, adev->txhostdesc_start,
-		       adev->txhostdesc_startphy);
+		adev->txhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->txbuf_area_size, adev->txbuf_start,
-		       adev->txbuf_startphy);
+		adev->txbuf_startphy);
 
 	adev->txdesc_start = NULL;
 
 	ACX_FREE_QUEUE(adev->rxhostdesc_area_size, adev->rxhostdesc_start,
-		       adev->rxhostdesc_startphy);
+		adev->rxhostdesc_startphy);
 	ACX_FREE_QUEUE(adev->rxbuf_area_size, adev->rxbuf_start,
-		       adev->rxbuf_startphy);
+		adev->rxbuf_startphy);
 
 	adev->rxdesc_start = NULL;
 
 	FN_EXIT0;
 }
+#endif
 
 static void acxpci_delete_dma_regions(acx_device_t * adev)
 {
@@ -689,12 +696,12 @@ static void acxpci_delete_dma_regions(acx_device_t * adev)
 	 * while calling dma_free_coherent() interrupts need to be 'free'
 	 * but if you spinlock the whole function (acxpci_free_desc_queues)
 	 * you'll get an error */
-	acxpci_free_desc_queues(adev);
+	acx_free_desc_queues(adev);
 
 	FN_EXIT0;
 }
 
-static inline 
+// static inline 
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {

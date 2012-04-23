@@ -19,3 +19,4 @@ void acx_handle_info_irq(acx_device_t *adev);
 void *acx_allocate(acx_device_t *adev, size_t size,
 		dma_addr_t *phy, const char *msg);
 
+void acx_free_desc_queues(acx_device_t *adev);

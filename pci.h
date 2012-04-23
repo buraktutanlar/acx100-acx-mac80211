@@ -23,7 +23,7 @@ void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_q
 STATick void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
 STATick void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 
-void acxpci_free_desc_queues(acx_device_t * adev);
+//= void acxpci_free_desc_queues(acx_device_t * adev);
 STATick void acxpci_delete_dma_regions(acx_device_t * adev);
 STATick inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 //= STATick void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
