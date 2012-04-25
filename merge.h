@@ -1,3 +1,4 @@
+#include <linux/interrupt.h>
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 
