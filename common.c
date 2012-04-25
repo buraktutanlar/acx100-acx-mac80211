@@ -5135,21 +5135,6 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	}
 #endif
 
-	// See:
-	//
-	//	commit d20ef63d32461332958661df73e21c0ca42601b0
-	//	Author: Johannes Berg <johannes@sipsolutions.net>
-	//	Date:   Sun Oct 11 15:10:40 2009 +0200
-	//
-	//    mac80211: document ieee80211_rx() context requirement
-	//
-	//    ieee80211_rx() must be called with softirqs disabled
-	//    since the networking stack requires this for netif_rx()
-	//    and some code in mac80211 can assume that it can not
-	//    be processing its own tasklet and this call at the same
-	//    time.
-	//
-	// Problem: ... I still get some "NOHZ: local_softirq_pending 08" messages
 	if (IS_PCI(adev)) {
 #if CONFIG_ACX_MAC80211_VERSION <= KERNEL_VERSION(2, 6, 32)
 		local_bh_disable();

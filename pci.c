@@ -1805,7 +1805,14 @@ unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev)
 			acxpcimem_handle_tx_error(adev, error, finger,  txstatus);
 
 		/* And finally report upstream */
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+		local_bh_disable();
 		ieee80211_tx_status(adev->ieee, hostdesc->skb);
+		local_bh_enable();
+#else
+		ieee80211_tx_status_ni(adev->ieee, hostdesc->skb);
+#endif
+
 
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
