@@ -6686,8 +6686,17 @@ static int acx_do_job_update_tim(acx_device_t *adev)
 	u16 tim_offset;
 	u16 tim_length;
 
+#if CONFIG_ACX_MAC80211_VERSION > KERNEL_VERSION(2, 6, 32)
 	beacon = ieee80211_beacon_get_tim(adev->ieee, adev->vif, &tim_offset,
 			&tim_length);
+#else
+	beacon = ieee80211_beacon_get(adev->ieee, adev->vif);
+	if (!beacon)
+		goto out;
+
+	tim_offset = acx_beacon_find_tim(beacon) - beacon->data;
+out:
+#endif
 
 	if (!beacon) {
 		logf0(L_ANY, "Error: beacon==NULL");
