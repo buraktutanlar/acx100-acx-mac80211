@@ -2139,6 +2139,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
  * ==================================================
  */
 
+#ifdef CONFIG_ACX_MAC80211_MEM
 /*
  * acxmem_l_process_rxdesc
  *
@@ -3107,7 +3108,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	FN_EXIT0;
 }
 #endif
-
+#endif
 
 /*
  * BOM Irq Handling, Timer
@@ -3115,6 +3116,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
  */
 
 void acx_handle_info_irq(acx_device_t *adev); // reorder later
+#ifdef CONFIG_ACX_MAC80211_MEM
 /* Interrupt handler bottom-half */
 // OW TODO Copy of pci: possible merging.
 void acxmem_irq_work(struct work_struct *work)
@@ -3209,6 +3211,7 @@ void acxmem_irq_work(struct work_struct *work)
 	return;
 
 }
+#endif
 
 /*
  * acx_handle_info_irq
