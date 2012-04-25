@@ -2,7 +2,7 @@
 
  */
 
-#include <acx_struct_dev.h>
+#include "acx_struct_dev.h"
 
 u16 interrupt_masks[3][3] = {
 	[ DEVTYPE_MEM ] = {
