@@ -6967,12 +6967,14 @@ static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 static struct kernel_param_ops acx_debug_flag_ops = {
         .get = acx_debug_flag_get,
         .set = acx_debug_flag_set,
 };
 
 module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
+#endif
 
 #endif
 
