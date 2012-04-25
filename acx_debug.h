@@ -13,6 +13,12 @@
 #define pr_fmt(fmt)	"acx.%s: " fmt, __FUNCTION__
 #endif
 
+#include <linux/kernel.h>
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 35)
+#define pr_warn pr_warning
+#endif
+
 /* enable pr_debug by default, if included before <linux> headers.
  * We're not using pr_debug() yet, but we need this header for
  * pr_fmt() anyway, so set here for when we do use pr_debug()
