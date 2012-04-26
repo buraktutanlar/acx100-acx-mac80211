@@ -1,4 +1,8 @@
 TODO
+====
+
+Code Maintenance and Style Fixing
+=================================
 
 These are in in priority order, top is highest.
 Once they're DONE, move to bottom, and edit or delete.
@@ -161,4 +165,56 @@ acxpci_proc_eeprom_output(buf, adev);
 acxmem_proc_eeprom_output(buf, adev);
   uses 0xffff
 
+
+Functional
+==========
+
+* Acx100: Add STA PS support (TIM updates)
+
+* Add Monitor Mode support (Acx1xx)
+
+* Fix/add runtime device full-reset (Acx1xx)
+
+- Specifically acx100 can get into a state, where only a full reset can recover
+things (emergency cleanup of descriptors/buffer show no effect)
+- Integrate with mac80211 functionality, to re-initialize resetted hw
+- Build a kind of watchdog, is-alive test, to determine a stuck device and
+trigger reset (exact criteria TBC, could be e.g. rx/tx-complete activity/irqs
+within a typical period)
+- In this context the the startup logging with the initial card config could be
+reviewed
+
+* TBC: Use ether-addr from eeprom (Acx1xx)
+- Currently it can happen, that devices use the same ether-addr, which is
+not ideal (obviously). Check if the eeprom contains a factory ether-addr, that
+could then be used
+
+* Add HW-scan support (Acx1xx)
+- Hw-scanning is possibly faster/less stress-full for device
+
+* Add device suspend / resume support (Acx1xx, mem/pci/usb)
+- Can probably well combined with full reset support, see above
+
+* Refine Rx-Filter config (Acx1xx):
+- Refine translation of mac80211 rx-filter config into corresponding hw
+configuration
+
+* Signal strength: Check if signal strengtg is correctly reported (Acx1xx):
+- FW value correct / plausible
+- Reported value in correct form ? (abs,rel,dBm*100,etc?)
+
+* Regulatory-Domain (Acx1xx): Improve intergration/setting of reg-domain with
+mac80211
+
+* Multi-vif support (Acx1xx)
+- TBC: Support multiple ethernet addresses
+- TBC: How to trade-off between multiple vifs and available hw/fw support
+resources (e.g. templates, crypto, auto-ack)
+. Rx-configs to use
+
+* HW crypto (Acx1xx): Port-back WEP HW crypto support (start with WEP, even if
+technically not much relevant anymore, it could maybe help to achieve TKIP
+after)
+
+* Add WDS support
 
