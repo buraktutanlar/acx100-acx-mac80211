@@ -3096,51 +3096,43 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 /*
  * Data for init_module/cleanup_module
  */
-#ifdef CONFIG_PCI
-static const struct pci_device_id acxpci_id_tbl[] __devinitdata = {
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1100A,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX100,
-	 },
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1100B,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX100,
-	 },
-	{
-	 .vendor = PCI_VENDOR_ID_TI,
-	 .device = PCI_DEVICE_ID_TI_TNETW1130,
-	 .subvendor = PCI_ANY_ID,
-	 .subdevice = PCI_ANY_ID,
-	 .driver_data = CHIPTYPE_ACX111,
-	 },
-	{
-	 .vendor = 0,
-	 .device = 0,
-	 .subvendor = 0,
-	 .subdevice = 0,
-	 .driver_data = 0,
-	 }
-};
 
+#if 0 // use later ?
+static struct acxpci_device_info acxpci_info_tbl[] __devinitdata = {
+        [0] = {
+                .part_name      = "acx111",
+                .helper_image   = "tiacx1111r16", // probly wrong !!
+        },
+};
+#endif
+
+#ifdef CONFIG_PCI
+static DEFINE_PCI_DEVICE_TABLE(acxpci_id_tbl) = {
+	{ PCI_VDEVICE(TI, PCI_DEVICE_ID_TI_TNETW1100A),
+	  .driver_data = CHIPTYPE_ACX100,
+	},
+	{ PCI_VDEVICE(TI, PCI_DEVICE_ID_TI_TNETW1100B),
+	  .driver_data = CHIPTYPE_ACX100,
+	},
+	{ PCI_VDEVICE(TI, PCI_DEVICE_ID_TI_TNETW1130),
+	 .driver_data = CHIPTYPE_ACX111,
+	},
+	{ }
+};
 MODULE_DEVICE_TABLE(pci, acxpci_id_tbl);
 
-static struct pci_driver
- acxpci_driver = {
-	.name = "acx_pci",
-	.id_table = acxpci_id_tbl,
-	.probe = acxpci_probe,
-	.remove = __devexit_p(acxpci_remove),
+static struct pci_driver acxpci_driver = {
+	.name		= "acx_pci",
+	.id_table	= acxpci_id_tbl,
+	.probe		= acxpci_probe,
+	.remove		= __devexit_p(acxpci_remove),
 #ifdef CONFIG_PM
-	.suspend = acxpci_e_suspend,
-	.resume = acxpci_e_resume
+	.suspend	= acxpci_e_suspend,
+	.resume		= acxpci_e_resume
 #endif /* CONFIG_PM */
 };
+#else
+#error "compiled pci.c w/o CONFIG_PCI !!"
 #endif /* CONFIG_PCI */
 
 
