@@ -2453,6 +2453,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 /*
  * Return an acx pointer to the next transmit data block.
  */
+#if 0 // using copy in mem.c
 static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	u32 block, next, last_block;
 	int blocks_needed;
@@ -2512,6 +2513,7 @@ static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 
 	return block;
 }
+#endif
 
 /*
  * Return buffer space back to the pool by following the next pointers until we find
