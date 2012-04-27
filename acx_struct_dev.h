@@ -194,6 +194,28 @@ enum {
 #define ACX_STATUS_3_AUTHENTICATED	3
 #define ACX_STATUS_4_ASSOCIATED		4
 
+struct eeprom_cfg {
+	/*** Config retrieved from EEPROM ***/
+	char			NVSv[8];
+	u16			NVS_vendor_offs;
+	u8			MAC[6];
+	u16			probe_delay;
+	u32			eof_memory;
+	u8			dot11CCAModes;
+	u8			dot11Diversity;
+	u8			dot11ShortPreambleOption;
+	u8			dot11PBCCOption;
+	u8			dot11ChannelAgility;
+	u8			dot11PhyType;
+	u8			dot11TempType;
+	co_antennas_t		antennas;
+	co_powerlevels_t	power_levels;
+	co_datarates_t		data_rates;
+	co_domains_t		domains;
+	co_product_id_t		product_id;
+	co_manuf_t		manufacturer;
+};
+
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
  * acx_priv_t) */
 
@@ -245,25 +267,7 @@ struct acx_device {
 	u8			radio_type;
 	u8			eeprom_version;
 
-	/*** Config retrieved from EEPROM ***/
-	char			cfgopt_NVSv[8];
-	u16			cfgopt_NVS_vendor_offs;
-	u8			cfgopt_MAC[6];
-	u16			cfgopt_probe_delay;
-	u32			cfgopt_eof_memory;
-	u8			cfgopt_dot11CCAModes;
-	u8			cfgopt_dot11Diversity;
-	u8			cfgopt_dot11ShortPreambleOption;
-	u8			cfgopt_dot11PBCCOption;
-	u8			cfgopt_dot11ChannelAgility;
-	u8			cfgopt_dot11PhyType;
-	u8			cfgopt_dot11TempType;
-	co_antennas_t		cfgopt_antennas;
-	co_powerlevels_t	cfgopt_power_levels;
-	co_datarates_t		cfgopt_data_rates;
-	co_domains_t		cfgopt_domains;
-	co_product_id_t		cfgopt_product_id;
-	co_manuf_t		cfgopt_manufacturer;
+	struct eeprom_cfg cfgopt;
 
 	/*** Firmware identification ***/
 	char		firmware_version[FW_ID_SIZE+1];

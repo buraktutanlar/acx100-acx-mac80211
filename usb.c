@@ -675,14 +675,14 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
  */
 static int acxusb_fill_configoption(acx_device_t * adev)
 {
-	adev->cfgopt_probe_delay = 200;
-	adev->cfgopt_dot11CCAModes = 4;
-	adev->cfgopt_dot11Diversity = 1;
-	adev->cfgopt_dot11ShortPreambleOption = 1;
-	adev->cfgopt_dot11PBCCOption = 1;
-	adev->cfgopt_dot11ChannelAgility = 0;
-	adev->cfgopt_dot11PhyType = 5;
-	adev->cfgopt_dot11TempType = 1;
+	adev->cfgopt.probe_delay = 200;
+	adev->cfgopt.dot11CCAModes = 4;
+	adev->cfgopt.dot11Diversity = 1;
+	adev->cfgopt.dot11ShortPreambleOption = 1;
+	adev->cfgopt.dot11PBCCOption = 1;
+	adev->cfgopt.dot11ChannelAgility = 0;
+	adev->cfgopt.dot11PhyType = 5;
+	adev->cfgopt.dot11TempType = 1;
 	return OK;
 }
 
