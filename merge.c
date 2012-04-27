@@ -3303,6 +3303,7 @@ void acx_set_interrupt_mask(acx_device_t *adev)
 {
 	FN_ENTER;
 
+	interrupt_sanity_checks(adev);
 	pr_notice("adev->irq_mask: before: %d devtype:%d chiptype:%d tobe: %d\n",
 		adev->irq_mask, (adev)->dev_type, (adev)->chip_type,
 		interrupt_masks[(adev)->dev_type][(adev)->chip_type]);
