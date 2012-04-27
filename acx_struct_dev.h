@@ -485,26 +485,16 @@ struct acx_device {
 // OW FIXME Type and ifdef mess ..
 #ifdef ACX_MAC80211_PCI
 	struct pci_dev	*pdev;
-#endif
-#ifdef ACX_MAC80211_MEM
-	struct platform_device	*pdev;
-#endif
-
-// OW FIXME Type and ifdef mess ..
-#ifdef ACX_MAC80211_PCI
 	unsigned long	membase;
-#endif
-#ifdef ACX_MAC80211_MEM
-	volatile u32	*membase;
-#endif
-	unsigned long	membase2;
-#ifdef ACX_MAC80211_PCI
 	void __iomem	*iobase;
 #endif
 #ifdef ACX_MAC80211_MEM
+	struct platform_device	*pdev;
+	volatile u32	*membase;
 	volatile u32	*iobase;
 #endif
 
+	unsigned long	membase2;
 	void __iomem	*iobase2;
 
 	/* command interface */
