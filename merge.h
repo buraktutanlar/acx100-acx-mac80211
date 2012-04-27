@@ -33,3 +33,5 @@ char *acx_proc_eeprom_output(int *length, acx_device_t *adev);
 void acx_up(struct ieee80211_hw *hw);
 
 void acx_set_interrupt_mask(acx_device_t * adev);
+
+void acx_show_card_eeprom_id(acx_device_t *adev);

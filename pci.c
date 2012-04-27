@@ -798,7 +798,7 @@ static int acxpci_upload_fw(acx_device_t * adev)
 	return res;
 }
 
-
+#if 0 // use merge.c copy
 #ifdef NONESSENTIAL_FEATURES
 typedef struct device_id {
 	unsigned char id[6];
@@ -866,7 +866,7 @@ static void acx_show_card_eeprom_id(acx_device_t * adev)
 	FN_EXIT0;
 }
 #endif /* NONESSENTIAL_FEATURES */
-
+#endif // use merge.c NONESSENTIAL_FEATURES
 
 /*
  * BOM CMDs (Control Path)

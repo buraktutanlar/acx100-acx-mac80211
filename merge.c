@@ -1144,44 +1144,43 @@ static int acxmem_upload_fw(acx_device_t *adev, char *filename)
 #endif // defer
 
 #if defined(NONESSENTIAL_FEATURES)
+
+#define CARD_EEPROM_ID_SIZE 6
 typedef struct device_id {
-	unsigned char id[6];
+	unsigned char id[CARD_EEPROM_ID_SIZE];
 	char *descr;
 	char *type;
-}device_id_t;
+} device_id_t;
 
-static const device_id_t
-device_ids[] =
-{
+static const device_id_t device_ids[] = {
 	{
-		{	'G', 'l', 'o', 'b', 'a', 'l'},
+		{ 'G', 'l', 'o', 'b', 'a', 'l' },
 		NULL,
 		NULL,
 	},
 	{
-		{	0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
 		"uninitialized",
 		"SpeedStream SS1021 or Gigafast WF721-AEX"
 	},
 	{
-		{	0x80, 0x81, 0x82, 0x83, 0x84, 0x85},
+		{ 0x80, 0x81, 0x82, 0x83, 0x84, 0x85 },
 		"non-standard",
 		"DrayTek Vigor 520"
 	},
 	{
-		{	'?', '?', '?', '?', '?', '?'},
+		{ '?', '?', '?', '?', '?', '?' },
 		"non-standard",
 		"Level One WPC-0200"
 	},
 	{
-		{	0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
 		"empty",
 		"DWL-650+ variant"
 	}
 };
 
-static void
-acx_show_card_eeprom_id(acx_device_t *adev)
+void acx_show_card_eeprom_id(acx_device_t *adev)
 {
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
 	int i, rc;
@@ -1193,8 +1192,7 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
 		if (IS_MEM(adev) || IS_PCI(adev))
 			rc = acx_read_eeprom_byte(adev,
-						ACX100_EEPROM_ID_OFFSET + i,
-						&buffer[i]);
+				ACX100_EEPROM_ID_OFFSET + i, &buffer[i]);
 		else
 			rc = NOT_OK; // in USB case
 
@@ -1208,16 +1206,17 @@ acx_show_card_eeprom_id(acx_device_t *adev)
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
 			if (device_ids[i].descr) {
 				pr_acx("EEPROM card ID string check "
-						"found %s card ID: is this %s?\n",
-						device_ids[i].descr, device_ids[i].type);
+					"found %s card ID: is this %s?\n",
+					device_ids[i].descr,
+					device_ids[i].type);
 			}
 			break;
 		}
 	}
 	if (i == ARRAY_SIZE(device_ids)) {
 		pr_acx("EEPROM card ID string check found "
-				"unknown card: expected 'Global', got '%.*s\'. "
-				"Please report\n", CARD_EEPROM_ID_SIZE, buffer);
+			"unknown card: expected 'Global', got '%.*s\'. "
+			"Please report\n", CARD_EEPROM_ID_SIZE, buffer);
 	}
 	FN_EXIT0;
 }

@@ -18,6 +18,8 @@
 #ifndef _ACX_H_
 #define _ACX_H_
 
+#define NONESSENTIAL_FEATURES 1
+
 #include "acx_compat.h"
 #include "acx_config.h"
 #include "acx_struct_hw.h"
