@@ -150,6 +150,9 @@ recode wait-loop to helper, replace multiple uses.
 compare load-firmware code to in-tree uses.
 pci & mem both do this (see above)
 
+---------
+Fix the messy use of io/membase(2) in struct acx_device for a pci and
+mem device.
 
 DONE
 ---------
