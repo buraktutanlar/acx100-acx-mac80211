@@ -3131,8 +3131,8 @@ static struct pci_driver acxpci_driver = {
 	.resume		= acxpci_e_resume
 #endif /* CONFIG_PM */
 };
-#else
-#error "compiled pci.c w/o CONFIG_PCI !!"
+//#else
+//#error "compiled pci.c w/o CONFIG_PCI !!"
 #endif /* CONFIG_PCI */
 
 
