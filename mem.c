@@ -191,7 +191,7 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev);
 //= static void acxmem_init_acx_txbuf2(acx_device_t *adev);
 STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 // static inline 
-txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
+//= txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
@@ -2071,7 +2071,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			}
 #endif
 
-			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	}
 
@@ -2430,10 +2430,12 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 }
 #endif
 
+#if 0 // replaced by acx_get_txdesc() in merge.h
 STATick inline txdesc_t*
 acxmem_get_txdesc(acx_device_t *adev, int index) {
 	return (txdesc_t*) (((u8*) adev->txdesc_start) + index * adev->txdesc_size);
 }
+#endif // acxmem_get_txdesc()
 
 STATick txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {

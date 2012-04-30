@@ -38,12 +38,13 @@
 // #define ACX_MAC80211_PCI
 
 #include "acx.h"
-#include "mem-inlines.h"
+#include "merge.h"
 
 // merge adaptation help
 #include "pci.h"
 #include "mem.h"
 #include "io-acx.h"
+#include "mem-inlines.h"
 
 // from mem.c:98
 #define FW_NO_AUTO_INCREMENT 1
@@ -595,9 +596,8 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 			if (IS_PCI(adev)) {
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
-				txdesc = acxpci_advance_txdesc(adev, txdesc,1);
-			} else
-				txdesc = acxmem_advance_txdesc(adev, txdesc,1);
+			}
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -789,9 +789,7 @@ void acx_log_txbuffer(acx_device_t *adev)
 			? read_slavemem8(adev, (u32) &(txdesc->Ctl_8))
 			: txdesc->Ctl_8;
 		printk("%02X ", Ctl_8);
-		txdesc = (IS_MEM(adev))
-			? acxmem_advance_txdesc(adev, txdesc, 1)
-			: acxpci_advance_txdesc(adev, txdesc, 1);
+		txdesc = acx_advance_txdesc(adev, txdesc, 1);
 	}
 	printk("\n");
 }
@@ -2292,7 +2290,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			}
 #endif
 
-			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	}
 
@@ -2487,12 +2485,14 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	return (blocks_needed);
 }
 
+#if 0
 static inline
 txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
 {
 	return (txdesc_t*) (((u8*) adev->txdesc_start)
 			+ index * adev->txdesc_size);
 }
+#endif
 
 /*
  * acxmem_l_alloc_tx
@@ -2577,7 +2577,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	/*
 	 * txdesc points to ACX memory
 	 */
-	txdesc = acxmem_get_txdesc(adev, head);
+	txdesc = acx_get_txdesc(adev, head);
 	ctl8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 
 	/*
@@ -2804,11 +2804,13 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev) {
 }
 #endif
 
+#if 0 // replaced by merge.h:acx_advance_txdesc()
 // static inline 
 txdesc_t*
 acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
 }
+#endif // acxmem_advance_txdesc()
 
 static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
@@ -3095,9 +3097,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		txdesc = (IS_MEM(adev))
-			? acxmem_get_txdesc(adev, finger)
-			: acxpci_get_txdesc(adev, finger);
+		txdesc = acx_get_txdesc(adev, finger);
 
 		/* If we allocated txdesc on tx path but then decided
 		 ** to NOT use it, then it will be left as a free "bubble"
@@ -3234,7 +3234,7 @@ void acxmem_clean_txdesc_emergency(acx_device_t *adev) {
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txdesc = acxmem_get_txdesc(adev, i);
+		txdesc = acx_get_txdesc(adev, i);
 
 		/* free it */
 		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
@@ -4133,7 +4133,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 					txdesc->Ctl2_8,
 					txdesc->error,
 					txdesc->u.r1.rate);
-			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 
 		/* dump host tx descriptor ring buffer */

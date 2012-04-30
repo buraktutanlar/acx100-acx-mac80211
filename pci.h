@@ -104,17 +104,3 @@ STATick int acxpci_e_resume(struct pci_dev *pdev);
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
-// make available to merge.c
-static inline txdesc_t *acxpci_get_txdesc(acx_device_t *adev, int index)
-{
-	return (txdesc_t *) (((u8 *) adev->txdesc_start) +
-			     index * adev->txdesc_size);
-}
-
-static inline 
-txdesc_t *acxpci_advance_txdesc(acx_device_t *adev, txdesc_t *txdesc,
-				int inc)
-{
-	return (txdesc_t *) (((u8 *) txdesc) + inc * adev->txdesc_size);
-}
-

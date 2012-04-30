@@ -136,7 +136,7 @@ void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee802
 void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 //= static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 // static inline 
-txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
+//= txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
 //= static txhostdesc_t *acxpci_get_txhostdesc(acx_device_t * adev, txdesc_t * txdesc);
 
 // Irq Handling, Timer
@@ -357,7 +357,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(*hostdesc);
-			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -1394,7 +1394,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 						thd, ttl);
 			seq_printf(file, "\n");
 
-			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	seq_printf(file,
 		     "\n"
@@ -1517,7 +1517,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 	}
 
 	head = adev->tx_head;
-	txdesc = acxpci_get_txdesc(adev, head);
+	txdesc = acx_get_txdesc(adev, head);
 	ctl8 = txdesc->Ctl_8;
 
 	/* 2005-10-11: there were several bug reports on this happening
@@ -1756,7 +1756,7 @@ unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev)
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		txdesc = acxpci_get_txdesc(adev, finger);
+		txdesc = acx_get_txdesc(adev, finger);
 
 		/* If we allocated txdesc on tx path but then decided
 		 ** to NOT use it, then it will be left as a free "bubble"
@@ -1852,7 +1852,7 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txdesc = acxpci_get_txdesc(adev, i);
+		txdesc = acx_get_txdesc(adev, i);
 
 		/* free it */
 		txdesc->ack_failures = 0;
@@ -2363,7 +2363,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 			       txdesc->Ctl_8,
 			       txdesc->Ctl2_8, txdesc->error,
 			       txdesc->u.r1.rate);
-			txdesc = acxpci_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 
 	/* dump host tx descriptor ring buffer */

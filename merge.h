@@ -8,7 +8,7 @@ int acxpci_upload_radio(acx_device_t *adev);
 
 int acx_create_hostdesc_queues(acx_device_t *adev);
 
-void acx_log_rxbuffer(acx_device_t *adev);
+void acx_log_rxbuffer(const acx_device_t *adev);
 void acx_log_txbuffer(acx_device_t *adev);
 
 void acx_op_stop(struct ieee80211_hw *hw);
@@ -40,3 +40,16 @@ void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 void acx_create_tx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 
 unsigned int acx_tx_clean_txdesc(acx_device_t *adev);
+
+static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
+{
+	return (txdesc_t*) (((u8*) adev->txdesc_start)
+			+ index * adev->txdesc_size);
+}
+
+static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
+					txdesc_t* txdesc, int inc)
+{
+	return (txdesc_t*) (((u8*) txdesc)
+			+ inc * adev->txdesc_size);
+}
