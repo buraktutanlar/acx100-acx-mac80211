@@ -1863,20 +1863,6 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-// static 
-inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index)
-{
-	return (txdesc_t *) (((u8 *) adev->txdesc_start) +
-			     index * adev->txdesc_size);
-}
-
-// static inline 
-txdesc_t *acxpci_advance_txdesc(acx_device_t *adev, txdesc_t *txdesc,
-				int inc)
-{
-	return (txdesc_t *) (((u8 *) txdesc) + inc * adev->txdesc_size);
-}
-
 #if 1 // merge soon
 // static 
 txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
