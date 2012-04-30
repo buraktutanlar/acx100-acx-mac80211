@@ -3093,7 +3093,10 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		txdesc = acxmem_get_txdesc(adev, finger);
+		// jimc - revisit
+		txdesc = (IS_MEM(adev))
+			? acxmem_get_txdesc(adev, finger)
+			: acxpci_get_txdesc(adev, finger);
 
 		/* If we allocated txdesc on tx path but then decided
 		 ** to NOT use it, then it will be left as a free "bubble"
