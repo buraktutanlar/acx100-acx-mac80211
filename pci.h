@@ -49,7 +49,7 @@ STATick inline void acxpci_init_mboxes(acx_device_t * adev);
 
 // Init, Configuration (Control Path)
 int acxpci_reset_dev(acx_device_t * adev);
-STATick int acxpci_verify_init(acx_device_t * adev);
+//= STATick int acxpci_verify_init(acx_device_t * adev);
 STATick void acxpci_reset_mac(acx_device_t * adev);
 STATick void acxpci_up(struct ieee80211_hw *hw);
 
