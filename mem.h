@@ -53,7 +53,9 @@ STATick void acx_show_card_eeprom_id(acx_device_t *adev);
 #endif
 
 // CMDs (Control Path)
-int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
+int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+				void *buffer, unsigned buflen,
+				unsigned cmd_timeout, const char *cmdstr);
 
 // STATick inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 
@@ -89,8 +91,8 @@ void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 //= STATick void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 //= STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
-STATick inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
-//= STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
+STATick inline txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t *txdesc, int inc);
+//= STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc);
 
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
