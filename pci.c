@@ -83,7 +83,7 @@ int acxpci_create_tx_host_desc_queue(acx_device_t * adev);
 
 void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
 //= static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
-static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
+//= static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 
 //= void acxpci_free_desc_queues(acx_device_t * adev);
 static void acxpci_delete_dma_regions(acx_device_t * adev);
@@ -249,7 +249,7 @@ void
 acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 			u32 rx_queue_start)
 {
-	acxpci_create_tx_desc_queue(adev, tx_queue_start);
+	acx_create_tx_desc_queue(adev, tx_queue_start);
 	acx_create_rx_desc_queue(adev, rx_queue_start);
 }
 
@@ -314,8 +314,8 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev,
 }
 #endif // acxpci_create_rx_desc_queue()
 
-static void acxpci_create_tx_desc_queue(acx_device_t * adev,
-					u32 tx_queue_start)
+#if 0 // merged
+static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -394,6 +394,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev,
 	}
 	FN_EXIT0;
 }
+#endif // acxpci_create_tx_desc_queue()
 
 /*
  * acxpci_free_desc_queues

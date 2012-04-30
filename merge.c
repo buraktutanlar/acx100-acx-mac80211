@@ -548,6 +548,132 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 	FN_EXIT0;
 }
 
+void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
+{
+	txdesc_t *txdesc;
+        txhostdesc_t *hostdesc;
+        dma_addr_t hostmemptr = 0; // mem.c - init quiets warning
+	u32 clr;
+	u32 mem_offs = 0; // mem.c - init quiets warning
+	int i;
+
+	FN_ENTER;
+
+	if (IS_ACX100(adev))
+		adev->txdesc_size = sizeof(*txdesc);
+	else
+		/* the acx111 txdesc is 4 bytes larger */
+		adev->txdesc_size = sizeof(*txdesc) + 4;
+
+	/* This refers to an ACX address, not one of ours */
+	adev->txdesc_start = (IS_PCI(adev))
+		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
+		: (txdesc_t *) tx_queue_start;
+
+	log(L_DEBUG, "adev->iobase2=%p\n"
+                "tx_queue_start=%08X\n" 
+		"adev->txdesc_start=%p\n",
+                adev->iobase2, tx_queue_start, adev->txdesc_start);
+
+	adev->tx_free = TX_CNT;
+	/* done by memset: adev->tx_head = 0; */
+	/* done by memset: adev->tx_tail = 0; */
+	txdesc = adev->txdesc_start;
+	if (IS_PCI(adev)) {
+		mem_offs = tx_queue_start;
+		hostmemptr = adev->txhostdesc_startphy;
+		hostdesc = adev->txhostdesc_start;
+	}
+	if (IS_ACX111(adev)) {
+		/* ACX111 has a preinitialized Tx buffer! */
+		/* loop over whole send pool */
+		/* FIXME: do we have to do the hostmemptr stuff here?? */
+		for (i = 0; i < TX_CNT; i++) {
+			txdesc->HostMemPtr = ptr2acx(hostmemptr);
+			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+			/* reserve two (hdr desc and payload desc) */
+			if (IS_PCI(adev)) {
+				hostdesc += 2;
+				hostmemptr += 2 * sizeof(*hostdesc);
+				txdesc = acxpci_advance_txdesc(adev, txdesc,1);
+			} else
+				txdesc = acxmem_advance_txdesc(adev, txdesc,1);
+		}
+	} else {
+		/* ACX100 Tx buffer needs to be initialized by us */
+		/* clear whole send pool. sizeof is safe here (we are
+		 * acx100) */
+		if (IS_PCI(adev))
+			memset(adev->txdesc_start, 0,
+				TX_CNT * sizeof(*txdesc));
+		else {	
+			/* adev->txdesc_start refers to device memory,
+			  so we can't write directly to it. */
+			clr = (u32) adev->txdesc_start;
+			while (clr < (u32) adev->txdesc_start
+				+ (TX_CNT * sizeof(*txdesc))) {
+				write_slavemem32(adev, clr, 0);
+				clr += 4;
+			}
+		}
+
+		/* loop over whole send pool */
+		for (i = 0; i < TX_CNT; i++) {
+			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
+				"size: 0x%X\n", txdesc, adev->txdesc_size);
+
+			if (IS_PCI(adev)) {
+				/* pointer to hostdesc memory */
+				txdesc->HostMemPtr = ptr2acx(hostmemptr);
+				/* initialise ctl */
+				txdesc->Ctl_8 = (DESC_CTL_HOSTOWN 
+						| DESC_CTL_RECLAIM
+						| DESC_CTL_AUTODMA
+						| DESC_CTL_FIRSTFRAG);
+
+				/* done by memset(0): txdesc->Ctl2_8 = 0; */
+				/* point to next txdesc */
+				txdesc->pNextDesc =
+					cpu2acx(mem_offs + adev->txdesc_size);
+				/* reserve two (hdr desc and payload desc) */
+				hostdesc += 2;
+				hostmemptr += 2 * sizeof(*hostdesc);
+				/* go to the next one */
+				mem_offs += adev->txdesc_size;
+				/* ++ is safe here (we are acx100) */
+				txdesc++;
+
+			} else {
+				/* initialise ctl */
+				/* No auto DMA here */
+				write_slavemem8(adev, (u32) &(txdesc->Ctl_8),
+						(u8) (DESC_CTL_HOSTOWN |
+							DESC_CTL_FIRSTFRAG));
+
+				/* done by memset(0): txdesc->Ctl2_8 = 0; */
+
+				/* point to next txdesc */
+				write_slavemem32(adev, (u32) &(txdesc->pNextDesc),
+						(u32) cpu_to_le32 ((u8 *) txdesc
+								+ adev->txdesc_size));
+
+				/* go to the next one */
+				/* ++ is safe here (we are acx100) */
+				txdesc++;
+			}
+		}
+		/* go back to the last one */
+		txdesc--;
+		/* and point to the first making it a ring buffer */
+		if (IS_PCI(adev))
+			txdesc->pNextDesc = cpu2acx(tx_queue_start);
+		else
+			write_slavemem32(adev, (u32) &(txdesc->pNextDesc),
+					(u32) cpu_to_le32 (tx_queue_start));
+	}
+	FN_EXIT0;
+}
+
 //##########################################
 /* free desc queue stuff */
 
