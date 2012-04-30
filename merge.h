@@ -38,3 +38,5 @@ void acx_show_card_eeprom_id(acx_device_t *adev);
 
 void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 void acx_create_tx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
+
+unsigned int acx_tx_clean_txdesc(acx_device_t *adev);

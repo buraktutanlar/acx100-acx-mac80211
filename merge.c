@@ -3056,7 +3056,8 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
  * Everytime we get called we know where the next packet to be cleaned is.
  */
 // OW TODO Very similar with pci: possible merging.
-unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
+unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
+{
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
 	unsigned finger;
@@ -3070,15 +3071,16 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 
 	FN_ENTER;
 
-	/*
-	 * Set up a template descriptor for re-initialization.  The only
-	 * things that get set are Ctl_8 and the rate, and the rate defaults
-	 * to 1Mbps.
-	 */
-	memset (&tmptxdesc, 0, sizeof (tmptxdesc));
-	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
-	tmptxdesc.u.r1.rate = 0x0a;
-
+	if (IS_MEM(adev)) {
+		/*
+		 * Set up a template descriptor for re-initialization.
+		 * The only things that get set are Ctl_8 and the
+		 * rate, and the rate defaults to 1Mbps.
+		 */
+		memset(&tmptxdesc, 0, sizeof (tmptxdesc));
+		tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
+		tmptxdesc.u.r1.rate = 0x0a;
+	}
 	if (unlikely(acx_debug & L_DEBUG))
 		acx_log_txbuffer(adev);
 
@@ -3093,7 +3095,6 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 	finger = adev->tx_tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
-		// jimc - revisit
 		txdesc = (IS_MEM(adev))
 			? acxmem_get_txdesc(adev, finger)
 			: acxpci_get_txdesc(adev, finger);
@@ -3104,70 +3105,116 @@ unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev) {
 		 ** We may meet it on the next ring pass here. */
 
 		/* stop if not marked as "tx finished" and "host owned" */
-		Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+		Ctl_8 = (IS_MEM(adev))
+			? read_slavemem8(adev, (u32) &(txdesc->Ctl_8))
+			: txdesc->Ctl_8;
 
 		// OW FIXME Check against pci.c
-		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN) != DESC_CTL_ACXDONE_HOSTOWN) {
-			//if (unlikely(!num_cleaned)) { /* maybe remove completely */
-			log(L_BUFT, "clean_txdesc: tail isn't free. "
-				"finger=%d, tail=%d, head=%d\n", finger, adev->tx_tail,
-					adev->tx_head);
-			//}
+		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN)
+			!= DESC_CTL_ACXDONE_HOSTOWN) {
+			/* maybe remove if wrapper */
+			if (unlikely(!num_cleaned))
+				pr_warn("clean_txdesc: tail isn't free. "
+					"finger=%d, tail=%d, head=%d\n",
+					finger,	adev->tx_tail, adev->tx_head);
 			break;
 		}
 
 		/* remember desc values... */
-		error = read_slavemem8(adev, (u32) &(txdesc->error));
-		ack_failures = read_slavemem8(adev, (u32) &(txdesc->ack_failures));
-		rts_failures = read_slavemem8(adev, (u32) &(txdesc->rts_failures));
-		rts_ok = read_slavemem8(adev, (u32) &(txdesc->rts_ok));
-		// OW FIXME does this also require le16_to_cpu()?
-		r100 = read_slavemem8(adev, (u32) &(txdesc->u.r1.rate));
-		r111 = le16_to_cpu(read_slavemem16 (adev, (u32) &(txdesc->u.r2.rate111)));
-
+		if (IS_MEM(adev)) {
+			error = read_slavemem8(adev, (u32) &(txdesc->error));
+			ack_failures = read_slavemem8(adev,
+					(u32) &(txdesc->ack_failures));
+			rts_failures = read_slavemem8(adev,
+					(u32) &(txdesc->rts_failures));
+			rts_ok = read_slavemem8(adev, (u32) &(txdesc->rts_ok));
+			// OW FIXME does this also require le16_to_cpu()?
+			r100 = read_slavemem8(adev,
+					(u32) &(txdesc->u.r1.rate));
+			r111 = le16_to_cpu(read_slavemem16(adev,
+					(u32)&(txdesc->u.r2.rate111)));
+		} else {
+			error = txdesc->error;
+			ack_failures = txdesc->ack_failures;
+			rts_failures = txdesc->rts_failures;
+			rts_ok = txdesc->rts_ok;
+			// OW FIXME does this also require le16_to_cpu()?
+			r100 = txdesc->u.r1.rate;
+			r111 = le16_to_cpu(txdesc->u.r2.rate111);
+		}
+		// mem.c gated this with ack_failures > 0, unimportant
 		log(L_BUFT,
-			"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u r100=%u r111=%04X tx_free=%u\n",
-			finger, ack_failures, rts_failures, rts_ok, r100, r111, adev->tx_free);
+			"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u"
+			" r100=%u r111=%04X tx_free=%u\n",
+			finger, ack_failures, rts_failures, rts_ok,
+			r100, r111, adev->tx_free);
 
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
-		hostdesc = acxmem_get_txhostdesc(adev, txdesc);
+		hostdesc = (IS_MEM(adev))
+			? acxmem_get_txhostdesc(adev, txdesc)
+			: acxpci_get_txhostdesc(adev, txdesc);
+
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
-        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && !(error & 0x30))
+		if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK)
+			&& !(error & 0x30))
 			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-    	if (IS_ACX111(adev)) {
-			acx111_tx_build_txstatus(adev, txstatus, r111, ack_failures);
+		if (IS_ACX111(adev)) {
+			acx111_tx_build_txstatus(adev, txstatus, r111,
+						ack_failures);
 		} else {
 			txstatus->status.rates[0].count = ack_failures + 1;
 		}
 
-		/*
-		 * Free up the transmit data buffers
-		 */
-		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-		if (acxmem) {
-			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
+		/* Free up the transmit data buffers */
+		if (IS_MEM(adev)) {
+			acxmem = read_slavemem32(adev,
+						(u32) &(txdesc->AcxMemPtr));
+			if (acxmem)
+				acxmem_reclaim_acx_txbuf_space(adev, acxmem);
+
+			/* ...and free the desc by clearing all the fields
+			   except the next pointer */
+			acxmem_copy_to_slavemem(adev,
+				(u32) &(txdesc->HostMemPtr),
+				(u8 *) &(tmptxdesc.HostMemPtr),
+				( sizeof(tmptxdesc)
+				  - sizeof(tmptxdesc.pNextDesc)));
+		} else {
+			txdesc->error = 0;
+			txdesc->ack_failures = 0;
+			txdesc->rts_failures = 0;
+			txdesc->rts_ok = 0;
+			/* signal host owning it LAST, since ACX
+			 * already knows descriptor is finished since
+			 * it set Ctl_8 accordin
+			 */
+			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 		}
-
-		/* ...and free the desc by clearing all the fields
-		 except the next pointer */
-		acxmem_copy_to_slavemem(adev, (u32) &(txdesc->HostMemPtr),
-				(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
-						- sizeof(tmptxdesc.pNextDesc));
-
 		adev->tx_free++;
 		num_cleaned++;
 
 		/* do error checking, rate handling and logging
 		 * AFTER having done the work, it's faster */
 		if (unlikely(error))
-			acxpcimem_handle_tx_error(adev, error, finger, txstatus);
+			acxpcimem_handle_tx_error(adev, error,
+					finger, txstatus);
 
 		/* And finally report upstream */
-		ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
-
+		
+		if (IS_MEM(adev))
+			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
+		else {
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+			local_bh_disable();
+			ieee80211_tx_status(adev->ieee, hostdesc->skb);
+			local_bh_enable();
+#else
+			ieee80211_tx_status_ni(adev->ieee, hostdesc->skb);
+#endif
+		}
 		/* update pointer for descr to be cleaned next */
 		finger = (finger + 1) % TX_CNT;
 	}
@@ -3296,7 +3343,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 	acx_lock(adev, flags);
 
 	/* clean processed tx descs, they may have been completely full */
-	tx_num_cleaned = acxmem_tx_clean_txdesc(adev);
+	tx_num_cleaned = acx_tx_clean_txdesc(adev);
 
 	/* nothing cleaned, yet (almost) no free buffers available?
 	 * --> clean all tx descs, no matter which status!!
@@ -3369,7 +3416,7 @@ void acxmem_irq_work(struct work_struct *work)
 		/* Tx reporting */
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
 			log(L_IRQ, "got Tx_Complete IRQ\n");
-				acxmem_tx_clean_txdesc(adev);
+				acx_tx_clean_txdesc(adev);
 
 				// Restart queue if stopped and enough tx-descr free
 				if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
@@ -3611,7 +3658,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 #if TX_CLEANUP_IN_SOFTIRQ
 				acx_schedule_task(adev, ACX_AFTER_IRQ_TX_CLEANUP);
 #else
-				acxmem_tx_clean_txdesc(adev);
+				acx_tx_clean_txdesc(adev);
 #endif
 			}
 		}
