@@ -48,14 +48,16 @@ else
 
 	PWD := $(shell pwd)
 
-	# Get the current git HEAD short version. In case something goes wrong here, ACX_GIT_VERSION 
-	# will be empty. This will then be handled in the source files.  
-	ACX_GIT_VERSION ?= $(shell (test -d .git) && (git show --format="%h" HEAD |head -1))
+	# Get the current git HEAD short version. In case something
+	# goes wrong here, ACX_GIT_VERSION will be empty. This will
+	# then be handled in the source files.
+	ACX_GIT_VERSION ?= $(shell git describe --tag)
 
 	KVERSION ?= $(shell uname -r)
 	KERNELDIR ?= /lib/modules/$(KVERSION)/build
 
-	# Uncomment following two lines to configure a build against a compat-wireless tree
+	# Uncomment following two lines to configure a build against a
+	# compat-wireless tree
 	#COMPAT_WIRELESS ?= "/path/to/compat-wireless"
 	#LINUX_KARCH ?= $(shell make -pn -C $(KERNELDIR) asm-generic |grep SRCARCH |head -1 |awk '{print $$3}')
 
