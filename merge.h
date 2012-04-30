@@ -35,3 +35,5 @@ void acx_up(struct ieee80211_hw *hw);
 void acx_set_interrupt_mask(acx_device_t * adev);
 
 void acx_show_card_eeprom_id(acx_device_t *adev);
+
+void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);

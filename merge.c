@@ -457,7 +457,96 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
 }
 
 //##########################################
-/* host desc queue stuff */
+/* non-host desc queue stuff */
+
+void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+{
+	rxdesc_t *rxdesc;
+	u32 mem_offs;
+	int i;
+
+	FN_ENTER;
+
+	/* done by memset: adev->rx_tail = 0; */
+
+	/* ACX111 doesn't need any further config: preconfigures itself.
+	 * Simply print ring buffer for debugging */
+	if (IS_ACX111(adev)) {
+		/* rxdesc_start already set here */
+
+		if (IS_PCI(adev))
+			adev->rxdesc_start = (rxdesc_t *)
+				((u8 *) adev->iobase2 + rx_queue_start);
+		else
+			adev->rxdesc_start = (rxdesc_t *)
+				((u8 *) rx_queue_start);
+
+		rxdesc = adev->rxdesc_start;
+
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
+
+			if (IS_PCI(adev))
+				adev->rxdesc_start = (rxdesc_t *)
+					((u8 *) adev->iobase2
+						+ acx2cpu(rxdesc->pNextDesc));
+			else
+				adev->rxdesc_start = (rxdesc_t *)
+					((u8 *) acx2cpu(rxdesc->pNextDesc));
+
+			rxdesc = adev->rxdesc_start;
+		}
+	} else {
+		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
+		/* rxdesc_start should be right AFTER Tx pool */
+		adev->rxdesc_start = (rxdesc_t *)
+			((u8 *) adev->txdesc_start
+				+ (TX_CNT * sizeof(txdesc_t)));
+
+		/* NB: sizeof(txdesc_t) above is valid because we know
+		* we are in if (acx100) block. Beware of cut-n-pasting
+		* elsewhere!  acx111's txdesc is larger! */
+
+		if (IS_PCI(adev))
+			memset(adev->rxdesc_start, 0,
+				RX_CNT * sizeof(*rxdesc));
+		else { // IS_MEM
+			mem_offs = (u32) adev->rxdesc_start;
+			while (mem_offs < (u32) adev->rxdesc_start
+				+ (RX_CNT * sizeof(*rxdesc))) {
+				write_slavemem32(adev, mem_offs, 0);
+				mem_offs += 4;
+			}
+		}
+		/* loop over whole receive pool */
+		rxdesc = adev->rxdesc_start;
+		mem_offs = rx_queue_start;
+		for (i = 0; i < RX_CNT; i++) {
+			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
+			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
+			/* point to next rxdesc */
+			if (IS_PCI(adev))
+				rxdesc->pNextDesc
+					= cpu2acx(mem_offs + sizeof(*rxdesc));
+			else // IS_MEM
+				write_slavemem32(adev,
+					(u32) &(rxdesc->pNextDesc),
+					(u32) cpu_to_le32 ((u8 *) rxdesc
+							+ sizeof(*rxdesc)));
+
+			/* go to the next one */
+			if (IS_PCI(adev))
+				mem_offs += sizeof(*rxdesc);
+			rxdesc++;
+		}
+		/* go to the last one */
+		rxdesc--;
+
+		/* and point to the first making it a ring buffer */
+		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
+	}
+	FN_EXIT0;
+}
 
 //##########################################
 /* free desc queue stuff */

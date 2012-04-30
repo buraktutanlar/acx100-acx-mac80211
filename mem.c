@@ -131,7 +131,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev);
 // static
 int acxmem_create_tx_host_desc_queue(acx_device_t *adev);
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
+//=STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 //= void acxmem_free_desc_queues(acx_device_t *adev);
 STATick void acxmem_delete_dma_regions(acx_device_t *adev);
@@ -613,7 +613,7 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 	acxmem_lock();
 
 	acxmem_create_tx_desc_queue(adev, tx_queue_start);
-	acxmem_create_rx_desc_queue(adev, rx_queue_start);
+	acx_create_rx_desc_queue(adev, rx_queue_start);
 	p = (u32 *) adev->acx_queue_indicator;
 	for (i = 0; i < 4; i++) {
 		write_slavemem32(adev, (u32) p, 0);
@@ -623,6 +623,7 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 
 }
 
+#if 0 // merged
 STATick
 void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 {
@@ -686,6 +687,7 @@ void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 	}
 	FN_EXIT0;
 }
+#endif // acxmem_create_rx_desc_queue()
 
 STATick 
 void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
