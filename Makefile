@@ -30,7 +30,7 @@ ifneq ($(KERNELRELEASE),)
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_PCI) += pci.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
-	acx-mac80211-objs := common.o $(acx-mac80211-obj-y) merge.o
+	acx-mac80211-objs := common.o $(acx-mac80211-obj-y) $(acx-mac80211-obj-m) merge.o
 
 else
 # Otherwise we were called directly from the command line: the kernel build
@@ -39,8 +39,8 @@ else
 	EXTRA_KCONFIG?= \
 		CONFIG_ACX_MAC80211=m \
 		CONFIG_ACX_MAC80211_PCI=y \
-		CONFIG_ACX_MAC80211_USB=y \
-		CONFIG_ACX_MAC80211_MEM=y
+		CONFIG_ACX_MAC80211_USB=m \
+		CONFIG_ACX_MAC80211_MEM=m
 
 	EXTRA_CFLAGS:= \
 		$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=m,%,$(filter %=m,$(EXTRA_KCONFIG)))) \
