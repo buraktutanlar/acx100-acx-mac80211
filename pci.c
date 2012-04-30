@@ -1792,11 +1792,13 @@ unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev)
 		hostdesc = acxpci_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
-        if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK) && !(error & 0x30))
+		if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK)
+			&& !(error & 0x30))
 			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-    	if (IS_ACX111(adev)) {
-			acx111_tx_build_txstatus(adev, txstatus, r111, ack_failures);
+		if (IS_ACX111(adev)) {
+			acx111_tx_build_txstatus(adev, txstatus, r111,
+						ack_failures);
 		} else {
 			txstatus->status.rates[0].count = ack_failures + 1;
 		}
