@@ -1432,6 +1432,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
  *
  * Called directly and only from the IRQ handler
  */
+#if 0 // merged
 // static 
 void acxpci_process_rxdesc(acx_device_t * adev)
 {
@@ -1487,7 +1488,7 @@ void acxpci_process_rxdesc(acx_device_t * adev)
 	adev->rx_tail = tail;
 	FN_EXIT0;
 }
-
+#endif // acxpci_process_rxdesc()
 
 /*
  * BOM Tx Path
@@ -1988,7 +1989,7 @@ void acxpci_irq_work(struct work_struct *work)
 		/* Now do Rx processing */
 		if (irqmasked & HOST_INT_RX_COMPLETE) {
 			log(L_IRQ, "got Rx_Complete IRQ\n");
-			acxpci_process_rxdesc(adev);
+			acx_process_rxdesc(adev);
 		}
 
 

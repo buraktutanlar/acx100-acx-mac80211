@@ -2358,12 +2358,13 @@ int acxmem_proc_diag_output(struct seq_file *file,
  *
  * Called directly and only from the IRQ handler
  */
-static void acxmem_process_rxdesc(acx_device_t *adev) {
+void acx_process_rxdesc(acx_device_t *adev)
+{
 	register rxhostdesc_t *hostdesc;
-	register rxdesc_t *rxdesc;
+	register rxdesc_t *rxdesc = NULL; // silence uninit warning
 	unsigned count, tail;
 	u32 addr;
-	u8 Ctl_8;
+	u8 Ctl_8 = 0; // silence uninit warning due to merge
 
 	FN_ENTER;
 
@@ -2377,28 +2378,73 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 	count = RX_CNT;
 	while (1) {
 		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
+		if (IS_MEM(adev))
+			rxdesc = &adev->rxdesc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
+		if (IS_PCI(adev)) {
+			if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+				&& (hostdesc->Status
+					& cpu_to_le32(DESC_STATUS_FULL)))
+				break;  /* found it! */
+			if (unlikely(!--count))
+				/* hmm, no luck: all descs empty, bail out */
+				goto end;
+			continue; /* skip IS_MEM handling */
+		}
+		/* else IS_MEM */
 		/*
-		 * Unlike the PCI interface, where the ACX can write directly to
-		 * the host descriptors, on the slave memory interface we have to
-		 * pull these.  All we really need to do is check the Ctl_8 field
-		 * in the rx descriptor on the ACX, which should be 0x11000000 if
-		 * we should process it.
+		 * Unlike the PCI interface, where the ACX can write
+		 * directly to the host descriptors, on the slave
+		 * memory interface we have to pull these.  All we
+		 * really need to do is check the Ctl_8 field in the
+		 * rx descriptor on the ACX, which should be
+		 * 0x11000000 if we should process it.
 		 */
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->Ctl_16
+			= read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
 			break; /* found it! */
 
-		if (unlikely(!--count)) /* hmm, no luck: all descs empty, bail out */
+		if (unlikely(!--count))
+			/* hmm, no luck: all descs empty, bail out */
 			goto end;
 	}
 
 	/* now process descriptors, starting with the first we figured out */
+	if (IS_PCI(adev)) {
+		while (1) {
+			log(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
+				tail, hostdesc->Ctl_16, hostdesc->Status);
+
+			acx_process_rxbuf(adev, hostdesc->data);
+			hostdesc->Status = 0;
+			/* flush all writes before adapter sees
+			 * CTL_HOSTOWN change */
+			wmb();
+			/* Host no longer owns this, needs to be LAST */
+			CLEAR_BIT(hostdesc->Ctl_16,
+				cpu_to_le16(DESC_CTL_HOSTOWN));
+
+			/* ok, descriptor is handled, now check the
+			 * next descriptor */
+			hostdesc = &adev->rxhostdesc_start[tail];
+
+			/* if next descriptor is empty, then bail out */
+			if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+				|| !(hostdesc->Status
+					& cpu_to_le32(DESC_STATUS_FULL)))
+				break;
+
+			tail = (tail + 1) % RX_CNT;
+		}
+		goto end; /* skip past IS_MEM */
+	}
+	/* else IF_MEM */
 	while (1) {
-		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
+		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n",
+			__func__, tail, Ctl_8);
 		/*
 		 * If the ACX has CTL_RECLAIM set on this descriptor there
 		 * is no buffer associated; it just wants us to tell it to
@@ -2406,36 +2452,40 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 		 */
 		if (!(Ctl_8 & DESC_CTL_RECLAIM)) {
 
-			/*
-			 * slave interface - pull data now
-			 */
+			/* slave interface - pull data now */
 			hostdesc->length = read_slavemem16(adev,
 					(u32) &(rxdesc->total_length));
-
 			/*
-			 * hostdesc->data is an rxbuffer_t, which includes header information,
-			 * but the length in the data packet doesn't.  The header information
-			 * takes up an additional 12 bytes, so add that to the length we copy.
+			 * hostdesc->data is an rxbuffer_t, which
+			 * includes header information, but the length
+			 * in the data packet doesn't.  The header
+			 * information takes up an additional 12
+			 * bytes, so add that to the length we copy.
 			 */
-			addr = read_slavemem32(adev, (u32) &(rxdesc->ACXMemPtr));
+			addr = read_slavemem32(adev,
+					(u32) &(rxdesc->ACXMemPtr));
 			if (addr) {
 				/*
-				 * How can &(rxdesc->ACXMemPtr) above ever be zero?  Looks like we
-				 * get that now and then - try to trap it for debug.
+				 * How can &(rxdesc->ACXMemPtr) above
+				 * ever be zero?  Looks like we get
+				 * that now and then - try to trap it
+				 * for debug.
 				 */
 				if (addr & 0xffff0000) {
-					log(L_ANY, "%s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
+					log(L_ANY, "%s: rxdesc 0x%08x\n",
+						__func__, (u32) rxdesc);
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
-				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
-						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
+				acxmem_chaincopy_from_slavemem(adev,
+					(u8 *) hostdesc->data, addr,
+					hostdesc->length
+					+ (u32) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
-		} else {
+		} else
 			log(L_ANY, "%s: rx reclaim only!\n", __func__);
-		}
 
 		hostdesc->Status = 0;
 
@@ -2457,7 +2507,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 		hostdesc = &adev->rxhostdesc_start[tail];
 		rxdesc = &adev->rxdesc_start[tail];
 
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->Ctl_16
+			= read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 
 		/* if next descriptor is empty, then bail out */
 		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))
@@ -2465,9 +2516,9 @@ static void acxmem_process_rxdesc(acx_device_t *adev) {
 
 		tail = (tail + 1) % RX_CNT;
 	}
-	end:
-		adev->rx_tail = tail;
-		FN_EXIT0;
+end:
+	adev->rx_tail = tail;
+	FN_EXIT0;
 }
 
 /*
@@ -2662,7 +2713,6 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	acxmem_unlock();
 
 }
-
 
 /*
  * Return an acx pointer to the next transmit data block.
@@ -3500,7 +3550,7 @@ void acxmem_irq_work(struct work_struct *work)
 		/* Rx processing */
 		if (irqmasked & HOST_INT_RX_DATA) {
 			log(L_IRQ, "got Rx_Complete IRQ\n");
-			acxmem_process_rxdesc(adev);
+			acx_process_rxdesc(adev);
 		}
 
 		/* HOST_INT_INFO */
@@ -3712,7 +3762,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 		// then we are then not getting rx irqs anymore
 		if (irqtype & HOST_INT_RX_DATA) {
 			log(L_IRQ, "got Rx_Data IRQ\n");
-			acxmem_process_rxdesc(adev);
+			acx_process_rxdesc(adev);
 		}
 
 		if (irqtype & HOST_INT_TX_COMPLETE) {
