@@ -194,7 +194,7 @@ STATick inline txdesc_t *acxmem_get_txdesc(acx_device_t *adev, int index);
 //= txdesc_t *acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc);
 STATick txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 
-void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
+//= void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
 void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
@@ -2271,7 +2271,8 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len)
 /*
  * Return an acx pointer to the next transmit data block.
  */
-STATick u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
+u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
+{
 	u32 block, next, last_block;
 	int blocks_needed;
 
@@ -2462,7 +2463,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 1 // copied to merge, pci version unmerged.
+#if 0 // copied to merge, pci version merge started.
 void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			struct ieee80211_tx_info *info, struct sk_buff *skb) {
 	/*

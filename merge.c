@@ -2837,8 +2837,8 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 0 // pci version unmerged.
-void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
+#if 1 // pci version merge started
+void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *info, struct sk_buff *skb)
 {
 	/*
@@ -2850,9 +2850,8 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	int rateset;
 	u8 Ctl_8, Ctl2_8;
 	int wlhdr_len;
-	u32 addr;
-
-	acxmem_lock_flags;
+	u32 addr;		// mem.c
+	acxmem_lock_flags;	// mem.c
 
 	FN_ENTER;
 	acxmem_lock();
@@ -2862,7 +2861,10 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = acxmem_get_txhostdesc(adev, txdesc);
+	hostdesc1 = (IS_MEM(adev))
+		? acxmem_get_txhostdesc(adev, txdesc)
+		: acxpci_get_txhostdesc(adev, txdesc);
+
 	// FIXME Cleanup?: wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
 
 	// wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
@@ -2871,18 +2873,26 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/* modify flag status in separate variable to be able to write it back
 	 * in one big swoop later (also in order to have less device memory
 	 * accesses) */
-	Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+	Ctl_8 = (IS_MEM(adev))
+		? read_slavemem8(adev, (u32) &(txdesc->Ctl_8))
+		: txdesc->Ctl_8;
+
 	Ctl2_8 = 0; /* really need to init it to 0, not txdesc->Ctl2_8, it seems */
 
 	hostdesc2 = hostdesc1 + 1;
 
-	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
+	(IS_PCI(adev))
+		? txdesc->total_length = cpu_to_le16(len)
+		: write_slavemem16(adev, (u32) &(txdesc->total_length),
+				cpu_to_le16(len));
+
 	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
 
-	/* DON'T simply set Ctl field to 0 here globally,
-	 * it needs to maintain a consistent flag status (those are state flags!!),
-	 * otherwise it may lead to severe disruption. Only set or reset particular
-	 * flags at the exact moment this is needed... */
+	/* DON'T simply set Ctl field to 0 here globally, it needs to
+	 * maintain a consistent flag status (those are state
+	 * flags!!), otherwise it may lead to severe disruption. Only
+	 * set or reset particular flags at the exact moment this is
+	 * needed... */
 
 	/* let chip do RTS/CTS handshaking before sending
 	 * in case packet size exceeds threshold */
@@ -2903,11 +2913,13 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 ** has only one nonzero bit */
 		txdesc->u.r2.rate111 = cpu_to_le16(rateset);
 
-		/* WARNING: I was never able to make it work with prism54 AP.
-		 ** It was falling down to 1Mbit where shortpre is not applicable,
-		 ** and not working at all at "5,11 basic rates only" setting.
-		 ** I even didn't see tx packets in radio packet capture.
-		 ** Disabled for now --vda */
+		/* WARNING: I was never able to make it work with
+		* prism54 AP.  It was falling down to 1Mbit where
+		* shortpre is not applicable, and not working at all
+		* at "5,11 basic rates only" setting.  I even didn't
+		* see tx packets in radio packet capture.  Disabled
+		* for now --vda */
+
 		/*| ((clt->shortpre && clt->cur!=RATE111_1) ? RATE111_SHORTPRE : 0) */
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
@@ -2921,9 +2933,12 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 		// Get rate for acx100, single rate only for acx100
 		rateset = ieee80211_get_tx_rate(adev->ieee, info)->hw_value;
-		logf1(L_BUFT, "rateset=%u\n", rateset)
-
-		write_slavemem8(adev, (u32) &(txdesc->u.r1.rate), (u8) rateset);
+		logf1(L_BUFT, "rateset=%u\n", rateset);
+			
+		(IS_PCI(adev))
+			? txdesc->u.r1.rate = (u8) rateset
+			: write_slavemem8(adev, (u32) &(txdesc->u.r1.rate),
+					(u8) rateset);
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
 		if (clt->pbcc511) {
@@ -2936,39 +2951,52 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 #endif
 
 		/* set autodma and reclaim and 1st mpdu */
-		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG);
+		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG |
+			(IS_PCI(adev)) 
+			? DESC_CTL_AUTODMA | DESC_CTL_RECLAIM : 0);
 
 #if ACX_FRAGMENTATION
-		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
+		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it
+		 * unconditionally, needs to be set for all non-last
+		 * fragments */
 #endif
 
 		hostdesc1->length = cpu_to_le16(wlhdr_len);
 
-		/*
-		 * Since we're not using autodma copy the packet data to the acx now.
-		 * Even host descriptors point to the packet header, and the odd indexed
-		 * descriptor following points to the packet data.
+		if (IS_PCI(adev))
+			goto is_pci_branch;
+
+		/* acxmem_tx_data():
+		 * Since we're not using autodma copy the packet data
+		 * to the acx now.  Even host descriptors point to the
+		 * packet header, and the odd indexed descriptor
+		 * following points to the packet data.
 		 *
-		 * The first step is to find free memory in the ACX transmit buffers.
-		 * They don't necessarily map one to one with the transmit queue entries,
-		 * so search through them starting just after the last one used.
+		 * The first step is to find free memory in the ACX
+		 * transmit buffers.  They don't necessarily map one
+		 * to one with the transmit queue entries, so search
+		 * through them starting just after the last one used.
 		 */
 		addr = acxmem_allocate_acx_txbuf_space(adev, len);
 		if (addr) {
 			acxmem_chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
 		} else {
 			/*
-			 * Bummer.  We thought we might have enough room in the transmit
-			 * buffers to send this packet, but it turns out we don't.  alloc_tx
-			 * has already marked this transmit descriptor as HOSTOWN and ACXDONE,
-			 * which means the ACX will hang when it gets to this descriptor unless
-			 * we do something about it.  Having a bubble in the transmit queue just
-			 * doesn't seem to work, so we have to reset this transmit queue entry's
-			 * state to its original value and back up our head pointer to point
-			 * back to this entry.
+			 * Bummer.  We thought we might have enough
+			 * room in the transmit buffers to send this
+			 * packet, but it turns out we don't.
+			 * alloc_tx has already marked this transmit
+			 * descriptor as HOSTOWN and ACXDONE, which
+			 * means the ACX will hang when it gets to
+			 * this descriptor unless we do something
+			 * about it.  Having a bubble in the transmit
+			 * queue just doesn't seem to work, so we have
+			 * to reset this transmit queue entry's state
+			 * to its original value and back up our head
+			 * pointer to point back to this entry.
 			 */
 			 // OW FIXME Logging
-			pr_info("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
+			pr_info("Bummer. Not enough room in the txbuf_space.\n");
 			hostdesc1->length = 0;
 			hostdesc2->length = 0;
 			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
@@ -2977,7 +3005,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			adev->tx_head = ((u8*) txdesc - (u8*) adev->txdesc_start)
 					/ adev->txdesc_size;
 			adev->tx_free++;
-			goto end;
+			goto end_of_chain;
 		}
 		/*
 		 * Tell the ACX where the packet is.
@@ -2991,21 +3019,31 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/* clears HOSTOWN and ACXDONE bits, thus telling that the descriptors
 	 * are now owned by the acx100; do this as LAST operation */
 	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
+
 	/* flush writes before we release hostdesc to the adapter here */
-	//wmb();
-
-
+is_pci_branch:
+	if (IS_PCI(adev)) {
+		wmb();
+		CLEAR_BIT(hostdesc1->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		CLEAR_BIT(hostdesc2->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+	}
 	/* write back modified flags */
 	//At this point Ctl_8 should just be FIRSTFRAG
 	CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
-	write_slavemem8(adev, (u32) &(txdesc->Ctl2_8), Ctl2_8);
-	write_slavemem8(adev, (u32) &(txdesc->Ctl_8), Ctl_8);
+	if (IS_MEM(adev)) {
+		write_slavemem8(adev, (u32) &(txdesc->Ctl2_8), Ctl2_8);
+		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), Ctl_8);
+	} else {
+             txdesc->Ctl2_8 = Ctl2_8;
+	     txdesc->Ctl_8 = Ctl_8;
+	}
 	/* unused: txdesc->tx_time = cpu_to_le32(jiffies); */
 
 	/*
 	 * Update the queue indicator to say there's data on the first queue.
 	 */
-	acxmem_update_queue_indicator(adev, 0);
+	if (IS_MEM(adev))
+		acxmem_update_queue_indicator(adev, 0);
 
 	/* flush writes before we tell the adapter that it's its turn now */
 	mmiowb();
@@ -3018,22 +3056,29 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	 * in order to not delay sending any further than absolutely needed
 	 * Do separate logs for acx100/111 to have human-readable rates */
 
-	end:
+end_of_chain:
 
 	// Debugging
 	if (unlikely(acx_debug & (L_XFER|L_DATA))) {
-		u16 fc = ((struct ieee80211_hdr *) hostdesc1->data)->frame_control;
+		u16 fc = ((struct ieee80211_hdr *)
+			hostdesc1->data)->frame_control;
 		if (IS_ACX111(adev))
 			pr_acx("tx: pkt (%s): len %d "
-				"rate %04X%s status %u\n", acx_get_packet_type_string(
-					le16_to_cpu(fc)), len, le16_to_cpu(txdesc->u.r2.rate111), (le16_to_cpu(txdesc->u.r2.rate111)& RATE111_SHORTPRE) ? "(SPr)" : "",
-					adev->status);
+				"rate %04X%s status %u\n",
+				acx_get_packet_type_string(le16_to_cpu(fc)),
+				len, le16_to_cpu(txdesc->u.r2.rate111),
+				(le16_to_cpu(txdesc->u.r2.rate111)
+					& RATE111_SHORTPRE)
+				? "(SPr)" : "",
+				adev->status);
 		else
 			pr_acx("tx: pkt (%s): len %d rate %03u%s status %u\n",
-					acx_get_packet_type_string(fc), len, read_slavemem8(adev,
-							(u32) &(txdesc->u.r1.rate)), (Ctl_8
-							& DESC_CTL_SHORT_PREAMBLE) ? "(SPr)" : "",
-					adev->status);
+				acx_get_packet_type_string(fc), len,
+				read_slavemem8(adev,
+					(u32) &(txdesc->u.r1.rate)),
+				(Ctl_8 & DESC_CTL_SHORT_PREAMBLE)
+				? "(SPr)" : "",
+				adev->status);
 
 		if (0 && acx_debug & L_DATA) {
 			pr_acx("tx: 802.11 [%d]: ", len);

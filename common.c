@@ -5373,11 +5373,11 @@ acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
 {
 	if (IS_PCI(adev))
-		return acxpci_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_USB(adev))
 		return acxusb_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_MEM(adev))
-		return acxmem_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb);
 
 	log(L_ANY, "%s: Unsupported dev_type=%i\n",
 		__func__, (adev)->dev_type);

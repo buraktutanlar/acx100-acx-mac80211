@@ -1563,6 +1563,7 @@ void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
+#if 0 // merged
 void
 acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 struct ieee80211_tx_info *info, struct sk_buff *skb)
@@ -1717,6 +1718,7 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	FN_EXIT0;
 }
+#endif // acxpci_tx_data()
 
 /*
  * acxpci_l_clean_txdesc

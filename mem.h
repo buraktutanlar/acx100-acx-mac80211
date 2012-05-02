@@ -135,3 +135,5 @@ void acxmem_power_led(acx_device_t *adev, int enable);
 int __init acxmem_init_module(void);
 void __exit acxmem_cleanup_module(void);
 
+// for merge of tx_data
+u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
