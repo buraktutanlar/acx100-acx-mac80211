@@ -59,3 +59,29 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acx_process_rxdesc(acx_device_t *adev);
+
+#if !defined(CONFIG_ACX_MAC80211_MEM)
+
+static inline
+u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
+{ return 0; }
+
+static inline
+void acxmem_chaincopy_to_slavemem(acx_device_t *adev,
+			u32 destination, u8 *source, int count)
+{ }
+
+static inline
+void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
+			u8 *destination, u32 source, int count)
+{ }
+
+static inline
+void acxmem_init_acx_txbuf2(acx_device_t *adev)
+{ }
+
+static inline
+void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
+{ }
+
+#endif

@@ -437,7 +437,7 @@ struct acx_device {
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
 
-#ifdef CONFIG_ACX_MAC80211_MEM
+#if (1 || defined(CONFIG_ACX_MAC80211_MEM))
 	u32 acx_txbuf_start;
 	int acx_txbuf_numblocks;
 	u32 acx_txbuf_free; /* addr of head of free list          */

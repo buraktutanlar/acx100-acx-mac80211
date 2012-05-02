@@ -39,6 +39,8 @@
 #include "acx.h"
 #include "usb.h"
 #include "merge.h"
+#include "mem.h"
+#include "pci.h"
 
 /*
  * BOM Config

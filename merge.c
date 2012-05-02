@@ -2352,7 +2352,6 @@ int acxmem_proc_diag_output(struct seq_file *file,
  * ==================================================
  */
 
-#ifdef CONFIG_ACX_MAC80211_MEM
 /*
  * acxmem_l_process_rxdesc
  *
@@ -2525,6 +2524,7 @@ end:
  * BOM Tx Path
  * ==================================================
  */
+#ifdef CONFIG_ACX_MAC80211_MEM
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	int blocks_needed;
@@ -2713,6 +2713,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	acxmem_unlock();
 
 }
+#endif // CONFIG_ACX_MAC80211_MEM
 
 /*
  * Return an acx pointer to the next transmit data block.
@@ -3493,8 +3494,10 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 
 	FN_EXIT0;
 }
-#endif
-#endif
+#endif // acxmem_i_tx_timeout()
+
+#ifdef CONFIG_ACX_MAC80211_MEM
+#endif // CONFIG_ACX_MAC80211_MEM
 
 /*
  * BOM Irq Handling, Timer
