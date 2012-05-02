@@ -56,3 +56,5 @@ static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 
 void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *info, struct sk_buff *skb);
+
+void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);

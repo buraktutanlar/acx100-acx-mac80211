@@ -5356,12 +5356,10 @@ static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 
 static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
-	if (IS_PCI(adev))
-		return acxpci_get_txbuf(adev, tx_opaque);
+	if (IS_PCI(adev) || IS_MEM(adev))
+		return _acx_get_txbuf(adev, tx_opaque);
 	if (IS_USB(adev))
 		return acxusb_get_txbuf(adev, tx_opaque);
-	if (IS_MEM(adev))
-		return acxmem_get_txbuf(adev, tx_opaque);
 
 	log(L_ANY, "%s: Unsupported dev_type=%i\n",
 		__func__, (adev)->dev_type);

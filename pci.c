@@ -130,7 +130,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 
 // Tx Path
 tx_t *acxpci_alloc_tx(acx_device_t * adev);
-void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
+//= void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 //= unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
 void acxpci_clean_txdesc_emergency(acx_device_t * adev);
@@ -1547,11 +1547,12 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 	return (tx_t *) txdesc;
 }
 
-
+#if 0
 void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 {
 	return acxpci_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
+#endif
 
 /*
  * acxpci_l_tx_data
@@ -1582,7 +1583,7 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = acxpci_get_txhostdesc(adev, txdesc);
+	hostdesc1 = acx_get_txhostdesc(adev, txdesc);
 	// FIXME Cleanup?: wireless_header = (struct ieee80211_hdr *)hostdesc1->data;
 
 	//wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control));
@@ -1792,7 +1793,7 @@ unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev)
 		// OW TODO 20091116 Compare mem.c
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
-		hostdesc = acxpci_get_txhostdesc(adev, txdesc);
+		hostdesc = acx_get_txhostdesc(adev, txdesc);
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
 		if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK)
@@ -1869,7 +1870,7 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 	FN_EXIT0;
 }
 
-#if 1 // merge soon
+#if 0 // merge soon
 // static 
 txhostdesc_t *acxpci_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 {

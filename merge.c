@@ -2812,6 +2812,33 @@ acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
 }
 #endif // acxmem_advance_txdesc()
 
+static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
+{
+	int index = (u8 *) txdesc - (u8 *) adev->txdesc_start;
+
+	FN_ENTER;
+
+	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
+		pr_acx("bad txdesc ptr %p\n", txdesc);
+		return NULL;
+	}
+	index /= adev->txdesc_size;
+	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
+		pr_acx("bad txdesc ptr %p\n", txdesc);
+		return NULL;
+	}
+
+	FN_EXIT0;
+
+	return &adev->txhostdesc_start[index * 2];
+}
+
+void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
+{
+	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
+}
+
+#if 0 // merged
 static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
@@ -2826,6 +2853,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 	}
 	return &adev->txhostdesc_start[index * 2];
 }
+#endif // acxmem_get_txhostdesc()
 
 /*
  * acxmem_l_tx_data
@@ -2861,9 +2889,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = (IS_MEM(adev))
-		? acxmem_get_txhostdesc(adev, txdesc)
-		: acxpci_get_txhostdesc(adev, txdesc);
+	hostdesc1 = acx_get_txhostdesc(adev, txdesc);
 
 	// FIXME Cleanup?: wireless_header = (struct ieee80211_hdr *) hostdesc1->data;
 
@@ -3196,9 +3222,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 
 		/* need to check for certain error conditions before we
 		 * clean the descriptor: we still need valid descr data here */
-		hostdesc = (IS_MEM(adev))
-			? acxmem_get_txhostdesc(adev, txdesc)
-			: acxpci_get_txhostdesc(adev, txdesc);
+		hostdesc = acx_get_txhostdesc(adev, txdesc);
 
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
