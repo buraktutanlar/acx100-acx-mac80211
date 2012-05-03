@@ -3038,8 +3038,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 		/* set autodma and reclaim and 1st mpdu */
 		SET_BIT(Ctl_8, DESC_CTL_FIRSTFRAG |
-			(IS_PCI(adev)) 
-			? DESC_CTL_AUTODMA | DESC_CTL_RECLAIM : 0);
+			(IS_PCI(adev) ? (DESC_CTL_AUTODMA | DESC_CTL_RECLAIM) : 0)
+			);
 
 #if ACX_FRAGMENTATION
 		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it
