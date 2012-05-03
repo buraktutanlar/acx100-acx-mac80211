@@ -524,16 +524,19 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
-			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 			/* point to next rxdesc */
-			if (IS_PCI(adev))
+			if (IS_PCI(adev)){
+				rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 				rxdesc->pNextDesc
 					= cpu2acx(mem_offs + sizeof(*rxdesc));
+			}
 			else // IS_MEM
+			{
 				write_slavemem32(adev,
 					(u32) &(rxdesc->pNextDesc),
 					(u32) cpu_to_le32 ((u8 *) rxdesc
 							+ sizeof(*rxdesc)));
+			}
 
 			/* go to the next one */
 			if (IS_PCI(adev))
@@ -544,7 +547,12 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		rxdesc--;
 
 		/* and point to the first making it a ring buffer */
-		rxdesc->pNextDesc = cpu2acx(rx_queue_start);
+		if (IS_PCI(adev))
+			rxdesc->pNextDesc = cpu2acx(rx_queue_start);
+		else // IS_MEM
+			write_slavemem32(adev, (u32) &(rxdesc->pNextDesc),
+					(u32) cpu_to_le32 (rx_queue_start));
+
 	}
 	FN_EXIT0;
 }
