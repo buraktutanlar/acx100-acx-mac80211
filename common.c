@@ -31,6 +31,7 @@
 #include <linux/vmalloc.h>
 #include <linux/firmware.h>
 #include <linux/ethtool.h>
+#include <linux/pci.h>
 #include <linux/nl80211.h>
 #include <linux/ieee80211.h>
 
