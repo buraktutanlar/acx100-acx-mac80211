@@ -61,8 +61,8 @@
  * merged with their pci counterparts.
  */
 #define acxmem_lock_flags	unsigned long flags
-#define acxmem_lock()		spin_lock_irqsave(&adev->spinlock, flags)
-#define acxmem_unlock()		spin_unlock_irqrestore(&adev->spinlock, flags)
+#define acxmem_lock()		if(IS_MEM(adev)) spin_lock_irqsave(&adev->spinlock, flags)
+#define acxmem_unlock()		if(IS_MEM(adev)) spin_unlock_irqrestore(&adev->spinlock, flags)
 
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
 #define acx_readl(v)		readl((v))
