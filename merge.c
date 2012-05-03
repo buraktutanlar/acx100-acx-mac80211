@@ -598,10 +598,11 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* loop over whole send pool */
 		/* FIXME: do we have to do the hostmemptr stuff here?? */
 		for (i = 0; i < TX_CNT; i++) {
-			txdesc->HostMemPtr = ptr2acx(hostmemptr);
+
 			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 			/* reserve two (hdr desc and payload desc) */
 			if (IS_PCI(adev)) {
+				txdesc->HostMemPtr = ptr2acx(hostmemptr);
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
 			}
