@@ -60,7 +60,7 @@
 /* These are used in many mem.c funcs, including those which should be
  * merged with their pci counterparts.
  */
-#define acxmem_lock_flags	unsigned long flags
+#define acxmem_lock_flags	unsigned long flags=0
 #define acxmem_lock()		if(IS_MEM(adev)) spin_lock_irqsave(&adev->spinlock, flags)
 #define acxmem_unlock()		if(IS_MEM(adev)) spin_unlock_irqrestore(&adev->spinlock, flags)
 
