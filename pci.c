@@ -406,6 +406,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
  */
 
 //static
+#if 0 //
 void acxpci_delete_dma_regions(acx_device_t * adev)
 {
 	FN_ENTER;
@@ -424,6 +425,7 @@ void acxpci_delete_dma_regions(acx_device_t * adev)
 
 	FN_EXIT0;
 }
+#endif // acxpci_delete_dma_regions()
 
 // static inline 
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
@@ -2988,7 +2990,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 	}
 
 	/* finally, clean up PCI bus state */
-	acxpci_delete_dma_regions(adev);
+	acx_delete_dma_regions(adev);
 	if (adev->iobase)
 		iounmap(adev->iobase);
 	if (adev->iobase2)
@@ -3045,7 +3047,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	acxpci_delete_dma_regions(adev);
+	acx_delete_dma_regions(adev);
 	pci_save_state(pdev);
 	pci_set_power_state(pdev, PCI_D3hot);
 
@@ -3518,7 +3520,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */
-	acxpci_delete_dma_regions(adev);
+	acx_delete_dma_regions(adev);
 	if (adev->iobase)
 		iounmap(adev->iobase);
 	if (adev->iobase2)

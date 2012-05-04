@@ -4349,6 +4349,31 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 }
 #endif
 
+void acx_delete_dma_regions(acx_device_t *adev)
+{
+	// unsigned long flags; // see comment below
+
+	FN_ENTER;
+	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
+	 * here instead? Or are we that much down the road that it's
+	 * no longer possible here? */
+
+	/* slave memory interface really doesn't like this. */
+	if (IS_PCI(adev))
+		write_reg16(adev, IO_ACX_ENABLE, 0);
+
+	acx_mwait(100);
+
+	/* NO locking for all parts of acxpci_free_desc_queues because
+         * while calling dma_free_coherent() interrupts need to be
+         * free, but if you spinlock the whole acxpci_free_desc_queues
+         * function you'll get an error */
+
+	acx_free_desc_queues(adev);
+
+	FN_EXIT0;
+}
+
 
 /*
  * BOM Driver, Module

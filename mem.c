@@ -134,7 +134,7 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_qu
 //=STATick void acxmem_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 //= STATick void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 //= void acxmem_free_desc_queues(acx_device_t *adev);
-STATick void acxmem_delete_dma_regions(acx_device_t *adev);
+//= STATick void acxmem_delete_dma_regions(acx_device_t *adev);
 //= STATick void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
@@ -783,7 +783,7 @@ void acxmem_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
  * others have been initialised to NULL so this
  * function can be used if only part of the queues were allocated.
  */
-
+#if 0 
 STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 
 	//unsigned long flags;
@@ -805,7 +805,7 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 
 	FN_EXIT0;
 }
-
+#endif // acxmem_delete_dma_regions()
 
 /*
  * BOM Firmware, EEPROM, Phy
@@ -3935,10 +3935,9 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 	if (adev->iobase)
 		iounmap((void *)adev->iobase);
 
-	fail_unknown_chiptype:
-
-	fail_ieee80211_alloc_hw:
-	acxmem_delete_dma_regions(adev);
+fail_unknown_chiptype:
+fail_ieee80211_alloc_hw:
+	acx_delete_dma_regions(adev);
 	platform_set_drvdata(pdev, NULL);
 	ieee80211_free_hw(ieee);
 
@@ -4028,7 +4027,7 @@ STATick int __devexit acxmem_remove(struct platform_device *pdev) {
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */
-	acxmem_delete_dma_regions(adev);
+	acx_delete_dma_regions(adev);
 	if (adev->iobase)
 		iounmap(adev->iobase);
 
@@ -4077,7 +4076,7 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
-	acxmem_delete_dma_regions(adev);
+	acx_delete_dma_regions(adev);
 
 	/*
 	 * Turn the ACX chip off.

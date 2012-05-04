@@ -60,6 +60,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acx_process_rxdesc(acx_device_t *adev);
 
+void acx_delete_dma_regions(acx_device_t *adev);
+
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 
 static inline
