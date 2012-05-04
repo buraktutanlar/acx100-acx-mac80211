@@ -204,7 +204,7 @@ int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
 // Irq Handling, Timer
 //= STATick void acxmem_irq_enable(acx_device_t *adev);
 //= STATick void acxmem_irq_disable(acx_device_t *adev);
-void acxmem_irq_work(struct work_struct *work);
+//=void acxmem_irq_work(struct work_struct *work);
 // STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 //= STATick void acxmem_handle_info_irq(acx_device_t *adev);

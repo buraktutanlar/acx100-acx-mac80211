@@ -5969,19 +5969,22 @@ void acx_init_task_scheduler(acx_device_t *adev) {
 	/* configure task scheduler */
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	if (IS_PCI(adev)) {
-		INIT_WORK(&adev->irq_work, acxpci_irq_work);
+		pr_info("device IS_PCI\n");
+		INIT_WORK(&adev->irq_work, acx_irq_work);
 		return;
 	}
 #endif
 #if defined(CONFIG_ACX_MAC80211_USB)
 	if (IS_USB(adev)) {
+		pr_info("device IS_USB\n");
 		INIT_WORK(&adev->irq_work, acxusb_irq_work);
 		return;
 	}
 #endif
 #if defined(CONFIG_ACX_MAC80211_MEM)
 	if (IS_MEM(adev)) {
-		INIT_WORK(&adev->irq_work, acxmem_irq_work);
+		pr_info("device IS_MEM\n");
+		INIT_WORK(&adev->irq_work, acx_irq_work);
 		return;
 	}
 #endif
@@ -6861,34 +6864,34 @@ static int __init acx_init_module(void)
 
 	acx_struct_size_check();
 
+	/* ACX_GIT_VERSION can be an empty string, if something went
+	   wrong before on Makefile/shell level. We trap this here
+	   ... since trapping empty macro strings in cpp seems not
+	   possible (didn't find how ) !? */
 	pr_info("acx-mac80211, version: %s (git: %s)\n",
-        ACX_RELEASE,
-        // ACX_GIT_VERSION can be an empty string, if something went wrong before on
-        // Makefile/shell level. We trap this here ... since trapping empty macro strings
-        // in cpp seems not possible (didn't find how ) !?
-        strlen(ACX_GIT_VERSION) ? ACX_GIT_VERSION : "unknown");
+		ACX_RELEASE,
+		strlen(ACX_GIT_VERSION) ? ACX_GIT_VERSION : "unknown");
 
 	pr_info("this driver is still EXPERIMENTAL\n"
 	       "acx: please read the README file and/or "
 	       "go to http://acx100.sourceforge.net/wiki for "
 	       "further information\n");
 
+	r1 = r2 = r3 = -EINVAL;
+
 #if defined(CONFIG_ACX_MAC80211_PCI)
+	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	r1 = acxpci_init_module();
-#else
-	r1 = -EINVAL;
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_USB)
+	pr_info("built with CONFIG_ACX_MAC80211_USB\n");
 	r2 = acxusb_init_module();
-#else
-	r2 = -EINVAL;
 #endif
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
+	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	r3 = acxmem_init_module();
-#else
-	r3 = -EINVAL;
 #endif
 
 	if (r3 && r2 && r1) {		/* all three failed! */
@@ -6896,11 +6899,8 @@ static int __init acx_init_module(void)
 		return -EINVAL;
 	}
 
-	// Init acx_e_proc_ops
 	acx_proc_init();
-
-	/* return success if at least one succeeded */
-	return 0;
+	return 0;	// at least one succeeded
 }
 
 static void __exit acx_cleanup_module(void)

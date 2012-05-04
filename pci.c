@@ -141,7 +141,7 @@ void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee802
 // Irq Handling, Timer
 //= static void acxpci_irq_enable(acx_device_t * adev);
 //= static void acxpci_irq_disable(acx_device_t * adev);
-void acxpci_irq_work(struct work_struct *work);
+//=void acxpci_irq_work(struct work_struct *work);
 // static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 //= static void acxpci_handle_info_irq(acx_device_t * adev);
@@ -1289,6 +1289,7 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 
 /* Interrupt handler bottom-half */
 #define IRQ_ITERATE 0
+#if 0 // acxpci_irq_work()
 void acxpci_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
@@ -1331,20 +1332,22 @@ void acxpci_irq_work(struct work_struct *work)
 			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
-		/* First report tx status. Just a guess, but it might be better in
-		 * AP mode with hostapd, because tx status reporting of previous tx
-		 * and new rx receiving are now in sequence. */
+		/* First report tx status. Just a guess, but it might
+		 * be better in AP mode with hostapd, because tx
+		 * status reporting of previous tx and new rx
+		 * receiving are now in sequence. */
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
 			log(L_IRQ, "got Tx_Complete IRQ\n");
 			
-			/* The condition on TX_START_CLEAN was removed, because
-			 * if was creating a race, sequencing problem in AP mode
-			 * during WPA association with different STAs.
+			/* The condition on TX_START_CLEAN was
+			 * removed, because if was creating a race,
+			 * sequencing problem in AP mode during WPA
+			 * association with different STAs.
 			 * 
-			 * The result were many WPA assoc retries of the STA,
-			 * until assoc finally succeeded. It happens 
-			 * sporadically, but still often. I oberserved this 
-			 * with a ath5k and acx STA.
+			 * The result were many WPA assoc retries of
+			 * the STA, until assoc finally succeeded. It
+			 * happens sporadically, but still often. I
+			 * oberserved this with a ath5k and acx STA.
 			 * 
 			 * It manifested as followed:
 			 * 1) STA authenticates and associates
@@ -1354,20 +1357,24 @@ void acxpci_irq_work(struct work_struct *work)
 			 * 4) And then it was looping in retrying this seq, 
 			 *    until it succeed 'by accident'
 			 *
-			 * Removing the TX_START_CLEAN check and always report
-			 * directly on the tx status resolved this problem.
-			 * Now WPA assoc succeeds directly and robust.			 			 			 			 
-			 */			 
+			 * Removing the TX_START_CLEAN check and
+			 * always report directly on the tx status
+			 * resolved this problem.  Now WPA assoc
+			 * succeeds directly and robust.
+			 */		 
 			acx_tx_clean_txdesc(adev);
 
 			// Restart queue if stopped and enough tx-descr free
-			if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(
-					adev->ieee)) {
-				log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
-						adev->tx_free);
+			if ((adev->tx_free >= TX_START_QUEUE)
+				&& acx_queue_stopped(adev->ieee)) {
+
+				log(L_BUF,
+					"tx: wake queue (avail. Tx desc %u)\n",
+					adev->tx_free);
 				acx_wake_queue(adev->ieee, NULL);
 				// Schedule the tx. Doesn't harm. Required in case of irq-iteration.
-				ieee80211_queue_work(adev->ieee, &adev->tx_work);
+				ieee80211_queue_work(adev->ieee,
+						&adev->tx_work);
 			}
 
 		}
@@ -1380,9 +1387,9 @@ void acxpci_irq_work(struct work_struct *work)
 
 
 #if IRQ_ITERATE
-		/* Tx new frames, after rx processing
-		 * If queue is running. We indirectly use this as indicator,
-		 * that tx_free >= TX_START_QUEUE */
+		/* Tx new frames, after rx processing.  If queue is
+		 * running. We indirectly use this as indicator, that
+		 * tx_free >= TX_START_QUEUE */
 		if (!acx_queue_stopped(adev->ieee))
 				acx_tx_queue_go(adev);
 #endif
@@ -1412,17 +1419,18 @@ void acxpci_irq_work(struct work_struct *work)
 	}
 #endif
 
-	/* Routine to perform blink with range
-	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
-	if (unlikely(adev->led_power == 2))
-		update_link_quality_led(adev);
+	/* Routine to perform blink with range FIXME:
+	 * update_link_quality_led is a stub - add proper code and
+	 * enable this again: if (unlikely(adev->led_power == 2))
+	 * update_link_quality_led(adev);
 	*/
 
 	// Renable irq-signal again for irqs we are interested in
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
 	write_flush(adev);
 
-	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
+	/* after_interrupt_jobs: need to be done outside acx_lock
+	 * (Sleeping required. None atomic) */
 	if (adev->after_interrupt_jobs){
 		acx_after_interrupt_task(adev);
 	}
@@ -1431,8 +1439,8 @@ void acxpci_irq_work(struct work_struct *work)
 
 	FN_EXIT0;
 	return;
-
 }
+#endif // acxpci_irq_work()
 
 /*
  * acxpci_handle_info_irq

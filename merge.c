@@ -3599,20 +3599,31 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
  */
 
 void acx_handle_info_irq(acx_device_t *adev); // reorder later
-#ifdef CONFIG_ACX_MAC80211_MEM
+
+#if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
+
+#define IRQ_ITERATE 0 // mem.c has it 1, but thats in #if0d code.
+
 /* Interrupt handler bottom-half */
-// OW TODO Copy of pci: possible merging.
-void acxmem_irq_work(struct work_struct *work)
+void acx_irq_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, irq_work);
 	int irqreason;
 	int irqmasked;
 	acxmem_lock_flags;
+	unsigned int irqcnt = 0; // but always do-while once, see IRQ_ITERATE
 
 	FN_ENTER;
 
 	acx_sem_lock(adev);
 	acxmem_lock();
+
+	/* OW, 20100611: Iterating and latency:
+	 * IRQ iteration can improve latency, by avoiding waiting for
+	 * the scheduling of the tx worklet.
+	 */
+
+	do {  // IRQ_ITERATE, but at least once
 
 	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
 	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
@@ -3620,7 +3631,11 @@ void acxmem_irq_work(struct work_struct *work)
 	 */
 	irqreason = read_reg16(adev, IO_ACX_IRQ_REASON);
 	irqmasked = irqreason & ~adev->irq_mask;
-	log(L_IRQ, "acxpci: irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
+	log(L_IRQ, "irqstatus=%04X, irqmasked==%04X\n", irqreason, irqmasked);
+
+#if IRQ_ITERATE
+	if (!irqmasked) break;
+#endif
 
 		/* HOST_INT_CMD_COMPLETE handling */
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
@@ -3630,30 +3645,72 @@ void acxmem_irq_work(struct work_struct *work)
 		}
 
 		/* Tx reporting */
+		/* First report tx status. Just a guess, but it might
+		 * be better in AP mode with hostapd, because tx
+		 * status reporting of previous tx and new rx
+		 * receiving are now in sequence. */
+
 		if (irqmasked & HOST_INT_TX_COMPLETE) {
 			log(L_IRQ, "got Tx_Complete IRQ\n");
-				acx_tx_clean_txdesc(adev);
 
-				// Restart queue if stopped and enough tx-descr free
-				if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-					log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
-							adev->tx_free);
-					acx_wake_queue(adev->ieee, NULL);
-					ieee80211_queue_work(adev->ieee, &adev->tx_work);
-				}
+			/* The condition on TX_START_CLEAN was
+			 * removed, because if was creating a race,
+			 * sequencing problem in AP mode during WPA
+			 * association with different STAs.
+			 * 
+			 * The result were many WPA assoc retries of
+			 * the STA, until assoc finally succeeded. It
+			 * happens sporadically, but still often. I
+			 * oberserved this with a ath5k and acx STA.
+			 * 
+			 * It manifested as followed:
+			 * 1) STA authenticates and associates
+			 * 2) And then hostapd reported reception of a 
+			 *    Data/PS-poll frame of an unassociated STA
+			 * 3) hostapd sends disassoc frame
+			 * 4) And then it was looping in retrying this seq, 
+			 *    until it succeed 'by accident'
+			 *
+			 * Removing the TX_START_CLEAN check and
+			 * always report directly on the tx status
+			 * resolved this problem.  Now WPA assoc
+			 * succeeds directly and robust.
+			 */		 
+			acx_tx_clean_txdesc(adev);
 
+			// Restart queue if stopped and enough tx-descr free
+			if ((adev->tx_free >= TX_START_QUEUE)
+				&& acx_queue_stopped(adev->ieee)) {
+				log(L_BUF,
+					"tx: wake queue (avail. Tx desc %u)\n",
+					adev->tx_free);
+				acx_wake_queue(adev->ieee, NULL);
+				/* Schedule the tx. Doesn't harm.
+				   Required in case of irq-iteration.
+				*/
+				ieee80211_queue_work(adev->ieee,
+						&adev->tx_work);
+			}
 		}
 
-		/* Rx processing */
-		if (irqmasked & HOST_INT_RX_DATA) {
+		/* Rx processing TODO - examine merged flags !!! */
+		if (irqmasked
+			& (IS_MEM(adev)
+			   ? HOST_INT_RX_DATA : HOST_INT_RX_COMPLETE)) {
 			log(L_IRQ, "got Rx_Complete IRQ\n");
 			acx_process_rxdesc(adev);
 		}
+#if IRQ_ITERATE
+		/* Tx new frames, after rx processing.  If queue is
+		 * running. We indirectly use this as indicator, that
+		 * tx_free >= TX_START_QUEUE */
+		if (!acx_queue_stopped(adev->ieee))
+			acx_tx_queue_go(adev);
+#endif
 
 		/* HOST_INT_INFO */
-		if (irqmasked & HOST_INT_INFO) {
+		if (irqmasked & HOST_INT_INFO)
 			acx_handle_info_irq(adev);
-		}
 
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
@@ -3667,15 +3724,15 @@ void acxmem_irq_work(struct work_struct *work)
 		/* These we just log, but either they happen rarely
 		 * or we keep them masked out */
 		if (acx_debug & L_IRQ)
-		{
 			acx_log_irq(irqreason);
-		}
 
-	/* Routine to perform blink with range
-	 * FIXME: update_link_quality_led is a stub - add proper code and enable this again:
-	if (unlikely(adev->led_power == 2))
-		update_link_quality_led(adev);
-	*/
+	} while (irqcnt--);
+
+	/* Routine to perform blink with range FIXME:
+	 * update_link_quality_led is a stub - add proper code and
+	 * enable this again: if (unlikely(adev->led_power == 2))
+	 * update_link_quality_led(adev);
+	 */
 
 	// Renable irq-signal again for irqs we are interested in
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -3683,16 +3740,15 @@ void acxmem_irq_work(struct work_struct *work)
 
 	acxmem_unlock();
 
-	// after_interrupt_jobs: need to be done outside acx_lock (Sleeping required. None atomic)
-	if (adev->after_interrupt_jobs){
+	/* after_interrupt_jobs: need to be done outside acx_lock
+	   (Sleeping required. None atomic) */
+	if (adev->after_interrupt_jobs)
 		acx_after_interrupt_task(adev);
-	}
 
 	acx_sem_unlock(adev);
 
 	FN_EXIT0;
 	return;
-
 }
 #endif
 
