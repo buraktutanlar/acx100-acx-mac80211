@@ -288,17 +288,17 @@ int acx_create_rx_host_desc_queue(acx_device_t * adev)
 	 * (and don't dare asking me why I'm warning you about that...) */
 	for (i = 0; i < RX_CNT; i++) {
 		hostdesc->data = rxbuf;
-		hostdesc->data_phy = cpu2acx(rxbuf_phy);
-		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		hostdesc->hd.data_phy = cpu2acx(rxbuf_phy);
+		hostdesc->hd.length = cpu_to_le16(RX_BUFFER_SIZE);
+		CLEAR_BIT(hostdesc->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 		rxbuf++;
 		rxbuf_phy += sizeof(*rxbuf);
 		hostdesc_phy += sizeof(*hostdesc);
-		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		hostdesc->hd.desc_phy_next = cpu2acx(hostdesc_phy);
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
 	FN_EXIT1(OK);
 	return OK;
       fail:
@@ -354,7 +354,7 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 ** We use only one txhostdesc per txdesc, but it looks like
 ** acx111 is buggy: it accesses second txhostdesc
 ** (via hostdesc.desc_phy_next field) even if
-** txdesc->length == hostdesc->length and thus
+** txdesc->hd.length == hostdesc->hd.length and thus
 ** entire packet was placed into first txhostdesc.
 ** Due to this bug acx111 hangs unless second txhostdesc
 ** has le16_to_cpu(hostdesc.length) = 3 (or larger)
@@ -368,12 +368,12 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 	for (i = 0; i < TX_CNT * 2; i++) {
 		hostdesc_phy += sizeof(*hostdesc);
 		if (!(i & 1)) {
-			hostdesc->data_phy = cpu2acx(txbuf_phy);
+			hostdesc->hd.data_phy = cpu2acx(txbuf_phy);
 			/* hostdesc->data_offset = ... */
 			/* hostdesc->reserved = ... */
-			hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-			/* hostdesc->length = ... */
-			hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+			hostdesc->hd.Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+			/* hostdesc->hd.length = ... */
+			hostdesc->hd.desc_phy_next = cpu2acx(hostdesc_phy);
 			hostdesc->pNext = ptr2acx(NULL);
 			/* hostdesc->Status = ... */
 			/* below: non-hardware fields */
@@ -382,12 +382,12 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 			txbuf += WLAN_A4FR_MAXLEN_WEP_FCS;
 			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS;
 		} else {
-			/* hostdesc->data_phy = ... */
+			/* hostdesc->hd.data_phy = ... */
 			/* hostdesc->data_offset = ... */
 			/* hostdesc->reserved = ... */
-			/* hostdesc->Ctl_16 = ... */
-			hostdesc->length = cpu_to_le16(3);	/* bug workaround */
-			/* hostdesc->desc_phy_next = ... */
+			/* hostdesc->hd.Ctl_16 = ... */
+			hostdesc->hd.length = cpu_to_le16(3);	/* bug workaround */
+			/* hostdesc->hd.desc_phy_next = ... */
 			/* hostdesc->pNext = ... */
 			/* hostdesc->Status = ... */
 			/* below: non-hardware fields */
@@ -402,12 +402,12 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 	for (i = 0; i < TX_CNT * 2; i++) {
 		hostdesc_phy += sizeof(*hostdesc);
 
-		hostdesc->data_phy = cpu2acx(txbuf_phy);
+		hostdesc->hd.data_phy = cpu2acx(txbuf_phy);
 		/* done by memset(0): hostdesc->data_offset = 0; */
 		/* hostdesc->reserved = ... */
-		hostdesc->Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
-		/* hostdesc->length = ... */
-		hostdesc->desc_phy_next = cpu2acx(hostdesc_phy);
+		hostdesc->hd.Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
+		/* hostdesc->hd.length = ... */
+		hostdesc->hd.desc_phy_next = cpu2acx(hostdesc_phy);
 		/* done by memset(0): hostdesc->pNext = ptr2acx(NULL); */
 		/* hostdesc->Status = ... */
 		/* ->data is a non-hardware field: */
@@ -432,7 +432,7 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -770,7 +770,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 		return;
 
 	for (i = 0; i < RX_CNT; i++) {
-		if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 			pr_acx("rx: buf %d full\n", i);
 		rxhostdesc++;
@@ -2392,7 +2392,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 
 		if (IS_PCI(adev)) {
-			if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+			if ((hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 				&& (hostdesc->Status
 					& cpu_to_le32(DESC_STATUS_FULL)))
 				break;  /* found it! */
@@ -2410,7 +2410,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		 * rx descriptor on the ACX, which should be
 		 * 0x11000000 if we should process it.
 		 */
-		Ctl_8 = hostdesc->Ctl_16
+		Ctl_8 = hostdesc->hd.Ctl_16
 			= read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
 			break; /* found it! */
@@ -2424,7 +2424,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 	if (IS_PCI(adev)) {
 		while (1) {
 			log(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
-				tail, hostdesc->Ctl_16, hostdesc->Status);
+				tail, hostdesc->hd.Ctl_16, hostdesc->Status);
 
 			acx_process_rxbuf(adev, hostdesc->data);
 			hostdesc->Status = 0;
@@ -2432,7 +2432,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 			 * CTL_HOSTOWN change */
 			wmb();
 			/* Host no longer owns this, needs to be LAST */
-			CLEAR_BIT(hostdesc->Ctl_16,
+			CLEAR_BIT(hostdesc->hd.Ctl_16,
 				cpu_to_le16(DESC_CTL_HOSTOWN));
 
 			/* ok, descriptor is handled, now check the
@@ -2440,7 +2440,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 			hostdesc = &adev->rxhostdesc_start[tail];
 
 			/* if next descriptor is empty, then bail out */
-			if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+			if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 				|| !(hostdesc->Status
 					& cpu_to_le32(DESC_STATUS_FULL)))
 				break;
@@ -2461,7 +2461,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		if (!(Ctl_8 & DESC_CTL_RECLAIM)) {
 
 			/* slave interface - pull data now */
-			hostdesc->length = read_slavemem16(adev,
+			hostdesc->hd.length = read_slavemem16(adev,
 					(u32) &(rxdesc->total_length));
 			/*
 			 * hostdesc->data is an rxbuffer_t, which
@@ -2487,7 +2487,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 				}
 				acxmem_chaincopy_from_slavemem(adev,
 					(u8 *) hostdesc->data, addr,
-					hostdesc->length
+					hostdesc->hd.length
 					+ (u32) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_process_rxbuf(adev, hostdesc->data);
@@ -2515,7 +2515,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		hostdesc = &adev->rxhostdesc_start[tail];
 		rxdesc = &adev->rxdesc_start[tail];
 
-		Ctl_8 = hostdesc->Ctl_16
+		Ctl_8 = hostdesc->hd.Ctl_16
 			= read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 
 		/* if next descriptor is empty, then bail out */
@@ -2972,7 +2972,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		: write_slavemem16(adev, (u32) &(txdesc->total_length),
 				cpu_to_le16(len));
 
-	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
+	hostdesc2->hd.length = cpu_to_le16(len - wlhdr_len);
 
 	/* DON'T simply set Ctl field to 0 here globally, it needs to
 	 * maintain a consistent flag status (those are state
@@ -3012,7 +3012,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		/* should add this to rate111 above as necessary */
 		| (clt->pbcc511 ? RATE111_PBCC511 : 0)
 #endif
-		hostdesc1->length = cpu_to_le16(len);
+		hostdesc1->hd.length = cpu_to_le16(len);
 	}
 	/* ACX100 */
 	else {
@@ -3047,7 +3047,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		 * fragments */
 #endif
 
-		hostdesc1->length = cpu_to_le16(wlhdr_len);
+		hostdesc1->hd.length = cpu_to_le16(wlhdr_len);
 
 		if (IS_PCI(adev))
 			goto is_pci_branch;
@@ -3083,8 +3083,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			 */
 			 // OW FIXME Logging
 			pr_info("Bummer. Not enough room in the txbuf_space.\n");
-			hostdesc1->length = 0;
-			hostdesc2->length = 0;
+			hostdesc1->hd.length = 0;
+			hostdesc2->hd.length = 0;
 			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
 			write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
 					| DESC_CTL_FIRSTFRAG);
@@ -3110,8 +3110,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 is_pci_branch:
 	if (IS_PCI(adev)) {
 		wmb();
-		CLEAR_BIT(hostdesc1->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-		CLEAR_BIT(hostdesc2->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		CLEAR_BIT(hostdesc1->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		CLEAR_BIT(hostdesc2->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 	}
 	/* write back modified flags */
 	//At this point Ctl_8 should just be FIRSTFRAG
@@ -4227,11 +4227,11 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 					"Status 0x%X\n",
 					i,
 					rxhostdesc,
-					acx2cpu(rxhostdesc->data_phy),
+					acx2cpu(rxhostdesc->hd.data_phy),
 					rxhostdesc->data_offset,
-					le16_to_cpu(rxhostdesc->Ctl_16),
-					le16_to_cpu(rxhostdesc->length),
-					acx2cpu(rxhostdesc->desc_phy_next),
+					le16_to_cpu(rxhostdesc->hd.Ctl_16),
+					le16_to_cpu(rxhostdesc->hd.length),
+					acx2cpu(rxhostdesc->hd.desc_phy_next),
 					rxhostdesc->Status);
 			rxhostdesc++;
 		}
@@ -4284,11 +4284,11 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 					"Status 0x%X\n",
 					i,
 					txhostdesc,
-					acx2cpu(txhostdesc->data_phy),
+					acx2cpu(txhostdesc->hd.data_phy),
 					txhostdesc->data_offset,
-					le16_to_cpu(txhostdesc->Ctl_16),
-					le16_to_cpu(txhostdesc->length),
-					acx2cpu(txhostdesc->desc_phy_next),
+					le16_to_cpu(txhostdesc->hd.Ctl_16),
+					le16_to_cpu(txhostdesc->hd.length),
+					acx2cpu(txhostdesc->hd.desc_phy_next),
 					le32_to_cpu(txhostdesc->Status));
 			txhostdesc++;
 		}

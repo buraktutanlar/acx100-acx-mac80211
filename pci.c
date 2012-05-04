@@ -297,7 +297,7 @@ static void acxpci_create_rx_desc_queue(acx_device_t * adev,
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
-			rxdesc->Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
+			rxdesc->hd.Ctl_8 = DESC_CTL_RECLAIM | DESC_CTL_AUTODMA;
 			/* point to next rxdesc */
 			rxdesc->pNextDesc
 				= cpu2acx(mem_offs + sizeof(*rxdesc));
@@ -353,7 +353,7 @@ static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start)
 		/* FIXME: do we have to do the hostmemptr stuff here?? */
 		for (i = 0; i < TX_CNT; i++) {
 			txdesc->HostMemPtr = ptr2acx(hostmemptr);
-			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
+			txdesc->hd.Ctl_8 = DESC_CTL_HOSTOWN;
 			/* reserve two (hdr desc and payload desc) */
 			hostdesc += 2;
 			hostmemptr += 2 * sizeof(*hostdesc);
@@ -1364,9 +1364,9 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	if (rxhostdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx_tail) ? " [tail]" : "";
-			if ((rxhostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 			    && (rxhostdesc->
-				Status & cpu_to_le32(DESC_STATUS_FULL)))
+				    Status & cpu_to_le32(DESC_STATUS_FULL)))
 				seq_printf(file, "%02u FULL%s\n", i, rtl);
 			else
 				seq_printf(file, "%02u empty%s\n", i, rtl);
@@ -1454,7 +1454,7 @@ void acxpci_process_rxdesc(acx_device_t * adev)
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
-		if ((hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		if ((hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 		    && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break;	/* found it! */
 
@@ -1465,20 +1465,20 @@ void acxpci_process_rxdesc(acx_device_t * adev)
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
 		log(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
-		    tail, hostdesc->Ctl_16, hostdesc->Status);
+		    tail, hostdesc->hd.Ctl_16, hostdesc->Status);
 
 		acx_process_rxbuf(adev, hostdesc->data);
 		hostdesc->Status = 0;
 		/* flush all writes before adapter sees CTL_HOSTOWN change */
 		wmb();
 		/* Host no longer owns this, needs to be LAST */
-		CLEAR_BIT(hostdesc->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+		CLEAR_BIT(hostdesc->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
 		/* ok, descriptor is handled, now check the next descriptor */
 		hostdesc = &adev->rxhostdesc_start[tail];
 
 		/* if next descriptor is empty, then bail out */
-		if (!(hostdesc->Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 		    || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break;
 
@@ -1678,8 +1678,8 @@ acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
 	/* flush writes before we release hostdesc to the adapter here */
 	wmb();
-	CLEAR_BIT(hostdesc1->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
-	CLEAR_BIT(hostdesc2->Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+	CLEAR_BIT(hostdesc1->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+	CLEAR_BIT(hostdesc2->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
 	/* write back modified flags */
 	CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
@@ -2333,7 +2333,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 			       rxhostdesc,
 			       acx2cpu(rxhostdesc->data_phy),
 			       rxhostdesc->data_offset,
-			       le16_to_cpu(rxhostdesc->Ctl_16),
+			       le16_to_cpu(rxhostdesc->hd.Ctl_16),
 			       le16_to_cpu(rxhostdesc->length),
 			       acx2cpu(rxhostdesc->desc_phy_next),
 			       rxhostdesc->Status);
@@ -2389,7 +2389,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 			       txhostdesc,
 			       acx2cpu(txhostdesc->data_phy),
 			       txhostdesc->data_offset,
-			       le16_to_cpu(txhostdesc->Ctl_16),
+			       le16_to_cpu(txhostdesc->hd.Ctl_16),
 			       le16_to_cpu(txhostdesc->length),
 			       acx2cpu(txhostdesc->desc_phy_next),
 			       le32_to_cpu(txhostdesc->Status));

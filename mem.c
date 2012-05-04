@@ -581,7 +581,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	 * (and don't dare asking me why I'm warning you about that...) */
 	for (i = 0; i < RX_CNT; i++) {
 		hostdesc->data = rxbuf;
-		hostdesc->length = cpu_to_le16(RX_BUFFER_SIZE);
+		hostdesc->hd.length = cpu_to_le16(RX_BUFFER_SIZE);
 		rxbuf++;
 		hostdesc++;
 	}
@@ -2166,7 +2166,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
 		 * in the rx descriptor on the ACX, which should be 0x11000000 if
 		 * we should process it.
 		 */
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
 			break; /* found it! */
 
@@ -2187,7 +2187,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
 			/*
 			 * slave interface - pull data now
 			 */
-			hostdesc->length = read_slavemem16(adev,
+			hostdesc->hd.length = read_slavemem16(adev,
 					(u32) &(rxdesc->total_length));
 
 			/*
@@ -2207,7 +2207,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
 					panic("Bad access!");
 				}
 				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
-						hostdesc->length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
+						hostdesc->hd.length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
@@ -2235,7 +2235,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
 		hostdesc = &adev->rxhostdesc_start[tail];
 		rxdesc = &adev->rxdesc_start[tail];
 
-		Ctl_8 = hostdesc->Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 
 		/* if next descriptor is empty, then bail out */
 		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))
@@ -2502,7 +2502,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	hostdesc2 = hostdesc1 + 1;
 
 	write_slavemem16(adev, (u32) &(txdesc->total_length), cpu_to_le16(len));
-	hostdesc2->length = cpu_to_le16(len - wlhdr_len);
+	hostdesc2->hd.length = cpu_to_le16(len - wlhdr_len);
 
 	/* DON'T simply set Ctl field to 0 here globally,
 	 * it needs to maintain a consistent flag status (those are state flags!!),
@@ -2539,7 +2539,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		/* should add this to rate111 above as necessary */
 		| (clt->pbcc511 ? RATE111_PBCC511 : 0)
 #endif
-		hostdesc1->length = cpu_to_le16(len);
+		hostdesc1->hd.length = cpu_to_le16(len);
 	}
 	/* ACX100 */
 	else {
@@ -2567,7 +2567,7 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		/* SET_BIT(Ctl2_8, DESC_CTL2_MORE_FRAG); cannot set it unconditionally, needs to be set for all non-last fragments */
 #endif
 
-		hostdesc1->length = cpu_to_le16(wlhdr_len);
+		hostdesc1->hd.length = cpu_to_le16(wlhdr_len);
 
 		/*
 		 * Since we're not using autodma copy the packet data to the acx now.
@@ -2594,8 +2594,8 @@ void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			 */
 			 // OW FIXME Logging
 			pr_info("acxmem_l_tx_data: Bummer. Not enough room in the txbuf_space.\n");
-			hostdesc1->length = 0;
-			hostdesc2->length = 0;
+			hostdesc1->hd.length = 0;
+			hostdesc2->hd.length = 0;
 			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
 			write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
 					| DESC_CTL_FIRSTFRAG);
@@ -3553,8 +3553,8 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 					rxhostdesc,
 					acx2cpu(rxhostdesc->data_phy),
 					rxhostdesc->data_offset,
-					le16_to_cpu(rxhostdesc->Ctl_16),
-					le16_to_cpu(rxhostdesc->length),
+					le16_to_cpu(rxhostdesc->hd.Ctl_16),
+					le16_to_cpu(rxhostdesc->hd.length),
 					acx2cpu(rxhostdesc->desc_phy_next),
 					rxhostdesc->Status);
 			rxhostdesc++;
@@ -3610,8 +3610,8 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 					txhostdesc,
 					acx2cpu(txhostdesc->data_phy),
 					txhostdesc->data_offset,
-					le16_to_cpu(txhostdesc->Ctl_16),
-					le16_to_cpu(txhostdesc->length),
+					le16_to_cpu(txhostdesc->hd.Ctl_16),
+					le16_to_cpu(txhostdesc->hd.length),
 					acx2cpu(txhostdesc->desc_phy_next),
 					le32_to_cpu(txhostdesc->Status));
 			txhostdesc++;
