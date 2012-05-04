@@ -991,13 +991,13 @@ static inline void acx_read_eeprom_area(acx_device_t *adev)
 }
 
 /*
- * acxx_read_phy_reg - from mem.c, has locking which looks harmless for pci.c
+ * _acx_read_phy_reg - from mem.c, has locking which looks harmless for pci.c
  *
  * common.c has acx_read_phy_reg too, called (pci|mem|usb), now (usb|x)
  * Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
-int acxx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) 
+int _acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) 
 {
 	int result = NOT_OK;
 	int count;
@@ -1038,22 +1038,27 @@ fail:
 	return result;
 }
 
-#if 0 // use mem.c til later
-int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
+#if 1 // use mem.c til later
+int _acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
+{
 	int count;
 	acxmem_lock_flags;
 
 	FN_ENTER;
 	acxmem_lock();
 
-	/* mprusko said that 32bit accesses result in distorted sensitivity
-	 * on his card. Unconfirmed, looks like it's not true (most likely since we
-	 * now properly flush writes). */
+	/* mprusko said that 32bit accesses result in distorted
+	 * sensitivity on his card. Unconfirmed, looks like it's not
+	 * true (most likely since we now properly flush writes).
+	 */
 	write_reg32(adev, IO_ACX_PHY_DATA, value);
 	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
 	write_flush(adev);
 	write_reg32(adev, IO_ACX_PHY_CTL, 1);
 	write_flush(adev);
+
+	if (IS_PCI(adev))
+		goto skip_mem_wait_loop;
 
 	// todo recode as fn
 	// this not present for pci
@@ -1064,16 +1069,15 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 		 * awful delay, sometimes also failure.
 		 * Doesn't matter anyway (only small delay). */
 		if (unlikely(!--count)) {
-			pr_acx("%s: timeout waiting for phy read\n", wiphy_name(
-					adev->ieee->wiphy));
+			pr_acx("%s: timeout waiting for phy read\n",
+				wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
 		cpu_relax();
 	}
-
+skip_mem_wait_loop:
 	log(L_DEBUG, "radio PHY write 0x%02X at 0x%04X\n", value, reg);
 fail:
-
 	acxmem_unlock();
 	FN_EXIT1(OK);  // FN_EXIT0 in pci
 	return OK;

@@ -97,7 +97,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_a
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 //= static inline void acxpci_read_eeprom_area(acx_device_t * adev);
 //int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
-int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
+//=int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 // static 
 int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 // static 
@@ -394,6 +394,7 @@ inline void acxpci_read_eeprom_area(acx_device_t * adev)
 #endif // ACX_DEBUG > 1 acxpci_read_eeprom_area() body 
 }
 
+#if 0 // acxpci_write_phy_reg()
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	FN_ENTER;
@@ -411,7 +412,7 @@ int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	FN_EXIT0;
 	return OK;
 }
-
+#endif // acxpci_write_phy_reg()
 
 
 /*

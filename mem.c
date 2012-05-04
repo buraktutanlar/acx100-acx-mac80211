@@ -144,7 +144,7 @@ int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charb
 #endif
 STATick inline void acxmem_read_eeprom_area(acx_device_t *adev);
 int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
+//=int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 //STATick 
 int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
 //static
@@ -758,7 +758,7 @@ STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
 #endif
 }
 
-#if 1 // copied to merge.c
+#if 0 // copied to merge.c
 int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
 	int count;
 	acxmem_lock_flags;
