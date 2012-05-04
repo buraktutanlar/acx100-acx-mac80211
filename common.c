@@ -1472,6 +1472,7 @@ acx_parse_configoption(acx_device_t * adev,
 			 const acx111_ie_configoption_t * pcfg)
 {
 	const u8 *pEle;
+	struct eeprom_cfg *acfg = &adev->cfgopt;
 	int i;
 	int is_acx111 = IS_ACX111(adev);
 
@@ -1498,57 +1499,57 @@ acx_parse_configoption(acx_device_t * adev,
 
 	pEle += 4;		/* skip (type,len) header */
 
-	memcpy(adev->cfgopt.NVSv, pEle, sizeof(adev->cfgopt.NVSv));
-	pEle += sizeof(adev->cfgopt.NVSv);
+	memcpy(acfg->NVSv, pEle, sizeof(acfg->NVSv));
+	pEle += sizeof(acfg->NVSv);
 
 	pr_info("NVSv: ");
-	for (i = 0; i < sizeof(adev->cfgopt.NVSv); i++) {
-		printk("%02X ", adev->cfgopt.NVSv[i]);
+	for (i = 0; i < sizeof(acfg->NVSv); i++) {
+		printk("%02X ", acfg->NVSv[i]);
 	}
 	printk("\n");
 
 	if (is_acx111) {
-		adev->cfgopt.NVS_vendor_offs = le16_to_cpu(*(u16 *) pEle);
-		pEle += sizeof(adev->cfgopt.NVS_vendor_offs);
+		acfg->NVS_vendor_offs = le16_to_cpu(*(u16 *) pEle);
+		pEle += sizeof(acfg->NVS_vendor_offs);
 
-		adev->cfgopt.probe_delay = 200;	/* good default value? */
+		acfg->probe_delay = 200;	/* good default value? */
 		pEle += 2;	/* FIXME: unknown, value 0x0001 */
 	} else {
-		memcpy(adev->cfgopt.MAC, pEle, sizeof(adev->cfgopt.MAC));
-		pEle += sizeof(adev->cfgopt.MAC);
+		memcpy(acfg->MAC, pEle, sizeof(acfg->MAC));
+		pEle += sizeof(acfg->MAC);
 
-		adev->cfgopt.probe_delay = le16_to_cpu(*(u16 *) pEle);
-		pEle += sizeof(adev->cfgopt.probe_delay);
-		if ((adev->cfgopt.probe_delay < 100)
-		    || (adev->cfgopt.probe_delay > 500)) {
+		acfg->probe_delay = le16_to_cpu(*(u16 *) pEle);
+		pEle += sizeof(acfg->probe_delay);
+		if ((acfg->probe_delay < 100)
+		    || (acfg->probe_delay > 500)) {
 			pr_info("strange probe_delay value %d, "
-			       "tweaking to 200\n", adev->cfgopt.probe_delay);
-			adev->cfgopt.probe_delay = 200;
+			       "tweaking to 200\n", acfg->probe_delay);
+			acfg->probe_delay = 200;
 		}
 	}
 
-	adev->cfgopt.eof_memory = le32_to_cpu(*(u32 *) pEle);
-	pEle += sizeof(adev->cfgopt.eof_memory);
+	acfg->eof_memory = le32_to_cpu(*(u32 *) pEle);
+	pEle += sizeof(acfg->eof_memory);
 
 	pr_info("NVS_vendor_offs:%04X probe_delay:%d eof_memory:%d\n",
-	       adev->cfgopt.NVS_vendor_offs,
-	       adev->cfgopt.probe_delay, adev->cfgopt.eof_memory);
+	       acfg->NVS_vendor_offs,
+	       acfg->probe_delay, acfg->eof_memory);
 
-	adev->cfgopt.dot11CCAModes = *pEle++;
-	adev->cfgopt.dot11Diversity = *pEle++;
-	adev->cfgopt.dot11ShortPreambleOption = *pEle++;
-	adev->cfgopt.dot11PBCCOption = *pEle++;
-	adev->cfgopt.dot11ChannelAgility = *pEle++;
-	adev->cfgopt.dot11PhyType = *pEle++;
-	adev->cfgopt.dot11TempType = *pEle++;
+	acfg->dot11CCAModes = *pEle++;
+	acfg->dot11Diversity = *pEle++;
+	acfg->dot11ShortPreambleOption = *pEle++;
+	acfg->dot11PBCCOption = *pEle++;
+	acfg->dot11ChannelAgility = *pEle++;
+	acfg->dot11PhyType = *pEle++;
+	acfg->dot11TempType = *pEle++;
 	pr_info("CCAModes:%02X Diversity:%02X ShortPreOpt:%02X "
 	       "PBCC:%02X ChanAgil:%02X PHY:%02X Temp:%02X\n",
-	       adev->cfgopt.dot11CCAModes,
-	       adev->cfgopt.dot11Diversity,
-	       adev->cfgopt.dot11ShortPreambleOption,
-	       adev->cfgopt.dot11PBCCOption,
-	       adev->cfgopt.dot11ChannelAgility,
-	       adev->cfgopt.dot11PhyType, adev->cfgopt.dot11TempType);
+	       acfg->dot11CCAModes,
+	       acfg->dot11Diversity,
+	       acfg->dot11ShortPreambleOption,
+	       acfg->dot11PBCCOption,
+	       acfg->dot11ChannelAgility,
+	       acfg->dot11PhyType, acfg->dot11TempType);
 
 	/* then use common parsing for next part which has common layout */
 
@@ -1568,42 +1569,42 @@ acx_parse_configoption(acx_device_t * adev,
 		pEle += 4;
 	}
 
-	adev->cfgopt.antennas.type = pEle[0];
-	adev->cfgopt.antennas.len = pEle[1];
+	acfg->antennas.type = pEle[0];
+	acfg->antennas.len = pEle[1];
 	pr_info("AntennaID:%02X Len:%02X Data:",
-	       adev->cfgopt.antennas.type, adev->cfgopt.antennas.len);
+	       acfg->antennas.type, acfg->antennas.len);
 	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt.antennas.list[i] = pEle[i + 2];
+		acfg->antennas.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] + 2;
-	adev->cfgopt.power_levels.type = pEle[0];
-	adev->cfgopt.power_levels.len = pEle[1];
+	acfg->power_levels.type = pEle[0];
+	acfg->power_levels.len = pEle[1];
 	pr_info("PowerLevelID:%02X Len:%02X Data:",
-	       adev->cfgopt.power_levels.type, adev->cfgopt.power_levels.len);
+	       acfg->power_levels.type, acfg->power_levels.len);
 	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt.power_levels.list[i] =
+		acfg->power_levels.list[i] =
 		    le16_to_cpu(*(u16 *) & pEle[i * 2 + 2]);
-		printk("%04X ", adev->cfgopt.power_levels.list[i]);
+		printk("%04X ", acfg->power_levels.list[i]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] * 2 + 2;
-	adev->cfgopt.data_rates.type = pEle[0];
-	adev->cfgopt.data_rates.len = pEle[1];
+	acfg->data_rates.type = pEle[0];
+	acfg->data_rates.len = pEle[1];
 	pr_info("DataRatesID:%02X Len:%02X Data:",
-	       adev->cfgopt.data_rates.type, adev->cfgopt.data_rates.len);
+	       acfg->data_rates.type, acfg->data_rates.len);
 	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt.data_rates.list[i] = pEle[i + 2];
+		acfg->data_rates.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
 	}
 	printk("\n");
 
 	pEle += pEle[1] + 2;
-	adev->cfgopt.domains.type = pEle[0];
-	adev->cfgopt.domains.len = pEle[1];
+	acfg->domains.type = pEle[0];
+	acfg->domains.len = pEle[1];
 
 	if (IS_MEM(adev) && IS_ACX100(adev))
 	{
@@ -1614,43 +1615,43 @@ acx_parse_configoption(acx_device_t * adev,
 	 * most likely a bug in the firmware, but we can fix it here
 	 * by bumping the length of this field by 1.
 	 */
-		adev->cfgopt.domains.len++;
+		acfg->domains.len++;
 	}
 
 	pr_info("DomainID:%02X Len:%02X Data:",
-	       adev->cfgopt.domains.type, adev->cfgopt.domains.len);
-	for (i = 0; i < adev->cfgopt.domains.len; i++) {
-		adev->cfgopt.domains.list[i] = pEle[i + 2];
+	       acfg->domains.type, acfg->domains.len);
+	for (i = 0; i < acfg->domains.len; i++) {
+		acfg->domains.list[i] = pEle[i + 2];
 		printk("%02X ", pEle[i + 2]);
 	}
 	printk("\n");
 
-	pEle += adev->cfgopt.domains.len + 2;
-	adev->cfgopt.product_id.type = pEle[0];
-	adev->cfgopt.product_id.len = pEle[1];
+	pEle += acfg->domains.len + 2;
+	acfg->product_id.type = pEle[0];
+	acfg->product_id.len = pEle[1];
 	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt.product_id.list[i] = pEle[i + 2];
+		acfg->product_id.list[i] = pEle[i + 2];
 	}
 	pr_info("ProductID:%02X Len:%02X Data:%.*s\n",
-	       adev->cfgopt.product_id.type, adev->cfgopt.product_id.len,
-	       adev->cfgopt.product_id.len,
-	       (char *)adev->cfgopt.product_id.list);
+	       acfg->product_id.type, acfg->product_id.len,
+	       acfg->product_id.len,
+	       (char *)acfg->product_id.list);
 
 	pEle += pEle[1] + 2;
-	adev->cfgopt.manufacturer.type = pEle[0];
-	adev->cfgopt.manufacturer.len = pEle[1];
+	acfg->manufacturer.type = pEle[0];
+	acfg->manufacturer.len = pEle[1];
 	for (i = 0; i < pEle[1]; i++) {
-		adev->cfgopt.manufacturer.list[i] = pEle[i + 2];
+		acfg->manufacturer.list[i] = pEle[i + 2];
 	}
 	pr_info("ManufacturerID:%02X Len:%02X Data:%.*s\n",
-	       adev->cfgopt.manufacturer.type, adev->cfgopt.manufacturer.len,
-	       adev->cfgopt.manufacturer.len,
-	       (char *)adev->cfgopt.manufacturer.list);
+	       acfg->manufacturer.type, acfg->manufacturer.len,
+	       acfg->manufacturer.len,
+	       (char *)acfg->manufacturer.list);
 /*
 	pr_info("EEPROM part:\n");
 	for (i=0; i<58; i++) {
 		printk("%02X =======>  0x%02X\n",
-			i, (u8 *)adev->cfgopt.NVSv[i-2]);
+			i, (u8 *)acfg->NVSv[i-2]);
 	}
 */
 }
@@ -1977,6 +1978,7 @@ int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
 
 void acx_set_defaults(acx_device_t * adev)
 {
+	struct eeprom_cfg *acfg = &adev->cfgopt;
 	FN_ENTER;
 
 	/* do it before getting settings, prevent bogus channel 0 warning */
@@ -2027,10 +2029,10 @@ void acx_set_defaults(acx_device_t * adev)
 
 	if (IS_PCI(adev)) {	/* FIXME: this should be made to apply to USB, too! */
 		/* first regulatory domain entry in EEPROM == default reg. domain */
-		adev->reg_dom_id = adev->cfgopt.domains.list[0];
+		adev->reg_dom_id = acfg->domains.list[0];
 	} else if(IS_MEM(adev)){
 		/* first regulatory domain entry in EEPROM == default reg. domain */
-		adev->reg_dom_id = adev->cfgopt.domains.list[0];
+		adev->reg_dom_id = acfg->domains.list[0];
 	}
 
 	/* 0xffff would be better, but then we won't get a "scan complete"
@@ -2039,7 +2041,7 @@ void acx_set_defaults(acx_device_t * adev)
 	adev->scan_mode = ACX_SCAN_OPT_ACTIVE;
 	adev->scan_duration = 100;
 	adev->scan_probe_delay = 200;
-	/* reported to break scanning: adev->scan_probe_delay = adev->cfgopt.probe_delay; */
+	/* reported to break scanning: adev->scan_probe_delay = acfg->probe_delay; */
 	adev->scan_rate = ACX_SCAN_RATE_1;
 
 
@@ -2773,13 +2775,13 @@ void acx_update_capabilities(acx_device_t * adev)
 	if (adev->wep_restricted) {
 		SET_BIT(cap, WF_MGMT_CAP_PRIVACY);
 	}
-	if (adev->cfgopt.dot11ShortPreambleOption) {
+	if (acfg->dot11ShortPreambleOption) {
 		SET_BIT(cap, WF_MGMT_CAP_SHORT);
 	}
-	if (adev->cfgopt.dot11PBCCOption) {
+	if (acfg->dot11PBCCOption) {
 		SET_BIT(cap, WF_MGMT_CAP_PBCC);
 	}
-	if (adev->cfgopt.dot11ChannelAgility) {
+	if (acfg->dot11ChannelAgility) {
 		SET_BIT(cap, WF_MGMT_CAP_AGILITY);
 	}
 	log(L_DEBUG, "caps updated from 0x%04X to 0x%04X\n",
