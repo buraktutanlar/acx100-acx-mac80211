@@ -2,10 +2,6 @@
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 
-// static int acx_upload_radio(acx_device_t *adev);
-int acxmem_upload_radio(acx_device_t *adev);
-int acxpci_upload_radio(acx_device_t *adev);
-
 int acx_create_hostdesc_queues(acx_device_t *adev);
 
 void acx_log_rxbuffer(const acx_device_t *adev);

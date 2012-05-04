@@ -138,7 +138,6 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_qu
 //= STATick void *acxmem_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
-//= int acxmem_upload_radio(acx_device_t *adev);
 //= int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 #ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
@@ -810,12 +809,6 @@ STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
 /*
  * BOM Firmware, EEPROM, Phy
  * ==================================================
- */
-
-/*
- * acxmem_s_upload_radio
- *
- * Uploads the appropriate radio module firmware into the card.
  */
 
 /*

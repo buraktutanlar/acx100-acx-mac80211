@@ -93,7 +93,6 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_a
 //= static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy
-int acxpci_upload_radio(acx_device_t * adev);
 //=int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 //= static inline void acxpci_read_eeprom_area(acx_device_t * adev);
@@ -441,14 +440,6 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  */
 
 /*
- * acxpci_s_upload_radio
- *
- * Uploads the appropriate radio module firmware into the card.
- *
- * Origin: Standard Read/Write to IO
- */
-
-/*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
@@ -736,7 +727,7 @@ acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
  * Origin: Derived from FW dissection
  */
 // static 
-int acxpci_upload_fw(acx_device_t * adev)
+int acxpci_upload_fw(acx_device_t *adev)
 {
 	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
@@ -1157,7 +1148,7 @@ inline void acxpci_init_mboxes(acx_device_t * adev)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-int acxpci_reset_dev(acx_device_t * adev)
+int acxpci_reset_dev(acx_device_t *adev)
 {
 	const char *msg = "";
 	int result = NOT_OK;
