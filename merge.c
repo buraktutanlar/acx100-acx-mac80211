@@ -1908,38 +1908,45 @@ int acxmem_reset_dev(acx_device_t *adev)
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 
-	/* Windows driver does some funny things here */
-	/*
-	 * clear bit 0x200 in register 0x2A0
-	 */
-	clear_regbits(adev, 0x2A0, 0x200);
+#ifdef CONFIG_PCI
+        acxpci_reset_mac(adev);
+#endif
 
-	/*
-	 * Set bit 0x200 in ACX_GPIO_OUT
-	 */
-	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+	/* Windows driver (MEM) does some funny things here */
 
-	/*
-	 * read register 0x900 until its value is 0x8400104C, sleeping
-	 * in between reads if it's not immediate
-	 */
-	tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-	count = 500;
-	while (count-- && (tmp != ACX_VENDOR_ID)) {
-		mdelay (10);
+	/* clear bit 0x200 in register 0x2A0 */
+	if (IS_MEM(adev))
+		clear_regbits(adev, 0x2A0, 0x200);
+
+	if (IS_PCI(adev))
+		ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
+
+	if (IS_MEM(adev)) {
+
+		/* Set bit 0x200 in ACX_GPIO_OUT */
+		set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+
+		/*
+		 * read register 0x900 until its value is 0x8400104C,
+		 * sleeping in between reads if it's not immediate
+		 */
 		tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-	}
+		count = 500;
+		while (count-- && (tmp != ACX_VENDOR_ID)) {
+			mdelay (10);
+			tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
+		}
+		
+		/* end what Windows driver does */
 
-	/* end what Windows driver does */
+		acxmem_reset_mac(adev);
 
-	acxmem_reset_mac(adev);
-
-	ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
-	if (!ecpu_ctrl) {
-		msg = "acx: eCPU is already running. ";
-		goto end_fail;
-	}
-
+		ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
+		if (!ecpu_ctrl) {
+			msg = "acx: eCPU is already running. ";
+			goto end_fail;
+		}
+	} // IS_MEM
 #if 0
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
@@ -1949,13 +1956,16 @@ int acxmem_reset_dev(acx_device_t *adev)
 
 	/* check sense on reset flags */
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
-		pr_acx("%s: eCPU did not start after boot (SOR), "
-			"is this fatal?\n", adev->ndev->name);
+		pr_acx("%s: %s: eCPU did not start after boot (SOR), "
+			"is this fatal?\n", adev->ndev->name,
+			wiphy_name(adev->ieee->wiphy));
 	}
 #endif
 
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	adev->irq_status |= HOST_INT_SCAN_COMPLETE;
+	(IS_MEM(adev))
+		? adev->irq_status |= HOST_INT_SCAN_COMPLETE
+		: SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE); 
 
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
@@ -1980,45 +1990,58 @@ int acxmem_reset_dev(acx_device_t *adev)
 
 	acxmem_unlock();
 	/* load the firmware */
-	if (OK != acxmem_upload_fw(adev))
+	result = (IS_MEM(adev))
+		? acxmem_upload_fw(adev)
+		: acxpci_upload_fw(adev);
+	if (OK != result) 
 		goto end_fail;
 	acxmem_lock();
 
 	/* acx_s_mwait(10);	this one really shouldn't be required */
 
 	/* now start eCPU by clearing bit */
-	clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+	(IS_MEM(adev))
+		? clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1)
+		: write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
+
 	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
-	/* Windows driver clears bit 0x200 in register 0x2A0 here */
-	clear_regbits(adev, 0x2A0, 0x200);
+	if (IS_MEM(adev)) { // windows
+		/* Windows driver clears bit 0x200 in register 0x2A0 here */
+		clear_regbits(adev, 0x2A0, 0x200);
 
-	/* Windows driver sets bit 0x200 in ACX_GPIO_OUT here */
-	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
-
+		/* Windows driver sets bit 0x200 in ACX_GPIO_OUT here */
+		set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
+	}
 	acxmem_unlock();
 	/* wait for eCPU bootup */
-	if (OK != acxmem_verify_init(adev)) {
+	result = (IS_MEM(adev))
+		? acxmem_verify_init(adev)
+		: acxpci_verify_init(adev);
+	if (OK != result) {
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
 	}
 	acxmem_lock();
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
-	acxmem_init_mboxes(adev);
-	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
-
+	if (IS_MEM(adev)) {
+		acxmem_init_mboxes(adev);
+		acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+	} else {
+		acxpci_init_mboxes(adev);
+		acxpci_write_cmd_type_status(adev, 0, 0);
+	}
 	/* test that EEPROM is readable */
-	//= acxmem_read_eeprom_area(adev);
 	acx_read_eeprom_area(adev);
 
 	result = OK;
 	goto end;
 
 	/* Finish error message. Indicate which function failed */
+end_unlock:
 end_fail:
 	pr_acx("%sreset_dev() FAILED\n", msg);
-
 end:
 	acxmem_unlock();
 	FN_EXIT1(result);
