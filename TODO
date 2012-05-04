@@ -60,6 +60,7 @@ acx(pci|mem)_op_(start|stop): DONE
 
 acx(pci|mem)_read_eeprom_byte(): DONE
 acx(pci|mem)_proc_eeprom_output(): DONE
+acx(pci|mem)_up(): DONE
 
 DONE: #if1d in mem.c, #if0d in merge.c pending proper merging
   int acxmem_write_fw(acx_device_t *adev,
@@ -81,7 +82,7 @@ acx(pci|mem)_get_txdesc(): DONE
 acx(pci|mem)_advance_txdesc(): DONE
 acx(pci|mem)_tx_data(): DONE
 acx(mem|pci)_get_txhostdesc(): DONE
-acx(pci|mem)_get txbuf(): DONE
+acx(pci|mem)_get_txbuf(): DONE
 
 acx(pci|mem)_process_rxdesc(): DONE
 
@@ -90,13 +91,16 @@ acx(pci|mem)_reset_dev(): DONE, pending
 acx(pci|mem)_verify_init(): DONE, pending
 - kinda pointless; though structurally identical, nothing is shared
 
+acx(mem|pci)_tx_clean_txdesc_emergency(): DONE
+acx(mem|pci)_write_phy_reg(): DONE
+
+
 acx(pci|mem)_irq_work():
   diffs around ITERATE
 
   slave_mem - need wrappers 
   slave-mem
 
-acxmem_tx_clean_txdesc_emergency():
   slave-mem
   maybe make a helper for above.
   grody diffs
