@@ -137,3 +137,9 @@ void __exit acxmem_cleanup_module(void);
 
 // for merge of tx_data
 u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
+
+// for merge of acx_reset_dev
+void acxmem_reset_mac(acx_device_t *adev);
+u32 acxmem_read_cmd_type_status(acx_device_t *adev);
+void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
+void acxmem_init_mboxes(acx_device_t *adev);

@@ -1888,8 +1888,9 @@ void acx_up(struct ieee80211_hw *hw)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-#if 0 // needs work
-int acxmem_reset_dev(acx_device_t *adev)
+static int acx_verify_init(acx_device_t *adev);
+#if 1 // needs work
+int acx_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
 	int result = NOT_OK;
@@ -2015,9 +2016,7 @@ int acxmem_reset_dev(acx_device_t *adev)
 	}
 	acxmem_unlock();
 	/* wait for eCPU bootup */
-	result = (IS_MEM(adev))
-		? acxmem_verify_init(adev)
-		: acxpci_verify_init(adev);
+	result = acx_verify_init(adev);
 	if (OK != result) {
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
@@ -2039,7 +2038,6 @@ int acxmem_reset_dev(acx_device_t *adev)
 	goto end;
 
 	/* Finish error message. Indicate which function failed */
-end_unlock:
 end_fail:
 	pr_acx("%sreset_dev() FAILED\n", msg);
 end:
@@ -2048,6 +2046,58 @@ end:
 	return result;
 }
 #endif // acxmem_reset_dev()
+
+static int acx_verify_init(acx_device_t *adev)
+{
+        int result = NOT_OK;
+        unsigned long timeout;
+	acxmem_lock_flags;
+
+        FN_ENTER;
+
+        timeout = jiffies + 2 * HZ;
+	// if-then differ primarily by irqstat size
+	if (IS_PCI(adev))
+		for (;;) {
+			u16 irqstat = read_reg16(adev,
+					IO_ACX_IRQ_STATUS_NON_DES);
+			if (irqstat & HOST_INT_FCS_THRESHOLD) {
+				result = OK;
+				write_reg16(adev, IO_ACX_IRQ_ACK,
+					HOST_INT_FCS_THRESHOLD);
+				break;
+			}
+			if (time_after(jiffies, timeout))
+				break;
+			/* Init may take up to ~0.5 sec total */
+			acx_mwait(50);
+		}
+	else
+		for (;;) {
+			u32 irqstat;
+			acxmem_lock();
+			irqstat = read_reg32(adev,
+					IO_ACX_IRQ_STATUS_NON_DES);
+			if ((irqstat != 0xFFFFFFFF) 
+				&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
+				result = OK;
+				write_reg32(adev, IO_ACX_IRQ_ACK,
+					HOST_INT_FCS_THRESHOLD);
+				acxmem_unlock();
+				break;
+			}
+			acxmem_unlock();
+			
+			if (time_after(jiffies, timeout))
+				break;
+			/* Init may take up to ~0.5 sec total */
+			acx_mwait(50);
+		}
+
+        FN_EXIT1(result);
+        return result;
+}
+
 
 /*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
@@ -2091,7 +2141,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxmem_reset_dev(adev))
+	if (OK != acx_reset_dev(adev))
 		return -1;
 
 	acxmem_lock();

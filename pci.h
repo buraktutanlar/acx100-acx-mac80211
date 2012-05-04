@@ -104,3 +104,8 @@ STATick int acxpci_e_resume(struct pci_dev *pdev);
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
+// for merge of acx_reset_dev
+void acxpci_reset_mac(acx_device_t *adev);
+u32 acxpci_read_cmd_type_status(acx_device_t *adev);
+void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
+void acxpci_init_mboxes(acx_device_t *adev);

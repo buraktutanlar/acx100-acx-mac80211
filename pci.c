@@ -108,7 +108,7 @@ int acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u3
 
 // CMDs (Control Path)
 int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
-static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
+//=static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
 //= static 
 u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 //= static inline void acxpci_init_mboxes(acx_device_t * adev);
@@ -1090,15 +1090,14 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	return NOT_OK;
 }
 
-static inline void
-acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
+// static inline 
+void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 {
 	FN_ENTER;
 	acx_writel(type | (status << 16), adev->cmd_area);
 	write_flush(adev);
 	FN_EXIT0;
 }
-
 
 //static
 u32 acxpci_read_cmd_type_status(acx_device_t *adev)

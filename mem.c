@@ -163,7 +163,7 @@ STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev);
 STATick inline void acxmem_init_mboxes(acx_device_t *adev);
 
 // Init, Configure (Control Path)
-int acxmem_reset_dev(acx_device_t *adev);
+//=int acxmem_reset_dev(acx_device_t *adev);
 STATick int acxmem_verify_init(acx_device_t *adev);
 STATick int acxmem_complete_hw_reset(acx_device_t *adev);
 STATick void acxmem_reset_mac(acx_device_t *adev);
@@ -1555,8 +1555,8 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 }
 #endif
 
-STATick inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
-		u16 status) {
+void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
+{
 	FN_ENTER;
 	write_slavemem32(adev, (u32) adev->cmd_area, type | (status << 16));
 	write_flush(adev);
@@ -1583,7 +1583,9 @@ STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
 	return cmd_status;
 }
 
-STATick inline void acxmem_init_mboxes(acx_device_t *adev) {
+//STATick inline 
+void acxmem_init_mboxes(acx_device_t *adev)
+{
 	u32 cmd_offs, info_offs;
 
 	FN_ENTER;
@@ -1627,7 +1629,7 @@ STATick inline void acxmem_init_mboxes(acx_device_t *adev) {
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-#if 1 // copied to merge, but needs work
+#if 0 // copied to merge, but needs work
 int acxmem_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
@@ -1808,7 +1810,7 @@ STATick int acxmem_complete_hw_reset(acx_device_t *adev) {
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxmem_reset_dev(adev))
+	if (OK != acx_reset_dev(adev))
 		return -1;
 
 	acxmem_lock();
@@ -1860,7 +1862,8 @@ STATick int acxmem_complete_hw_reset(acx_device_t *adev) {
  * MAC will be reset
  * Call context: reset_dev
  */
-STATick void acxmem_reset_mac(acx_device_t *adev) {
+STATick void acxmem_reset_mac(acx_device_t *adev)
+{
 	int count;
 	FN_ENTER;
 
