@@ -69,34 +69,31 @@ DONE: #if1d in mem.c, #if0d in merge.c pending proper merging
 acx(pci|mem)_up(): DONE
 acx(pci|mem)_handle_info_irq(): DONE
 acx(pci|mem)_set_interrupt_mask(): DONE
+acx_show_card_eeprom_id(): DONE
 
-acx(mem|pci)_create_(tx|tx)_desc_queue(): DONE, pending
+acx(mem|pci)_create_(tx|tx)_desc_queue(): DONE
    maybe later, refactor IS_MEM|PCI branches into _helpers
 					  
-acx(mem|pci)_tx_clean_txdesc(): DONE, pending
+acx(mem|pci)_tx_clean_txdesc(): DONE
    maybe later, refactor IS_MEM|PCI branches into _helpers
 
-acx(pci|mem)_get_txdesc(): DONE, pending (9/11)
-acx(pci|mem)_advance_txdesc(): DONE, pending (12/11)
-acx(pci|mem)_tx_data(): DONE, pending (12/11)
-acx(mem|pci)_get_txhostdesc(): DONE, pending (13/11)
-acx(pci|mem)_get txbuf(): DONE, pending (13/11)
+acx(pci|mem)_get_txdesc(): DONE
+acx(pci|mem)_advance_txdesc(): DONE
+acx(pci|mem)_tx_data(): DONE
+acx(mem|pci)_get_txhostdesc(): DONE
+acx(pci|mem)_get txbuf(): DONE
+
+acx(pci|mem)_process_rxdesc(): DONE
+
+acx(pci|mem)_delete_dma_regions(): DONE, pending
+acx(pci|mem)_reset_dev(): DONE, pending
+acx(pci|mem)_verify_init(): DONE, pending
+- kinda pointless; though structurally identical, nothing is shared
 
 acx(pci|mem)_irq_work():
   diffs around ITERATE
 
-acx(pci|mem)_delete_dma_regions():
-	whitespace, comment diffs
-	called 2x from #if0d merge.c:acxmem_probe()
-	
-acxmem_tx_data():
-  extra locking
-  acx(pci|mem)_get_txhostdesc() usage
   slave_mem - need wrappers 
-
-acxmem_tx_clean_txdesc():
-  extra tmpdesc stuff
-  acx(pci|mem)_get_txdesc - look at it.
   slave-mem
 
 acxmem_tx_clean_txdesc_emergency():
@@ -114,8 +111,6 @@ acxmem_issue_cmd_timeo_debug():
     VS acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 
-acxmem_reset_dev():
-
 acxpci_init_mboxes():
 
 acxmem_proc_diag_output():
@@ -124,18 +119,13 @@ acxmem_proc_diag_output():
 acx(pci|mem)_write_phy_reg()
   copied from mem.c, but needs work before use
 
-acx(pci|mem)_read_eeprom_byte()
 acx(pci|mem)_write_eeprom_byte()  (UNUSED)
 
 acx(pci|mem)_s_write_fw()
 acx(pci|mem)_s_validate_fw()
-acx_show_card_eeprom_id()
 acx(pci|mem)_issue_cmd_timeo_debug() fair divergence
 acx(pci|mem)_init_mboxes()
 acx(pci|mem)_reset_dev()
-acx(pci|mem)_verify_init()
-acx(pci|mem)_process_rxdesc()
-acx(pci|mem)_tx_data()
 acx(pci|mem)_interrupt()   (comment diffs)
 acx111(pci|mem)_ioctl_info() (extra printks in mem
 
