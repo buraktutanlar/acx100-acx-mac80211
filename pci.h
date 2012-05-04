@@ -12,16 +12,16 @@
 		   let linker find the fns in mem.o, pci.o */
 
 // Logging
-STATick void acxpci_log_rxbuffer(const acx_device_t *adev);
-STATick void acxpci_log_txbuffer(acx_device_t *adev);
+//= STATick void acxpci_log_rxbuffer(const acx_device_t *adev);
+//= STATick void acxpci_log_txbuffer(acx_device_t *adev);
 
-int acxpci_create_hostdesc_queues(acx_device_t *adev);
+//=int acxpci_create_hostdesc_queues(acx_device_t *adev);
 //= STATick int acxpci_create_rx_host_desc_queue(acx_device_t *adev);
-STATick int acxpci_create_tx_host_desc_queue(acx_device_t *adev);
+//=STATick int acxpci_create_tx_host_desc_queue(acx_device_t *adev);
 
 void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-STATick void acxpci_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
-STATick void acxpci_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
+//=STATick void acxpci_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
+//= STATick void acxpci_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 
 //= void acxpci_free_desc_queues(acx_device_t *adev);
 STATick void acxpci_delete_dma_regions(acx_device_t *adev);

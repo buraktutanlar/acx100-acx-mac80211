@@ -132,7 +132,7 @@ tx_t *acxpci_alloc_tx(acx_device_t * adev);
 //= void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
 void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 //= unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
-void acxpci_clean_txdesc_emergency(acx_device_t * adev);
+//=void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 //= static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
 // static inline 
 //= txdesc_t *acxpci_advance_txdesc(acx_device_t * adev, txdesc_t * txdesc, int inc);
@@ -1255,6 +1255,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 
 /* clean *all* Tx descriptors, and regardless of their previous state.
  * Used for brute-force reset handling. */
+#if 0 // acxpci_clean_txdesc_emergency()
 void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 {
 	txdesc_t *txdesc;
@@ -1277,7 +1278,7 @@ void acxpci_clean_txdesc_emergency(acx_device_t * adev)
 
 	FN_EXIT0;
 }
-
+#endif // acxpci_clean_txdesc_emergency()
 
 /*
  * BOM Irq Handling, Timer

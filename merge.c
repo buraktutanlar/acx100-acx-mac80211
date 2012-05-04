@@ -2665,7 +2665,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 		} else {
 			txattempts = 0;
 			log(L_ANY, "%s: flushing transmit queue.\n", __func__);
-			acxmem_clean_txdesc_emergency(adev);
+			acx_clean_txdesc_emergency(adev);
 		}
 		txdesc = NULL;
 		goto end;
@@ -3429,40 +3429,48 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 
 /* clean *all* Tx descriptors, and regardless of their previous state.
  * Used for brute-force reset handling. */
-void acxmem_clean_txdesc_emergency(acx_device_t *adev) {
-	txdesc_t *txdesc;
+void acx_clean_txdesc_emergency(acx_device_t *adev)
+{
+	txdesc_t *txd;
 	int i;
 
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txdesc = acx_get_txdesc(adev, i);
+		txd = acx_get_txdesc(adev, i);
 
 		/* free it */
-		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_ok), 0);
-		write_slavemem8(adev, (u32) &(txdesc->error), 0);
-		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN);
-
+		if (IS_PCI(adev)) {
+			txd->ack_failures = 0;
+			txd->rts_failures = 0;
+			txd->rts_ok = 0;
+			txd->error = 0;
+			txd->Ctl_8 = DESC_CTL_HOSTOWN;
+			continue;
+		} else {
+			write_slavemem8(adev, (u32) &(txd->ack_failures), 0);
+			write_slavemem8(adev, (u32) &(txd->rts_failures), 0);
+			write_slavemem8(adev, (u32) &(txd->rts_ok), 0);
+			write_slavemem8(adev, (u32) &(txd->error), 0);
+			write_slavemem8(adev, (u32) &(txd->Ctl_8),
+					DESC_CTL_HOSTOWN);
+		}
 #if 0
 		u32 acxmem;
 		/*
-		 * Clean up the memory allocated on the ACX for this transmit descriptor.
+		 * Clean up the memory allocated on the ACX for this
+		 * transmit descriptor.
 		 */
-		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-
-		if (acxmem) {
+		acxmem = read_slavemem32(adev, (u32) &(txd->AcxMemPtr));
+		if (acxmem)
 			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
-		}
 #endif
-
-		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
+		write_slavemem32(adev, (u32) &(txd->AcxMemPtr), 0);
 	}
-
 	adev->tx_free = TX_CNT;
 
-	acxmem_init_acx_txbuf2(adev);
+	if (IS_MEM(adev))
+		acxmem_init_acx_txbuf2(adev);
 
 	FN_EXIT0;
 }
@@ -3559,7 +3567,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 		pr_info("%s: FAILED to free any of the many full tx buffers. "
 			"Switching to emergency freeing. "
 			"Please report!\n", ndev->name);
-		acxmem_clean_txdesc_emergency(adev);
+		acx_clean_txdesc_emergency(adev);
 	}
 
 	if (acx_queue_stopped(ndev) && (ACX_STATUS_4_ASSOCIATED == adev->status))

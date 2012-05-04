@@ -530,13 +530,13 @@ acx_get_wlan_hdr(acx_device_t *adev, const rxbuffer_t *rxbuf)
 
 // Data Access
 
-int acxpci_create_hostdesc_queues(acx_device_t * adev);
-void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxpci_free_desc_queues(acx_device_t * adev);
+//=int acxpci_create_hostdesc_queues(acx_device_t * adev);
+//=void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
+//=void acxpci_free_desc_queues(acx_device_t * adev);
 
 // Firmware, EEPROM, Phy
 int acxpci_upload_radio(acx_device_t * adev);
-int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
+//=int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
 // int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
 int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
@@ -551,16 +551,16 @@ int acxpci_reset_dev(acx_device_t * adev);
 
 // Proc, Debug
 int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
+//=char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
 
 // Rx Path
 
 // Tx Path
 tx_t *acxpci_alloc_tx(acx_device_t * adev);
-void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
-void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
-void acxpci_clean_txdesc_emergency(acx_device_t * adev);
+//=void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
+//=void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+//=unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
+//=void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
 
 // Irq Handling, Timer
@@ -586,13 +586,13 @@ void __exit acxpci_cleanup_module(void);
  * ==================================================
  */
 // Data Access
-int acxmem_create_hostdesc_queues(acx_device_t *adev);
-void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
-void acxmem_free_desc_queues(acx_device_t *adev);
+//= int acxmem_create_hostdesc_queues(acx_device_t *adev);
+//= void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start, u32 rx_queue_start);
+//=void acxmem_free_desc_queues(acx_device_t *adev);
 
 // Firmware, EEPROM, Phy
 int acxmem_upload_radio(acx_device_t *adev);
-int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
+//=int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
 #ifdef UNUSED
 int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 *charbuf);
 #endif
@@ -609,7 +609,7 @@ int acxmem_reset_dev(acx_device_t *adev);
 
 // Proc, Debug
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
-char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
+//=char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
 
 // Rx Path
 
@@ -617,12 +617,12 @@ char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+//=void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
 //=void acxmem_init_acx_txbuf2(acx_device_t *adev);
 
-void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
-unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
-void acxmem_clean_txdesc_emergency(acx_device_t *adev);
+//=void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
+//=unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
+//= void acxmem_clean_txdesc_emergency(acx_device_t *adev);
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
