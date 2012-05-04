@@ -111,10 +111,6 @@ irqreturn_t acx_interrupt(int irq, void *dev_id);
 STATick void acxmem_handle_info_irq(acx_device_t *adev);
 void acxmem_set_interrupt_mask(acx_device_t *adev);
 
-// Mac80211 Ops
-STATick int acxmem_op_start(struct ieee80211_hw *hw);
-STATick void acxmem_op_stop(struct ieee80211_hw *hw);
-
 // Helpers
 void acxmem_power_led(acx_device_t *adev, int enable);
 // INLINE_IO int acxmem_adev_present(acx_device_t *adev);
