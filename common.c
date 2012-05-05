@@ -1251,7 +1251,9 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 	return OK;
 
       fail:
-	acx_free_desc_queues(adev);
+	if (IS_PCI(adev) || IS_MEM(adev))
+		acx_free_desc_queues(adev);
+
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
