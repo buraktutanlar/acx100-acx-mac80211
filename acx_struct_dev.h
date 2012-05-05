@@ -482,12 +482,12 @@ struct acx_device {
 #endif
 	struct device *bus_dev;
 
-#ifdef ACX_MAC80211_PCI
+#if defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM)
 	struct pci_dev	*pdev;
 	unsigned long	membase;
 	void __iomem	*iobase;
 #endif
-#ifdef ACX_MAC80211_MEM
+#ifdef CONFIG_ACX_MAC80211_MEM
 	struct platform_device	*pdev;
 #endif
 
