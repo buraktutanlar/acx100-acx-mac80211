@@ -323,9 +323,12 @@ void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 //- tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len);
-//- void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int //- finger, struct ieee80211_tx_info *info);
-//- u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc, struct //- ieee80211_tx_info *info);
-//- void acx111_tx_build_txstatus(acx_device_t *adev,	struct //- ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures);
+void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
+		unsigned int finger, struct ieee80211_tx_info *info);
+u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
+		struct ieee80211_tx_info *info);
+void acx111_tx_build_txstatus(acx_device_t *adev, 
+		struct ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures);
 //- u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
 //- int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 //- 
@@ -343,8 +346,8 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 //- // -----
 void acx_init_task_scheduler(acx_device_t *adev);
 void acx_after_interrupt_task(acx_device_t *adev);
-//- void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-//- void acx_log_irq(u16 irqtype);
+void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+void acx_log_irq(u16 irqtype);
 void acx_timer(unsigned long address);
 //- void acx_set_timer(acx_device_t * adev, int timeout_us);
 //- 
@@ -405,9 +408,9 @@ void acx_mwait(int ms);
 // void great_inquisitor(acx_device_t *adev);
 
 #if !ACX_DEBUG
-//- static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
+static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
 #else
-//- const char *acx_get_packet_type_string(u16 fc);
+const char *acx_get_packet_type_string(u16 fc);
 #endif
 
 // MAC address helpers
