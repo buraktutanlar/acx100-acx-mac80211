@@ -78,18 +78,18 @@
 
 // int acxpci_create_hostdesc_queues(acx_device_t * adev);
 //static 
-int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
+//- int acxpci_create_rx_host_desc_queue(acx_device_t * adev);
 //static 
-int acxpci_create_tx_host_desc_queue(acx_device_t * adev);
+//- int acxpci_create_tx_host_desc_queue(acx_device_t * adev);
 
-void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
+//- void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
 //= static void acxpci_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start);
 //= static void acxpci_create_tx_desc_queue(acx_device_t * adev, u32 tx_queue_start);
 
 //= void acxpci_free_desc_queues(acx_device_t * adev);
 //= static void acxpci_delete_dma_regions(acx_device_t * adev);
 //=static inline
-void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+//- void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
 //= static void *acxpci_allocate(acx_device_t * adev, size_t size, dma_addr_t * phy, const char *msg);
 
 // Firmware, EEPROM, Phy
@@ -99,21 +99,21 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_a
 //int acxpci_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf);
 //=int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value);
 // static 
-int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
+//- int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 // static 
-int acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
+//- int acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image, u32 offset);
 //= static int acxpci_upload_fw(acx_device_t * adev);
 // static void acx_show_card_eeprom_id(acx_device_t * adev);
 
 // CMDs (Control Path)
-int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
+//- int acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char *cmdstr);
 //=static inline void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status);
 //= static 
-u32 acxpci_read_cmd_type_status(acx_device_t *adev);
+//- u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 //= static inline void acxpci_init_mboxes(acx_device_t * adev);
 
 // Init, Configuration (Control Path)
-int acxpci_reset_dev(acx_device_t * adev);
+//- int acxpci_reset_dev(acx_device_t * adev);
 //= static int acxpci_verify_init(acx_device_t * adev);
 //= static void acxpci_reset_mac(acx_device_t * adev);
 //= static void acxpci_up(struct ieee80211_hw *hw);
@@ -121,16 +121,16 @@ int acxpci_reset_dev(acx_device_t * adev);
 // Other (Control Path)
 
 // Proc, Debug
-int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+//- int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 //=char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
 
 // Rx Path
 //= static void acxpci_process_rxdesc(acx_device_t * adev);
 
 // Tx Path
-tx_t *acxpci_alloc_tx(acx_device_t * adev);
+//- tx_t *acxpci_alloc_tx(acx_device_t * adev);
 //= void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
-void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
+//- void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *info, struct sk_buff *skb);
 //= unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
 //=void acxpci_clean_txdesc_emergency(acx_device_t * adev);
 //= static inline txdesc_t *acxpci_get_txdesc(acx_device_t * adev, int index);
@@ -143,17 +143,17 @@ void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee802
 //= static void acxpci_irq_disable(acx_device_t * adev);
 //=void acxpci_irq_work(struct work_struct *work);
 // static irqreturn_t acxpci_interrupt(int irq, void *dev_id);
-irqreturn_t acx_interrupt(int irq, void *dev_id);
+//- irqreturn_t acx_interrupt(int irq, void *dev_id);
 //= static void acxpci_handle_info_irq(acx_device_t * adev);
 //= void acxpci_set_interrupt_mask(acx_device_t * adev);
 
 // Helpers
-void acxpci_power_led(acx_device_t * adev, int enable);
-INLINE_IO int acxpci_adev_present(acx_device_t *adev);
+//- void acxpci_power_led(acx_device_t * adev, int enable);
+//- INLINE_IO int acxpci_adev_present(acx_device_t *adev);
 
 // Ioctls
-int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
-int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
+//- int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
+//- int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct //- iw_request_info *info, struct iw_param *vwrq, char *extra);
 
 // Driver, Module
 #ifdef CONFIG_PCI
@@ -170,8 +170,8 @@ static int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
 static void vlynq_remove(struct vlynq_device *vdev);
 #endif // CONFIG_VLYNQ
 
-int __init acxpci_init_module(void);
-void __exit acxpci_cleanup_module(void);
+//- int __init acxpci_init_module(void);
+//- void __exit acxpci_cleanup_module(void);
 
 
 /*
