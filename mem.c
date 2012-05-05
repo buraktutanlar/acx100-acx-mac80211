@@ -812,7 +812,7 @@ int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value) {
  *	0	success
  */
 
-#if 1 // copied to merge, but needs work
+#if 0 // acxmem_write_fw() - copied to merge, but needs work -- test now
 // static - probly could restore, but..
 int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) {
@@ -876,6 +876,7 @@ int acxmem_write_fw(acx_device_t *adev,
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
 	return (sum != le32_to_cpu(fw_image->chksum));
 }
+#endif // 
 
 /*
  * acxmem_s_validate_fw
@@ -892,6 +893,7 @@ int acxmem_write_fw(acx_device_t *adev,
  *	OK	success
  */
 // static 
+#if 1 // acxmem_validate_fw()
 int acxmem_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset)
 {
@@ -958,8 +960,7 @@ int acxmem_validate_fw(acx_device_t *adev,
 	FN_EXIT1(result);
 	return result;
 }
-
-#endif
+#endif // acxmem_validate_fw()
 
 STATick int acxmem_upload_fw(acx_device_t *adev) {
 	firmware_image_t *fw_image = NULL;
@@ -999,7 +1000,7 @@ STATick int acxmem_upload_fw(acx_device_t *adev) {
 	for (try = 1; try <= 5; try++) {
 
 		acxmem_lock();
-		res = acxmem_write_fw(adev, fw_image, 0);
+		res = acx_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
 		if (OK == res) {
 			res = acxmem_validate_fw(adev, fw_image, 0);

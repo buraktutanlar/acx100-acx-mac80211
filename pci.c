@@ -431,8 +431,9 @@ int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
  * Standard csum implementation + write to IO
  */
 // static 
-int acxpci_write_fw(acx_device_t * adev,
-		const firmware_image_t *fw_image, u32 offset)
+#if 0 // acxpci_write_fw()
+int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
+		u32 offset)
 {
 	int len, size;
 	u32 sum, v32;
@@ -479,7 +480,7 @@ int acxpci_write_fw(acx_device_t * adev,
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
 	return (sum != le32_to_cpu(fw_image->chksum));
 }
-
+#endif // acxpci_write_fw()
 
 /*
  * acxpci_s_validate_fw
@@ -623,7 +624,7 @@ int acxpci_upload_fw(acx_device_t *adev)
 	}
 
 	for (try = 1; try <= 5; try++) {
-		res = acxpci_write_fw(adev, fw_image, 0);
+		res = acx_write_fw(adev, fw_image, 0);
 		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
 			res = acxpci_validate_fw(adev, fw_image, 0);
