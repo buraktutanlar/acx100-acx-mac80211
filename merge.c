@@ -1098,9 +1098,9 @@ fail:
  *	0	success
  */
 // static 
-#if 0 // needs work
-int acxmem_write_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset)
+#if 1 // needs work, but it compiles
+int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
+		u32 offset)
 {
 	int len, size;
 	u32 sum, v32;
@@ -1117,15 +1117,25 @@ int acxmem_write_fw(acx_device_t *adev,
 	sum = p[0] + p[1] + p[2] + p[3];
 	p += 4;
 
+	if (IS_MEM(adev)) {
 #ifdef NOPE // mem.c only, all else same
 #if FW_NO_AUTO_INCREMENT
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
-	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
-	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
-	write_flush(adev);
+		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+		write_flush(adev);
 #endif
 #endif
+	} else {
+#if FW_NO_AUTO_INCREMENT
+		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
+#else
+		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
+		write_flush(adev);
+#endif
+	}
 	len = 0;
 	size = le32_to_cpu(fw_image->size) & (~3);
 
@@ -1135,6 +1145,15 @@ int acxmem_write_fw(acx_device_t *adev,
 		p += 4;
 		len += 4;
 
+		if (IS_PCI(adev)) {
+#if FW_NO_AUTO_INCREMENT
+			write_reg32(adev, IO_ACX_SLV_MEM_ADDR,
+				offset + len - 4);
+			write_flush(adev);
+#endif
+			write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
+			write_flush(adev);
+		} else {
 #ifdef NOPE // mem.c
 #if FW_NO_AUTO_INCREMENT
 		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
@@ -1158,10 +1177,12 @@ int acxmem_write_fw(acx_device_t *adev,
 				offset + len - 4, v32, tmp, id);
 			checkMismatch = 0;
 		}
-	}
-// ... here
+		} // ! IS_PCI
+
+	} // while (likely(len < size)
+
 	log(L_DEBUG, "firmware written, size:%d sum1:%x sum2:%x\n",
-			size, sum, le32_to_cpu(fw_image->chksum));
+		size, sum, le32_to_cpu(fw_image->chksum));
 
 	/* compare our checksum with the stored image checksum */
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
