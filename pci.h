@@ -26,7 +26,8 @@ void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 
 //= void acxpci_free_desc_queues(acx_device_t *adev);
 //- STATick void acxpci_delete_dma_regions(acx_device_t *adev);
-//- STATick inline void acxpci_free_coherent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
+void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
+		void *vaddr, dma_addr_t dma_handle);
 //= STATick void *acxpci_allocate(acx_device_t *adev, size_t size, dma_addr_t *phy, const char *msg);
 
 // Firmware, EEPROM, Phy
@@ -36,9 +37,11 @@ int acxpci_upload_radio(acx_device_t *adev);
 //- STATick inline void acxpci_read_eeprom_area(acx_device_t *adev);
 //- int acxpci_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 //- int acxpci_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-//- STATick int acxpci_write_fw(acx_device_t *adev, const firmware_image_t //- *fw_image, u32 offset);
-//- STATick int acxpci_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image, u32 offset);
-//- STATick int acxpci_upload_fw(acx_device_t *adev);
+int acxpci_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
+		u32 offset);
+int acxpci_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
+		u32 offset);
+int acxpci_upload_fw(acx_device_t *adev);
 // STATick void acx_show_card_eeprom_id(acx_device_t *adev);
 
 // CMDs (Control Path)
@@ -48,10 +51,10 @@ int acxpci_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 // coplied to merge.c
 // STATick inline void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 //- STATick u32 acxpci_read_cmd_type_status(acx_device_t *adev);
-//- STATick inline void acxpci_init_mboxes(acx_device_t *adev);
+void acxpci_init_mboxes(acx_device_t *adev);
 
 // Init, Configuration (Control Path)
-//- int acxpci_reset_dev(acx_device_t *adev);
+int acxpci_reset_dev(acx_device_t *adev);
 //= STATick int acxpci_verify_init(acx_device_t *adev);
 void acxpci_reset_mac(acx_device_t *adev);
 //- STATick void acxpci_up(struct ieee80211_hw *hw);
