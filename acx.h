@@ -18,7 +18,9 @@
 #ifndef _ACX_H_
 #define _ACX_H_
 
-#define NONESSENTIAL_FEATURES 1
+#define NONESSENTIAL_FEATURES 1	// acx_show_card_eeprom_id()
+//#define UNUSED 0		// lots of errs ifdefd
+//#define CONFIG_PM 0		// in include/generated/autoconf.h
 
 #include "acx_compat.h"
 #include "acx_config.h"
