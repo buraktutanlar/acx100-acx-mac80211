@@ -114,7 +114,7 @@ u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 
 // Init, Configuration (Control Path)
 int acxpci_reset_dev(acx_device_t * adev);
-static int acxpci_verify_init(acx_device_t * adev);
+//= static int acxpci_verify_init(acx_device_t * adev);
 //= static void acxpci_reset_mac(acx_device_t * adev);
 //= static void acxpci_up(struct ieee80211_hw *hw);
 
@@ -994,7 +994,7 @@ int acxpci_reset_dev(acx_device_t *adev)
 	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
 	/* wait for eCPU bootup */
-	if (OK != acxpci_verify_init(adev)) {
+	if (OK != acx_verify_init(adev)) {
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
 	}
@@ -1019,7 +1019,7 @@ int acxpci_reset_dev(acx_device_t *adev)
 	return result;
 }
 
-#if 1 // !unused
+#if 0 // !unused
 static int acxpci_verify_init(acx_device_t * adev)
 {
 	int result = NOT_OK;

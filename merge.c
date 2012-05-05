@@ -1892,7 +1892,7 @@ void acx_up(struct ieee80211_hw *hw)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-static int acx_verify_init(acx_device_t *adev);
+int acx_verify_init(acx_device_t *adev);
 #if 1 // needs work
 int acx_reset_dev(acx_device_t *adev)
 {
@@ -2051,7 +2051,7 @@ end:
 }
 #endif // acxmem_reset_dev()
 
-static int acx_verify_init(acx_device_t *adev)
+int acx_verify_init(acx_device_t *adev)
 {
         int result = NOT_OK;
         unsigned long timeout;

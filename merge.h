@@ -59,9 +59,11 @@ void acx_process_rxdesc(acx_device_t *adev);
 
 void acx_delete_dma_regions(acx_device_t *adev);
 int acx_reset_dev(acx_device_t *adev);
+int acx_verify_init(acx_device_t *adev);
 
 void acx_clean_txdesc_emergency(acx_device_t *adev);
 void acx_irq_work(struct work_struct *work);
+
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 
