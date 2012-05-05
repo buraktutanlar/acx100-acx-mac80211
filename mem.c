@@ -966,6 +966,7 @@ int acxmem_validate_fw(acx_device_t *adev,
 }
 #endif // acxmem_validate_fw()
 
+#if 0 // acxmem_upload_fw()
 STATick int acxmem_upload_fw(acx_device_t *adev) {
 	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
@@ -1075,7 +1076,7 @@ STATick int acxmem_upload_fw(acx_device_t *adev) {
 	FN_EXIT1(res);
 	return res;
 }
-
+#endif // acxmem_upload_fw()
 
 /*
  * BOM CMDs (Control Path)

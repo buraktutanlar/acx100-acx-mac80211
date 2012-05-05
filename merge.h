@@ -71,6 +71,7 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
+int acxmem_upload_fw(acx_device_t *adev);
 
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)

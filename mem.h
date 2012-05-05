@@ -52,7 +52,7 @@ int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			u32 offset);
 int acxmem_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			u32 offset);
-int acxmem_upload_fw(acx_device_t *adev);
+//a int acxmem_upload_fw(acx_device_t *adev);
 //- 
 #if defined(NONESSENTIAL_FEATURES)
 //- STATick void acx_show_card_eeprom_id(acx_device_t *adev);

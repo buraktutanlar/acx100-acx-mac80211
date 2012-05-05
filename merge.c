@@ -1280,30 +1280,35 @@ int acx_validate_fw(acx_device_t *adev,
 }
 #endif // acxmem_validate_fw()
 
-#if 0 // defer, 
-static int acxmem_upload_fw(acx_device_t *adev, char *filename)
+#if 1 // use for mem.c only
+
+#ifdef PATCH_AROUND_BAD_SPOTS
+/*
+ * arm-linux-objdump -d patch.bin, or
+ * od -Ax -t x4 patch.bin after finding the bounds
+ * of the .text section with arm-linux-objdump -s patch.bin
+ */
+static const u32 patch[] = {
+	0xe584c030, 0xe59fc008, 0xe92d1000, 0xe59fc004, 0xe8bd8000,
+	0x0000080c, 0x0000aa68, 0x605a2200, 0x2c0a689c, 0x2414d80a,
+	0x2f00689f, 0x1c27d007, 0x06241e7c, 0x2f000e24, 0xe000d1f6,
+	0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
+	0xffff0808
+};
+#endif // PATCH_AROUND_BAD_SPOTS
+
+static int _acx_upload_fw(acx_device_t *adev, char *filename)
 {
 	firmware_image_t *fw_image = NULL;
 	int res = NOT_OK;
 	int try;
 	u32 file_size;
-	char *filename = "WLANGEN.BIN";
 
 	acxmem_lock_flags;
 
 #ifdef PATCH_AROUND_BAD_SPOTS
 	u32 offset;
 	int i;
-	/*
-	 * arm-linux-objdump -d patch.bin, or
-	 * od -Ax -t x4 patch.bin after finding the bounds
-	 * of the .text section with arm-linux-objdump -s patch.bin
-	 */
-	u32 patch[] = { 0xe584c030, 0xe59fc008, 0xe92d1000, 0xe59fc004, 0xe8bd8000,
-			0x0000080c, 0x0000aa68, 0x605a2200, 0x2c0a689c, 0x2414d80a,
-			0x2f00689f, 0x1c27d007, 0x06241e7c, 0x2f000e24, 0xe000d1f6,
-			0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
-			0xffff0808 };
 #endif
 
 	FN_ENTER;
@@ -1337,6 +1342,8 @@ static int acxmem_upload_fw(acx_device_t *adev, char *filename)
 			"retrying...\n", try);
 		acx_mwait(1000); /* better wait for a while... */
 	}
+
+	if (IS_MEM(adev)) {
 
 #ifdef PATCH_AROUND_BAD_SPOTS
 	acxmem_lock();
@@ -1384,13 +1391,20 @@ static int acxmem_upload_fw(acx_device_t *adev, char *filename)
 
 	}
 	acxmem_unlock();
-#endif
+#endif // PATCH_AROUND_BAD_SPOTS
+	} // IS_MEM
+
 	vfree(fw_image);
 
 	FN_EXIT1(res);
 	return res;
 }
-#endif // defer
+int acxmem_upload_fw(acx_device_t *adev)
+{
+	char *filename = "WLANGEN.BIN";
+	return _acx_upload_fw(adev, filename);
+}
+#endif // acx_upload_fw()
 
 #if defined(NONESSENTIAL_FEATURES)
 
