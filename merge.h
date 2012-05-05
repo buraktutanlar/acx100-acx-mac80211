@@ -69,6 +69,9 @@ void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 void acx_init_mboxes(acx_device_t *adev);
 int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
+int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
+		u32 offset);
+
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 

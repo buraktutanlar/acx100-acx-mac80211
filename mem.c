@@ -893,7 +893,7 @@ int acxmem_write_fw(acx_device_t *adev,
  *	OK	success
  */
 // static 
-#if 1 // acxmem_validate_fw()
+#if 0 // acxmem_validate_fw()
 int acxmem_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset)
 {
@@ -1007,7 +1007,7 @@ STATick int acxmem_upload_fw(acx_device_t *adev) {
 		res = acx_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
 		if (OK == res) {
-			res = acxmem_validate_fw(adev, fw_image, 0);
+			res = acx_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG|L_INIT, "acx_validate_fw "
 					"(main): %d\n", res);
 		}

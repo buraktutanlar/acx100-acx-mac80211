@@ -499,6 +499,7 @@ int acxpci_write_fw(acx_device_t * adev, const firmware_image_t *fw_image,
  * Origin: Standard csum + Read IO
  */
 // static 
+#if 0 // acxpci_validate_fw()
 int
 acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 		     u32 offset)
@@ -565,7 +566,7 @@ acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 	FN_EXIT1(result);
 	return result;
 }
-
+#endif // acxpci_validate_fw()
 
 /*
  * acxpci_s_upload_fw
@@ -628,7 +629,7 @@ int acxpci_upload_fw(acx_device_t *adev)
 		res = acx_write_fw(adev, fw_image, 0);
 		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined): %d\n", res);
 		if (OK == res) {
-			res = acxpci_validate_fw(adev, fw_image, 0);
+			res = acx_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG | L_INIT, "acx_validate_fw "
 			    		"(main/combined): %d\n", res);
 		}

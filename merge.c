@@ -151,12 +151,7 @@ static int acx_upload_radio(acx_device_t *adev, char *filename)
 
 		log(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
 		if (OK == res) {
-			// JC: merge mem vs pci here.
-			if (IS_MEM(adev))
-				res = acxmem_validate_fw(adev, radio_image, offset);
-			else if (IS_PCI(adev))
-				res = acxpci_validate_fw(adev, radio_image, offset);
-			else BUG();
+			res = acx_validate_fw(adev, radio_image, offset);
 			log(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
 		}
 		acxmem_unlock();
@@ -1328,7 +1323,7 @@ static int acxmem_upload_fw(acx_device_t *adev, char *filename)
 		res = acx_write_fw(adev, fw_image, 0);
 		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
 		if (OK == res) {
-			res = acxmem_validate_fw(adev, fw_image, 0);
+			res = acx_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG|L_INIT, "acx_validate_fw "
 					"(main): %d\n", res);
 		}
