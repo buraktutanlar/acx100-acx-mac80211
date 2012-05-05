@@ -925,6 +925,7 @@ inline void acxpci_init_mboxes(acx_device_t * adev)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
+#if 0 // acxpci_reset_dev()
 int acxpci_reset_dev(acx_device_t *adev)
 {
 	const char *msg = "";
@@ -1018,6 +1019,7 @@ int acxpci_reset_dev(acx_device_t *adev)
 	FN_EXIT1(result);
 	return result;
 }
+#endif // acxpci_reset_dev()
 
 #if 0 // !unused
 static int acxpci_verify_init(acx_device_t * adev)
@@ -2170,7 +2172,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_reset_dev(adev))
+	if (OK != acx_reset_dev(adev))
 		goto fail_reset_dev;
 
 	if (IS_ACX100(adev)) {
@@ -2470,7 +2472,7 @@ int acxpci_e_resume(struct pci_dev *pdev)
 	pci_restore_state(pdev);
 	pr_acx("rsm: PCI state restored\n");
 
-	if (OK != acxpci_reset_dev(adev))
+	if (OK != acx_reset_dev(adev))
 		goto end_unlock;
 	pr_acx("rsm: device reset done\n");
 	if (OK != acx_init_mac(adev))
@@ -2774,7 +2776,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * since the firmware which directly controls large parts of the I/O
 	 * registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
-	if (OK != acxpci_reset_dev(adev))
+	if (OK != acx_reset_dev(adev))
 		goto fail_vlynq_reset_dev;
 
 	if (OK != acx_init_mac(adev))
