@@ -432,20 +432,20 @@ void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
 	 * 1 word
 	 */
 	val = 2 << 16 | 1 << 2;
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_CTL]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_CTL);
 
 	/*
 	 * SLV_MEM_CP[23:5] = start of 1st block
 	 * SLV_MEM_CP[3:2] = offset to memblkptr = 0
 	 */
 	val = destination & 0x00ffffe0;
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_CP]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_CP);
 
 	/*
 	 * SLV_MEM_ADDR[23:2] = SLV_MEM_CTL[5:2] + SLV_MEM_CP[23:5]
 	 */
 	val = (destination & 0x00ffffe0) + (1 << 2);
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_ADDR]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_ADDR);
 
 	/*
 	 * Write the data to the slave data register, rounding up to
@@ -453,7 +453,7 @@ void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
 	 * 0)
 	 */
 	while (count > 0) {
-		acx_writel (*data++, &adev->iobase[ACX_SLV_MEM_DATA]);
+		acx_writel (*data++, adev->iobase + ACX_SLV_MEM_DATA);
 		count -= 4;
 	}
 
@@ -500,27 +500,27 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 	 * SLV_MEM_CTL[5:2] = offset to data portion = 1 word
 	 */
 	val = (2 << 16) | (1 << 2);
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_CTL]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_CTL);
 
 	/*
 	 * SLV_MEM_CP[23:5] = start of 1st block
 	 * SLV_MEM_CP[3:2] = offset to memblkptr = 0
 	 */
 	val = source & 0x00ffffe0;
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_CP]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_CP);
 
 	/*
 	 * SLV_MEM_ADDR[23:2] = SLV_MEM_CTL[5:2] + SLV_MEM_CP[23:5]
 	 */
 	val = (source & 0x00ffffe0) + (1 << 2);
-	acx_writel (val, &adev->iobase[ACX_SLV_MEM_ADDR]);
+	acx_writel (val, adev->iobase + ACX_SLV_MEM_ADDR);
 
 	/*
 	 * Read the data from the slave data register, rounding up to the end
 	 * of the word containing the last byte (hence the > 0)
 	 */
 	while (count > 0) {
-		*data++ = acx_readl (&adev->iobase[ACX_SLV_MEM_DATA]);
+		*data++ = acx_readl (adev->iobase + ACX_SLV_MEM_DATA);
 		count -= 4;
 	}
 
@@ -3793,8 +3793,8 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	addr_size = iomem->end - iomem->start + 1;
-	adev->membase = (volatile u32 *) iomem->start;
-	adev->iobase = (volatile u32 *) ioremap_nocache(iomem->start, addr_size);
+	adev->membase = iomem->start;
+	adev->iobase = ioremap_nocache(iomem->start, addr_size);
 	if (!adev->iobase) {
 		result = -ENOMEM;
 		dev_err(adev->bus_dev, "Couldn't ioremap\n");
@@ -3808,7 +3808,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	log(L_ANY, "found an %s-based wireless network card, "
 			"irq:%d, "
-			"membase:0x%p, mem_size:%ld, "
+			"membase:0x%08lx, mem_size:%ld, "
 			"iobase:0x%p",
 			chip_name,
 			adev->irq,

@@ -86,9 +86,14 @@ do { \
 #endif
 
 typedef enum {
-	ACX_SOFT_RESET = 0,
-	ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA, ACX_SLV_REG_ADATA,
-	ACX_SLV_MEM_CP, ACX_SLV_MEM_ADDR, ACX_SLV_MEM_DATA, ACX_SLV_MEM_CTL,
+	ACX_SOFT_RESET 	  = 0x0000,
+	ACX_SLV_REG_ADDR  = 0x0004,
+	ACX_SLV_REG_DATA  = 0x0008,
+	ACX_SLV_REG_ADATA = 0x000c,
+	ACX_SLV_MEM_CP    = 0x0010,
+	ACX_SLV_MEM_ADDR  = 0x0014, /*redundant with IO_ACX_SLV_MEM_ADDR */
+	ACX_SLV_MEM_DATA  = 0x0018, /*redundant with IO_ACX_SLV_MEM_DATA*/
+	ACX_SLV_MEM_CTL   = 0x001c, /*redundant with IO_ACX_SLV_END_CTL */
 } acxreg_t;
 
 #define INLINE_IO static inline
@@ -96,8 +101,8 @@ typedef enum {
 INLINE_IO u32 read_id_register(acx_device_t *adev)
 {
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-	acx_writel(0x24, &adev->iobase[ACX_SLV_REG_ADDR]);
-	return acx_readl(&adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(0x24, adev->iobase + ACX_SLV_REG_ADDR);
+	return acx_readl(adev->iobase + ACX_SLV_REG_DATA);
 }
 
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
@@ -116,8 +121,8 @@ INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
 		return acx_readl(((u8 *) adev->iobase) + addr);
 	}
 
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	val = acx_readl(&adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	val = acx_readl(adev->iobase + ACX_SLV_REG_DATA);
 
 	return val;
 }
@@ -138,8 +143,8 @@ INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset)
 		return acx_readw(((u8 *) adev->iobase) + addr);
 	}
 
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	lo = acx_readw((u16 *) &adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	lo = acx_readw((u16 *) (adev->iobase + ACX_SLV_REG_DATA));
 
 	return lo;
 }
@@ -159,8 +164,8 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	if (addr < 0x20)
 		return readb(((u8 *) adev->iobase) + addr);
 
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	lo = acx_readw((u8 *) &adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	lo = acx_readw((u8 *) (adev->iobase + ACX_SLV_REG_DATA));
 
 	return (u8) lo;
 }
@@ -181,8 +186,8 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 		return;
 	}
 
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	acx_writel(val, &adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	acx_writel(val, adev->iobase + ACX_SLV_REG_DATA);
 }
 
 INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
@@ -200,8 +205,8 @@ INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
 		acx_writew(val, ((u8 *) adev->iobase) + addr);
 		return;
 	}
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	acx_writew(val, (u16 *) &adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	acx_writew(val, (u16 *) (adev->iobase + ACX_SLV_REG_DATA));
 }
 
 INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
@@ -219,8 +224,8 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
 		writeb(val, ((u8 *) adev->iobase) + addr);
 		return;
 	}
-	acx_writel(addr, &adev->iobase[ACX_SLV_REG_ADDR]);
-	writeb(val, (u8 *) &adev->iobase[ACX_SLV_REG_DATA]);
+	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
+	writeb(val, (u8 *) (adev->iobase + ACX_SLV_REG_DATA));
 }
 
 /* Handle PCI posting properly:
