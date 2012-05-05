@@ -2007,7 +2007,8 @@ void acx_set_defaults(acx_device_t * adev)
 	acx_get_sensitivity(adev);
 
 	/* set our global interrupt mask */
-	acx_set_interrupt_mask(adev);
+	if (IS_PCI(adev) || IS_MEM(adev))
+		acx_set_interrupt_mask(adev);
 
 	adev->led_power = 1;	/* LED is active on startup */
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
