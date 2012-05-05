@@ -488,7 +488,7 @@ struct acx_device {
 	void __iomem	*iobase;
 #endif
 #ifdef CONFIG_ACX_MAC80211_MEM
-	struct platform_device	*pdev;
+	struct platform_device	*pdevmem;
 #endif
 
 	unsigned long	membase2;

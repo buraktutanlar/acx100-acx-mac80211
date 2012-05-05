@@ -3760,7 +3760,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 	 ** just _presume_ that we're under sem (instead of actually taking it): */
 	/* acx_sem_lock(adev); */
 	adev->ieee = ieee;
-	adev->pdev = pdev;
+	adev->pdevmem = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_MEM;
 
