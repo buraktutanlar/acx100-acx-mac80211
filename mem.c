@@ -938,14 +938,18 @@ int acxmem_validate_fw(acx_device_t *adev,
 
 		if (unlikely(w32 != v32)) {
 			pr_acx("FATAL: firmware upload: "
-				"data parts at offset %d don't match\n(0x%08X vs. 0x%08X)!\n"
+				"data parts at offset %d don't match (0x%08X vs. 0x%08X)! "
 				"I/O timing issues or defective memory, with DWL-xx0+? "
-				"ACX_IO_WIDTH=16 may help. Please report\n", len, v32, w32);
+				"ACX_IO_WIDTH=16 may help. Please report\n",
+				len, v32, w32);
 			result = NOT_OK;
 			break;
 		}
 
-		sum += (u8) w32 + (u8) (w32 >> 8) + (u8) (w32 >> 16) + (u8) (w32 >> 24);
+		sum += (u8) w32
+			+ (u8) (w32 >> 8)
+			+ (u8) (w32 >> 16)
+			+ (u8) (w32 >> 24);
 	}
 
 	/* sum control verification */

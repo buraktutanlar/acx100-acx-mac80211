@@ -1205,8 +1205,8 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
  *	OK	success
  */
 // static 
-#if 0 // needs work
-int acxmem_validate_fw(acx_device_t *adev,
+#if 1 // compiles
+int acx_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset) 
 {
 	u32 sum, v32, w32;
@@ -1238,7 +1238,14 @@ int acxmem_validate_fw(acx_device_t *adev,
 		p += 4;
 		len += 4;
 
+		if (IS_PCI(adev)) {
 
+#if FW_NO_AUTO_INCREMENT
+		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
+#endif
+		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
+
+		} else {
 #ifdef NOPE // mem.c only
 #if FW_NO_AUTO_INCREMENT
 		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
@@ -1246,14 +1253,14 @@ int acxmem_validate_fw(acx_device_t *adev,
 		udelay(10);
 		w32 = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
 #endif
-
 		w32 = read_slavemem32(adev, offset + len - 4);
-
+		}
 		if (unlikely(w32 != v32)) {
 			pr_acx("FATAL: firmware upload: "
-				"data parts at offset %d don't match\n(0x%08X vs. 0x%08X)!\n"
+				"data parts at offset %d don't match (0x%08X vs. 0x%08X)! "
 				"I/O timing issues or defective memory, with DWL-xx0+? "
-				"ACX_IO_WIDTH=16 may help. Please report\n", len, v32, w32);
+				"ACX_IO_WIDTH=16 may help. Please report\n",
+				len, v32, w32);
 			result = NOT_OK;
 			break;
 		}

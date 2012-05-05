@@ -547,9 +547,10 @@ acxpci_validate_fw(acx_device_t * adev, const firmware_image_t *fw_image,
 			break;
 		}
 
-		sum +=
-		    (u8) w32 + (u8) (w32 >> 8) + (u8) (w32 >> 16) +
-		    (u8) (w32 >> 24);
+		sum += (u8) w32
+			+ (u8) (w32 >> 8)
+			+ (u8) (w32 >> 16)
+			+ (u8) (w32 >> 24);
 	}
 
 	/* sum control verification */
