@@ -1492,8 +1492,9 @@ void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 	FN_EXIT0;
 }
 
-#if 0 //
-static inline void acxmem_init_mboxes(acx_device_t *adev)
+#if 1 //
+// static inline 
+void acx_init_mboxes(acx_device_t *adev)
 {
 	u32 cmd_offs, info_offs;
 
@@ -1501,16 +1502,19 @@ static inline void acxmem_init_mboxes(acx_device_t *adev)
 
 	cmd_offs = read_reg32(adev, IO_ACX_CMD_MAILBOX_OFFS);
 	info_offs = read_reg32(adev, IO_ACX_INFO_MAILBOX_OFFS);
-	adev->cmd_area = (u8*) cmd_offs;
-	adev->info_area = (u8*) info_offs;
-
+	if (IS_MEM(adev)) {
+		adev->cmd_area = (u8*) cmd_offs;
+		adev->info_area = (u8*) info_offs;
+		if (adev->iobase2)
+			pr_notice("adev->iobase2 != 0 for MEM dev\n");
+	} else {
+		adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
+		adev->info_area = (u8 *) adev->iobase2 + info_offs;
+	}
 	// OW iobase2 not used in mem.c, in pci.c it is
-	/*
-	 log(L_DEBUG, "iobase2=%p\n"
-	 */
-	log(L_DEBUG, "cmd_mbox_offset=%X cmd_area=%p\n"
-		"acx: info_mbox_offset=%X info_area=%p\n",
-		cmd_offs, adev->cmd_area,
+	log(L_DEBUG, "iobase2=%p cmd_mbox_offset=%X cmd_area=%p"
+		"info_mbox_offset=%X info_area=%p\n",
+		adev->iobase2, cmd_offs, adev->cmd_area,
 		info_offs, adev->info_area);
 
 	FN_EXIT0;
@@ -2038,10 +2042,10 @@ int acx_reset_dev(acx_device_t *adev)
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 	if (IS_MEM(adev)) {
-		acxmem_init_mboxes(adev);
+		acx_init_mboxes(adev);
 		acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 	} else {
-		acxpci_init_mboxes(adev);
+		acx_init_mboxes(adev);
 		acx_write_cmd_type_status(adev, 0, 0);
 	}
 	/* test that EEPROM is readable */

@@ -1342,6 +1342,7 @@ STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
 #endif // acxmem_read_cmd_type_status()
 
 //STATick inline 
+#if 0 // acxmem_init_mboxes()
 void acxmem_init_mboxes(acx_device_t *adev)
 {
 	u32 cmd_offs, info_offs;
@@ -1364,7 +1365,7 @@ void acxmem_init_mboxes(acx_device_t *adev)
 
 	FN_EXIT0;
 }
-
+#endif // acxmem_init_mboxes()
 
 /*
  * BOM Init, Configure (Control Path)
@@ -1504,7 +1505,7 @@ int acxmem_reset_dev(acx_device_t *adev)
 	acxmem_lock();
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
-	acxmem_init_mboxes(adev);
+	acx_init_mboxes(adev);
 	acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* test that EEPROM is readable */
