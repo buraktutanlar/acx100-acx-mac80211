@@ -274,7 +274,7 @@ int acx_interrogate_debug(acx_device_t *adev, void *pdr,
 // BOM Configuration (Common:Control Path)
 // -----
 void acx_set_defaults(acx_device_t * adev);
-//- void acx_start(acx_device_t * adev);
+void acx_start(acx_device_t * adev);
 //- int acx_net_reset(struct ieee80211_hw *ieee);
 int acx_init_mac(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
@@ -318,10 +318,10 @@ void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_tx_work(struct work_struct *work);
 //- void acx_tx_queue_go(acx_device_t *adev);
 //- int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
-//- void acx_tx_queue_flush(acx_device_t *adev);
-//- void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
+void acx_tx_queue_flush(acx_device_t *adev);
+void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 int acx_queue_stopped(struct ieee80211_hw *ieee);
-//- void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
+void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 //- tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len);
 //- void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error, unsigned int //- finger, struct ieee80211_tx_info *info);
 //- u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc, struct //- ieee80211_tx_info *info);
@@ -342,10 +342,10 @@ int acx_queue_stopped(struct ieee80211_hw *ieee);
 //- // BOM Irq Handling, Timer (Common)
 //- // -----
 void acx_init_task_scheduler(acx_device_t *adev);
-//- void acx_after_interrupt_task(acx_device_t *adev);
+void acx_after_interrupt_task(acx_device_t *adev);
 //- void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 //- void acx_log_irq(u16 irqtype);
-//- void acx_timer(unsigned long address);
+void acx_timer(unsigned long address);
 //- void acx_set_timer(acx_device_t * adev, int timeout_us);
 //- 
 //- // BOM Mac80211 Ops (Common)
