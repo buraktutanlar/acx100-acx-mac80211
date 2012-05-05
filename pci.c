@@ -741,7 +741,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 			    (cmd == ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
-	acxpci_write_cmd_type_status(adev, cmd, 0);
+	acx_write_cmd_type_status(adev, cmd, 0);
 
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
 	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
@@ -790,7 +790,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	cmd_status = acx_read_cmd_type_status(adev);
 
 	/* put the card in IDLE state */
-	acxpci_write_cmd_type_status(adev, 0, 0);
+	acx_write_cmd_type_status(adev, 0, 0);
 
 	/* Timed out! */
 	if (counter == -1) {
@@ -859,6 +859,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 }
 
 // static inline 
+#if 0 // acxpci_write_cmd_type_status()
 void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 {
 	FN_ENTER;
@@ -866,6 +867,7 @@ void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 	write_flush(adev);
 	FN_EXIT0;
 }
+#endif // acxpci_write_cmd_type_status()
 
 #if 0 // acxpci_read_cmd_type_status()
 //static
@@ -1004,7 +1006,7 @@ int acxpci_reset_dev(acx_device_t *adev)
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 
 	acxpci_init_mboxes(adev);
-	acxpci_write_cmd_type_status(adev, 0, 0);
+	acx_write_cmd_type_status(adev, 0, 0);
 
 	/* test that EEPROM is readable */
 	acxpci_read_eeprom_area(adev);

@@ -1477,6 +1477,21 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 }
 #endif // acxmem_read_cmd_type_status()
 
+// static inline 
+void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
+{
+	FN_ENTER;
+
+	if (IS_MEM(adev))
+		write_slavemem32(adev, (u32) adev->cmd_area,
+				type | (status << 16));
+	else
+		acx_writel(type | (status << 16), adev->cmd_area);
+
+	write_flush(adev);
+	FN_EXIT0;
+}
+
 #if 0 //
 static inline void acxmem_init_mboxes(acx_device_t *adev)
 {
@@ -1570,9 +1585,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	timeout += jiffies;
 
 	do {
-		cmd_status = (IS_MEM(adev))
-			? acxmem_read_cmd_type_status(adev)
-			: acxpci_read_cmd_type_status(adev);
+		cmd_status = acx_read_cmd_type_status(adev);
 		/* Test for IDLE state */
 		// pci.c had more complicated timeout code here.
 		if (!cmd_status)
@@ -1612,10 +1625,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		}
 	}
 	/* now write the actual command type */
-	if (IS_MEM(adev))
-		acxmem_write_cmd_type_status(adev, cmd, 0);
-	else
-		acxpci_write_cmd_type_status(adev, cmd, 0);
+	acx_write_cmd_type_status(adev, cmd, 0);
 
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
 	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
@@ -1651,14 +1661,12 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	} while (likely(--counter));
 
 	/* save state for debugging */
-	cmd_status = (IS_MEM(adev))
-		? acxmem_read_cmd_type_status(adev)
-		: acxpci_read_cmd_type_status(adev);
+	cmd_status = acx_read_cmd_type_status(adev);
 
 	/* put the card in IDLE state */
 	(IS_MEM(adev))
-		? acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0)
-		: acxpci_write_cmd_type_status(adev, 0, 0);
+		? acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0)
+		: acx_write_cmd_type_status(adev, 0, 0);
 
 	/* Timed out! */
 	if (counter == 0) {
@@ -2031,10 +2039,10 @@ int acx_reset_dev(acx_device_t *adev)
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 	if (IS_MEM(adev)) {
 		acxmem_init_mboxes(adev);
-		acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+		acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 	} else {
 		acxpci_init_mboxes(adev);
-		acxpci_write_cmd_type_status(adev, 0, 0);
+		acx_write_cmd_type_status(adev, 0, 0);
 	}
 	/* test that EEPROM is readable */
 	acx_read_eeprom_area(adev);

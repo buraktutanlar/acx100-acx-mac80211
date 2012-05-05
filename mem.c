@@ -1173,7 +1173,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 				== ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
-	acxmem_write_cmd_type_status(adev, cmd, 0);
+	acx_write_cmd_type_status(adev, cmd, 0);
 
 	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
 	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
@@ -1211,7 +1211,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	cmd_status = acx_read_cmd_type_status(adev);
 
 	/* put the card in IDLE state */
-	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+	acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* Timed out! */
 	if (counter == 0) {
@@ -1309,6 +1309,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 }
 #endif
 
+#if 0 // acxmem_write_cmd_type_status()
 void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 {
 	FN_ENTER;
@@ -1316,6 +1317,7 @@ void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 	write_flush(adev);
 	FN_EXIT0;
 }
+#endif // acxmem_write_cmd_type_status()
 
 #if 0 // acxmem_read_cmd_type_status()
 STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
@@ -1503,7 +1505,7 @@ int acxmem_reset_dev(acx_device_t *adev)
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
 	acxmem_init_mboxes(adev);
-	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+	acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 	/* test that EEPROM is readable */
 	acxmem_read_eeprom_area(adev);
