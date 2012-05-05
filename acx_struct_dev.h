@@ -482,7 +482,6 @@ struct acx_device {
 #endif
 	struct device *bus_dev;
 
-// OW FIXME Type and ifdef mess ..
 #ifdef ACX_MAC80211_PCI
 	struct pci_dev	*pdev;
 	unsigned long	membase;
@@ -490,8 +489,6 @@ struct acx_device {
 #endif
 #ifdef ACX_MAC80211_MEM
 	struct platform_device	*pdev;
-	volatile u32	*membase;
-	volatile u32	*iobase;
 #endif
 
 	unsigned long	membase2;
