@@ -1455,21 +1455,20 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-#if 0 // slavemem resolve before merge
-static u32 acxmem_read_cmd_type_status(acx_device_t *adev)
+#if 1 // 
+u32 acx_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
 
 	FN_ENTER;
 
-	cmd_type = read_slavemem32(adev, (u32) adev->cmd_area);
-
+	cmd_type = (IS_MEM(adev))
+		? read_slavemem32(adev, (u32) adev->cmd_area)
+		: acx_readl(adev->cmd_area);
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
-	log(L_DEBUG, "%s: "
-		"cmd_type:%04X cmd_status:%04X [%s]\n",
-		__func__,
+	log(L_DEBUG, "cmd_type:%04X cmd_status:%04X [%s]\n",
 		cmd_type, cmd_status,
 		acx_cmd_status_str(cmd_status));
 	

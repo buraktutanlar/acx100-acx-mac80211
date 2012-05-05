@@ -703,7 +703,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	counter = (timeout * 1000 / HZ) - 1;	/* in ms */
 	timeout += jiffies;
 	do {
-		cmd_status = acxpci_read_cmd_type_status(adev);
+		cmd_status = acx_read_cmd_type_status(adev);
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
@@ -787,7 +787,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	} while (likely(--counter));
 
 	/* save state for debugging */
-	cmd_status = acxpci_read_cmd_type_status(adev);
+	cmd_status = acx_read_cmd_type_status(adev);
 
 	/* put the card in IDLE state */
 	acxpci_write_cmd_type_status(adev, 0, 0);
@@ -867,6 +867,7 @@ void acxpci_write_cmd_type_status(acx_device_t * adev, u16 type, u16 status)
 	FN_EXIT0;
 }
 
+#if 0 // acxpci_read_cmd_type_status()
 //static
 u32 acxpci_read_cmd_type_status(acx_device_t *adev)
 {
@@ -884,6 +885,7 @@ u32 acxpci_read_cmd_type_status(acx_device_t *adev)
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
+#endif // acxpci_read_cmd_type_status()
 
 // static 
 inline void acxpci_init_mboxes(acx_device_t * adev)

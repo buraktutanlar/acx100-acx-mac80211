@@ -64,6 +64,7 @@ int acx_verify_init(acx_device_t *adev);
 void acx_clean_txdesc_emergency(acx_device_t *adev);
 void acx_irq_work(struct work_struct *work);
 
+u32 acx_read_cmd_type_status(acx_device_t *adev);
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 

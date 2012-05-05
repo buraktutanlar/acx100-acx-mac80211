@@ -158,7 +158,7 @@ void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination, u32 source, 
 // CMDs (Control Path)
 //- int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *buffer, unsigned buflen, unsigned cmd_timeout, const char* cmdstr);
 //- STATick inline void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
-u32 acxmem_read_cmd_type_status(acx_device_t *adev);
+//= u32 acxmem_read_cmd_type_status(acx_device_t *adev);
 //- STATick inline void acxmem_init_mboxes(acx_device_t *adev);
 
 // Init, Configure (Control Path)
@@ -1140,7 +1140,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* wait for firmware to become idle for our command submission */
 	counter = 199; /* in ms */
 	do {
-		cmd_status = acxmem_read_cmd_type_status(adev);
+		cmd_status = acx_read_cmd_type_status(adev);
 		/* Test for IDLE state */
 		if (!cmd_status)
 			break;
@@ -1208,7 +1208,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	} while (likely(--counter));
 
 	/* save state for debugging */
-	cmd_status = acxmem_read_cmd_type_status(adev);
+	cmd_status = acx_read_cmd_type_status(adev);
 
 	/* put the card in IDLE state */
 	acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
@@ -1317,6 +1317,7 @@ void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 	FN_EXIT0;
 }
 
+#if 0 // acxmem_read_cmd_type_status()
 STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
 	u32 cmd_type, cmd_status;
 
@@ -1336,6 +1337,7 @@ STATick u32 acxmem_read_cmd_type_status(acx_device_t *adev) {
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
+#endif // acxmem_read_cmd_type_status()
 
 //STATick inline 
 void acxmem_init_mboxes(acx_device_t *adev)
