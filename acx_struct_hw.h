@@ -957,7 +957,7 @@ enum {
 /* inform hw that we have filled command mailbox */
 #define INT_TRIG_CMD		0x01
 
-struct txhostdesc {
+struct hostdesc {
 	acx_ptr	data_phy;			/* 0x00 [u8 *] */
 	u16	data_offset;			/* 0x04 */
 	u16	reserved;			/* 0x06 */
@@ -965,7 +965,11 @@ struct txhostdesc {
 	u16	length;			/* 0x0a */
 	acx_ptr	desc_phy_next;		/* 0x0c [txhostdesc *] */
 	acx_ptr	pNext;			/* 0x10 [txhostdesc *] */
-	u32	Status;			/* 0x14, unused on Tx */
+} ACX_PACKED;
+
+struct txhostdesc {
+	struct hostdesc hd;
+
 /* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
 
@@ -976,14 +980,9 @@ struct txhostdesc {
 } ACX_PACKED;
 
 struct rxhostdesc {
-	acx_ptr	data_phy;			/* 0x00 [rxbuffer_t *] */
-	u16	data_offset;			/* 0x04 */
-	u16	reserved;			/* 0x06 */
-	u16	Ctl_16;			/* 0x08; 16bit value, endianness!! */
-	u16	length;			/* 0x0a */
-	acx_ptr	desc_phy_next;		/* 0x0c [rxhostdesc_t *] */
-	acx_ptr	pNext;			/* 0x10 [rxhostdesc_t *] */
-	u32	Status;			/* 0x14 */
+	struct hostdesc hd;
+	u32	Status;			/* 0x14, unused on Tx */
+	
 /* From here on you can use this area as you want (variable length, too!) */
 	rxbuffer_t *data;
 } ACX_PACKED;
