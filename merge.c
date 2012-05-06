@@ -3226,6 +3226,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), addr);
 
 	}
+
+is_pci_branch:
 	/* don't need to clean ack/rts statistics here, already
 	 * done on descr cleanup */
 
@@ -3234,7 +3236,6 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	CLEAR_BIT(Ctl_8, DESC_CTL_ACXDONE_HOSTOWN);
 
 	/* flush writes before we release hostdesc to the adapter here */
-is_pci_branch:
 	if (IS_PCI(adev)) {
 		wmb();
 		CLEAR_BIT(hostdesc1->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
