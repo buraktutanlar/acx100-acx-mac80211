@@ -1840,47 +1840,11 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 #define REG_ACX_VENDOR_ID 0x900
 #define ACX_VENDOR_ID 0x8400104c
 
-#if 0 // unused yet, review before #if1
-static int acxmem_verify_init(acx_device_t *adev) {
-	int result = NOT_OK;
-	unsigned long timeout;
-	u32 irqstat;
-
-	acxmem_lock_flags;
-
-	FN_ENTER;
-
-	timeout = jiffies + 2 * HZ;
-	for (;;) {
-		acxmem_lock();
-		irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if ((irqstat != 0xFFFFFFFF)
-			&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
-			result = OK;
-			write_reg32(adev, IO_ACX_IRQ_ACK,
-				HOST_INT_FCS_THRESHOLD);
-			acxmem_unlock();
-			break;
-		}
-		acxmem_unlock();
-
-		if (time_after(jiffies, timeout))
-			break;
-		/* Init may take up to ~0.5 sec total */
-		acx_mwait(50);
-	}
-
-	FN_EXIT1(result);
-	return result;
-}
-#endif // acxmem_verify_init()
 
 /*
  * BOM Init, Configure (Control Path)
  * ==================================================
  */
-
-
 
 /*
  * acxmem_l_reset_mac
@@ -2209,7 +2173,7 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 	 * reset, so the ACX memory is in the state we want.
 	 */
 }
-#endif
+#endif // acxmem_init_acx_txbuf()
 
 /*
  * Most of the acx specific pieces of hardware reset.
@@ -2271,7 +2235,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 
 	return 0;
 }
-#endif
+#endif // acxmem_complete_hw_reset()
 
 #if 0
 /***********************************************************************
@@ -2701,7 +2665,7 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	return (blocks_needed);
 }
 
-#if 0
+#if 0 // acxmem_get_txdesc()
 static inline
 txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
 {
@@ -2719,6 +2683,7 @@ txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
  * sufficiently many.
  */
  // OW TODO Align with pci.c
+#if 1 // acxmem_alloc_tx()
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	struct txdesc *txdesc;
 	unsigned head;
@@ -2833,6 +2798,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 
 	return (tx_t*) txdesc;
 }
+#endif // acxmem_alloc_tx()
 
 /*
  * acxmem_l_dealloc_tx
@@ -2844,6 +2810,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
  * state and move the queue head pointer back.
  *
  */
+#if 1 // acxmem_dealloc_tx()
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
@@ -2878,6 +2845,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	acxmem_unlock();
 
 }
+#endif // acxmem_dealloc_tx()
 #endif // CONFIG_ACX_MAC80211_MEM
 
 /*
@@ -2990,43 +2958,6 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 
 }
 
-
-/* Re-initialize tx-buffer list
- */
-#if 0 // none in pci, doesnt belong here
-void acxmem_init_acx_txbuf2(acx_device_t *adev) {
-
-	int i;
-	u32 adr, next_adr;
-
-	adr = adev->acx_txbuf_start;
-	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {
-		next_adr = adr + adev->memblocksize;
-
-		// Last block is marked with 0x02000000
-		if (i == adev->acx_txbuf_numblocks - 1) {
-			write_slavemem32(adev, adr, 0x02000000);
-		}
-		// Else write pointer to next block
-		else {
-			write_slavemem32(adev, adr, (next_adr >> 5));
-		}
-		adr = next_adr;
-	}
-
-	adev->acx_txbuf_free = adev->acx_txbuf_start;
-	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
-
-}
-#endif
-
-#if 0 // replaced by merge.h:acx_advance_txdesc()
-// static inline 
-txdesc_t*
-acxmem_advance_txdesc(acx_device_t *adev, txdesc_t* txdesc, int inc) {
-	return (txdesc_t*) (((u8*) txdesc) + inc * adev->txdesc_size);
-}
-#endif // acxmem_advance_txdesc()
 
 static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 {
