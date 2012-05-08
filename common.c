@@ -970,6 +970,7 @@ acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 	   0x00010000   using host indirect descriptors (else host must access ACX memory?)
 	 */
 	if (IS_PCI(adev)) {
+		#if defined(CONFIG_ACX_MAC80211_PCI)
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc =
@@ -977,17 +978,20 @@ acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 		    acx2cpu(MemoryConfigOption.pRxHostDesc),
 		    (long)adev->rx.hostdesc_startphy);
+		#endif
 	}
 	else if(IS_MEM(adev)) {
 		/*
 		 * ACX ignores DMA_config for generic slave mode.
 		 */
+		#if defined(CONFIG_ACX_MAC80211_MEM)
 		MemoryConfigOption.DMA_config = 0;
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 			acx2cpu(MemoryConfigOption.pRxHostDesc),
 			(long)adev->rx.hostdesc_startphy);
+		#endif
 	}
 	else {
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
@@ -1204,12 +1208,16 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 	memconf.rx_queue1_type = 7;	/* must be set to 7 */
 	/* done by memset: memconf.rx_queue1_prio = 0; low prio */
 	if (IS_PCI(adev)) {
+		#if defined(CONFIG_ACX_MAC80211_PCI)
 		memconf.rx_queue1_host_rx_start =
 		    cpu2acx(adev->rx.hostdesc_startphy);
+		#endif
 	}
-	else if (IS_MEM(adev))
-	{
-		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rx.hostdesc_startphy);
+	else if (IS_MEM(adev)) {
+		#if defined(CONFIG_ACX_MAC80211_MEM)
+		memconf.rx_queue1_host_rx_start =
+			cpu2acx(adev->rx.hostdesc_startphy);
+		#endif
 	}
 
 	/* Tx descriptor queue config */
@@ -5403,10 +5411,13 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 	int debug = acx_debug & L_BUFT;
 
 	if (debug) {
+		#if defined(CONFIG_ACX_MAC80211_PCI) || \
+	 		defined(CONFIG_ACX_MAC80211_MEM)
 		i = ((u8*) txdesc - (u8*) adev->tx.desc_start)
 			/ adev->tx.desc_size;
 		sprintf(tmpstr, "txdesc=%i: rates in info"
 			"[bitrate,hw_value,count]: ", i);
+		#endif
 	}
 
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
