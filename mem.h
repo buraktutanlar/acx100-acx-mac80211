@@ -4,11 +4,13 @@
  * forward declares some of the functions used in mem.c, reducing the
  * set of forward declarations in mem.c
  */
-
-#define STATick	/* ick: suppress static, let linker find fns in
-		   mem.o pci.o */
+#ifndef _MEM_H_
+#define _MEM_H_
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
+
+#define STATick
+/* ick: suppress static, let linker find fns in mem.o pci.o */
 
 #define DUMP_MEM_DEFINED 1 // to insure export of dump* fns too
 
@@ -21,14 +23,13 @@ inline void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) { }
 #endif
 
 void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination,
-		u8 *source, int count);
+			u8 *source, int count);
+void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
+			u32 source, int count);
 void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
-		u8 *source, int count);
+			u8 *source, int count);
 void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
-		u32 source, int count);
-
-// in merge.c !
-// int acxmem_upload_radio(acx_device_t *adev);
+			u32 source, int count);
 
 int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			u32 offset);
@@ -53,7 +54,7 @@ void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 void acxmem_init_mboxes(acx_device_t *adev);
 
 
-#else // CONFIG_ACX_MAC80211_MEM
+#else /* !CONFIG_ACX_MAC80211_MEM */
 
 
 static inline void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) { }
@@ -81,7 +82,8 @@ static inline int acxmem_validate_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset)
 { return 0; }
 
-static inline void acxmem_reset_mac(acx_device_t *adev) { }
+static inline void acxmem_reset_mac(acx_device_t *adev)
+{ }
 
 static inline int acxmem_proc_diag_output(struct seq_file *file,
 		acx_device_t *adev)
@@ -97,10 +99,14 @@ static inline u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev,
 		int count)
 { return 0; }
 
-static inline void acxmem_init_acx_txbuf2(acx_device_t *adev) { }
+static inline void acxmem_init_acx_txbuf2(acx_device_t *adev)
+{ }
 
-static inline int __init acxmem_init_module(void) { return 0; }
-static inline void __exit acxmem_cleanup_module(void) { }
+static inline int __init acxmem_init_module(void)
+{ return 0; }
+
+static inline void __exit acxmem_cleanup_module(void)
+{ }
 
 static inline void acxmem_write_cmd_type_status(acx_device_t *adev,
 		u16 type, u16 status)
@@ -108,5 +114,5 @@ static inline void acxmem_write_cmd_type_status(acx_device_t *adev,
 
 static inline void acxmem_init_mboxes(acx_device_t *adev) { }
 
-
-#endif // CONFIG_ACX_MAC80211_MEM
+#endif /* defined(CONFIG_ACX_MAC80211_MEM) */
+#endif /* _MEM_H_ */
