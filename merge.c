@@ -209,33 +209,34 @@ int acxpci_upload_radio(acx_device_t *adev)
 /* ########################################## */
 /* host_desc_queue creation */
 
-static void *acx_allocate(acx_device_t *adev, size_t size,
-			dma_addr_t * phy, const char *msg)
+static int acx_allocate(acx_device_t *adev, struct desc_info *di,
+			const char *msg)
 {
 	void *ptr;
 
 	if (IS_PCI(adev))
 		ptr = dma_alloc_coherent(adev->bus_dev,
-					size, phy, GFP_KERNEL);
+					di->size, &di->phy, GFP_KERNEL);
 	else {
-		ptr = kmalloc(size, GFP_KERNEL);
+		ptr = kmalloc(di->size, GFP_KERNEL);
 		/*
 		 * The ACX can't use the physical address, so we'll
 		 * have to fa later and it might be handy to have the
 		 * virtual address.
 		 */
-		*phy = (dma_addr_t) NULL;
+		di->phy = (dma_addr_t) NULL;
 	}
-
+	
 	if (ptr) {
-		log(L_DEBUG, "%s sz=%d adr=0x%p phy=0x%08llx\n",
-			msg, (int)size, ptr, (unsigned long long)*phy);
-		memset(ptr, 0, size);
-		return ptr;
+		log(L_DEBUG, "%s sz=%u adr=0x%p phy=0x%08llx\n", msg,
+			di->size, ptr, (unsigned long long)di->phy); 
+		memset(ptr, 0, di->size);
+		di->start = ptr;
+		return 0;
 	}
-	pr_err("%s allocation FAILED (%d bytes)\n", msg, (int)size);
-		
-	return NULL;
+	pr_err("%s allocation FAILED (%u bytes)\n", msg, di->size);
+
+	return -ENOMEM;
 }
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
@@ -251,19 +252,16 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	rxbuffer_t *rxbuf;
 	dma_addr_t hostdesc_phy;
 	dma_addr_t rxbuf_phy;
-	int i;
+	int i, rc;
 
 	FN_ENTER;
 
 	/* allocate the RX host descriptor queue pool */
 	adev->rx.host.size = RX_CNT * sizeof(*hostdesc);
-	adev->rx.host.rxstart
-		= acx_allocate(adev,
-			adev->rx.host.size,
-			&adev->rx.host.phy,
-			"rxhostdesc_start");
-	if (!adev->rx.host.rxstart)
+	rc = acx_allocate(adev, &adev->rx.host, "rxhostdesc_start");
+	if (rc)
 		goto fail;
+
 	/* check for proper alignment of RX host descriptor pool */
 	if ((long)adev->rx.host.rxstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
@@ -273,10 +271,8 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
 	adev->rx.buf.size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rx.buf.rxstart
-		= acx_allocate(adev, adev->rx.buf.size,
-			&adev->rx.buf.phy, "rxbuf_start");
-	if (!adev->rx.buf.rxstart)
+	rc = acx_allocate(adev, &adev->rx.buf, "rxbuf_start");
+	if (rc)
 		goto fail;
 
 	rxbuf = (rxbuffer_t*) adev->rx.buf.rxstart;
@@ -303,7 +299,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	FN_EXIT1(OK);
 	return OK;
       fail:
-	pr_acx("FAILED\n");
+	pr_acx("FAILED: %d\n", rc);
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
@@ -315,7 +311,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 	u8 *txbuf;
 	dma_addr_t hostdesc_phy;
 	dma_addr_t txbuf_phy;
-	int i;
+	int i, rc;
 
 	FN_ENTER;
 
@@ -323,20 +319,16 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 	/* OW 20100513 adev->tx.buf.size = TX_CNT
 	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
 	adev->tx.buf.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	adev->tx.buf.txstart
-		= acx_allocate(adev, adev->tx.buf.size,
-			&adev->tx.buf.phy, "txbuf_start");
-	if (!adev->tx.buf.txstart)
+	rc = acx_allocate(adev, &adev->tx.buf, "txbuf_start");
+	if (rc)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
 	adev->tx.host.size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->tx.host.txstart
-		= acx_allocate(adev, adev->tx.host.size,
-			&adev->tx.host.phy,
-			"txhostdesc_start");
-	if (!adev->tx.host.txstart)
+	rc = acx_allocate(adev, &adev->tx.host, "txhostdesc_start");
+	if (rc)
 		goto fail;
+
 	/* check for proper alignment of TX host descriptor pool */
 	if ((long)adev->tx.host.txstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
