@@ -535,6 +535,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
  * plus 32 bytes safety offset at the end
  */
 //static
+#if 0 // acxmem_create_rx_host_desc_queue()
 int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 {
 	rxhostdesc_t *hostdesc;
@@ -588,6 +589,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
+#endif // acxmem_create_rx_host_desc_queue()
 
 /*
  * In the generic slave memory access mode, most of the stuff in
