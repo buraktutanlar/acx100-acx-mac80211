@@ -2186,7 +2186,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 				txdesc->Ctl2_8,
 				txdesc->error,
 				txdesc->u.r1.rate);
-			txdesc = acxmem_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 
 		/* dump host tx descriptor ring buffer */
