@@ -3490,7 +3490,10 @@ void acx_clean_txdesc_emergency(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
+#if defined(CONFIG_ACX_MAC80211_MEM)
+// probly should move this back to merge.c
+void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue)
+{
 #ifdef USING_MORE_THAN_ONE_TRANSMIT_QUEUE
 	u32 indicator;
 	unsigned long flags;
@@ -3550,6 +3553,7 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
 	local_irq_restore (flags);
 #endif
 }
+#endif // CONFIG_ACX_MAC80211_MEM) acxmem_update_queue_indicator()
 
 // OW TODO See if this is usable with mac80211
 #if 0
