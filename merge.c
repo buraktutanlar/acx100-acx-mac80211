@@ -256,33 +256,33 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	FN_ENTER;
 
 	/* allocate the RX host descriptor queue pool */
-	adev->rx.hostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rx.hostdesc_start
+	adev->rx.host.size = RX_CNT * sizeof(*hostdesc);
+	adev->rx.host.rxstart
 		= acx_allocate(adev,
-			adev->rx.hostdesc_area_size,
-			&adev->rx.hostdesc_startphy,
+			adev->rx.host.size,
+			&adev->rx.host.phy,
 			"rxhostdesc_start");
-	if (!adev->rx.hostdesc_start)
+	if (!adev->rx.host.rxstart)
 		goto fail;
 	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->rx.hostdesc_start & 3) {
+	if ((long)adev->rx.host.rxstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
-	adev->rx.buf_area_size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rx.buf_start
-		= acx_allocate(adev, adev->rx.buf_area_size,
-			&adev->rx.buf_startphy, "rxbuf_start");
-	if (!adev->rx.buf_start)
+	adev->rx.buf.size = RX_CNT * RX_BUFFER_SIZE;
+	adev->rx.buf.rxstart
+		= acx_allocate(adev, adev->rx.buf.size,
+			&adev->rx.buf.phy, "rxbuf_start");
+	if (!adev->rx.buf.rxstart)
 		goto fail;
 
-	rxbuf = adev->rx.buf_start;
-	rxbuf_phy = adev->rx.buf_startphy;
-	hostdesc = adev->rx.hostdesc_start;
-	hostdesc_phy = adev->rx.hostdesc_startphy;
+	rxbuf = (rxbuffer_t*) adev->rx.buf.rxstart;
+	rxbuf_phy = adev->rx.buf.phy;
+	hostdesc = adev->rx.host.rxstart;
+	hostdesc_phy = adev->rx.host.phy;
 
 	/* don't make any popular C programming pointer arithmetic
 	 * mistakes here, otherwise I'll kill you...  (and don't dare
@@ -299,7 +299,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->rx.hostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->rx.host.phy);
 	FN_EXIT1(OK);
 	return OK;
       fail:
@@ -320,33 +320,33 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 	FN_ENTER;
 
 	/* allocate TX buffer */
-	/* OW 20100513 adev->tx.buf_area_size = TX_CNT
+	/* OW 20100513 adev->tx.buf.size = TX_CNT
 	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
-	adev->tx.buf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	adev->tx.buf_start
-		= acx_allocate(adev, adev->tx.buf_area_size,
-			&adev->tx.buf_startphy, "txbuf_start");
-	if (!adev->tx.buf_start)
+	adev->tx.buf.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
+	adev->tx.buf.txstart
+		= acx_allocate(adev, adev->tx.buf.size,
+			&adev->tx.buf.phy, "txbuf_start");
+	if (!adev->tx.buf.txstart)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
-	adev->tx.hostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->tx.hostdesc_start
-		= acx_allocate(adev, adev->tx.hostdesc_area_size,
-			&adev->tx.hostdesc_startphy,
+	adev->tx.host.size = TX_CNT * 2 * sizeof(*hostdesc);
+	adev->tx.host.txstart
+		= acx_allocate(adev, adev->tx.host.size,
+			&adev->tx.host.phy,
 			"txhostdesc_start");
-	if (!adev->tx.hostdesc_start)
+	if (!adev->tx.host.txstart)
 		goto fail;
 	/* check for proper alignment of TX host descriptor pool */
-	if ((long)adev->tx.hostdesc_start & 3) {
+	if ((long)adev->tx.host.txstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
-	hostdesc = adev->tx.hostdesc_start;
-	hostdesc_phy = adev->tx.hostdesc_startphy;
-	txbuf = adev->tx.buf_start;
-	txbuf_phy = adev->tx.buf_startphy;
+	hostdesc = adev->tx.host.txstart;
+	hostdesc_phy = adev->tx.host.phy;
+	txbuf = (u8*) adev->tx.buf.txstart;
+	txbuf_phy = adev->tx.buf.phy;
 
 #if 0
 /* Each tx buffer is accessed by hardware via txdesc -> txhostdesc(s)
@@ -429,7 +429,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->tx.hostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->tx.host.phy);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -587,8 +587,8 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	txdesc = adev->tx.desc_start;
 	if (IS_PCI(adev)) {
 		mem_offs = tx_queue_start;
-		hostmemptr = adev->tx.hostdesc_startphy;
-		hostdesc = adev->tx.hostdesc_start;
+		hostmemptr = adev->tx.host.phy;
+		hostdesc = adev->tx.host.txstart;
 	}
 	if (IS_ACX111(adev)) {
 		/* ACX111 has a preinitialized Tx buffer! */
@@ -729,10 +729,10 @@ void acx_free_desc_queues(acx_device_t *adev)
 
 #ifndef ACX_FREE_QUEUES
 #define ACX_FREE_QUEUES(adev, _dir_) \
-	ACX_FREE_QUEUE(adev, adev->_dir_.hostdesc_area_size, \
-		adev->_dir_.hostdesc_start, adev->_dir_.hostdesc_startphy); \
-	ACX_FREE_QUEUE(adev, adev->_dir_.buf_area_size, \
-		adev->_dir_.buf_start, adev->_dir_.buf_startphy);
+	ACX_FREE_QUEUE(adev, adev->_dir_.host.size, \
+		adev->_dir_.host.start, adev->_dir_.host.phy); \
+	ACX_FREE_QUEUE(adev, adev->_dir_.buf.size, \
+		adev->_dir_.buf.start, adev->_dir_.buf.phy);
 #endif
 
 	FN_ENTER;
@@ -784,7 +784,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 	pr_debug("entry\n");
 
-	rxhostdesc = adev->rx.hostdesc_start;
+	rxhostdesc = adev->rx.host.rxstart;
 	if (unlikely(!rxhostdesc))
 		return;
 
@@ -2461,14 +2461,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->tx.buf_start, adev->tx.buf_area_size, adev->tx.desc_size,
-		adev->tx.desc_start, adev->tx.hostdesc_start,
-		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
+		adev->tx.buf.txstart, adev->tx.buf.size, adev->tx.desc_size,
+		adev->tx.desc_start, adev->tx.host.txstart,
+		adev->tx.host.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
 		adev->rx.desc_start,
-		adev->rx.hostdesc_start, adev->rx.hostdesc_area_size,
-		adev->rx.buf_start, adev->rx.buf_area_size);
+		adev->rx.host.rxstart, adev->rx.host.size,
+		adev->rx.buf.rxstart, adev->rx.buf.size);
 
 	acxmem_unlock();
 	FN_EXIT0;
@@ -2506,7 +2506,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 	tail = adev->rx.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rx.hostdesc_start[tail];
+		hostdesc = &adev->rx.host.rxstart[tail];
 		if (IS_MEM(adev))
 			rxdesc = &adev->rx.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
@@ -2558,7 +2558,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 
 			/* ok, descriptor is handled, now check the
 			 * next descriptor */
-			hostdesc = &adev->rx.hostdesc_start[tail];
+			hostdesc = &adev->rx.host.rxstart[tail];
 
 			/* if next descriptor is empty, then bail out */
 			if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
@@ -2633,7 +2633,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rx.hostdesc_start[tail];
+		hostdesc = &adev->rx.host.rxstart[tail];
 		rxdesc = &adev->rx.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16
@@ -2986,7 +2986,7 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 
 	FN_EXIT0;
 
-	return &adev->tx.hostdesc_start[index * 2];
+	return &adev->tx.host.txstart[index * 2];
 }
 
 void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
@@ -3007,7 +3007,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	return &adev->tx.hostdesc_start[index * 2];
+	return &adev->tx.host.txstart[index * 2];
 }
 #endif // acxmem_get_txhostdesc()
 
@@ -4385,7 +4385,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rx.hostdesc_start;
+		rxhostdesc = adev->rx.host.rxstart;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)
@@ -4442,7 +4442,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 		/* dump host tx descriptor ring buffer */
 
-		txhostdesc = adev->tx.hostdesc_start;
+		txhostdesc = adev->tx.host.txstart;
 
 		/* loop over complete host send pool */
 		if (txhostdesc)

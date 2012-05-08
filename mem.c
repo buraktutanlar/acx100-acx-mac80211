@@ -1146,14 +1146,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->tx.buf_start, adev->tx.buf_area_size, adev->tx.desc_size,
-		adev->tx.desc_start, adev->tx.hostdesc_start,
-		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
+		adev->tx.buf.txstart, adev->tx.buf.size, adev->tx.desc_size,
+		adev->tx.desc_start, adev->tx.host.txstart,
+		adev->tx.host.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
 		adev->rx.desc_start,
-		adev->rx.hostdesc_start, adev->rx.hostdesc_area_size,
-		adev->rx.buf_start, adev->rx.buf_area_size);
+		adev->rx.host.rxstart, adev->rx.host.size,
+		adev->rx.buf.rxstart, adev->rx.buf.size);
 
 	acxmem_unlock();
 	FN_EXIT0;
@@ -1191,7 +1191,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 	tail = adev->rx.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rx.hostdesc_start[tail];
+		hostdesc = &adev->rx.host.rxstart[tail];
 		rxdesc = &adev->rx.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
@@ -1274,7 +1274,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rx.hostdesc_start[tail];
+		hostdesc = &adev->rx.host.rxstart[tail];
 		rxdesc = &adev->rx.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
@@ -1496,7 +1496,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	return &adev->tx.hostdesc_start[index * 2];
+	return &adev->tx.host.txstart[index * 2];
 }
 
 
@@ -2147,7 +2147,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rx.hostdesc_start;
+		rxhostdesc = adev->rx.host.rxstart;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)
@@ -2204,7 +2204,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host tx descriptor ring buffer */
 
-		txhostdesc = adev->tx.hostdesc_start;
+		txhostdesc = adev->tx.host.txstart;
 
 		/* loop over complete host send pool */
 		if (txhostdesc)
