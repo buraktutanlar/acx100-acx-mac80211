@@ -238,8 +238,13 @@ void *acx_allocate(acx_device_t * adev, size_t size,
 }
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
-static
-int acx_create_rx_host_desc_queue(acx_device_t * adev)
+/*
+ * acx_create_rx_host_desc_queue()
+ *
+ * the whole size of a data buffer (header plus data body) plus 32
+ * bytes safety offset at the end
+ */
+static int acx_create_rx_host_desc_queue(acx_device_t * adev)
 {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
@@ -1104,7 +1109,7 @@ fail:
 #endif // acxmem_write_phy_reg()
 
 /*
- * acxmem_s_write_fw
+ * acx_write_fw
  *
  * Write the firmware image into the card.
  *
@@ -1951,7 +1956,7 @@ void acx_up(struct ieee80211_hw *hw)
 }
 
 /*
- * acxmem_s_reset_dev
+ * acx_reset_dev
  *
  * Arguments:
  *	netdevice that contains the adev variable
