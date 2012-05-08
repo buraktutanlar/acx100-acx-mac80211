@@ -68,9 +68,9 @@ u32 acx_read_cmd_type_status(acx_device_t *adev);
 void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
 void acx_init_mboxes(acx_device_t *adev);
 int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
-		u32 offset);
+			u32 offset);
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
-		u32 offset);
+			u32 offset);
 int acxmem_upload_fw(acx_device_t *adev);
 
 void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
@@ -79,26 +79,23 @@ void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 
-static inline
-u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
+static inline u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev,
+			int count)
 { return 0; }
 
-static inline
-void acxmem_chaincopy_to_slavemem(acx_device_t *adev,
+static inline void acxmem_chaincopy_to_slavemem(acx_device_t *adev,
 			u32 destination, u8 *source, int count)
 { }
 
-static inline
-void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
+static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 			u8 *destination, u32 source, int count)
 { }
 
-static inline
-void acxmem_init_acx_txbuf2(acx_device_t *adev)
+static inline void acxmem_init_acx_txbuf2(acx_device_t *adev)
 { }
 
-static inline
-void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
+static inline void acxmem_dump_mem(acx_device_t *adev, u32 start,
+			int length)
 { }
 
 #endif
