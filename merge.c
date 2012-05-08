@@ -718,6 +718,7 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 void acx_free_desc_queues(acx_device_t *adev)
 {
 
+
 #define ACX_FREE_QUEUE(adev, size, ptr, phyaddr) \
 	if (ptr) { \
 		if (IS_PCI(adev)) \
@@ -728,22 +729,20 @@ void acx_free_desc_queues(acx_device_t *adev)
 		size = 0; \
 	}
 
+#ifndef ACX_FREE_QUEUES
+#define ACX_FREE_QUEUES(adev, _dir_) \
+	ACX_FREE_QUEUE(adev, adev->_dir_.hostdesc_area_size, \
+		adev->_dir_.hostdesc_start, adev->_dir_.hostdesc_startphy); \
+	ACX_FREE_QUEUE(adev, adev->_dir_.buf_area_size, \
+		adev->_dir_.buf_start, adev->_dir_.buf_startphy);
+#endif
+
 	FN_ENTER;
 
-	ACX_FREE_QUEUE(adev, adev->tx.hostdesc_area_size,
-		adev->tx.hostdesc_start, adev->tx.hostdesc_startphy);
-
-	ACX_FREE_QUEUE(adev, adev->tx.buf_area_size,
-		adev->tx.buf_start, adev->tx.buf_startphy);
-
+	ACX_FREE_QUEUES(adev, tx);
 	adev->tx.desc_start = NULL;
 
-	ACX_FREE_QUEUE(adev, adev->rx.hostdesc_area_size,
-		adev->rx.hostdesc_start, adev->rx.hostdesc_startphy);
-
-	ACX_FREE_QUEUE(adev, adev->rx.buf_area_size,
-		adev->rx.buf_start, adev->rx.buf_startphy);
-
+	ACX_FREE_QUEUES(adev, rx);
 	adev->rx.desc_start = NULL;
 
 	FN_EXIT0;

@@ -91,3 +91,7 @@ static inline void acxmem_update_queue_indicator(acx_device_t *adev,
 { }
 
 #endif
+
+#if !defined(CONFIG_ACX_MAC80211_PCI) && !defined(CONFIG_ACX_MAC80211_MEM)
+#define ACX_FREE_QUEUES(adev, _dir_) // empty stub here, real one in merge.c
+#endif
