@@ -478,36 +478,12 @@ struct acx_device {
 
 	/*** PCI stuff ***/
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
-	/* pointers to tx buffers, tx host descriptors (in host memory)
-	** and tx descs in device memory */
-#if 0	
-	unsigned int	tx_tail;
-	u8		*txbuf_start;
-	txhostdesc_t	*txhostdesc_start;
-	/* sizes of above host memory areas */
-	unsigned int	txbuf_area_size;
-	unsigned int	txhostdesc_area_size;
-	unsigned int	txdesc_size;	/* size of txdesc */
-	dma_addr_t	txbuf_startphy;
-	dma_addr_t	txhostdesc_startphy;
-	txdesc_t	*txdesc_start;	/* points to PCI-mapped memory */
-#else
+
+	/* pointers to tx buffers, tx host descriptors (in host
+	 * memory) and tx descs in device memory, same for rx
+	 */
 	struct tx_desc_pair tx;
-#endif
-#if 0	
-	/* same for rx */
-	unsigned int	rx_tail;
-	rxbuffer_t	*rxbuf_start;
-	rxhostdesc_t	*rxhostdesc_start;
-	rxdesc_t	*rxdesc_start;
-	/* physical addresses of above host memory areas */
-	dma_addr_t	rxbuf_startphy;
-	dma_addr_t	rxhostdesc_startphy;
-	unsigned int	rxbuf_area_size;
-	unsigned int	rxhostdesc_area_size;
-#else
 	struct rx_desc_pair rx;
-#endif
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
