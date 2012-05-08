@@ -191,7 +191,7 @@ void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
 	 * Right now I'm making the assumption that the destination is
 	 * aligned, but I'd better check.
 	 */
-	if ((u32) destination & 3) {
+	if ((ulong) destination & 3) {
 		pr_acx("copy_from_slavemem: warning!  destination not word-aligned!\n");
 	}
 
@@ -308,7 +308,7 @@ void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
 		pr_err("chaincopy_to_slavemem overflow!\n");
 		count = sizeof aligned_source;
 	}
-	if ((u32) source & 3) {
+	if ((ulong) source & 3) {
 		memcpy(aligned_source, source, count);
 		data = (u32 *) aligned_source;
 	}
@@ -373,7 +373,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 		pr_acx("chaincopy: source block 0x%04x not aligned!\n", source);
 		acxmem_dump_mem(adev, 0, 0x10000);
 	}
-	if ((u32) destination & 3) {
+	if ((ulong) destination & 3) {
 		//printk ("acx chaincopy: data destination not word aligned!\n");
 		data = (u32 *) aligned_destination;
 		if (count > sizeof aligned_destination) {
@@ -416,7 +416,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 	 * If the destination wasn't aligned, we would have saved it
 	 * in the aligned buffer, so copy it where it should go.
 	 */
-	if ((u32) destination & 3) {
+	if ((ulong) destination & 3) {
 		memcpy(destination, aligned_destination, saved_count);
 	}
 }
@@ -430,7 +430,6 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
  * use we have for the host descriptors is to store the packets on the
  * way out.
  */
-
 
 
 /*
@@ -647,7 +646,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		/*
 		 * slave memory version
 		 */
-		acxmem_copy_to_slavemem(adev, (u32) (adev->cmd_area + 4), buffer, (cmd
+		acxmem_copy_to_slavemem(adev, (ulong) (adev->cmd_area + 4), buffer, (cmd
 				== ACX1xx_CMD_INTERROGATE) ? 4 : buflen);
 	}
 	/* now write the actual command type */
@@ -755,7 +754,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	/* read in result parameters if needed */
 	if (buffer && buflen && (cmd == ACX1xx_CMD_INTERROGATE)) {
-		acxmem_copy_from_slavemem(adev, buffer, (u32) (adev->cmd_area + 4), buflen);
+		acxmem_copy_from_slavemem(adev, buffer, (ulong) (adev->cmd_area + 4), buflen);
 		if (acx_debug & L_DEBUG) {
 			log(L_ANY, "%s: output buffer (len=%u): ", __func__, buflen);
 			acx_dump_bytes(buffer, buflen);
@@ -844,7 +843,7 @@ STATick int acxmem_complete_hw_reset(acx_device_t *adev)
 	if (IS_ACX100(adev)) {
 		/* ACX100: configopt struct in cmd mailbox - directly
 		 * after reset */
-		acxmem_copy_from_slavemem(adev, (u8*) &co, (u32) adev->cmd_area, sizeof(co));
+		acxmem_copy_from_slavemem(adev, (u8*) &co, (ulong) adev->cmd_area, sizeof(co));
 	}
 	acxmem_unlock();
 
@@ -1008,7 +1007,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx.tail) ? " [tail]" : "";
-			Ctl_8 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+			Ctl_8 = read_slavemem8(adev, (ulong) &(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
 				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
 			else
@@ -1016,10 +1015,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 			//seq_printf(file, "\n");
 
-			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (u32) rxdesc, sizeof(rxd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (ulong) rxdesc, sizeof(rxd));
 			seq_printf(file,
 				"%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
-				(u32) rxdesc,
+				(ulong) rxdesc,
 				rxd.pNextDesc.v,
 				rxd.HostMemPtr.v,
 				rxd.ACXMemPtr.v,
@@ -1052,9 +1051,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx.tail) ? " [tail]" : "";
-			acxmem_copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
+						(ulong) txdesc, sizeof(txd));
 
-			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+			Ctl_8 = read_slavemem8(adev, (ulong) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
 				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
 			else if (Ctl_8 & DESC_CTL_HOSTOWN)
@@ -1064,8 +1064,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			
 			seq_printf(file,
 				"%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
-				"%02x %02x %02x %02x %04x: ", (u32) txdesc,
-				txd.pNextDesc.v, txd.HostMemPtr.v, txd.AcxMemPtr.v,
+				"%02x %02x %02x %02x %04x: ", (ulong) txdesc,
+				txd.pNextDesc.v, txd.HostMemPtr.v,
+				txd.AcxMemPtr.v,
 				txd.tx_time, txd.total_length, txd.Reserved,
 				txd.dummy[0], txd.dummy[1], txd.dummy[2],
 				txd.dummy[3], txd.Ctl_8, txd.Ctl2_8, txd.error,
@@ -1073,7 +1074,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				txd.rts_ok, txd.u.r1.rate,
 				txd.u.r1.queue_ctrl, txd.queue_info);
 			
-			tmp = read_slavemem32(adev, (u32) & (txdesc->AcxMemPtr));
+			tmp = read_slavemem32(adev, (ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
 			// Output allocated tx-buffer chain
@@ -1204,7 +1205,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		 * rx descriptor on the ACX, which should be
 		 * 0x11000000 if we should process it.
 		 */
-		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (ulong) &(rxdesc->Ctl_8));
 		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
 			break; /* found it! */
 
@@ -1226,7 +1227,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 			 * slave interface - pull data now
 			 */
 			hostdesc->hd.length = read_slavemem16(adev,
-					(u32) &(rxdesc->total_length));
+					(ulong) &(rxdesc->total_length));
 
 			/*
 			 * hostdesc->data is an rxbuffer_t, which
@@ -1235,7 +1236,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 			 * information takes up an additional 12
 			 * bytes, so add that to the length we copy.
 			 */
-			addr = read_slavemem32(adev, (u32) &(rxdesc->ACXMemPtr));
+			addr = read_slavemem32(adev, (ulong) &(rxdesc->ACXMemPtr));
 			if (addr) {
 				/*
 				 * How can &(rxdesc->ACXMemPtr) above
@@ -1244,12 +1245,12 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 				 * for debug.
 				 */
 				if (addr & 0xffff0000) {
-					log(L_ANY, "%s: rxdesc 0x%08x\n", __func__, (u32) rxdesc);
+					log(L_ANY, "%s: rxdesc 0x%08lx\n", __func__, (ulong) rxdesc);
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
 				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
-						hostdesc->hd.length + (u32) &((rxbuffer_t *) 0)->hdr_a3);
+						hostdesc->hd.length + (ulong) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
@@ -1265,7 +1266,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		CLEAR_BIT (Ctl_8, DESC_CTL_HOSTOWN);
 		SET_BIT (Ctl_8, DESC_CTL_HOSTDONE);
 		SET_BIT (Ctl_8, DESC_CTL_RECLAIM);
-		write_slavemem8(adev, (u32) &rxdesc->Ctl_8, Ctl_8);
+		write_slavemem8(adev, (ulong) &rxdesc->Ctl_8, Ctl_8);
 
 		/*
 		 * Now tell the ACX we've finished with the receive
@@ -1277,7 +1278,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		hostdesc = &adev->rx.host.rxstart[tail];
 		rxdesc = &adev->rx.desc_start[tail];
 
-		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (ulong) &(rxdesc->Ctl_8));
 
 		/* if next descriptor is empty, then bail out */
 		if (!(Ctl_8 & DESC_CTL_HOSTOWN) || !(Ctl_8 & DESC_CTL_ACXDONE))

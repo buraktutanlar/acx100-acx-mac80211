@@ -3598,7 +3598,7 @@ static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "data, len=%d, sizeof(struct"
 			"acx_template_beacon)=%d:\n",
-			len, sizeof(struct acx_template_beacon));
+			len, (int)sizeof(struct acx_template_beacon));
 		acx_dump_bytes(data, len);
 	}
 
