@@ -5,7 +5,11 @@
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
 
+void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
+			u32 rx_queue_start);
+
 int acx_create_hostdesc_queues(acx_device_t *adev);
+void acx_free_desc_queues(acx_device_t *adev);
 
 void acx_log_rxbuffer(const acx_device_t *adev);
 void acx_log_txbuffer(acx_device_t *adev);
@@ -15,11 +19,6 @@ int acx_op_start(struct ieee80211_hw *hw);
 
 void acx_handle_info_irq(acx_device_t *adev);
 
-// temporary ?? may go static after all users are in merge.c
-void *acx_allocate(acx_device_t *adev, size_t size,
-		   dma_addr_t *phy, const char *msg);
-
-void acx_free_desc_queues(acx_device_t *adev);
 
 int _acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int _acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
@@ -35,9 +34,6 @@ void acx_up(struct ieee80211_hw *hw);
 void acx_set_interrupt_mask(acx_device_t *adev);
 
 void acx_show_card_eeprom_id(acx_device_t *adev);
-
-void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
-void acx_create_tx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 
 unsigned int acx_tx_clean_txdesc(acx_device_t *adev);
 
@@ -62,9 +58,6 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			u32 offset);
 int acxmem_upload_fw(acx_device_t *adev);
-
-void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-			u32 rx_queue_start);
 
 /* wrappers on acx_upload_radio(adev, filename */
 int acxmem_upload_radio(acx_device_t *adev);

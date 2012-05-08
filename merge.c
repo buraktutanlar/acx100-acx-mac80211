@@ -206,11 +206,11 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
-//##########################################
-/* host desc queue stuff */
+/* ########################################## */
+/* host_desc_queue creation */
 
-void *acx_allocate(acx_device_t * adev, size_t size,
-		dma_addr_t * phy, const char *msg)
+static void *acx_allocate(acx_device_t *adev, size_t size,
+			dma_addr_t * phy, const char *msg)
 {
 	void *ptr;
 
@@ -233,8 +233,8 @@ void *acx_allocate(acx_device_t * adev, size_t size,
 		memset(ptr, 0, size);
 		return ptr;
 	}
-	pr_err("%s allocation FAILED (%d bytes)\n",
-		msg, (int)size);
+	pr_err("%s allocation FAILED (%d bytes)\n", msg, (int)size);
+		
 	return NULL;
 }
 
@@ -245,7 +245,7 @@ void *acx_allocate(acx_device_t * adev, size_t size,
  * the whole size of a data buffer (header plus data body) plus 32
  * bytes safety offset at the end
  */
-static int acx_create_rx_host_desc_queue(acx_device_t * adev)
+static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 {
 	rxhostdesc_t *hostdesc;
 	rxbuffer_t *rxbuf;
@@ -303,14 +303,13 @@ static int acx_create_rx_host_desc_queue(acx_device_t * adev)
 	FN_EXIT1(OK);
 	return OK;
       fail:
-	pr_acx("create_rx_host_desc_queue FAILED\n");
+	pr_acx("FAILED\n");
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
 
-static
-int acx_create_tx_host_desc_queue(acx_device_t * adev)
+static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 {
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
@@ -435,34 +434,10 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 	FN_EXIT1(OK);
 	return OK;
 fail:
-	pr_acx("create_tx_host_desc_queue FAILED\n");
+	pr_err("FAILED\n");
 	/* dealloc will be done by free function on error case */
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
-}
-
-void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-			u32 rx_queue_start)
-{
-	u32 *p;
-	int i;
-
-	acxmem_lock_flags;
-	acxmem_lock();
-
-	acx_create_tx_desc_queue(adev, tx_queue_start);
-	acx_create_rx_desc_queue(adev, rx_queue_start);
-
-	if (IS_PCI(adev))
-		goto out;
-
-	p = (u32 *) adev->acx_queue_indicator;
-	for (i = 0; i < 4; i++) {
-		write_slavemem32(adev, (u32) p, 0);
-		p++;
-	}
-out:
-	acxmem_unlock();
 }
 
 int acx_create_hostdesc_queues(acx_device_t *adev)
@@ -479,10 +454,10 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
         return result;
 }
 
-//##########################################
-/* non-host desc queue stuff */
+/* ########################################## */
+/* non-host desc_queue creation */
 
-void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
@@ -579,7 +554,7 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 	FN_EXIT0;
 }
 
-void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
+static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 {
 	txdesc_t *txdesc;
         txhostdesc_t *hostdesc;
@@ -705,8 +680,32 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	FN_EXIT0;
 }
 
-//##########################################
-/* free desc queue stuff */
+void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
+			u32 rx_queue_start)
+{
+	u32 *p;
+	int i;
+
+	acxmem_lock_flags;
+	acxmem_lock();
+
+	acx_create_tx_desc_queue(adev, tx_queue_start);
+	acx_create_rx_desc_queue(adev, rx_queue_start);
+
+	if (IS_PCI(adev))
+		goto out;
+
+	p = (u32 *) adev->acx_queue_indicator;
+	for (i = 0; i < 4; i++) {
+		write_slavemem32(adev, (u32) p, 0);
+		p++;
+	}
+out:
+	acxmem_unlock();
+}
+
+/* ########################################## */
+/* free desc_queue stuff */
 
 /*
  * acx_free_desc_queues
@@ -717,7 +716,6 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
  */
 void acx_free_desc_queues(acx_device_t *adev)
 {
-
 
 #define ACX_FREE_QUEUE(adev, size, ptr, phyaddr) \
 	if (ptr) { \
