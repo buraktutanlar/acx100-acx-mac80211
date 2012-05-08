@@ -256,16 +256,16 @@ void acxpci_delete_dma_regions(acx_device_t * adev)
 {
 	FN_ENTER;
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
-	 * here instead? Or are we that much down the road that it's no
-	 * longer possible here? */
+	 * here instead? Or are we that much down the road that it's
+	 * no longer possible here? */
 	write_reg16(adev, IO_ACX_ENABLE, 0);
 
 	acx_mwait(100);
 
-	/* NO locking for all parts of acxpci_free_desc_queues because:
-	 * while calling dma_free_coherent() interrupts need to be 'free'
-	 * but if you spinlock the whole function (acxpci_free_desc_queues)
-	 * you'll get an error */
+	/* NO locking for all parts of acxpci_free_desc_queues
+	 * because: while calling dma_free_coherent() interrupts need
+	 * to be 'free' but if you spinlock the whole function
+	 * (acxpci_free_desc_queues) you'll get an error */
 	acx_free_desc_queues(adev);
 
 	FN_EXIT0;
@@ -313,12 +313,11 @@ acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
 
 	FN_ENTER;
 
-	/* first we need to enable the OE (EEPROM Output Enable) GPIO line
-	 * to be able to write to the EEPROM.
-	 * NOTE: an EEPROM writing success has been reported,
-	 * but you probably have to modify GPIO_OUT, too,
-	 * and you probably need to activate a different GPIO
-	 * line instead! */
+	/* first we need to enable the OE (EEPROM Output Enable) GPIO
+	 * line to be able to write to the EEPROM.  NOTE: an EEPROM
+	 * writing success has been reported, but you probably have to
+	 * modify GPIO_OUT, too, and you probably need to activate a
+	 * different GPIO line instead! */
 	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
 	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
 	write_flush(adev);
@@ -400,9 +399,9 @@ int acxpci_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	FN_ENTER;
 
-	/* mprusko said that 32bit accesses result in distorted sensitivity
-	 * on his card. Unconfirmed, looks like it's not true (most likely since we
-	 * now properly flush writes). */
+	/* mprusko said that 32bit accesses result in distorted
+	 * sensitivity on his card. Unconfirmed, looks like it's not
+	 * true (most likely since we now properly flush writes). */
 	write_reg32(adev, IO_ACX_PHY_DATA, value);
 	write_reg32(adev, IO_ACX_PHY_ADDR, reg);
 	write_flush(adev);
@@ -587,9 +586,10 @@ int acxpci_upload_fw(acx_device_t *adev)
 
 	FN_ENTER;
 
-	/* print exact chipset and radio ID to make sure people
-	 * really get a clue on which files exactly they need to provide.
-	 * Firmware loading is a frequent end-user PITA with these chipsets.
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they need to provide.
+	 * Firmware loading is a frequent end-user PITA with these
+	 * chipsets.
 	 */
 	pr_acx("need firmware for acx1%02d chipset with radio ID %02X\n"
 		"Please provide via firmware hotplug:\n"
@@ -602,9 +602,11 @@ int acxpci_upload_fw(acx_device_t *adev)
 		IS_ACX111(adev)*11, adev->radio_type
 		);
 
-	/* print exact chipset and radio ID to make sure people really get a clue on which files exactly they are supposed to provide,
-	 * since firmware loading is the biggest enduser PITA with these chipsets.
-	 * Not printing radio ID in 0xHEX in order to not confuse them into wrong file naming */
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they are supposed to
+	 * provide, since firmware loading is the biggest enduser PITA
+	 * with these chipsets.  Not printing radio ID in 0xHEX in
+	 * order to not confuse them into wrong file naming */
 	pr_acx("need to load firmware for acx1%02d chipset with radio ID %02x, please provide via firmware hotplug:\n"
 		"acx: either one file only (<c>ombined firmware image file, radio-specific) or two files (radio-less base image file *plus* separate <r>adio-specific extension file)\n",
 		IS_ACX111(adev)*11, adev->radio_type);
@@ -734,8 +736,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	/* now write the parameters of the command if needed */
 	if (buffer && buflen) {
-		/* if it's an INTERROGATE command, just pass the length
-		 * of parameters to read, as data */
+		/* if it's an INTERROGATE command, just pass the
+		 * length of parameters to read, as data */
 #if CMD_DISCOVERY
 		if (cmd == ACX1xx_CMD_INTERROGATE)
 			memset_io(adev->cmd_area + 4, 0xAA, buflen);
@@ -756,9 +758,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	/* wait for firmware to process command */
 
-	/* Ensure nonzero and not too large timeout.
-	 ** Also converts e.g. 100->99, 200->199
-	 ** which is nice but not essential */
+	/* Ensure nonzero and not too large timeout.  Also converts
+	 * e.g. 100->99, 200->199 which is nice but not essential */
 	cmd_timeout = (cmd_timeout - 1) | 1;
 	if (unlikely(cmd_timeout > 1199))
 		cmd_timeout = 1199;
@@ -825,8 +826,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
 		/* zero out result buffer
-		 * WARNING: this will trash stack in case of illegally large input
-		 * length! */
+		 * WARNING: this will trash stack in case of illegally
+		 * large input length! */
 		if (buffer && buflen)
 			memset(buffer, 0, buflen);
 		goto bad;
@@ -848,8 +849,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	return OK;
 
      bad:
-	/* Give enough info so that callers can avoid
-	 ** printing their own diagnostic messages */	
+	/* Give enough info so that callers can avoid printing their
+	 * own diagnostic messages */	
 	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
 			devname,
 			cmdstr, buflen, cmd_timeout,
@@ -946,8 +947,8 @@ int acxpci_reset_dev(acx_device_t *adev)
 
 	FN_ENTER;
 
-	/* reset the device to make sure the eCPU is stopped
-	 * to upload the firmware correctly */
+	/* reset the device to make sure the eCPU is stopped to upload
+	 * the firmware correctly */
 
 #ifdef CONFIG_PCI
 	acxpci_reset_mac(adev);
@@ -977,8 +978,8 @@ int acxpci_reset_dev(acx_device_t *adev)
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
 	 * most probably since eCPU runs some init code from EEPROM
-	 * (started burst read in reset_mac()) which also
-	 * sets the radio type ID */
+	 * (started burst read in reset_mac()) which also sets the
+	 * radio type ID */
 
 	count = 0xffff;
 	do {
@@ -1178,24 +1179,24 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 			txdesc = acx_advance_txdesc(adev, txdesc, 1);
 		}
 	seq_printf(file,
-		     "\n"
-		     "** PCI data **\n"
-		     "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
-		     "txdesc_size %u, txdesc_start %p\n"
-		     "txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
-		     "rxdesc_start %p\n"
-		     "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
-		     "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		     adev->txbuf_start, adev->txbuf_area_size,
-		     (unsigned long long)adev->txbuf_startphy,
-		     adev->txdesc_size, adev->txdesc_start,
-		     adev->txhostdesc_start, adev->txhostdesc_area_size,
-		     (unsigned long long)adev->txhostdesc_startphy,
-		     adev->rxdesc_start,
-		     adev->rxhostdesc_start, adev->rxhostdesc_area_size,
-		     (unsigned long long)adev->rxhostdesc_startphy,
-		     adev->rxbuf_start, adev->rxbuf_area_size,
-		     (unsigned long long)adev->rxbuf_startphy);
+		"\n"
+		"** PCI data **\n"
+		"txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
+		"txdesc_size %u, txdesc_start %p\n"
+		"txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
+		"rxdesc_start %p\n"
+		"rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
+		"rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
+		adev->txbuf_start, adev->txbuf_area_size,
+		(unsigned long long)adev->txbuf_startphy,
+		adev->txdesc_size, adev->txdesc_start,
+		adev->txhostdesc_start, adev->txhostdesc_area_size,
+		(unsigned long long)adev->txhostdesc_startphy,
+		adev->rxdesc_start,
+		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
+		(unsigned long long)adev->rxhostdesc_startphy,
+		adev->rxbuf_start, adev->rxbuf_area_size,
+		(unsigned long long)adev->rxbuf_startphy);
 
 	FN_EXIT0;
 	return 0;
@@ -1216,8 +1217,8 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
  * acxpci_l_alloc_tx
  * Actually returns a txdesc_t* ptr
  *
- * FIXME: in case of fragments, should allocate multiple descrs
- * after figuring out how many we need and whether we still have
+ * FIXME: in case of fragments, should allocate multiple descrs after
+ * figuring out how many we need and whether we still have
  * sufficiently many.
  */
 tx_t* acxpci_alloc_tx(acx_device_t * adev)
@@ -1238,13 +1239,13 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 	txdesc = acx_get_txdesc(adev, head);
 	ctl8 = txdesc->Ctl_8;
 
-	/* 2005-10-11: there were several bug reports on this happening
-	 ** but now cause seems to be understood & fixed */
+	/* 2005-10-11: there were several bug reports on this
+	 * happening but now cause seems to be understood & fixed */
 
 	// TODO OW Check if this is correct
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
-		/* whoops, descr at current index is not free, so probably
-		 * ring buffer already full */
+		/* whoops, descr at current index is not free, so
+		 * probably ring buffer already full */
 		pr_acx("BUG: tx_head:%d Ctl8:0x%02X - failed to find "
 		       "free txdesc\n", head, ctl8);
 		txdesc = NULL;
@@ -1324,9 +1325,9 @@ void acxpci_irq_work(struct work_struct *work)
 	while(irqcnt--) {
 #endif
 
-	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq reasons.
-	 * However masked irq reasons we still read with IO_ACX_IRQ_REASON or
-	 * IO_ACX_IRQ_STATUS_NON_DES
+	/* We only get an irq-signal for IO_ACX_IRQ_MASK unmasked irq
+	 * reasons.  However masked irq reasons we still read with
+	 * IO_ACX_IRQ_REASON or IO_ACX_IRQ_STATUS_NON_DES
 	 */
 	irqreason = read_reg16(adev, IO_ACX_IRQ_REASON);
 	irqmasked = irqreason & ~adev->irq_mask;
@@ -1512,8 +1513,8 @@ void acxpci_power_led(acx_device_t * adev, int enable)
 {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
-	/* A hack. Not moving message rate limiting to adev->xxx
-	 * (it's only a debug message after all) */
+	/* A hack. Not moving message rate limiting to adev->xxx (it's
+	 * only a debug message after all) */
 	static int rate_limit = 0;
 
 	if (rate_limit++ < 3)
@@ -1529,8 +1530,8 @@ void acxpci_power_led(acx_device_t * adev, int enable)
 
 INLINE_IO int acxpci_adev_present(acx_device_t *adev)
 {
-	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
-	 * which should be safe): */
+	/* fast version (accesses the first register,
+	 * IO_ACX_SOFT_RESET, which should be safe): */
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
@@ -1575,8 +1576,8 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* get Acx111 Memory Configuration */
 	memset(&memconf, 0, sizeof(memconf));
-	/* BTW, fails with 12 (Write only) error code.
-	 ** Retained for easy testing of issue_cmd error handling :) */
+	/* BTW, fails with 12 (Write only) error code.  Retained for
+	 * easy testing of issue_cmd error handling :) */
 	acx_interrogate(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG);
 
 	/* get Acx111 Queue Configuration */
@@ -2009,21 +2010,24 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ieee->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
 
-	/* TODO: although in the original driver the maximum value was 100,
-	 * the OpenBSD driver assigns maximum values depending on the type of
-	 * radio transceiver (i.e. Radia, Maxim, etc.). This value is always a
-	 * positive integer which most probably indicates the gain of the AGC
-	 * in the rx path of the chip, in dB steps (0.625 dB, for example?).
-	 * The mapping of this rssi value to dBm is still unknown, but it can
-	 * nevertheless be used as a measure of relative signal strength. The
-	 * other two values, i.e. max_signal and max_noise, do not seem to be
-	 * supported on my acx111 card (they are always 0), although iwconfig
-	 * reports them (in dBm) when using ndiswrapper with the Windows XP
-	 * driver. The GPL-licensed part of the AVM FRITZ!WLAN USB Stick
-	 * driver sources (for the TNETW1450, though) seems to also indicate
-	 * that only the RSSI is supported. In conclusion, the max_signal and
-	 * max_noise values will not be initialised by now, as they do not
-	 * seem to be supported or how to acquire them is still unknown. */
+	/* TODO: although in the original driver the maximum value was
+	 * 100, the OpenBSD driver assigns maximum values depending on
+	 * the type of radio transceiver (i.e. Radia, Maxim,
+	 * etc.). This value is always a positive integer which most
+	 * probably indicates the gain of the AGC in the rx path of
+	 * the chip, in dB steps (0.625 dB, for example?).  The
+	 * mapping of this rssi value to dBm is still unknown, but it
+	 * can nevertheless be used as a measure of relative signal
+	 * strength. The other two values, i.e. max_signal and
+	 * max_noise, do not seem to be supported on my acx111 card
+	 * (they are always 0), although iwconfig reports them (in
+	 * dBm) when using ndiswrapper with the Windows XP driver. The
+	 * GPL-licensed part of the AVM FRITZ!WLAN USB Stick driver
+	 * sources (for the TNETW1450, though) seems to also indicate
+	 * that only the RSSI is supported. In conclusion, the
+	 * max_signal and max_noise values will not be initialised by
+	 * now, as they do not seem to be supported or how to acquire
+	 * them is still unknown. */
 
 	// We base signal quality on winlevel approach of previous driver
 	// TODO OW 20100615 This should into a common init code
@@ -2038,8 +2042,9 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	pr_acx("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
 	mutex_init(&adev->mutex);
-	/* since nobody can see new netdev yet, we can as well
-	 ** just _presume_ that we're under sem (instead of actually taking it): */
+	/* since nobody can see new netdev yet, we can as well just
+	 * _presume_ that we're under sem (instead of actually taking
+	 * it): */
 	/* acx_sem_lock(adev); */
 	adev->ieee = ieee;
 	adev->pdev = pdev;
@@ -2061,11 +2066,12 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* enable busmastering (required for CardBus) */
 	pci_set_master(pdev);
 
-	/* Specify DMA mask 30-bit. Problem was triggered from >=2.6.33 on x86_64 */
+	/* Specify DMA mask 30-bit. Problem was triggered from
+	 * >=2.6.33 on x86_64 */
 	adev->bus_dev->coherent_dma_mask = DMA_BIT_MASK(30);
 
-	/* chiptype is u8 but id->driver_data is ulong
-	 ** Works for now (possible values are 1 and 2) */
+	/* chiptype is u8 but id->driver_data is ulong Works for now
+	 * (possible values are 1 and 2) */
 	chip_type = (u8) id->driver_data;
 	/* acx100 and acx111 have different PCI memory regions */
 	if (chip_type == CHIPTYPE_ACX100) {
@@ -2111,8 +2117,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/*
 	 * We got them? Map them!
 	 *
-	 * We pass 0 as the third argument to pci_iomap(): it will map the full
-	 * region in this case, which is what we want.
+	 * We pass 0 as the third argument to pci_iomap(): it will map
+	 * the full region in this case, which is what we want.
 	 */
 
 	mem1 = pci_iomap(pdev, mem_region1, 0);
@@ -2178,15 +2184,16 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
-	/* NB: read_reg() reads may return bogus data before reset_dev(),
-	 * since the firmware which directly controls large parts of the I/O
-	 * registers isn't initialized yet.
+	/* NB: read_reg() reads may return bogus data before
+	 * reset_dev(), since the firmware which directly controls
+	 * large parts of the I/O registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
 	if (OK != acx_reset_dev(adev))
 		goto fail_reset_dev;
 
 	if (IS_ACX100(adev)) {
-		/* ACX100: configopt struct in cmd mailbox - directly after reset */
+		/* ACX100: configopt struct in cmd mailbox - directly
+		 * after reset */
 		memcpy_fromio(&co, adev->cmd_area, sizeof(co));
 	}
 
@@ -2194,11 +2201,13 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto fail_init_mac;
 
 	if (IS_ACX111(adev)) {
-		/* ACX111: configopt struct needs to be queried after full init */
+		/* ACX111: configopt struct needs to be queried after
+		 * full init */
 		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
 	}
 
-	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+	/* TODO: merge them into one function, they are called just
+	 * once and are the same for pci & usb */
 	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_read_eeprom_byte;
 
@@ -2209,7 +2218,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
-	 * firmware operations happening in parallel or uninitialized data */
+	 * firmware operations happening in parallel or uninitialized
+	 * data */
 
 	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_proc_register_entries;
@@ -2352,9 +2362,9 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 		}
 
 #ifdef REDUNDANT
-		/* put the eCPU to sleep to save power
-		 * Halting is not possible currently,
-		 * since not supported by all firmware versions */
+		/* put the eCPU to sleep to save power Halting is not
+		 * possible currently, since not supported by all
+		 * firmware versions */
 		acx_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
 #endif
 		/* disable power LED to save power :-) */
@@ -2362,8 +2372,8 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 		acxpci_power_led(adev, 0);
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
-			/* FIXME: does this actually keep halting the eCPU?
-			 * I don't think so...
+			/* FIXME: does this actually keep halting the
+			 * eCPU?  I don't think so...
 			 */
 			acxpci_reset_mac(adev);
 		} else {
@@ -2408,9 +2418,8 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 	/* remove dev registration */
 	pci_set_drvdata(pdev, NULL);
 
-	/* Free netdev (quite late,
-	 * since otherwise we might get caught off-guard
-	 * by a netdev timeout handler execution
+	/* Free netdev (quite late, since otherwise we might get
+	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
@@ -2492,8 +2501,9 @@ int acxpci_e_resume(struct pci_dev *pdev)
 	acx_up(hw);
 	pr_acx("rsm: acx up done\n");
 
-	/* now even reload all card parameters as they were before suspend,
-	 * and possibly be back in the network again already :-) */
+	/* now even reload all card parameters as they were before
+	 * suspend, and possibly be back in the network again already
+	 * :-) */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
 		//acx_update_card_settings(adev);
@@ -2681,8 +2691,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	mutex_init(&adev->mutex);
-	/* since nobody can see new netdev yet, we can as well
-	 ** just _presume_ that we're under sem (instead of actually taking it): */
+	/* since nobody can see new netdev yet, we can as well just
+	 * _presume_ that we're under sem (instead of actually taking
+	 * it): */
 	/* acx_sem_lock(adev); */
 	adev->ieee = ieee;
 	adev->vdev = vdev;
@@ -2782,9 +2793,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
-	/* NB: read_reg() reads may return bogus data before reset_dev(),
-	 * since the firmware which directly controls large parts of the I/O
-	 * registers isn't initialized yet.
+	/* NB: read_reg() reads may return bogus data before
+	 * reset_dev(), since the firmware which directly controls
+	 * large parts of the I/O registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
 	if (OK != acx_reset_dev(adev))
 		goto fail_vlynq_reset_dev;
@@ -2793,7 +2804,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_init_mac;
 
 	acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	/* TODO: merge them into one function, they are called just once and are the same for pci & usb */
+	/* TODO: merge them into one function, they are called just
+	 * once and are the same for pci & usb */
 	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
 		goto fail_vlynq_read_eeprom_version;
 
@@ -2804,16 +2816,19 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* Register the card, AFTER everything else has been set up,
 	 * since otherwise an ioctl could step on our feet due to
-	 * firmware operations happening in parallel or uninitialized data */
+	 * firmware operations happening in parallel or uninitialized
+	 * data */
 
 	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_vlynq_proc_register_entries;
 
 	/* Now we have our device, so make sure the kernel doesn't try
-	 * to send packets even though we're not associated to a network yet */
+	 * to send packets even though we're not associated to a
+	 * network yet */
 
-	/* after register_netdev() userspace may start working with dev
-	 * (in particular, on other CPUs), we only need to up the sem */
+	/* after register_netdev() userspace may start working with
+	 * dev (in particular, on other CPUs), we only need to up the
+	 * sem */
 	/* acx_sem_unlock(adev); */
 
 	pr_acx("net device %s, driver compiled "
@@ -2936,9 +2951,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* remove dev registration */
 	vlynq_set_drvdata(vdev, NULL);
 
-	/* Free netdev (quite late,
-	 * since otherwise we might get caught off-guard
-	 * by a netdev timeout handler execution
+	/* Free netdev (quite late, since otherwise we might get
+	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
