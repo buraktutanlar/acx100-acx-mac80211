@@ -1047,11 +1047,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 		adev->acx_txbuf_free);
 
-	txdesc = adev->txdesc_start;
+	txdesc = adev->tx.desc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx_tail) ? " [tail]" : "";
+			ttl = (i == adev->tx.tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd, (u32) txdesc, sizeof(txd));
 
 			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
@@ -1146,9 +1146,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->txbuf_start, adev->txbuf_area_size, adev->txdesc_size,
-		adev->txdesc_start, adev->txhostdesc_start,
-		adev->txhostdesc_area_size, adev->acx_txbuf_start,
+		adev->tx.buf_start, adev->tx.buf_area_size, adev->tx.desc_size,
+		adev->tx.desc_start, adev->tx.hostdesc_start,
+		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
 		adev->rxdesc_start,
@@ -1486,17 +1486,17 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 STATick txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 {
-	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
-	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
+	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
+	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	index /= adev->txdesc_size;
+	index /= adev->tx.desc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	return &adev->txhostdesc_start[index * 2];
+	return &adev->tx.hostdesc_start[index * 2];
 }
 
 
@@ -2172,7 +2172,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 		}
 
 		/* dump acx111 internal tx descriptor ring buffer */
-		txdesc = adev->txdesc_start;
+		txdesc = adev->tx.desc_start;
 
 		/* loop over complete transmit pool */
 		if (txdesc)
@@ -2204,7 +2204,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host tx descriptor ring buffer */
 
-		txhostdesc = adev->txhostdesc_start;
+		txhostdesc = adev->tx.hostdesc_start;
 
 		/* loop over complete host send pool */
 		if (txhostdesc)

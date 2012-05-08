@@ -321,33 +321,33 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 	FN_ENTER;
 
 	/* allocate TX buffer */
-	/* OW 20100513 adev->txbuf_area_size = TX_CNT
+	/* OW 20100513 adev->tx.buf_area_size = TX_CNT
 	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
-	adev->txbuf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	adev->txbuf_start
-		= acx_allocate(adev, adev->txbuf_area_size,
-			&adev->txbuf_startphy, "txbuf_start");
-	if (!adev->txbuf_start)
+	adev->tx.buf_area_size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
+	adev->tx.buf_start
+		= acx_allocate(adev, adev->tx.buf_area_size,
+			&adev->tx.buf_startphy, "txbuf_start");
+	if (!adev->tx.buf_start)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
-	adev->txhostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
-	adev->txhostdesc_start
-		= acx_allocate(adev, adev->txhostdesc_area_size,
-			&adev->txhostdesc_startphy,
+	adev->tx.hostdesc_area_size = TX_CNT * 2 * sizeof(*hostdesc);
+	adev->tx.hostdesc_start
+		= acx_allocate(adev, adev->tx.hostdesc_area_size,
+			&adev->tx.hostdesc_startphy,
 			"txhostdesc_start");
-	if (!adev->txhostdesc_start)
+	if (!adev->tx.hostdesc_start)
 		goto fail;
 	/* check for proper alignment of TX host descriptor pool */
-	if ((long)adev->txhostdesc_start & 3) {
+	if ((long)adev->tx.hostdesc_start & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
-	hostdesc = adev->txhostdesc_start;
-	hostdesc_phy = adev->txhostdesc_startphy;
-	txbuf = adev->txbuf_start;
-	txbuf_phy = adev->txbuf_startphy;
+	hostdesc = adev->tx.hostdesc_start;
+	hostdesc_phy = adev->tx.hostdesc_startphy;
+	txbuf = adev->tx.buf_start;
+	txbuf_phy = adev->tx.buf_startphy;
 
 #if 0
 /* Each tx buffer is accessed by hardware via txdesc -> txhostdesc(s)
@@ -430,7 +430,7 @@ int acx_create_tx_host_desc_queue(acx_device_t * adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->txhostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->tx.hostdesc_startphy);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -523,7 +523,7 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
 		adev->rxdesc_start = (rxdesc_t *)
-			((u8 *) adev->txdesc_start
+			((u8 *) adev->tx.desc_start
 				+ (TX_CNT * sizeof(txdesc_t)));
 
 		/* NB: sizeof(txdesc_t) above is valid because we know
@@ -591,29 +591,29 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	FN_ENTER;
 
 	if (IS_ACX100(adev))
-		adev->txdesc_size = sizeof(*txdesc);
+		adev->tx.desc_size = sizeof(*txdesc);
 	else
 		/* the acx111 txdesc is 4 bytes larger */
-		adev->txdesc_size = sizeof(*txdesc) + 4;
+		adev->tx.desc_size = sizeof(*txdesc) + 4;
 
 	/* This refers to an ACX address, not one of ours */
-	adev->txdesc_start = (IS_PCI(adev))
+	adev->tx.desc_start = (IS_PCI(adev))
 		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
 		: (txdesc_t *) tx_queue_start;
 
 	log(L_DEBUG, "adev->iobase2=%p\n"
                 "tx_queue_start=%08X\n" 
-		"adev->txdesc_start=%p\n",
-                adev->iobase2, tx_queue_start, adev->txdesc_start);
+		"adev->tx.desc_start=%p\n",
+                adev->iobase2, tx_queue_start, adev->tx.desc_start);
 
 	adev->tx_free = TX_CNT;
 	/* done by memset: adev->tx_head = 0; */
-	/* done by memset: adev->tx_tail = 0; */
-	txdesc = adev->txdesc_start;
+	/* done by memset: adev->tx.tail = 0; */
+	txdesc = adev->tx.desc_start;
 	if (IS_PCI(adev)) {
 		mem_offs = tx_queue_start;
-		hostmemptr = adev->txhostdesc_startphy;
-		hostdesc = adev->txhostdesc_start;
+		hostmemptr = adev->tx.hostdesc_startphy;
+		hostdesc = adev->tx.hostdesc_start;
 	}
 	if (IS_ACX111(adev)) {
 		/* ACX111 has a preinitialized Tx buffer! */
@@ -635,13 +635,13 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* clear whole send pool. sizeof is safe here (we are
 		 * acx100) */
 		if (IS_PCI(adev))
-			memset(adev->txdesc_start, 0,
+			memset(adev->tx.desc_start, 0,
 				TX_CNT * sizeof(*txdesc));
 		else {	
-			/* adev->txdesc_start refers to device memory,
+			/* adev->tx.desc_start refers to device memory,
 			  so we can't write directly to it. */
-			clr = (u32) adev->txdesc_start;
-			while (clr < (u32) adev->txdesc_start
+			clr = (u32) adev->tx.desc_start;
+			while (clr < (u32) adev->tx.desc_start
 				+ (TX_CNT * sizeof(*txdesc))) {
 				write_slavemem32(adev, clr, 0);
 				clr += 4;
@@ -651,7 +651,7 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
 			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
-				"size: 0x%X\n", txdesc, adev->txdesc_size);
+				"size: 0x%X\n", txdesc, adev->tx.desc_size);
 
 			if (IS_PCI(adev)) {
 				/* pointer to hostdesc memory */
@@ -665,12 +665,12 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				/* done by memset(0): txdesc->Ctl2_8 = 0; */
 				/* point to next txdesc */
 				txdesc->pNextDesc =
-					cpu2acx(mem_offs + adev->txdesc_size);
+					cpu2acx(mem_offs + adev->tx.desc_size);
 				/* reserve two (hdr desc and payload desc) */
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
 				/* go to the next one */
-				mem_offs += adev->txdesc_size;
+				mem_offs += adev->tx.desc_size;
 				/* ++ is safe here (we are acx100) */
 				txdesc++;
 
@@ -686,7 +686,7 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				/* point to next txdesc */
 				write_slavemem32(adev, (u32) &(txdesc->pNextDesc),
 						(u32) cpu_to_le32 ((u8 *) txdesc
-								+ adev->txdesc_size));
+								+ adev->tx.desc_size));
 
 				/* go to the next one */
 				/* ++ is safe here (we are acx100) */
@@ -730,13 +730,13 @@ void acx_free_desc_queues(acx_device_t *adev)
 
 	FN_ENTER;
 
-	ACX_FREE_QUEUE(adev, adev->txhostdesc_area_size,
-		adev->txhostdesc_start, adev->txhostdesc_startphy);
+	ACX_FREE_QUEUE(adev, adev->tx.hostdesc_area_size,
+		adev->tx.hostdesc_start, adev->tx.hostdesc_startphy);
 
-	ACX_FREE_QUEUE(adev, adev->txbuf_area_size,
-		adev->txbuf_start, adev->txbuf_startphy);
+	ACX_FREE_QUEUE(adev, adev->tx.buf_area_size,
+		adev->tx.buf_start, adev->tx.buf_startphy);
 
-	adev->txdesc_start = NULL;
+	adev->tx.desc_start = NULL;
 
 	ACX_FREE_QUEUE(adev, adev->rxhostdesc_area_size,
 		adev->rxhostdesc_start, adev->rxhostdesc_startphy);
@@ -810,7 +810,7 @@ void acx_log_txbuffer(acx_device_t *adev)
 
 	pr_debug("entry\n");
 
-	txdesc = adev->txdesc_start;
+	txdesc = adev->tx.desc_start;
 	if (unlikely(!txdesc))
 			return;
 
@@ -2358,11 +2358,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 		adev->acx_txbuf_free);
 
-	txdesc = adev->txdesc_start;
+	txdesc = adev->tx.desc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx_tail) ? " [tail]" : "";
+			ttl = (i == adev->tx.tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
 						(u32) txdesc, sizeof(txd));
 
@@ -2464,9 +2464,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->txbuf_start, adev->txbuf_area_size, adev->txdesc_size,
-		adev->txdesc_start, adev->txhostdesc_start,
-		adev->txhostdesc_area_size, adev->acx_txbuf_start,
+		adev->tx.buf_start, adev->tx.buf_area_size, adev->tx.desc_size,
+		adev->tx.desc_start, adev->tx.hostdesc_start,
+		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
 		adev->rxdesc_start,
@@ -2673,8 +2673,8 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 static inline
 txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
 {
-	return (txdesc_t*) (((u8*) adev->txdesc_start)
-			+ index * adev->txdesc_size);
+	return (txdesc_t*) (((u8*) adev->tx.desc_start)
+			+ index * adev->tx.desc_size);
 }
 #endif
 
@@ -2844,7 +2844,7 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	 * This is only called immediately after we've allocated, so
 	 * we should be able to set the head back to this descriptor.
 	 */
-	index = ((u8*) txdesc - (u8*) adev->txdesc_start) / adev->txdesc_size;
+	index = ((u8*) txdesc - (u8*) adev->tx.desc_start) / adev->tx.desc_size;
 	pr_info("acx_dealloc: moving head from %d to %d\n",
 		adev->tx_head, index);
 	adev->tx_head = index;
@@ -2973,15 +2973,15 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 
 static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 {
-	int index = (u8 *) txdesc - (u8 *) adev->txdesc_start;
+	int index = (u8 *) txdesc - (u8 *) adev->tx.desc_start;
 
 	FN_ENTER;
 
-	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
+	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
 		pr_acx("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	index /= adev->txdesc_size;
+	index /= adev->tx.desc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		pr_acx("bad txdesc ptr %p\n", txdesc);
 		return NULL;
@@ -2989,7 +2989,7 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 
 	FN_EXIT0;
 
-	return &adev->txhostdesc_start[index * 2];
+	return &adev->tx.hostdesc_start[index * 2];
 }
 
 void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
@@ -3000,17 +3000,17 @@ void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 #if 0 // merged
 static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
-	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
-	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
+	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
+	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	index /= adev->txdesc_size;
+	index /= adev->tx.desc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	return &adev->txhostdesc_start[index * 2];
+	return &adev->tx.hostdesc_start[index * 2];
 }
 #endif // acxmem_get_txhostdesc()
 
@@ -3188,8 +3188,8 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 			write_slavemem16(adev, (u32) &(txdesc->total_length), 0);
 			write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
 					| DESC_CTL_FIRSTFRAG);
-			adev->tx_head = ((u8*) txdesc - (u8*) adev->txdesc_start)
-					/ adev->txdesc_size;
+			adev->tx_head = ((u8*) txdesc - (u8*) adev->tx.desc_start)
+					/ adev->tx.desc_size;
 			adev->tx_free++;
 			goto end_of_chain;
 		}
@@ -3320,7 +3320,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 	if (unlikely(acx_debug & L_DEBUG))
 		acx_log_txbuffer(adev);
 
-	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx_tail);
+	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx.tail);
 
 	/* We know first descr which is not free yet. We advance it as
 	 * far as we see correct bits set in following descs (if next
@@ -3329,7 +3329,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 	 * descs.  We will catch up when all intermediate descs will
 	 * be freed also */
 
-	finger = adev->tx_tail;
+	finger = adev->tx.tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->tx_head)) {
 		txdesc = acx_get_txdesc(adev, finger);
@@ -3352,7 +3352,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 			if (unlikely(!num_cleaned))
 				pr_warn("clean_txdesc: tail isn't free. "
 					"finger=%d, tail=%d, head=%d\n",
-					finger,	adev->tx_tail, adev->tx_head);
+					finger,	adev->tx.tail, adev->tx_head);
 			break;
 		}
 
@@ -3454,7 +3454,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 		finger = (finger + 1) % TX_CNT;
 	}
 	/* remember last position */
-	adev->tx_tail = finger;
+	adev->tx.tail = finger;
 
 	FN_EXIT1(num_cleaned);
 	return num_cleaned;
@@ -4413,7 +4413,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 		}
 
 		/* dump acx111 internal tx descriptor ring buffer */
-		txdesc = adev->txdesc_start;
+		txdesc = adev->tx.desc_start;
 
 		/* loop over complete transmit pool */
 		if (txdesc)
@@ -4445,7 +4445,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 		/* dump host tx descriptor ring buffer */
 
-		txhostdesc = adev->txhostdesc_start;
+		txhostdesc = adev->tx.hostdesc_start;
 
 		/* loop over complete host send pool */
 		if (txhostdesc)

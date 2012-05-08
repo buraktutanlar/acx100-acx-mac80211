@@ -666,11 +666,11 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 			adev->tx_free,
 			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
 
-	txdesc = adev->txdesc_start;
+	txdesc = adev->tx.desc_start;
 	if (txdesc)
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx_tail) ? " [tail]" : "";
+			ttl = (i == adev->tx.tail) ? " [tail]" : "";
 
 			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
 				seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
@@ -694,11 +694,11 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 		"rxdesc_start %p\n"
 		"rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
 		"rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		adev->txbuf_start, adev->txbuf_area_size,
-		(unsigned long long)adev->txbuf_startphy,
-		adev->txdesc_size, adev->txdesc_start,
-		adev->txhostdesc_start, adev->txhostdesc_area_size,
-		(unsigned long long)adev->txhostdesc_startphy,
+		adev->tx.buf_start, adev->tx.buf_area_size,
+		(unsigned long long)adev->tx.buf_startphy,
+		adev->tx.desc_size, adev->tx.desc_start,
+		adev->tx.hostdesc_start, adev->tx.hostdesc_area_size,
+		(unsigned long long)adev->tx.hostdesc_startphy,
 		adev->rxdesc_start,
 		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
 		(unsigned long long)adev->rxhostdesc_startphy,
@@ -1074,7 +1074,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 		}
 
 	/* dump acx111 internal tx descriptor ring buffer */
-	txdesc = adev->txdesc_start;
+	txdesc = adev->tx.desc_start;
 
 	/* loop over complete transmit pool */
 	if (txdesc)
@@ -1105,7 +1105,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* dump host tx descriptor ring buffer */
 
-	txhostdesc = adev->txhostdesc_start;
+	txhostdesc = adev->tx.hostdesc_start;
 
 	/* loop over complete host send pool */
 	if (txhostdesc)

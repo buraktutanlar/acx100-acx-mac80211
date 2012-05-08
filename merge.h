@@ -40,15 +40,15 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev);
 
 static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
 {
-	return (txdesc_t*) (((u8*) adev->txdesc_start)
-			+ index * adev->txdesc_size);
+	return (txdesc_t*) (((u8*) adev->tx.desc_start)
+			+ index * adev->tx.desc_size);
 }
 
 static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 					txdesc_t* txdesc, int inc)
 {
 	return (txdesc_t*) (((u8*) txdesc)
-			+ inc * adev->txdesc_size);
+			+ inc * adev->tx.desc_size);
 }
 
 void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,

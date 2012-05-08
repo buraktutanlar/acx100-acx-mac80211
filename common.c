@@ -5403,8 +5403,8 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 	int debug = acx_debug & L_BUFT;
 
 	if (debug) {
-		i = ((u8*) txdesc - (u8*) adev->txdesc_start)
-			/ adev->txdesc_size;
+		i = ((u8*) txdesc - (u8*) adev->tx.desc_start)
+			/ adev->tx.desc_size;
 		sprintf(tmpstr, "txdesc=%i: rates in info"
 			"[bitrate,hw_value,count]: ", i);
 	}

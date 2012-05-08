@@ -216,6 +216,22 @@ struct eeprom_cfg {
 	co_manuf_t		manufacturer;
 };
 
+/* tx fields refactored */
+struct tx_desc_pair {
+	unsigned int	tail;
+	u8		*buf_start;
+	txhostdesc_t	*hostdesc_start;
+	/* sizes of above host memory areas */
+	unsigned int	buf_area_size;
+	unsigned int	hostdesc_area_size;
+	unsigned int	desc_size;	/* size of txdesc */
+
+	dma_addr_t	buf_startphy;
+	dma_addr_t	hostdesc_startphy;
+	txdesc_t	*desc_start;	/* points to PCI-mapped memory */
+
+};
+
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
  * acx_priv_t) */
 
@@ -449,17 +465,20 @@ struct acx_device {
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
 	/* pointers to tx buffers, tx host descriptors (in host memory)
 	** and tx descs in device memory */
+#if 0	
 	unsigned int	tx_tail;
 	u8		*txbuf_start;
 	txhostdesc_t	*txhostdesc_start;
-	txdesc_t	*txdesc_start;	/* points to PCI-mapped memory */
-	dma_addr_t	txbuf_startphy;
-	dma_addr_t	txhostdesc_startphy;
 	/* sizes of above host memory areas */
 	unsigned int	txbuf_area_size;
 	unsigned int	txhostdesc_area_size;
-
-	unsigned int	txdesc_size;	/* size of txdesc; ACX111 = ACX100 + 4 */
+	unsigned int	txdesc_size;	/* size of txdesc */
+	dma_addr_t	txbuf_startphy;
+	dma_addr_t	txhostdesc_startphy;
+	txdesc_t	*txdesc_start;	/* points to PCI-mapped memory */
+#else
+	struct tx_desc_pair tx;
+#endif
 
 	/* same for rx */
 	unsigned int	rx_tail;
