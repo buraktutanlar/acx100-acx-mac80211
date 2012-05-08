@@ -216,35 +216,33 @@ struct eeprom_cfg {
 	co_manuf_t		manufacturer;
 };
 
-/* tx fields refactored */
-struct tx_desc_pair {
-	unsigned int	tail;
-	u8		*buf_start;
-	txhostdesc_t	*hostdesc_start;
-	txdesc_t	*desc_start;	/* points to PCI-mapped memory */
-
-	/* sizes of above host memory areas */
-	unsigned int	buf_area_size;
-	unsigned int	hostdesc_area_size;
-	unsigned int	desc_size;	/* size of txdesc */
-
-	dma_addr_t	buf_startphy;
-	dma_addr_t	hostdesc_startphy;
+/* desc allocation info for both rx,tx hostdesc,desc */
+struct desc_info {
+	union { /* points to PCI-mapped memory */
+		txhostdesc_t	*txstart;
+		rxhostdesc_t	*rxstart;
+		void		*start;
+	};
+	unsigned int	size;	// hostdesc_area_size;
+	dma_addr_t	phy;	// hostdesc_startphy;
 };
-// identical to above, except for field types (and theyre close too)
-struct rx_desc_pair {
-	unsigned int	tail;
-	rxbuffer_t	*buf_start;
-	rxhostdesc_t	*hostdesc_start;
-	rxdesc_t	*desc_start;
 
-	/* sizes of above host memory areas */
-	unsigned int	buf_area_size;
-	unsigned int	hostdesc_area_size;
+/* tx fields refactored */
+struct tx_desc_pair2 {
+	unsigned int	tail;
+	txdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of txdesc */
 
-	dma_addr_t	buf_startphy;
-	dma_addr_t	hostdesc_startphy;
+	struct desc_info host;
+	struct desc_info buf;
+};
+struct rx_desc_pair2 {
+	unsigned int	tail;
+	rxdesc_t	*desc_start;
+	unsigned int	desc_size;	/* size of rxdesc */
+
+	struct desc_info host;
+	struct desc_info buf;
 };
 
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
@@ -482,8 +480,8 @@ struct acx_device {
 	/* pointers to tx buffers, tx host descriptors (in host
 	 * memory) and tx descs in device memory, same for rx
 	 */
-	struct tx_desc_pair tx;
-	struct rx_desc_pair rx;
+	struct tx_desc_pair2 tx;
+	struct rx_desc_pair2 rx;
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
