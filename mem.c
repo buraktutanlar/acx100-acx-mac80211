@@ -145,7 +145,8 @@ char acxmem_printable(char c);
 
 #if DUMP_MEM_DEFINED > 0
 //= static 
-void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) {
+void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
+{
 	int i;
 	u8 buf[16];
 
@@ -466,9 +467,8 @@ acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 	FN_ENTER;
 
 	data_verify = kmalloc(len, GFP_KERNEL);
-	if (!data_verify) {
+	if (!data_verify)
 		goto end;
-	}
 
 	/* first we need to enable the OE (EEPROM Output Enable) GPIO
 	 * line to be able to write to the EEPROM.  NOTE: an EEPROM
@@ -531,7 +531,8 @@ acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 }
 #endif /* UNUSED */
 
-STATick inline void acxmem_read_eeprom_area(acx_device_t *adev) {
+STATick inline void acxmem_read_eeprom_area(acx_device_t *adev)
+{
 #if ACX_DEBUG > 1
 	int offs;
 	u8 tmp;
@@ -792,7 +793,8 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  */
 
 
-STATick int acxmem_verify_init(acx_device_t *adev) {
+STATick int acxmem_verify_init(acx_device_t *adev)
+{
 	int result = NOT_OK;
 	unsigned long timeout;
 	u32 irqstat;
@@ -826,7 +828,8 @@ STATick int acxmem_verify_init(acx_device_t *adev) {
 /*
  * Most of the acx specific pieces of hardware reset.
  */
-STATick int acxmem_complete_hw_reset(acx_device_t *adev) {
+STATick int acxmem_complete_hw_reset(acx_device_t *adev)
+{
 	acx111_ie_configoption_t co;
 	acxmem_lock_flags;
 
@@ -934,7 +937,8 @@ STATick void acxmem_reset_mac(acx_device_t *adev)
  ** FIXME: most likely needs refinement
  */
 #if 0 // or mem.c:2019:2: error: implicit declaration of function 'ndev2adev'
-STATick void acxmem_i_set_multicast_list(struct net_device *ndev) {
+STATick void acxmem_i_set_multicast_list(struct net_device *ndev)
+{
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
@@ -1167,7 +1171,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
  *
  * Called directly and only from the IRQ handler
  */
-STATick void acxmem_process_rxdesc(acx_device_t *adev) {
+STATick void acxmem_process_rxdesc(acx_device_t *adev)
+{
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc;
 	unsigned count, tail;
@@ -1290,7 +1295,8 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev) {
  * ==================================================
  */
 
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque) {
+void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
+{
 	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
 }
 
@@ -1379,7 +1385,8 @@ u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
  * interrupt context, so it shouldn't block to protect the integrity
  * of the linked list.  The ISR already holds the lock.
  */
-STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
+STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr)
+{
 	u32 cur, last, next;
 
 	if ((blockptr >= adev->acx_txbuf_start) &&
@@ -1477,7 +1484,8 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 #endif
 
 STATick txhostdesc_t*
-acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
+acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
+{
 	int index = (u8*) txdesc - (u8*) adev->txdesc_start;
 	if (unlikely(ACX_DEBUG && (index % adev->txdesc_size))) {
 		pr_info("bad txdesc ptr %p\n", txdesc);
@@ -1535,7 +1543,8 @@ void acxmem_clean_txdesc_emergency(acx_device_t *adev)
 	FN_EXIT0;
 }
 
-void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
+void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue)
+{
 #ifdef USING_MORE_THAN_ONE_TRANSMIT_QUEUE
 	u32 indicator;
 	unsigned long flags;
@@ -1605,7 +1614,8 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue) {
  */
 #if 0 // or mem.c:3242:3: warning: passing argument 1 of 'acx_wake_queue'
       // from incompatible pointer type [enabled by default]
-STATick void acxmem_i_tx_timeout(struct net_device *ndev) {
+STATick void acxmem_i_tx_timeout(struct net_device *ndev)
+{
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 	unsigned int tx_num_cleaned;
@@ -1884,7 +1894,8 @@ static const struct ieee80211_ops acxmem_hw_ops = {
  * ==================================================
  */
 
-void acxmem_power_led(acx_device_t *adev, int enable) {
+void acxmem_power_led(acx_device_t *adev, int enable)
+{
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
 	/* A hack. Not moving message rate limiting to adev->xxx
@@ -1902,13 +1913,15 @@ void acxmem_power_led(acx_device_t *adev, int enable) {
 				| gpio_pled);
 }
 
-INLINE_IO int acxmem_adev_present(acx_device_t *adev) {
+INLINE_IO int acxmem_adev_present(acx_device_t *adev)
+{
 	/* fast version (accesses the first register, IO_ACX_SOFT_RESET,
 	 * which should be safe): */
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
-STATick char acxmem_printable(char c) {
+STATick char acxmem_printable(char c)
+{
 	return ((c >= 20) && (c < 127)) ? c : '.';
 }
 
@@ -2225,11 +2238,11 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 	return OK;
 }
 
-/***********************************************************************
- */
+/*********************************************************************/
 int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 		struct iw_request_info *info,
-		struct iw_param *vwrq, char *extra) {
+		struct iw_param *vwrq, char *extra)
+{
 	// OW
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
@@ -2258,12 +2271,13 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 	acx_lock(adev, flags);
 	gpio_old = read_reg16(adev, IO_ACX_GPIO_OUT);
 	write_reg16(adev, IO_ACX_GPIO_OUT,
-			(gpio_old & 0xf8ff)	| ((u16) *extra << 8));
+			(gpio_old & 0xf8ff) | ((u16) *extra << 8));
 	acx_unlock(adev, flags);
 
 	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
 	pr_acx("%s: PHY power amplifier bias: old:%d, new:%d\n",
-			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
+		wiphy_name(adev->ieee->wiphy),
+		(gpio_old & 0x0700) >> 8, (unsigned char) *extra);
 
 	acx_sem_unlock(adev);
 
@@ -2291,8 +2305,8 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
-STATick int __devinit acxmem_probe(struct platform_device *pdev) {
-
+STATick int __devinit acxmem_probe(struct platform_device *pdev)
+{
 	acx_device_t *adev = NULL;
 	const char *chip_name;
 	int result = -EIO;
@@ -2311,7 +2325,8 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
 	if (!ieee) {
-		pr_acx("could not allocate ieee80211 structure %s\n", pdev->name);
+		pr_acx("could not allocate ieee80211 structure %s\n",
+			pdev->name);
 		goto fail_ieee80211_alloc_hw;
 	}
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
@@ -2429,7 +2444,8 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 			IRQF_SHARED,
 			KBUILD_MODNAME,
 			adev)) {
-		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		pr_acx("%s: request_irq FAILED\n",
+			wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
@@ -2490,8 +2506,8 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 #endif
 
 	pr_acx("net device %s, driver compiled "
-        "against wireless extensions %d and Linux %s\n",
-        wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+		"against wireless extensions %d and Linux %s\n",
+		wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
 
@@ -2499,7 +2515,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	/* need to be able to restore PCI state after a suspend */
 #ifdef CONFIG_PM
-			// pci_save_state(pdev);
+	// pci_save_state(pdev);
 #endif
 
 	err = acx_setup_modes(adev);
@@ -2559,9 +2575,10 @@ fail_ieee80211_alloc_hw:
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-STATick int __devexit acxmem_remove(struct platform_device *pdev) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+STATick int __devexit acxmem_remove(struct platform_device *pdev)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
@@ -2656,9 +2673,10 @@ STATick int __devexit acxmem_remove(struct platform_device *pdev) {
  */
 #ifdef CONFIG_PM
 STATick int
-acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+acxmem_e_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 	acx_device_t *adev;
 
 	FN_ENTER;
@@ -2693,9 +2711,10 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state) {
 	return OK;
 }
 
-STATick int acxmem_e_resume(struct platform_device *pdev) {
-
-	struct ieee80211_hw *hw = (struct ieee80211_hw *) platform_get_drvdata(pdev);
+STATick int acxmem_e_resume(struct platform_device *pdev)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)
+		platform_get_drvdata(pdev);
 	acx_device_t *adev;
 
 	FN_ENTER;
@@ -2771,7 +2790,8 @@ STATick struct platform_driver acxmem_driver = {
  *
  * Module initialization routine, called once at module load time
  */
-int __init acxmem_init_module(void) {
+int __init acxmem_init_module(void)
+{
 	int res;
 
 	FN_ENTER;
@@ -2807,7 +2827,8 @@ int __init acxmem_init_module(void) {
  * Called at module unload time. This is our last chance to
  * clean up after ourselves.
  */
-void __exit acxmem_cleanup_module(void) {
+void __exit acxmem_cleanup_module(void)
+{
 	FN_ENTER;
 
 	pr_acxmem("cleanup_module\n");
