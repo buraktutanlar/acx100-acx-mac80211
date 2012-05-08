@@ -1,3 +1,6 @@
+#ifndef _MERGE_H_
+#define _MERGE_H_
+
 #include <linux/interrupt.h>
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -38,19 +41,6 @@ void acx_create_tx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 
 unsigned int acx_tx_clean_txdesc(acx_device_t *adev);
 
-static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
-{
-	return (txdesc_t*) (((u8*) adev->tx.desc_start)
-			+ index * adev->tx.desc_size);
-}
-
-static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
-					txdesc_t* txdesc, int inc)
-{
-	return (txdesc_t*) (((u8*) txdesc)
-			+ inc * adev->tx.desc_size);
-}
-
 void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *info, struct sk_buff *skb);
 
@@ -80,18 +70,36 @@ void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 int acxmem_upload_radio(acx_device_t *adev);
 int acxpci_upload_radio(acx_device_t *adev);
 
-#if defined(CONFIG_ACX_MAC80211_MEM)
+#if defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM)
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 
-#else
+static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
+{
+	return (txdesc_t*) (((u8*) adev->tx.desc_start)
+			+ index * adev->tx.desc_size);
+}
+
+static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
+					txdesc_t* txdesc, int inc)
+{
+	return (txdesc_t*) (((u8*) txdesc)
+			+ inc * adev->tx.desc_size);
+}
+
+#else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
 
 static inline void acxmem_update_queue_indicator(acx_device_t *adev,
 			int txqueue)
 { }
 
-#endif
+static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
+			txdesc_t* txdesc, int inc)
+{ return (txdesc_t*) NULL; }
 
-#if !defined(CONFIG_ACX_MAC80211_PCI) && !defined(CONFIG_ACX_MAC80211_MEM)
-#define ACX_FREE_QUEUES(adev, _dir_) // empty stub here, real one in merge.c
-#endif
+/* empty stub here, real one in merge.c */
+#define ACX_FREE_QUEUES(adev, _dir_)
+
+#endif /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
+
+#endif /* _MERGE_H_ */
