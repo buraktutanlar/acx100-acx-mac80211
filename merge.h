@@ -73,6 +73,9 @@ int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
 int acxmem_upload_fw(acx_device_t *adev);
 
+void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
+			u32 rx_queue_start);
+
 
 #if !defined(CONFIG_ACX_MAC80211_MEM)
 

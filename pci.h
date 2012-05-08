@@ -19,8 +19,8 @@
 //= STATick int acxpci_create_rx_host_desc_queue(acx_device_t *adev);
 //=STATick int acxpci_create_tx_host_desc_queue(acx_device_t *adev);
 
-void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-		u32 rx_queue_start);
+//! void acxpci_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
+//!		u32 rx_queue_start);
 //=STATick void acxpci_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start);
 //= STATick void acxpci_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start);
 

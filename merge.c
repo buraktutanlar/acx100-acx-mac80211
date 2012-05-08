@@ -438,6 +438,30 @@ fail:
 	return NOT_OK;
 }
 
+void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
+			u32 rx_queue_start)
+{
+	u32 *p;
+	int i;
+
+	acxmem_lock_flags;
+	acxmem_lock();
+
+	acx_create_tx_desc_queue(adev, tx_queue_start);
+	acx_create_rx_desc_queue(adev, rx_queue_start);
+
+	if (IS_PCI(adev))
+		goto out;
+
+	p = (u32 *) adev->acx_queue_indicator;
+	for (i = 0; i < 4; i++) {
+		write_slavemem32(adev, (u32) p, 0);
+		p++;
+	}
+out:
+	acxmem_unlock();
+}
+
 int acx_create_hostdesc_queues(acx_device_t *adev)
 {
         int result;

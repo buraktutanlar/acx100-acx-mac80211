@@ -240,7 +240,7 @@ static void vlynq_remove(struct vlynq_device *vdev);
  * plus 32 bytes safety offset at the end
  */
 
-
+#if 0 // acxpci_create_desc_queues()
 void
 acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 			u32 rx_queue_start)
@@ -248,6 +248,7 @@ acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start,
 	acx_create_tx_desc_queue(adev, tx_queue_start);
 	acx_create_rx_desc_queue(adev, rx_queue_start);
 }
+#endif // acxpci_create_desc_queues()
 
 //static
 #if 0 //

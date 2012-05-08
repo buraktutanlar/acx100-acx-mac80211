@@ -600,6 +600,7 @@ int acxmem_create_rx_host_desc_queue(acx_device_t *adev)
  * on the way out.
  */
 
+#if 0 // acxmem_create_desc_queues()
 void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 			u32 rx_queue_start)
 {
@@ -617,9 +618,8 @@ void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 		p++;
 	}
 	acxmem_unlock();
-
 }
-
+#endif // acxmem_create_desc_queues()
 
 #if 0 
 STATick void acxmem_delete_dma_regions(acx_device_t *adev) {
