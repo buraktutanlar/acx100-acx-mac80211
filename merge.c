@@ -256,33 +256,33 @@ static int acx_create_rx_host_desc_queue(acx_device_t * adev)
 	FN_ENTER;
 
 	/* allocate the RX host descriptor queue pool */
-	adev->rxhostdesc_area_size = RX_CNT * sizeof(*hostdesc);
-	adev->rxhostdesc_start
+	adev->rx.hostdesc_area_size = RX_CNT * sizeof(*hostdesc);
+	adev->rx.hostdesc_start
 		= acx_allocate(adev,
-			adev->rxhostdesc_area_size,
-			&adev->rxhostdesc_startphy,
+			adev->rx.hostdesc_area_size,
+			&adev->rx.hostdesc_startphy,
 			"rxhostdesc_start");
-	if (!adev->rxhostdesc_start)
+	if (!adev->rx.hostdesc_start)
 		goto fail;
 	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->rxhostdesc_start & 3) {
+	if ((long)adev->rx.hostdesc_start & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
-	adev->rxbuf_area_size = RX_CNT * RX_BUFFER_SIZE;
-	adev->rxbuf_start
-		= acx_allocate(adev, adev->rxbuf_area_size,
-			&adev->rxbuf_startphy, "rxbuf_start");
-	if (!adev->rxbuf_start)
+	adev->rx.buf_area_size = RX_CNT * RX_BUFFER_SIZE;
+	adev->rx.buf_start
+		= acx_allocate(adev, adev->rx.buf_area_size,
+			&adev->rx.buf_startphy, "rxbuf_start");
+	if (!adev->rx.buf_start)
 		goto fail;
 
-	rxbuf = adev->rxbuf_start;
-	rxbuf_phy = adev->rxbuf_startphy;
-	hostdesc = adev->rxhostdesc_start;
-	hostdesc_phy = adev->rxhostdesc_startphy;
+	rxbuf = adev->rx.buf_start;
+	rxbuf_phy = adev->rx.buf_startphy;
+	hostdesc = adev->rx.hostdesc_start;
+	hostdesc_phy = adev->rx.hostdesc_startphy;
 
 	/* don't make any popular C programming pointer arithmetic
 	 * mistakes here, otherwise I'll kill you...  (and don't dare
@@ -299,7 +299,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t * adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->rxhostdesc_startphy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->rx.hostdesc_startphy);
 	FN_EXIT1(OK);
 	return OK;
       fail:
@@ -490,7 +490,7 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 	FN_ENTER;
 
-	/* done by memset: adev->rx_tail = 0; */
+	/* done by memset: adev->rx.tail = 0; */
 
 	/* ACX111 doesn't need any further config: preconfigures itself.
 	 * Simply print ring buffer for debugging */
@@ -498,31 +498,31 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		/* rxdesc_start already set here */
 
 		if (IS_PCI(adev))
-			adev->rxdesc_start = (rxdesc_t *)
+			adev->rx.desc_start = (rxdesc_t *)
 				((u8 *) adev->iobase2 + rx_queue_start);
 		else
-			adev->rxdesc_start = (rxdesc_t *)
+			adev->rx.desc_start = (rxdesc_t *)
 				((u8 *) rx_queue_start);
 
-		rxdesc = adev->rxdesc_start;
+		rxdesc = adev->rx.desc_start;
 
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 
 			if (IS_PCI(adev))
-				adev->rxdesc_start = (rxdesc_t *)
+				adev->rx.desc_start = (rxdesc_t *)
 					((u8 *) adev->iobase2
 						+ acx2cpu(rxdesc->pNextDesc));
 			else
-				adev->rxdesc_start = (rxdesc_t *)
+				adev->rx.desc_start = (rxdesc_t *)
 					((u8 *) acx2cpu(rxdesc->pNextDesc));
 
-			rxdesc = adev->rxdesc_start;
+			rxdesc = adev->rx.desc_start;
 		}
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
-		adev->rxdesc_start = (rxdesc_t *)
+		adev->rx.desc_start = (rxdesc_t *)
 			((u8 *) adev->tx.desc_start
 				+ (TX_CNT * sizeof(txdesc_t)));
 
@@ -531,18 +531,18 @@ void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 		 * elsewhere!  acx111's txdesc is larger! */
 
 		if (IS_PCI(adev))
-			memset(adev->rxdesc_start, 0,
+			memset(adev->rx.desc_start, 0,
 				RX_CNT * sizeof(*rxdesc));
 		else { // IS_MEM
-			mem_offs = (u32) adev->rxdesc_start;
-			while (mem_offs < (u32) adev->rxdesc_start
+			mem_offs = (u32) adev->rx.desc_start;
+			while (mem_offs < (u32) adev->rx.desc_start
 				+ (RX_CNT * sizeof(*rxdesc))) {
 				write_slavemem32(adev, mem_offs, 0);
 				mem_offs += 4;
 			}
 		}
 		/* loop over whole receive pool */
-		rxdesc = adev->rxdesc_start;
+		rxdesc = adev->rx.desc_start;
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
@@ -738,13 +738,13 @@ void acx_free_desc_queues(acx_device_t *adev)
 
 	adev->tx.desc_start = NULL;
 
-	ACX_FREE_QUEUE(adev, adev->rxhostdesc_area_size,
-		adev->rxhostdesc_start, adev->rxhostdesc_startphy);
+	ACX_FREE_QUEUE(adev, adev->rx.hostdesc_area_size,
+		adev->rx.hostdesc_start, adev->rx.hostdesc_startphy);
 
-	ACX_FREE_QUEUE(adev, adev->rxbuf_area_size,
-		adev->rxbuf_start, adev->rxbuf_startphy);
+	ACX_FREE_QUEUE(adev, adev->rx.buf_area_size,
+		adev->rx.buf_start, adev->rx.buf_startphy);
 
-	adev->rxdesc_start = NULL;
+	adev->rx.desc_start = NULL;
 
 	FN_EXIT0;
 }
@@ -787,7 +787,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 	pr_debug("entry\n");
 
-	rxhostdesc = adev->rxhostdesc_start;
+	rxhostdesc = adev->rx.hostdesc_start;
 	if (unlikely(!rxhostdesc))
 		return;
 
@@ -2314,10 +2314,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 #endif
 
 	seq_printf(file, "** Rx buf **\n");
-	rxdesc = adev->rxdesc_start;
+	rxdesc = adev->rx.desc_start;
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx_tail) ? " [tail]" : "";
+			rtl = (i == adev->rx.tail) ? " [tail]" : "";
 			Ctl_8 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
 				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
@@ -2469,9 +2469,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
-		adev->rxdesc_start,
-		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
-		adev->rxbuf_start, adev->rxbuf_area_size);
+		adev->rx.desc_start,
+		adev->rx.hostdesc_start, adev->rx.hostdesc_area_size,
+		adev->rx.buf_start, adev->rx.buf_area_size);
 
 	acxmem_unlock();
 	FN_EXIT0;
@@ -2506,12 +2506,12 @@ void acx_process_rxdesc(acx_device_t *adev)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to
 	 * handle. */
-	tail = adev->rx_tail;
+	tail = adev->rx.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rxhostdesc_start[tail];
+		hostdesc = &adev->rx.hostdesc_start[tail];
 		if (IS_MEM(adev))
-			rxdesc = &adev->rxdesc_start[tail];
+			rxdesc = &adev->rx.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -2561,7 +2561,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 
 			/* ok, descriptor is handled, now check the
 			 * next descriptor */
-			hostdesc = &adev->rxhostdesc_start[tail];
+			hostdesc = &adev->rx.hostdesc_start[tail];
 
 			/* if next descriptor is empty, then bail out */
 			if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
@@ -2636,8 +2636,8 @@ void acx_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
+		hostdesc = &adev->rx.hostdesc_start[tail];
+		rxdesc = &adev->rx.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16
 			= read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
@@ -2649,7 +2649,7 @@ void acx_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 	}
 end:
-	adev->rx_tail = tail;
+	adev->rx.tail = tail;
 	FN_EXIT0;
 }
 
@@ -4364,7 +4364,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rxdesc_start;
+	rxdesc = adev->rx.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -4388,7 +4388,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rxhostdesc_start;
+		rxhostdesc = adev->rx.hostdesc_start;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)

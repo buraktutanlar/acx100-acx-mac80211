@@ -973,10 +973,10 @@ acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc =
-		    cpu2acx(adev->rxhostdesc_startphy);
+		    cpu2acx(adev->rx.hostdesc_startphy);
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 		    acx2cpu(MemoryConfigOption.pRxHostDesc),
-		    (long)adev->rxhostdesc_startphy);
+		    (long)adev->rx.hostdesc_startphy);
 	}
 	else if(IS_MEM(adev)) {
 		/*
@@ -987,7 +987,7 @@ acx100_init_memory_pools(acx_device_t * adev, const acx_ie_memmap_t * mmt)
 		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 			acx2cpu(MemoryConfigOption.pRxHostDesc),
-			(long)adev->rxhostdesc_startphy);
+			(long)adev->rx.hostdesc_startphy);
 	}
 	else {
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x20000);
@@ -1205,11 +1205,11 @@ static int acx111_create_dma_regions(acx_device_t * adev)
 	/* done by memset: memconf.rx_queue1_prio = 0; low prio */
 	if (IS_PCI(adev)) {
 		memconf.rx_queue1_host_rx_start =
-		    cpu2acx(adev->rxhostdesc_startphy);
+		    cpu2acx(adev->rx.hostdesc_startphy);
 	}
 	else if (IS_MEM(adev))
 	{
-		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rxhostdesc_startphy);
+		memconf.rx_queue1_host_rx_start = cpu2acx(adev->rx.hostdesc_startphy);
 	}
 
 	/* Tx descriptor queue config */

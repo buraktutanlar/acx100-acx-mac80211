@@ -1004,10 +1004,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 #endif
 
 	seq_printf(file, "** Rx buf **\n");
-	rxdesc = adev->rxdesc_start;
+	rxdesc = adev->rx.desc_start;
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx_tail) ? " [tail]" : "";
+			rtl = (i == adev->rx.tail) ? " [tail]" : "";
 			Ctl_8 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
 				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
@@ -1151,9 +1151,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->tx.hostdesc_area_size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
-		adev->rxdesc_start,
-		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
-		adev->rxbuf_start, adev->rxbuf_area_size);
+		adev->rx.desc_start,
+		adev->rx.hostdesc_start, adev->rx.hostdesc_area_size,
+		adev->rx.buf_start, adev->rx.buf_area_size);
 
 	acxmem_unlock();
 	FN_EXIT0;
@@ -1188,11 +1188,11 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to
 	 * handle. */
-	tail = adev->rx_tail;
+	tail = adev->rx.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
+		hostdesc = &adev->rx.hostdesc_start[tail];
+		rxdesc = &adev->rx.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -1274,8 +1274,8 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rxhostdesc_start[tail];
-		rxdesc = &adev->rxdesc_start[tail];
+		hostdesc = &adev->rx.hostdesc_start[tail];
+		rxdesc = &adev->rx.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
 
@@ -1286,7 +1286,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 	}
 	end:
-		adev->rx_tail = tail;
+		adev->rx.tail = tail;
 		FN_EXIT0;
 }
 
@@ -2124,7 +2124,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rxdesc_start;
+	rxdesc = adev->rx.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -2147,7 +2147,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rxhostdesc_start;
+		rxhostdesc = adev->rx.hostdesc_start;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)

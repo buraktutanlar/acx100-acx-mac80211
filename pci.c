@@ -649,10 +649,10 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	FN_ENTER;
 
 	seq_printf(file, "** Rx buf **\n");
-	rxhostdesc = adev->rxhostdesc_start;
+	rxhostdesc = adev->rx.hostdesc_start;
 	if (rxhostdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx_tail) ? " [tail]" : "";
+			rtl = (i == adev->rx.tail) ? " [tail]" : "";
 			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 			    && (rxhostdesc->
 				    Status & cpu_to_le32(DESC_STATUS_FULL)))
@@ -699,11 +699,11 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 		adev->tx.desc_size, adev->tx.desc_start,
 		adev->tx.hostdesc_start, adev->tx.hostdesc_area_size,
 		(unsigned long long)adev->tx.hostdesc_startphy,
-		adev->rxdesc_start,
-		adev->rxhostdesc_start, adev->rxhostdesc_area_size,
-		(unsigned long long)adev->rxhostdesc_startphy,
-		adev->rxbuf_start, adev->rxbuf_area_size,
-		(unsigned long long)adev->rxbuf_startphy);
+		adev->rx.desc_start,
+		adev->rx.hostdesc_start, adev->rx.hostdesc_area_size,
+		(unsigned long long)adev->rx.hostdesc_startphy,
+		adev->rx.buf_start, adev->rx.buf_area_size,
+		(unsigned long long)adev->rx.buf_startphy);
 
 	FN_EXIT0;
 	return 0;
@@ -1025,7 +1025,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rxdesc_start;
+	rxdesc = adev->rx.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -1049,7 +1049,7 @@ acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* dump host rx descriptor ring buffer */
 
-	rxhostdesc = adev->rxhostdesc_start;
+	rxhostdesc = adev->rx.hostdesc_start;
 
 	/* loop over complete receive pool */
 	if (rxhostdesc)

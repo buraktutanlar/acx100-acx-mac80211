@@ -221,6 +221,8 @@ struct tx_desc_pair {
 	unsigned int	tail;
 	u8		*buf_start;
 	txhostdesc_t	*hostdesc_start;
+	txdesc_t	*desc_start;	/* points to PCI-mapped memory */
+
 	/* sizes of above host memory areas */
 	unsigned int	buf_area_size;
 	unsigned int	hostdesc_area_size;
@@ -228,8 +230,21 @@ struct tx_desc_pair {
 
 	dma_addr_t	buf_startphy;
 	dma_addr_t	hostdesc_startphy;
-	txdesc_t	*desc_start;	/* points to PCI-mapped memory */
+};
+// identical to above, except for field types (and theyre close too)
+struct rx_desc_pair {
+	unsigned int	tail;
+	rxbuffer_t	*buf_start;
+	rxhostdesc_t	*hostdesc_start;
+	rxdesc_t	*desc_start;
 
+	/* sizes of above host memory areas */
+	unsigned int	buf_area_size;
+	unsigned int	hostdesc_area_size;
+	unsigned int	desc_size;	/* size of txdesc */
+
+	dma_addr_t	buf_startphy;
+	dma_addr_t	hostdesc_startphy;
 };
 
 /* FIXME: this should be named something like struct acx_priv (typedef'd to
@@ -479,7 +494,7 @@ struct acx_device {
 #else
 	struct tx_desc_pair tx;
 #endif
-
+#if 0	
 	/* same for rx */
 	unsigned int	rx_tail;
 	rxbuffer_t	*rxbuf_start;
@@ -490,6 +505,9 @@ struct acx_device {
 	dma_addr_t	rxhostdesc_startphy;
 	unsigned int	rxbuf_area_size;
 	unsigned int	rxhostdesc_area_size;
+#else
+	struct rx_desc_pair rx;
+#endif
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
