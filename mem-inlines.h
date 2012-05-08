@@ -1,3 +1,6 @@
+#ifndef _MEM_INLINES_H_
+#define _MEM_INLINES_H_
+
 /*
  * Locking in mem
  * ==================================================
@@ -378,3 +381,4 @@ INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address)
 	return val;
 }
 
+#endif /* _MEM_INLINES_H_ */
