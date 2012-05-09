@@ -1017,7 +1017,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (ulong) rxdesc, sizeof(rxd));
 			seq_printf(file,
-				"%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
+				"%0lx: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
 				(ulong) rxdesc,
 				rxd.pNextDesc.v,
 				rxd.HostMemPtr.v,
@@ -1063,7 +1063,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				seq_printf(file, "%02u busy          (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
 			
 			seq_printf(file,
-				"%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
+				"%0lx: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
 				"%02x %02x %02x %02x %04x: ", (ulong) txdesc,
 				txd.pNextDesc.v, txd.HostMemPtr.v,
 				txd.AcxMemPtr.v,
