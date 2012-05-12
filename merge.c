@@ -814,9 +814,9 @@ void acx_log_txbuffer(acx_device_t *adev)
 	printk("\n");
 }
 
-
-/* ####################################################################### */
-
+/* ####################################################################
+ * BOM Firmware, EEPROM, Phy
+ */
 /*
  * acx_read_eeprom_byte
  *
@@ -867,7 +867,6 @@ fail:
 	return result;
 }
 
-#if 1 // from mem.c, has extra locking, apparently harmless
 char *acx_proc_eeprom_output(int *length, acx_device_t *adev)
 {
 	char *p, *buf;
@@ -887,15 +886,13 @@ char *acx_proc_eeprom_output(int *length, acx_device_t *adev)
 	FN_EXIT1(p - buf);
 	return buf;
 }
-#endif // acx_proc_eeprom_output()
 
 /*
  * We don't lock hw accesses here since we never r/w eeprom in IRQ
  * Note: this function sleeps only because of GFP_KERNEL alloc
  */
-/* unused in mem, used in pci */
-#if 0 //
-int acx_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
+#ifdef UNUSED /* acx_write_eeprom() */
+int acx_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 			const u8 *charbuf)
 {
 	u8 *data_verify = NULL;
@@ -980,7 +977,7 @@ end:
 	FN_EXIT1(result);
 	return result;
 }
-#endif // acx_s_write_eeprom()
+#endif  /* acx_write_eeprom() */
 
 static inline void acx_read_eeprom_area(acx_device_t *adev)
 {
