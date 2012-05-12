@@ -2608,7 +2608,7 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	}
 	pr_info("%s: changing radio power level to %u dBm (%u)\n",
 	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
-	acxpci_write_phy_reg(adev, 0x11, table[level_dbm]);
+	acx_write_phy_reg(adev, 0x11, table[level_dbm]);
 	return OK;
 }
 

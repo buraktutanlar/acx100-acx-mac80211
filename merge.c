@@ -1048,7 +1048,6 @@ fail:
 	return result;
 }
 
-#if 1 // use mem.c til later
 int _acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 {
 	int count;
@@ -1093,7 +1092,6 @@ fail:
 	FN_EXIT1(OK);  // FN_EXIT0 in pci
 	return OK;
 }
-#endif // acxmem_write_phy_reg()
 
 /*
  * acx_write_fw
