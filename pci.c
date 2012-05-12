@@ -1102,7 +1102,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	FN_ENTER;
 
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
+	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+				&acxpci_hw_ops);
 	if (!ieee) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
@@ -1119,7 +1120,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 
 	ieee->wiphy->interface_modes =
-			BIT(NL80211_IFTYPE_STATION)	|
+			BIT(NL80211_IFTYPE_STATION) |
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
@@ -1353,7 +1354,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = acx_setup_modes(adev);
 	if (err) {
-	pr_acx("can't setup hwmode\n");
+		pr_acx("can't setup hwmode\n");
 		goto fail_setup_modes;
 	}
 
@@ -1377,53 +1378,53 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 
 	/* err = ieee80211_register_hw(ieee); */
-	fail_ieee80211_register_hw:
-		ieee80211_unregister_hw(ieee);
+fail_ieee80211_register_hw:
+	ieee80211_unregister_hw(ieee);
 
 	/* err = acx_setup_modes(adev) */
-	fail_setup_modes:
+fail_setup_modes:
 
 	/* acx_proc_register_entries(ieee, 0) */
-	fail_proc_register_entries:
-		acx_proc_unregister_entries(ieee);
+fail_proc_register_entries:
+	acx_proc_unregister_entries(ieee);
 
 	/* acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version) */
-	fail_read_eeprom_byte:
+fail_read_eeprom_byte:
 
 	/* acx_s_init_mac(adev) */
-	fail_init_mac:
+fail_init_mac:
 
 	/* acxpci_s_reset_dev(adev) */
-	fail_reset_dev:
+fail_reset_dev:
 
 	/* request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, */
-	fail_request_irq:
-		free_irq(adev->irq, adev);
+fail_request_irq:
+	free_irq(adev->irq, adev);
 
-	fail_no_irq:
-
+fail_no_irq:
+	
 	/* pci_iomap(pdev, mem_region2, 0) */
-	fail_iomap2:
-		pci_iounmap(pdev, mem2);
+fail_iomap2:
+	pci_iounmap(pdev, mem2);
 
 	/* pci_iomap(pdev, mem_region1, 0) */
-	fail_iomap1:
-		pci_iounmap(pdev, mem1);
+fail_iomap1:
+	pci_iounmap(pdev, mem1);
 
 	/* 	err = pci_request_region(pdev, mem_region2, "acx_2"); */
-	fail_request_mem_region2:
-		pci_release_region(pdev, mem_region2);
+fail_request_mem_region2:
+	pci_release_region(pdev, mem_region2);
 
 	/* err = pci_request_region(pdev, mem_region1, "acx_1"); */
-	fail_request_mem_region1:
-		pci_release_region(pdev, mem_region1);
+fail_request_mem_region1:
+	pci_release_region(pdev, mem_region1);
 
-	fail_unknown_chiptype:
+fail_unknown_chiptype:
 
 	/* pci_enable_device(pdev) */
-	fail_pci_enable_device:
-		pci_disable_device(pdev);
-		pci_set_drvdata(pdev, NULL);
+fail_pci_enable_device:
+	pci_disable_device(pdev);
+	pci_set_drvdata(pdev, NULL);
 
 	/* OW TODO Check if OK for PM */
 #ifdef CONFIG_PM
@@ -1431,12 +1432,12 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 
 	/* ieee80211_alloc_hw */
-	fail_ieee80211_alloc_hw:
-		ieee80211_free_hw(ieee);
-
-	done:
-		FN_EXIT1(result);
-		return result;
+fail_ieee80211_alloc_hw:
+	ieee80211_free_hw(ieee);
+	
+done:
+	FN_EXIT1(result);
+	return result;
 }
 
 

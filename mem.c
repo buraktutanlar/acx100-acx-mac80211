@@ -2170,7 +2170,8 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 
 	FN_ENTER;
 
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
+	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+				&acxmem_hw_ops);
 	if (!ieee) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 			pdev->name);
@@ -2239,11 +2240,11 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 	 * Works for now (possible values are 1 and 2) */
 	chip_type = CHIPTYPE_ACX100;
 	/* acx100 and acx111 have different PCI memory regions */
-	if (chip_type == CHIPTYPE_ACX100) {
+	if (chip_type == CHIPTYPE_ACX100)
 		chip_name = "ACX100";
-	} else if (chip_type == CHIPTYPE_ACX111) {
+	else if (chip_type == CHIPTYPE_ACX111)
 		chip_name = "ACX111";
-	} else {
+	else {
 		pr_acx("unknown chip type 0x%04X\n", chip_type);
 		goto fail_unknown_chiptype;
 	}
@@ -2388,19 +2389,19 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 
 
 	/* error paths: undo everything in reverse order... */
-	fail_ieee80211_register_hw:
+fail_ieee80211_register_hw:
 
-	fail_acx_setup_modes:
+fail_acx_setup_modes:
 
-	fail_proc_register_entries:
+fail_proc_register_entries:
 	acx_proc_unregister_entries(ieee);
 
-	fail_complete_hw_reset:
+fail_complete_hw_reset:
 
-	fail_request_irq:
+fail_request_irq:
 	free_irq(adev->irq, adev);
 
-	fail_ioremap:
+fail_ioremap:
 	if (adev->iobase)
 		iounmap((void *)adev->iobase);
 
@@ -2410,8 +2411,7 @@ fail_ieee80211_alloc_hw:
 	platform_set_drvdata(pdev, NULL);
 	ieee80211_free_hw(ieee);
 
-	done:
-
+done:
 	FN_EXIT1(result);
 	return result;
 }
