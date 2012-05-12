@@ -560,13 +560,6 @@ static inline struct ieee80211_hdr* acx_get_wlan_hdr(acx_device_t *adev,
  * ==================================================
  */
 
-/* Data Access */
-
-/* =int acxpci_create_hostdesc_queues(acx_device_t * adev);
- * =void acxpci_create_desc_queues(acx_device_t * adev, u32 tx_queue_start, u32 rx_queue_start);
- * =void acxpci_free_desc_queues(acx_device_t * adev);
- */
-
 /* Firmware, EEPROM, Phy
  * - int acxpci_upload_radio(acx_device_t * adev);
  * =int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
@@ -584,20 +577,13 @@ int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  * - 
  * Proc, Debug
  * - int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
- * =char *acxpci_proc_eeprom_output(int *len, acx_device_t * adev);
  * - 
  * Rx Path
- * - 
  * Tx Path
  * - tx_t *acxpci_alloc_tx(acx_device_t * adev);
- * =void *acxpci_get_txbuf(acx_device_t * adev, tx_t * tx_opaque);
- * =void acxpci_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len, struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
- * =unsigned int acxpci_tx_clean_txdesc(acx_device_t * adev);
- * =void acxpci_clean_txdesc_emergency(acx_device_t * adev);
  * - int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
  * - 
  * Irq Handling, Timer
- * - void acxpci_irq_work(struct work_struct *work);
  * - void acxpci_set_interrupt_mask(acx_device_t * adev);
  * - 
  * Mac80211 Ops
@@ -609,11 +595,6 @@ int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  * - int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info  * - *info, struct iw_param *vwrq, char *extra);
  * - int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct  * - iw_request_info *info, struct iw_param *vwrq, char *extra);
  * - 
- * Driver, Module
- * - 
- * - int __init acxpci_init_module(void);
- * - void __exit acxpci_cleanup_module(void);
- * - 
  */
 
 /*
@@ -621,21 +602,17 @@ int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  * ==================================================
  */
 
-/* Data Access
- * = int acxmem_create_hostdesc_queues(acx_device_t *adev);
- * = void acxmem_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,  * - u32 rx_queue_start);
- * =void acxmem_free_desc_queues(acx_device_t *adev);
- * - 
+/*
  * Firmware, EEPROM, Phy
  * - int acxmem_upload_radio(acx_device_t *adev);
- * =int acxmem_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf);
  */
 #ifdef UNUSED
-/* - int acxmem_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len, const u8 //- *charbuf); */
+/*
+ * int acx_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
+ * 			const u8 *charbuf);
+ */
 #endif
-/* - int acxmem_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
- * - int acxmem_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
- * - 
+/*
  * CMDs (Control Path)
  */
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
@@ -648,26 +625,17 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  * - 
  * Proc, Debug
  * - int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
- * =char *acxmem_proc_eeprom_output(int *len, acx_device_t *adev);
  * - 
  * Rx Path
- * - 
  * Tx Path
- * - tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
- * - void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
- * - 
- * =void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
  * =void acxmem_init_acx_txbuf2(acx_device_t *adev);
  * - 
  * =void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,  * - struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
- * =unsigned int acxmem_tx_clean_txdesc(acx_device_t *adev);
- * = void acxmem_clean_txdesc_emergency(acx_device_t *adev);
  * - 
  * - void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
  * - int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
  * - 
  * Irq Handling, Timer
- * - void acxmem_irq_work(struct work_struct *work);
  * - void acxmem_set_interrupt_mask(acx_device_t *adev);
  * - 
  * Helpers
@@ -676,10 +644,6 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  * Ioctls
  * int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
  * int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
- */
-
-/* - int __init acxmem_init_module(void);
- * - void __exit acxmem_cleanup_module(void);
  */
 
 #endif /* _ACX_FUNC_H_ */
