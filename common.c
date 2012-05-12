@@ -502,6 +502,8 @@ static const u16 acx111_ie_len[] = {
 	0,
 	ACX1FF_IE_EEPROM_VER_LEN,
 };
+BUILD_BUG_DECL(acx111_ie_len__VS__acx100_ie_len,
+	ARRAY_SIZE(acx111_ie_len) != ARRAY_SIZE(acx100_ie_len));
 
 static const u16 acx111_ie_len_dot11[] = {
 	0,
@@ -525,6 +527,8 @@ static const u16 acx111_ie_len_dot11[] = {
 	0,
 	0,
 };
+BUILD_BUG_DECL(acx111_ie_len_dot11__VS__acx100_ie_len_dot11,
+	ARRAY_SIZE(acx111_ie_len_dot11) != ARRAY_SIZE(acx100_ie_len_dot11));
 
 // BOM Rate and channel definition
 // ---
@@ -687,6 +691,8 @@ static acx_proc_show_t *const
 	acx_proc_show_antenna,
 	acx_proc_show_reg_domain,
 };
+BUILD_BUG_DECL(proc_files__VS__acx_proc_show_funcs,
+	ARRAY_SIZE(proc_files) != ARRAY_SIZE(acx_proc_show_funcs));
 
 static acx_proc_write_t *const
  acx_proc_write_funcs[] = {
