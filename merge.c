@@ -1202,7 +1202,7 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 #endif
 
 /*
- * acxmem_s_validate_fw
+ * acx_validate_fw
  *
  * Compare the firmware image given with
  * the firmware image written into the card.
@@ -1215,10 +1215,8 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
  *	NOT_OK	firmware image corrupted or not correctly written
  *	OK	success
  */
-/* static  */
-#if 1 // compiles
-int acx_validate_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset) 
+int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
+		u32 offset) 
 {
 	u32 sum, v32, w32;
 	int len, size;
@@ -1294,9 +1292,8 @@ int acx_validate_fw(acx_device_t *adev,
 	FN_EXIT1(result);
 	return result;
 }
-#endif // acxmem_validate_fw()
 
-#if 1 // use for mem.c only
+#if 1 /* used for mem.c only */
 
 #ifdef PATCH_AROUND_BAD_SPOTS
 /*
