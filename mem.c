@@ -791,39 +791,6 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  * ==================================================
  */
 
-
-STATick int acxmem_verify_init(acx_device_t *adev)
-{
-	int result = NOT_OK;
-	unsigned long timeout;
-	u32 irqstat;
-
-	acxmem_lock_flags;
-
-	FN_ENTER;
-
-	timeout = jiffies + 2 * HZ;
-	for (;;) {
-		acxmem_lock();
-		irqstat = read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES);
-		if ((irqstat != 0xFFFFFFFF) && (irqstat & HOST_INT_FCS_THRESHOLD)) {
-			result = OK;
-			write_reg32(adev, IO_ACX_IRQ_ACK, HOST_INT_FCS_THRESHOLD);
-			acxmem_unlock();
-			break;
-		}
-		acxmem_unlock();
-
-		if (time_after(jiffies, timeout))
-			break;
-		/* Init may take up to ~0.5 sec total */
-		acx_mwait(50);
-	}
-
-	FN_EXIT1(result);
-	return result;
-}
-
 /*
  * Most of the acx specific pieces of hardware reset.
  */
