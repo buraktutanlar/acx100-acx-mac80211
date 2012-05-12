@@ -6182,13 +6182,7 @@ end:
 int acx_debugfs_add_adev(struct acx_device *adev);
 void acx_debugfs_remove_adev(struct acx_device *adev);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-int acx_op_add_interface(struct ieee80211_hw *ieee,
-		      struct ieee80211_if_init_conf *conf)
-#else
-int acx_op_add_interface(struct ieee80211_hw *ieee,
-		      struct ieee80211_vif *vif)
-#endif
+int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	int err = -EOPNOTSUPP;
@@ -6201,14 +6195,9 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	FN_ENTER;
 	acx_sem_lock(adev);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	vif_type = conf->type;
-#else
 	vif_type = vif->type;
-#endif
 	adev->vif_type = vif_type;
 	log(L_ANY, "vif_type=%04X\n", vif_type);
-
 
 	if (vif_type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor++;
@@ -6217,8 +6206,8 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 
 	adev->vif_operating = 1;
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	adev->vif = conf->vif;
-	mac_vif = conf->mac_addr;
+	adev->vif = vif->vif;
+	mac_vif = vif->mac_addr;
 #else
 	adev->vif = vif;
 	mac_vif = vif->addr;
@@ -6266,12 +6255,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	acx_debugfs_add_adev(adev);
 
 	pr_info("Virtual interface added (type: 0x%08X, MAC: %s)\n",
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-		adev->vif_type, acx_print_mac(mac, conf->mac_addr)
-#else
-		adev->vif_type,	acx_print_mac(mac, vif->addr)
-#endif
-		);
+		adev->vif_type,	acx_print_mac(mac, vif->addr));
 
 	err = 0;
 
@@ -6281,13 +6265,7 @@ out_unlock:
 	return err;
 }
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-void acx_op_remove_interface(struct ieee80211_hw *hw,
-			struct ieee80211_if_init_conf *conf)
-#else
-void acx_op_remove_interface(struct ieee80211_hw *hw,
-			struct ieee80211_vif *vif)
-#endif
+void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -6297,11 +6275,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 	acx_sem_lock(adev);
 	acx_debugfs_remove_adev(adev);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	if (conf->type == NL80211_IFTYPE_MONITOR)
-#else
 	if (vif->type == NL80211_IFTYPE_MONITOR)
-#endif
 		adev->vif_monitor--;
 	else {
 		adev->vif_operating = 0;
@@ -6310,20 +6284,11 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 
 	acx_set_mode(adev, ACX_MODE_OFF);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	log(L_DEBUG, "vif_operating=%d, conf->type=%d\n",
-		adev->vif_operating, conf->type);
-#else
 	log(L_DEBUG, "vif_operating=%d, vif->type=%d\n",
 		adev->vif_operating, vif->type);
-#endif
+
 	log(L_ANY, "Virtual interface removed: type=%d, MAC=%s\n",
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-		conf->type, acx_print_mac(mac, conf->mac_addr)
-#else
-		vif->type, acx_print_mac(mac, vif->addr)
-#endif
-		);
+		vif->type, acx_print_mac(mac, vif->addr));
 
 	acx_sem_unlock(adev);
 	FN_EXIT0;

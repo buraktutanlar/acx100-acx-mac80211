@@ -28,3 +28,12 @@ do { \
 #else
 #include <generated/utsrelease.h>
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+/*
+  Unsure about this one, its rather unselective.
+  Done to fix up acx_op_add_interface(..) in main code,
+  leaning towards mainline. TBD
+*/
+#  define ieee80211_vif ieee80211_if_init_conf
+#endif
