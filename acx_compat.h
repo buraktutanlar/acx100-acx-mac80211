@@ -13,7 +13,7 @@ do { \
 
 #endif
 
-// may get into 3.4
+/* to be submitted to LKML */
 #ifndef BUILD_BUG_DECL
 #define BUILD_BUG_DECL(name, condition)					\
        static __initdata struct {					\

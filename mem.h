@@ -14,7 +14,7 @@
 
 #define DUMP_MEM_DEFINED 1 // to insure export of dump* fns too
 
-// Logging
+/* Logging */
 
 #if DUMP_MEM_DEFINED > 0
 void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
@@ -71,8 +71,9 @@ static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 		u8 *destination, u32 source, int count)
 { }
 
-//inline int acxmem_upload_radio(acx_device_t *adev)
-//{ return 0; }
+/* inline int acxmem_upload_radio(acx_device_t *adev)
+ * { return 0; }
+ */
 
 static inline int acxmem_write_fw(acx_device_t *adev,
 		const firmware_image_t *fw_image, u32 offset)

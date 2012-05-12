@@ -84,7 +84,7 @@
 #define acx_writel(v, r)	writel((v), (r))
 #define acx_writew(v, r)	writew((v), (r))
 
-// This controls checking of spin-locking in the mem-interface
+/* This controls checking of spin-locking in the mem-interface */
 #define ACXMEM_SPIN_CHECK 0
 
 #if ACXMEM_SPIN_CHECK

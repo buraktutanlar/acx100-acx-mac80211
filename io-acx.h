@@ -1,6 +1,7 @@
 
-// ick: shouldnt declare things in headers
-// cuz including it 2x is bad
+/* ick: shouldnt declare things in headers
+ * cuz including it 2x is bad
+ */
 
 static const u16 IO_ACX100[] = {
 	0x0000,			/* IO_ACX_SOFT_RESET */
