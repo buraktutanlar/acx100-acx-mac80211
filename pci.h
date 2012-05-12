@@ -1,3 +1,5 @@
+#ifndef _PCI_H_
+#define _PCI_H_
 
 /* This file provides prototypes for functions defined in pci.c which
  * are used by common.c etc.  It also forward declares functions
@@ -58,3 +60,5 @@ void acxpci_reset_mac(acx_device_t *adev);
 u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type,
 		u16 status);
+
+#endif /* _PCI_H_ */
