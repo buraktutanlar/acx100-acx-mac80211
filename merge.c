@@ -1919,7 +1919,7 @@ void acx_up(struct ieee80211_hw *hw)
  *	as well as uploads and verifies the firmware to the card
  */
 int acx_verify_init(acx_device_t *adev);
-#if 1 // needs work
+
 int acx_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
@@ -2075,7 +2075,6 @@ end:
 	FN_EXIT1(result);
 	return result;
 }
-#endif // acxmem_reset_dev()
 
 int acx_verify_init(acx_device_t *adev)
 {

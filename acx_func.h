@@ -579,7 +579,6 @@ int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		const char *cmdstr);
 /* - 
  * Init, Configuration (Control Path)
- * - int acxpci_reset_dev(acx_device_t * adev);
  * - 
  * Other (Control Path)
  * - 
@@ -644,7 +643,6 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		const char* cmdstr);
 /* - 
  * Init, Configure (Control Path)
- * - int acxmem_reset_dev(acx_device_t *adev);
  * - 
  * Other (Control Path)
  * - 

@@ -24,15 +24,10 @@ int acxpci_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 
 /* CMDs (Control Path) */
 int acxpci_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
-			void *buffer, unsigned buflen, unsigned cmd_timeout,
-			const char *cmdstr);
+		void *buffer, unsigned buflen, unsigned cmd_timeout,
+		const char *cmdstr);
 
 void acxpci_init_mboxes(acx_device_t *adev);
-
-/* Init, Configuration (Control Path) */
-int acxpci_reset_dev(acx_device_t *adev);
-
-/* Other (Control Path) */
 
 /* Proc, Debug */
 int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
