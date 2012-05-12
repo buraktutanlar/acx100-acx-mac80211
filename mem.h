@@ -31,11 +31,6 @@ void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
 void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 			u32 source, int count);
 
-int acxmem_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
-			u32 offset);
-int acxmem_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
-			u32 offset);
-
 void acxmem_reset_mac(acx_device_t *adev);
 
 int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
@@ -59,8 +54,12 @@ void acxmem_init_mboxes(acx_device_t *adev);
 
 static inline void acxmem_dump_mem(acx_device_t *adev, u32 start, int length) { }
 
-static inline void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination,
-		u8 *source, int count)
+static inline void acxmem_copy_to_slavemem(acx_device_t *adev,
+		u32 destination, u8 *source, int count)
+{ }
+
+static inline void acxmem_copy_from_slavemem(acx_device_t *adev,
+		u8 *destination, u32 source, int count)
 { }
 
 static inline void acxmem_chaincopy_to_slavemem(acx_device_t *adev,
@@ -75,14 +74,10 @@ static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
  * { return 0; }
  */
 
-static inline int acxmem_write_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset)
-{ return 0; }
+//static inline int acxmem_write_fw(acx_device_t *adev,
+//		const firmware_image_t *fw_image, u32 offset)
+//{ return 0; }
 			
-static inline int acxmem_validate_fw(acx_device_t *adev,
-		const firmware_image_t *fw_image, u32 offset)
-{ return 0; }
-
 static inline void acxmem_reset_mac(acx_device_t *adev)
 { }
 
