@@ -532,7 +532,7 @@ struct acx_device {
 	int		bulkoutep;	/* bulk-out endpoint */
 	int		rxtruncsize;
 #endif
-
+	struct dentry	*debugfs_dir;
 };
 /* --- */
 

@@ -682,7 +682,7 @@ static const char *const proc_files[] = {
 typedef int acx_proc_show_t(struct seq_file *file, void *v);
 typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *, size_t, loff_t *);
 
-static acx_proc_show_t *const acx_proc_show_funcs[] = {
+acx_proc_show_t *const acx_proc_show_funcs[] = {
 	acx_proc_show_acx,
 	acx_proc_show_diag,
 	acx_proc_show_eeprom,
@@ -6172,6 +6172,8 @@ end:
  * BOM Mac80211 Ops
  * ==================================================
  */
+int acx_debugfs_add_adev(struct acx_device *adev);
+void acx_debugfs_remove_adev(struct acx_device *adev);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_op_add_interface(struct ieee80211_hw *ieee,
@@ -6254,6 +6256,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	}
 
 	acx_update_mode(adev);
+	acx_debugfs_add_adev(adev);
 
 	pr_info("Virtual interface added (type: 0x%08X, MAC: %s)\n",
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
@@ -6285,6 +6288,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+	acx_debugfs_remove_adev(adev);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	if (conf->type == NL80211_IFTYPE_MONITOR)
@@ -6833,6 +6837,8 @@ void great_inquisitor(acx_device_t * adev)
  * BOM Driver, Module
  * ==================================================
  */
+int __init acx_debugfs_init(void);
+void __init acx_debugfs_exit(void);
 
 static int __init acx_init_module(void)
 {
@@ -6876,12 +6882,17 @@ static int __init acx_init_module(void)
 	}
 
 	acx_proc_init();
-	return 0;	// at least one succeeded
+	acx_debugfs_init();
+
+	/* return success if at least one succeeded */
+	return 0;
 }
 
+void acx_debugfs_exit(void);
 static void __exit acx_cleanup_module(void)
 {
 	/* TODO Check, that interface isn't still up */
+	acx_debugfs_exit();
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_cleanup_module();
