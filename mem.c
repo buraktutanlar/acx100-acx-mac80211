@@ -139,7 +139,7 @@ char acxmem_printable(char c);
  * ==================================================
  */
 
-#include "mem-inlines.h"
+#include "inlines.h"
 
 #if DUMP_MEM_DEFINED > 0
 /* = static  */

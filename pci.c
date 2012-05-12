@@ -131,7 +131,7 @@ static void vlynq_remove(struct vlynq_device *vdev);
  * ==================================================
  */
 
-#include "pci-inlines.h"
+#include "inlines.h"
 
 /* ----- */
 

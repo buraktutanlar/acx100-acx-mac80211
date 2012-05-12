@@ -37,7 +37,7 @@
 #include "pci.h"
 #include "mem.h"
 #include "io-acx.h"
-#include "mem-inlines.h"
+#include "inlines.h"
 
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
