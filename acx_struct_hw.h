@@ -540,12 +540,17 @@ typedef struct rxbuffer {
 	u8	phy_level;		/* PHY stat */
 	u8	phy_snr;		/* PHY stat */
 	u32	time;			/* timestamp upon MAC rcv first byte */
-/* 4-byte (acx100) or 8-byte (acx111) phy header will be here
-** if RX_CFG1_INCLUDE_PHY_HDR is in effect:
-**	phy_hdr_t phy			*/
+
+	/* 4-byte (acx100) or 8-byte (acx111) phy header will be here
+	 * if RX_CFG1_INCLUDE_PHY_HDR is in effect:
+	 */
+	/* phy_hdr_t	phy; */
+
 	struct ieee80211_hdr hdr_a3;
 	/* maximally sized data part of wlan packet */
-	// OW 20100513 u8	data_a3[30 + 2312 + 4 - 24]; /*WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]*/
+	/* OW 20100513 u8	data_a3[30 + 2312 + 4 - 24];
+	// WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN]
+	*/
 	u8	data_a3[WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN];
 	/* can add hdr/data_a4 if needed */
 } ACX_PACKED rxbuffer_t;
@@ -945,7 +950,7 @@ enum {
 	IO_ACX_ECPU_CTRL
 };
 /* ***** ABSOLUTELY ALWAYS KEEP OFFSETS IN SYNC WITH THE INITIALIZATION
-** OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
+ * OF THE I/O ARRAYS!!!! (grep for '^IO_ACX') ***** */
 
 /* Values for IO_ACX_INT_TRIG register: */
 /* inform hw that rxdesc in queue needs processing */
@@ -973,8 +978,9 @@ struct txhostdesc {
 /* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
 
-	// OW ieee80211_tx_status not really required here
-	// struct ieee80211_tx_status txstatus;
+	/* OW ieee80211_tx_status not really required here
+	 * struct ieee80211_tx_status txstatus;
+	 */
 	struct sk_buff *skb;
 
 } ACX_PACKED;
@@ -991,8 +997,8 @@ struct rxhostdesc {
 
 
 /***********************************************************************
-** BOM USB structures and constants
-*/
+ * BOM USB structures and constants
+ */
 #ifdef ACX_MAC80211_USB
 
 /* Used for usb_txbuffer.desc field */
@@ -1009,12 +1015,12 @@ typedef struct usb_txbuffer {
 	u8	ctrl2;
 	u16	data_len;
 	/* wlan packet content is placed here: */
-	// OW 20100513 u8	data[30 + 2312 + 4]; /*WLAN_A4FR_MAXLEN_WEP_FCS]*/
+	/* OW 20100513 u8	data[30 + 2312 + 4]; // WLAN_A4FR_MAXLEN_WEP_FCS] */
 	u8	data[WLAN_A4FR_MAXLEN_WEP_FCS];
 } ACX_PACKED usb_txbuffer_t;
 
 /* USB returns either rx packets (see rxbuffer) or
-** these "tx status" structs: */
+ * these "tx status" structs: */
 typedef struct usb_txstatus {
 	u16	mac_cnt_rcvd;		/* only 12 bits are len! (0xfff) */
 	u8	queue_index;
@@ -1122,7 +1128,7 @@ typedef struct acx111_ie_configoption {
 	u8			_padding[4];
 } ACX_PACKED acx111_ie_configoption_t;
 
-// Misc TODO Move elsewhere
+/* Misc TODO Move elsewhere */
 typedef struct shared_queueindicator {
         u32     indicator;
         u16     host_lock;
@@ -1522,7 +1528,7 @@ typedef struct acx_template_proberesp {
 					/* 24 n SSID * */
 					/* nn n Supported Rates * */
 					/* nn 1 DS Parameter Set * */
-// OW 20100514	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2];
+/* OW 20100514	u8	variable[0x54 - 2-2-6-6-6-2-8-2-2]; */
 	u8	variable[0x154 - 2-2-6-6-6-2-8-2-2];
 } ACX_PACKED acx_template_proberesp_t;
 #define acx_template_beacon_t acx_template_proberesp_t
@@ -1531,8 +1537,9 @@ typedef struct acx_template_proberesp {
 typedef struct acx_template_nullframe {
 	u16	size;
 	struct ieee80211_hdr hdr;
-	// OW, 20080210 code: 	struct wlan_hdr_a3 hdr;
-	// maybe better user: ieee80211_hdr_3addr
+	/* OW, 20080210 code: 	struct wlan_hdr_a3 hdr;
+	 * maybe better user: ieee80211_hdr_3addr
+	 */
 } ACX_PACKED acx_template_nullframe_t;
 
 
@@ -1660,8 +1667,9 @@ typedef struct acx_ie_generic {
 	} ACX_PACKED m;
 } ACX_PACKED acx_ie_generic_t;
 
-// OW TODO This could be cleanup actually.
-// Code for WEP key setting in HW should be taken from 20080210 version.
+/* OW TODO This could be cleanup actually.
+ * Code for WEP key setting in HW should be taken from 20080210 version.
+ */
 #define ACX_SEC_KEYSIZE                     16
 /* Security algorithms. */
 enum {
