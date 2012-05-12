@@ -899,7 +899,7 @@ int acx_s_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 			const u8 *charbuf)
 {
 	u8 *data_verify = NULL;
-	/* unsigned long flags; /*  block warn unused */
+	/* unsigned long flags; //  block warn unused */
 	int count, i;
 	int result = NOT_OK;
 	u16 gpio_orig;
@@ -4511,17 +4511,17 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 
 	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
 	pr_acx("%s: PHY power amplifier bias: old:%d, new:%d\n",
-			wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8, (unsigned char) *extra);
+		wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8,
+		(unsigned char) *extra);
 
 	acx_sem_unlock(adev);
-
 	return OK;
 }
 #endif
 
 void acx_delete_dma_regions(acx_device_t *adev)
 {
-	/* unsigned long flags; /*  see comment below */
+	/* unsigned long flags; //  see comment below */
 
 	FN_ENTER;
 	/* disable radio Tx/Rx. Shouldn't we use the firmware commands
