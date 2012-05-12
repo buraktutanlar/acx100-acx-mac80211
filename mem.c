@@ -80,7 +80,7 @@
  * ==================================================
  */
 
-// OW PM for later
+/* OW PM for later */
 #undef CONFIG_PM
 
 /*
@@ -92,7 +92,7 @@
 #define DUMP_MEM_DURING_DIAG 0
 #define DUMP_IF_SLOW 0
 
-// OW #define PATCH_AROUND_BAD_SPOTS 1
+/* OW #define PATCH_AROUND_BAD_SPOTS 1 */
 #define PATCH_AROUND_BAD_SPOTS 1
 #define HX4700_FIRMWARE_CHECKSUM 0x0036862e
 #define HX4700_ALTERNATE_FIRMWARE_CHECKSUM 0x00368a75
@@ -108,7 +108,7 @@
  */
 
 #if DUMP_MEM_DEFINED > 0
-//= static 
+/* = static  */
 void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
 #endif
 
@@ -127,10 +127,10 @@ char acxmem_printable(char c);
 #define CARD_EEPROM_ID_SIZE 6
 #define REG_ACX_VENDOR_ID 0x900
 
-// This is the vendor id on the HX4700, anyway
+/* This is the vendor id on the HX4700, anyway */
 #define ACX_VENDOR_ID 0x8400104c
 
-//OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4)
+/* OW 20090815 #define WLAN_A4FR_MAXLEN_WEP_FCS	(30 + 2312 + 4) */
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 
@@ -144,7 +144,7 @@ char acxmem_printable(char c);
 #include "mem-inlines.h"
 
 #if DUMP_MEM_DEFINED > 0
-//= static 
+/* = static  */
 void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
 {
 	int i;
@@ -178,7 +178,7 @@ void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
  *
  * TODO - rewrite using address autoincrement, handle partial words
  */
-//= static
+/* = static */
 void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
 			u32 source, int count)
 {
@@ -225,7 +225,7 @@ void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
  *
  * TODO - rewrite using autoincrement, handle partial words
  */
-//= static
+/* = static */
 void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination,
 			u8 *source, int count)
 {
@@ -284,7 +284,7 @@ void acxmem_copy_to_slavemem(acx_device_t *adev, u32 destination,
  * to the ACX transmit buffer structure with minimal intervention on
  * our part.  Interrupts should be disabled when calling this.
  */
-//=static
+/* =static */
 void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
 				u8 *source, int count)
 {
@@ -352,7 +352,7 @@ void acxmem_chaincopy_to_slavemem(acx_device_t *adev, u32 destination,
  * intervention on our part.  Interrupts should be disabled when
  * calling this.
  */
-//= static 
+/* = static  */
 void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 				u32 source, int count)
 {
@@ -374,7 +374,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 		acxmem_dump_mem(adev, 0, 0x10000);
 	}
 	if ((ulong) destination & 3) {
-		//printk ("acx chaincopy: data destination not word aligned!\n");
+		/* printk ("acx chaincopy: data destination not word aligned!\n"); */
 		data = (u32 *) aligned_destination;
 		if (count > sizeof aligned_destination) {
 			pr_err("chaincopy_from_slavemem overflow!\n");
@@ -897,7 +897,7 @@ STATick void acxmem_reset_mac(acx_device_t *adev)
 	int count;
 	FN_ENTER;
 
-	// OW Bit setting done differently in pci.c
+	/* OW Bit setting done differently in pci.c */
 	/* halt eCPU */
 	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
 
@@ -1013,7 +1013,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			else
 				seq_printf(file, "%02u (%02x) empty%-10s", i, Ctl_8, rtl);
 
-			//seq_printf(file, "\n");
+			/* seq_printf(file, "\n"); */
 
 			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (ulong) rxdesc, sizeof(rxd));
 			seq_printf(file,
@@ -1077,7 +1077,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			tmp = read_slavemem32(adev, (ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
-			// Output allocated tx-buffer chain
+			/* Output allocated tx-buffer chain */
 #if 1
 			if (tmp) {
 				while ((tmp2 = read_slavemem32(adev, (u32) tmp)) != 0x02000000) {
@@ -1112,7 +1112,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	}
 
 #if 1
-	// Tx-buffer list dump
+	/* Tx-buffer list dump */
 	seq_printf(file, "\n");
 	seq_printf(file, "* Tx-buffer list dump\n");
 	seq_printf(file, "acx_txbuf_numblocks=%d, acx_txbuf_blocks_free=%d, \n"
@@ -1128,7 +1128,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		tmp += adev->memblocksize;
 	}
 	seq_printf(file, "\n");
-	// ---
+	/* --- */
 #endif
 
 	seq_printf(file, "\n"
@@ -1136,7 +1136,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		"irq_mask 0x%04x irq_status 0x%04x irq on acx 0x%04x\n"
 
 		"txbuf_start 0x%p, txbuf_area_size %u\n"
-		// OW TODO Add also the acx tx_buf size available
+		/* OW TODO Add also the acx tx_buf size available */
 		"txdesc_size %u, txdesc_start 0x%p\n"
 		"txhostdesc_start 0x%p, txhostdesc_area_size %u\n"
 		"txbuf start 0x%04x, txbuf size %d\n"
@@ -1467,11 +1467,11 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {
 		next_adr = adr + adev->memblocksize;
 
-		// Last block is marked with 0x02000000
+		/* Last block is marked with 0x02000000 */
 		if (i == adev->acx_txbuf_numblocks - 1) {
 			write_slavemem32(adev, adr, 0x02000000);
 		}
-		// Else write pointer to next block
+		/* Else write pointer to next block */
 		else {
 			write_slavemem32(adev, adr, (next_adr >> 5));
 		}
@@ -1607,14 +1607,14 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue)
 }
 #endif
 
-// OW TODO See if this is usable with mac80211
+/* OW TODO See if this is usable with mac80211 */
 /***********************************************************************
  ** acxmem_i_tx_timeout
  **
  ** Called from network core. Must not sleep!
  */
 #if 0 // or mem.c:3242:3: warning: passing argument 1 of 'acx_wake_queue'
-      // from incompatible pointer type [enabled by default]
+      /* from incompatible pointer type [enabled by default] */
 STATick void acxmem_i_tx_timeout(struct net_device *ndev)
 {
 	acx_device_t *adev = ndev2adev(ndev);
@@ -1685,8 +1685,9 @@ STATick void acxmem_i_tx_timeout(struct net_device *ndev)
  after we set it once. Let's hope this will be fixed in firmware someday
  */
 
-// OW FIXME Old interrupt handler
-// ---
+/* OW FIXME Old interrupt handler
+ * ---
+ */
 #if 0 // or mem.c:3579:4: error: implicit declaration of function 'acxmem_log_unusual_irq'
 STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
@@ -1746,9 +1747,10 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 
 		/* Handle most important IRQ types first */
 
-		// OW 20091123 FIXME Rx path stops under load problem:
-		// Maybe the RX rings fills up to fast, we are missing an irq and
-		// then we are then not getting rx irqs anymore
+		/* OW 20091123 FIXME Rx path stops under load problem:
+		 * Maybe the RX rings fills up to fast, we are missing an irq and
+		 * then we are then not getting rx irqs anymore
+		 */
 		if (irqtype & HOST_INT_RX_DATA) {
 			log(L_IRQ, "got Rx_Data IRQ\n");
 			acxmem_process_rxdesc(adev);
@@ -1835,15 +1837,16 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	}
 #endif
 
-	// OW 20091129 TODO Currently breaks mem.c ...
-	// If sleeping is required like for update card settings, this is usefull
-	// For now I replaced sleeping for command handling by mdelays.
-//	if (adev->after_interrupt_jobs){
-//		acx_e_after_interrupt_task(adev);
-//	}
+	/* OW 20091129 TODO Currently breaks mem.c ...
+	 * If sleeping is required like for update card settings, this is usefull
+	 * For now I replaced sleeping for command handling by mdelays.
+ * 	if (adev->after_interrupt_jobs){
+ * 		acx_e_after_interrupt_task(adev);
+ * 	}
+	 */
 
 
-// OW TODO
+/* OW TODO */
 #if 0
 	/* Routine to perform blink with range */
 	if (unlikely(adev->led_power == 2))
@@ -1862,7 +1865,7 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	return IRQ_NONE;
 }
 #endif
-// ---
+/* --- */
 
 
 /*
@@ -1926,7 +1929,7 @@ STATick char acxmem_printable(char c)
 	return ((c >= 20) && (c < 127)) ? c : '.';
 }
 
-// OW TODO
+/* OW TODO */
 #if 0 // or mem.c:3695:42: error: 'acx_device_t' has no member named 'wstats'
 STATick void update_link_quality_led(acx_device_t *adev)
 {
@@ -1952,7 +1955,7 @@ STATick void update_link_quality_led(acx_device_t *adev)
  * ==================================================
  */
 
-// OW TODO Not used in pci either !?
+/* OW TODO Not used in pci either !? */
 #if 0 // or mem.c:3717:5: error: conflicting types for 'acx111pci_ioctl_info'
 int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 			struct iw_request_info *info,
@@ -2244,7 +2247,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 		struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra)
 {
-	// OW
+	/* OW */
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long flags;
 	u16 gpio_old;
@@ -2340,7 +2343,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
 					| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
-	// OW TODO Check if RTS/CTS threshold can be included here
+	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was
 	 * 100, the OpenBSD driver assigns maximum values depending on
@@ -2361,8 +2364,9 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 	 * now, as they do not seem to be supported or how to acquire
 	 * them is still unknown. */
 
-	// We base signal quality on winlevel approach of previous driver
-	// TODO OW 20100615 This should into a common init code
+	/* We base signal quality on winlevel approach of previous driver
+	 * TODO OW 20100615 This should into a common init code
+	 */
 	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	ieee->max_signal = 100;
 
@@ -2456,7 +2460,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 	#endif
 	log(L_ANY, "request_irq %d successful\n", adev->irq);
-	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
 	acxmem_lock();
 	acx_irq_disable(adev);
 	acxmem_unlock();
@@ -2470,15 +2474,15 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 #endif /* NONESSENTIAL_FEATURES */
 
 	/* Device setup is finished, now start initializing the card */
-	// ---
+	/* --- */
 
 	acx_init_task_scheduler(adev);
 
-	// Mac80211 Tx_queue
+	/* Mac80211 Tx_queue */
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
-	// OK init parts from pci.c are done in acxmem_complete_hw_reset(adev)
+	/* OK init parts from pci.c are done in acxmem_complete_hw_reset(adev) */
 	if (OK != acxmem_complete_hw_reset(adev))
 		goto fail_complete_hw_reset;
 
@@ -2499,8 +2503,9 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 	 * to send packets even though we're not associated to a
 	 * network yet */
 
-// OW FIXME Check if acx_stop_queue, acx_carrier_off should be included
-// OW Rest can be cleaned up
+/* OW FIXME Check if acx_stop_queue, acx_carrier_off should be included
+ * OW Rest can be cleaned up
+ */
 #if 0
 	acx_stop_queue(ndev, "on probe");
 	acx_carrier_off(ndev, "on probe");
@@ -2516,7 +2521,7 @@ STATick int __devinit acxmem_probe(struct platform_device *pdev)
 
 	/* need to be able to restore PCI state after a suspend */
 #ifdef CONFIG_PM
-	// pci_save_state(pdev);
+	/* pci_save_state(pdev); */
 #endif
 
 	err = acx_setup_modes(adev);
@@ -2591,7 +2596,7 @@ STATick int __devexit acxmem_remove(struct platform_device *pdev)
 		goto end_no_lock;
 	}
 
-	// Unregister ieee80211 device
+	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
@@ -2637,10 +2642,10 @@ STATick int __devexit acxmem_remove(struct platform_device *pdev)
 		acxmem_unlock();
 	}
 
-	// Proc
+	/* Proc */
 	acx_proc_unregister_entries(adev->ieee);
 
-	// IRQs
+	/* IRQs */
 	acxmem_lock();
 	acx_irq_disable(adev);
 	acxmem_unlock();
@@ -2703,8 +2708,9 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state)
 	/*
 	 * Turn the ACX chip off.
 	 */
-	// This should be done by the corresponding platform module, e.g. hx4700_acx.c
-	// hwdata->stop_hw();
+	/* This should be done by the corresponding platform module, e.g. hx4700_acx.c
+	 * hwdata->stop_hw();
+	 */
 
 	acx_sem_unlock(adev);
 
@@ -2735,8 +2741,9 @@ STATick int acxmem_e_resume(struct platform_device *pdev)
 	/*
 	 * Turn on the ACX.
 	 */
-	// This should be done by the corresponding platform module, e.g. hx4700_acx.c
-	// hwdata->start_hw();
+	/* This should be done by the corresponding platform module, e.g. hx4700_acx.c
+	 * hwdata->start_hw();
+	 */
 
 	acxmem_complete_hw_reset(adev);
 
