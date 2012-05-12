@@ -49,7 +49,7 @@ extern unsigned int acx_debug;
 enum { acx_debug = 0 };
 #endif
 
-// BOM Operations by writing to acx_diag
+/* BOM Operations by writing to acx_diag */
 enum {
 	ACX_DIAG_OP_RECALIB = 0x0001,
 	ACX_DIAG_OP_PROCESS_TX_RX = 0x0002,
@@ -113,8 +113,8 @@ enum {
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
-/* used to be 2048, but FreeBSD driver changed it to 4096 to work properly
-** in noisy wlans */
+/* used to be 2048, but FreeBSD driver changed it to 4096 to work
+ * properly in noisy wlans */
 #define DEFAULT_MSDU_LIFETIME	4096
 #define DEFAULT_RTS_THRESHOLD	2312	/* max. size: disable RTS mechanism */
 #define DEFAULT_BEACON_INTERVAL	100
@@ -123,7 +123,7 @@ enum {
 #define ACX100_RID_GUESSING_MAXLEN	2048	/* I'm not really sure */
 #define ACX100_RIDDATA_MAXLEN		ACX100_RID_GUESSING_MAXLEN
 
-// BOM 'After Interrupt' Commands 
+/* BOM 'After Interrupt' Commands  */
 #define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x01
 #define ACX_AFTER_IRQ_UPDATE_TIM	0x02
 #define ACX_AFTER_IRQ_COMPLETE_SCAN	0x04
@@ -183,8 +183,8 @@ enum {
 #define ACX_MODE_2_STA		2
 #define ACX_MODE_3_AP		3
 /* These are our own inventions. Sending these to firmware
-** makes it stop emitting beacons, which is exactly what we want
-** for these modes */
+ * makes it stop emitting beacons, which is exactly what we want
+ * for these modes */
 #define ACX_MODE_MONITOR	0xfe
 #define ACX_MODE_OFF		0xff
 /* 'Submode': identifies exact status of ADHOC/STA host */
@@ -223,12 +223,12 @@ struct desc_info {
 		rxhostdesc_t	*rxstart;
 		void		*start;
 	};
-	unsigned int	size;	// hostdesc_area_size;
-	dma_addr_t	phy;	// hostdesc_startphy;
+	unsigned int	size;	/* hostdesc_area_size; */
+	dma_addr_t	phy;	/* hostdesc_startphy; */
 };
 
 /* tx fields refactored */
-struct tx_desc_pair2 {
+struct tx_desc_pair {
 	unsigned int	tail;
 	txdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of txdesc */
@@ -236,7 +236,7 @@ struct tx_desc_pair2 {
 	struct desc_info host;
 	struct desc_info buf;
 };
-struct rx_desc_pair2 {
+struct rx_desc_pair {
 	unsigned int	tail;
 	rxdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of rxdesc */
@@ -245,8 +245,8 @@ struct rx_desc_pair2 {
 	struct desc_info buf;
 };
 
-/* FIXME: this should be named something like struct acx_priv (typedef'd to
- * acx_priv_t) */
+/* FIXME: this should be named something like struct acx_priv
+ * (typedef'd to acx_priv_t) */
 
 /* non-firmware struct, no packing necessary */
 struct acx_device {
@@ -266,19 +266,20 @@ struct acx_device {
 #endif
 
 	/*** Linux network device ***/
-	//struct device	*dev;		/* pointer to linux netdevice */
+	/* struct device	*dev;		// pointer to linux netdevice */
 
-	/*** Device statistics ***/
-	struct ieee80211_low_level_stats	ieee_stats;		/* wireless device statistics */
+	/* wireless device statistics */
+	struct ieee80211_low_level_stats	ieee_stats;
 
-	/*** Device statistics ***/
-	struct net_device_stats	stats;		/* net device statistics */
+	/* net device statistics */
+	struct net_device_stats	stats;
 
 #ifdef WIRELESS_EXT
-//	struct iw_statistics	wstats;		/* wireless statistics */
+/* 	struct iw_statistics	wstats;		// wireless statistics */
 #endif
 	struct ieee80211_hw	*ieee;
-	// FIXME OW 20100616 rx_status is reported for each skb. Check if this field is really required
+	/* FIXME OW 20100616 rx_status is reported for each skb. Check
+	 * if this field is really required */
 	struct ieee80211_rx_status rx_status;
 	struct ieee80211_vif	*vif;
 
@@ -307,9 +308,9 @@ struct acx_device {
 
 	/*** Device state ***/
 	u16		dev_state_mask;
-	u8		led_power;		/* power LED status */
-	u32		get_mask;		/* mask of settings to fetch from the card */
-	u32		set_mask;		/* mask of settings to write to the card */
+	u8		led_power;	/* power LED status */
+	u32		get_mask;	/* mask of settings to fetch from the card */
+	u32		set_mask;	/* mask of settings to write to the card */
 	u32		initialized:1;
 	/* Barely used in USB case */
 	u16		irq_status;
@@ -324,28 +325,31 @@ struct acx_device {
 	unsigned int	irq;
 
 	/*** scanning ***/
-	u16		scan_count;		/* number of times to do channel scan */
-	u8		scan_mode;		/* 0 == active, 1 == passive, 2 == background */
+	u16		scan_count;	/* number of times to do channel scan */
+	u8		scan_mode;	/* 0 == active, 1 == passive, 2 == background */
 	u8		scan_rate;
 	u16		scan_duration;
 	u16		scan_probe_delay;
 #if WIRELESS_EXT > 15
-//	struct iw_spy_data	spy_data;	/* FIXME: needs to be implemented! */
+/* 	struct iw_spy_data	spy_data;	// FIXME: needs to be implemented! */
 #endif
 
-	// TODO FIXME Fields previously defined in acx_mac80211.h. Review usage what and how
+	/* TODO FIXME Fields previously defined in
+	 * acx_mac80211.h. Review usage what and how */
 	int vif_type;
-    /* Counter of active monitor interfaces. */
-	// TODO FIXME Review if required / usage
-    int vif_monitor;
-    /* Is the card operating in AP, STA or IBSS mode? */
-	// TODO FIXME Review if required / usage
-    unsigned int vif_operating:1;
+
+	/* Counter of active monitor interfaces. */
+	/* TODO FIXME Review if required / usage */
+	int vif_monitor;
+
+	/* Is the card operating in AP, STA or IBSS mode? */
+	/* TODO FIXME Review if required / usage */
+	unsigned int vif_operating:1;
 
 	/*** Wireless network settings ***/
 	/* copy of the device address (ifconfig hw ether) that we actually use
-	** for 802.11; copied over from the network device's MAC address
-	** (ifconfig) when it makes sense only */
+	 * for 802.11; copied over from the network device's MAC address
+	 * (ifconfig) when it makes sense only */
 	u8		dev_addr[MAX_ADDR_LEN];
 	u8		bssid[ETH_ALEN];	/* the BSSID after having joined */
 	u8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
@@ -374,11 +378,12 @@ struct acx_device {
 #endif
 
 	/* stations known to us (if we're an ap) */
-//	client_t	sta_list[32];		/* tab is larger than list, so that */
-//	client_t	*sta_hash_tab[64];	/* hash collisions are not likely */
-//	client_t	*ap_client;		/* this one is our AP (STA mode only) */
+/* 	client_t	sta_list[32];		// tab is larger than list, so that
+ * 	client_t	*sta_hash_tab[64];	// hash collisions are not likely
+ * 	client_t	*ap_client;		// this one is our AP (STA mode only)
+ */
 
-	// Mac80211 Tx_queue
+	/* Mac80211 Tx_queue */
 	struct sk_buff_head tx_queue;
 	struct work_struct tx_work;
 
@@ -469,8 +474,8 @@ struct acx_device {
 #if (1 || defined(CONFIG_ACX_MAC80211_MEM))
 	u32 acx_txbuf_start;
 	int acx_txbuf_numblocks;
-	u32 acx_txbuf_free; /* addr of head of free list          */
-	int acx_txbuf_blocks_free; /* how many are still open            */
+	u32 acx_txbuf_free;		/* addr of head of free list */
+	int acx_txbuf_blocks_free;	/* how many are still open */
 	queueindicator_t *acx_queue_indicator;
 #endif
 
@@ -480,8 +485,8 @@ struct acx_device {
 	/* pointers to tx buffers, tx host descriptors (in host
 	 * memory) and tx descs in device memory, same for rx
 	 */
-	struct tx_desc_pair2 tx;
-	struct rx_desc_pair2 rx;
+	struct tx_desc_pair tx;
+	struct rx_desc_pair rx;
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
@@ -529,10 +534,9 @@ struct acx_device {
 #endif
 
 };
-// ---
+/* --- */
 
-static inline
-acx_device_t* ieee2adev(struct ieee80211_hw *hw)
+static inline acx_device_t* ieee2adev(struct ieee80211_hw *hw)
 {
         return hw->priv;
 }
