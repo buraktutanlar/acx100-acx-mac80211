@@ -437,24 +437,6 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
  * ==================================================
  */
 
-STATick inline void acxmem_read_eeprom_area(acx_device_t *adev)
-{
-#if ACX_DEBUG > 1
-	int offs;
-	u8 tmp;
-
-	FN_ENTER;
-
-	for (offs = 0x8c; offs < 0xb9; offs++)
-		acx_read_eeprom_byte(adev, offs, &tmp);
-
-	FN_EXIT0;
-
-#endif
-}
-
-
-
 /*
  * BOM CMDs (Control Path)
  * ==================================================

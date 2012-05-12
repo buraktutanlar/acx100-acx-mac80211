@@ -157,23 +157,6 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  * ==================================================
  */
 
-/* static */
-inline void acxpci_read_eeprom_area(acx_device_t * adev)
-{
-#if ACX_DEBUG > 1
-	int offs;
-	u8 tmp;
-
-	FN_ENTER;
-
-	for (offs = 0x8c; offs < 0xb9; offs++)
-		acx_read_eeprom_byte(adev, offs, &tmp);
-
-	FN_EXIT0;
-#endif // ACX_DEBUG > 1 acxpci_read_eeprom_area() body 
-}
-
-
 /*
  * acxpci_s_upload_fw
  *
