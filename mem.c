@@ -979,7 +979,7 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 1 // copied to merge, but needs work
+#if 0 // copied to merge, but needs work
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
@@ -1007,15 +1007,19 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx.tail) ? " [tail]" : "";
-			Ctl_8 = read_slavemem8(adev, (ulong) &(rxdesc->Ctl_8));
+			Ctl_8 = read_slavemem8(adev, (ulong)
+					&(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) FULL %-10s",
+					i, Ctl_8, rtl);
 			else
-				seq_printf(file, "%02u (%02x) empty%-10s", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) empty%-10s",
+					i, Ctl_8, rtl);
 
 			/* seq_printf(file, "\n"); */
 
-			acxmem_copy_from_slavemem(adev, (u8 *) &rxd, (ulong) rxdesc, sizeof(rxd));
+			acxmem_copy_from_slavemem(adev, (u8 *) &rxd,
+						(ulong) rxdesc, sizeof(rxd));
 			seq_printf(file,
 				"%0lx: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
 				(ulong) rxdesc,
@@ -1038,8 +1042,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		}
 
 	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
-		adev->acx_txbuf_free, acx_queue_stopped(adev->ieee)
-		? "STOPPED" : "Running");
+		adev->acx_txbuf_free,
+		acx_queue_stopped(adev->ieee) ? "STOPPED" : "Running");
 
 	seq_printf(file,
 		"** Tx buf %d blocks total, %d available, free list head %04x\n",
@@ -1056,11 +1060,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 			Ctl_8 = read_slavemem8(adev, (ulong) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 			else if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u available     (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u available     (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 			else
-				seq_printf(file, "%02u busy          (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u busy          (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 			
 			seq_printf(file,
 				"%0lx: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
@@ -1074,7 +1081,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				txd.rts_ok, txd.u.r1.rate,
 				txd.u.r1.queue_ctrl, txd.queue_info);
 			
-			tmp = read_slavemem32(adev, (ulong) & (txdesc->AcxMemPtr));
+			tmp = read_slavemem32(adev,
+					(ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
 			/* Output allocated tx-buffer chain */
@@ -1117,8 +1125,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	seq_printf(file, "* Tx-buffer list dump\n");
 	seq_printf(file, "acx_txbuf_numblocks=%d, acx_txbuf_blocks_free=%d, \n"
 		"acx_txbuf_start==%04x, acx_txbuf_free=%04x, memblocksize=%d\n",
-			adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
-			adev->acx_txbuf_start, adev->acx_txbuf_free, adev->memblocksize);
+		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
+		adev->acx_txbuf_start, adev->acx_txbuf_free, adev->memblocksize);
 
 	tmp = adev->acx_txbuf_start;
 	for (i = 0; i < adev->acx_txbuf_numblocks; i++) {

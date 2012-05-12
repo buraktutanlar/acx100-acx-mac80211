@@ -2280,7 +2280,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 0 // needs work
+#if 1 // real close
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
@@ -2308,11 +2308,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx.tail) ? " [tail]" : "";
-			Ctl_8 = read_slavemem8(adev, (u32) &(rxdesc->Ctl_8));
+			Ctl_8 = read_slavemem8(adev, (ulong)
+					&(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u (%02x) FULL %-10s", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) FULL %-10s",
+					i, Ctl_8, rtl);
 			else
-				seq_printf(file, "%02u (%02x) empty%-10s", i, Ctl_8, rtl);
+				seq_printf(file, "%02u (%02x) empty%-10s",
+					i, Ctl_8, rtl);
 
 			/* seq_printf(file, "\n"); */
 
@@ -2320,7 +2323,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 						(u32) rxdesc, sizeof(rxd));
 			seq_printf(file,
 				"%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
-				(u32) rxdesc,
+				(uint) rxdesc,
 				rxd.pNextDesc.v,
 				rxd.HostMemPtr.v,
 				rxd.ACXMemPtr.v,
@@ -2340,8 +2343,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		}
 
 	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
-			adev->acx_txbuf_free, acx_queue_stopped(adev->ieee) ? "STOPPED"
-					: "Running");
+			adev->acx_txbuf_free,
+			acx_queue_stopped(adev->ieee) ? "STOPPED" : "Running");
 
 	seq_printf(file,
 		"** Tx buf %d blocks total, %d available, free list head %04x\n",
@@ -2358,15 +2361,19 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 			else if (Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u available     (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u available     (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 			else
-				seq_printf(file, "%02u busy          (%02X)%-7s%-7s", i, Ctl_8, thd, ttl);
+				seq_printf(file, "%02u busy          (%02X)%-7s%-7s",
+						i, Ctl_8, thd, ttl);
 
 			seq_printf(file,
 				"%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
-				"%02x %02x %02x %02x %04x: ", (u32) txdesc,
+				"%02x %02x %02x %02x %04x: ",
+				(uint) txdesc,
 				txd.pNextDesc.v, txd.HostMemPtr.v,
 				txd.AcxMemPtr.v,
 				txd.tx_time, txd.total_length, txd.Reserved,
@@ -2377,14 +2384,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				txd.u.r1.queue_ctrl, txd.queue_info);
 			
 			tmp = read_slavemem32(adev,
-					(u32) & (txdesc->AcxMemPtr));
+					(ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
 			/* Output allocated tx-buffer chain */
 #if 1
 			if (tmp) {
-				while ((tmp2 = read_slavemem32(adev,
- (u32) tmp)) != 0x02000000) {
+				while ((tmp2 = read_slavemem32(adev, (u32) tmp))
+						!= 0x02000000) {
 					tmp2 = tmp2 << 5;
 					seq_printf(file, "%04x=%04x,", tmp, tmp2);
 					tmp = tmp2;
@@ -2400,7 +2407,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 			if (txd.AcxMemPtr.v) {
 				acxmem_copy_from_slavemem(adev, buf,
- txd.AcxMemPtr.v, sizeof(buf));
+					txd.AcxMemPtr.v, sizeof(buf));
 				for (j = 0; (j < txd.total_length) && (j < (sizeof(buf) - 4)); j
 						+= 16) {
 					seq_printf(file, "    ");
@@ -4138,19 +4145,19 @@ void acx_op_stop(struct ieee80211_hw *hw)
 void acxmem_power_led(acx_device_t *adev, int enable) {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
-	/* A hack. Not moving message rate limiting to adev->xxx
-	 * (it's only a debug message after all) */
+	/* A hack. Not moving message rate limiting to adev->xxx (it's
+	 * only a debug message after all) */
 	static int rate_limit = 0;
 
 	if (rate_limit++ < 3)
 		log(L_IOCTL, "Please report in case toggling the power "
-				"LED doesn't work for your card!\n");
+			"LED doesn't work for your card!\n");
 	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
-				& ~gpio_pled);
+		write_reg16(adev, IO_ACX_GPIO_OUT, 
+			read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
-		write_reg16(adev, IO_ACX_GPIO_OUT, read_reg16(adev, IO_ACX_GPIO_OUT)
-				| gpio_pled);
+		write_reg16(adev, IO_ACX_GPIO_OUT,
+			read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 #endif
 

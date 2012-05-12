@@ -846,13 +846,13 @@ void acxpci_power_led(acx_device_t * adev, int enable)
 
 	if (rate_limit++ < 3)
 		log(L_IOCTL, "Please report in case toggling the power "
-		    "LED doesn't work for your card\n");
+			"LED doesn't work for your card\n");
 	if (enable)
 		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
+			read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
 		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
+			read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
 
 INLINE_IO int acxpci_adev_present(acx_device_t *adev)
