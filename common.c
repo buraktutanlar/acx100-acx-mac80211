@@ -242,10 +242,13 @@ static int acx_proc_show_reg_domain(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_reg_domain(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
 static int acx_proc_show_antenna(struct seq_file *file, void *v);
 static ssize_t acx_proc_write_antenna(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+/*
+  obsoleted by debugfs.c
 static int acx_proc_open(struct inode *inode, struct file *file);
 static void acx_proc_init(void);
 int acx_proc_register_entries(struct ieee80211_hw *ieee);
 int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
+*/
 #endif
 
 /* Rx Path */
@@ -710,10 +713,12 @@ acx_proc_write_t *const acx_proc_write_funcs[] = {
 BUILD_BUG_DECL(SHOW, ARRAY_SIZE(acx_proc_show_funcs)
 		  != ARRAY_SIZE(acx_proc_write_funcs));
 
+#ifndef CONFIG_DEBUG_FS
+/* obsoleted */
 static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
-
 #endif
-/* ----- */
+
+#endif /* CONFIG_PROC_FS */
 
 /*
  * BOM Locking
@@ -4116,7 +4121,7 @@ static u8 acx_rate111to100(u16 r)
  * ==================================================
  */
 
-#ifdef CONFIG_PROC_FS
+#if defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS)
 
 static int acx_proc_show_diag(struct seq_file *file, void *v)
 {
@@ -4881,6 +4886,7 @@ out:
 	return ret;
 }
 
+#if 0 /* now in debugfs.c */
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
 	int i;
@@ -4983,9 +4989,11 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 	FN_EXIT0;
 	return OK;
 }
+#else /* now in debugfs.c */
+void acx_proc_init(void) { }	/* stub */
+#endif /* now in debugfs.c */
 
-
-#endif /* CONFIG_PROC_FS */
+#endif /* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS) */
 
 /*
  * BOM Rx Path
