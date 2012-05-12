@@ -21,7 +21,6 @@ int acxpci_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
 int acxpci_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset);
-int acxpci_upload_fw(acx_device_t *adev);
 
 /* CMDs (Control Path) */
 int acxpci_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
@@ -32,7 +31,6 @@ void acxpci_init_mboxes(acx_device_t *adev);
 
 /* Init, Configuration (Control Path) */
 int acxpci_reset_dev(acx_device_t *adev);
-void acxpci_reset_mac(acx_device_t *adev);
 
 /* Other (Control Path) */
 
@@ -56,9 +54,22 @@ void acxpci_power_led(acx_device_t *adev, int enable);
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
-void acxpci_reset_mac(acx_device_t *adev);
 u32 acxpci_read_cmd_type_status(acx_device_t *adev);
 void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type,
 		u16 status);
 
+#if defined(CONFIG_ACX_MAC80211_PCI)
+
+void acxpci_reset_mac(acx_device_t *adev);
+int acxpci_upload_fw(acx_device_t *adev);
+
+#else /* !CONFIG_ACX_MAC80211_PCI */
+
+static inline void acxpci_reset_mac(acx_device_t *adev)
+{}
+
+static inline int acxpci_upload_fw(acx_device_t *adev)
+{ return 0; }
+
+#endif /* CONFIG_ACX_MAC80211_PCI */
 #endif /* _PCI_H_ */
