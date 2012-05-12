@@ -63,7 +63,12 @@ int acxmem_upload_fw(acx_device_t *adev);
 int acxmem_upload_radio(acx_device_t *adev);
 int acxpci_upload_radio(acx_device_t *adev);
 
-#if defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM)
+void acx_power_led(acx_device_t * adev, int enable);
+
+
+#if defined(CONFIG_ACX_MAC80211_PCI) \
+ || defined(CONFIG_ACX_MAC80211_MEM)
+
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 

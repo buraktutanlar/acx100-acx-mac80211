@@ -39,9 +39,6 @@ tx_t *acxpci_alloc_tx(acx_device_t *adev);
 
 /* Irq Handling, Timer */
 
-/* Helpers */
-void acxpci_power_led(acx_device_t *adev, int enable);
-
 /* Ioctls
  * Driver, Module
  */

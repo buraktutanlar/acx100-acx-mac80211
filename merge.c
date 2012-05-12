@@ -4125,8 +4125,8 @@ void acx_op_stop(struct ieee80211_hw *hw)
  * BOM Helpers
  * ==================================================
  */
-# if 0 // defer
-void acxmem_power_led(acx_device_t *adev, int enable) {
+void acx_power_led(acx_device_t * adev, int enable)
+{
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
 	/* A hack. Not moving message rate limiting to adev->xxx (it's
@@ -4137,13 +4137,12 @@ void acxmem_power_led(acx_device_t *adev, int enable) {
 		log(L_IOCTL, "Please report in case toggling the power "
 			"LED doesn't work for your card!\n");
 	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT, 
+		write_reg16(adev, IO_ACX_GPIO_OUT,
 			read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
 	else
 		write_reg16(adev, IO_ACX_GPIO_OUT,
 			read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
 }
-#endif
 
 /* identical */
 INLINE_IO int acxmem_adev_present(acx_device_t *adev)

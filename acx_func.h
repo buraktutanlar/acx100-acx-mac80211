@@ -588,9 +588,6 @@ int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  * - 
  * Mac80211 Ops
  * - 
- * Helpers
- * - void acxpci_power_led(acx_device_t * adev, int enable);
- * - 
  * Ioctls
  * - int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info  * - *info, struct iw_param *vwrq, char *extra);
  * - int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct  * - iw_request_info *info, struct iw_param *vwrq, char *extra);
@@ -637,9 +634,6 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  * - 
  * Irq Handling, Timer
  * - void acxmem_set_interrupt_mask(acx_device_t *adev);
- * - 
- * Helpers
- * - void acxmem_power_led(acx_device_t *adev, int enable);
  * - 
  * Ioctls
  * int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);

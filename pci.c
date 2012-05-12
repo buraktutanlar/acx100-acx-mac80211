@@ -517,7 +517,7 @@ static void update_link_quality_led(acx_device_t * adev)
 		       (HZ / 2 -
 			HZ / 2 * (unsigned long)qual /
 			adev->brange_max_quality))) {
-		acxpci_l_power_led(adev, (adev->brange_last_state == 0));
+		acx_power_led(adev, (adev->brange_last_state == 0));
 		adev->brange_last_state ^= 1;	// toggle
 		adev->brange_time_last_state_change = jiffies;
 	}
@@ -725,25 +725,6 @@ static const struct ieee80211_ops acxpci_hw_ops = {
  * BOM Helpers
  * ==================================================
  */
-
-void acxpci_power_led(acx_device_t * adev, int enable)
-{
-	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
-
-	/* A hack. Not moving message rate limiting to adev->xxx (it's
-	 * only a debug message after all) */
-	static int rate_limit = 0;
-
-	if (rate_limit++ < 3)
-		log(L_IOCTL, "Please report in case toggling the power "
-			"LED doesn't work for your card\n");
-	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
-	else
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
-}
 
 INLINE_IO int acxpci_adev_present(acx_device_t *adev)
 {
@@ -1505,7 +1486,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 #endif
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");
-		acxpci_power_led(adev, 0);
+		acx_power_led(adev, 0);
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
 			/* FIXME: does this actually keep halting the
@@ -2063,7 +2044,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		}
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");
-		acxpci_power_led(adev, 0);
+		acx_power_led(adev, 0);
 
 		/* stop our eCPU */
 		/* OW PCI still does something here (although also need to be reviewed). */
