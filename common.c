@@ -6207,7 +6207,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 	vif_type = vif->type;
 #endif
 	adev->vif_type = vif_type;
-	logf1(L_ANY, "vif_type=%04X\n", vif_type);
+	log(L_ANY, "vif_type=%04X\n", vif_type);
 
 
 	if (vif_type == NL80211_IFTYPE_MONITOR)
@@ -6226,17 +6226,17 @@ int acx_op_add_interface(struct ieee80211_hw *ieee,
 
 	switch (adev->vif_type) {
 	case NL80211_IFTYPE_AP:
-		logf0(L_ANY, "NL80211_IFTYPE_AP\n");
+		log(L_ANY, "NL80211_IFTYPE_AP\n");
 		adev->mode = ACX_MODE_3_AP;
 		break;
 
 	case NL80211_IFTYPE_ADHOC:
-		logf0(L_ANY, "NL80211_IFTYPE_ADHOC\n");
+		log(L_ANY, "NL80211_IFTYPE_ADHOC\n");
 		adev->mode = ACX_MODE_0_ADHOC;
 		break;
 
 	case NL80211_IFTYPE_STATION:
-		logf0(L_ANY, "NL80211_IFTYPE_STATION\n");
+		log(L_ANY, "NL80211_IFTYPE_STATION\n");
 		adev->mode = ACX_MODE_2_STA;
 		break;
 
@@ -6311,15 +6311,13 @@ void acx_op_remove_interface(struct ieee80211_hw *hw,
 	acx_set_mode(adev, ACX_MODE_OFF);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	log(L_DEBUG, "%s: vif_operating=%d, conf->type=%d\n",
-		__func__, adev->vif_operating, conf->type);
+	log(L_DEBUG, "vif_operating=%d, conf->type=%d\n",
+		adev->vif_operating, conf->type);
 #else
-	log(L_DEBUG, "%s: vif_operating=%d, vif->type=%d\n",
-		__func__, adev->vif_operating, vif->type);
+	log(L_DEBUG, "vif_operating=%d, vif->type=%d\n",
+		adev->vif_operating, vif->type);
 #endif
-	log(L_ANY, "acx: Virtual interface removed: "
-		"type=%d, MAC=%s\n",
-
+	log(L_ANY, "Virtual interface removed: type=%d, MAC=%s\n",
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 		conf->type, acx_print_mac(mac, conf->mac_addr)
 #else
