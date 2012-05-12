@@ -520,7 +520,7 @@ struct acx_device {
 #endif
 
 	/*** USB stuff ***/
-#ifdef ACX_MAC80211_USB
+#ifdef CONFIG_ACX_MAC80211_USB
 	struct usb_device	*usbdev;
 
 	rxbuffer_t	rxtruncbuf;

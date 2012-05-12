@@ -30,13 +30,6 @@
 
 #define pr_acx	pr_info
 
-/* this will be problematic when combined with the *_PCI macro.
-   acx_struct_dev.h defines iobase field 2x, with different types, for
-   MEM and PCI includes.  Punt for now..
-*/
-#define ACX_MAC80211_MEM
-/* #define ACX_MAC80211_PCI */
-
 #include "acx.h"
 #include "merge.h"
 

@@ -892,7 +892,7 @@ struct rxdesc {
 } ACX_PACKED;		/* size 52 = 0x34 */
 
 
-#if defined(ACX_MAC80211_PCI) || defined(ACX_MAC80211_MEM)
+#if defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM)
 
 /* Register I/O offsets */
 #define ACX100_EEPROM_ID_OFFSET	0x380
@@ -999,7 +999,7 @@ struct rxhostdesc {
 /***********************************************************************
  * BOM USB structures and constants
  */
-#ifdef ACX_MAC80211_USB
+#ifdef CONFIG_ACX_MAC80211_USB
 
 /* Used for usb_txbuffer.desc field */
 #define USB_TXBUF_TXDESC	0xA
