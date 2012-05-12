@@ -18,9 +18,12 @@ void acx_debugfs_remove_adev(struct acx_device *adev) { return 0; }
 #include <net/mac80211.h>
 #include "acx.h"
 
-struct acx_device;
 typedef int acx_proc_show_t(struct seq_file *file, void *v);
+typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *,
+				size_t, loff_t *);
+
 extern acx_proc_show_t *const acx_proc_show_funcs[];
+extern acx_proc_write_t *const acx_proc_write_funcs[];
 
 /*
  * debugfs files are created under $DBGMNT/acx_mac80211/phyX by
@@ -81,9 +84,37 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 	return single_open(file, acx_proc_show_funcs[fidx], adev);
 }
 
+static int acx_dbgfs_write(struct file *file, const char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	int fidx = (int) file->f_path.dentry->d_inode->i_private;
+	struct acx_device *adev = (struct acx_device *)
+		file->f_path.dentry->d_parent->d_inode->i_private;
+
+	switch (fidx) {
+	case INFO:
+	case DIAG:
+	case EEPROM:
+	case PHY:
+	case DEBUG:
+	case SENSITIVITY:
+	case TX_LEVEL:
+	case ANTENNA:
+	case REG_DOMAIN:
+		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
+			dbgfs_files[fidx], file->f_mode, fidx, adev);
+		break;
+	default:
+		pr_err("unknown file @ %d: %s\n", fidx,
+			file->f_path.dentry->d_name.name);
+		return -ENOENT;
+	}
+	return (acx_proc_write_funcs[fidx])(file, buf, count, ppos);
+}
+
 const struct file_operations acx_fops = {
 	.read		= seq_read,
-	//.write	= default_write_file,
+	.write		= acx_dbgfs_write,
 	.open		= acx_dbgfs_open,
 	.llseek		= noop_llseek,
 };
@@ -115,7 +146,8 @@ int acx_debugfs_add_adev(struct acx_device *adev)
 
 	for (i = 0; i < ARRAY_SIZE(dbgfs_files); i++) {
 
-		fmode = 0644;
+		fmode = (acx_proc_write_funcs[i])
+			? 0644 : 0444;
 		file = debugfs_create_file(dbgfs_files[i], fmode, acx_dbgfs_devdir,
 					(void*) i, &acx_fops);
 		if (!file)

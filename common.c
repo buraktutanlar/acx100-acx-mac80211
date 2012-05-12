@@ -696,8 +696,7 @@ acx_proc_show_t *const acx_proc_show_funcs[] = {
 BUILD_BUG_DECL(proc_files__VS__acx_proc_show_funcs,
 	ARRAY_SIZE(proc_files) != ARRAY_SIZE(acx_proc_show_funcs));
 
-static acx_proc_write_t *const
- acx_proc_write_funcs[] = {
+acx_proc_write_t *const acx_proc_write_funcs[] = {
 	NULL,
 	acx_proc_write_diag,
 	NULL,
