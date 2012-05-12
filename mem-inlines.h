@@ -81,19 +81,21 @@
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
 #define acx_readl(v)		readl((v))
 #define acx_readw(v)		readw((v))
+#define acx_readb(v)		readb((v))
 #define acx_writel(v, r)	writel((v), (r))
 #define acx_writew(v, r)	writew((v), (r))
+#define acx_writeb(v, r)	writeb((v), (r))
 
 /* This controls checking of spin-locking in the mem-interface */
 #define ACXMEM_SPIN_CHECK 0
 
 #if ACXMEM_SPIN_CHECK
-#define ACXMEM_WARN_NOT_SPIN_LOCKED \
-do { \
-	if (!spin_is_locked(&adev->spinlock)){ \
+#define ACXMEM_WARN_NOT_SPIN_LOCKED					\
+do {									\
+	if (!spin_is_locked(&adev->spinlock)){				\
 		logf0(L_ANY, "mem: warning: data access not locked!\n"); \
-		dump_stack(); \
-	} \
+		dump_stack();						\
+	}								\
 } while (0)
 #else
 #define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
@@ -119,21 +121,45 @@ INLINE_IO u32 read_id_register(acx_device_t *adev)
 	return acx_readl(adev->iobase + ACX_SLV_REG_DATA);
 }
 
+#define check_IO_ACX_ECPU_CTRL(adev, addr, offset)		\
+								\
+	if (offset > IO_ACX_ECPU_CTRL)				\
+		addr = offset;					\
+	else							\
+		addr = adev->io[offset];
+
+/* note the buried return */
+#define ret_addr_lt20_rd_(adev, addr, _lwb)				\
+	if (addr < 0x20)						\
+		return acx_read##_lwb(((u8 *) adev->iobase) + addr);
+
+#define ret_addr_lt20_rdl(adev, addr)	ret_addr_lt20_rd_(adev, addr, l)
+#define ret_addr_lt20_rdw(adev, addr)	ret_addr_lt20_rd_(adev, addr, w)
+#define ret_addr_lt20_rdb(adev, addr)	ret_addr_lt20_rd_(adev, addr, b)
+
+/* note the buried return */
+#define ret_addr_lt20_wr_(adev, addr, _lwb, val)			\
+	if (addr < 0x20) {						\
+		acx_write##_lwb(val, ((u8 *) adev->iobase) + addr);	\
+		return;							\
+	}
+
+#define ret_addr_lt20_wrl(adev, addr, val)	\
+	ret_addr_lt20_wr_(adev, addr, l, val)
+#define ret_addr_lt20_wrw(adev, addr, val)	\
+	ret_addr_lt20_wr_(adev, addr, w, val)
+#define ret_addr_lt20_wrb(adev, addr, val)	\
+	ret_addr_lt20_wr_(adev, addr, b, val)
+
+
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
 {
 	u32 val;
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20) {
-		return acx_readl(((u8 *) adev->iobase) + addr);
-	}
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_rdl(adev, addr);
 
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	val = acx_readl(adev->iobase + ACX_SLV_REG_DATA);
@@ -147,15 +173,8 @@ INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset)
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20) {
-		return acx_readw(((u8 *) adev->iobase) + addr);
-	}
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_rdw(adev, addr);
 
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	lo = acx_readw((u16 *) (adev->iobase + ACX_SLV_REG_DATA));
@@ -169,14 +188,8 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20)
-		return readb(((u8 *) adev->iobase) + addr);
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_rdb(adev, addr);
 
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	lo = acx_readw((u8 *) (adev->iobase + ACX_SLV_REG_DATA));
@@ -189,16 +202,8 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
-
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20) {
-		acx_writel(val, ((u8 *) adev->iobase) + addr);
-		return;
-	}
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_wrl(adev, addr, val);
 
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	acx_writel(val, adev->iobase + ACX_SLV_REG_DATA);
@@ -209,16 +214,9 @@ INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_wrw(adev, addr, val);
 
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20) {
-		acx_writew(val, ((u8 *) adev->iobase) + addr);
-		return;
-	}
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	acx_writew(val, (u16 *) (adev->iobase + ACX_SLV_REG_DATA));
 }
@@ -228,16 +226,9 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
 	u32 addr;
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
+	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
+	ret_addr_lt20_wrb(adev, addr, val);
 
-	if (offset > IO_ACX_ECPU_CTRL)
-		addr = offset;
-	else
-		addr = adev->io[offset];
-
-	if (addr < 0x20) {
-		writeb(val, ((u8 *) adev->iobase) + addr);
-		return;
-	}
 	acx_writel(addr, adev->iobase + ACX_SLV_REG_ADDR);
 	writeb(val, (u8 *) (adev->iobase + ACX_SLV_REG_DATA));
 }
