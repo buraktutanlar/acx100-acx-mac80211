@@ -219,10 +219,10 @@ static int acx_allocate(acx_device_t *adev, struct desc_info *di,
 		 */
 		di->phy = (dma_addr_t) NULL;
 	}
-	
+
 	if (ptr) {
 		log(L_DEBUG, "%s sz=%u adr=0x%p phy=0x%08llx\n", msg,
-			di->size, ptr, (unsigned long long)di->phy); 
+			di->size, ptr, (unsigned long long)di->phy);
 		memset(ptr, 0, di->size);
 		di->start = ptr;
 		return 0;
@@ -562,7 +562,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		: (txdesc_t *) tx_queue_start;
 
 	log(L_DEBUG, "adev->iobase2=%p\n"
-                "tx_queue_start=%08X\n" 
+                "tx_queue_start=%08X\n"
 		"adev->tx.desc_start=%p\n",
                 adev->iobase2, tx_queue_start, adev->tx.desc_start);
 
@@ -597,7 +597,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		if (IS_PCI(adev))
 			memset(adev->tx.desc_start, 0,
 				TX_CNT * sizeof(*txdesc));
-		else {	
+		else {
 			/* adev->tx.desc_start refers to device memory,
 			  so we can't write directly to it. */
 			clr = (ulong) adev->tx.desc_start;
@@ -617,7 +617,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				/* pointer to hostdesc memory */
 				txdesc->HostMemPtr = ptr2acx(hostmemptr);
 				/* initialise ctl */
-				txdesc->Ctl_8 = (DESC_CTL_HOSTOWN 
+				txdesc->Ctl_8 = (DESC_CTL_HOSTOWN
 						| DESC_CTL_RECLAIM
 						| DESC_CTL_AUTODMA
 						| DESC_CTL_FIRSTFRAG);
@@ -943,7 +943,7 @@ int acx_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
 	data_verify = kmalloc(len, GFP_KERNEL);
 	if (!data_verify)
 		goto end;
-	
+
 	for (i = 0; i < len; i++) {
 		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
 		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
@@ -997,7 +997,7 @@ static inline void acx_read_eeprom_area(acx_device_t *adev)
  * (usb|x).  Messing with rx/tx disabling and enabling here
  * (write_reg32(adev, IO_ACX_ENABLE, 0b000000xx)) kills traffic
  */
-int _acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf) 
+int _acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 {
 	int result = NOT_OK;
 	int count;
@@ -1204,7 +1204,7 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
  *	OK	success
  */
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
-		u32 offset) 
+		u32 offset)
 {
 	u32 sum, v32, w32;
 	int len, size;
@@ -1496,7 +1496,7 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-#if 1 // 
+#if 1 //
 u32 acx_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
@@ -1512,7 +1512,7 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 	log(L_DEBUG, "cmd_type:%04X cmd_status:%04X [%s]\n",
 		cmd_type, cmd_status,
 		acx_cmd_status_str(cmd_status));
-	
+
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
@@ -1627,7 +1627,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	counter = 199; /* in ms */
 	/* from pci.c */
 	timeout = HZ / 5;
-	counter = (timeout * 1000 / HZ) - 1;    
+	counter = (timeout * 1000 / HZ) - 1;
 	timeout += jiffies;
 
 	do {
@@ -1747,7 +1747,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
 		devname, cmdstr, buflen, cmd_timeout,
-		(buffer 
+		(buffer
 			? le16_to_cpu(((acx_ie_generic_t *) buffer)->type)
 			: -1),
 		acx_cmd_status_str(cmd_status)
@@ -1960,7 +1960,7 @@ int acx_reset_dev(acx_device_t *adev)
 			mdelay (10);
 			tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
 		}
-		
+
 		/* end what Windows driver does */
 
 		acxmem_reset_mac(adev);
@@ -1989,7 +1989,7 @@ int acx_reset_dev(acx_device_t *adev)
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
 	(IS_MEM(adev))
 		? adev->irq_status |= HOST_INT_SCAN_COMPLETE
-		: SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE); 
+		: SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
 
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
@@ -2017,7 +2017,7 @@ int acx_reset_dev(acx_device_t *adev)
 	result = (IS_MEM(adev))
 		? acxmem_upload_fw(adev)
 		: acxpci_upload_fw(adev);
-	if (OK != result) 
+	if (OK != result)
 		goto end_fail;
 	acxmem_lock();
 
@@ -2100,7 +2100,7 @@ int acx_verify_init(acx_device_t *adev)
 			acxmem_lock();
 			irqstat = read_reg32(adev,
 					IO_ACX_IRQ_STATUS_NON_DES);
-			if ((irqstat != 0xFFFFFFFF) 
+			if ((irqstat != 0xFFFFFFFF)
 				&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
 				result = OK;
 				write_reg32(adev, IO_ACX_IRQ_ACK,
@@ -2109,7 +2109,7 @@ int acx_verify_init(acx_device_t *adev)
 				break;
 			}
 			acxmem_unlock();
-			
+
 			if (time_after(jiffies, timeout))
 				break;
 			/* Init may take up to ~0.5 sec total */
@@ -2366,7 +2366,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				txd.ack_failures, txd.rts_failures,
 				txd.rts_ok, txd.u.r1.rate,
 				txd.u.r1.queue_ctrl, txd.queue_info);
-			
+
 			tmp = read_slavemem32(adev,
 					(ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
@@ -3102,7 +3102,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		/* Get rate for acx100, single rate only for acx100 */
 		rateset = ieee80211_get_tx_rate(adev->ieee, info)->hw_value;
 		logf1(L_BUFT, "rateset=%u\n", rateset);
-			
+
 		(IS_PCI(adev))
 			? txdesc->u.r1.rate = (u8) rateset
 			: write_slavemem8(adev, (ulong) &(txdesc->u.r1.rate),
@@ -3420,7 +3420,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 					finger, txstatus);
 
 		/* And finally report upstream */
-		
+
 		if (IS_MEM(adev))
 			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
 		else {
@@ -3672,25 +3672,25 @@ void acx_irq_work(struct work_struct *work)
 			 * removed, because if was creating a race,
 			 * sequencing problem in AP mode during WPA
 			 * association with different STAs.
-			 * 
+			 *
 			 * The result were many WPA assoc retries of
 			 * the STA, until assoc finally succeeded. It
 			 * happens sporadically, but still often. I
 			 * oberserved this with a ath5k and acx STA.
-			 * 
+			 *
 			 * It manifested as followed:
 			 * 1) STA authenticates and associates
-			 * 2) And then hostapd reported reception of a 
+			 * 2) And then hostapd reported reception of a
 			 *    Data/PS-poll frame of an unassociated STA
 			 * 3) hostapd sends disassoc frame
-			 * 4) And then it was looping in retrying this seq, 
+			 * 4) And then it was looping in retrying this seq,
 			 *    until it succeed 'by accident'
 			 *
 			 * Removing the TX_START_CLEAN check and
 			 * always report directly on the tx status
 			 * resolved this problem.  Now WPA assoc
 			 * succeeds directly and robust.
-			 */		 
+			 */
 			acx_tx_clean_txdesc(adev);
 
 			/* Restart queue if stopped and enough tx-descr free */
@@ -4019,9 +4019,9 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	/* OW 20091129 TODO Currently breaks mem.c ...
 	 * If sleeping is required like for update card settings, this is usefull
 	 * For now I replaced sleeping for command handling by mdelays.
- * 	if (adev->after_interrupt_jobs){
- * 		acx_e_after_interrupt_task(adev);
- * 	}
+ *	if (adev->after_interrupt_jobs){
+ *		acx_e_after_interrupt_task(adev);
+ *	}
 	 */
 
 
@@ -5027,7 +5027,7 @@ static struct platform_driver acxmem_driver = {
 	},
 	.probe = acxmem_probe,
 	.remove = __devexit_p(acxmem_remove),
-	
+
 #ifdef CONFIG_PM
 	.suspend = acxmem_e_suspend,
 	.resume = acxmem_e_resume
