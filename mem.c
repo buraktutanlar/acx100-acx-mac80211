@@ -166,8 +166,8 @@ void acxmem_dump_mem(acx_device_t *adev, u32 start, int length)
 
 /*
  * BOM Data Access
- * 
- * => See locking comment above  
+ *
+ * => See locking comment above
  * ==================================================
  */
 
@@ -922,7 +922,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			else
 				seq_printf(file, "%02u busy          (%02X)%-7s%-7s",
 						i, Ctl_8, thd, ttl);
-			
+
 			seq_printf(file,
 				"%0lx: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
 				"%02x %02x %02x %02x %04x: ", (ulong) txdesc,
@@ -934,7 +934,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				txd.ack_failures, txd.rts_failures,
 				txd.rts_ok, txd.u.r1.rate,
 				txd.u.r1.queue_ctrl, txd.queue_info);
-			
+
 			tmp = read_slavemem32(adev,
 					(ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
@@ -1702,9 +1702,9 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	/* OW 20091129 TODO Currently breaks mem.c ...
 	 * If sleeping is required like for update card settings, this is usefull
 	 * For now I replaced sleeping for command handling by mdelays.
- * 	if (adev->after_interrupt_jobs){
- * 		acx_e_after_interrupt_task(adev);
- * 	}
+ *	if (adev->after_interrupt_jobs){
+ *		acx_e_after_interrupt_task(adev);
+ *	}
 	 */
 
 
@@ -2628,7 +2628,7 @@ STATick struct platform_driver acxmem_driver = {
 	},
 	.probe = acxmem_probe,
 	.remove = __devexit_p(acxmem_remove),
-	
+
 #ifdef CONFIG_PM
 	.suspend = acxmem_e_suspend,
 	.resume = acxmem_e_resume
