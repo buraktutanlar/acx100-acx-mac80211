@@ -53,13 +53,13 @@ static const char *const dbgfs_files[] = {
 	[DEBUG]		= "debug",
 	[SENSITIVITY]	= "sensitivity",
 	[TX_LEVEL]	= "tx_level",
-	[ANTENNA]	= "antenna", 
+	[ANTENNA]	= "antenna",
 	[REG_DOMAIN]	= "reg_domain",
 };
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
-	int fidx = (int) inode->i_private; 
+	int fidx = (int) inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
 
