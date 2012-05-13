@@ -663,10 +663,10 @@ const u8 acx_bitpos2rate100[] = {
 	[2] = RATE100_5,
 	[3] = RATE100_2,	/* should not happen */
 	[4] = RATE100_2,	/* should not happen */
-	[5] = RATE100_11,	
+	[5] = RATE100_11,
 	[6] = RATE100_2,	/* should not happen */
 	[7] = RATE100_2,	/* should not happen */
-	[8] = RATE100_22,		
+	[8] = RATE100_22,
 	[9] = RATE100_2,	/* should not happen */
 	[10] = RATE100_2,	/* should not happen */
 	[11] = RATE100_2,	/* should not happen */
@@ -989,7 +989,7 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 	MemoryBlockSize.size = cpu_to_le16(adev->memblocksize);
 
 	/* Then we alert the card to our decision of block size */
-	if (OK != acx_configure(adev, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE)) 
+	if (OK != acx_configure(adev, &MemoryBlockSize, ACX100_IE_BLOCK_SIZE))
 		goto bad;
 
 	/* We figure out how many total blocks we can create, using
@@ -1219,7 +1219,7 @@ static int acx111_create_dma_regions(acx_device_t *adev)
 	/* the number of STAs (STA contexts) to support
 	 ** NB: was set to 1 and everything seemed to work nevertheless... */
 	memconf.no_of_stations = 1; //cpu_to_le16(ARRAY_SIZE(adev->sta_list));
-	
+
 	/* specify the memory block size. Default is 256 */
 	memconf.memory_block_size = cpu_to_le16(adev->memblocksize);
 	/* let's use 50%/50% for tx/rx (specify percentage, units of 5%) */
@@ -1464,7 +1464,7 @@ void acx_display_hardware_details(acx_device_t *adev)
  *
  * Loads a firmware image
  * Returns:
- *  0: 						unable to load file
+ *  0:						unable to load file
  *  pointer to firmware:	success
  */
 firmware_image_t *acx_read_fw(struct device *dev, const char *file,
@@ -1736,7 +1736,7 @@ int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 		return acxpci_issue_cmd_timeo_debug(adev, cmd, param, len,
 						timeout, cmdstr);
 	if (IS_USB(adev))
-		return acxusb_issue_cmd_timeo_debug(adev, cmd, param, len, 
+		return acxusb_issue_cmd_timeo_debug(adev, cmd, param, len,
 						timeout, cmdstr);
 	if (IS_MEM(adev))
 		return acxmem_issue_cmd_timeo_debug(adev, cmd, param, len,
@@ -3283,7 +3283,7 @@ static int acx_update_rx_config(acx_device_t *adev)
 	log(L_INIT, "Updating RXconfig to mode=0x%04X,"
 		"rx_config_1:2=%04X:%04X\n",
 		adev->mode, adev->rx_config_1, adev->rx_config_2);
-	
+
 	cfg.rx_cfg1 = cpu_to_le16(adev->rx_config_1);
 	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
 	res = acx_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
@@ -4330,7 +4330,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 		part_str,
 		dma->rx_dma_req,
 		dma->rx_dma_err, dma->tx_dma_req, dma->tx_dma_err);
-	
+
 	part_str = "IRQ";
 
 	if (st == st_end)
@@ -4404,7 +4404,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 		wep->dot11_def_key_mib,
 		wep->wep_key_not_found,
 		wep->wep_decrypt_fail, temp1, temp2);
-	
+
 	part_str = "power";
 
 	if (st == st_end)
@@ -4448,9 +4448,9 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 		"%s:\n"
 		"  mic_rx_pkts %u, mic_calc_fail %u\n",
 		part_str, mic->mic_rx_pkts, mic->mic_calc_fail);
-	
+
 	part_str = "AES";
-	
+
 	if (st == st_end)
 		goto fw_stats_end;
 
@@ -4620,7 +4620,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v)
 		adev->form_factor,
 		adev->eeprom_version,
 		adev->firmware_version, adev->firmware_numver);
-	
+
 	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
@@ -4741,7 +4741,7 @@ static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
 static ssize_t acx_proc_write_sensitivity(struct file *file,
 					const char __user *buf,
 					size_t count, loff_t *ppos)
-					
+
 {
 	acx_device_t *adev = (acx_device_t *)
 		PDE(file->f_path.dentry->d_inode)->data;
@@ -5049,7 +5049,7 @@ void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf)
 	/* For debugging */
 	if (((IEEE80211_FCTL_STYPE & fc) != IEEE80211_STYPE_BEACON)
 		&& (acx_debug & (L_XFER|L_DATA))) {
-		
+
 		printk_ratelimited(
 			"acx: rx: %s time:%u len:%u signal:%u,raw=%u"
 			"SNR:%u,raw=%u macstat:%02X "
@@ -5132,7 +5132,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	/* FIXME cleanup ?: noise = acx_signal_to_winlevel(rxbuf->phy_snr); */
 
 	/* status->signal = acx_signal_determine_quality(level, noise);
-	 * TODO OW 20100619 On ACX100 seem to be always zero (seen during hx4700 tests ?!) 
+	 * TODO OW 20100619 On ACX100 seem to be always zero (seen during hx4700 tests ?!)
 	 */
 	status->signal = level;
 
@@ -5352,7 +5352,7 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 /*
  * OW Included skb->len to check required blocks upfront in
  * acx_l_alloc_tx This should perhaps also go into pci and usb ?
- */ 
+ */
 tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len)
 {
 	if (IS_PCI(adev))
@@ -5421,7 +5421,7 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 
 	if (debug) {
 		#if defined(CONFIG_ACX_MAC80211_PCI) || \
-	 		defined(CONFIG_ACX_MAC80211_MEM)
+			defined(CONFIG_ACX_MAC80211_MEM)
 		i = ((u8*) txdesc - (u8*) adev->tx.desc_start)
 			/ adev->tx.desc_size;
 		sprintf(tmpstr, "txdesc=%i: rates in info"
@@ -5444,7 +5444,7 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 				i, tmpbitrate->bitrate, tmpbitrate->hw_value,
 				tmpcount,
 				(i < IEEE80211_TX_MAX_RATES - 1)
-				? ", " : ""); 
+				? ", " : "");
 	}
 	if (debug)
 		logf1(L_ANY, "%s: rateset=0x%04X\n", tmpstr, rateset);
@@ -5883,7 +5883,7 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm,
  *                       dwrq->flags, dwrq->length, extra ? "set" : "No key");
  */
 
-/* 	acx_sem_lock(adev); */
+/*	acx_sem_lock(adev); */
 
 	/* index = (dwrq->flags & IW_ENCODE_INDEX) - 1; */
 	if (key->keylen > 0) {
@@ -5952,7 +5952,7 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm,
                 adev->wep_restricted = 1;
         }
 */
-/* 	adev->auth_alg = algorithm; */
+/*	adev->auth_alg = algorithm; */
 	/* set flag to make sure the card WEP settings get updated */
 
 	/* OW
@@ -5977,7 +5977,7 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm,
 */
 
 	result = -EINPROGRESS;
-/* 	acx_sem_unlock(adev); */
+/*	acx_sem_unlock(adev); */
 
 	FN_EXIT1(result);
 	return result;
@@ -6268,14 +6268,14 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
 
 	default:
 		logf1(L_ANY, "Unknown adev->vif_type=%d\n", adev->vif_type);
-		
+
 		goto out_unlock;
 		break;
 	}
 
 	/* Reconfigure mac-address globally, affecting all vifs */
 	if (!mac_is_equal(mac_vif, adev->dev_addr)) {
-	
+
 		acx1xx_set_station_id(adev, mac_vif);
 		SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	}
@@ -6323,8 +6323,8 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 	FN_EXIT0;
 }
 
-/* FUNCTION_GREP_RESET 
- * The function_grep script can get confused with multiple "{"" opening braces 
+/* FUNCTION_GREP_RESET
+ * The function_grep script can get confused with multiple "{"" opening braces
  * due e.g. due to #ifdefs. This tag reset the parser state of the script.
  */
 
@@ -6574,7 +6574,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		 err = 0;
 		 break; */
 	}
-	
+
 	out_unlock:
 	acx_unlock(adev, flags);
 
@@ -6624,7 +6624,7 @@ int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 	FN_ENTER;
 	acx_sem_lock(adev);
     /* TODO */
-  	acx_sem_unlock(adev);
+	acx_sem_unlock(adev);
 	FN_EXIT0;
 	return 0;
 }
