@@ -462,7 +462,7 @@ static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 				((u8 *) adev->iobase2 + rx_queue_start);
 		else
 			adev->rx.desc_start = (rxdesc_t *)
-				((u8 *) rx_queue_start);
+				((u8 *) (uintptr_t)rx_queue_start);
 
 		rxdesc = adev->rx.desc_start;
 
@@ -471,11 +471,11 @@ static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 			if (IS_PCI(adev))
 				adev->rx.desc_start = (rxdesc_t *)
-					((u8 *) adev->iobase2
+					((u8 *)(uintptr_t)adev->iobase2
 						+ acx2cpu(rxdesc->pNextDesc));
 			else
 				adev->rx.desc_start = (rxdesc_t *)
-					((u8 *) acx2cpu(rxdesc->pNextDesc));
+				   ((u8 *)(ulong)acx2cpu(rxdesc->pNextDesc));
 
 			rxdesc = adev->rx.desc_start;
 		}
@@ -516,7 +516,7 @@ static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 			{
 				write_slavemem32(adev,
 					(uintptr_t) &(rxdesc->pNextDesc),
-					(u32) cpu_to_le32 ((u8 *) rxdesc
+					(u32) cpu_to_le32 ((uintptr_t)(u8 *) rxdesc
 							+ sizeof(*rxdesc)));
 			}
 
@@ -559,7 +559,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	/* This refers to an ACX address, not one of ours */
 	adev->tx.desc_start = (IS_PCI(adev))
 		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
-		: (txdesc_t *) tx_queue_start;
+		: (txdesc_t *) (uintptr_t)tx_queue_start;
 
 	log(L_DEBUG, "adev->iobase2=%p\n"
                 "tx_queue_start=%08X\n"
@@ -645,8 +645,8 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 
 				/* point to next txdesc */
 				write_slavemem32(adev, (uintptr_t) &(txdesc->pNextDesc),
-						(u32) cpu_to_le32 ((u8 *) txdesc
-								+ adev->tx.desc_size));
+						(u32)cpu_to_le32((uintptr_t)(u8 *)txdesc
+						+ adev->tx.desc_size));
 
 				/* go to the next one */
 				/* ++ is safe here (we are acx100) */
@@ -1537,7 +1537,7 @@ void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 /* static inline  */
 void acx_init_mboxes(acx_device_t *adev)
 {
-	u32 cmd_offs, info_offs;
+	uintptr_t cmd_offs, info_offs;
 
 	FN_ENTER;
 
@@ -1553,10 +1553,10 @@ void acx_init_mboxes(acx_device_t *adev)
 		adev->info_area = (u8 *) adev->iobase2 + info_offs;
 	}
 	/* OW iobase2 not used in mem.c, in pci.c it is */
-	log(L_DEBUG, "iobase2=%p cmd_mbox_offset=%X cmd_area=%p"
-		"info_mbox_offset=%X info_area=%p\n",
-		adev->iobase2, cmd_offs, adev->cmd_area,
-		info_offs, adev->info_area);
+	log(L_DEBUG,
+	    "iobase2=%p cmd_mbox_offset=%lX cmd_area=%pinfo_mbox_offset=%lX info_area=%p\n",
+	    adev->iobase2, cmd_offs, adev->cmd_area,
+	    info_offs, adev->info_area);
 
 	FN_EXIT0;
 }
@@ -2304,10 +2304,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			/* seq_printf(file, "\n"); */
 
 			acxmem_copy_from_slavemem(adev, (u8 *) &rxd,
-						(u32) rxdesc, sizeof(rxd));
+						(uintptr_t) rxdesc, sizeof(rxd));
 			seq_printf(file,
-				"%04x: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
-				(uint) rxdesc,
+				"%04lx: %04x %04x %04x %04x %04x %04x %04x Ctl_8=%04x %04x %04x %04x %04x %04x %04x %04x\n",
+				(uintptr_t) rxdesc,
 				rxd.pNextDesc.v,
 				rxd.HostMemPtr.v,
 				rxd.ACXMemPtr.v,
@@ -2341,9 +2341,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			thd = (i == adev->tx_head) ? " [head]" : "";
 			ttl = (i == adev->tx.tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
-						(u32) txdesc, sizeof(txd));
+						(uintptr_t) txdesc, sizeof(txd));
 
-			Ctl_8 = read_slavemem8(adev, (u32) &(txdesc->Ctl_8));
+			Ctl_8 = read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_ACXDONE)
 				seq_printf(file, "%02u ready to free (%02X)%-7s%-7s",
 						i, Ctl_8, thd, ttl);
@@ -2355,9 +2355,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 						i, Ctl_8, thd, ttl);
 
 			seq_printf(file,
-				"%04x: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
+				"%04lx: %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x %02x %02x %02x %02x "
 				"%02x %02x %02x %02x %04x: ",
-				(uint) txdesc,
+				(uintptr_t) txdesc,
 				txd.pNextDesc.v, txd.HostMemPtr.v,
 				txd.AcxMemPtr.v,
 				txd.tx_time, txd.total_length, txd.Reserved,

@@ -59,7 +59,7 @@ static const char *const dbgfs_files[] = {
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
-	int fidx = (int) inode->i_private;
+	int fidx = (uintptr_t)inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
 
@@ -84,10 +84,10 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 	return single_open(file, acx_proc_show_funcs[fidx], adev);
 }
 
-static int acx_dbgfs_write(struct file *file, const char __user *buf,
+static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
-	int fidx = (int) file->f_path.dentry->d_inode->i_private;
+	int fidx = (uintptr_t) file->f_path.dentry->d_inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
 
@@ -123,7 +123,7 @@ static struct dentry *acx_dbgfs_dir;
 
 int acx_debugfs_add_adev(struct acx_device *adev)
 {
-	int i;
+	long i;
 	fmode_t fmode;
 	struct dentry *file;
 	const char *devname = wiphy_name(adev->ieee->wiphy);

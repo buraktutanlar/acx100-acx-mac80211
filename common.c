@@ -1155,7 +1155,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 		/* sets the beginning of the rx descriptor queue,
 		 * after the tx descrs */
 		adev->acx_queue_indicator = (queueindicator_t *)
-			le32_to_cpu (queueconf.QueueEnd);
+			(uintptr_t)le32_to_cpu (queueconf.QueueEnd);
 
 		if (OK != acx_create_hostdesc_queues(adev))
 			goto fail;
