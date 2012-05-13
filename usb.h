@@ -117,4 +117,3 @@ static inline void __exit acxusb_cleanup_module(void)
 {}
 
 #endif
-
