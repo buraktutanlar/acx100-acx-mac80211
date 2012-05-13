@@ -3049,9 +3049,10 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 	hostdesc2 = hostdesc1 + 1;
 
-	(IS_PCI(adev))
-		? txdesc->total_length = cpu_to_le16(len)
-		: write_slavemem16(adev, (uintptr_t) &(txdesc->total_length),
+	if (IS_PCI(adev))
+		txdesc->total_length = cpu_to_le16(len);
+	else
+		write_slavemem16(adev, (uintptr_t)&(txdesc->total_length),
 				cpu_to_le16(len));
 
 	hostdesc2->hd.length = cpu_to_le16(len - wlhdr_len);
@@ -3103,9 +3104,10 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		rateset = ieee80211_get_tx_rate(adev->ieee, info)->hw_value;
 		logf1(L_BUFT, "rateset=%u\n", rateset);
 
-		(IS_PCI(adev))
-			? txdesc->u.r1.rate = (u8) rateset
-			: write_slavemem8(adev, (uintptr_t) &(txdesc->u.r1.rate),
+		if (IS_PCI(adev))
+			txdesc->u.r1.rate = (u8) rateset;
+		else
+			write_slavemem8(adev, (uintptr_t)&(txdesc->u.r1.rate),
 					(u8) rateset);
 
 #ifdef TODO_FIGURE_OUT_WHEN_TO_SET_THIS
