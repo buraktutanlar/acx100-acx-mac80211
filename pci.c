@@ -1080,7 +1080,7 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  * id	- ptr to the device id entry that matched this device
  */
 #ifdef CONFIG_PCI
-/* static  */
+static
 int __devinit
 acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
@@ -1091,8 +1091,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem_region2_size;
 	unsigned long phymem1;
 	unsigned long phymem2;
-	void *mem1 = NULL;
-	void *mem2 = NULL;
+	void __iomem *mem1 = NULL;
+	void __iomem *mem2 = NULL;
 	acx_device_t *adev = NULL;
 	const char *chip_name;
 	int result = -EIO;
@@ -1449,7 +1449,7 @@ done:
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-/* static */
+static
 void __devexit acxpci_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
@@ -1555,7 +1555,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 ** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
-/* static  */
+static
 int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
@@ -1587,7 +1587,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	return OK;
 }
 
-/* static */
+static
 int acxpci_e_resume(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
