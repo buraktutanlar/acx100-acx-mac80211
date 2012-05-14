@@ -3118,7 +3118,7 @@ static int acx1xx_update_tx(acx_device_t *adev)
 	int res;
 	FN_ENTER;
 
-	log(L_INIT, "Updating TX: %s, channel=%d\n",
+	log(L_XFER, "Updating TX: %s, channel=%d\n",
 		adev->tx_enabled ? "enable" : "disable", adev->channel);
 
 	if (adev->tx_enabled)
@@ -3146,7 +3146,7 @@ static int acx1xx_update_rx(acx_device_t *adev)
 	int res;
 	FN_ENTER;
 
-	log(L_INIT, "Updating RX: %s, channel=%d\n",
+	log(L_XFER, "Updating RX: %s, channel=%d\n",
 		adev->rx_enabled ? "enable" : "disable", adev->channel);
 
 	if (adev->rx_enabled)
