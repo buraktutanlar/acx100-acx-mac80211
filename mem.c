@@ -681,10 +681,11 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 /*
  * Most of the acx specific pieces of hardware reset.
  */
-STATick int acxmem_complete_hw_reset(acx_device_t *adev)
+static int acxmem_complete_hw_reset(acx_device_t *adev)
 {
 	acx111_ie_configoption_t co;
 	acxmem_lock_flags;
+	int ret;
 
 	/* NB: read_reg() reads may return bogus data before
 	 * reset_dev(), since the firmware which directly controls
@@ -728,10 +729,11 @@ STATick int acxmem_complete_hw_reset(acx_device_t *adev)
 
 	/* TODO: merge them into one function, they are called just
 	 * once and are the same for pci & usb */
-	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		return -2;
-
+	ret = acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version);
 	acxmem_unlock();
+
+	if (OK != ret)
+		return -2;
 
 	acx_parse_configoption(adev, &co);
 	acx_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
@@ -1029,12 +1031,13 @@ int acxmem_proc_diag_output(struct seq_file *file,
  * ==================================================
  */
 
+#if 0
 /*
  * acxmem_l_process_rxdesc
  *
  * Called directly and only from the IRQ handler
  */
-STATick void acxmem_process_rxdesc(acx_device_t *adev)
+static void acxmem_process_rxdesc(acx_device_t *adev)
 {
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc;
@@ -1153,16 +1156,7 @@ STATick void acxmem_process_rxdesc(acx_device_t *adev)
 		adev->rx.tail = tail;
 		FN_EXIT0;
 }
-
-/*
- * BOM Tx Path
- * ==================================================
- */
-
-void *acxmem_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
-{
-	return acxmem_get_txhostdesc(adev, (txdesc_t*) tx_opaque)->data;
-}
+#endif
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len)
 {
@@ -1242,55 +1236,6 @@ u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
 }
 
 /*
- * Return buffer space back to the pool by following the next pointers
- * until we find the block marked as the end.  Point the last block to
- * the head of the free list, then update the head of the free list to
- * point to the newly freed memory.  This routine gets called in
- * interrupt context, so it shouldn't block to protect the integrity
- * of the linked list.  The ISR already holds the lock.
- */
-STATick void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr)
-{
-	u32 cur, last, next;
-
-	if ((blockptr >= adev->acx_txbuf_start) &&
-		(blockptr <= adev->acx_txbuf_start +
-		(adev->acx_txbuf_numblocks - 1)	* adev->memblocksize)) {
-		cur = blockptr;
-		do {
-			last = cur;
-			next = read_slavemem32(adev, cur);
-
-			/*
-			 * Advance to the next block in this allocation
-			 */
-			cur = (next & 0x7ffff) << 5;
-
-			/*
-			 * This block now counts as free.
-			 */
-			adev->acx_txbuf_blocks_free++;
-		} while (!(next & 0x02000000));
-
-		/*
-		 * last now points to the last block of that
-		 * allocation.  Update the pointer in that block to
-		 * point to the free list and reset the free list to
-		 * the first block of the free call.  If there were no
-		 * free blocks, make sure the new end of the list
-		 * marks itself as truly the end.
-		 */
-		if (adev->acx_txbuf_free) {
-			write_slavemem32(adev, last, adev->acx_txbuf_free >> 5);
-		} else {
-			write_slavemem32(adev, last, 0x02000000);
-		}
-		adev->acx_txbuf_free = blockptr;
-	}
-
-}
-
-/*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
  * The transmit buffer is a circular queue with one 32 bit word
  * reserved at the beginning of each block.  The upper 13 bits are a
@@ -1362,113 +1307,6 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 	}
 	return &adev->tx.host.txstart[index * 2];
 }
-
-
-#if 0
-/* clean *all* Tx descriptors, and regardless of their previous state.
- * Used for brute-force reset handling. */
-void acxmem_clean_txdesc_emergency(acx_device_t *adev)
-{
-	txdesc_t *txdesc;
-	int i;
-
-	FN_ENTER;
-
-	for (i = 0; i < TX_CNT; i++) {
-		txdesc = acxmem_get_txdesc(adev, i);
-
-		/* free it */
-		write_slavemem8(adev, (u32) &(txdesc->ack_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_failures), 0);
-		write_slavemem8(adev, (u32) &(txdesc->rts_ok), 0);
-		write_slavemem8(adev, (u32) &(txdesc->error), 0);
-		write_slavemem8(adev, (u32) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN);
-
-#if 0
-		u32 acxmem;
-		/*
-		 * Clean up the memory allocated on the ACX for this
-		 * transmit descriptor.
-		 */
-		acxmem = read_slavemem32(adev, (u32) &(txdesc->AcxMemPtr));
-
-		if (acxmem) {
-			acxmem_reclaim_acx_txbuf_space(adev, acxmem);
-		}
-#endif
-
-		write_slavemem32(adev, (u32) &(txdesc->AcxMemPtr), 0);
-	}
-
-	adev->tx_free = TX_CNT;
-
-	acxmem_init_acx_txbuf2(adev);
-
-	FN_EXIT0;
-}
-
-void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue)
-{
-#ifdef USING_MORE_THAN_ONE_TRANSMIT_QUEUE
-	u32 indicator;
-	unsigned long flags;
-	int count;
-
-	/*
-	 * Can't handle an interrupt while we're fiddling with the
-	 * ACX's lock, according to TI.  The ACX is supposed to hold
-	 * fw_lock for at most 500ns.
-	 */
-	local_irq_save(flags);
-
-	/*
-	 * Wait for ACX to release the lock (at most 500ns).
-	 */
-	count = 0;
-	while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
-			&& (count++ < 50)) {
-		ndelay (10);
-	}
-	if (count < 50) {
-
-		/*
-		 * Take out the host lock - anything non-zero will
-		 * work, so don't worry about be/le
-		 */
-		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 1);
-
-		/*
-		 * Avoid a race condition
-		 */
-		count = 0;
-		while (read_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->fw_lock))
-				&& (count++ < 50)) {
-			ndelay (10);
-		}
-
-		if (count < 50) {
-			/*
-			 * Mark the queue active
-			 */
-			indicator = read_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator));
-			indicator |= cpu_to_le32 (1 << txqueue);
-			write_slavemem32 (adev, (u32) &(adev->acx_queue_indicator->indicator), indicator);
-		}
-
-		/*
-		 * Release the host lock
-		 */
-		write_slavemem16 (adev, (u32) &(adev->acx_queue_indicator->host_lock), 0);
-
-	}
-
-	/*
-	 * Restore interrupts
-	 */
-	local_irq_restore (flags);
-#endif
-}
-#endif
 
 /* OW TODO See if this is usable with mac80211 */
 /***********************************************************************
@@ -2153,7 +1991,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
-STATick int __devinit acxmem_probe(struct platform_device *pdev)
+static int __devinit acxmem_probe(struct platform_device *pdev)
 {
 	acx_device_t *adev = NULL;
 	const char *chip_name;
@@ -2404,7 +2242,7 @@ fail_request_irq:
 
 fail_ioremap:
 	if (adev->iobase)
-		iounmap((void *)adev->iobase);
+		iounmap(adev->iobase);
 
 fail_unknown_chiptype:
 fail_ieee80211_alloc_hw:
@@ -2425,7 +2263,7 @@ done:
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-STATick int __devexit acxmem_remove(struct platform_device *pdev)
+static int __devexit acxmem_remove(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
 		platform_get_drvdata(pdev);
@@ -2623,7 +2461,7 @@ STATick int acxmem_e_resume(struct platform_device *pdev)
 #endif /* CONFIG_PM */
 
 
-STATick struct platform_driver acxmem_driver = {
+static struct platform_driver acxmem_driver = {
 	.driver = {
 		.name = "acx-mem",
 	},
