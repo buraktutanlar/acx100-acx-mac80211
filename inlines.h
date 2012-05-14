@@ -17,7 +17,7 @@
  * Locking in mem is more complex as for pci, because the different
  * data-access functions below need to be protected against incoming
  * interrupts.
- * 
+ *
  * Data-access on the mem device is always going in serveral,
  * none-atomic steps, involving 2 or more register writes
  * (e.g. ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA).
@@ -26,41 +26,41 @@
  * ongoing, this may give access interference with by the involved
  * operations, since the irq routine is also using the same
  * data-access functions.
- * 
+ *
  * In case of interference, this often manifests during driver
  * operations as failure of device cmds and subsequent hanging of the
  * device. It especially appeared during sw-scans while a connection
  * was up.
- * 
+ *
  * For this reason, irqs shall be off while data access functions are
  * executed, and for this we'll use the acx-spinlock.
  *
  * In pci we don't have this problem, because all data-access
  * functions are atomic enough and we use dma (and the sw-scan problem
  * is also not observed in pci, which indicates confirmation).
- * 
+ *
  * Apart from this, the pure acx-sem locking is already coordinating
  * accesses well enough, that simple driver operation without
  * inbetween scans work without problems.
  *
  * Different locking approaches a possible to solves this (e.g. fine
  * vs coarse-grained).
- * 
+ *
  * The chosen approach is:
- * 
+ *
  * 1) Mem.c data-access functions contain all a check to insure, they
  * are executed under the acx-spinlock.  => This is the red line that
  * tells, if something needs coverage.
- * 
+ *
  * 2) The scope of acx-spinlocking is local, in this case here only to
  * mem.c.  All common.c functions are already protected by the sem.
  *
  * 3) In order to consolidate locking calls and also to account for
  * the logic of the various write_flush() calls around, locking in mem
  * should be:
- * 
+ *
  * a) as coarse-grained as possible, and ...
- * 
+ *
  * b) ... as fine-grained as required. Basically that means, that
  * before functions, that sleep, unlocking needs to be done. And
  * locking is taken up again inside the sleeping
@@ -75,9 +75,14 @@
 /* These are used in many mem.c funcs, including those which should be
  * merged with their pci counterparts.
  */
-#define acxmem_lock_flags	unsigned long flags=0
-#define acxmem_lock()		if(IS_MEM(adev)) spin_lock_irqsave(&adev->spinlock, flags)
-#define acxmem_unlock()		if(IS_MEM(adev)) spin_unlock_irqrestore(&adev->spinlock, flags)
+#define acxmem_lock_flags	unsigned long flags = 0
+#define acxmem_lock()						\
+	if (IS_MEM(adev))					\
+		 spin_lock_irqsave(&adev->spinlock, flags)
+
+#define acxmem_unlock()		\
+	if (IS_MEM(adev))	\
+		 spin_unlock_irqrestore(&adev->spinlock, flags)
 
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
 #define acx_readl(v)		readl((v))
@@ -92,18 +97,16 @@
 
 #if ACXMEM_SPIN_CHECK
 #define ACXMEM_WARN_NOT_SPIN_LOCKED					\
-do {									\
-	if (!spin_is_locked(&adev->spinlock)){				\
-		logf0(L_ANY, "mem: warning: data access not locked!\n"); \
+	(if (!spin_is_locked(&adev->spinlock)) {			\
+		logf0(L_ANY, "mem: warning: data access not locked!\n");\
 		dump_stack();						\
-	}								\
-} while (0)
+	})
 #else
 #define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
 #endif
 
-typedef enum {
-	ACX_SOFT_RESET 	  = 0x0000,
+enum acxreg_t {
+	ACX_SOFT_RESET	  = 0x0000,
 	ACX_SLV_REG_ADDR  = 0x0004,
 	ACX_SLV_REG_DATA  = 0x0008,
 	ACX_SLV_REG_ADATA = 0x000c,
@@ -111,7 +114,7 @@ typedef enum {
 	ACX_SLV_MEM_ADDR  = 0x0014, /*redundant with IO_ACX_SLV_MEM_ADDR */
 	ACX_SLV_MEM_DATA  = 0x0018, /*redundant with IO_ACX_SLV_MEM_DATA*/
 	ACX_SLV_MEM_CTL   = 0x001c, /*redundant with IO_ACX_SLV_END_CTL */
-} acxreg_t;
+};
 
 #define INLINE_IO static inline
 
@@ -122,16 +125,15 @@ INLINE_IO u32 read_id_register(acx_device_t *adev)
 	return acx_readl(adev->iobase + ACX_SLV_REG_DATA);
 }
 
-#define check_IO_ACX_ECPU_CTRL(adev, addr, offset)		\
-								\
-	if (offset > IO_ACX_ECPU_CTRL)				\
-		addr = offset;					\
-	else							\
+#define check_IO_ACX_ECPU_CTRL(adev, addr, offset)	\
+	if (offset > IO_ACX_ECPU_CTRL)			\
+		addr = offset;				\
+	else						\
 		addr = adev->io[offset];
 
 /* note the buried return */
-#define ret_addr_lt20_rd_(adev, addr, _lwb)				\
-	if (addr < 0x20)						\
+#define ret_addr_lt20_rd_(adev, addr, _lwb)			\
+	if (addr < 0x20)					\
 		return acx_read##_lwb(adev->iobase + addr);
 
 #define ret_addr_lt20_rdl(adev, addr)	ret_addr_lt20_rd_(adev, addr, l)
@@ -139,10 +141,10 @@ INLINE_IO u32 read_id_register(acx_device_t *adev)
 #define ret_addr_lt20_rdb(adev, addr)	ret_addr_lt20_rd_(adev, addr, b)
 
 /* note the buried return */
-#define ret_addr_lt20_wr_(adev, addr, _lwb, val)			\
-	if (addr < 0x20) {						\
+#define ret_addr_lt20_wr_(adev, addr, _lwb, val)		\
+	if (addr < 0x20) {					\
 		acx_write##_lwb(val, adev->iobase + addr);	\
-		return;							\
+		return;						\
 	}
 
 #define ret_addr_lt20_wrl(adev, addr, val)	\
@@ -353,7 +355,7 @@ INLINE_IO u32 read_slavemem32(acx_device_t *adev, u32 slave_address)
 
 	write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0x0);
 	write_reg32(adev, IO_ACX_SLV_MEM_ADDR, slave_address);
-	udelay (10);
+	udelay(10);
 	val = read_reg32(adev, IO_ACX_SLV_MEM_DATA);
 
 	return val;
