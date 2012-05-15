@@ -152,8 +152,7 @@ INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
 		return acx_readl(adev->iobase + adev->io[offset]);
 		#else
 		return acx_readw(adev->iobase + adev->io[offset])
-			+ (acx_readw(adev->iobase +
-					adev->io[offset] + 2) << 16);
+		    + (acx_readw(adev->iobase + adev->io[offset] + 2) << 16);
 		#endif
 	}
 	/* else IS_MEM */
@@ -208,20 +207,19 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	return (u8) lo;
 }
 
-INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset,
-			u32 val)
+INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 {
 	u32 addr;
 
 	if (IS_PCI(adev)) {
 		#if ACX_IO_WIDTH == 32
 		acx_writel(val, adev->iobase + adev->io[offset]);
-#else
-		acx_writew(val & 0xffff, (u8 *) adev->iobase
-			+ adev->io[offset]);
-		acx_writew(val >> 16, (u8 *) adev->iobase
-			+ adev->io[offset] + 2);
-#endif
+		#else
+		acx_writew(val & 0xffff,
+			(u8 *) adev->iobase + adev->io[offset]);
+		acx_writew(val >> 16,
+			(u8 *) adev->iobase + adev->io[offset] + 2);
+		#endif
 	}
 	/* else IS_MEM */
 
@@ -233,8 +231,7 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset,
 	acx_writel(val, adev->iobase + ACX_SLV_REG_DATA);
 }
 
-INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset,
-			u16 val)
+INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
 {
 	u32 addr;
 
@@ -308,8 +305,7 @@ INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset,
 	write_flush(adev);
 }
 
-INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset,
-			u32 bits)
+INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
 {
 	u32 tmp;
 
