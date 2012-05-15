@@ -2917,23 +2917,6 @@ void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
 
-#if 0 // merged
-static txhostdesc_t*
-acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
-	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
-	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
-		pr_info("bad txdesc ptr %p\n", txdesc);
-		return NULL;
-	}
-	index /= adev->tx.desc_size;
-	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
-		pr_info("bad txdesc ptr %p\n", txdesc);
-		return NULL;
-	}
-	return &adev->tx.host.txstart[index * 2];
-}
-#endif // acxmem_get_txhostdesc()
-
 /*
  * acxmem_l_tx_data
  *
