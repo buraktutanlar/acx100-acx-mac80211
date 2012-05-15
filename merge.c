@@ -2200,7 +2200,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 1 // real close
+#if 0 // real close
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {

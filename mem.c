@@ -835,7 +835,7 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 0 // copied to merge, but needs work
+#if 1 // copied to merge, but needs work
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
