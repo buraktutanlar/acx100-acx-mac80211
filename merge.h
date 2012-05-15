@@ -26,6 +26,8 @@ static int __init acx_debugfs_init(void)  { return 0; }
 static void __exit acx_debugfs_exit(void) { }
 #endif /* defined CONFIG_DEBUG_FS */
 
+#if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
+
 #include <linux/interrupt.h>
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -91,8 +93,7 @@ int acxpci_upload_radio(acx_device_t *adev);
 void acx_power_led(acx_device_t * adev, int enable);
 
 
-#if defined(CONFIG_ACX_MAC80211_PCI) \
- || defined(CONFIG_ACX_MAC80211_MEM)
+// #if !(defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM)
 
 
 void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
@@ -112,6 +113,10 @@ static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 
 #else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
 
+static inline void acx_create_desc_queues(acx_device_t *adev,
+			u32 tx_queue_start, u32 rx_queue_start)
+{ }
+
 static inline void acxmem_update_queue_indicator(acx_device_t *adev,
 			int txqueue)
 { }
@@ -124,5 +129,4 @@ static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 #define ACX_FREE_QUEUES(adev, _dir_)
 
 #endif /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
-
 #endif /* _MERGE_H_ */

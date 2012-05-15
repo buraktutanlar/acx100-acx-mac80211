@@ -1,4 +1,6 @@
 
+#if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
+
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
 #include "acx_debug.h"
 
@@ -5027,3 +5029,4 @@ MODULE_DESCRIPTION( "ACX Slave Memory Driver" );
 MODULE_LICENSE( "GPL" );
 
 #endif // til-end
+#endif /* defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM */
