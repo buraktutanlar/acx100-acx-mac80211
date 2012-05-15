@@ -1318,9 +1318,6 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 
 	FN_ENTER;
 
-	/* No combined image; tell common we need the radio firmware, too */
-	adev->need_radio_fw = 1;
-
 	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
 	if (!fw_image) {
 		FN_EXIT1(NOT_OK);
@@ -1353,11 +1350,11 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 #ifdef PATCH_AROUND_BAD_SPOTS
 	acxmem_lock();
 	/*
-	 * Only want to do this if the firmware is exactly what we expect for an
-	 * iPaq 4700; otherwise, bad things would ensue.
+	 * Only want to do this if the firmware is exactly what we
+	 * expect for an iPaq 4700; otherwise, bad things would ensue.
 	 */
 	if ((HX4700_FIRMWARE_CHECKSUM == fw_image->chksum)
-			|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
+		|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
 		/*
 		 * Put the patch after the main firmware image.
 		 * 0x950c contains the ACX's idea of the end of the
@@ -1407,12 +1404,75 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 	FN_EXIT1(res);
 	return res;
 }
+
 int acxmem_upload_fw(acx_device_t *adev)
 {
 	char *filename = "WLANGEN.BIN";
-	return _acx_upload_fw(adev, filename);
+	int rc;
+
+	FN_ENTER;
+	/* No combined image; tell common we need the radio firmware, too */
+	adev->need_radio_fw = 1;
+	rc = _acx_upload_fw(adev, filename);
+	FN_EXIT1(rc);
+	return rc;
 }
-#endif // acx_upload_fw()
+
+int acxpci_upload_fw(acx_device_t *adev)
+{
+	char filename[sizeof("tiacx1NNcNN")];
+	int rc;
+
+	FN_ENTER;
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they need to provide.
+	 * Firmware loading is a frequent end-user PITA with these
+	 * chipsets.
+	 */
+	pr_acx("need firmware for acx1%02d chipset with radio ID %02X\n"
+		"Please provide via firmware hotplug:\n"
+		"either combined firmware (single file named "
+		"'tiacx1%02dc%02X')\n"
+		"or two files (base firmware file 'tiacx1%02d' "
+		"+ radio fw 'tiacx1%02dr%02X')\n",
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11,
+		IS_ACX111(adev)*11, adev->radio_type
+		);
+
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they are supposed to
+	 * provide, since firmware loading is the biggest enduser PITA
+	 * with these chipsets.  Not printing radio ID in 0xHEX in
+	 * order to not confuse them into wrong file naming
+	 */
+	pr_acx("need to load firmware for acx1%02d chipset with radio "
+		"ID %02x, please provide via firmware hotplug:\n"
+		"either one file only (<c>ombined firmware image file, "
+		"radio-specific) or two files (radio-less base image "
+		"file *plus* separate <r>adio-specific extension file)\n",
+		IS_ACX111(adev)*11, adev->radio_type);
+
+	/* Try combined, then main image */
+	adev->need_radio_fw = 0;
+	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
+		 IS_ACX111(adev) * 11, adev->radio_type);
+
+	rc = _acx_upload_fw(adev, filename);
+	if (!rc) {
+		FN_EXIT1(rc);
+		return rc;
+	}
+	adev->need_radio_fw = 1;
+	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
+		 IS_ACX111(adev) * 11, adev->radio_type);
+
+	rc = _acx_upload_fw(adev, filename);
+	FN_EXIT1(rc);
+	return rc;
+}
+#endif	// acx_upload_fw()
 
 #if defined(NONESSENTIAL_FEATURES)
 
@@ -1477,7 +1537,7 @@ void acx_show_card_eeprom_id(acx_device_t *adev)
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
 			if (device_ids[i].descr) {
 				pr_acx("EEPROM card ID string check "
-					"found %s card ID: is this %s?\n",
+					"found %s card ID: is this a %s?\n",
 					device_ids[i].descr,
 					device_ids[i].type);
 			}

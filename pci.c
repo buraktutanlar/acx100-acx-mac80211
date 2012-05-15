@@ -164,6 +164,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  * Origin: Derived from FW dissection
  */
 /* static  */
+#if 0 // acxpci_upload_fw()
 int acxpci_upload_fw(acx_device_t *adev)
 {
 	firmware_image_t *fw_image = NULL;
@@ -239,7 +240,7 @@ int acxpci_upload_fw(acx_device_t *adev)
 	FN_EXIT1(res);
 	return res;
 }
-
+#endif
 
 /*
  * BOM CMDs (Control Path)
