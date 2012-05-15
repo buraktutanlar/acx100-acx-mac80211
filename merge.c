@@ -459,7 +459,7 @@ static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 		if (IS_PCI(adev))
 			adev->rx.desc_start = (rxdesc_t *)
-				((u8 *) adev->iobase2 + rx_queue_start);
+				(adev->iobase2 + rx_queue_start);
 		else
 			adev->rx.desc_start = (rxdesc_t *)
 				((u8 *) (uintptr_t)rx_queue_start);
@@ -1533,9 +1533,7 @@ void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 	FN_EXIT0;
 }
 
-#if 1 //
-/* static inline  */
-void acx_init_mboxes(acx_device_t *adev)
+static void acx_init_mboxes(acx_device_t *adev)
 {
 	uintptr_t cmd_offs, info_offs;
 
@@ -1549,18 +1547,16 @@ void acx_init_mboxes(acx_device_t *adev)
 		if (adev->iobase2)
 			pr_notice("adev->iobase2 != 0 for MEM dev\n");
 	} else {
-		adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
-		adev->info_area = (u8 *) adev->iobase2 + info_offs;
+		adev->cmd_area = adev->iobase2 + cmd_offs;
+		adev->info_area = adev->iobase2 + info_offs;
 	}
 	/* OW iobase2 not used in mem.c, in pci.c it is */
-	log(L_DEBUG,
-	    "iobase2=%p cmd_mbox_offset=%lX cmd_area=%pinfo_mbox_offset=%lX info_area=%p\n",
-	    adev->iobase2, cmd_offs, adev->cmd_area,
-	    info_offs, adev->info_area);
+	log(L_DEBUG, "iobase2=%p cmd_mbox_offset=%lX cmd_area=%pinfo_mbox_offset=%lX info_area=%p\n",
+		adev->iobase2, cmd_offs, adev->cmd_area,
+		info_offs, adev->info_area);
 
 	FN_EXIT0;
 }
-#endif
 
 /*
  * acxmem_s_issue_cmd_timeo
@@ -2153,66 +2149,6 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 /*
  * Most of the acx specific pieces of hardware reset.
  */
-#if 0 // none in pci.c, doesnt belong here
-static int acxmem_complete_hw_reset(acx_device_t *adev)
-{
-	acx111_ie_configoption_t co;
-	acxmem_lock_flags;
-
-	/* NB: read_reg() reads may return bogus data before
-	 * reset_dev(), since the firmware which directly controls
-	 * large parts of the I/O registers isn't initialized yet.
-	 * acx100 seems to be more affected than acx111 */
-	if (OK != acx_reset_dev(adev))
-		return -1;
-
-	acxmem_lock();
-	if (IS_ACX100(adev)) {
-		/* ACX100: configopt struct in cmd mailbox - directly
-		 * after reset */
-		acxmem_copy_from_slavemem(adev, (u8*) &co,
-			(u32) adev->cmd_area, sizeof(co));
-	}
-	acxmem_unlock();
-
-	if (OK != acx_init_mac(adev))
-		return -3;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111: configopt struct needs to be queried after
-		 * full init */
-		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	}
-
-	/* Set up transmit buffer administration */
-	acxmem_init_acx_txbuf(adev);
-
-	acxmem_lock();
-
-	/* Windows driver writes 0x01000000 to register 0x288,
-	 * RADIO_CTL, if the form factor is 3.  It also write protects
-	 * the EEPROM by writing 1<<9 to GPIO_OUT
-	 */
-	if (adev->form_factor == 3) {
-		set_regbits(adev, 0x288, 0x01000000);
-		set_regbits(adev, 0x298, 1 << 9);
-	}
-
-	/* TODO: merge them into one function, they are called just
-	 * once and are the same for pci & usb */
-	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		return -2;
-
-	acxmem_unlock();
-
-	acx_parse_configoption(adev, &co);
-	acx_get_firmware_version(adev);
-	/* needs to be after acx_s_init_mac() */
-	acx_display_hardware_details(adev);
-
-	return 0;
-}
-#endif // acxmem_complete_hw_reset()
 
 #if 0
 /***********************************************************************

@@ -11,6 +11,21 @@ typedef ssize_t ((acx_proc_write_t)(struct file *, const char __user *,
 extern acx_proc_show_t *const acx_proc_show_funcs[];
 extern acx_proc_write_t *const acx_proc_write_funcs[];
 
+/* debugfs.c API used by common.c */
+#if defined CONFIG_DEBUG_FS
+int acx_debugfs_add_adev(struct acx_device *adev);
+void acx_debugfs_remove_adev(struct acx_device *adev);
+int acx_proc_register_entries(struct ieee80211_hw *hw);
+int __init acx_debugfs_init(void);
+void __exit acx_debugfs_exit(void);
+#else
+static int acx_debugfs_add_adev(struct acx_device *adev) { return 0; }
+static void acx_debugfs_remove_adev(struct acx_device *adev) { }
+static int acx_proc_register_entries(struct ieee80211_hw *hw) { return 0; }
+static int __init acx_debugfs_init(void)  { return 0; }
+static void __exit acx_debugfs_exit(void) { }
+#endif /* defined CONFIG_DEBUG_FS */
+
 #include <linux/interrupt.h>
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);
@@ -62,7 +77,7 @@ void acx_irq_work(struct work_struct *work);
 
 u32 acx_read_cmd_type_status(acx_device_t *adev);
 void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
-void acx_init_mboxes(acx_device_t *adev);
+
 int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			u32 offset);
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
