@@ -1689,7 +1689,7 @@ void acx_parse_configoption(acx_device_t *adev,
 	       (char *)acfg->manufacturer.list);
 	/*
 	pr_info("EEPROM part:\n");
-	for (i=0; i<58; i++) {
+	for (i = 0; i < 58; i++) {
 		printk("%02X =======>  0x%02X\n",
 			i, (u8 *)acfg->NVSv[i-2]);
 	}
@@ -2514,7 +2514,7 @@ static int acx1xx_get_tx_level(acx_device_t *adev)
 		FN_EXIT1(NOT_OK);
 		return NOT_OK;
 	}
-	adev->tx_level_val= tx_level.level;
+	adev->tx_level_val = tx_level.level;
 	log(L_ANY, "Got tx-power-level: %d\n", adev->tx_level_val);
 end:
 	FN_EXIT0;
@@ -2523,7 +2523,7 @@ end:
 
 static int acx1xx_set_tx_level(acx_device_t *adev, u8 level_val)
 {
-	adev->tx_level_val=level_val;
+	adev->tx_level_val = level_val;
 	return acx1xx_update_tx_level(adev);
 }
 
@@ -2538,7 +2538,7 @@ static int acx1xx_update_tx_level(acx_device_t *adev)
 
 	log(L_ANY, "Updating tx-power-level to: %d\n", adev->tx_level_val);
 	memset(&tx_level, 0, sizeof(tx_level));
-	tx_level.level=adev->tx_level_val;
+	tx_level.level = adev->tx_level_val;
 
 	return acx_configure(adev, &tx_level, ACX1xx_IE_DOT11_TX_POWER_LEVEL);
 }
@@ -2670,7 +2670,7 @@ static int acx1xx_get_antenna(acx_device_t *adev)
 	FN_ENTER;
 
 	memset(antenna, 0, sizeof(antenna));
-	res=acx_interrogate(adev, antenna,
+	res = acx_interrogate(adev, antenna,
 			  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 	adev->antenna[0] = antenna[4];
 	adev->antenna[1] = antenna[5];
@@ -2688,7 +2688,7 @@ static int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1)
 
 	adev->antenna[0] = val0;
 	adev->antenna[1] = val1;
-	res=acx1xx_update_antenna(adev);
+	res = acx1xx_update_antenna(adev);
 
 	FN_EXIT0;
 	return res;
@@ -2706,7 +2706,7 @@ static int acx1xx_update_antenna(acx_device_t *adev)
 	memset(antenna, 0, sizeof(antenna));
 	antenna[4] = adev->antenna[0];
 	antenna[5] = adev->antenna[1];
-	res=acx_configure(adev, &antenna,
+	res = acx_configure(adev, &antenna,
 			ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 
 	FN_EXIT0;
@@ -2774,7 +2774,7 @@ static int acx100_set_tx_antenna(acx_device_t *adev, u8 val)
 		val2 = 0;
 		break;
 	default:
-		val2=val;
+		val2 = val;
 	}
 	logf1(L_ANY, "val2=%02d\n", val2);
 
@@ -2832,7 +2832,7 @@ static int acx1xx_get_station_id(acx_device_t *adev)
 
 	FN_ENTER;
 
-	res=acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+	res = acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 	paddr = &stationID[4];
 	for (i = 0; i < ETH_ALEN; i++) {
 		/* we copy the MAC address (reversed in the card) to
@@ -2854,7 +2854,7 @@ static int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr)
 	FN_ENTER;
 
 	MAC_COPY(adev->dev_addr, new_addr);
-	res=acx1xx_update_station_id(adev);
+	res = acx1xx_update_station_id(adev);
 
 	FN_EXIT0;
 	return res;
@@ -2878,7 +2878,7 @@ static int acx1xx_update_station_id(acx_device_t *adev)
 		 * (reversed in the card!) */
 		paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
 	}
-	res=acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+	res = acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 
 	FN_EXIT0;
 	return res;
@@ -2891,7 +2891,7 @@ static int acx1xx_get_ed_threshold(acx_device_t *adev)
 	FN_ENTER;
 
 	if (IS_ACX100(adev)) {
-		res=acx100_get_ed_threshold(adev);
+		res = acx100_get_ed_threshold(adev);
 	} else {
 		log(L_INIT, "acx111 doesn't support ED\n");
 		adev->ed_threshold = 0;
@@ -2911,7 +2911,7 @@ static int acx100_get_ed_threshold(acx_device_t *adev)
 
 	FN_ENTER;
 	memset(ed_threshold, 0, sizeof(ed_threshold));
-	res=acx_interrogate(adev, ed_threshold,
+	res = acx_interrogate(adev, ed_threshold,
 			  ACX100_IE_DOT11_ED_THRESHOLD);
 	adev->ed_threshold = ed_threshold[4];
 
@@ -2926,7 +2926,7 @@ static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold)
 
 	FN_ENTER;
 	adev->ed_threshold=ed_threshold;
-	res=acx1xx_update_ed_threshold(adev);
+	res = acx1xx_update_ed_threshold(adev);
 
 	FN_EXIT0;
 	return res;
@@ -2935,14 +2935,14 @@ static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold)
 
 static int acx1xx_update_ed_threshold(acx_device_t *adev)
 {
-	int res=NOT_OK;
+	int res = NOT_OK;
 
 	FN_ENTER;
 	log(L_INIT, "Updating the Energy Detect (ED) threshold: %u\n",
 	    adev->ed_threshold);
 
 	if (IS_ACX100(adev))
-		res=acx100_update_ed_threshold(adev);
+		res = acx100_update_ed_threshold(adev);
 	else
 		log(L_INIT, "acx111 doesn't support ED threshold\n");
 
@@ -2958,7 +2958,7 @@ static int acx100_update_ed_threshold(acx_device_t *adev)
 	FN_ENTER;
 	memset(ed_threshold, 0, sizeof(ed_threshold));
 	ed_threshold[4] = adev->ed_threshold;
-	res=acx_configure(adev, &ed_threshold,
+	res = acx_configure(adev, &ed_threshold,
 			ACX100_IE_DOT11_ED_THRESHOLD);
 
 	FN_EXIT0;
@@ -3005,8 +3005,8 @@ static int acx1xx_set_cca(acx_device_t *adev, u8 cca)
 
 	FN_ENTER;
 
-	adev->cca=cca;
-	res=acx1xx_update_cca(adev);
+	adev->cca = cca;
+	res = acx1xx_update_cca(adev);
 
 	FN_EXIT0;
 	return res;
@@ -3053,7 +3053,7 @@ static int acx1xx_get_rate_fallback(acx_device_t *adev)
 
 	FN_ENTER;
 	memset(rate, 0, sizeof(rate));
-	res=acx_interrogate(adev, &rate,
+	res = acx_interrogate(adev, &rate,
 			ACX1xx_IE_RATE_FALLBACK);
 	adev->rate_auto = rate[4];
 
@@ -3324,7 +3324,7 @@ static int acx_update_wep(acx_device_t *adev)
 
 static int acx_update_wep_options(acx_device_t *adev)
 {
-	int res=NOT_OK;
+	int res = NOT_OK;
 
 	FN_ENTER;
 
@@ -3340,7 +3340,7 @@ static int acx_update_wep_options(acx_device_t *adev)
 
 static int acx100_update_wep_options(acx_device_t *adev)
 {
-	int res=NOT_OK;
+	int res = NOT_OK;
 	acx100_ie_wep_options_t options;
 
 	FN_ENTER;
@@ -6335,7 +6335,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 		adev->vif_monitor--;
 	else {
 		adev->vif_operating = 0;
-		adev->vif=NULL;
+		adev->vif = NULL;
 	}
 
 	acx_set_mode(adev, ACX_MODE_OFF);
