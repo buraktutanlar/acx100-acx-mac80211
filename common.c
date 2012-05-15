@@ -4523,19 +4523,24 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 /*
  * A write on acx_diag executes different operations for debugging
  */
-static ssize_t acx_proc_write_diag(struct file *file, const char __user *buf,
-				   size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_diag(struct file *file, 
+				const char __user *ubuf,
+				size_t count, loff_t *ppos)
 {
 	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
 	acx_device_t *adev = (acx_device_t *) pde->data;
 
 	ssize_t ret = -EINVAL;
-	char *after;
+	char *after, buf[32];
 	unsigned int val;
-	size_t size;
+	size_t size, len;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
 
 	val = (unsigned int) simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
@@ -4698,13 +4703,21 @@ static int acx_proc_show_debug(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_debug(struct file *file, const char __user *buf,
-				   size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_debug(struct file *file,
+				const char __user *ubuf,
+				size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
-	char *after;
-	unsigned long val = simple_strtoul(buf, &after, 0);
-	size_t size = after - buf + 1;
+	char *after, buf[32];
+	unsigned long val;
+	size_t size, len;
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
+
+	val = simple_strtoul(buf, &after, 0);
+	size = after - buf + 1;
 
 	FN_ENTER;
 	/* No sem locking required, since debug is global for all devices */
@@ -4736,7 +4749,7 @@ static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
 }
 
 static ssize_t acx_proc_write_sensitivity(struct file *file,
-					const char __user *buf,
+					const char __user *ubuf,
 					size_t count, loff_t *ppos)
 
 {
@@ -4744,12 +4757,16 @@ static ssize_t acx_proc_write_sensitivity(struct file *file,
 		PDE(file->f_path.dentry->d_inode)->data;
 
 	ssize_t ret = -EINVAL;
-	char *after;
+	char *after, buf[32];
 	unsigned long val;
-	size_t size;
+	size_t size, len;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
 
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
@@ -4784,19 +4801,23 @@ static int acx_proc_show_tx_level(struct seq_file *file, void *v)
 }
 
 static ssize_t acx111_proc_write_tx_level(struct file *file,
-					const char __user *buf,
+					const char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
 	acx_device_t *adev = (acx_device_t *)
 		PDE(file->f_path.dentry->d_inode)->data;
 
 	ssize_t ret = -EINVAL;
-	char *after;
+	char *after, buf[32];
 	unsigned long val;
-	size_t size;
+	size_t size, len;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
 
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
@@ -4831,19 +4852,23 @@ static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
 }
 
 static ssize_t acx_proc_write_reg_domain(struct file *file,
-					const char __user *buf,
+					const char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
 	acx_device_t *adev = (acx_device_t *)
 		PDE(file->f_path.dentry->d_inode)->data;
 
 	ssize_t ret = -EINVAL;
-	char *after;
+	char *after, buf[32];
 	unsigned long val;
-	size_t size;
+	size_t size, len;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
 
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
@@ -4879,20 +4904,24 @@ static int acx_proc_show_antenna(struct seq_file *file, void *v)
 }
 
 static ssize_t acx_proc_write_antenna(struct file *file,
-				const char __user *buf,
+				const char __user *ubuf,
 				size_t count, loff_t *ppos)
 {
 	acx_device_t *adev = (acx_device_t *)
 		PDE(file->f_path.dentry->d_inode)->data;
 
 	ssize_t ret = -EINVAL;
-	char *after;
+	char *after, buf[32];
 	unsigned long val;
 	u8 val0, val1;
-	size_t size;
+	size_t size, len;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
+
+	len = min(count, sizeof(buf) - 1);
+	if (unlikely(copy_from_user(buf, ubuf, len)))
+		return -EFAULT;
 
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
