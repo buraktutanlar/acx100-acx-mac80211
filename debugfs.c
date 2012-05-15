@@ -112,7 +112,7 @@ static int acx_dbgfs_write(struct file *file, const char __user *buf,
 	return (acx_proc_write_funcs[fidx])(file, buf, count, ppos);
 }
 
-const struct file_operations acx_fops = {
+static const struct file_operations acx_fops = {
 	.read		= seq_read,
 	.write		= acx_dbgfs_write,
 	.open		= acx_dbgfs_open,
@@ -124,7 +124,7 @@ static struct dentry *acx_dbgfs_dir;
 int acx_debugfs_add_adev(struct acx_device *adev)
 {
 	int i;
-	fmode_t fmode;
+	int fmode;
 	struct dentry *file;
 	const char *devname = wiphy_name(adev->ieee->wiphy);
 	struct dentry *acx_dbgfs_devdir
@@ -167,7 +167,8 @@ fail:
 void acx_debugfs_remove_adev(struct acx_device *adev)
 {
 	debugfs_remove_recursive(adev->debugfs_dir);
-	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy), adev->debugfs_dir);
+	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy),
+		adev->debugfs_dir);
 	adev->debugfs_dir = NULL;
 }
 
