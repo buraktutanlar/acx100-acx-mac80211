@@ -45,8 +45,8 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev);
 int __init acxmem_init_module(void);
 void __exit acxmem_cleanup_module(void);
 
-void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status);
-void acxmem_init_mboxes(acx_device_t *adev);
+void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
+				u16 status);
 
 
 #else /* !CONFIG_ACX_MAC80211_MEM */
