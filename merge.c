@@ -3946,10 +3946,11 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 
 		if (unlikely(++adev->irq_loops_this_jiffy> MAX_IRQLOOPS_PER_JIFFY)) {
 			pr_err("acx: too many interrupts per jiffy!\n");
-			/* Looks like card floods us with IRQs! Try to stop that */
+			/* Looks like card floods us with IRQs! Try to
+			 * stop that */
 			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-			/* This will short-circuit all future attempts to handle IRQ.
-			 * We cant do much more... */
+			/* This will short-circuit all future attempts
+			 * to handle IRQ.  We cant do much more... */
 			adev->irq_mask = 0;
 			break;
 		}
@@ -3957,13 +3958,11 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 #endif
 
 	/* OW 20091129 TODO Currently breaks mem.c ...
-	 * If sleeping is required like for update card settings, this is usefull
-	 * For now I replaced sleeping for command handling by mdelays.
- *	if (adev->after_interrupt_jobs){
- *		acx_e_after_interrupt_task(adev);
- *	}
+	 * If sleeping is required like for update card settings, this
+	 * is usefull For now I replaced sleeping for command handling
+	 * by mdelays.  if (adev->after_interrupt_jobs){
+	 * acx_e_after_interrupt_task(adev); }
 	 */
-
 
 /* OW TODO */
 #if 0
