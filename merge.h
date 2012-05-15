@@ -1,6 +1,16 @@
 #ifndef _MERGE_H_
 #define _MERGE_H_
 
+/* these 2 externs are defined in common.c (but we dont have a
+ * common.h), so expose them here.  Theyre used in debugfs.c
+ */
+typedef int acx_proc_show_t(struct seq_file *file, void *v);
+typedef ssize_t ((acx_proc_write_t)(struct file *, const char __user *,
+				    size_t, loff_t *));
+
+extern acx_proc_show_t *const acx_proc_show_funcs[];
+extern acx_proc_write_t *const acx_proc_write_funcs[];
+
 #include <linux/interrupt.h>
 
 irqreturn_t acx_interrupt(int irq, void *dev_id);

@@ -17,13 +17,7 @@ void acx_debugfs_remove_adev(struct acx_device *adev) { return 0; }
 #include <linux/seq_file.h>
 #include <net/mac80211.h>
 #include "acx.h"
-
-typedef int acx_proc_show_t(struct seq_file *file, void *v);
-typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *,
-				size_t, loff_t *);
-
-extern acx_proc_show_t *const acx_proc_show_funcs[];
-extern acx_proc_write_t *const acx_proc_write_funcs[];
+#include "merge.h" /* for acx_proc_(show|write)_funcs[]; */
 
 /*
  * debugfs files are created under $DBGMNT/acx_mac80211/phyX by
@@ -56,6 +50,8 @@ static const char *const dbgfs_files[] = {
 	[ANTENNA]	= "antenna",
 	[REG_DOMAIN]	= "reg_domain",
 };
+BUILD_BUG_DECL(dbgfs_files__VS__enum_REG_DOMAIN,
+	ARRAY_SIZE(dbgfs_files) != REG_DOMAIN + 1);
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
