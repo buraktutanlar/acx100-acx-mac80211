@@ -6974,7 +6974,44 @@ static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
 
 static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 {
-        TODO();
+	int i, len = strlen(val);
+	char sign, *e, *p = (char*) val;
+
+	pr_info("val: %s len:%d\n", val, len);
+	while (*p) {
+		sign = *p++;
+		switch (sign) {
+		case '+':
+		case '-':
+			break;
+		default:
+			return -EINVAL;
+		}
+		if ((e = strchr(p, ',')))
+			*e = '\0';
+
+		for (i = 0; i < ARRAY_SIZE(flag_names); i++) {
+			if (strcmp(p, flag_names[i])) {
+
+				pr_info("found: %s flags:0x%x\n",
+					p, acx_debug);
+
+				if (sign == '+')
+					acx_debug |= (1 << i);
+				else
+					acx_debug &= ~(1 << i);
+
+				pr_info("new:%x\n", acx_debug);
+				p = ++e;
+				continue;
+			}
+		}
+		if (i == ARRAY_SIZE(flag_names)) {
+			pr_err("no match on val: %s len:%d\n", p, len);
+			return -EINVAL;
+		}
+		p = ++e;
+	}
 	return 0;
 }
 
