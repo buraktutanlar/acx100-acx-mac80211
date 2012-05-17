@@ -1,6 +1,8 @@
 #ifndef _MERGE_H_
 #define _MERGE_H_
 
+#include <linux/irq.h>
+
 /* these 2 externs are defined in common.c (but we dont have a
  * common.h), so expose them here.  Theyre used in debugfs.c
  */
