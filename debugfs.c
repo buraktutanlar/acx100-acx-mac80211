@@ -17,13 +17,7 @@ void acx_debugfs_remove_adev(struct acx_device *adev) { return 0; }
 #include <linux/seq_file.h>
 #include <net/mac80211.h>
 #include "acx.h"
-
-typedef int acx_proc_show_t(struct seq_file *file, void *v);
-typedef ssize_t (acx_proc_write_t)(struct file *, const char __user *,
-				size_t, loff_t *);
-
-extern acx_proc_show_t *const acx_proc_show_funcs[];
-extern acx_proc_write_t *const acx_proc_write_funcs[];
+#include "merge.h" /* for acx_proc_(show|write)_funcs[]; */
 
 /*
  * debugfs files are created under $DBGMNT/acx_mac80211/phyX by
@@ -39,6 +33,9 @@ extern acx_proc_write_t *const acx_proc_write_funcs[];
  * match/strcmp against the callback.  The acx_device *ptr is
  * retrieved from the file's parent's private data, and passed to the
  * callback so it knows what vif to print data for.
+ *
+ * Similarly, a singe write handler retrieves the acx_device_t pointer
+ * and file-index, and dispatches to the file handler for that index.
  */
 
 enum file_index {
@@ -56,6 +53,8 @@ static const char *const dbgfs_files[] = {
 	[ANTENNA]	= "antenna",
 	[REG_DOMAIN]	= "reg_domain",
 };
+BUILD_BUG_DECL(dbgfs_files__VS__enum_REG_DOMAIN,
+	ARRAY_SIZE(dbgfs_files) != REG_DOMAIN + 1);
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
@@ -87,6 +86,7 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 static int acx_dbgfs_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
+	/* retrieve file-index and adev from private fields */
 	int fidx = (int) file->f_path.dentry->d_inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
@@ -112,7 +112,7 @@ static int acx_dbgfs_write(struct file *file, const char __user *buf,
 	return (acx_proc_write_funcs[fidx])(file, buf, count, ppos);
 }
 
-const struct file_operations acx_fops = {
+static const struct file_operations acx_fops = {
 	.read		= seq_read,
 	.write		= acx_dbgfs_write,
 	.open		= acx_dbgfs_open,
@@ -124,7 +124,7 @@ static struct dentry *acx_dbgfs_dir;
 int acx_debugfs_add_adev(struct acx_device *adev)
 {
 	int i;
-	fmode_t fmode;
+	int fmode;
 	struct dentry *file;
 	const char *devname = wiphy_name(adev->ieee->wiphy);
 	struct dentry *acx_dbgfs_devdir
@@ -134,7 +134,8 @@ int acx_debugfs_add_adev(struct acx_device *adev)
 		pr_err("debugfs_create_dir() failed\n");
 		return -ENOMEM;
 	}
-	pr_info("adev:%p nm:%s dirp:%p\n", adev, devname, acx_dbgfs_devdir);
+	pr_info("adev:%p nm:%s dirp:%p\n", adev, devname,
+		acx_dbgfs_devdir);
 
 	if (acx_dbgfs_devdir->d_inode->i_private) {
 		/* this shouldnt happen */
@@ -142,12 +143,14 @@ int acx_debugfs_add_adev(struct acx_device *adev)
 			acx_dbgfs_devdir->d_inode->i_private);
 		goto fail;
 	}
+	/* save adev in dir's private field */
 	acx_dbgfs_devdir->d_inode->i_private = (void*) adev;
 
 	for (i = 0; i < ARRAY_SIZE(dbgfs_files); i++) {
 
 		fmode = (acx_proc_write_funcs[i])
 			? 0644 : 0444;
+		/* save file-index in in file's private field */
 		file = debugfs_create_file(dbgfs_files[i], fmode,
 					acx_dbgfs_devdir,
 					(void*) i, &acx_fops);
@@ -164,7 +167,8 @@ fail:
 void acx_debugfs_remove_adev(struct acx_device *adev)
 {
 	debugfs_remove_recursive(adev->debugfs_dir);
-	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy), adev->debugfs_dir);
+	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy),
+		adev->debugfs_dir);
 	adev->debugfs_dir = NULL;
 }
 

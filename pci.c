@@ -164,6 +164,7 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  * Origin: Derived from FW dissection
  */
 /* static  */
+#if 0 // acxpci_upload_fw()
 int acxpci_upload_fw(acx_device_t *adev)
 {
 	firmware_image_t *fw_image = NULL;
@@ -239,7 +240,7 @@ int acxpci_upload_fw(acx_device_t *adev)
 	FN_EXIT1(res);
 	return res;
 }
-
+#endif
 
 /*
  * BOM CMDs (Control Path)
@@ -1080,9 +1081,8 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  * id	- ptr to the device id entry that matched this device
  */
 #ifdef CONFIG_PCI
-static
-int __devinit
-acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+static int __devinit acxpci_probe(struct pci_dev *pdev,
+				const struct pci_device_id *id)
 {
 	acx111_ie_configoption_t co;
 	unsigned long mem_region1 = 0;
@@ -1449,10 +1449,10 @@ done:
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-static
-void __devexit acxpci_remove(struct pci_dev *pdev)
+static void __devexit acxpci_remove(struct pci_dev *pdev)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
+	struct ieee80211_hw *hw
+		= (struct ieee80211_hw *) pci_get_drvdata(pdev);
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long mem_region1, mem_region2;
 
@@ -1555,8 +1555,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 ** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
-static
-int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
+static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
@@ -1587,8 +1586,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	return OK;
 }
 
-static
-int acxpci_e_resume(struct pci_dev *pdev)
+static int acxpci_e_resume(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
@@ -1782,7 +1780,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	FN_ENTER;
 
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
+	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+				&acxpci_hw_ops);
 	if (!ieee) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       dev_name(&vdev->dev));

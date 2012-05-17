@@ -659,11 +659,11 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	bad:
 	/* Give enough info so that callers can avoid printing their
 	* own diagnostic messages */
-	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+	logf1(L_ANY,
+		"%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
+		devname, cmdstr, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+		acx_cmd_status_str(cmd_status)
 	);
 
 	acxmem_unlock();
@@ -835,7 +835,7 @@ STATick void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 0 // copied to merge, but needs work
+#if 1 // copied to merge, but needs work
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
@@ -1070,24 +1070,28 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		 * rx descriptor on the ACX, which should be
 		 * 0x11000000 if we should process it.
 		 */
-		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
+		Ctl_8 = hostdesc->hd.Ctl_16
+			= read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
+					
 		if ((Ctl_8 & DESC_CTL_HOSTOWN) && (Ctl_8 & DESC_CTL_ACXDONE))
 			break; /* found it! */
 
-		if (unlikely(!--count)) /* hmm, no luck: all descs empty, bail out */
+		if (unlikely(!--count))
+			/* hmm, no luck: all descs empty, bail out */
 			goto end;
 	}
 
-	/* now process descriptors, starting with the first we figured out */
+	/* now process descriptors, starting with the first we figured
+	 * out */
 	while (1) {
-		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n", __func__, tail, Ctl_8);
+		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n",
+			__func__, tail, Ctl_8);
 		/*
 		 * If the ACX has CTL_RECLAIM set on this descriptor
 		 * there is no buffer associated; it just wants us to
 		 * tell it to reclaim the memory.
 		 */
 		if (!(Ctl_8 & DESC_CTL_RECLAIM)) {
-
 			/*
 			 * slave interface - pull data now
 			 */
@@ -1101,7 +1105,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 			 * information takes up an additional 12
 			 * bytes, so add that to the length we copy.
 			 */
-			addr = read_slavemem32(adev, (uintptr_t) &(rxdesc->ACXMemPtr));
+			addr = read_slavemem32(adev,
+					(uintptr_t) &(rxdesc->ACXMemPtr));
 			if (addr) {
 				/*
 				 * How can &(rxdesc->ACXMemPtr) above
@@ -1115,14 +1120,15 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
-				acxmem_chaincopy_from_slavemem(adev, (u8 *) hostdesc->data, addr,
-						hostdesc->hd.length + (uintptr_t) &((rxbuffer_t *) 0)->hdr_a3);
+				acxmem_chaincopy_from_slavemem(adev, (u8 *)
+					hostdesc->data, addr,
+					hostdesc->hd.length
+					+ (uintptr_t) &((rxbuffer_t *) 0)->hdr_a3);
 
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
-		} else {
+		} else
 			log(L_ANY, "%s: rx reclaim only!\n", __func__);
-		}
 
 		hostdesc->Status = 0;
 
@@ -1158,7 +1164,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 }
 #endif
 
-static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len)
+static int acxmem_get_txbuf_space_needed(acx_device_t *adev,
+					unsigned int len)
 {
 	int blocks_needed;
 
@@ -1988,7 +1995,8 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  *   - Initialize the dev and wlan data
  *   - Initialize the MAC
  *
- * pdev	- ptr to pci device structure containing info about pci configuration
+ * pdev - ptr to pci device structure containing info about pci
+ *	  configuration
  * id	- ptr to the device id entry that matched this device
  */
 static int __devinit acxmem_probe(struct platform_device *pdev)
@@ -2261,7 +2269,8 @@ done:
  * Shut device down (if not hot unplugged)
  * and deallocate PCI resources for the acx chip.
  *
- * pdev - ptr to PCI device structure containing info about pci configuration
+ * pdev - ptr to PCI device structure containing info about pci
+ * configuration
  */
 static int __devexit acxmem_remove(struct platform_device *pdev)
 {
@@ -2360,12 +2369,12 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
  * TODO: PM code needs to be fixed / debugged / tested.
  */
 #ifdef CONFIG_PM
-STATick int
-acxmem_e_suspend(struct platform_device *pdev, pm_message_t state)
+static int acxmem_e_suspend(struct platform_device *pdev,
+			pm_message_t state)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)
-		platform_get_drvdata(pdev);
 	acx_device_t *adev;
+	struct ieee80211_hw *hw
+		= (struct ieee80211_hw *) platform_get_drvdata(pdev);
 
 	FN_ENTER;
 	pr_acx("suspend handler is experimental!\n");

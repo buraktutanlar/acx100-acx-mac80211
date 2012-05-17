@@ -1,29 +1,20 @@
-#ifndef _MEM_INLINES_H_
-#define _MEM_INLINES_H_
+#ifndef _INLINES_H_
+#define _INLINES_H_
 
-/* currently need this even for no-mem builds, as it contains the
- * locking elements used in merge.c. TBD whether its worth
- * repartitioning to achieve this
- */
-#if defined(CONFIG_ACX_MAC80211_MEM) || 1
-
-/*
+/* ##################################################
  * BOM Data Access
  * Locking in mem
- * ==================================================
- */
-
-/*
- * Locking in mem is more complex as for pci, because the different
+ *
+ * Locking in mem is more complex than for pci, because the different
  * data-access functions below need to be protected against incoming
  * interrupts.
  *
- * Data-access on the mem device is always going in serveral,
- * none-atomic steps, involving 2 or more register writes
- * (e.g. ACX_SLV_REG_ADDR, ACX_SLV_REG_DATA).
+ * Data-access on the mem device is always going in several non-atomic
+ * steps, involving 2 or more register writes (e.g. ACX_SLV_REG_ADDR,
+ * ACX_SLV_REG_DATA).
  *
  * If an interrupt is serviced while a data-access function is
- * ongoing, this may give access interference with by the involved
+ * ongoing, this may cause access interference with the involved
  * operations, since the irq routine is also using the same
  * data-access functions.
  *
@@ -43,14 +34,14 @@
  * accesses well enough, that simple driver operation without
  * inbetween scans work without problems.
  *
- * Different locking approaches a possible to solves this (e.g. fine
+ * Different locking approaches are possible to solve this (e.g. fine
  * vs coarse-grained).
  *
  * The chosen approach is:
  *
- * 1) Mem.c data-access functions contain all a check to insure, they
- * are executed under the acx-spinlock.  => This is the red line that
- * tells, if something needs coverage.
+ * 1) Mem.c data-access functions all contain a check to insure that
+ * they are executed under the acx-spinlock.  => This is the red line
+ * that tells, if something needs coverage.
  *
  * 2) The scope of acx-spinlocking is local, in this case here only to
  * mem.c.  All common.c functions are already protected by the sem.
@@ -61,20 +52,17 @@
  *
  * a) as coarse-grained as possible, and ...
  *
- * b) ... as fine-grained as required. Basically that means, that
- * before functions, that sleep, unlocking needs to be done. And
- * locking is taken up again inside the sleeping
- * function. Specifically the cmd-functions are used in this path.
+ * b) ... as fine-grained as required.  Basically that means that
+ * before functions that sleep are called, unlocking needs to be done.
+ * And locks are taken again inside the sleeping function.
+ * Specifically the cmd-functions are used in this path.
  *
  * Once stable, the locking checks in the data-access functions could
- * be #defined away. Mem.c is anyway more used two smaller cpus (pxa
+ * be #defined away.  Mem.c is anyway more used two smaller cpus (pxa
  * UP e.g.), so the implied runtime constraints by the lock won't take
  * much effect.
  */
 
-/* These are used in many mem.c funcs, including those which should be
- * merged with their pci counterparts.
- */
 #define acxmem_lock_flags	unsigned long flags = 0
 #define acxmem_lock()						\
 	if (IS_MEM(adev))					\
@@ -164,8 +152,7 @@ INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
 		return acx_readl(adev->iobase + adev->io[offset]);
 		#else
 		return acx_readw(adev->iobase + adev->io[offset])
-			+ (acx_readw(adev->iobase +
-					adev->io[offset] + 2) << 16);
+		    + (acx_readw(adev->iobase + adev->io[offset] + 2) << 16);
 		#endif
 	}
 	/* else IS_MEM */
@@ -220,20 +207,19 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	return (u8) lo;
 }
 
-INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset,
-			u32 val)
+INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 {
 	u32 addr;
 
 	if (IS_PCI(adev)) {
 		#if ACX_IO_WIDTH == 32
 		acx_writel(val, adev->iobase + adev->io[offset]);
-#else
-		acx_writew(val & 0xffff, (u8 *) adev->iobase
-			+ adev->io[offset]);
-		acx_writew(val >> 16, (u8 *) adev->iobase
-			+ adev->io[offset] + 2);
-#endif
+		#else
+		acx_writew(val & 0xffff,
+			(u8 *) adev->iobase + adev->io[offset]);
+		acx_writew(val >> 16,
+			(u8 *) adev->iobase + adev->io[offset] + 2);
+		#endif
 	}
 	/* else IS_MEM */
 
@@ -245,8 +231,7 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset,
 	acx_writel(val, adev->iobase + ACX_SLV_REG_DATA);
 }
 
-INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset,
-			u16 val)
+INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
 {
 	u32 addr;
 
@@ -320,8 +305,7 @@ INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset,
 	write_flush(adev);
 }
 
-INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset,
-			u32 bits)
+INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
 {
 	u32 tmp;
 
@@ -447,5 +431,4 @@ INLINE_IO u16 read_slavemem16(acx_device_t *adev, u32 slave_address)
 	return val;
 }
 
-#endif /* CONFIG_ACX_MAC80211_MEM */
-#endif /* _MEM_INLINES_H_ */
+#endif /* _INLINES_H_ */

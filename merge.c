@@ -1,4 +1,6 @@
 
+#if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
+
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
 #include "acx_debug.h"
 
@@ -333,7 +335,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 	txbuf = (u8*) adev->tx.buf.txstart;
 	txbuf_phy = adev->tx.buf.phy;
 
-#if 0
+#if 0	/* tx-buffer */
 /* Each tx buffer is accessed by hardware via txdesc -> txhostdesc(s)
  * -> txbuffer(s).  We use only one txhostdesc per txdesc, but it
  * looks like acx111 is buggy: it accesses second txhostdesc (via
@@ -377,7 +379,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 		}
 		hostdesc++;
 	}
-#endif
+#endif	/* tx-buffer */
 	/* We initialize two hostdescs so that they point to adjacent
 	 * memory areas. Thus txbuf is really just a contiguous memory
 	 * area */
@@ -459,7 +461,7 @@ static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
 
 		if (IS_PCI(adev))
 			adev->rx.desc_start = (rxdesc_t *)
-				((u8 *) adev->iobase2 + rx_queue_start);
+				(adev->iobase2 + rx_queue_start);
 		else
 			adev->rx.desc_start = (rxdesc_t *)
 				((u8 *) (uintptr_t)rx_queue_start);
@@ -718,7 +720,7 @@ void acx_free_desc_queues(acx_device_t *adev)
 		adev->_dir_.host.start, adev->_dir_.host.phy); \
 	ACX_FREE_QUEUE(adev, adev->_dir_.buf.size, \
 		adev->_dir_.buf.start, adev->_dir_.buf.phy);
-#endif
+#endif	// ACX_FREE_QUEUES
 
 	FN_ENTER;
 
@@ -970,11 +972,11 @@ end:
 	FN_EXIT1(result);
 	return result;
 }
-#endif  /* acx_write_eeprom() */
+#endif	/* acx_write_eeprom() */
 
 static inline void acx_read_eeprom_area(acx_device_t *adev)
 {
-#if ACX_DEBUG > 1
+#if ACX_DEBUG > 1 /* in acx_read_eeprom_area() */
 	int offs;
 	u8 tmp;
 
@@ -983,11 +985,12 @@ static inline void acx_read_eeprom_area(acx_device_t *adev)
 	if (IS_MEM(adev) || IS_PCI(adev))
 		for (offs = 0x8c; offs < 0xb9; offs++)
 			acx_read_eeprom_byte(adev, offs, &tmp);
-	else BUG();
+	else
+		BUG();
 
 	FN_EXIT0;
 
-#endif
+#endif	/* ACX_DEBUG > 1 : in acx_read_eeprom_area() */
 }
 
 /*
@@ -1097,7 +1100,7 @@ fail:
  *	0	success
  */
 /* static  */
-#if 1 // needs work, but it compiles
+#if 1	// acx_write_fw()
 int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset)
 {
@@ -1124,16 +1127,17 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
 		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
 		write_flush(adev);
-#endif
-#endif
-	} else {
+#endif	/* FW_NO_AUTO_INCREMENT */
+#endif	/* NOPE mem.c only, all else same */
+	}
+	else {
 #if FW_NO_AUTO_INCREMENT
 		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 0); /* use basic mode */
 #else
 		write_reg32(adev, IO_ACX_SLV_MEM_CTL, 1); /* use autoincrement mode */
 		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset); /* configure start address */
 		write_flush(adev);
-#endif
+#endif	/* FW_NO_AUTO_INCREMENT */
 	}
 	len = 0;
 	size = le32_to_cpu(fw_image->size) & (~3);
@@ -1149,18 +1153,18 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 			write_reg32(adev, IO_ACX_SLV_MEM_ADDR,
 				offset + len - 4);
 			write_flush(adev);
-#endif
+#endif	/* FW_NO_AUTO_INCREMENT */
 			write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
 			write_flush(adev);
 		} else {
-#ifdef NOPE // mem.c
+#ifdef NOPE
 #if FW_NO_AUTO_INCREMENT
 		write_reg32(adev, IO_ACX_SLV_MEM_ADDR, offset + len - 4);
 		write_flush(adev);
-#endif
+#endif	/* FW_NO_AUTO_INCREMENT */
 		write_reg32(adev, IO_ACX_SLV_MEM_DATA, v32);
 		write_flush(adev);
-#endif
+#endif	/* NOPE */
 /* mem.c only, til .. */
 		write_slavemem32(adev, offset + len - 4, v32);
 
@@ -1187,7 +1191,7 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 	FN_EXIT1(sum != le32_to_cpu(fw_image->chksum));
 	return (sum != le32_to_cpu(fw_image->chksum));
 }
-#endif
+#endif	// acx_write_fw()
 
 /*
  * acx_validate_fw
@@ -1281,7 +1285,7 @@ int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 	return result;
 }
 
-#if 1 /* used for mem.c only */
+#if 1	/* used for mem.c only */
 
 #ifdef PATCH_AROUND_BAD_SPOTS
 /*
@@ -1296,7 +1300,7 @@ static const u32 patch[] = {
 	0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
 	0xffff0808
 };
-#endif // PATCH_AROUND_BAD_SPOTS
+#endif	// PATCH_AROUND_BAD_SPOTS
 
 static int _acx_upload_fw(acx_device_t *adev, char *filename)
 {
@@ -1310,12 +1314,9 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 #ifdef PATCH_AROUND_BAD_SPOTS
 	u32 offset;
 	int i;
-#endif
+#endif	/* PATCH_AROUND_BAD_SPOTS */
 
 	FN_ENTER;
-
-	/* No combined image; tell common we need the radio firmware, too */
-	adev->need_radio_fw = 1;
 
 	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
 	if (!fw_image) {
@@ -1349,11 +1350,11 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 #ifdef PATCH_AROUND_BAD_SPOTS
 	acxmem_lock();
 	/*
-	 * Only want to do this if the firmware is exactly what we expect for an
-	 * iPaq 4700; otherwise, bad things would ensue.
+	 * Only want to do this if the firmware is exactly what we
+	 * expect for an iPaq 4700; otherwise, bad things would ensue.
 	 */
 	if ((HX4700_FIRMWARE_CHECKSUM == fw_image->chksum)
-			|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
+		|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
 		/*
 		 * Put the patch after the main firmware image.
 		 * 0x950c contains the ACX's idea of the end of the
@@ -1395,7 +1396,7 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 
 	}
 	acxmem_unlock();
-#endif // PATCH_AROUND_BAD_SPOTS
+#endif	// PATCH_AROUND_BAD_SPOTS
 	} // IS_MEM
 
 	vfree(fw_image);
@@ -1403,12 +1404,75 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 	FN_EXIT1(res);
 	return res;
 }
+
 int acxmem_upload_fw(acx_device_t *adev)
 {
 	char *filename = "WLANGEN.BIN";
-	return _acx_upload_fw(adev, filename);
+	int rc;
+
+	FN_ENTER;
+	/* No combined image; tell common we need the radio firmware, too */
+	adev->need_radio_fw = 1;
+	rc = _acx_upload_fw(adev, filename);
+	FN_EXIT1(rc);
+	return rc;
 }
-#endif // acx_upload_fw()
+
+int acxpci_upload_fw(acx_device_t *adev)
+{
+	char filename[sizeof("tiacx1NNcNN")];
+	int rc;
+
+	FN_ENTER;
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they need to provide.
+	 * Firmware loading is a frequent end-user PITA with these
+	 * chipsets.
+	 */
+	pr_acx("need firmware for acx1%02d chipset with radio ID %02X\n"
+		"Please provide via firmware hotplug:\n"
+		"either combined firmware (single file named "
+		"'tiacx1%02dc%02X')\n"
+		"or two files (base firmware file 'tiacx1%02d' "
+		"+ radio fw 'tiacx1%02dr%02X')\n",
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11, adev->radio_type,
+		IS_ACX111(adev)*11,
+		IS_ACX111(adev)*11, adev->radio_type
+		);
+
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they are supposed to
+	 * provide, since firmware loading is the biggest enduser PITA
+	 * with these chipsets.  Not printing radio ID in 0xHEX in
+	 * order to not confuse them into wrong file naming
+	 */
+	pr_acx("need to load firmware for acx1%02d chipset with radio "
+		"ID %02x, please provide via firmware hotplug:\n"
+		"either one file only (<c>ombined firmware image file, "
+		"radio-specific) or two files (radio-less base image "
+		"file *plus* separate <r>adio-specific extension file)\n",
+		IS_ACX111(adev)*11, adev->radio_type);
+
+	/* Try combined, then main image */
+	adev->need_radio_fw = 0;
+	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
+		 IS_ACX111(adev) * 11, adev->radio_type);
+
+	rc = _acx_upload_fw(adev, filename);
+	if (!rc) {
+		FN_EXIT1(rc);
+		return rc;
+	}
+	adev->need_radio_fw = 1;
+	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
+		 IS_ACX111(adev) * 11, adev->radio_type);
+
+	rc = _acx_upload_fw(adev, filename);
+	FN_EXIT1(rc);
+	return rc;
+}
+#endif	// acx_upload_fw()
 
 #if defined(NONESSENTIAL_FEATURES)
 
@@ -1473,7 +1537,7 @@ void acx_show_card_eeprom_id(acx_device_t *adev)
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
 			if (device_ids[i].descr) {
 				pr_acx("EEPROM card ID string check "
-					"found %s card ID: is this %s?\n",
+					"found %s card ID: is this a %s?\n",
 					device_ids[i].descr,
 					device_ids[i].type);
 			}
@@ -1489,14 +1553,14 @@ void acx_show_card_eeprom_id(acx_device_t *adev)
 }
 #else
 static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
-#endif /* NONESSENTIAL_FEATURES */
+#endif	/* NONESSENTIAL_FEATURES */
 
 /*
  * BOM CMDs (Control Path)
  * ==================================================
  */
 
-#if 1 //
+#if 1	/* acx_read_cmd_type_status() */
 u32 acx_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
@@ -1516,7 +1580,7 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
-#endif // acxmem_read_cmd_type_status()
+#endif	/* acx_read_cmd_type_status() */
 
 /* static inline  */
 void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
@@ -1533,9 +1597,7 @@ void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
 	FN_EXIT0;
 }
 
-#if 1 //
-/* static inline  */
-void acx_init_mboxes(acx_device_t *adev)
+static void acx_init_mboxes(acx_device_t *adev)
 {
 	uintptr_t cmd_offs, info_offs;
 
@@ -1549,18 +1611,16 @@ void acx_init_mboxes(acx_device_t *adev)
 		if (adev->iobase2)
 			pr_notice("adev->iobase2 != 0 for MEM dev\n");
 	} else {
-		adev->cmd_area = (u8 *) adev->iobase2 + cmd_offs;
-		adev->info_area = (u8 *) adev->iobase2 + info_offs;
+		adev->cmd_area = adev->iobase2 + cmd_offs;
+		adev->info_area = adev->iobase2 + info_offs;
 	}
 	/* OW iobase2 not used in mem.c, in pci.c it is */
-	log(L_DEBUG,
-	    "iobase2=%p cmd_mbox_offset=%lX cmd_area=%pinfo_mbox_offset=%lX info_area=%p\n",
-	    adev->iobase2, cmd_offs, adev->cmd_area,
-	    info_offs, adev->info_area);
+	log(L_DEBUG, "iobase2=%p cmd_mbox_offset=%lX cmd_area=%pinfo_mbox_offset=%lX info_area=%p\n",
+		adev->iobase2, cmd_offs, adev->cmd_area,
+		info_offs, adev->info_area);
 
 	FN_EXIT0;
 }
-#endif
 
 /*
  * acxmem_s_issue_cmd_timeo
@@ -1585,7 +1645,7 @@ void acx_init_mboxes(acx_device_t *adev)
  * Also ifup/down works more reliable on the mem device.
  *
  */
-#if 0 // needs work
+#if 0	/* acxmem_issue_cmd_timeo_debug() */
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
 			unsigned cmd_timeout, const char *cmdstr)
@@ -1811,7 +1871,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
-#endif // acxmem_issue_cmd_timeo_debug()
+#endif	/* acxmem_issue_cmd_timeo_debug() */
 
 #define REG_ACX_VENDOR_ID 0x900
 #define ACX_VENDOR_ID 0x8400104c
@@ -1828,7 +1888,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
  * MAC will be reset
  * Call context: reset_dev
  */
-#if 0 // review before restoring
+#if 0	// acxmem_reset_mac()
 static void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
@@ -1866,7 +1926,7 @@ static void acxmem_reset_mac(acx_device_t *adev)
 
 	FN_EXIT0;
 }
-#endif // acxmem_reset_mac()
+#endif	// acxmem_reset_mac()
 
 void acx_up(struct ieee80211_hw *hw)
 {
@@ -1932,7 +1992,7 @@ int acx_reset_dev(acx_device_t *adev)
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 
-#ifdef CONFIG_PCI
+#ifdef CONFIG_ACX_MAC80211_PCI
         acxpci_reset_mac(adev);
 #endif
 
@@ -1971,7 +2031,7 @@ int acx_reset_dev(acx_device_t *adev)
 			goto end_fail;
 		}
 	} // IS_MEM
-#if 0
+#if 0	// IO_ACX_SOR_CFG
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */
 		msg = "acx: eCPU did not start after boot from flash. ";
@@ -1984,7 +2044,7 @@ int acx_reset_dev(acx_device_t *adev)
 			"is this fatal?\n", adev->ndev->name,
 			wiphy_name(adev->ieee->wiphy));
 	}
-#endif
+#endif	// IO_ACX_SOR_CFG
 
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
 	(IS_MEM(adev))
@@ -2128,9 +2188,9 @@ int acx_verify_init(acx_device_t *adev)
  * control field, of which only 0x02000000 has any meaning.  The lower
  * 19 bits are the address of the next block divided by 32.
  */
-#if 0 // none in pci
-static void acxmem_init_acx_txbuf(acx_device_t *adev) {
-
+#if 0	// acxmem_init_acx_txbuf()
+static void acxmem_init_acx_txbuf(acx_device_t *adev)
+{
 	/*
 	 * acx100_s_init_memory_pools set up txbuf_start and
 	 * txbuf_numblocks for us.  All we need to do is reset the
@@ -2148,73 +2208,13 @@ static void acxmem_init_acx_txbuf(acx_device_t *adev) {
 	 * reset, so the ACX memory is in the state we want.
 	 */
 }
-#endif // acxmem_init_acx_txbuf()
+#endif	// acxmem_init_acx_txbuf()
 
 /*
  * Most of the acx specific pieces of hardware reset.
  */
-#if 0 // none in pci.c, doesnt belong here
-static int acxmem_complete_hw_reset(acx_device_t *adev)
-{
-	acx111_ie_configoption_t co;
-	acxmem_lock_flags;
 
-	/* NB: read_reg() reads may return bogus data before
-	 * reset_dev(), since the firmware which directly controls
-	 * large parts of the I/O registers isn't initialized yet.
-	 * acx100 seems to be more affected than acx111 */
-	if (OK != acx_reset_dev(adev))
-		return -1;
-
-	acxmem_lock();
-	if (IS_ACX100(adev)) {
-		/* ACX100: configopt struct in cmd mailbox - directly
-		 * after reset */
-		acxmem_copy_from_slavemem(adev, (u8*) &co,
-			(u32) adev->cmd_area, sizeof(co));
-	}
-	acxmem_unlock();
-
-	if (OK != acx_init_mac(adev))
-		return -3;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111: configopt struct needs to be queried after
-		 * full init */
-		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	}
-
-	/* Set up transmit buffer administration */
-	acxmem_init_acx_txbuf(adev);
-
-	acxmem_lock();
-
-	/* Windows driver writes 0x01000000 to register 0x288,
-	 * RADIO_CTL, if the form factor is 3.  It also write protects
-	 * the EEPROM by writing 1<<9 to GPIO_OUT
-	 */
-	if (adev->form_factor == 3) {
-		set_regbits(adev, 0x288, 0x01000000);
-		set_regbits(adev, 0x298, 1 << 9);
-	}
-
-	/* TODO: merge them into one function, they are called just
-	 * once and are the same for pci & usb */
-	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		return -2;
-
-	acxmem_unlock();
-
-	acx_parse_configoption(adev, &co);
-	acx_get_firmware_version(adev);
-	/* needs to be after acx_s_init_mac() */
-	acx_display_hardware_details(adev);
-
-	return 0;
-}
-#endif // acxmem_complete_hw_reset()
-
-#if 0
+#if 0	// acxmem_i_set_multicast_list()
 /***********************************************************************
  ** acxmem_i_set_multicast_list
  ** FIXME: most likely needs refinement
@@ -2264,7 +2264,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * BOM Proc, Debug
  * ==================================================
  */
-#if 1 // real close
+#if 0	// acxmem_proc_diag_output()
 int acxmem_proc_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
@@ -2371,8 +2371,9 @@ int acxmem_proc_diag_output(struct seq_file *file,
 					(ulong) & (txdesc->AcxMemPtr));
 			seq_printf(file, " %04x: ", tmp);
 
-			/* Output allocated tx-buffer chain */
-#if 1
+
+#if 1			/* Output allocated tx-buffer chain */
+
 			if (tmp) {
 				while ((tmp2 = read_slavemem32(adev, (u32) tmp))
 						!= 0x02000000) {
@@ -2382,7 +2383,8 @@ int acxmem_proc_diag_output(struct seq_file *file,
 				}
 				seq_printf(file, " %04x=%04x", tmp, tmp2);
 			}
-#endif
+#endif			/* Output allocated tx-buffer chain */
+
 			seq_printf(file, "\n");
 
 #if 0
@@ -2407,7 +2409,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		}
 	}
 
-#if 1
+#if 1	/* Tx-buffer list dump */
 	/* Tx-buffer list dump */
 	seq_printf(file, "\n");
 	seq_printf(file, "* Tx-buffer list dump\n");
@@ -2427,7 +2429,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	}
 	seq_printf(file, "\n");
 	/* --- */
-#endif
+#endif	/* Tx-buffer list dump */
 
 	seq_printf(file, "\n"
 		"** Generic slave data **\n"
@@ -2458,7 +2460,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 	FN_EXIT0;
 	return 0;
 }
-#endif // acxmem_proc_diag_output()
+#endif	// acxmem_proc_diag_output()
 
 /*
  * BOM Rx Path
@@ -2650,7 +2652,7 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
 	return (blocks_needed);
 }
 
-#if 0 // acxmem_get_txdesc()
+#if 0	// acxmem_get_txdesc()
 static inline
 txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
 {
@@ -2668,7 +2670,7 @@ txdesc_t* acxmem_get_txdesc(acx_device_t *adev, int index)
  * sufficiently many.
  */
  /* OW TODO Align with pci.c */
-#if 1 // acxmem_alloc_tx()
+#if 1	// acxmem_alloc_tx()
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	struct txdesc *txdesc;
 	unsigned head;
@@ -2787,7 +2789,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 
 	return (tx_t*) txdesc;
 }
-#endif // acxmem_alloc_tx()
+#endif	// acxmem_alloc_tx()
 
 /*
  * acxmem_l_dealloc_tx
@@ -2799,7 +2801,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
  * pointer back.
  *
  */
-#if 1 // acxmem_dealloc_tx()
+#if 1	// acxmem_dealloc_tx()
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
@@ -2834,13 +2836,13 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	acxmem_unlock();
 
 }
-#endif // acxmem_dealloc_tx()
-#endif // CONFIG_ACX_MAC80211_MEM
+#endif	// acxmem_dealloc_tx()
+#endif	// CONFIG_ACX_MAC80211_MEM
 
 /*
  * Return an acx pointer to the next transmit data block.
  */
-#if 0 // using copy in mem.c
+#if 0	/* acxmem_allocate_acx_txbuf_space() */
 static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 	u32 block, next, last_block;
 	int blocks_needed;
@@ -2902,7 +2904,7 @@ static u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count) {
 
 	return block;
 }
-#endif
+#endif	/* acxmem_allocate_acx_txbuf_space() */
 
 /*
  * Return buffer space back to the pool by following the next pointers
@@ -2979,23 +2981,6 @@ void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
 
-#if 0 // merged
-static txhostdesc_t*
-acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
-	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
-	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
-		pr_info("bad txdesc ptr %p\n", txdesc);
-		return NULL;
-	}
-	index /= adev->tx.desc_size;
-	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
-		pr_info("bad txdesc ptr %p\n", txdesc);
-		return NULL;
-	}
-	return &adev->tx.host.txstart[index * 2];
-}
-#endif // acxmem_get_txhostdesc()
-
 /*
  * acxmem_l_tx_data
  *
@@ -3007,7 +2992,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc) {
  * pre-allocated tx descrs, properly setting up transfer data and
  * CTL_xxx flags according to fragment number.
  */
-#if 1 // pci version merge started
+#if 1	// pci version merge started
 void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		struct ieee80211_tx_info *info, struct sk_buff *skb)
 {
@@ -3263,7 +3248,7 @@ end_of_chain:
 
 	FN_EXIT0;
 }
-#endif // acxmem_tx_data()
+#endif	// acxmem_tx_data()
 
 /*
  * acxmem_l_clean_txdesc
@@ -3555,10 +3540,10 @@ void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue)
 	local_irq_restore (flags);
 #endif
 }
-#endif // CONFIG_ACX_MAC80211_MEM) acxmem_update_queue_indicator()
+#endif	// CONFIG_ACX_MAC80211_MEM) acxmem_update_queue_indicator()
 
 /* OW TODO See if this is usable with mac80211 */
-#if 0
+#if 0	// acxmem_i_tx_timeout()
 /***********************************************************************
  ** acxmem_i_tx_timeout
  **
@@ -3605,10 +3590,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev) {
 
 	FN_EXIT0;
 }
-#endif // acxmem_i_tx_timeout()
-
-#ifdef CONFIG_ACX_MAC80211_MEM
-#endif // CONFIG_ACX_MAC80211_MEM
+#endif	// acxmem_i_tx_timeout()
 
 /*
  * BOM Irq Handling, Timer
@@ -3652,7 +3634,7 @@ void acx_irq_work(struct work_struct *work)
 
 #if IRQ_ITERATE
 	if (!irqmasked) break;
-#endif
+#endif	/* IRQ_ITERATE */
 
 		/* HOST_INT_CMD_COMPLETE handling */
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
@@ -3723,7 +3705,7 @@ void acx_irq_work(struct work_struct *work)
 		 * tx_free >= TX_START_QUEUE */
 		if (!acx_queue_stopped(adev->ieee))
 			acx_tx_queue_go(adev);
-#endif
+#endif	/* IRQ_ITERATE */
 
 		/* HOST_INT_INFO */
 		if (irqmasked & HOST_INT_INFO)
@@ -3807,7 +3789,7 @@ void acx_irq_work(struct work_struct *work)
 
 void acx_handle_info_irq(acx_device_t *adev)
 {
-#if ACX_DEBUG
+#if ACX_DEBUG /* static const char * const info_type_msg[] */
 	static const char * const info_type_msg[] = {
 		"(unknown)",
 		"scan complete",
@@ -3827,7 +3809,8 @@ void acx_handle_info_irq(acx_device_t *adev)
 		"???",
 		"TKIP IV value exceeds thresh"
 	};
-#endif
+#endif	/* ACX_DEBUG static const char * const info_type_msg[] */
+
 	u32 info_type, info_status;
 
 	info_type = (IS_MEM(adev))
@@ -3869,7 +3852,7 @@ void acx_set_interrupt_mask(acx_device_t *adev)
 /* OW FIXME Old interrupt handler
  * ---
  */
-#if 0
+#if 0	/* acxmem_interrupt() */
 static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
@@ -3919,7 +3902,8 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	/* safety condition; we'll normally abort loop below
 	 * in case no IRQ type occurred */
 	while (likely(--irqcount)) {
-#endif
+#endif	// IRQ_ITERATE
+
 		/* ACK all IRQs ASAP */
 		write_reg16(adev, IO_ACX_IRQ_ACK, 0xffff);
 
@@ -3949,10 +3933,11 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 			 * some reason...) */
 			if (adev->tx_free <= TX_START_CLEAN) {
 #if TX_CLEANUP_IN_SOFTIRQ
-				acx_schedule_task(adev, ACX_AFTER_IRQ_TX_CLEANUP);
+				acx_schedule_task(adev,
+						ACX_AFTER_IRQ_TX_CLEANUP);
 #else
 				acx_tx_clean_txdesc(adev);
-#endif
+#endif	/* TX_CLEANUP_IN_SOFTIRQ */
 			}
 		}
 
@@ -3962,7 +3947,8 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 			if (irqtype & HOST_INT_CMD_COMPLETE) {
 				log(L_IRQ, "got Command_Complete IRQ\n");
 				/* save the state for the running issue_cmd() */
-				SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
+				SET_BIT(adev->irq_status,
+					HOST_INT_CMD_COMPLETE);
 			}
 			if (irqtype & HOST_INT_INFO) {
 				acx_handle_info_irq(adev);
@@ -3970,9 +3956,11 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 			if (irqtype & HOST_INT_SCAN_COMPLETE) {
 				log(L_IRQ, "got Scan_Complete IRQ\n");
 				/* need to do that in process context */
-				acx_schedule_task(adev, ACX_AFTER_IRQ_COMPLETE_SCAN);
+				acx_schedule_task(adev,
+						ACX_AFTER_IRQ_COMPLETE_SCAN);
 				/* remember that fw is not scanning anymore */
-				SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
+				SET_BIT(adev->irq_status,
+					HOST_INT_SCAN_COMPLETE);
 			}
 		}
 
@@ -4006,33 +3994,35 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 		if (!irqtype)
 			break;
 
-		if (unlikely(++adev->irq_loops_this_jiffy> MAX_IRQLOOPS_PER_JIFFY)) {
+		if (unlikely(++adev->irq_loops_this_jiffy
+				> MAX_IRQLOOPS_PER_JIFFY)) {
 			pr_err("acx: too many interrupts per jiffy!\n");
-			/* Looks like card floods us with IRQs! Try to stop that */
+			/* Looks like card floods us with IRQs! Try to
+			 * stop that */
 			write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
-			/* This will short-circuit all future attempts to handle IRQ.
-			 * We cant do much more... */
+			/* This will short-circuit all future attempts
+			 * to handle IRQ.  We cant do much more... */
 			adev->irq_mask = 0;
 			break;
 		}
 	}
-#endif
+#endif	/* IRQ_ITERATE */
 
 	/* OW 20091129 TODO Currently breaks mem.c ...
-	 * If sleeping is required like for update card settings, this is usefull
-	 * For now I replaced sleeping for command handling by mdelays.
- *	if (adev->after_interrupt_jobs){
- *		acx_e_after_interrupt_task(adev);
- *	}
+	 * If sleeping is required like for update card settings, this
+	 * is usefull For now I replaced sleeping for command handling
+	 * by mdelays.  if (adev->after_interrupt_jobs){
+	 * acx_e_after_interrupt_task(adev); }
 	 */
 
-
 /* OW TODO */
-#if 0
+#if 0	/* call update_link_quality_led() */
+
 	/* Routine to perform blink with range */
 	if (unlikely(adev->led_power == 2))
 		update_link_quality_led(adev);
-#endif
+
+#endif	/* call update_link_quality_led() */
 
 	/* handled: */
 	/* write_flush(adev); - not needed, last op was read anyway */
@@ -4045,7 +4035,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	FN_EXIT0;
 	return IRQ_NONE;
 }
-#endif
+#endif	/* acxmem_interrupt() */
 /* --- */
 
 
@@ -4155,8 +4145,9 @@ INLINE_IO int acxmem_adev_present(acx_device_t *adev)
 }
 
 /* OW TODO */
-#if 0
-static void update_link_quality_led(acx_device_t *adev) {
+#if 0	/* update_link_quality_led() */
+static void update_link_quality_led(acx_device_t *adev)
+{
 	int qual;
 
 	qual = acx_signal_determine_quality(adev->wstats.qual.level,
@@ -4171,7 +4162,7 @@ static void update_link_quality_led(acx_device_t *adev) {
 		adev->brange_time_last_state_change = jiffies;
 	}
 }
-#endif
+#endif	/* update_link_quality_led() */
 
 
 /*
@@ -4180,10 +4171,11 @@ static void update_link_quality_led(acx_device_t *adev) {
  */
 
 /* OW TODO Not used in pci either !? */
-#if 0
+#if 0	/* acx111pci_ioctl_info() */
 int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
-		struct iw_param *vwrq, char *extra) {
-#if ACX_DEBUG > 1
+		struct iw_param *vwrq, char *extra)
+{
+#if ACX_DEBUG > 1 /* in acx111pci_ioctl_info body */
 
 	acx_device_t *adev = ieee2adev(hw);
 	rxdesc_t *rxdesc;
@@ -4461,12 +4453,12 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 		end_ok:
 
 		acx_sem_unlock(adev);
-#endif /* ACX_DEBUG */
+#endif	/* ACX_DEBUG > 1 in acx111pci_ioctl_info body */
 	return OK;
 }
 
-/***********************************************************************
- */
+/********************************************************************/
+
 int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 		struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra) {
@@ -4509,7 +4501,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 	acx_sem_unlock(adev);
 	return OK;
 }
-#endif
+#endif	/* acx111pci_ioctl_info() */
 
 void acx_delete_dma_regions(acx_device_t *adev)
 {
@@ -4556,7 +4548,7 @@ void acx_delete_dma_regions(acx_device_t *adev)
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
-#if 0 // non-trivial diffs vs pci
+#if 0	/* acxmem_probe() */
 static int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	acx_device_t *adev = NULL;
@@ -4577,7 +4569,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
 	if (!ieee) {
-		pr_acx("could not allocate ieee80211 structure %s\n", pdev->name);
+		pr_acx("could not allocate ieee80211 structure %s\n",
+			pdev->name);
 		goto fail_ieee80211_alloc_hw;
 	}
 	SET_IEEE80211_DEV(ieee, &pdev->dev);
@@ -4696,7 +4689,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 			IRQF_SHARED,
 			KBUILD_MODNAME,
 			adev)) {
-		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		pr_acx("%s: request_irq FAILED\n",
+			wiphy_name(adev->ieee->wiphy));
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
@@ -4782,7 +4776,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
-#endif
+#endif	/* CMD_DISCOVERY */
 
 	result = OK;
 	goto done;
@@ -4817,7 +4811,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	FN_EXIT1(result);
 	return result;
 }
-#endif
+#endif	/* acxmem_probe() */
 
 /*
  * acxmem_e_remove
@@ -4827,7 +4821,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-#if 0 // close, but defer merge
+#if 0	/* acxmem_remove() */
 static int __devexit acxmem_remove(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
@@ -4863,7 +4857,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 		 * not possible currently, since not supported by all
 		 * firmware versions */
 		acx_issue_cmd(adev, ACX100_CMD_SLEEP, NULL, 0);
-#endif
+#endif	/* REDUNDANT */
 
 		acxmem_lock();
 
@@ -4920,9 +4914,9 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 
 	return(0);
 }
-#endif
+#endif	/* acxmem_remove() */
 
-#if 0 // til-end
+#if 0	/* CONFIG_PM not ready */
 /*
  * TODO: PM code needs to be fixed / debugged / tested.
  */
@@ -5020,7 +5014,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 	FN_EXIT0;
 	return OK;
 }
-#endif /* CONFIG_PM */
+#endif	/* CONFIG_PM */
 
 
 static struct platform_driver acxmem_driver = {
@@ -5033,7 +5027,7 @@ static struct platform_driver acxmem_driver = {
 #ifdef CONFIG_PM
 	.suspend = acxmem_e_suspend,
 	.resume = acxmem_e_resume
-#endif /* CONFIG_PM */
+#endif	/* CONFIG_PM */
 };
 
 /*
@@ -5046,20 +5040,21 @@ int __init acxmem_init_module(void) {
 
 	FN_ENTER;
 
-#if (ACX_IO_WIDTH==32)
+#if (ACX_IO_WIDTH == 32)
 	pr_acx("compiled to use 32bit I/O access. "
 		"I/O timing issues might occur, such as "
 		"non-working firmware upload. Report them\n");
 #else
 	pr_acx("compiled to use 16bit I/O access only "
 			"(compatibility mode)\n");
-#endif
+#endif	/* (ACX_IO_WIDTH == 32) */
 
 #ifdef __LITTLE_ENDIAN
 #define ENDIANNESS_STRING "acx: running on a little-endian CPU\n"
 #else
 #define ENDIANNESS_STRING "acx: running on a BIG-ENDIAN CPU\n"
-#endif
+#endif	/* __LITTLE_ENDIAN */
+
 	log(L_INIT,
 			ENDIANNESS_STRING
 			"acx: Slave-memory module initialized, "
@@ -5090,4 +5085,5 @@ MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );
 MODULE_DESCRIPTION( "ACX Slave Memory Driver" );
 MODULE_LICENSE( "GPL" );
 
-#endif // til-end
+#endif	/* CONFIG_PM not ready */
+#endif	/* CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM */
