@@ -1,6 +1,6 @@
 
-// ick: shouldnt declare things in headers
-// cuz including it 2x is bad
+#ifndef _IO_ACX_H_
+#define _IO_ACX_H_
 
 static const u16 IO_ACX100[] = {
 	0x0000,			/* IO_ACX_SOFT_RESET */
@@ -84,3 +84,5 @@ static const u16 IO_ACX111[] = {
 	0x0104,			/* IO_ACX_SOR_CFG */
 	0x0108,			/* IO_ACX_ECPU_CTRL */
 };
+
+#endif /* _IO_ACX_H_ */

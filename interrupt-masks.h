@@ -99,7 +99,7 @@ inline void interrupt_sanity_checks(void) {}
 const char *devtype_names[] = { "PCI", "USB", "MEM" };
 const char *chiptype_names[] = { "", "ACX100", "ACX111" };
 
-// defd to textually match #define table in acx-struct-hw (then reordered)
+/* defd to textually match #define table in acx-struct-hw (then reordered) */
 struct interrupt_desc {
 	int flagval;
 	char *name;
@@ -166,17 +166,17 @@ void interrupt_show_flags(u16 flagval, u16 versus)
 {
 	int i, mask, flagdiffs;
 
-	// pr_info("flagval:0x%x versus:0x%x\n", flagval, versus);
+	/* pr_info("flagval:0x%x versus:0x%x\n", flagval, versus); */
 
 	flagdiffs = flagval ^ versus;
 
-	// pr_info("flagdiffs:0x%x\n", flagdiffs);
+	/* pr_info("flagdiffs:0x%x\n", flagdiffs); */
 
 	if (!flagdiffs) return;
 
 	flagdiffs = ~flagdiffs;	// flags are active low 
 
-	// pr_info("~flagdiffs:0x%x\n", flagdiffs);
+	/* pr_info("~flagdiffs:0x%x\n", flagdiffs); */
 
 	for (i = 0; i < 16; i++) {
 		mask = 1 << i;
@@ -200,7 +200,7 @@ inline void interrupt_sanity_checks(acx_device_t *adev)
 	for (d = 0; d < DEVTYPE_MAX; d++) {
 		for (c = 0; c < CHIPTYPE_MAX; c++) {
 
-			// skip non-devices or no-flags (same condition really)
+			/* skip non-devices or no-flags (same condition really) */
 			if (!interrupt_masks[d][c]) continue;
 			if (!chiptype_names[c])	continue;
 
@@ -210,7 +210,7 @@ inline void interrupt_sanity_checks(acx_device_t *adev)
 
 			interrupt_show_flags(interrupt_masks[d][c], 0);
 
-			// continue;
+			/* continue; */
 
 			/* see diffs */
 			pr_info("vs devtype:%d:%s chip:%d:%s val:0x%x\n",

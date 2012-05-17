@@ -86,24 +86,23 @@ acx(pci|mem)_get_txbuf(): DONE
 
 acx(pci|mem)_process_rxdesc(): DONE
 
-acx(pci|mem)_delete_dma_regions(): DONE, pending
-acx(pci|mem)_reset_dev(): DONE, pending
-acx(pci|mem)_verify_init(): DONE, pending
+acx(pci|mem)_delete_dma_regions(): DONE
+acx(pci|mem)_reset_dev(): DONE
+acx(pci|mem)_verify_init(): DONE
 - kinda pointless; though structurally identical, nothing is shared
 
 acx(mem|pci)_tx_clean_txdesc_emergency(): DONE
 acx(mem|pci)_write_phy_reg(): DONE
 
-
-acx(pci|mem)_irq_work():
+acx(pci|mem)_irq_work(): DONE
   diffs around ITERATE
-
   slave_mem - need wrappers 
-  slave-mem
-
   slave-mem
   maybe make a helper for above.
   grody diffs
+
+acx(pci|mem)_reset_dev(): DONE
+acx(pci|mem)_s_validate_fw(): DONE except for few stray comments
 
 OTHERS
 
@@ -115,7 +114,8 @@ acxmem_issue_cmd_timeo_debug():
     VS acxmem_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
 
 
-acxpci_init_mboxes():
+acx(pci|mem)_init_mboxes(): DONE, old are cleaned
+acx(pci|mem)_s_write_fw(): DONE, only header left.
 
 acxmem_proc_diag_output():
   grody diffs
@@ -125,22 +125,18 @@ acx(pci|mem)_write_phy_reg()
 
 acx(pci|mem)_write_eeprom_byte()  (UNUSED)
 
-acx(pci|mem)_s_write_fw()
-acx(pci|mem)_s_validate_fw()
 acx(pci|mem)_issue_cmd_timeo_debug() fair divergence
-acx(pci|mem)_init_mboxes()
-acx(pci|mem)_reset_dev()
 acx(pci|mem)_interrupt()   (comment diffs)
 acx111(pci|mem)_ioctl_info() (extra printks in mem
 
 ---------
-refactor struct acx_device
+refactor struct acx_device: DONE
 
 move (tx|rx)(host)?desc to sub-structure.
 this will allow simplification of code doing buffer allocs and frees.
 
 ---------
-move or copy (tbd) all proc files to debugfs
+move or copy (tbd) all proc files to debugfs: DONE
 
 ---------
 acx_proc_show_eeprom(struct seq_file *file, void *v)

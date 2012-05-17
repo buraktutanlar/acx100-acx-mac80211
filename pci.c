@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define ACX_MAC80211_PCI 1
 
 #include "acx_debug.h"
 
@@ -52,6 +51,7 @@
 #include "acx.h"
 #include "pci.h"
 #include "merge.h"
+#include "io-acx.h"
 
 /*
  * BOM Config
@@ -80,8 +80,9 @@ static void vlynq_remove(struct vlynq_device *vdev);
  * ==================================================
  */
 
-// PCI
-// -----
+/* PCI
+ * -----
+ */
 #ifdef CONFIG_PCI
 #define PCI_TYPE		(PCI_USES_MEM | PCI_ADDR0 | PCI_NO_ACPI_WAKE)
 #define PCI_ACX100_REGION1		0x01
@@ -130,9 +131,9 @@ static void vlynq_remove(struct vlynq_device *vdev);
  * ==================================================
  */
 
-#include "pci-inlines.h"
+#include "inlines.h"
 
-// -----
+/* ----- */
 
 /*
  * acxpci_s_create_rx_host_desc_queue
@@ -142,7 +143,7 @@ static void vlynq_remove(struct vlynq_device *vdev);
  */
 
 
-// static inline 
+/* static inline  */
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {
@@ -156,123 +157,13 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  */
 
 /*
- * We don't lock hw accesses here since we never r/w eeprom in IRQ
- * Note: this function sleeps only because of GFP_KERNEL alloc
- */
-#ifdef UNUSED
-int
-acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len,
-		      const u8 * charbuf)
-{
-	u8 *data_verify = NULL;
-	unsigned long flags;
-	int count, i;
-	int result = NOT_OK;
-	u16 gpio_orig;
-
-	pr_acx("WARNING! I would write to EEPROM now. "
-	       "Since I really DON'T want to unless you know "
-	       "what you're doing (THIS CODE WILL PROBABLY "
-	       "NOT WORK YET!), I will abort that now. And "
-	       "definitely make sure to make a "
-	       "/proc/driver/acx_wlan0_eeprom backup copy first!!! "
-	       "(the EEPROM content includes the PCI config header!! "
-	       "If you kill important stuff, then you WILL "
-	       "get in trouble and people DID get in trouble already)\n");
-	return OK;
-
-	FN_ENTER;
-
-	/* first we need to enable the OE (EEPROM Output Enable) GPIO
-	 * line to be able to write to the EEPROM.  NOTE: an EEPROM
-	 * writing success has been reported, but you probably have to
-	 * modify GPIO_OUT, too, and you probably need to activate a
-	 * different GPIO line instead! */
-	gpio_orig = read_reg16(adev, IO_ACX_GPIO_OE);
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig & ~1);
-	write_flush(adev);
-
-	/* ok, now start writing the data out */
-	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
-		write_reg32(adev, IO_ACX_EEPROM_DATA, *(charbuf + i));
-		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 1);
-
-		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-			if (unlikely(!--count)) {
-				pr_acx("WARNING, DANGER!!! "
-				       "Timeout waiting for EEPROM write\n");
-				goto end;
-			}
-			cpu_relax();
-		}
-	}
-
-	/* disable EEPROM writing */
-	write_reg16(adev, IO_ACX_GPIO_OE, gpio_orig);
-	write_flush(adev);
-
-	data_verify = kmalloc(len, GFP_KERNEL);
-	if (!data_verify)
-		goto end;
-
-	/* now start a verification run */
-	for (i = 0; i < len; i++) {
-		write_reg32(adev, IO_ACX_EEPROM_CFG, 0);
-		write_reg32(adev, IO_ACX_EEPROM_ADDR, addr + i);
-		write_flush(adev);
-		write_reg32(adev, IO_ACX_EEPROM_CTL, 2);
-
-		count = 0xffff;
-		while (read_reg16(adev, IO_ACX_EEPROM_CTL)) {
-			if (unlikely(!--count)) {
-				pr_acx("timeout waiting for EEPROM read\n");
-				goto end;
-			}
-			cpu_relax();
-		}
-
-		data_verify[i] = read_reg16(adev, IO_ACX_EEPROM_DATA);
-	}
-
-	if (0 == memcmp(charbuf, data_verify, len))
-		result = OK;	/* read data matches, success */
-
-	kfree(data_verify);
-end:
-	FN_EXIT1(result);
-	return result;
-}
-#endif /* UNUSED */
-
-//static
-inline void acxpci_read_eeprom_area(acx_device_t * adev)
-{
-#if ACX_DEBUG > 1
-	int offs;
-	u8 tmp;
-
-	FN_ENTER;
-
-	for (offs = 0x8c; offs < 0xb9; offs++)
-		acx_read_eeprom_byte(adev, offs, &tmp);
-
-	FN_EXIT0;
-#endif // ACX_DEBUG > 1 acxpci_read_eeprom_area() body 
-}
-
-
-/*
  * acxpci_s_upload_fw
  *
  * Called from acx_reset_dev
  *
  * Origin: Derived from FW dissection
  */
-// static 
+/* static  */
 int acxpci_upload_fw(acx_device_t *adev)
 {
 	firmware_image_t *fw_image = NULL;
@@ -478,7 +369,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 			break;
 
 		if (counter % 8 == 0) {
-			// Timeout
+			/* Timeout */
 			if (time_after(jiffies, timeout)) {
 				counter = -1;
 				break;
@@ -554,7 +445,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
 			acx_cmd_status_str(cmd_status)
 	);
-	// dump_stack();
+	/* dump_stack(); */
 	FN_EXIT1(NOT_OK);
 	
 	return NOT_OK;
@@ -575,7 +466,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  *
  * Origin: Standard Read/Write to IO
  */
-//static
+/* static */
 void acxpci_reset_mac(acx_device_t * adev)
 {
 	u16 temp;
@@ -626,7 +517,7 @@ static void update_link_quality_led(acx_device_t * adev)
 		       (HZ / 2 -
 			HZ / 2 * (unsigned long)qual /
 			adev->brange_max_quality))) {
-		acxpci_l_power_led(adev, (adev->brange_last_state == 0));
+		acx_power_led(adev, (adev->brange_last_state == 0));
 		adev->brange_last_state ^= 1;	// toggle
 		adev->brange_time_last_state_change = jiffies;
 	}
@@ -749,7 +640,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 	/* 2005-10-11: there were several bug reports on this
 	 * happening but now cause seems to be understood & fixed */
 
-	// TODO OW Check if this is correct
+	/* TODO OW Check if this is correct */
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so
 		 * probably ring buffer already full */
@@ -834,25 +725,6 @@ static const struct ieee80211_ops acxpci_hw_ops = {
  * BOM Helpers
  * ==================================================
  */
-
-void acxpci_power_led(acx_device_t * adev, int enable)
-{
-	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
-
-	/* A hack. Not moving message rate limiting to adev->xxx (it's
-	 * only a debug message after all) */
-	static int rate_limit = 0;
-
-	if (rate_limit++ < 3)
-		log(L_IOCTL, "Please report in case toggling the power "
-		    "LED doesn't work for your card\n");
-	if (enable)
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) & ~gpio_pled);
-	else
-		write_reg16(adev, IO_ACX_GPIO_OUT,
-			    read_reg16(adev, IO_ACX_GPIO_OUT) | gpio_pled);
-}
 
 INLINE_IO int acxpci_adev_present(acx_device_t *adev)
 {
@@ -1207,91 +1079,8 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  * pdev	- ptr to pci device structure containing info about pci configuration
  * id	- ptr to the device id entry that matched this device
  */
-static const u16 IO_ACX100[] = {
-	0x0000,			/* IO_ACX_SOFT_RESET */
-
-	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
-	0x0018,			/* IO_ACX_SLV_MEM_DATA */
-	0x001c,			/* IO_ACX_SLV_MEM_CTL */
-	0x0020,			/* IO_ACX_SLV_END_CTL */
-
-	0x0034,			/* IO_ACX_FEMR */
-
-	0x007c,			/* IO_ACX_INT_TRIG */
-	0x0098,			/* IO_ACX_IRQ_MASK */
-	0x00a4,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00a8,			/* IO_ACX_IRQ_REASON */
-	0x00ac,			/* IO_ACX_IRQ_ACK */
-	0x00b0,			/* IO_ACX_HINT_TRIG */
-
-	0x0104,			/* IO_ACX_ENABLE */
-
-	0x0250,			/* IO_ACX_EEPROM_CTL */
-	0x0254,			/* IO_ACX_EEPROM_ADDR */
-	0x0258,			/* IO_ACX_EEPROM_DATA */
-	0x025c,			/* IO_ACX_EEPROM_CFG */
-
-	0x0268,			/* IO_ACX_PHY_ADDR */
-	0x026c,			/* IO_ACX_PHY_DATA */
-	0x0270,			/* IO_ACX_PHY_CTL */
-
-	0x0290,			/* IO_ACX_GPIO_OE */
-
-	0x0298,			/* IO_ACX_GPIO_OUT */
-
-	0x02a4,			/* IO_ACX_CMD_MAILBOX_OFFS */
-	0x02a8,			/* IO_ACX_INFO_MAILBOX_OFFS */
-	0x02ac,			/* IO_ACX_EEPROM_INFORMATION */
-
-	0x02d0,			/* IO_ACX_EE_START */
-	0x02d4,			/* IO_ACX_SOR_CFG */
-	0x02d8			/* IO_ACX_ECPU_CTRL */
-};
-
-static const u16 IO_ACX111[] = {
-	0x0000,			/* IO_ACX_SOFT_RESET */
-
-	0x0014,			/* IO_ACX_SLV_MEM_ADDR */
-	0x0018,			/* IO_ACX_SLV_MEM_DATA */
-	0x001c,			/* IO_ACX_SLV_MEM_CTL */
-	0x0020,			/* IO_ACX_SLV_END_CTL */
-
-	0x0034,			/* IO_ACX_FEMR */
-
-	0x00b4,			/* IO_ACX_INT_TRIG */
-	0x00d4,			/* IO_ACX_IRQ_MASK */
-	/* we do mean NON_DES (0xf0), not NON_DES_MASK which is at 0xe0: */
-	0x00f0,			/* IO_ACX_IRQ_STATUS_NON_DES */
-	0x00e4,			/* IO_ACX_IRQ_REASON */
-	0x00e8,			/* IO_ACX_IRQ_ACK */
-	0x00ec,			/* IO_ACX_HINT_TRIG */
-
-	0x01d0,			/* IO_ACX_ENABLE */
-
-	0x0338,			/* IO_ACX_EEPROM_CTL */
-	0x033c,			/* IO_ACX_EEPROM_ADDR */
-	0x0340,			/* IO_ACX_EEPROM_DATA */
-	0x0344,			/* IO_ACX_EEPROM_CFG */
-
-	0x0350,			/* IO_ACX_PHY_ADDR */
-	0x0354,			/* IO_ACX_PHY_DATA */
-	0x0358,			/* IO_ACX_PHY_CTL */
-
-	0x0374,			/* IO_ACX_GPIO_OE */
-
-	0x037c,			/* IO_ACX_GPIO_OUT */
-
-	0x0388,			/* IO_ACX_CMD_MAILBOX_OFFS */
-	0x038c,			/* IO_ACX_INFO_MAILBOX_OFFS */
-	0x0390,			/* IO_ACX_EEPROM_INFORMATION */
-
-	0x0100,			/* IO_ACX_EE_START */
-	0x0104,			/* IO_ACX_SOR_CFG */
-	0x0108,			/* IO_ACX_ECPU_CTRL */
-};
-
 #ifdef CONFIG_PCI
-// static 
+/* static  */
 int __devinit
 acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
@@ -1313,7 +1102,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	FN_ENTER;
 
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
+	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+				&acxpci_hw_ops);
 	if (!ieee) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
@@ -1330,11 +1120,11 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 
 	ieee->wiphy->interface_modes =
-			BIT(NL80211_IFTYPE_STATION)	|
+			BIT(NL80211_IFTYPE_STATION) |
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
-	// OW TODO Check if RTS/CTS threshold can be included here
+	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was
 	 * 100, the OpenBSD driver assigns maximum values depending on
@@ -1355,8 +1145,9 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * now, as they do not seem to be supported or how to acquire
 	 * them is still unknown. */
 
-	// We base signal quality on winlevel approach of previous driver
-	// TODO OW 20100615 This should into a common init code
+	/* We base signal quality on winlevel approach of previous driver
+	 * TODO OW 20100615 This should into a common init code
+	 */
 	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	ieee->max_signal = 100;
 
@@ -1488,7 +1279,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	log(L_IRQ | L_INIT, "using IRQ %d: OK\n", pdev->irq);
 
-	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
 	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
@@ -1502,11 +1293,11 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 
 	/* PCI setup is finished, now start initializing the card */
-	// -----
+	/* ----- */
 	
 	acx_init_task_scheduler(adev);
 
-	// Mac80211 Tx_queue
+	/* Mac80211 Tx_queue */
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
@@ -1563,7 +1354,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = acx_setup_modes(adev);
 	if (err) {
-	pr_acx("can't setup hwmode\n");
+		pr_acx("can't setup hwmode\n");
 		goto fail_setup_modes;
 	}
 
@@ -1581,71 +1372,72 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* error paths: undo everything in reverse order... */
 
-	// TODO FIXME OW 20100507
-	// Check if reverse doing is correct. e.g. if alloc failed, no dealloc is required !!
-	// => See vlynq probe
+	/* TODO FIXME OW 20100507
+	 * Check if reverse doing is correct. e.g. if alloc failed, no dealloc is required !!
+	 * => See vlynq probe
+	 */
 
-	// err = ieee80211_register_hw(ieee);
-	fail_ieee80211_register_hw:
-		ieee80211_unregister_hw(ieee);
+	/* err = ieee80211_register_hw(ieee); */
+fail_ieee80211_register_hw:
+	ieee80211_unregister_hw(ieee);
 
-	// err = acx_setup_modes(adev)
-	fail_setup_modes:
+	/* err = acx_setup_modes(adev) */
+fail_setup_modes:
 
-	// acx_proc_register_entries(ieee, 0)
-	fail_proc_register_entries:
-		acx_proc_unregister_entries(ieee);
+	/* acx_proc_register_entries(ieee, 0) */
+fail_proc_register_entries:
+	acx_proc_unregister_entries(ieee);
 
-	// acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version)
-	fail_read_eeprom_byte:
+	/* acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version) */
+fail_read_eeprom_byte:
 
-	// acx_s_init_mac(adev)
-	fail_init_mac:
+	/* acx_s_init_mac(adev) */
+fail_init_mac:
 
-	// acxpci_s_reset_dev(adev)
-	fail_reset_dev:
+	/* acxpci_s_reset_dev(adev) */
+fail_reset_dev:
 
-	// request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME,
-	fail_request_irq:
-		free_irq(adev->irq, adev);
+	/* request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, */
+fail_request_irq:
+	free_irq(adev->irq, adev);
 
-	fail_no_irq:
+fail_no_irq:
+	
+	/* pci_iomap(pdev, mem_region2, 0) */
+fail_iomap2:
+	pci_iounmap(pdev, mem2);
 
-	// pci_iomap(pdev, mem_region2, 0)
-	fail_iomap2:
-		pci_iounmap(pdev, mem2);
+	/* pci_iomap(pdev, mem_region1, 0) */
+fail_iomap1:
+	pci_iounmap(pdev, mem1);
 
-	// pci_iomap(pdev, mem_region1, 0)
-	fail_iomap1:
-		pci_iounmap(pdev, mem1);
+	/* 	err = pci_request_region(pdev, mem_region2, "acx_2"); */
+fail_request_mem_region2:
+	pci_release_region(pdev, mem_region2);
 
-	// 	err = pci_request_region(pdev, mem_region2, "acx_2");
-	fail_request_mem_region2:
-		pci_release_region(pdev, mem_region2);
+	/* err = pci_request_region(pdev, mem_region1, "acx_1"); */
+fail_request_mem_region1:
+	pci_release_region(pdev, mem_region1);
 
-	// err = pci_request_region(pdev, mem_region1, "acx_1");
-	fail_request_mem_region1:
-		pci_release_region(pdev, mem_region1);
+fail_unknown_chiptype:
 
-	fail_unknown_chiptype:
+	/* pci_enable_device(pdev) */
+fail_pci_enable_device:
+	pci_disable_device(pdev);
+	pci_set_drvdata(pdev, NULL);
 
-	// pci_enable_device(pdev)
-	fail_pci_enable_device:
-		pci_disable_device(pdev);
-		pci_set_drvdata(pdev, NULL);
-
-	// OW TODO Check if OK for PM
+	/* OW TODO Check if OK for PM */
 #ifdef CONFIG_PM
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
-	// ieee80211_alloc_hw
-	fail_ieee80211_alloc_hw:
-		ieee80211_free_hw(ieee);
-
-	done:
-		FN_EXIT1(result);
-		return result;
+	/* ieee80211_alloc_hw */
+fail_ieee80211_alloc_hw:
+	ieee80211_free_hw(ieee);
+	
+done:
+	FN_EXIT1(result);
+	return result;
 }
 
 
@@ -1657,7 +1449,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-// static
+/* static */
 void __devexit acxpci_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
@@ -1672,7 +1464,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 		goto end_no_lock;
 	}
 
-	// Unregister ieee80211 device
+	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
@@ -1695,7 +1487,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 #endif
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");
-		acxpci_power_led(adev, 0);
+		acx_power_led(adev, 0);
 		/* stop our eCPU */
 		if (IS_ACX111(adev)) {
 			/* FIXME: does this actually keep halting the
@@ -1712,15 +1504,15 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 
 	}
 
-	// Proc
+	/* Proc */
 	acx_proc_unregister_entries(adev->ieee);
 
-	// IRQs
+	/* IRQs */
 	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);
 
-	// Mem regions
+	/* Mem regions */
 	if (IS_ACX100(adev)) {
 		mem_region1 = PCI_ACX100_REGION1;
 		mem_region2 = PCI_ACX100_REGION2;
@@ -1763,7 +1555,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 ** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
-// static 
+/* static  */
 int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
@@ -1782,7 +1574,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	acx_sem_lock(adev);
 
 	ieee80211_unregister_hw(hw);	/* this one cannot sleep */
-	// OW 20100603 FIXME acxpci_s_down(hw);
+	/* OW 20100603 FIXME acxpci_s_down(hw); */
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
@@ -1795,7 +1587,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	return OK;
 }
 
-//static
+/* static */
 int acxpci_e_resume(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
@@ -1832,7 +1624,7 @@ int acxpci_e_resume(struct pci_dev *pdev)
 	 * :-) */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
-		//acx_update_card_settings(adev);
+		/* acx_update_card_settings(adev); */
 		pr_acx("rsm: settings updated\n");
 	}
 	ieee80211_register_hw(hw);
@@ -1885,15 +1677,16 @@ static struct pci_driver acxpci_driver = {
 	.resume		= acxpci_e_resume
 #endif /* CONFIG_PM */
 };
-//#else
-//#error "compiled pci.c w/o CONFIG_PCI !!"
+/* #else
+ * #error "compiled pci.c w/o CONFIG_PCI !!"
+ */
 #endif /* CONFIG_PCI */
 
 
 /*
  * VLYNQ support
  */
-// TODO Check section mismatch warning vlynq
+/* TODO Check section mismatch warning vlynq */
 
 #ifdef CONFIG_VLYNQ
 struct vlynq_reg_config {
@@ -1969,8 +1762,9 @@ static struct vlynq_known vlynq_known_devices[] = {
 
 static struct vlynq_device_id acx_vlynq_id[] = {
 	{ CHIP_TNETW1130, vlynq_div_auto, 0 },
-	// TNETW1350 not supported by the acx driver, therefore don't claim it anymore
-	// { CHIP_TNETW1350, vlynq_div_auto, 1 },
+	/* TNETW1350 not supported by the acx driver, therefore don't claim it anymore
+	 * { CHIP_TNETW1350, vlynq_div_auto, 1 },
+	 */
 	{ 0, 0, 0 },
 };
 
@@ -1995,7 +1789,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_ieee80211_alloc_hw;
 	}
 
-	// Initialize driver private data
+	/* Initialize driver private data */
 	SET_IEEE80211_DEV(ieee, &vdev->dev);
 	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 
@@ -2005,8 +1799,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
 
-	// We base signal quality on winlevel approach of previous driver
-	// TODO OW 20100615 This should into a common init code
+	/* We base signal quality on winlevel approach of previous driver
+	 * TODO OW 20100615 This should into a common init code
+	 */
 	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	ieee->max_signal = 100;
 
@@ -2026,9 +1821,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
 
-	// Finished with private interface
+	/* Finished with private interface */
 
-	// Begin board specific inits
+	/* Begin board specific inits */
 	result = vlynq_enable_device(vdev);
 	if (result)
 		goto fail_vlynq_enable_device;
@@ -2103,7 +1898,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	}
 	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 
-	// Acx irqs shall be off and are enabled later in acxpci_s_up
+	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
 	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
@@ -2111,11 +1906,11 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->mgmt_timer.function = (void (*)(unsigned long))0x0000dead;
 
 	/* PCI setup is finished, now start initializing the card */
-	// -----
+	/* ----- */
 
 	acx_init_task_scheduler(adev);
 
-	// Mac80211 Tx_queue
+	/* Mac80211 Tx_queue */
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
@@ -2234,7 +2029,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	}
 
 
-	// Unregister ieee80211 device
+	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
 	ieee80211_unregister_hw(adev->ieee);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
@@ -2250,16 +2045,16 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		}
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");
-		acxpci_power_led(adev, 0);
+		acx_power_led(adev, 0);
 
 		/* stop our eCPU */
-		// OW PCI still does something here (although also need to be reviewed).
+		/* OW PCI still does something here (although also need to be reviewed). */
 	}
 
-	// Proc
+	/* Proc */
 	acx_proc_unregister_entries(adev->ieee);
 
-	// IRQs
+	/* IRQs */
 	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
 	free_irq(adev->irq, adev);

@@ -15,18 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * USB support for TI ACX100/TNETW1450 based devices. Many parts are taken from
- * the PCI driver.
+ * USB support for TI ACX100/TNETW1450 based devices. Many parts are
+ * taken from the PCI driver.
  *
  * Authors:
  *  Martin Wawro <martin.wawro AT uni-dortmund.de>
  *  Andreas Mohr <andi AT lisas.de>
  *
  * LOCKING
- *  callback functions called by USB core are running in interrupt context
- *  and thus have names with _i_.
+ *  callback functions called by USB core are running in interrupt
+ *  context and thus have names with _i_.
  */
-#define ACX_MAC80211_USB 1
 
 #define pr_fmt(fmt) "acxusb.%s: " fmt, __FUNCTION__
 #include "acx_debug.h"

@@ -8,6 +8,7 @@
 #if defined(CONFIG_ACX_MAC80211_MEM) || 1
 
 /*
+ * BOM Data Access
  * Locking in mem
  * ==================================================
  */
@@ -151,11 +152,21 @@ INLINE_IO u32 read_id_register(acx_device_t *adev)
 #define ret_addr_lt20_wrb(adev, addr, val)	\
 	ret_addr_lt20_wr_(adev, addr, b, val)
 
-
 INLINE_IO u32 read_reg32(acx_device_t *adev, unsigned int offset)
 {
 	u32 val;
 	u32 addr;
+
+	if (IS_PCI(adev)) {
+		#if ACX_IO_WIDTH == 32
+		return acx_readl((u8 *) adev->iobase + adev->io[offset]);
+		#else
+		return acx_readw((u8 *) adev->iobase + adev->io[offset])
+			+ (acx_readw((u8 *) adev->iobase +
+					adev->io[offset] + 2) << 16);
+		#endif
+	}
+	/* else IS_MEM */
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
@@ -172,6 +183,11 @@ INLINE_IO u16 read_reg16(acx_device_t *adev, unsigned int offset)
 	u16 lo;
 	u32 addr;
 
+	if (IS_PCI(adev))
+		return acx_readw((u8 *) adev->iobase + adev->io[offset]);
+
+	/* else IS_MEM */
+
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
 	ret_addr_lt20_rdw(adev, addr);
@@ -187,6 +203,11 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	u8 lo;
 	u32 addr;
 
+	if (IS_PCI(adev))
+		return readb((u8 *) adev->iobase + adev->io[offset]);
+
+	/* else IS_MEM */
+
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
 	ret_addr_lt20_rdb(adev, addr);
@@ -197,9 +218,22 @@ INLINE_IO u8 read_reg8(acx_device_t *adev, unsigned int offset)
 	return (u8) lo;
 }
 
-INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
+INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset,
+			u32 val)
 {
 	u32 addr;
+
+	if (IS_PCI(adev)) {
+		#if ACX_IO_WIDTH == 32
+		acx_writel(val, (u8 *) adev->iobase + adev->io[offset]);
+#else
+		acx_writew(val & 0xffff, (u8 *) adev->iobase
+			+ adev->io[offset]);
+		acx_writew(val >> 16, (u8 *) adev->iobase
+			+ adev->io[offset] + 2);
+#endif
+	}
+	/* else IS_MEM */
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
@@ -209,9 +243,16 @@ INLINE_IO void write_reg32(acx_device_t *adev, unsigned int offset, u32 val)
 	acx_writel(val, adev->iobase + ACX_SLV_REG_DATA);
 }
 
-INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset, u16 val)
+INLINE_IO void write_reg16(acx_device_t *adev, unsigned int offset,
+			u16 val)
 {
 	u32 addr;
+
+	if (IS_PCI(adev)) {
+		acx_writew(val, (u8 *) adev->iobase + adev->io[offset]);
+		return;
+	}
+	/* else IS_MEM */
 
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
@@ -225,6 +266,12 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
 {
 	u32 addr;
 
+	if (IS_PCI(adev)) {
+		writeb(val, (u8 *) adev->iobase + adev->io[offset]);
+		return;
+	}
+	/* else IS_MEM */
+
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	check_IO_ACX_ECPU_CTRL(adev, addr, offset);
 	ret_addr_lt20_wrb(adev, addr, val);
@@ -233,22 +280,33 @@ INLINE_IO void write_reg8(acx_device_t *adev, unsigned int offset, u8 val)
 	writeb(val, (u8 *) (adev->iobase + ACX_SLV_REG_DATA));
 }
 
-/* Handle PCI posting properly: Make sure that writes reach the
- * adapter in case they require to be executed *before* the next
- * write, by reading a random (and safely accessible) register.  This
- * call has to be made if there is no read following (which would
- * flush the data to the adapter), yet the written data has to reach
- * the adapter immediately. */
+
+/* Handle PCI posting properly:
+ * Make sure that writes reach the adapter in case they require to be
+ * executed *before* the next write, by reading a random (and safely
+ * accessible) register.  This call has to be made if there is no read
+ * following (which would flush the data to the adapter), yet the
+ * written data has to reach the adapter immediately.
+ */
+
 INLINE_IO void write_flush(acx_device_t *adev)
 {
 	/* readb(adev->iobase + adev->io[IO_ACX_INFO_MAILBOX_OFFS]); */
+	if (IS_PCI(adev)) {
+		/* faster version (accesses the first register,
+		 * IO_ACX_SOFT_RESET, which should also be safe): */
+		readb(adev->iobase);
+		return;
+	}
+	/* else IS_MEM */
 	/* faster version (accesses the first register,
 	 * IO_ACX_SOFT_RESET, which should also be safe): */
 	ACXMEM_WARN_NOT_SPIN_LOCKED;
 	(void) acx_readl(adev->iobase);
 }
 
-INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
+INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset,
+			u32 bits)
 {
 	u32 tmp;
 
@@ -260,7 +318,8 @@ INLINE_IO void set_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
 	write_flush(adev);
 }
 
-INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset, u32 bits)
+INLINE_IO void clear_regbits(acx_device_t *adev, unsigned int offset,
+			u32 bits)
 {
 	u32 tmp;
 
