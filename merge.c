@@ -3002,7 +3002,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
 	/* FIXME Cleanup?: struct ieee80211_hdr *wireless_header; */
 	txhostdesc_t *hostdesc1, *hostdesc2;
-	int rateset;
+	u16 rateset;
 	u8 Ctl_8, Ctl2_8;
 	int wlhdr_len;
 	u32 addr;		// mem.c
