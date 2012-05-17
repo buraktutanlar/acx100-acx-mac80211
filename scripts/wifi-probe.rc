@@ -1,0 +1,128 @@
+#!/bin/bash
+# dual use script/rc file
+
+devs="wlan0 wlan1"		# I have 2 cards
+drvname="acx"			# 1st driver (rtl8180) doesnt log
+logdir=~/wifi-test-data		# write files here, must exist
+apmac=00:11:22:33:44:55
+chan=11
+macs="00:11:22:33:44:55 00:AA:BB:CC:DD:EE 00:1A:2B:3C:4D:5E"
+iperfsvrs="192.168.10.127 192.168.10.128"
+iperfargs="-t30 -i5"
+others="eth0 wlan0"
+
+wifi-help () {
+echo
+echo "provides functions to probe, test wifi drivers using iw-tools"
+echo "   wifi-probe:	run the probes/tests"
+echo "   mon-up:	create monitor ifaces, do tcpdump captures on them"
+echo "   mon-down:	close those monitor interfaces"
+echo "   wifi-save:	save the files to to driver-version dir"
+echo "   wifi-net:	run some connectivity tests (ifdowns $others)"
+echo "vars: # set to change behavior"
+echo "   devs:	$devs"
+echo "   drvname:	$drvname"
+echo "   apmac:	$apmac		# not used now"
+echo "   chan:	$chan"
+echo "   macs:	$macs"
+echo "   iperfsvrs:	$iperfsvrs	# iperf server addresses"
+echo "   iperfargs:	$iperfargs"
+echo "   others:	$others		# ifdown these in wifi-ent"
+echo
+}
+echo wifi-help for info
+
+loudly () {
+    echo "# $@"
+    fname=`echo $@ | sed -e 's/ /-/g'`
+    $@ 2> $fname-err | tee $fname
+    [ $? != 0 ] && echo "non-zero exit on $fname: $?"
+    [ -s $fname-err ] || rm $fname-err
+}
+
+mon-up () {
+    local flags=$*
+    for dev in $devs ; do
+	loudly iw dev $dev interface add fish-$dev type monitor $flags
+	loudly iw dev fish-$dev set channel $chan
+	loudly ifconfig fish-$dev up
+	( tcpdump -i fish-$dev -s 65000 -p -U -w  fish-$dev.dump )&
+    done
+}
+
+mon-down () {    
+    for dev in $devs ; do
+	loudly iw dev fish-$dev del
+	# tcpdump ends automatically
+	dt=`date +%F.%H.%M.%S`
+	mv fish-$dev.dump fish-$dev-$dt.dump
+    done
+    [ -n "$pid_event" ] && kill $pid_event
+}
+    
+wifi-probe () {
+
+    ( iw --debug event -f > iw-event-f 2> iw-event-f-err )&
+    pid_event=$!
+
+    loudly iw list
+
+    for dev in $devs ; do
+	loudly ifconfig $dev
+	loudly iwconfig $dev
+	loudly iwlist $dev scan
+	loudly iw dev $dev info
+	loudly iw dev $dev link
+	loudly iw dev $dev scan
+	loudly iw dev $dev survey dump
+    done
+    
+    for phy in $phys ; do
+	loudly iw phy $phy info
+    done
+    
+    # these are unsupported on wlan0
+    loudly iw dev wlan1 survey dump
+    loudly iw dev wlan1 station dump
+    loudly iw dev wlan1 station get $apmac
+
+    # doesnt work for me
+    # probe-macs;
+
+    dmesg | grep -E "$drvname" > dmesg
+    grep -vE '^#|key' /etc/network/interfaces > e_n_a
+}
+
+wifi-net () {
+    # jam some data across
+
+    # I need to remove other routes (better way? hints welcome)
+    for dev in $others; do
+	ifdown $dev;
+    done;
+
+    loudly ping -c 5  8.8.8.8
+    loudly traceroute 8.8.8.8
+    for svr in $iperfsvrs ; do
+	loudly iperf -c $svr $iperfargs
+    done
+    for dev in $others; do
+	ifup $dev;
+    done;
+}
+
+probe-macs () {
+    for mac in $macs; do
+	echo mac $mac
+	for dev in $devs ; do # wlan1 
+	    loudly iw dev $dev station get $mac
+	done
+    done
+}
+
+wifi-save () {
+    svdir=`modinfo acx-mac80211 | grep -E ^version: | cut -c17-`
+    mkdir -p $svdir
+    mv iw* ifconfig* dmesg e_n_a fish*dump iperf-* ping-* traceroute-* $svdir
+}
+
