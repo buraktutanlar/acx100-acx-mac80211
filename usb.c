@@ -69,9 +69,9 @@
  */
 
 /* ACX100 (TNETW1100) USB device: D-Link DWL-120+ */
-#define ACX100_VENDOR_ID 			0x2001
-#define ACX100_PRODUCT_ID_UNBOOTED 	0x3B01
-#define ACX100_PRODUCT_ID_BOOTED 	0x3B00
+#define ACX100_VENDOR_ID			0x2001
+#define ACX100_PRODUCT_ID_UNBOOTED	0x3B01
+#define ACX100_PRODUCT_ID_BOOTED	0x3B00
 
 /* TNETW1450 USB devices */
 #define VENDOR_ID_DLINK		0x07b8	/* D-Link Corp. */
@@ -148,7 +148,7 @@ MODULE_DEVICE_TABLE(usb, acxusb_ids);
  * BOM Data Access
  * ==================================================
  */
- 
+
 /*
  * BOM Firmware, EEPROM, Phy
  * ==================================================
@@ -984,25 +984,25 @@ static void acxusb_complete_rx(struct urb *urb)
 
             tx = (usb_tx_t*) (adev->usb_tx + stat->hostdata);
             skb = tx->skb;
-    		txstatus = IEEE80211_SKB_CB(skb);
+		txstatus = IEEE80211_SKB_CB(skb);
 
             if (!(txstatus->flags & IEEE80211_TX_CTL_NO_ACK))
-    			txstatus->flags |= IEEE80211_TX_STAT_ACK;
+			txstatus->flags |= IEEE80211_TX_STAT_ACK;
 
-        	txstatus->status.rates[0].count = stat->ack_failures + 1;
+		txstatus->status.rates[0].count = stat->ack_failures + 1;
 
-    		// report upstream
-    		ieee80211_tx_status(adev->ieee, skb);
+		// report upstream
+		ieee80211_tx_status(adev->ieee, skb);
 
-        	tx->busy = 0;
-    		adev->tx_free++;
+		tx->busy = 0;
+		adev->tx_free++;
 
-    		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
-    			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
-    					adev->tx_free);
-    			acx_wake_queue(adev->ieee, NULL);
-    			ieee80211_queue_work(adev->ieee, &adev->tx_work);
-    		}
+		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
+					adev->tx_free);
+			acx_wake_queue(adev->ieee, NULL);
+			ieee80211_queue_work(adev->ieee, &adev->tx_work);
+		}
 
 			goto next;
 		}
@@ -1567,7 +1567,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	   Ideally we would figure out how to do a USB request to get
 	   the radio type of ACX100 cards and query this on second .probe().
 	*/
-	   
+
 	static int radio_type;
 	/* this one needs to be more precise in case there appears
 	 * a TNETW1450 from the same vendor */
@@ -1923,4 +1923,3 @@ void __exit acxusb_cleanup_module(void)
 	usb_deregister(&acxusb_driver);
 	log(L_INIT, "USB module unloaded\n");
 }
-

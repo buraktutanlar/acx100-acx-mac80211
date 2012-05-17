@@ -77,7 +77,7 @@ static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 //static inline int acxmem_write_fw(acx_device_t *adev,
 //		const firmware_image_t *fw_image, u32 offset)
 //{ return 0; }
-			
+
 static inline void acxmem_reset_mac(acx_device_t *adev)
 { }
 

@@ -222,7 +222,7 @@ int acxpci_upload_fw(acx_device_t *adev)
 		if (OK == res) {
 			res = acx_validate_fw(adev, fw_image, 0);
 			log(L_DEBUG | L_INIT, "acx_validate_fw "
-			    		"(main/combined): %d\n", res);
+					"(main/combined): %d\n", res);
 		}
 
 		if (OK == res) {
@@ -282,7 +282,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
 		pr_acx("%s: %s: firmware is not loaded yet, "
-		       "cannot execute commands!\n", 
+		       "cannot execute commands!\n",
            __func__, devname);
 		goto bad;
 	}
@@ -318,7 +318,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		goto bad;
 	} else if (counter < 190) {	/* if waited >10ms... */
 		log(L_CTL | L_DEBUG, "%s: waited for IDLE %dms. "
-		    "Please report\n", 
+		    "Please report\n",
         __func__, 199 - counter);
 	}
 
@@ -390,7 +390,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		log(L_ANY, "%s: %s: timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
 		       "cmd_status:%d (%s)\n",
-		       __func__, devname, 
+		       __func__, devname,
                        (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
@@ -438,7 +438,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
      bad:
 	/* Give enough info so that callers can avoid printing their
-	 * own diagnostic messages */	
+	 * own diagnostic messages */
 	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
 			devname,
 			cmdstr, buflen, cmd_timeout,
@@ -447,7 +447,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	);
 	/* dump_stack(); */
 	FN_EXIT1(NOT_OK);
-	
+
 	return NOT_OK;
 }
 
@@ -1080,7 +1080,7 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  * id	- ptr to the device id entry that matched this device
  */
 #ifdef CONFIG_PCI
-/* static  */
+static
 int __devinit
 acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
@@ -1091,8 +1091,8 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem_region2_size;
 	unsigned long phymem1;
 	unsigned long phymem2;
-	void *mem1 = NULL;
-	void *mem2 = NULL;
+	void __iomem *mem1 = NULL;
+	void __iomem *mem2 = NULL;
 	acx_device_t *adev = NULL;
 	const char *chip_name;
 	int result = -EIO;
@@ -1294,7 +1294,7 @@ acxpci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* PCI setup is finished, now start initializing the card */
 	/* ----- */
-	
+
 	acx_init_task_scheduler(adev);
 
 	/* Mac80211 Tx_queue */
@@ -1411,7 +1411,7 @@ fail_iomap2:
 fail_iomap1:
 	pci_iounmap(pdev, mem1);
 
-	/* 	err = pci_request_region(pdev, mem_region2, "acx_2"); */
+	/*	err = pci_request_region(pdev, mem_region2, "acx_2"); */
 fail_request_mem_region2:
 	pci_release_region(pdev, mem_region2);
 
@@ -1449,7 +1449,7 @@ done:
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
-/* static */
+static
 void __devexit acxpci_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)pci_get_drvdata(pdev);
@@ -1555,7 +1555,7 @@ void __devexit acxpci_remove(struct pci_dev *pdev)
 ** TODO: PM code needs to be fixed / debugged / tested.
 */
 #ifdef CONFIG_PM
-/* static  */
+static
 int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
@@ -1587,7 +1587,7 @@ int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	return OK;
 }
 
-/* static */
+static
 int acxpci_e_resume(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
