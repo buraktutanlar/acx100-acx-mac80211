@@ -1318,6 +1318,15 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 
 	FN_ENTER;
 
+	if (IS_PCI(adev) && adev->need_radio_fw) {
+		filename[sizeof("tiacx1NN") - 1] = '\0';
+		fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
+		if (!fw_image) {
+			FN_EXIT1(NOT_OK);
+			return NOT_OK;
+		}
+	}
+
 	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
 	if (!fw_image) {
 		FN_EXIT1(NOT_OK);
