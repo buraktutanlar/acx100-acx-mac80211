@@ -3118,58 +3118,57 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 
 		hostdesc1->hd.length = cpu_to_le16(wlhdr_len);
 
-		if (IS_PCI(adev))
-			goto is_pci_branch;
+		if (IS_MEM(adev))
+		{
 
-		/* acxmem_tx_data():
-		 * Since we're not using autodma copy the packet data
-		 * to the acx now.  Even host descriptors point to the
-		 * packet header, and the odd indexed descriptor
-		 * following points to the packet data.
-		 *
-		 * The first step is to find free memory in the ACX
-		 * transmit buffers.  They don't necessarily map one
-		 * to one with the transmit queue entries, so search
-		 * through them starting just after the last one used.
-		 */
-		addr = acxmem_allocate_acx_txbuf_space(adev, len);
-		if (addr) {
-			acxmem_chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
-		} else {
-			/*
-			 * Bummer.  We thought we might have enough
-			 * room in the transmit buffers to send this
-			 * packet, but it turns out we don't.
-			 * alloc_tx has already marked this transmit
-			 * descriptor as HOSTOWN and ACXDONE, which
-			 * means the ACX will hang when it gets to
-			 * this descriptor unless we do something
-			 * about it.  Having a bubble in the transmit
-			 * queue just doesn't seem to work, so we have
-			 * to reset this transmit queue entry's state
-			 * to its original value and back up our head
-			 * pointer to point back to this entry.
+			/* acxmem_tx_data():
+			 * Since we're not using autodma copy the packet data
+			 * to the acx now.  Even host descriptors point to the
+			 * packet header, and the odd indexed descriptor
+			 * following points to the packet data.
+			 *
+			 * The first step is to find free memory in the ACX
+			 * transmit buffers.  They don't necessarily map one
+			 * to one with the transmit queue entries, so search
+			 * through them starting just after the last one used.
 			 */
-			 /* OW FIXME Logging */
-			pr_info("Bummer. Not enough room in the txbuf_space.\n");
-			hostdesc1->hd.length = 0;
-			hostdesc2->hd.length = 0;
-			write_slavemem16(adev, (uintptr_t) &(txdesc->total_length), 0);
-			write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
-					| DESC_CTL_FIRSTFRAG);
-			adev->tx_head = ((u8*) txdesc - (u8*) adev->tx.desc_start)
-					/ adev->tx.desc_size;
-			adev->tx_free++;
-			goto end_of_chain;
+			addr = acxmem_allocate_acx_txbuf_space(adev, len);
+			if (addr) {
+				acxmem_chaincopy_to_slavemem(adev, addr, hostdesc1->data, len);
+			} else {
+				/*
+				 * Bummer.  We thought we might have enough
+				 * room in the transmit buffers to send this
+				 * packet, but it turns out we don't.
+				 * alloc_tx has already marked this transmit
+				 * descriptor as HOSTOWN and ACXDONE, which
+				 * means the ACX will hang when it gets to
+				 * this descriptor unless we do something
+				 * about it.  Having a bubble in the transmit
+				 * queue just doesn't seem to work, so we have
+				 * to reset this transmit queue entry's state
+				 * to its original value and back up our head
+				 * pointer to point back to this entry.
+				 */
+				 /* OW FIXME Logging */
+				pr_info("Bummer. Not enough room in the txbuf_space.\n");
+				hostdesc1->hd.length = 0;
+				hostdesc2->hd.length = 0;
+				write_slavemem16(adev, (uintptr_t) &(txdesc->total_length), 0);
+				write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
+						| DESC_CTL_FIRSTFRAG);
+				adev->tx_head = ((u8*) txdesc - (u8*) adev->tx.desc_start)
+						/ adev->tx.desc_size;
+				adev->tx_free++;
+				goto end_of_chain;
+			}
+			/*
+			 * Tell the ACX where the packet is.
+			 */
+			write_slavemem32(adev, (uintptr_t) &(txdesc->AcxMemPtr), addr);
 		}
-		/*
-		 * Tell the ACX where the packet is.
-		 */
-		write_slavemem32(adev, (uintptr_t) &(txdesc->AcxMemPtr), addr);
-
 	}
 
-is_pci_branch:
 	/* don't need to clean ack/rts statistics here, already
 	 * done on descr cleanup */
 
