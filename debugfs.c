@@ -116,7 +116,9 @@ static const struct file_operations acx_fops = {
 	.read		= seq_read,
 	.write		= acx_dbgfs_write,
 	.open		= acx_dbgfs_open,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
 	.llseek		= noop_llseek,
+#endif
 };
 
 static struct dentry *acx_dbgfs_dir;
