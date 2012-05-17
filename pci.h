@@ -60,8 +60,5 @@ int acxpci_upload_fw(acx_device_t *adev);
 static inline void acxpci_reset_mac(acx_device_t *adev)
 {}
 
-static inline int acxpci_upload_fw(acx_device_t *adev)
-{ return 0; }
-
 #endif /* CONFIG_ACX_MAC80211_PCI */
 #endif /* _PCI_H_ */
