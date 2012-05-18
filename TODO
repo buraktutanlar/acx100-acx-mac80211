@@ -154,8 +154,7 @@ compare load-firmware code to in-tree uses.
 pci & mem both do this (see above)
 
 ---------
-Fix the messy use of io/membase(2) in struct acx_device for a pci and
-mem device.
+Make CONFIG_PCI check in acx_reset_dev():acxpci_reset_mac(); a runtime check.
 
 DONE
 ---------
