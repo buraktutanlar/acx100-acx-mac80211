@@ -4941,7 +4941,7 @@ out:
 	return ret;
 }
 
-#ifdef ACX_WANT_PROC_FILES_ANYWAY
+#if defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY
 
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
@@ -6235,8 +6235,6 @@ end:
  * BOM Mac80211 Ops
  * ==================================================
  */
-int acx_debugfs_add_adev(struct acx_device *adev);
-void acx_debugfs_remove_adev(struct acx_device *adev);
 
 int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 {
@@ -6853,8 +6851,6 @@ void great_inquisitor(acx_device_t * adev)
  * BOM Driver, Module
  * ==================================================
  */
-int __init acx_debugfs_init(void);
-void __init acx_debugfs_exit(void);
 
 static int __init acx_init_module(void)
 {
@@ -6893,7 +6889,6 @@ static int __init acx_init_module(void)
 	return 0;
 }
 
-void acx_debugfs_exit(void);
 static void __exit acx_cleanup_module(void)
 {
 	/* TODO Check, that interface isn't still up */

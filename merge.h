@@ -15,16 +15,14 @@ extern acx_proc_show_t *const acx_proc_show_funcs[];
 extern acx_proc_write_t *const acx_proc_write_funcs[];
 
 /* debugfs.c API used by common.c */
-#if defined CONFIG_DEBUG_FS
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FS
 int acx_debugfs_add_adev(struct acx_device *adev);
 void acx_debugfs_remove_adev(struct acx_device *adev);
-int acx_proc_register_entries(struct ieee80211_hw *hw);
 int __init acx_debugfs_init(void);
 void __exit acx_debugfs_exit(void);
 #else
 static int acx_debugfs_add_adev(struct acx_device *adev) { return 0; }
 static void acx_debugfs_remove_adev(struct acx_device *adev) { }
-static int acx_proc_register_entries(struct ieee80211_hw *hw) { return 0; }
 static int __init acx_debugfs_init(void)  { return 0; }
 static void __exit acx_debugfs_exit(void) { }
 #endif /* defined CONFIG_DEBUG_FS */

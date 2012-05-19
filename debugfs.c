@@ -1,13 +1,8 @@
-
-#ifndef CONFIG_DEBUG_FS
-
-/* API: not static inline - must be available for linking */
-int __init acx_debugfs_init(void)  { return 0; }
-void __exit acx_debugfs_exit(void) {}
-int  acx_debugfs_add_adev   (struct acx_device *adev) { return 0; }
-void acx_debugfs_remove_adev(struct acx_device *adev) { return 0; }
-
-#else /* CONFIG_DEBUG_FS */
+/*
+ * debugfs API to rest of driver is prototyped in merge.h, including
+ * the stubs.
+ */
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FS
 
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
 
