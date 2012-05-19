@@ -6877,20 +6877,9 @@ static int __init acx_init_module(void)
 
 	r1 = r2 = r3 = -EINVAL;
 
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	r1 = acxpci_init_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
-	pr_info("built with CONFIG_ACX_MAC80211_USB\n");
 	r2 = acxusb_init_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	r3 = acxmem_init_module();
-#endif
 
 	if (r3 && r2 && r1) {		/* all three failed! */
 		pr_info("r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
@@ -6910,18 +6899,9 @@ static void __exit acx_cleanup_module(void)
 	/* TODO Check, that interface isn't still up */
 	acx_debugfs_exit();
 
-#if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
 	acxusb_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
 	acxmem_cleanup_module();
-#endif
-
 }
 
 /*
@@ -6929,8 +6909,8 @@ static void __exit acx_cleanup_module(void)
  * ==================================================
  */
 
-module_init(acx_init_module)
-module_exit(acx_cleanup_module)
+module_init(acx_init_module);
+module_exit(acx_cleanup_module);
 
 #if ACX_DEBUG
 

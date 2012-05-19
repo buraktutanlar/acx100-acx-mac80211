@@ -2495,6 +2495,7 @@ int __init acxmem_init_module(void)
 
 	FN_ENTER;
 
+	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 #if (ACX_IO_WIDTH==32)
 	pr_acx("compiled to use 32bit I/O access. "
 		"I/O timing issues might occur, such as "

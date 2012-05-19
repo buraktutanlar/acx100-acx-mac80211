@@ -1905,8 +1905,8 @@ static struct usb_driver
  */
 int __init acxusb_init_module(void)
 {
-	log(L_INIT, "USB module initialized, "
-	    "probing for devices...\n");
+	pr_info("built with CONFIG_ACX_MAC80211_USB\n");
+	log(L_INIT, "USB module initialized, probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }
 

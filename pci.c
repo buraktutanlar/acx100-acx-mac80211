@@ -2100,7 +2100,7 @@ int __init acxpci_init_module(void)
 
 	FN_ENTER;
 
-	printk(KERN_EMERG);
+	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 
 #if (ACX_IO_WIDTH==32)
 	log(L_INIT, "compiled to use 32bit I/O access. "
