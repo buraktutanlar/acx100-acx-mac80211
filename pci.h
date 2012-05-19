@@ -6,9 +6,6 @@
  * inside pci.c, thus reducing set of forward declarations needed there.
  */
 
-#define STATick /* ick - suppress static, and thus a raft of warnings
-		   let linker find the fns in mem.o, pci.o */
-
 /* Logging */
 
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,

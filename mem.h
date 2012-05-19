@@ -9,9 +9,6 @@
 
 #if defined(CONFIG_ACX_MAC80211_MEM)
 
-#define STATick
-/* ick: suppress static, let linker find fns in mem.o pci.o */
-
 #define DUMP_MEM_DEFINED 1 // to insure export of dump* fns too
 
 /* Logging */
