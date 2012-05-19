@@ -6789,16 +6789,17 @@ const char* acx_get_packet_type_string(u16 fc)
 		"MGMT/AssocReq", "MGMT/AssocResp", "MGMT/ReassocReq",
 		"MGMT/ReassocResp", "MGMT/ProbeReq", "MGMT/ProbeResp",
 		"MGMT/UNKNOWN", "MGMT/UNKNOWN", "MGMT/Beacon", "MGMT/ATIM",
-		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen"
+		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen",
+		"MGMT/UNKNOWN"
 	};
 	static const char * const ctl_arr[] = {
 		"CTL/PSPoll", "CTL/RTS", "CTL/CTS", "CTL/Ack", "CTL/CFEnd",
-		"CTL/CFEndCFAck"
+		"CTL/CFEndCFAck", "CTL/UNKNOWN"
 	};
 	static const char * const data_arr[] = {
 		"DATA/DataOnly", "DATA/Data CFAck", "DATA/Data CFPoll",
 		"DATA/Data CFAck/CFPoll", "DATA/Null", "DATA/CFAck",
-		"DATA/CFPoll", "DATA/CFAck/CFPoll"
+		"DATA/CFPoll", "DATA/CFAck/CFPoll", "DATA/UNKNOWN"
 	};
 	const char *str;
 	u8 fstype = (IEEE80211_FCTL_STYPE & fc) >> 4;
@@ -6806,23 +6807,14 @@ const char* acx_get_packet_type_string(u16 fc)
 
 	switch (IEEE80211_FCTL_FTYPE & fc) {
 	case IEEE80211_FTYPE_MGMT:
-		if (fstype < ARRAY_SIZE(mgmt_arr))
-			str = mgmt_arr[fstype];
-		else
-			str = "MGMT/UNKNOWN";
+		str = mgmt_arr[min((size_t)fstype, ARRAY_SIZE(mgmt_arr) - 1)];
 		break;
 	case IEEE80211_FTYPE_CTL:
 		ctl = fstype - 0x0a;
-		if (ctl < ARRAY_SIZE(ctl_arr))
-			str = ctl_arr[ctl];
-		else
-			str = "CTL/UNKNOWN";
+		str = ctl_arr[min((size_t)ctl, ARRAY_SIZE(ctl_arr) - 1)];
 		break;
 	case IEEE80211_FTYPE_DATA:
-		if (fstype < ARRAY_SIZE(data_arr))
-			str = data_arr[fstype];
-		else
-			str = "DATA/UNKNOWN";
+		str = data_arr[min((size_t)fstype, ARRAY_SIZE(data_arr) - 1)];
 		break;
 	default:
 		str = "UNKNOWN";
