@@ -53,12 +53,10 @@ void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type,
 #if defined(CONFIG_ACX_MAC80211_PCI)
 
 void acxpci_reset_mac(acx_device_t *adev);
-int acxpci_upload_fw(acx_device_t *adev);
 
 #else /* !CONFIG_ACX_MAC80211_PCI */
 
-static inline void acxpci_reset_mac(acx_device_t *adev)
-{}
+static inline void acxpci_reset_mac(acx_device_t *adev) {}
 
 #endif /* CONFIG_ACX_MAC80211_PCI */
 #endif /* _PCI_H_ */
