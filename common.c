@@ -6238,7 +6238,7 @@ end:
 int acx_debugfs_add_adev(struct acx_device *adev);
 void acx_debugfs_remove_adev(struct acx_device *adev);
 
-int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
+int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	int err = -EOPNOTSUPP;
@@ -6261,13 +6261,8 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
 		goto out_unlock;
 
 	adev->vif_operating = 1;
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	adev->vif = vif->vif;
-	mac_vif = vif->mac_addr;
-#else
-	adev->vif = vif;
-	mac_vif = vif->addr;
-#endif
+	adev->vif = VIF_vif(vif);
+	mac_vif = VIF_addr(vif);
 
 	switch (adev->vif_type) {
 	case NL80211_IFTYPE_AP:
@@ -6321,7 +6316,7 @@ out_unlock:
 	return err;
 }
 
-void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -6332,11 +6327,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
 	acx_sem_lock(adev);
 	acx_debugfs_remove_adev(adev);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	mac_vif = vif->mac_addr;
-#else
-	mac_vif = vif->addr;
-#endif
+	mac_vif = VIF_addr(vif);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor--;

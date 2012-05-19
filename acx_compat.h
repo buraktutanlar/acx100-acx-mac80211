@@ -29,11 +29,20 @@ do { \
 #include <generated/utsrelease.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 /*
-  Unsure about this one, its rather unselective.
-  Done to fix up acx_op_add_interface(..) in main code,
-  leaning towards mainline. TBD
-*/
-#  define ieee80211_vif ieee80211_if_init_conf
+ * v2.6.34 added ieee80211_vif, and obsoleted ieee80211_if_init_conf.
+ * To declutter acx_op_(add|remove)_interface(..), define macros to
+ * hide this struct change, naming them close to new one.  This is
+ * surely not a solution for every conceivable _vif situation (the new
+ * struct surely holds a different set of fields), but is sufficient
+ * here.
+ */
+#  define ieee80211_VIF ieee80211_if_init_conf
+#  define VIF_vif(vif)  vif->vif
+#  define VIF_addr(vif) vif->mac_addr
+#else
+#  define ieee80211_VIF ieee80211_vif
+#  define VIF_vif(vif)  vif
+#  define VIF_addr(vif) vif->addr
 #endif

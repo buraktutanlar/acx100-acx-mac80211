@@ -23,10 +23,10 @@
  * #define CONFIG_PM 0		// in include/generated/autoconf.h
  */
 
-#include "acx_compat.h"
 #include "acx_config.h"
 #include "acx_struct_hw.h"
 #include "acx_struct_dev.h"
 #include "acx_func.h"
+#include "acx_compat.h"
 
 #endif /* _ACX_H_ */
