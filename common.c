@@ -6957,11 +6957,16 @@ unsigned int acx_debug = ACX_DEFAULT_MSG;
 module_param_named(debug, acx_debug, uint, 0644);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+/* implement /sys/module/acx_mac80211/parameters/debugflags */
+
 static const char *flag_names[] = {
 	"L_LOCK", "L_INIT", "L_IRQ", "L_ASSOC", "L_FUNC", "L_XFER",
 	"L_DATA", "L_DEBUG", "L_IOCTL", "L_CTL", "L_BUFR", "L_XFER_BEACON",
 	"L_BUFT", "L_USBRXTX", "L_BUF",
 };
+/* should check enum debug_flags, but no suitable val is set */
+BUILD_BUG_DECL(flag_names, ARRAY_SIZE(flag_names) != 15);
 
 static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
 {
@@ -6981,11 +6986,14 @@ static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
 
 static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 {
-	int i, len = strlen(val);
-	char sign, *e, *p = (char*) val;
+	int i;
+	char sign, *e, *p = (char*) val; /* cast away const */
 
-	pr_info("val: %s len:%d\n", val, len);
-	while (*p) {
+	if ((e = strchr(p, '\n')))
+		*e = '\0';	/* trim trailing newline */
+
+	pr_info("parsing flags: %s\n", p);
+	for (; p; p = e) {
 		sign = *p++;
 		switch (sign) {
 		case '+':
@@ -6995,43 +7003,34 @@ static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 			return -EINVAL;
 		}
 		if ((e = strchr(p, ',')))
-			*e = '\0';
+			*e++ = '\0';	/* end 1st term, ready next */
 
 		for (i = 0; i < ARRAY_SIZE(flag_names); i++) {
-			if (strcmp(p, flag_names[i])) {
 
-				pr_info("found: %s flags:0x%x\n",
-					p, acx_debug);
-
+			if (!strcmp(p, flag_names[i])) {
 				if (sign == '+')
 					acx_debug |= (1 << i);
 				else
 					acx_debug &= ~(1 << i);
-
-				pr_info("new:%x\n", acx_debug);
-				p = ++e;
-				continue;
+				break;
 			}
 		}
 		if (i == ARRAY_SIZE(flag_names)) {
-			pr_err("no match on val: %s len:%d\n", p, len);
+			pr_err("no match on val: %s\n", p);
 			return -EINVAL;
 		}
-		p = ++e;
 	}
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 static struct kernel_param_ops acx_debug_flag_ops = {
         .get = acx_debug_flag_get,
         .set = acx_debug_flag_set,
 };
-
 module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
-#endif
 
-#endif
+#endif	/* implement /sys/module/acx_mac80211/parameters/debugflags */
+#endif	/* ACX_DEBUG */
 
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
