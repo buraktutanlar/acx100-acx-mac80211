@@ -2480,11 +2480,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
  */
 
 /*
- * acxmem_l_process_rxdesc
+ * acx_process_rxdesc
  *
- * Called directly and only from the IRQ handler
+ * Called from IRQ handlers (acx_irq_work, #if0d acxmem_interrupt)
  */
-void acx_process_rxdesc(acx_device_t *adev)
+static void acx_process_rxdesc(acx_device_t *adev)
 {
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc = NULL; // silence uninit warning
