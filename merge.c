@@ -1414,7 +1414,7 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 	return res;
 }
 
-int acxmem_upload_fw(acx_device_t *adev)
+static int acxmem_upload_fw(acx_device_t *adev)
 {
 	char *filename = "WLANGEN.BIN";
 	int rc;
@@ -1427,7 +1427,7 @@ int acxmem_upload_fw(acx_device_t *adev)
 	return rc;
 }
 
-int acxpci_upload_fw(acx_device_t *adev)
+static int acxpci_upload_fw(acx_device_t *adev)
 {
 	char filename[sizeof("tiacx1NNcNN")];
 	int rc;
