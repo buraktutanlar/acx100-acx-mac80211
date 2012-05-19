@@ -491,6 +491,7 @@ static inline int mac_is_mcast(const u8 *mac)
 }
 
 #define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
+#define MACSTR_SIZE 3*6 /* 2 chars plus ':' per byte, trailing ':' is \0 */
 #define MAC(bytevector) \
 	((unsigned char *)bytevector)[0], \
 	((unsigned char *)bytevector)[1], \

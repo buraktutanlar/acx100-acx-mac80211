@@ -6244,7 +6244,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 	int err = -EOPNOTSUPP;
 
 	u8 *mac_vif;
-	char mac[] = MACSTR; // approximate max length
+	char mac[MACSTR_SIZE];
 
 	int vif_type;
 
@@ -6320,7 +6320,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	char mac[] = MACSTR; // approximate max length
+	char mac[MACSTR_SIZE];
 	u8 *mac_vif;
 
 	FN_ENTER;
