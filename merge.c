@@ -209,9 +209,13 @@ static int acx_allocate(acx_device_t *adev, struct desc_info *di,
 {
 	void *ptr;
 
-	if (IS_PCI(adev))
+	if (IS_PCI(adev)) {
 		ptr = dma_alloc_coherent(adev->bus_dev,
 					di->size, &di->phy, GFP_KERNEL);
+
+		pr_info("bdev:%p size:%d phy:%p ptr:%p\n",
+			adev->bus_dev, di->size, (void*) di->phy, ptr);
+	}
 	else {
 		ptr = kmalloc(di->size, GFP_KERNEL);
 		/*
