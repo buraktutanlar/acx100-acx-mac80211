@@ -310,16 +310,18 @@ int acx_setup_modes(acx_device_t *adev);
 /* BOM Proc, Debug (Common)
  * -----
  */
-#ifdef CONFIG_PROC_FS
-int acx_proc_register_entries(struct ieee80211_hw *ieee);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
-#else
-/* - static inline int
- * - acx_proc_register_entries(const struct ieee80211_hw *ieee) { return OK; }
- * - static inline int
- * - acx_proc_unregister_entries(const struct ieee80211_hw *ieee) { return OK; }
- */
+
+#if defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY
+#  define PROC_ENTRIES
 #endif
+
+DECL_OR_STUB(PROC_ENTRIES,
+	int acx_proc_register_entries(struct ieee80211_hw *ieee),
+	{ return 0; })
+DECL_OR_STUB(PROC_ENTRIES,
+	int acx_proc_unregister_entries(struct ieee80211_hw *ieee),
+	{ return 0; })
+	
 /* - 
  * BOM Rx Path (Common)
  * -----

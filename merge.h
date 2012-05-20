@@ -15,7 +15,7 @@ extern acx_proc_show_t *const acx_proc_show_funcs[];
 extern acx_proc_write_t *const acx_proc_write_funcs[];
 
 /* debugfs.c API used by common.c */
-#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FS
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
 int acx_debugfs_add_adev(struct acx_device *adev);
 void acx_debugfs_remove_adev(struct acx_device *adev);
 int __init acx_debugfs_init(void);

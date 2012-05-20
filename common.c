@@ -225,44 +225,6 @@ static void acx_update_ratevector(acx_device_t *adev);
 static void acx_s_update_80211_powersave_mode(acx_device_t *adev)
 #endif
 
-/* Proc, Debug */
-#ifdef CONFIG_PROC_FS
-static int acx_proc_show_diag(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_diag(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-static int acx_proc_show_acx(struct seq_file *file, void *v);
-static int acx_proc_show_eeprom(struct seq_file *file, void *v);
-static int acx_proc_show_phy(struct seq_file *file, void *v);
-static int acx_proc_show_debug(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_debug(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-static int acx_proc_show_sensitivity(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_sensitivity(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_tx_level(struct seq_file *file, void *v);
-static ssize_t acx111_proc_write_tx_level(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_reg_domain(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_reg_domain(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_antenna(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_antenna(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-/*
-  obsoleted by debugfs.c
-static int acx_proc_open(struct inode *inode, struct file *file);
-static void acx_proc_init(void);
-int acx_proc_register_entries(struct ieee80211_hw *ieee);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
-*/
-#endif
-
 /* Rx Path */
 void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t * rxbuf);
 static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
@@ -703,48 +665,6 @@ u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value)
 	return (bitrate);
 }
 
-#if defined CONFIG_PROC_FS || defined CONFIG_PROC_FS
-/*
- * debugfs.c provides new interface to the "files", procfs interface
- * is deprecated for new stuff.  Keep PROC_FS facility for users with
- * non-DEBUG_FS kernels, so keep handlers themselves here.
- */
-#ifdef ACX_WANT_PROC_FILES_ANYWAY
-/* obsoleted by debugfs.c */
-static const char *const proc_files[] = {
-	"info", "diag", "eeprom", "phy", "debug",
-	"sensitivity", "tx_level", "antenna", "reg_domain",
-};
-static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
-#endif /* ACX_WANT_PROC_FILES_ANYWAY */
-
-acx_proc_show_t *const acx_proc_show_funcs[] = {
-	acx_proc_show_acx,
-	acx_proc_show_diag,
-	acx_proc_show_eeprom,
-	acx_proc_show_phy,
-	acx_proc_show_debug,
-	acx_proc_show_sensitivity,
-	acx_proc_show_tx_level,
-	acx_proc_show_antenna,
-	acx_proc_show_reg_domain,
-};
-
-acx_proc_write_t *const acx_proc_write_funcs[] = {
-	NULL,
-	acx_proc_write_diag,
-	NULL,
-	NULL,
-	acx_proc_write_debug,
-	acx_proc_write_sensitivity,
-	acx111_proc_write_tx_level,
-	acx_proc_write_antenna,
-	acx_proc_write_reg_domain,
-};
-BUILD_BUG_DECL(SHOW, ARRAY_SIZE(acx_proc_show_funcs)
-		  != ARRAY_SIZE(acx_proc_write_funcs));
-
-#endif /* CONFIG_PROC_FS */
 
 /*
  * BOM Locking
@@ -4142,12 +4062,17 @@ static u8 acx_rate111to100(u16 r)
 }
 */
 
-/*
- * BOM Proc, Debug
- * ==================================================
+/* ##################################################
+ * Proc, Debug:
+ *
+ * File read/write handlers for both procfs, debugfs.  Procfs is
+ * deprecated for new files, so proc-files are disabled by default;
+ * ACX_WANT_PROC_FILES_ANYWAY enables them.  Debugfs is enabled, it
+ * can be disabled by ACX_NO_DEBUG_FILES.
  */
 
-#if defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS)
+#if (defined CONFIG_PROC_FS  &&  defined ACX_WANT_PROC_FILES_ANYWAY) \
+ || (defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES)
 
 static int acx_proc_show_diag(struct seq_file *file, void *v)
 {
@@ -4886,7 +4811,6 @@ out:
 	return ret;
 }
 
-
 static int acx_proc_show_antenna(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
@@ -4941,7 +4865,45 @@ out:
 	return ret;
 }
 
-#if defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY
+acx_proc_show_t *const acx_proc_show_funcs[] = {
+	acx_proc_show_acx,
+	acx_proc_show_diag,
+	acx_proc_show_eeprom,
+	acx_proc_show_phy,
+	acx_proc_show_debug,
+	acx_proc_show_sensitivity,
+	acx_proc_show_tx_level,
+	acx_proc_show_antenna,
+	acx_proc_show_reg_domain,
+};
+
+acx_proc_write_t *const acx_proc_write_funcs[] = {
+	NULL,
+	acx_proc_write_diag,
+	NULL,
+	NULL,
+	acx_proc_write_debug,
+	acx_proc_write_sensitivity,
+	acx111_proc_write_tx_level,
+	acx_proc_write_antenna,
+	acx_proc_write_reg_domain,
+};
+BUILD_BUG_DECL(acx_proc_show_funcs__VS__acx_proc_write_funcs,
+	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(acx_proc_write_funcs));
+	
+
+#if (defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY)
+/*
+ * procfs has been explicitly enabled
+ */
+static const char *const proc_files[] = {
+	"info", "diag", "eeprom", "phy", "debug",
+	"sensitivity", "tx_level", "antenna", "reg_domain",
+};
+BUILD_BUG_DECL(acx_proc_show_funcs__VS__proc_files,
+	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(proc_files));
+
+static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
 
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
@@ -5045,11 +5007,14 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 	FN_EXIT0;
 	return OK;
 }
-#else /* ACX_WANT_PROC_FILES_ANYWAY */
-static void acx_proc_init(void) { }	/* stub */
-#endif /* ACX_WANT_PROC_FILES_ANYWAY */
+#else
+static inline void acx_proc_init(void) {}
 
-#endif /* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS) */
+#endif	/* ACX_WANT_PROC_FILES_ANYWAY */
+#endif	/* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUG_FS) */
+
+/* should have a real cleanup func */
+static inline void acx_proc_exit(void) {}
 
 /*
  * BOM Rx Path
@@ -6893,6 +6858,7 @@ static void __exit acx_cleanup_module(void)
 {
 	/* TODO Check, that interface isn't still up */
 	acx_debugfs_exit();
+	acx_proc_exit();
 
 	acxpci_cleanup_module();
 	acxusb_cleanup_module();

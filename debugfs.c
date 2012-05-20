@@ -2,7 +2,7 @@
  * debugfs API to rest of driver is prototyped in merge.h, including
  * the stubs.
  */
-#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FS
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
 
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
 
@@ -169,22 +169,6 @@ void acx_debugfs_remove_adev(struct acx_device *adev)
 	adev->debugfs_dir = NULL;
 }
 
-/* compat funcs, also address lifecycle issues */
-int acx_proc_register_entries(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	pr_info("compat wrapper\n");
-	return acx_debugfs_add_adev(adev);
-}
-
-int acx_proc_unregister_entries(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	pr_info("compat wrapper\n");
-	acx_debugfs_remove_adev(adev);
-	return 0;
-}
-
 int __init acx_debugfs_init(void)
 {
 	acx_dbgfs_dir = debugfs_create_dir(KBUILD_MODNAME, NULL);
@@ -199,4 +183,4 @@ void __exit acx_debugfs_exit(void)
 	debugfs_remove_recursive(acx_dbgfs_dir);
 }
 
-#endif /* CONFIG_DEBUG_FS */
+#endif /* CONFIG_DEBUG_FS && ! ACX_NO_DEBUG_FILES */
