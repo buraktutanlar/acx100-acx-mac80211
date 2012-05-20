@@ -104,7 +104,7 @@ none:
 }
 
 /*
- * modified from acxmem_s_upload_radio, and wrapped below
+ * modified from acxmem_upload_radio, and wrapped below
  */
 static int acx_upload_radio(acx_device_t *adev, char *filename)
 {
