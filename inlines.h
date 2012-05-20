@@ -66,11 +66,15 @@
 #define acxmem_lock_flags	unsigned long flags = 0
 #define acxmem_lock()						\
 	if (IS_MEM(adev))					\
-		 spin_lock_irqsave(&adev->spinlock, flags)
+		 spin_lock_irqsave(&adev->spinlock, flags);	\
+	else							\
+		__acquire(&adev->spinlock)
 
-#define acxmem_unlock()		\
-	if (IS_MEM(adev))	\
-		 spin_unlock_irqrestore(&adev->spinlock, flags)
+#define acxmem_unlock()						 \
+	if (IS_MEM(adev))					 \
+		 spin_unlock_irqrestore(&adev->spinlock, flags); \
+	else							 \
+		__release(&adev->spinlock)
 
 /* Endianess: read[lw], write[lw] do little-endian conversion internally */
 #define acx_readl(v)		readl((v))
