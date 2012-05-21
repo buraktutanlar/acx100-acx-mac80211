@@ -70,8 +70,8 @@ void log_fn_exit_v(const char *funcname, int v);
 char *acx_print_mac(char *buf, const u8 *mac);
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
-void acx_dump_bytes(const void *data, int num);
-const char *acx_cmd_status_str(unsigned int state);
+//-void acx_dump_bytes(const void *data, int num);
+//-const char *acx_cmd_status_str(unsigned int state);
 
 /* Data Access */
 static int acx100_init_memory_pools(acx_device_t *adev, const acx_ie_memmap_t * mmt);
@@ -83,10 +83,10 @@ MODULE_FIRMWARE("tiacx111");
 MODULE_FIRMWARE("tiacx111c16");
 MODULE_FIRMWARE("tiacx111r16");
 
-void acx_get_firmware_version(acx_device_t *adev);
-void acx_display_hardware_details(acx_device_t *adev);
-firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
-void acx_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t * pcfg);
+//-void acx_get_firmware_version(acx_device_t *adev);
+//-void acx_display_hardware_details(acx_device_t *adev);
+//-firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
+//-void acx_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t * pcfg);
 int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
@@ -103,12 +103,12 @@ static inline unsigned int acx_rate111to5bits(unsigned int rate);
 int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 /* Configuration (Control Path) */
-void acx_set_defaults(acx_device_t *adev);
+//-void acx_set_defaults(acx_device_t *adev);
 void acx_update_card_settings(acx_device_t *adev);
-void acx_start(acx_device_t *adev);
+//-void acx_start(acx_device_t *adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
-int acx_init_mac(acx_device_t *adev);
-int acx_setup_modes(acx_device_t *adev);
+//-int acx_init_mac(acx_device_t *adev);
+//-int acx_setup_modes(acx_device_t *adev);
 
 static int acx_set_mode(acx_device_t *adev, u16 mode);
 static int acx_update_mode(acx_device_t *adev);
@@ -226,7 +226,7 @@ static void acx_s_update_80211_powersave_mode(acx_device_t *adev)
 #endif
 
 /* Rx Path */
-void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t * rxbuf);
+//-void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t * rxbuf);
 static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 /* Tx Path */
@@ -236,13 +236,13 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 #endif
 
-void acx_tx_work(struct work_struct *work);
+//-void acx_tx_work(struct work_struct *work);
 void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
-void acx_tx_queue_flush(acx_device_t *adev);
-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
-int acx_queue_stopped(struct ieee80211_hw *ieee);
-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
+//-void acx_tx_queue_flush(acx_device_t *adev);
+//-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
+//-int acx_queue_stopped(struct ieee80211_hw *ieee);
+//-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
 static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
@@ -252,11 +252,11 @@ static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque,
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
 			unsigned int finger,
 			struct ieee80211_tx_info *info);
-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
-			struct ieee80211_tx_info *info);
-void acx111_tx_build_txstatus(acx_device_t *adev,
-			struct ieee80211_tx_info *txstatus, u16 r111,
-			u8 ack_failures);
+//-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
+//-			struct ieee80211_tx_info *info);
+//-void acx111_tx_build_txstatus(acx_device_t *adev,
+//-			struct ieee80211_tx_info *txstatus, u16 r111,
+//-			u8 ack_failures);
 u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 
@@ -276,25 +276,29 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee
 #endif
 
 /* Irq Handling, Timer */
-void acx_init_task_scheduler(acx_device_t *adev);
-void acx_after_interrupt_task(acx_device_t *adev);
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-void acx_log_irq(u16 irqtype);
-void acx_timer(unsigned long address);
+//-void acx_init_task_scheduler(acx_device_t *adev);
+//-void acx_after_interrupt_task(acx_device_t *adev);
+//-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+//-void acx_log_irq(u16 irqtype);
+//-void acx_timer(unsigned long address);
 void acx_set_timer(acx_device_t *adev, int timeout_us);
 
 /* Mac80211 Ops */
-int acx_op_config(struct ieee80211_hw *hw, u32 changed);
-void acx_op_bss_info_changed(struct ieee80211_hw *hw,
+//-int acx_op_config(struct ieee80211_hw *hw, u32 changed);
+/* void acx_op_bss_info_changed(struct ieee80211_hw *hw,
 			struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *info, u32 changed);
+
 int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		struct ieee80211_key_conf *key);
-void acx_op_configure_filter(struct ieee80211_hw *hw,
+*/
+/* void acx_op_configure_filter(struct ieee80211_hw *hw,
 			unsigned int changed_flags,
 			unsigned int *total_flags, u64 multicast);
+*/
 
+/*
 #if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
 int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		u16 queue, const struct ieee80211_tx_queue_params *params);
@@ -302,20 +306,23 @@ int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 #endif
+*/
 
-int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+/* int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			struct ieee80211_tx_queue_stats *stats);
 #endif
 
+
 int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 		bool set);
+*/
 static int acx_do_job_update_tim(acx_device_t *adev);
 
 /* Helpers */
-void acx_mwait(int ms);
+//-void acx_mwait(int ms);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
