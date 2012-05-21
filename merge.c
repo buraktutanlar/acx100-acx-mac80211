@@ -698,6 +698,20 @@ out:
 /* ########################################## */
 /* free desc_queue stuff */
 
+static inline void acx_free_desc_queue(acx_device_t *adev,
+					struct desc_info *dinfo)
+{
+	if (dinfo->start) {
+		if (IS_PCI(adev))
+			acxpci_free_coherent(NULL, dinfo->size, dinfo->start,
+					dinfo->phy);
+		else
+			kfree(dinfo->start);
+		dinfo->start = NULL;
+		dinfo->size = 0;
+	}
+}
+
 /*
  * acx_free_desc_queues
  *
@@ -707,31 +721,14 @@ out:
  */
 void acx_free_desc_queues(acx_device_t *adev)
 {
-
-#define ACX_FREE_QUEUE(adev, size, ptr, phyaddr)			\
-	if (ptr) {							\
-		if (IS_PCI(adev))					\
-			acxpci_free_coherent(NULL, size, ptr, phyaddr); \
-		else							\
-			kfree(ptr);					\
-		ptr = NULL;						\
-		size = 0;						\
-	}
-
-#ifndef ACX_FREE_QUEUES
-#define ACX_FREE_QUEUES(adev, _dir_)				\
-	ACX_FREE_QUEUE(adev, adev->_dir_.host.size,		\
-		adev->_dir_.host.start, adev->_dir_.host.phy);	\
-	ACX_FREE_QUEUE(adev, adev->_dir_.buf.size,		\
-		adev->_dir_.buf.start, adev->_dir_.buf.phy)
-#endif	// ACX_FREE_QUEUES
-
 	FN_ENTER;
 
-	ACX_FREE_QUEUES(adev, tx);
+	acx_free_desc_queue(adev, &adev->tx.host);
+	acx_free_desc_queue(adev, &adev->tx.buf);
 	adev->tx.desc_start = NULL;
 
-	ACX_FREE_QUEUES(adev, rx);
+	acx_free_desc_queue(adev, &adev->rx.host);
+	acx_free_desc_queue(adev, &adev->rx.buf);
 	adev->rx.desc_start = NULL;
 
 	FN_EXIT0;

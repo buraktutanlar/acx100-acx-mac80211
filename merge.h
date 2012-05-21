@@ -165,11 +165,9 @@ DECL_OR_STUB ( PCI_OR_MEM,
 	void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque),
 	{ return (void*) NULL; } )
 
-//void acx_process_rxdesc(acx_device_t *adev);
 
 #if (defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM)
 
-void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
 
 static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
 {
@@ -192,9 +190,6 @@ static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
 static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 					txdesc_t* txdesc, int inc)
 { return (txdesc_t*) NULL; }
-
-/* empty stub here, real one in merge.c */
-#define ACX_FREE_QUEUES(adev, _dir_)
 
 
 #endif /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
