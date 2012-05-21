@@ -1,5 +1,11 @@
+#ifndef _INTERRRUPT_MASKS_H_
+#define _INTERRRUPT_MASKS_H_
 /*
-
+ * Define interrupt flag for acx100 & acx111 chips.  Separated to here
+ * to gather all pci/mem & 100/111 settings together, to simplify
+ * comparison of flags (and possibly increase sharing of handlers).
+ * Theyre all static to satisfy sparse, but it doesnt matter, since
+ * this is included just once, in merge.c
  */
 
 #include "acx_struct_dev.h"
@@ -7,7 +13,7 @@
 #define DEVTYPE_MAX	3
 #define CHIPTYPE_MAX	3
 
-u16 interrupt_masks[DEVTYPE_MAX][CHIPTYPE_MAX] = {
+static u16 interrupt_masks[DEVTYPE_MAX][CHIPTYPE_MAX] = {
 	[ DEVTYPE_MEM ] = {
 		[ CHIPTYPE_ACX100 ]
 		= (u16) ~ (0
@@ -96,8 +102,8 @@ u16 interrupt_masks[DEVTYPE_MAX][CHIPTYPE_MAX] = {
 inline void interrupt_sanity_checks(void) {}
 #else
 
-const char *devtype_names[] = { "PCI", "USB", "MEM" };
-const char *chiptype_names[] = { "", "ACX100", "ACX111" };
+static const char *devtype_names[] = { "PCI", "USB", "MEM" };
+static const char *chiptype_names[] = { "", "ACX100", "ACX111" };
 
 /* defd to textually match #define table in acx-struct-hw (then reordered) */
 struct interrupt_desc {
@@ -106,7 +112,7 @@ struct interrupt_desc {
 	char *desc;
 };
 
-const struct interrupt_desc interrupt_descs[] = { 
+static const struct interrupt_desc interrupt_descs[] = { 
 	{ 0x0001, "HOST_INT_RX_DATA",
 	  "IN:  packet rcvd from remote host to device"
 	},
@@ -162,7 +168,7 @@ const struct interrupt_desc interrupt_descs[] = {
  * Otherwize, show the changes, and mark them with ! to show the
  * direction of the difference.
  */
-void interrupt_show_flags(u16 flagval, u16 versus)
+static void interrupt_show_flags(u16 flagval, u16 versus)
 {
 	int i, mask, flagdiffs;
 
@@ -188,7 +194,7 @@ void interrupt_show_flags(u16 flagval, u16 versus)
 	}
 }
 
-inline void interrupt_sanity_checks(acx_device_t *adev)
+static inline void interrupt_sanity_checks(acx_device_t *adev)
 {
 	int d, c;
 
@@ -226,4 +232,5 @@ inline void interrupt_sanity_checks(acx_device_t *adev)
 	}
 }
 
-#endif
+#endif	/* (ACX_DEBUG < 2) */
+#endif	/* _INTERRRUPT_MASKS_H_ */
