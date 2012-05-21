@@ -448,7 +448,7 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
 /* ########################################## */
 /* non-host desc_queue creation */
 
-static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
@@ -740,7 +740,7 @@ void acx_free_desc_queues(acx_device_t *adev)
 /* ########################################## */
 /* irq stuff */
 
-void acx_irq_enable(acx_device_t * adev)
+void acx_irq_enable(acx_device_t *adev)
 {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -752,7 +752,7 @@ void acx_irq_enable(acx_device_t * adev)
 }
 
 
-void acx_irq_disable(acx_device_t * adev)
+void acx_irq_disable(acx_device_t *adev)
 {
 	FN_ENTER;
 
@@ -2990,7 +2990,7 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 	return &adev->tx.host.txstart[index * 2];
 }
 
-void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
+void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
 	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
@@ -3075,7 +3075,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	if (IS_ACX111(adev)) {
 
 		/* Build rateset for acx111 */
-		rateset=acx111_tx_build_rateset(adev, txdesc, info);
+		rateset = acx111_tx_build_rateset(adev, txdesc, info);
 
 		/* note that if !txdesc->do_auto, txrate->cur has only
 		 * one nonzero bit */
@@ -4130,7 +4130,7 @@ void acx_op_stop(struct ieee80211_hw *hw)
  * BOM Helpers
  * ==================================================
  */
-void acx_power_led(acx_device_t * adev, int enable)
+void acx_power_led(acx_device_t *adev, int enable)
 {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 
