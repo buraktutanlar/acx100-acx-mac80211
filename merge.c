@@ -1573,7 +1573,6 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-#if 1	/* acx_read_cmd_type_status() */
 u32 acx_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
@@ -1593,7 +1592,6 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
-#endif	/* acx_read_cmd_type_status() */
 
 /* static inline  */
 void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)

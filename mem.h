@@ -1,8 +1,8 @@
 
 /* this file provides prototypes for functions defined in mem.c that
- * are used by common.c etc, and is thus the internal API.  It also
- * forward declares some of the functions used in mem.c, reducing the
- * set of forward declarations in mem.c
+ * are used by common.c etc; it is part of the internal API.  It also
+ * forward declares some of the functions used in mem.c, which reduces
+ * the set of forward declarations in mem.c
  */
 #ifndef _MEM_H_
 #define _MEM_H_
@@ -42,9 +42,6 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev);
 int __init acxmem_init_module(void);
 void __exit acxmem_cleanup_module(void);
 
-void acxmem_write_cmd_type_status(acx_device_t *adev, u16 type,
-				u16 status);
-
 
 #else /* !CONFIG_ACX_MAC80211_MEM */
 
@@ -66,14 +63,6 @@ static inline void acxmem_chaincopy_to_slavemem(acx_device_t *adev,
 static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 		u8 *destination, u32 source, int count)
 { }
-
-/* inline int acxmem_upload_radio(acx_device_t *adev)
- * { return 0; }
- */
-
-//static inline int acxmem_write_fw(acx_device_t *adev,
-//		const firmware_image_t *fw_image, u32 offset)
-//{ return 0; }
 
 static inline void acxmem_reset_mac(acx_device_t *adev)
 { }
@@ -99,10 +88,6 @@ static inline int __init acxmem_init_module(void)
 { return 0; }
 
 static inline void __exit acxmem_cleanup_module(void)
-{ }
-
-static inline void acxmem_write_cmd_type_status(acx_device_t *adev,
-		u16 type, u16 status)
 { }
 
 static inline void acxmem_init_mboxes(acx_device_t *adev) { }

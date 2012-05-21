@@ -40,10 +40,6 @@ tx_t *acxpci_alloc_tx(acx_device_t *adev);
  * Driver, Module
  */
 
-u32 acxpci_read_cmd_type_status(acx_device_t *adev);
-void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type,
-		u16 status);
-
 #if defined(CONFIG_ACX_MAC80211_PCI)
 
 int __init acxpci_init_module(void);
