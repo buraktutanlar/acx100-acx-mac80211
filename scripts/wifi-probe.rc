@@ -4,12 +4,20 @@
 devs="wlan0 wlan1"		# I have 2 cards
 drvname="acx"			# 1st driver (rtl8180) doesnt log
 logdir=~/wifi-test-data		# write files here, must exist
-apmac=00:11:22:33:44:55
+apmac=00:14:d1:e8:65:0a
 chan=11
-macs="00:11:22:33:44:55 00:AA:BB:CC:DD:EE 00:1A:2B:3C:4D:5E"
+macs="00:18:DE:06:B2:0C 00:30:BD:4D:E2:47 00:18:4D:24:B3:FA"
 iperfsvrs="192.168.10.127 192.168.10.128"
 iperfargs="-t30 -i5"
 others="eth0 wlan0"
+dbgfs="/dbg"
+
+for f in ~/wifi-probe.prefs ../wifi-probe.prefs ./wifi-probe.prefs ; do
+    if [ -f $f ] ; then
+	echo loading $f
+	. $f
+    fi
+done
 
 wifi-help () {
 echo
@@ -28,6 +36,8 @@ echo "   macs:	$macs"
 echo "   iperfsvrs:	$iperfsvrs	# iperf server addresses"
 echo "   iperfargs:	$iperfargs"
 echo "   others:	$others		# ifdown these in wifi-ent"
+echo
+echo "you can set these permanently in ./wifi-probe.prefs"
 echo
 }
 echo wifi-help for info
@@ -124,5 +134,10 @@ wifi-save () {
     svdir=`modinfo acx-mac80211 | grep -E ^version: | cut -c17-`
     mkdir -p $svdir
     mv iw* ifconfig* dmesg e_n_a fish*dump iperf-* ping-* traceroute-* $svdir
+    cp -r $dbgfs/ieee80211 $svdir
+    cp -r $dbgfs/acx_mac80211 $svdir
 }
 
+# shorthands, for: cat $fdebug; echo "" > $fdebug, etc
+fdebug=/sys/module/acx_mac80211/parameters/debug
+fdebugflags=/sys/module/acx_mac80211/parameters/debugflags

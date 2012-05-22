@@ -1,13 +1,8 @@
-
-#ifndef CONFIG_DEBUG_FS
-
-/* API: not static inline - must be available for linking */
-int __init acx_debugfs_init(void)  { return 0; }
-void __exit acx_debugfs_exit(void) {}
-int  acx_debugfs_add_adev   (struct acx_device *adev) { return 0; }
-void acx_debugfs_remove_adev(struct acx_device *adev) { return 0; }
-
-#else /* CONFIG_DEBUG_FS */
+/*
+ * debugfs API to rest of driver is prototyped in merge.h, including
+ * the stubs.
+ */
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
 
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
 
@@ -58,7 +53,7 @@ BUILD_BUG_DECL(dbgfs_files__VS__enum_REG_DOMAIN,
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
-	int fidx = (int) inode->i_private;
+	size_t fidx = (size_t) inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
 
@@ -73,21 +68,21 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 	case ANTENNA:
 	case REG_DOMAIN:
 		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
-			dbgfs_files[fidx], file->f_mode, fidx, adev);
+			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
 		break;
 	default:
-		pr_err("unknown file @ %d: %s\n", fidx,
+		pr_err("unknown file @ %d: %s\n", (int)fidx,
 			file->f_path.dentry->d_name.name);
 		return -ENOENT;
 	}
 	return single_open(file, acx_proc_show_funcs[fidx], adev);
 }
 
-static int acx_dbgfs_write(struct file *file, const char __user *buf,
+static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	/* retrieve file-index and adev from private fields */
-	int fidx = (int) file->f_path.dentry->d_inode->i_private;
+	size_t fidx = (size_t) file->f_path.dentry->d_inode->i_private;
 	struct acx_device *adev = (struct acx_device *)
 		file->f_path.dentry->d_parent->d_inode->i_private;
 
@@ -102,10 +97,10 @@ static int acx_dbgfs_write(struct file *file, const char __user *buf,
 	case ANTENNA:
 	case REG_DOMAIN:
 		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
-			dbgfs_files[fidx], file->f_mode, fidx, adev);
+			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
 		break;
 	default:
-		pr_err("unknown file @ %d: %s\n", fidx,
+		pr_err("unknown file @ %d: %s\n", (int)fidx,
 			file->f_path.dentry->d_name.name);
 		return -ENOENT;
 	}
@@ -125,7 +120,7 @@ static struct dentry *acx_dbgfs_dir;
 
 int acx_debugfs_add_adev(struct acx_device *adev)
 {
-	int i;
+	size_t i;
 	int fmode;
 	struct dentry *file;
 	const char *devname = wiphy_name(adev->ieee->wiphy);
@@ -174,22 +169,6 @@ void acx_debugfs_remove_adev(struct acx_device *adev)
 	adev->debugfs_dir = NULL;
 }
 
-/* compat funcs, also address lifecycle issues */
-int acx_proc_register_entries(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	pr_info("compat wrapper\n");
-	return acx_debugfs_add_adev(adev);
-}
-
-int acx_proc_unregister_entries(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = ieee2adev(hw);
-	pr_info("compat wrapper\n");
-	acx_debugfs_remove_adev(adev);
-	return 0;
-}
-
 int __init acx_debugfs_init(void)
 {
 	acx_dbgfs_dir = debugfs_create_dir(KBUILD_MODNAME, NULL);
@@ -204,4 +183,4 @@ void __exit acx_debugfs_exit(void)
 	debugfs_remove_recursive(acx_dbgfs_dir);
 }
 
-#endif /* CONFIG_DEBUG_FS */
+#endif /* CONFIG_DEBUG_FS && ! ACX_NO_DEBUG_FILES */

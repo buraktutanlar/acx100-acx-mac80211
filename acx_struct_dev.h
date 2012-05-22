@@ -24,7 +24,7 @@
  * BOM Debug / log functionality
  * ==================================================
  */
-enum {
+enum debug_flags {
 	L_LOCK		= (ACX_DEBUG>1)*0x0001,	/* locking debug log */
 	L_INIT		= (ACX_DEBUG>0)*0x0002,	/* special card initialization logging */
 	L_IRQ		= (ACX_DEBUG>0)*0x0004,	/* interrupt stuff */

@@ -165,7 +165,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	   mem.addr = cpu_to_le16(reg);
 	   mem.type = cpu_to_le16(0x82);
 	   mem.len = cpu_to_le32(4);
-	   acx_s_issue_cmd(adev, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
+	   acx_issue_cmd(adev, ACX1xx_CMD_MEM_READ, &mem, sizeof(mem));
 	   *charbuf = mem.data;
 	   log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
 	 */
@@ -490,7 +490,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
  */
 
 /*
- * acxusb_s_issue_cmd_timeo
+ * acxusb_issue_cmd_timeo_debug
  * Excecutes a command in the command mailbox
  *
  * buffer = a pointer to the data.
@@ -666,7 +666,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
  */
 
 /*
- * acxusb_s_fill_configoption
+ * acxusb_fill_configoption
  *
  * temporary helper function to at least fill important cfgopt members with
  * useful replacement values until we figure out how one manages to fetch
@@ -1054,7 +1054,7 @@ static void acxusb_complete_rx(struct urb *urb)
 }
 
 /*
- * acxusb_l_poll_rx
+ * acxusb_poll_rx
  * This function (re)initiates a bulk-in USB transfer on a given urb
  */
 static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
@@ -1172,7 +1172,7 @@ static void acxusb_complete_tx(struct urb *urb)
 }
 
 /*
- * acxusb_l_alloc_tx
+ * acxusb_alloc_tx
  * Actually returns a usb_tx_t* ptr
  */
 tx_t *acxusb_alloc_tx(acx_device_t *adev)
@@ -1219,13 +1219,14 @@ void *acxusb_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
 }
 
 /*
- * acxusb_l_tx_data
+ * acxusb_tx_data
  *
  * Can be called from IRQ (rx -> (AP bridging or mgmt response) -> tx).
  * Can be called from acx_i_start_xmit (data frames from net core).
  */
 void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
-		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb) {
+		struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
+{
 	struct usb_device *usbdev;
 	struct urb *txurb;
 	usb_tx_t *tx;
@@ -1396,7 +1397,7 @@ void acxusb_irq_work(struct work_struct *work)
 
 
 /*
- * acxusb_e_start()
+ * acxusb_op_start()
  * This function is called when the user sets up the network interface.
  * It initializes a management timer, sets up the USB card and starts
  * the network tx queue and USB receive.
@@ -1430,7 +1431,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	adev->mgmt_timer.function = acx_timer;
 	adev->mgmt_timer.data = (unsigned long)adev;
 
-	/* acx_s_start needs it */
+	/* acx_start needs it */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx_start(adev);
 
@@ -1447,7 +1448,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 }
 
 /*
- * acxusb_e_stop()
+ * acxusb_op_stop()
  *
  * This function stops the network functionality of the interface (invoked
  * when the user calls ifconfig <wlan> down). The tx queue is halted and
@@ -1539,7 +1540,7 @@ static const struct ieee80211_ops acxusb_hw_ops = {
  */
 
 /*
- * acxusb_e_probe()
+ * acxusb_probe()
  *
  * This function is invoked by the kernel's USB core whenever a new device is
  * attached to the system or the module is loaded. It is presented a usb_device
@@ -1828,7 +1829,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 }
 
 /*
- * acxusb_e_disconnect()
+ * acxusb_disconnect()
  *
  * This function is invoked whenever the user pulls the plug from the USB
  * device or the module is removed from the kernel. In these cases, the
@@ -1905,8 +1906,8 @@ static struct usb_driver
  */
 int __init acxusb_init_module(void)
 {
-	log(L_INIT, "USB module initialized, "
-	    "probing for devices...\n");
+	pr_info("built with CONFIG_ACX_MAC80211_USB\n");
+	log(L_INIT, "USB module initialized, probing for devices...\n");
 	return usb_register(&acxusb_driver);
 }
 

@@ -70,8 +70,8 @@ void log_fn_exit_v(const char *funcname, int v);
 char *acx_print_mac(char *buf, const u8 *mac);
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
-void acx_dump_bytes(const void *data, int num);
-const char *acx_cmd_status_str(unsigned int state);
+//-void acx_dump_bytes(const void *data, int num);
+//-const char *acx_cmd_status_str(unsigned int state);
 
 /* Data Access */
 static int acx100_init_memory_pools(acx_device_t *adev, const acx_ie_memmap_t * mmt);
@@ -83,10 +83,10 @@ MODULE_FIRMWARE("tiacx111");
 MODULE_FIRMWARE("tiacx111c16");
 MODULE_FIRMWARE("tiacx111r16");
 
-void acx_get_firmware_version(acx_device_t *adev);
-void acx_display_hardware_details(acx_device_t *adev);
-firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
-void acx_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t * pcfg);
+//-void acx_get_firmware_version(acx_device_t *adev);
+//-void acx_display_hardware_details(acx_device_t *adev);
+//-firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size);
+//-void acx_parse_configoption(acx_device_t *adev, const acx111_ie_configoption_t * pcfg);
 int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
@@ -103,12 +103,12 @@ static inline unsigned int acx_rate111to5bits(unsigned int rate);
 int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 /* Configuration (Control Path) */
-void acx_set_defaults(acx_device_t *adev);
+//-void acx_set_defaults(acx_device_t *adev);
 void acx_update_card_settings(acx_device_t *adev);
-void acx_start(acx_device_t *adev);
+//-void acx_start(acx_device_t *adev);
 int acx_net_reset(struct ieee80211_hw *ieee);
-int acx_init_mac(acx_device_t *adev);
-int acx_setup_modes(acx_device_t *adev);
+//-int acx_init_mac(acx_device_t *adev);
+//-int acx_setup_modes(acx_device_t *adev);
 
 static int acx_set_mode(acx_device_t *adev, u16 mode);
 static int acx_update_mode(acx_device_t *adev);
@@ -225,46 +225,8 @@ static void acx_update_ratevector(acx_device_t *adev);
 static void acx_s_update_80211_powersave_mode(acx_device_t *adev)
 #endif
 
-/* Proc, Debug */
-#ifdef CONFIG_PROC_FS
-static int acx_proc_show_diag(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_diag(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-static int acx_proc_show_acx(struct seq_file *file, void *v);
-static int acx_proc_show_eeprom(struct seq_file *file, void *v);
-static int acx_proc_show_phy(struct seq_file *file, void *v);
-static int acx_proc_show_debug(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_debug(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-static int acx_proc_show_sensitivity(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_sensitivity(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_tx_level(struct seq_file *file, void *v);
-static ssize_t acx111_proc_write_tx_level(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_reg_domain(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_reg_domain(struct file *file,
-					const char __user *buf,
-					size_t count, loff_t *ppos);
-static int acx_proc_show_antenna(struct seq_file *file, void *v);
-static ssize_t acx_proc_write_antenna(struct file *file,
-				const char __user *buf, size_t count,
-				loff_t *ppos);
-/*
-  obsoleted by debugfs.c
-static int acx_proc_open(struct inode *inode, struct file *file);
-static void acx_proc_init(void);
-int acx_proc_register_entries(struct ieee80211_hw *ieee);
-int acx_proc_unregister_entries(struct ieee80211_hw *ieee);
-*/
-#endif
-
 /* Rx Path */
-void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t * rxbuf);
+//-void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t * rxbuf);
 static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf);
 
 /* Tx Path */
@@ -274,13 +236,13 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 #endif
 
-void acx_tx_work(struct work_struct *work);
+//-void acx_tx_work(struct work_struct *work);
 void acx_tx_queue_go(acx_device_t *adev);
 int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
-void acx_tx_queue_flush(acx_device_t *adev);
-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
-int acx_queue_stopped(struct ieee80211_hw *ieee);
-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
+//-void acx_tx_queue_flush(acx_device_t *adev);
+//-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
+//-int acx_queue_stopped(struct ieee80211_hw *ieee);
+//-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
 static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
 static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
@@ -290,11 +252,11 @@ static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque,
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
 			unsigned int finger,
 			struct ieee80211_tx_info *info);
-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
-			struct ieee80211_tx_info *info);
-void acx111_tx_build_txstatus(acx_device_t *adev,
-			struct ieee80211_tx_info *txstatus, u16 r111,
-			u8 ack_failures);
+//-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
+//-			struct ieee80211_tx_info *info);
+//-void acx111_tx_build_txstatus(acx_device_t *adev,
+//-			struct ieee80211_tx_info *txstatus, u16 r111,
+//-			u8 ack_failures);
 u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 
@@ -314,25 +276,29 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee
 #endif
 
 /* Irq Handling, Timer */
-void acx_init_task_scheduler(acx_device_t *adev);
-void acx_after_interrupt_task(acx_device_t *adev);
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-void acx_log_irq(u16 irqtype);
-void acx_timer(unsigned long address);
+//-void acx_init_task_scheduler(acx_device_t *adev);
+//-void acx_after_interrupt_task(acx_device_t *adev);
+//-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
+//-void acx_log_irq(u16 irqtype);
+//-void acx_timer(unsigned long address);
 void acx_set_timer(acx_device_t *adev, int timeout_us);
 
 /* Mac80211 Ops */
-int acx_op_config(struct ieee80211_hw *hw, u32 changed);
-void acx_op_bss_info_changed(struct ieee80211_hw *hw,
+//-int acx_op_config(struct ieee80211_hw *hw, u32 changed);
+/* void acx_op_bss_info_changed(struct ieee80211_hw *hw,
 			struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *info, u32 changed);
+
 int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
 		struct ieee80211_key_conf *key);
-void acx_op_configure_filter(struct ieee80211_hw *hw,
+*/
+/* void acx_op_configure_filter(struct ieee80211_hw *hw,
 			unsigned int changed_flags,
 			unsigned int *total_flags, u64 multicast);
+*/
 
+/*
 #if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
 int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		u16 queue, const struct ieee80211_tx_queue_params *params);
@@ -340,20 +306,23 @@ int acx_conf_tx(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 		const struct ieee80211_tx_queue_params *params);
 #endif
+*/
 
-int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
+/* int acx_op_get_stats(struct ieee80211_hw *hw, struct ieee80211_low_level_stats *stats);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			struct ieee80211_tx_queue_stats *stats);
 #endif
 
+
 int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta,
 		bool set);
+*/
 static int acx_do_job_update_tim(acx_device_t *adev);
 
 /* Helpers */
-void acx_mwait(int ms);
+//-void acx_mwait(int ms);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 static u8 acx_signal_to_winlevel(u8 rawlevel);
 u8 acx_signal_determine_quality(u8 signal, u8 noise);
@@ -703,48 +672,6 @@ u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value)
 	return (bitrate);
 }
 
-#if defined CONFIG_PROC_FS || defined CONFIG_PROC_FS
-/*
- * debugfs.c provides new interface to the "files", procfs interface
- * is deprecated for new stuff.  Keep PROC_FS facility for users with
- * non-DEBUG_FS kernels, so keep handlers themselves here.
- */
-#ifdef ACX_WANT_PROC_FILES_ANYWAY
-/* obsoleted by debugfs.c */
-static const char *const proc_files[] = {
-	"info", "diag", "eeprom", "phy", "debug",
-	"sensitivity", "tx_level", "antenna", "reg_domain",
-};
-static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
-#endif /* ACX_WANT_PROC_FILES_ANYWAY */
-
-acx_proc_show_t *const acx_proc_show_funcs[] = {
-	acx_proc_show_acx,
-	acx_proc_show_diag,
-	acx_proc_show_eeprom,
-	acx_proc_show_phy,
-	acx_proc_show_debug,
-	acx_proc_show_sensitivity,
-	acx_proc_show_tx_level,
-	acx_proc_show_antenna,
-	acx_proc_show_reg_domain,
-};
-
-acx_proc_write_t *const acx_proc_write_funcs[] = {
-	NULL,
-	acx_proc_write_diag,
-	NULL,
-	NULL,
-	acx_proc_write_debug,
-	acx_proc_write_sensitivity,
-	acx111_proc_write_tx_level,
-	acx_proc_write_antenna,
-	acx_proc_write_reg_domain,
-};
-BUILD_BUG_DECL(SHOW, ARRAY_SIZE(acx_proc_show_funcs)
-		  != ARRAY_SIZE(acx_proc_write_funcs));
-
-#endif /* CONFIG_PROC_FS */
 
 /*
  * BOM Locking
@@ -4142,12 +4069,17 @@ static u8 acx_rate111to100(u16 r)
 }
 */
 
-/*
- * BOM Proc, Debug
- * ==================================================
+/* ##################################################
+ * Proc, Debug:
+ *
+ * File read/write handlers for both procfs, debugfs.  Procfs is
+ * deprecated for new files, so proc-files are disabled by default;
+ * ACX_WANT_PROC_FILES_ANYWAY enables them.  Debugfs is enabled, it
+ * can be disabled by ACX_NO_DEBUG_FILES.
  */
 
-#if defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS)
+#if (defined CONFIG_PROC_FS  &&  defined ACX_WANT_PROC_FILES_ANYWAY) \
+ || (defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES)
 
 static int acx_proc_show_diag(struct seq_file *file, void *v)
 {
@@ -4886,7 +4818,6 @@ out:
 	return ret;
 }
 
-
 static int acx_proc_show_antenna(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
@@ -4941,7 +4872,45 @@ out:
 	return ret;
 }
 
-#ifdef ACX_WANT_PROC_FILES_ANYWAY
+acx_proc_show_t *const acx_proc_show_funcs[] = {
+	acx_proc_show_acx,
+	acx_proc_show_diag,
+	acx_proc_show_eeprom,
+	acx_proc_show_phy,
+	acx_proc_show_debug,
+	acx_proc_show_sensitivity,
+	acx_proc_show_tx_level,
+	acx_proc_show_antenna,
+	acx_proc_show_reg_domain,
+};
+
+acx_proc_write_t *const acx_proc_write_funcs[] = {
+	NULL,
+	acx_proc_write_diag,
+	NULL,
+	NULL,
+	acx_proc_write_debug,
+	acx_proc_write_sensitivity,
+	acx111_proc_write_tx_level,
+	acx_proc_write_antenna,
+	acx_proc_write_reg_domain,
+};
+BUILD_BUG_DECL(acx_proc_show_funcs__VS__acx_proc_write_funcs,
+	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(acx_proc_write_funcs));
+	
+
+#if (defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY)
+/*
+ * procfs has been explicitly enabled
+ */
+static const char *const proc_files[] = {
+	"info", "diag", "eeprom", "phy", "debug",
+	"sensitivity", "tx_level", "antenna", "reg_domain",
+};
+BUILD_BUG_DECL(acx_proc_show_funcs__VS__proc_files,
+	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(proc_files));
+
+static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
 
 static int acx_proc_open(struct inode *inode, struct file *file)
 {
@@ -5045,11 +5014,14 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 	FN_EXIT0;
 	return OK;
 }
-#else /* ACX_WANT_PROC_FILES_ANYWAY */
-static void acx_proc_init(void) { }	/* stub */
-#endif /* ACX_WANT_PROC_FILES_ANYWAY */
+#else
+static inline void acx_proc_init(void) {}
 
-#endif /* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUGC_FS) */
+#endif	/* ACX_WANT_PROC_FILES_ANYWAY */
+#endif	/* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUG_FS) */
+
+/* should have a real cleanup func */
+static inline void acx_proc_exit(void) {}
 
 /*
  * BOM Rx Path
@@ -6235,16 +6207,14 @@ end:
  * BOM Mac80211 Ops
  * ==================================================
  */
-int acx_debugfs_add_adev(struct acx_device *adev);
-void acx_debugfs_remove_adev(struct acx_device *adev);
 
-int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
+int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 {
 	acx_device_t *adev = ieee2adev(ieee);
 	int err = -EOPNOTSUPP;
 
 	u8 *mac_vif;
-	char mac[] = MACSTR; // approximate max length
+	char mac[MACSTR_SIZE];
 
 	int vif_type;
 
@@ -6261,13 +6231,8 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_vif *vif)
 		goto out_unlock;
 
 	adev->vif_operating = 1;
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	adev->vif = vif->vif;
-	mac_vif = vif->mac_addr;
-#else
-	adev->vif = vif;
-	mac_vif = vif->addr;
-#endif
+	adev->vif = VIF_vif(vif);
+	mac_vif = VIF_addr(vif);
 
 	switch (adev->vif_type) {
 	case NL80211_IFTYPE_AP:
@@ -6321,22 +6286,18 @@ out_unlock:
 	return err;
 }
 
-void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	char mac[] = MACSTR; // approximate max length
+	char mac[MACSTR_SIZE];
 	u8 *mac_vif;
 
 	FN_ENTER;
 	acx_sem_lock(adev);
 	acx_debugfs_remove_adev(adev);
 
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
-	mac_vif = vif->mac_addr;
-#else
-	mac_vif = vif->addr;
-#endif
+	mac_vif = VIF_addr(vif);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor--;
@@ -6798,16 +6759,17 @@ const char* acx_get_packet_type_string(u16 fc)
 		"MGMT/AssocReq", "MGMT/AssocResp", "MGMT/ReassocReq",
 		"MGMT/ReassocResp", "MGMT/ProbeReq", "MGMT/ProbeResp",
 		"MGMT/UNKNOWN", "MGMT/UNKNOWN", "MGMT/Beacon", "MGMT/ATIM",
-		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen"
+		"MGMT/Disassoc", "MGMT/Authen", "MGMT/Deauthen",
+		"MGMT/UNKNOWN"
 	};
 	static const char * const ctl_arr[] = {
 		"CTL/PSPoll", "CTL/RTS", "CTL/CTS", "CTL/Ack", "CTL/CFEnd",
-		"CTL/CFEndCFAck"
+		"CTL/CFEndCFAck", "CTL/UNKNOWN"
 	};
 	static const char * const data_arr[] = {
 		"DATA/DataOnly", "DATA/Data CFAck", "DATA/Data CFPoll",
 		"DATA/Data CFAck/CFPoll", "DATA/Null", "DATA/CFAck",
-		"DATA/CFPoll", "DATA/CFAck/CFPoll"
+		"DATA/CFPoll", "DATA/CFAck/CFPoll", "DATA/UNKNOWN"
 	};
 	const char *str;
 	u8 fstype = (IEEE80211_FCTL_STYPE & fc) >> 4;
@@ -6815,23 +6777,14 @@ const char* acx_get_packet_type_string(u16 fc)
 
 	switch (IEEE80211_FCTL_FTYPE & fc) {
 	case IEEE80211_FTYPE_MGMT:
-		if (fstype < ARRAY_SIZE(mgmt_arr))
-			str = mgmt_arr[fstype];
-		else
-			str = "MGMT/UNKNOWN";
+		str = mgmt_arr[min((size_t)fstype, ARRAY_SIZE(mgmt_arr) - 1)];
 		break;
 	case IEEE80211_FTYPE_CTL:
 		ctl = fstype - 0x0a;
-		if (ctl < ARRAY_SIZE(ctl_arr))
-			str = ctl_arr[ctl];
-		else
-			str = "CTL/UNKNOWN";
+		str = ctl_arr[min((size_t)ctl, ARRAY_SIZE(ctl_arr) - 1)];
 		break;
 	case IEEE80211_FTYPE_DATA:
-		if (fstype < ARRAY_SIZE(data_arr))
-			str = data_arr[fstype];
-		else
-			str = "DATA/UNKNOWN";
+		str = data_arr[min((size_t)fstype, ARRAY_SIZE(data_arr) - 1)];
 		break;
 	default:
 		str = "UNKNOWN";
@@ -6870,8 +6823,6 @@ void great_inquisitor(acx_device_t * adev)
  * BOM Driver, Module
  * ==================================================
  */
-int __init acx_debugfs_init(void);
-void __init acx_debugfs_exit(void);
 
 static int __init acx_init_module(void)
 {
@@ -6894,20 +6845,9 @@ static int __init acx_init_module(void)
 
 	r1 = r2 = r3 = -EINVAL;
 
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	r1 = acxpci_init_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
-	pr_info("built with CONFIG_ACX_MAC80211_USB\n");
 	r2 = acxusb_init_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	r3 = acxmem_init_module();
-#endif
 
 	if (r3 && r2 && r1) {		/* all three failed! */
 		pr_info("r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
@@ -6921,24 +6861,15 @@ static int __init acx_init_module(void)
 	return 0;
 }
 
-void acx_debugfs_exit(void);
 static void __exit acx_cleanup_module(void)
 {
 	/* TODO Check, that interface isn't still up */
 	acx_debugfs_exit();
+	acx_proc_exit();
 
-#if defined(CONFIG_ACX_MAC80211_PCI)
 	acxpci_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_USB)
 	acxusb_cleanup_module();
-#endif
-
-#if defined(CONFIG_ACX_MAC80211_MEM)
 	acxmem_cleanup_module();
-#endif
-
 }
 
 /*
@@ -6946,8 +6877,8 @@ static void __exit acx_cleanup_module(void)
  * ==================================================
  */
 
-module_init(acx_init_module)
-module_exit(acx_cleanup_module)
+module_init(acx_init_module);
+module_exit(acx_cleanup_module);
 
 #if ACX_DEBUG
 
@@ -6957,11 +6888,16 @@ unsigned int acx_debug = ACX_DEFAULT_MSG;
 module_param_named(debug, acx_debug, uint, 0644);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+/* implement /sys/module/acx_mac80211/parameters/debugflags */
+
 static const char *flag_names[] = {
 	"L_LOCK", "L_INIT", "L_IRQ", "L_ASSOC", "L_FUNC", "L_XFER",
 	"L_DATA", "L_DEBUG", "L_IOCTL", "L_CTL", "L_BUFR", "L_XFER_BEACON",
 	"L_BUFT", "L_USBRXTX", "L_BUF",
 };
+/* should check enum debug_flags, but no suitable val is set */
+BUILD_BUG_DECL(flag_names, ARRAY_SIZE(flag_names) != 15);
 
 static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
 {
@@ -6981,11 +6917,14 @@ static int acx_debug_flag_get(char *buf, const struct kernel_param *kp)
 
 static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 {
-	int i, len = strlen(val);
-	char sign, *e, *p = (char*) val;
+	int i;
+	char sign, *e, *p = (char*) val; /* cast away const */
 
-	pr_info("val: %s len:%d\n", val, len);
-	while (*p) {
+	if ((e = strchr(p, '\n')))
+		*e = '\0';	/* trim trailing newline */
+
+	pr_info("parsing flags: %s\n", p);
+	for (; p; p = e) {
 		sign = *p++;
 		switch (sign) {
 		case '+':
@@ -6995,43 +6934,34 @@ static int acx_debug_flag_set(const char *val, const struct kernel_param *kp)
 			return -EINVAL;
 		}
 		if ((e = strchr(p, ',')))
-			*e = '\0';
+			*e++ = '\0';	/* end 1st term, ready next */
 
 		for (i = 0; i < ARRAY_SIZE(flag_names); i++) {
-			if (strcmp(p, flag_names[i])) {
 
-				pr_info("found: %s flags:0x%x\n",
-					p, acx_debug);
-
+			if (!strcmp(p, flag_names[i])) {
 				if (sign == '+')
 					acx_debug |= (1 << i);
 				else
 					acx_debug &= ~(1 << i);
-
-				pr_info("new:%x\n", acx_debug);
-				p = ++e;
-				continue;
+				break;
 			}
 		}
 		if (i == ARRAY_SIZE(flag_names)) {
-			pr_err("no match on val: %s len:%d\n", p, len);
+			pr_err("no match on val: %s\n", p);
 			return -EINVAL;
 		}
-		p = ++e;
 	}
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 static struct kernel_param_ops acx_debug_flag_ops = {
         .get = acx_debug_flag_get,
         .set = acx_debug_flag_set,
 };
-
 module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
-#endif
 
-#endif
+#endif	/* implement /sys/module/acx_mac80211/parameters/debugflags */
+#endif	/* ACX_DEBUG */
 
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");

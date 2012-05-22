@@ -133,20 +133,12 @@ static void vlynq_remove(struct vlynq_device *vdev);
 
 #include "inlines.h"
 
-/* ----- */
-
-/*
- * acxpci_s_create_rx_host_desc_queue
- *
- * the whole size of a data buffer (header plus data body)
- * plus 32 bytes safety offset at the end
- */
-
-
-/* static inline  */
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {
+	pr_info("hwdev:%p size:%d, vaddr:%p, dma_handle:%p\n",
+		hwdev, size, vaddr, (void*) dma_handle);
+
 	dma_free_coherent(hwdev == NULL	? NULL : &hwdev->dev,
 			size, vaddr, dma_handle);
 }
@@ -157,98 +149,12 @@ void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
  */
 
 /*
- * acxpci_s_upload_fw
- *
- * Called from acx_reset_dev
- *
- * Origin: Derived from FW dissection
- */
-/* static  */
-#if 0 // acxpci_upload_fw()
-int acxpci_upload_fw(acx_device_t *adev)
-{
-	firmware_image_t *fw_image = NULL;
-	int res = NOT_OK;
-	int try;
-	u32 file_size;
-	char filename[sizeof("tiacx1NNcNN")];
-
-	FN_ENTER;
-
-	/* print exact chipset and radio ID to make sure people really
-	 * get a clue on which files exactly they need to provide.
-	 * Firmware loading is a frequent end-user PITA with these
-	 * chipsets.
-	 */
-	pr_acx("need firmware for acx1%02d chipset with radio ID %02X\n"
-		"Please provide via firmware hotplug:\n"
-		"either combined firmware (single file named 'tiacx1%02dc%02X')\n"
-		"or two files (base firmware file 'tiacx1%02d' "
-		"+ radio fw 'tiacx1%02dr%02X')\n",
-		IS_ACX111(adev)*11, adev->radio_type,
-		IS_ACX111(adev)*11, adev->radio_type,
-		IS_ACX111(adev)*11,
-		IS_ACX111(adev)*11, adev->radio_type
-		);
-
-	/* print exact chipset and radio ID to make sure people really
-	 * get a clue on which files exactly they are supposed to
-	 * provide, since firmware loading is the biggest enduser PITA
-	 * with these chipsets.  Not printing radio ID in 0xHEX in
-	 * order to not confuse them into wrong file naming */
-	pr_acx("need to load firmware for acx1%02d chipset with radio ID %02x, please provide via firmware hotplug:\n"
-		"acx: either one file only (<c>ombined firmware image file, radio-specific) or two files (radio-less base image file *plus* separate <r>adio-specific extension file)\n",
-		IS_ACX111(adev)*11, adev->radio_type);
-
-	/* Try combined, then main image */
-	adev->need_radio_fw = 0;
-	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
-		 IS_ACX111(adev) * 11, adev->radio_type);
-
-	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
-	if (!fw_image) {
-		adev->need_radio_fw = 1;
-		filename[sizeof("tiacx1NN") - 1] = '\0';
-		fw_image =
-		    acx_read_fw(adev->bus_dev, filename, &file_size);
-		if (!fw_image) {
-			FN_EXIT1(NOT_OK);
-			return NOT_OK;
-		}
-	}
-
-	for (try = 1; try <= 5; try++) {
-		res = acx_write_fw(adev, fw_image, 0);
-		log(L_DEBUG | L_INIT, "acx_write_fw (main/combined): %d\n", res);
-		if (OK == res) {
-			res = acx_validate_fw(adev, fw_image, 0);
-			log(L_DEBUG | L_INIT, "acx_validate_fw "
-					"(main/combined): %d\n", res);
-		}
-
-		if (OK == res) {
-			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
-			break;
-		}
-		pr_acx("firmware upload attempt #%d FAILED, "
-		       "retrying...\n", try);
-		acx_mwait(1000);	/* better wait for a while... */
-	}
-
-	vfree(fw_image);
-
-	FN_EXIT1(res);
-	return res;
-}
-#endif
-
-/*
  * BOM CMDs (Control Path)
  * ==================================================
  */
 
 /*
- * acxpci_s_issue_cmd_timeo
+ * acxpci_issue_cmd_timeo_debug
  *
  * Sends command to fw, extract result
  *
@@ -460,7 +366,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 
 /*
- * acxpci_l_reset_mac
+ * acxpci_reset_mac
  *
  * MAC will be reset
  * Call context: reset_dev
@@ -613,7 +519,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
  */
 
 /*
- * acxpci_l_alloc_tx
+ * acxpci_alloc_tx
  * Actually returns a txdesc_t* ptr
  *
  * FIXME: in case of fragments, should allocate multiple descrs after
@@ -1067,7 +973,7 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  */
 
 /*
- * acxpci_e_probe
+ * acxpci_probe
  *
  * Probe routine called when a PCI device w/ matching ID is found.
  * Here's the sequence:
@@ -1279,7 +1185,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	}
 	log(L_IRQ | L_INIT, "using IRQ %d: OK\n", pdev->irq);
 
-	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
+	/* Acx irqs shall be off and are enabled later in acx_up */
 	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
@@ -1330,7 +1236,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 
 	acx_parse_configoption(adev, &co);
 	acx_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
-	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
 	/* Register the card, AFTER everything else has been set up,
@@ -1391,10 +1297,10 @@ fail_proc_register_entries:
 	/* acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version) */
 fail_read_eeprom_byte:
 
-	/* acx_s_init_mac(adev) */
+	/* acx_init_mac(adev) */
 fail_init_mac:
 
-	/* acxpci_s_reset_dev(adev) */
+	/* acx_reset_dev(adev) */
 fail_reset_dev:
 
 	/* request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, */
@@ -1442,7 +1348,7 @@ done:
 
 
 /*
- * acxpci_e_remove
+ * acxpci_remove
  *
  * Shut device down (if not hot unplugged)
  * and deallocate PCI resources for the acx chip.
@@ -1573,7 +1479,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	acx_sem_lock(adev);
 
 	ieee80211_unregister_hw(hw);	/* this one cannot sleep */
-	/* OW 20100603 FIXME acxpci_s_down(hw); */
+	/* OW 20100603 FIXME acx_down(hw); */
 	/* down() does not set it to 0xffff, but here we really want that */
 	write_reg16(adev, IO_ACX_IRQ_MASK, 0xffff);
 	write_reg16(adev, IO_ACX_FEMR, 0x0);
@@ -1897,7 +1803,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	}
 	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 
-	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
+	/* Acx irqs shall be off and are enabled later in acx_up */
 	acx_irq_disable(adev);
 
 	/* to find crashes due to weird driver access
@@ -1931,7 +1837,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	acx_parse_configoption(adev, &co);
 	acx_set_defaults(adev);
-	acx_get_firmware_version(adev);	/* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
 	/* Register the card, AFTER everything else has been set up,
@@ -2100,7 +2006,7 @@ int __init acxpci_init_module(void)
 
 	FN_ENTER;
 
-	printk(KERN_EMERG);
+	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 
 #if (ACX_IO_WIDTH==32)
 	log(L_INIT, "compiled to use 32bit I/O access. "

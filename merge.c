@@ -104,7 +104,7 @@ none:
 }
 
 /*
- * modified from acxmem_s_upload_radio, and wrapped below
+ * modified from acxmem_upload_radio, and wrapped below
  */
 static int acx_upload_radio(acx_device_t *adev, char *filename)
 {
@@ -209,9 +209,13 @@ static int acx_allocate(acx_device_t *adev, struct desc_info *di,
 {
 	void *ptr;
 
-	if (IS_PCI(adev))
+	if (IS_PCI(adev)) {
 		ptr = dma_alloc_coherent(adev->bus_dev,
 					di->size, &di->phy, GFP_KERNEL);
+
+		pr_info("bdev:%p size:%d phy:%p ptr:%p\n",
+			adev->bus_dev, di->size, (void*) di->phy, ptr);
+	}
 	else {
 		ptr = kmalloc(di->size, GFP_KERNEL);
 		/*
@@ -444,7 +448,7 @@ int acx_create_hostdesc_queues(acx_device_t *adev)
 /* ########################################## */
 /* non-host desc_queue creation */
 
-static void acx_create_rx_desc_queue(acx_device_t * adev, u32 rx_queue_start)
+static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
 	u32 mem_offs;
@@ -694,6 +698,20 @@ out:
 /* ########################################## */
 /* free desc_queue stuff */
 
+static inline void acx_free_desc_queue(acx_device_t *adev,
+					struct desc_info *dinfo)
+{
+	if (dinfo->start) {
+		if (IS_PCI(adev))
+			acxpci_free_coherent(NULL, dinfo->size, dinfo->start,
+					dinfo->phy);
+		else
+			kfree(dinfo->start);
+		dinfo->start = NULL;
+		dinfo->size = 0;
+	}
+}
+
 /*
  * acx_free_desc_queues
  *
@@ -703,31 +721,14 @@ out:
  */
 void acx_free_desc_queues(acx_device_t *adev)
 {
-
-#define ACX_FREE_QUEUE(adev, size, ptr, phyaddr) \
-	if (ptr) { \
-		if (IS_PCI(adev)) \
-			acxpci_free_coherent(NULL, size, ptr, phyaddr); \
-		else \
-			kfree(ptr); \
-		ptr = NULL; \
-		size = 0; \
-	}
-
-#ifndef ACX_FREE_QUEUES
-#define ACX_FREE_QUEUES(adev, _dir_) \
-	ACX_FREE_QUEUE(adev, adev->_dir_.host.size, \
-		adev->_dir_.host.start, adev->_dir_.host.phy); \
-	ACX_FREE_QUEUE(adev, adev->_dir_.buf.size, \
-		adev->_dir_.buf.start, adev->_dir_.buf.phy);
-#endif	// ACX_FREE_QUEUES
-
 	FN_ENTER;
 
-	ACX_FREE_QUEUES(adev, tx);
+	acx_free_desc_queue(adev, &adev->tx.host);
+	acx_free_desc_queue(adev, &adev->tx.buf);
 	adev->tx.desc_start = NULL;
 
-	ACX_FREE_QUEUES(adev, rx);
+	acx_free_desc_queue(adev, &adev->rx.host);
+	acx_free_desc_queue(adev, &adev->rx.buf);
 	adev->rx.desc_start = NULL;
 
 	FN_EXIT0;
@@ -736,7 +737,7 @@ void acx_free_desc_queues(acx_device_t *adev)
 /* ########################################## */
 /* irq stuff */
 
-void acx_irq_enable(acx_device_t * adev)
+void acx_irq_enable(acx_device_t *adev)
 {
 	FN_ENTER;
 	write_reg16(adev, IO_ACX_IRQ_MASK, adev->irq_mask);
@@ -748,7 +749,7 @@ void acx_irq_enable(acx_device_t * adev)
 }
 
 
-void acx_irq_disable(acx_device_t * adev)
+void acx_irq_disable(acx_device_t *adev)
 {
 	FN_ENTER;
 
@@ -1414,7 +1415,7 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 	return res;
 }
 
-int acxmem_upload_fw(acx_device_t *adev)
+static int acxmem_upload_fw(acx_device_t *adev)
 {
 	char *filename = "WLANGEN.BIN";
 	int rc;
@@ -1427,7 +1428,7 @@ int acxmem_upload_fw(acx_device_t *adev)
 	return rc;
 }
 
-int acxpci_upload_fw(acx_device_t *adev)
+static int acxpci_upload_fw(acx_device_t *adev)
 {
 	char filename[sizeof("tiacx1NNcNN")];
 	int rc;
@@ -1569,7 +1570,6 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-#if 1	/* acx_read_cmd_type_status() */
 u32 acx_read_cmd_type_status(acx_device_t *adev)
 {
 	u32 cmd_type, cmd_status;
@@ -1589,7 +1589,6 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 	FN_EXIT1(cmd_status);
 	return cmd_status;
 }
-#endif	/* acx_read_cmd_type_status() */
 
 /* static inline  */
 void acx_write_cmd_type_status(acx_device_t *adev, u16 type, u16 status)
@@ -2480,11 +2479,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
  */
 
 /*
- * acxmem_l_process_rxdesc
+ * acx_process_rxdesc
  *
- * Called directly and only from the IRQ handler
+ * Called from IRQ handlers (acx_irq_work, #if0d acxmem_interrupt)
  */
-void acx_process_rxdesc(acx_device_t *adev)
+static void acx_process_rxdesc(acx_device_t *adev)
 {
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc = NULL; // silence uninit warning
@@ -2988,7 +2987,7 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 	return &adev->tx.host.txstart[index * 2];
 }
 
-void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque)
+void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 {
 	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
 }
@@ -3073,7 +3072,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	if (IS_ACX111(adev)) {
 
 		/* Build rateset for acx111 */
-		rateset=acx111_tx_build_rateset(adev, txdesc, info);
+		rateset = acx111_tx_build_rateset(adev, txdesc, info);
 
 		/* note that if !txdesc->do_auto, txrate->cur has only
 		 * one nonzero bit */
@@ -4128,7 +4127,7 @@ void acx_op_stop(struct ieee80211_hw *hw)
  * BOM Helpers
  * ==================================================
  */
-void acx_power_led(acx_device_t * adev, int enable)
+void acx_power_led(acx_device_t *adev, int enable)
 {
 	u16 gpio_pled = IS_ACX111(adev) ? 0x0040 : 0x0800;
 

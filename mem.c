@@ -69,9 +69,7 @@
 
 #include "acx.h"
 #include "merge.h"
-#include "mem.h"  // which has STATick defn
-
-#define INLINE_IO static inline
+#include "mem.h"
 
 /*
  * BOM Config
@@ -114,8 +112,8 @@ void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
 		u32 source, int count);
 
 static void acxmem_init_acx_txbuf(acx_device_t *adev);
-txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
-char acxmem_printable(char c);
+// txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
+static char acxmem_printable(char c);
 
 /*
  * BOM Defines, static vars, etc.
@@ -441,7 +439,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
  */
 
 /*
- * acxmem_s_issue_cmd_timeo
+ * acxmem_issue_cmd_timeo_debug
  *
  * Sends command to fw, extract result
  *
@@ -736,19 +734,19 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 		return -2;
 
 	acx_parse_configoption(adev, &co);
-	acx_get_firmware_version(adev); /* needs to be after acx_s_init_mac() */
+	acx_get_firmware_version(adev); /* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
 	return 0;
 }
 
 /*
- * acxmem_l_reset_mac
+ * acxmem_reset_mac
  *
  * MAC will be reset
  * Call context: reset_dev
  */
-STATick void acxmem_reset_mac(acx_device_t *adev)
+void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
 	FN_ENTER;
@@ -792,7 +790,7 @@ STATick void acxmem_reset_mac(acx_device_t *adev)
  ** FIXME: most likely needs refinement
  */
 #if 0 // or mem.c:2019:2: error: implicit declaration of function 'ndev2adev'
-STATick void acxmem_i_set_multicast_list(struct net_device *ndev)
+static void acxmem_i_set_multicast_list(struct net_device *ndev)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -1033,7 +1031,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 #if 0
 /*
- * acxmem_l_process_rxdesc
+ * acxmem_process_rxdesc
  *
  * Called directly and only from the IRQ handler
  */
@@ -1252,7 +1250,7 @@ u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
 static void acxmem_init_acx_txbuf(acx_device_t *adev)
 {
 	/*
-	 * acx100_s_init_memory_pools set up txbuf_start and
+	 * acx100_init_memory_pools set up txbuf_start and
 	 * txbuf_numblocks for us.  All we need to do is reset the
 	 * rest of the bookeeping.
 	 */
@@ -1299,7 +1297,8 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 }
 #endif
 
-STATick txhostdesc_t*
+#if 0 // acxmem_get_txhostdesc()
+static txhostdesc_t*
 acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 {
 	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
@@ -1314,6 +1313,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
 	}
 	return &adev->tx.host.txstart[index * 2];
 }
+#endif  // acxmem_get_txhostdesc()
 
 /* OW TODO See if this is usable with mac80211 */
 /***********************************************************************
@@ -1323,7 +1323,7 @@ acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
  */
 #if 0 // or mem.c:3242:3: warning: passing argument 1 of 'acx_wake_queue'
       /* from incompatible pointer type [enabled by default] */
-STATick void acxmem_i_tx_timeout(struct net_device *ndev)
+static void acxmem_i_tx_timeout(struct net_device *ndev)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -1397,7 +1397,7 @@ STATick void acxmem_i_tx_timeout(struct net_device *ndev)
  * ---
  */
 #if 0 // or mem.c:3579:4: error: implicit declaration of function 'acxmem_log_unusual_irq'
-STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
+static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 {
 	acx_device_t *adev = dev_id;
 	unsigned long flags;
@@ -1470,10 +1470,9 @@ STATick irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 			 * bit unless we're going towards full, in
 			 * which case we do it immediately, too
 			 * (otherwise we might lockup with a full Tx
-			 * buffer if we go into
-			 * acxmem_l_clean_txdesc() at a time when we
-			 * won't wakeup the net queue in there for
-			 * some reason...) */
+			 * buffer if we go into acxmem_clean_txdesc()
+			 * at a time when we won't wakeup the net
+			 * queue in there for some reason...) */
 			if (adev->tx_free <= TX_START_CLEAN) {
 #if TX_CLEANUP_IN_SOFTIRQ
 				acx_schedule_task(adev, ACX_AFTER_IRQ_TX_CLEANUP);
@@ -1613,14 +1612,14 @@ INLINE_IO int acxmem_adev_present(acx_device_t *adev)
 	return acx_readl(adev->iobase) != 0xffffffff;
 }
 
-STATick char acxmem_printable(char c)
+static char acxmem_printable(char c)
 {
 	return ((c >= 20) && (c < 127)) ? c : '.';
 }
 
 /* OW TODO */
 #if 0 // or mem.c:3695:42: error: 'acx_device_t' has no member named 'wstats'
-STATick void update_link_quality_led(acx_device_t *adev)
+static void update_link_quality_led(acx_device_t *adev)
 {
 	int qual;
 
@@ -2151,7 +2150,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 	#endif
 	log(L_ANY, "request_irq %d successful\n", adev->irq);
-	/* Acx irqs shall be off and are enabled later in acxpci_s_up */
+	/* Acx irqs shall be off and are enabled later in acx_up */
 	acxmem_lock();
 	acx_irq_disable(adev);
 	acxmem_unlock();
@@ -2409,7 +2408,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 	return OK;
 }
 
-STATick int acxmem_e_resume(struct platform_device *pdev)
+static int acxmem_e_resume(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
 		platform_get_drvdata(pdev);
@@ -2439,7 +2438,7 @@ STATick int acxmem_e_resume(struct platform_device *pdev)
 	acxmem_complete_hw_reset(adev);
 
 	/*
-	 * done by acx_s_set_defaults for initial startup
+	 * done by acx_set_defaults for initial startup
 	 */
 	acx_set_interrupt_mask(adev);
 
@@ -2452,7 +2451,7 @@ STATick int acxmem_e_resume(struct platform_device *pdev)
 	 * suspend, and possibly be back in the network again already
 	 * :-)
 	 */
-	/* - most settings updated in acxmem_s_up() */
+	/* - most settings updated in acx_up() */
 	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
 		acx_update_card_settings(adev);
@@ -2495,6 +2494,7 @@ int __init acxmem_init_module(void)
 
 	FN_ENTER;
 
+	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 #if (ACX_IO_WIDTH==32)
 	pr_acx("compiled to use 32bit I/O access. "
 		"I/O timing issues might occur, such as "

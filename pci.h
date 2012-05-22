@@ -6,9 +6,6 @@
  * inside pci.c, thus reducing set of forward declarations needed there.
  */
 
-#define STATick /* ick - suppress static, and thus a raft of warnings
-		   let linker find the fns in mem.o, pci.o */
-
 /* Logging */
 
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
@@ -43,22 +40,19 @@ tx_t *acxpci_alloc_tx(acx_device_t *adev);
  * Driver, Module
  */
 
+#if defined(CONFIG_ACX_MAC80211_PCI)
+
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
 
-u32 acxpci_read_cmd_type_status(acx_device_t *adev);
-void acxpci_write_cmd_type_status(acx_device_t *adev, u16 type,
-		u16 status);
-
-#if defined(CONFIG_ACX_MAC80211_PCI)
-
 void acxpci_reset_mac(acx_device_t *adev);
-int acxpci_upload_fw(acx_device_t *adev);
 
 #else /* !CONFIG_ACX_MAC80211_PCI */
 
-static inline void acxpci_reset_mac(acx_device_t *adev)
-{}
+static inline int __init acxpci_init_module(void) { return 0; }
+static inline void __exit acxpci_cleanup_module(void) { }
+
+static inline void acxpci_reset_mac(acx_device_t *adev) {}
 
 #endif /* CONFIG_ACX_MAC80211_PCI */
 #endif /* _PCI_H_ */
