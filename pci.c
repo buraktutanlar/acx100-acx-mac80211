@@ -136,8 +136,8 @@ static void vlynq_remove(struct vlynq_device *vdev);
 void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
 			void *vaddr, dma_addr_t dma_handle)
 {
-	pr_info("hwdev:%p size:%d, vaddr:%p, dma_handle:%p\n",
-		hwdev, size, vaddr, (void*) dma_handle);
+	pr_info("hwdev:%p size:%ld, vaddr:%p, dma_handle:%p\n",
+		hwdev, (long unsigned int) size, vaddr, (void*) dma_handle);
 
 	dma_free_coherent(hwdev == NULL	? NULL : &hwdev->dev,
 			size, vaddr, dma_handle);
