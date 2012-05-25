@@ -1601,10 +1601,10 @@ int acxmem_wait_cmd_status(acx_device_t *adev, unsigned cmd,
 	}
         else if (counter < 190)
 		/* if waited > 10ms ... */
-		pr_info("waited %dms on cmd: %s Please report\n",
+		pr_info("waited %d ms on cmd: %s Please report\n",
 			199-counter, cmdstr);
 	else
-		log(L_CTL | L_DEBUG, "waited for IDLE %dms after cmd:%s\n",
+		log(L_CTL | L_DEBUG, "waited for IDLE %d ms after cmd: %s\n",
 			199 - counter, cmdstr);
 
 	return 0;
@@ -1648,10 +1648,10 @@ int acxpci_wait_cmd_status(acx_device_t *adev, unsigned cmd,
         }
         else if (counter < 190)
 		/* if waited > 10ms ... */
-		pr_info("waited %dms on cmd: %s Please report\n",
-			199-counter, cmdstr);
+		pr_info("waited %d ms on cmd: %s Please report\n",
+			199 - counter, cmdstr);
 	else
-		log(L_CTL | L_DEBUG, "waited for IDLE %dms after cmd:%s\n",
+		log(L_CTL | L_DEBUG, "waited for IDLE %d ms after cmd: %s\n",
 			199 - counter, cmdstr);
 
 	return 0;
@@ -1703,7 +1703,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
+	log(L_CTL, "cmd:%s, cmd:0x%02X, buflen:%u, timeout:%ums, type:0x%04X\n",
 		cmdstr, cmd, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
@@ -1719,7 +1719,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	}
 
 	/* wait for firmware to become idle for our command submission */
-	if (IS_MEM(adev))
+	if (1 || IS_MEM(adev))
 		rc = acxmem_wait_cmd_status(adev, cmd, buffer, buflen,
 				cmd_timeout, cmdstr, devname);
 	else
@@ -1779,7 +1779,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		if (adev->irq_status & HOST_INT_CMD_COMPLETE)
 			break;
 
-		if (IS_MEM(adev))
+		if (1 || IS_MEM(adev))
 			udelay(1000);
 		else
 			/* another pci waitloop kludge */
@@ -1804,7 +1804,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (counter == 0) { // pci == -1, trivial
 
 		log(L_ANY, "%s: Timed out %s for CMD_COMPLETE. "
-			"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
+			"irq bits:0x%02X irq_status:0x%04X timeout:%dms "
 			"cmd_status:%d (%s)\n", devname,
 		       (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
@@ -1914,7 +1914,7 @@ u32 acx_read_cmd_type_status(acx_device_t *adev)
 	cmd_status = (cmd_type >> 16);
 	cmd_type = (u16) cmd_type;
 
-	log(L_DEBUG, "cmd_type:%04X cmd_status:%04X [%s]\n",
+	log(L_DEBUG, "cmd_type:%02X cmd_status:%04X [%s]\n",
 		cmd_type, cmd_status,
 		acx_cmd_status_str(cmd_status));
 

@@ -3355,7 +3355,7 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
  * ==================================================
  */
 static int acx_init_max_template_generic(acx_device_t *adev, unsigned int len,
-				unsigned int cmd)
+				unsigned int cmdarg)
 {
 	int res;
 	union {
@@ -3368,7 +3368,7 @@ static int acx_init_max_template_generic(acx_device_t *adev, unsigned int len,
 
 	memset(&templ, 0, len);
 	templ.null.size = cpu_to_le16(len - 2);
-	res = acx_issue_cmd(adev, cmd, &templ, len);
+	res = acx_issue_cmd(adev, cmdarg, &templ, len);
 	return res;
 }
 
