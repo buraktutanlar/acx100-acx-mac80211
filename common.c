@@ -6935,6 +6935,7 @@ static struct kernel_param_ops acx_debug_flag_ops = {
         .set = acx_debug_flag_set,
 };
 module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
+MODULE_PARM_DESC(debugflags, "read/set flag names: +L_CTL,-L_BUFT etc");
 
 #endif	/* implement /sys/module/acx_mac80211/parameters/debugflags */
 #endif	/* ACX_DEBUG */
