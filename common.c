@@ -5179,12 +5179,7 @@ out:
  * acx_compat, and hiding this #if/else.  OTOH, inclusion doesnt care
  * about old kernels
  */
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-int
-#else
-void
-#endif
-acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -5195,11 +5190,7 @@ acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
 		acx_stop_queue(adev->ieee, NULL);
 
-	#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-	return NETDEV_TX_OK;
-	#else
-	return;
-	#endif
+	return OP_TX_RET_OK;
 }
 
 void acx_tx_work(struct work_struct *work)
