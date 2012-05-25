@@ -207,7 +207,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		pr_acx("%s: cmd_status is not IDLE: 0x%04X!=0\n",
 			devname, cmd_status);
 		goto bad;
-	} else if (counter < 190) {	/* if waited >10ms... */
+	}
+	else if (counter < 190) {	/* if waited >10ms... */
 		log(L_CTL | L_DEBUG,
 			"waited for IDLE %dms. Please report\n",
 			199 - counter);
@@ -286,7 +287,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 
 		log(L_ANY, "timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
-				counter, cmd_timeout, cmd_timeout - counter);
+			counter, cmd_timeout, cmd_timeout - counter);
 
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
 		log(L_CTL | L_DEBUG,
@@ -295,8 +296,8 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 			cmd_timeout - counter, counter);
 	}
 
-	logf1(L_CTL, "cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
-		cmdstr, buflen, cmd_timeout,
+	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
+		devname, cmdstr, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
 		acx_cmd_status_str(cmd_status)
 	);
@@ -322,17 +323,18 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	/* ok: */
 	log(L_DEBUG, "%s: took %ld jiffies to complete\n",
 		cmdstr, jiffies - start);
+
 	FN_EXIT1(OK);
 	return OK;
 
      bad:
 	/* Give enough info so that callers can avoid printing their
 	 * own diagnostic messages */
-	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+	logf1(L_ANY,
+		"%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
+		devname, cmdstr, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+		acx_cmd_status_str(cmd_status)
 	);
 	/* dump_stack(); */
 	FN_EXIT1(NOT_OK);
@@ -434,8 +436,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx.tail) ? " [tail]" : "";
 			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-			    && (rxhostdesc->
-				    Status & cpu_to_le32(DESC_STATUS_FULL)))
+			    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 				seq_printf(file, "%02u FULL%s\n", i, rtl);
 			else
 				seq_printf(file, "%02u empty%s\n", i, rtl);
@@ -547,7 +548,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 
 	/* returning current descriptor, so advance to next free one */
 	adev->tx_head = (head + 1) % TX_CNT;
-      end:
+end:
 	FN_EXIT0;
 
 	return (tx_t *) txdesc;
@@ -628,11 +629,10 @@ INLINE_IO int acxpci_adev_present(acx_device_t *adev)
  * ==================================================
  */
 
-#if 0
-int
-acx111pci_ioctl_info(struct net_device *ndev,
-		     struct iw_request_info *info,
-		     struct iw_param *vwrq, char *extra)
+#if 0	/* acx111pci_ioctl_info() plus */
+int acx111pci_ioctl_info(struct net_device *ndev,
+			struct iw_request_info *info,
+			struct iw_param *vwrq, char *extra)
 {
 #if ACX_DEBUG > 1
 	acx_device_t *adev = ndev2adev(ndev);
@@ -901,12 +901,10 @@ acx111pci_ioctl_info(struct net_device *ndev,
 }
 
 
-/***********************************************************************
-*/
-int
-acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
-				 struct iw_request_info *info,
-				 struct iw_param *vwrq, char *extra)
+/*******************************************************************/
+int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
+				struct iw_request_info *info,
+				struct iw_param *vwrq, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -946,7 +944,7 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
 
 	return OK;
 }
-#endif /* 0 */
+#endif	/* acx111pci_ioctl_info() plus */
 
 
 /*
