@@ -57,3 +57,8 @@ do { \
 #  define OP_TX_RET_TYPE void
 #  define OP_TX_RET_OK   /* void */
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+/* map new name to old */
+#  define irq_set_irq_type set_irq_type
+#endif
