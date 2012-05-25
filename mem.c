@@ -461,7 +461,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
  * Also ifup/down works more reliable on the mem device.
  *
  */
-#if 1 // copied to merge, but needs work
+#if 0 // acxmem_issue_cmd_timeo_debug()
 int
 acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
@@ -663,7 +663,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
-#endif
+#endif // acxmem_issue_cmd_timeo_debug()
 
 
 /*

@@ -138,6 +138,7 @@ static void vlynq_remove(struct vlynq_device *vdev);
  * ==================================================
  */
 
+#if 0 // acxpci_issue_cmd_timeo_debug
 /*
  * acxpci_issue_cmd_timeo_debug
  *
@@ -341,7 +342,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	return NOT_OK;
 }
-
+#endif // acxpci_issue_cmd_timeo_debug
 
 /*
  * BOM Init, Configuration (Control Path)
