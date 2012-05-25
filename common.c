@@ -66,7 +66,7 @@ static inline const char *acx_sanitize_str(const char *s);
 /* Logging */
 void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
+void log_fn_exitv(const char *funcname, int v);
 char *acx_print_mac(char *buf, const u8 *mac);
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
@@ -794,12 +794,12 @@ void log_fn_exit(const char *funcname)
 	if (indent >= sizeof(acx_debug_spaces))
 		indent = sizeof(acx_debug_spaces) - 1;
 
-	pr_info("%08ld %s<== %s\n", d % 100000000,
+	pr_info(" %08ld %s<== %s\n", d % 100000000,
 		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
 		funcname);
 }
 
-void log_fn_exit_v(const char *funcname, int v)
+void log_fn_exitv(const char *funcname, int v)
 {
 	int indent;
 	TIMESTAMP(d);
