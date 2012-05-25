@@ -159,7 +159,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 
 	FN_ENTER;
 
-	pr_acxusb("%s doesn't seem to work yet, disabled.\n", __func__);
+	pr_acxusb("doesn't seem to work yet, disabled.\n");
 
 	/*
 	   mem.addr = cpu_to_le16(reg);
@@ -528,14 +528,13 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "%s: cmd=%s, buflen=%u, type=0x%04X\n",
-	    __func__,
+	log(L_CTL, "cmd=%s, buflen=%u, type=0x%04X\n",
 	    cmdstr, buflen,
 	    buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	loc = kmalloc(buflen + 4 + BOGUS_SAFETY_PADDING, GFP_KERNEL);
 	if (!loc) {
-		pr_acx("%s: %s: no memory for data buffer\n", __func__, devname);
+		pr_acx("%s: no memory for data buffer\n", devname);
 		goto bad;
 	}
 
@@ -610,7 +609,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 				 ACX_USB_CTRL_TIMEOUT	/* timeout in ms */
 	    );
 	if (result < 0) {
-		pr_acx("%s: %s: USB read error %d\n", __func__, devname, result);
+		pr_acx("%s: USB read error %d\n", devname, result);
 		goto bad;
 	}
 	if (acx_debug & L_CTL) {
@@ -633,9 +632,9 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	cmd_status = le16_to_cpu(loc->status);
 	if (cmd_status != 1) {
-		pr_acx("%s: %s: cmd %s is not SUCCESS: %d (%s)\n",
-		       __func__, devname, cmdstr,
-		       cmd_status, acx_cmd_status_str(cmd_status));
+		pr_acx("%s: cmd %s is not SUCCESS: %d (%s)\n",
+			devname, cmdstr, cmd_status,
+			acx_cmd_status_str(cmd_status));
 		goto bad;
 	}
 	if ((cmd == ACX1xx_CMD_INTERROGATE) && buffer && buflen) {

@@ -1676,13 +1676,13 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "%s: cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
-		__func__, cmdstr, cmd, buflen, cmd_timeout,
+	log(L_CTL, "cmd:%s, cmd:0x%04X, buflen:%u, timeout:%ums, type:0x%04X)\n",
+		cmdstr, cmd, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		pr_acx("%s: %s: firmware is not loaded yet, cannot execute commands!\n",
-				__func__, devname);
+		pr_acx("%s: firmware is not loaded yet, cannot execute commands!\n",
+			devname);
 		goto bad;
 	}
 
@@ -1710,12 +1710,12 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	if (counter == 0) {
 		/* the card doesn't get idle, we're in trouble */
-		pr_acx("%s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
-				__func__, devname, cmd_status);
+		pr_acx("%s: cmd_status is not IDLE: 0x%04X!=0\n",
+			devname, cmd_status);
 		goto bad;
 	} else if (counter < 190) { /* if waited >10ms... */
-		log(L_CTL|L_DEBUG, "%s: waited for IDLE %dms. Please report\n",
-				__func__, 199 - counter);
+		log(L_CTL|L_DEBUG, "waited for IDLE %dms. Please report\n",
+			199 - counter);
 	}
 
 	/* now write the parameters of the command if needed */
@@ -1786,17 +1786,15 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* Timed out! */
 	if (counter == 0) {
 
-		log(L_ANY, "%s: %s: Timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "%s: Timed out %s for CMD_COMPLETE. "
 			"irq bits:0x%04X irq_status:0x%04X timeout:%dms "
-			"cmd_status:%d (%s)\n",
-			__func__, devname,
+			"cmd_status:%d (%s)\n", devname,
 			(adev->irqs_active) ? "waiting" : "polling",
 			irqtype, adev->irq_status, cmd_timeout,
 			cmd_status, acx_cmd_status_str(cmd_status));
-		log(L_ANY, "%s: "
+		log(L_ANY,
 			"timeout: counter:%d cmd_timeout:%d "
 			"cmd_timeout-counter:%d\n",
-			__func__,
 			counter, cmd_timeout, cmd_timeout - counter);
 
 		if (read_reg16(adev, IO_ACX_IRQ_MASK) == 0xffff) {
@@ -1806,9 +1804,8 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		}
 
 	} else if (cmd_timeout - counter > 30) { /* if waited >30ms... */
-		log(L_CTL|L_DEBUG, "%s: "
+		log(L_CTL|L_DEBUG,
 			"%s for CMD_COMPLETE %dms. count:%d. Please report\n",
-			__func__,
 			(adev->irqs_active) ? "waited" : "polled",
 			cmd_timeout - counter, counter);
 	}
@@ -1828,8 +1825,7 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 		if (buflen > 388) {
 			/* 388 is maximum command length */
-			log(L_ANY, "%s: invalid length 0x%08x\n",
-				__func__, buflen);
+			log(L_ANY, "invalid length 0x%08x\n", buflen);
 			buflen = 388;
 		}
 		p = (u8 *) buffer;
@@ -1851,15 +1847,14 @@ int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		acxmem_copy_from_slavemem(adev, buffer,
 					(u32) (adev->cmd_area + 4), buflen);
 		if (acx_debug & L_DEBUG) {
-			log(L_ANY, "%s: output buffer (len=%u): ",
-				__func__, buflen);
+			log(L_ANY, "output buffer (len=%u): ", buflen);
 			acx_dump_bytes(buffer, buflen);
 		}
 	}
 
 	/* ok: */
-	log(L_DEBUG, "%s: %s: took %ld jiffies to complete\n",
-		__func__, cmdstr, jiffies - start);
+	log(L_DEBUG, "%s: took %ld jiffies to complete\n",
+		cmdstr, jiffies - start);
 
 	acxmem_unlock();
 	FN_EXIT1(OK);
@@ -1908,7 +1903,7 @@ static void acxmem_reset_mac(acx_device_t *adev)
 
 	/* now do soft reset of eCPU, set bit */
 	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-	log(L_DEBUG, "%s: enable soft reset...\n", __func__);
+	log(L_DEBUG, "enable soft reset...\n");
 
 	/* Windows driver sleeps here for a while with this sequence */
 	for (count = 0; count < 200; count++) {
@@ -1916,8 +1911,7 @@ static void acxmem_reset_mac(acx_device_t *adev)
 	}
 
 	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "%s: disable soft reset and go to init mode...\n",
-		__func__);
+	log(L_DEBUG, "disable soft reset and go to init mode...\n");
 	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
 
 	/* now start a burst read from initial EEPROM */
@@ -2569,8 +2563,7 @@ static void acx_process_rxdesc(acx_device_t *adev)
 	}
 	/* else IF_MEM */
 	while (1) {
-		log(L_BUFR, "%s: rx: tail=%u Ctl_8=%02X\n",
-			__func__, tail, Ctl_8);
+		log(L_BUFR, "rx: tail=%u Ctl_8=%02X\n", tail, Ctl_8);
 		/*
 		 * If the ACX has CTL_RECLAIM set on this descriptor there
 		 * is no buffer associated; it just wants us to tell it to
@@ -2598,8 +2591,8 @@ static void acx_process_rxdesc(acx_device_t *adev)
 				 * for debug.
 				 */
 				if (addr & 0xffff0000) {
-					log(L_ANY, "%s: rxdesc 0x%08lx\n",
-						__func__, (uintptr_t) rxdesc);
+					log(L_ANY, "rxdesc 0x%08lx\n",
+						(uintptr_t) rxdesc);
 					acxmem_dump_mem(adev, 0, 0x10000);
 					panic("Bad access!");
 				}
@@ -2611,7 +2604,7 @@ static void acx_process_rxdesc(acx_device_t *adev)
 				acx_process_rxbuf(adev, hostdesc->data);
 			}
 		} else
-			log(L_ANY, "%s: rx reclaim only!\n", __func__);
+			log(L_ANY, "rx reclaim only!\n");
 
 		hostdesc->Status = 0;
 
@@ -2694,7 +2687,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	acxmem_lock();
 
 	if (unlikely(!adev->tx_free)) {
-		log(L_ANY, "%s: BUG: no free txdesc left\n", __func__);
+		log(L_ANY, "BUG: no free txdesc left\n");
 		/*
 		 * Probably the ACX ignored a transmit attempt and now
 		 * there's a packet sitting in the queue we think
@@ -2706,12 +2699,12 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 		 */
 		if (txattempts < 10) {
 			txattempts++;
-			log(L_ANY, "%s: trying to wake up ACX\n", __func__);
+			log(L_ANY, "trying to wake up ACX\n");
 			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
 			write_flush(adev);
 		} else {
 			txattempts = 0;
-			log(L_ANY, "%s: flushing transmit queue.\n", __func__);
+			log(L_ANY, "flushing transmit queue.\n");
 			acx_clean_txdesc_emergency(adev);
 		}
 		txdesc = NULL;
@@ -2746,11 +2739,10 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
 	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
 		txdesc = NULL;
-		log(L_BUFT, "%s: !(blocks_needed <= adev->acx_txbuf_blocks_free), "
-				"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
-				"Stopping queue.\n",
-				__func__,
-				len, blocks_needed, adev->acx_txbuf_blocks_free);
+		log(L_BUFT, "!(blocks_needed <= adev->acx_txbuf_blocks_free), "
+			"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
+			"Stopping queue.\n",
+			len, blocks_needed, adev->acx_txbuf_blocks_free);
 		acx_stop_queue(adev->ieee, NULL);
 		goto end;
 	}
@@ -2776,8 +2768,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
 		/* whoops, descr at current index is not free, so probably
 		 * ring buffer already full */
-		log(L_ANY, "%s: BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
-			__func__,
+		log(L_ANY, "BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
 			head, ctl8);
 		txdesc = NULL;
 		goto end;
@@ -2787,8 +2778,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
 
 	adev->tx_free--;
-	log(L_BUFT, "%s: tx: got desc %u, %u remain\n",
-			__func__, head, adev->tx_free);
+	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->tx_free);
 
 	/* returning current descriptor, so advance to next free one */
 	adev->tx_head = (head + 1) % TX_CNT;
@@ -4816,8 +4806,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev) {
 	platform_set_drvdata(pdev, NULL);
 	ieee80211_free_hw(ieee);
 
-	done:
-
+done:
 	FN_EXIT1(result);
 	return result;
 }
@@ -4842,8 +4831,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	FN_ENTER;
 
 	if (!hw) {
-		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
-		    __func__);
+		log(L_DEBUG, "card is unused. Skipping any release code\n");
 		goto end_no_lock;
 	}
 
@@ -4917,11 +4905,9 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	pr_acx("%s done\n", __func__);
-
-	end_no_lock:
+end_no_lock:
+	pr_acx("done\n");
 	FN_EXIT0;
-
 	return(0);
 }
 #endif	/* acxmem_remove() */
