@@ -48,9 +48,18 @@
 //	L_ANY
 #define ACX_DEFAULT_MSG (L_ASSOC|L_INIT)
 
-/* assume 32bit I/O width
- * (16bit is also compatible with Compact Flash) */
+/* assume 32bit I/O width (16bit is also compatible with Compact Flash) */
 #define ACX_IO_WIDTH 32
+
+#if (ACX_IO_WIDTH == 32)
+# define IO_COMPILE_NOTE \
+	"compiled to use 32bit I/O access. "		\
+	"I/O timing issues might occur, such as "	\
+	"non-working firmware upload. Report them\n"
+#else
+# define IO_COMPILE_NOTE \
+	"compiled to use 16bit I/O access only (compatibility mode)\n"
+#endif
 
 /* Set this to 1 if you want monitor mode to use
  * phy header. Currently it is not useful anyway since we
@@ -82,5 +91,11 @@
 /* 0 - normal mode */
 /* 1 - development/debug: probe for IEs on modprobe */
 #define CMD_DISCOVERY 0
+
+#ifdef __LITTLE_ENDIAN
+#define ENDIAN_STR "acx: running on a little-endian CPU\n"
+#else
+#define ENDIAN_STR "acx: running on a BIG-ENDIAN CPU\n"
+#endif
 
 #endif /* _ACX_CONFIG_H_ */

@@ -4594,26 +4594,10 @@ int __init acxmem_init_module(void) {
 
 	FN_ENTER;
 
-#if (ACX_IO_WIDTH == 32)
-	pr_acx("compiled to use 32bit I/O access. "
-		"I/O timing issues might occur, such as "
-		"non-working firmware upload. Report them\n");
-#else
-	pr_acx("compiled to use 16bit I/O access only "
-			"(compatibility mode)\n");
-#endif	/* (ACX_IO_WIDTH == 32) */
-
-#ifdef __LITTLE_ENDIAN
-#define ENDIANNESS_STRING "acx: running on a little-endian CPU\n"
-#else
-#define ENDIANNESS_STRING "acx: running on a BIG-ENDIAN CPU\n"
-#endif	/* __LITTLE_ENDIAN */
-
-	log(L_INIT,
-			ENDIANNESS_STRING
-			"acx: Slave-memory module initialized, "
-			"waiting for cards to probe...\n"
-	);
+	pr_acx(IO_COMPILE_NOTE);
+	log(L_INIT, ENDIAN_STR
+		"acx: Slave-memory module initialized, "
+		"waiting for cards to probe...\n");
 
 	res = platform_driver_register(&acxmem_driver);
 	FN_EXIT1(res);

@@ -1981,22 +1981,8 @@ int __init acxpci_init_module(void)
 	FN_ENTER;
 
 	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
-
-#if (ACX_IO_WIDTH==32)
-	log(L_INIT, "compiled to use 32bit I/O access. "
-	       "I/O timing issues might occur, such as "
-	       "non-working firmware upload. Report them\n");
-#else
-	log(L_INIT, "compiled to use 16bit I/O access only "
-	       "(compatibility mode)\n");
-#endif
-
-#ifdef __LITTLE_ENDIAN
-#define ENDIANNESS_STRING "running on a little-endian CPU\n"
-#else
-#define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
-#endif
-	log(L_INIT, ENDIANNESS_STRING
+	pr_acx(IO_COMPILE_NOTE);
+	log(L_INIT, ENDIAN_STR
 	    " PCI/VLYNQ module initialized, waiting for cards to probe...\n");
 
 #if defined(CONFIG_PCI)
