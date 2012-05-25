@@ -6,11 +6,6 @@
  * inside pci.c, thus reducing set of forward declarations needed there.
  */
 
-/* Logging */
-
-void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
-		void *vaddr, dma_addr_t dma_handle);
-
 /* Firmware, EEPROM, Phy */
 int acxpci_upload_radio(acx_device_t *adev);
 

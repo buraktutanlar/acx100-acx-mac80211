@@ -702,11 +702,16 @@ static inline void acx_free_desc_queue(acx_device_t *adev,
 					struct desc_info *dinfo)
 {
 	if (dinfo->start) {
-		if (IS_PCI(adev))
-			acxpci_free_coherent(NULL, dinfo->size, dinfo->start,
+		if (IS_PCI(adev)) {
+
+			pr_info("size:%d, vaddr:%p, dma_handle:%p\n",
+				dinfo->size, dinfo->start, (void*) dinfo->phy);
+
+			dma_free_coherent(NULL, dinfo->size, dinfo->start,
 					dinfo->phy);
-		else
+		} else
 			kfree(dinfo->start);
+
 		dinfo->start = NULL;
 		dinfo->size = 0;
 	}
