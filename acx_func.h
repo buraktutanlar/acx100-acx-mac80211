@@ -205,11 +205,12 @@ const char *acx_cmd_status_str(unsigned int state);
 			pr_notice(args);	\
 	} while (0)
 
-/* Log with prefix "acx: __func__ */
-#define logf0(chan, msg) \
-		log(chan, "acx: %s: " msg, __func__);
-#define logf1(chan, msg, args...) \
-		log(chan, "acx: %s: " msg, __func__, args);
+/* Log with prefix "acx: __func__.
+   No - suppress this, its handled now by pr_fmt() etc.
+   preserve the api just in case..
+ */
+#define logf0	log
+#define logf1	log
 
 /* None-Debug build
  * OW 20100405: An none-debug build is currently probably broken
