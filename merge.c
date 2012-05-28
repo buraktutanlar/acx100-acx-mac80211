@@ -3153,10 +3153,10 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 		if ((Ctl_8 & DESC_CTL_ACXDONE_HOSTOWN)
 			!= DESC_CTL_ACXDONE_HOSTOWN) {
 			/* maybe remove if wrapper */
-			if (unlikely(!num_cleaned))
+			if (unlikely(!num_cleaned) && (acx_debug & L_BUFT))
 				pr_warn("clean_txdesc: tail isn't free. "
-					"finger=%d, tail=%d, head=%d\n",
-					finger,	adev->tx.tail, adev->tx_head);
+					"finger=%d, tail=%d, head=%d\n", finger,
+				        adev->tx.tail, adev->tx_head);
 			break;
 		}
 
