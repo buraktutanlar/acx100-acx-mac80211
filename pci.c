@@ -133,26 +133,12 @@ static void vlynq_remove(struct vlynq_device *vdev);
 
 #include "inlines.h"
 
-void acxpci_free_coherent(struct pci_dev *hwdev, size_t size,
-			void *vaddr, dma_addr_t dma_handle)
-{
-	pr_info("hwdev:%p size:%ld, vaddr:%p, dma_handle:%p\n",
-		hwdev, (long unsigned int) size, vaddr, (void*) dma_handle);
-
-	dma_free_coherent(hwdev == NULL	? NULL : &hwdev->dev,
-			size, vaddr, dma_handle);
-}
-
-/*
- * BOM Firmware, EEPROM, Phy
- * ==================================================
- */
-
 /*
  * BOM CMDs (Control Path)
  * ==================================================
  */
 
+#if 0 // acxpci_issue_cmd_timeo_debug
 /*
  * acxpci_issue_cmd_timeo_debug
  *
@@ -183,14 +169,13 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
-	log(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X\n",
-		__func__, cmdstr, buflen, cmd_timeout,
+	log(L_CTL, "cmd=%s, buflen=%u, timeout=%ums, type=0x%04X\n",
+		cmdstr, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1);
 
 	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
-		pr_acx("%s: %s: firmware is not loaded yet, "
-		       "cannot execute commands!\n",
-           __func__, devname);
+		pr_acx("%s: firmware is not loaded yet, "
+		       "cannot execute commands!\n", devname);
 		goto bad;
 	}
 
@@ -220,13 +205,14 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	if (!counter) {
 		/* the card doesn't get idle, we're in trouble */
-		pr_acx("%s: %s: cmd_status is not IDLE: 0x%04X!=0\n",
-		       __func__, devname, cmd_status);
+		pr_acx("%s: cmd_status is not IDLE: 0x%04X!=0\n",
+			devname, cmd_status);
 		goto bad;
-	} else if (counter < 190) {	/* if waited >10ms... */
-		log(L_CTL | L_DEBUG, "%s: waited for IDLE %dms. "
-		    "Please report\n",
-        __func__, 199 - counter);
+	}
+	else if (counter < 190) {	/* if waited >10ms... */
+		log(L_CTL | L_DEBUG,
+			"waited for IDLE %dms. Please report\n",
+			199 - counter);
 	}
 
 	/* now write the parameters of the command if needed */
@@ -294,29 +280,27 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 	/* Timed out! */
 	if (counter == -1) {
-		log(L_ANY, "%s: %s: timed out %s for CMD_COMPLETE. "
+		log(L_ANY, "%s: timed out %s for CMD_COMPLETE. "
 		       "irq bits:0x%04X irq_status:0x%04X timeout:%dms "
-		       "cmd_status:%d (%s)\n",
-		       __func__, devname,
+		       "cmd_status:%d (%s)\n", devname,
                        (adev->irqs_active) ? "waiting" : "polling",
 		       irqtype, adev->irq_status, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
+
 		log(L_ANY, "timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
-				counter, cmd_timeout, cmd_timeout - counter);
+			counter, cmd_timeout, cmd_timeout - counter);
 
 	} else if ((cmd_timeout - counter) > 30) {	/* if waited >30ms... */
-		log(L_CTL | L_DEBUG, "%s: %s for CMD_COMPLETE %dms. "
-		    "count:%d. Please report\n",
-		    __func__,
-		    (adev->irqs_active) ? "waited" : "polled",
-		    cmd_timeout - counter, counter);
+		log(L_CTL | L_DEBUG,
+			"%s for CMD_COMPLETE %dms. count:%d. Please report\n",
+			(adev->irqs_active) ? "waited" : "polled",
+			cmd_timeout - counter, counter);
 	}
 
 	logf1(L_CTL, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X: %s\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+		devname, cmdstr, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+		acx_cmd_status_str(cmd_status)
 	);
 
 	if (1 != cmd_status) {	/* it is not a 'Success' */
@@ -338,26 +322,27 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		}
 	}
 	/* ok: */
-	log(L_DEBUG, "%s: %s: took %ld jiffies to complete\n",
-	    __func__, cmdstr, jiffies - start);
+	log(L_DEBUG, "%s: took %ld jiffies to complete\n",
+		cmdstr, jiffies - start);
+
 	FN_EXIT1(OK);
 	return OK;
 
      bad:
 	/* Give enough info so that callers can avoid printing their
 	 * own diagnostic messages */
-	logf1(L_ANY, "%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
-			devname,
-			cmdstr, buflen, cmd_timeout,
-			buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
-			acx_cmd_status_str(cmd_status)
+	logf1(L_ANY,
+		"%s: cmd=%s, buflen=%u, timeout=%ums, type=0x%04X, status=%s: FAILED\n",
+		devname, cmdstr, buflen, cmd_timeout,
+		buffer ? le16_to_cpu(((acx_ie_generic_t *) buffer)->type) : -1,
+		acx_cmd_status_str(cmd_status)
 	);
 	/* dump_stack(); */
 	FN_EXIT1(NOT_OK);
 
 	return NOT_OK;
 }
-
+#endif // acxpci_issue_cmd_timeo_debug
 
 /*
  * BOM Init, Configuration (Control Path)
@@ -452,8 +437,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->rx.tail) ? " [tail]" : "";
 			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-			    && (rxhostdesc->
-				    Status & cpu_to_le32(DESC_STATUS_FULL)))
+			    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 				seq_printf(file, "%02u FULL%s\n", i, rtl);
 			else
 				seq_printf(file, "%02u empty%s\n", i, rtl);
@@ -565,7 +549,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 
 	/* returning current descriptor, so advance to next free one */
 	adev->tx_head = (head + 1) % TX_CNT;
-      end:
+end:
 	FN_EXIT0;
 
 	return (tx_t *) txdesc;
@@ -646,11 +630,10 @@ INLINE_IO int acxpci_adev_present(acx_device_t *adev)
  * ==================================================
  */
 
-#if 0
-int
-acx111pci_ioctl_info(struct net_device *ndev,
-		     struct iw_request_info *info,
-		     struct iw_param *vwrq, char *extra)
+#if 0	/* acx111pci_ioctl_info() plus */
+int acx111pci_ioctl_info(struct net_device *ndev,
+			struct iw_request_info *info,
+			struct iw_param *vwrq, char *extra)
 {
 #if ACX_DEBUG > 1
 	acx_device_t *adev = ndev2adev(ndev);
@@ -919,12 +902,10 @@ acx111pci_ioctl_info(struct net_device *ndev,
 }
 
 
-/***********************************************************************
-*/
-int
-acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
-				 struct iw_request_info *info,
-				 struct iw_param *vwrq, char *extra)
+/*******************************************************************/
+int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
+				struct iw_request_info *info,
+				struct iw_param *vwrq, char *extra)
 {
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
@@ -964,7 +945,7 @@ acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
 
 	return OK;
 }
-#endif /* 0 */
+#endif	/* acx111pci_ioctl_info() plus */
 
 
 /*
@@ -1365,8 +1346,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	FN_ENTER;
 
 	if (!hw) {
-		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
-		    __func__);
+		log(L_DEBUG, "card is unused. Skipping any release code\n");
 		goto end_no_lock;
 	}
 
@@ -1747,11 +1727,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	vlynq_set_local_mapping(vdev, vdev->mem_start, mapping);
 	vlynq_set_remote_mapping(vdev, 0, match->rx_mapping);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
-	set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
-#else
 	irq_set_irq_type(vlynq_virq_to_irq(vdev, match->irq), match->irq_type);
-#endif
 
 	addr = (u32)ioremap(vdev->mem_start, 0x1000);
 	if (!addr) {
@@ -1928,11 +1904,9 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	FN_ENTER;
 
 	if (!hw) {
-		log(L_DEBUG, "%s: card is unused. Skipping any release code\n",
-		    __func__);
+		log(L_DEBUG, "card is unused. Skipping any release code\n");
 		goto end_no_lock;
 	}
-
 
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
@@ -2007,25 +1981,9 @@ int __init acxpci_init_module(void)
 	FN_ENTER;
 
 	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
-
-#if (ACX_IO_WIDTH==32)
-	log(L_INIT, "compiled to use 32bit I/O access. "
-	       "I/O timing issues might occur, such as "
-	       "non-working firmware upload. Report them\n");
-#else
-	log(L_INIT, "compiled to use 16bit I/O access only "
-	       "(compatibility mode)\n");
-#endif
-
-#ifdef __LITTLE_ENDIAN
-#define ENDIANNESS_STRING "running on a little-endian CPU\n"
-#else
-#define ENDIANNESS_STRING "running on a BIG-ENDIAN CPU\n"
-#endif
-	log(L_INIT,
-	    "acx: " ENDIANNESS_STRING
-	    " PCI/VLYNQ module initialized, "
-	    "waiting for cards to probe...\n");
+	pr_acx(IO_COMPILE_NOTE);
+	log(L_INIT, ENDIAN_STR
+	    " PCI/VLYNQ module initialized, waiting for cards to probe...\n");
 
 #if defined(CONFIG_PCI)
 	res = pci_register_driver(&acxpci_driver);
@@ -2033,9 +1991,8 @@ int __init acxpci_init_module(void)
 	res = vlynq_register_driver(&vlynq_acx);
 #endif
 
-	if (res) {
+	if (res)
 		pr_err("can't register pci/vlynq driver\n");
-	}
 
 	FN_EXIT1(res);
 	return res;

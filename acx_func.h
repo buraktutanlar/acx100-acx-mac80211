@@ -169,7 +169,7 @@ void acx_lock_unhold(void);
 #if ACX_DEBUG
 void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
+void log_fn_exitv(const char *funcname, int v);
 /* 
  * char *acx_print_mac(char *buf, const u8 *mac);
  * void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
@@ -189,7 +189,7 @@ const char *acx_cmd_status_str(unsigned int state);
 #define FN_EXIT1(v) \
 	do { \
 		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit_v(__func__, v); \
+			log_fn_exitv(__func__, v); \
 		} \
 	} while (0)
 #define FN_EXIT0 \
@@ -205,11 +205,12 @@ const char *acx_cmd_status_str(unsigned int state);
 			pr_notice(args);	\
 	} while (0)
 
-/* Log with prefix "acx: __func__ */
-#define logf0(chan, msg) \
-		log(chan, "acx: %s: " msg, __func__);
-#define logf1(chan, msg, args...) \
-		log(chan, "acx: %s: " msg, __func__, args);
+/* Log with prefix "acx: __func__.
+   No - suppress this, its handled now by pr_fmt() etc.
+   preserve the api just in case..
+ */
+#define logf0	log
+#define logf1	log
 
 /* None-Debug build
  * OW 20100405: An none-debug build is currently probably broken

@@ -1,3 +1,5 @@
+#ifndef _ACX_COMPAT_H_
+#define _ACX_COMPAT_H_
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) || LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 40)
 #include <linux/ratelimit.h>
@@ -57,3 +59,10 @@ do { \
 #  define OP_TX_RET_TYPE void
 #  define OP_TX_RET_OK   /* void */
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+/* map new name to old */
+#  define irq_set_irq_type set_irq_type
+#endif
+
+#endif /*  _ACX_COMPAT_H_ */

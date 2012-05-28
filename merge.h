@@ -27,6 +27,10 @@ static int __init acx_debugfs_init(void)  { return 0; }
 static void __exit acx_debugfs_exit(void) { }
 #endif /* defined CONFIG_DEBUG_FS */
 
+int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
+		void *buffer, unsigned buflen, unsigned cmd_timeout,
+		const char *cmdstr);
+
 #if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
 # define PCI_OR_MEM
 #endif

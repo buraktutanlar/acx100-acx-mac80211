@@ -66,7 +66,7 @@ static inline const char *acx_sanitize_str(const char *s);
 /* Logging */
 void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
-void log_fn_exit_v(const char *funcname, int v);
+void log_fn_exitv(const char *funcname, int v);
 char *acx_print_mac(char *buf, const u8 *mac);
 void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
 void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
@@ -794,12 +794,12 @@ void log_fn_exit(const char *funcname)
 	if (indent >= sizeof(acx_debug_spaces))
 		indent = sizeof(acx_debug_spaces) - 1;
 
-	pr_info("%08ld %s<== %s\n", d % 100000000,
+	pr_info(" %08ld %s<== %s\n", d % 100000000,
 		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
 		funcname);
 }
 
-void log_fn_exit_v(const char *funcname, int v)
+void log_fn_exitv(const char *funcname, int v)
 {
 	int indent;
 	TIMESTAMP(d);
@@ -1630,8 +1630,7 @@ int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 	if (IS_USB(adev))
 		return acxusb_read_phy_reg(adev, reg, charbuf);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 
 	return (NOT_OK);
 }
@@ -1643,8 +1642,7 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 	if (IS_USB(adev))
 		return acxusb_write_phy_reg(adev, reg, value);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 
 	return (NOT_OK);
 }
@@ -1656,18 +1654,15 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
 		unsigned len, unsigned timeout, const char* cmdstr)
 {
-	if (IS_PCI(adev))
-		return acxpci_issue_cmd_timeo_debug(adev, cmd, param, len,
+	if (IS_PCI(adev) || IS_MEM(adev))
+		return _acx_issue_cmd_timeo_debug(adev, cmd, param, len,
 						timeout, cmdstr);
 	if (IS_USB(adev))
 		return acxusb_issue_cmd_timeo_debug(adev, cmd, param, len,
 						timeout, cmdstr);
-	if (IS_MEM(adev))
-		return acxmem_issue_cmd_timeo_debug(adev, cmd, param, len,
-						timeout, cmdstr);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",  __func__,
-		(adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
+
 	return (NOT_OK);
 }
 
@@ -1686,16 +1681,15 @@ int acx_configure_debug(acx_device_t *adev, void *pdr, int type,
 		len = adev->ie_len_dot11[type - 0x1000];
 
 	if (unlikely(!len))
-		log(L_DEBUG, "%s: zero-length type %s?!\n",
-				__func__, typestr);
+		log(L_DEBUG, "zero-length type %s?!\n", typestr);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 
-	sprintf(msgbuf, "%s: %s: type=0x%04X, typestr=%s, len=%u",
-			__func__, wiphy_name(adev->ieee->wiphy),
-			type, typestr, len);
+	sprintf(msgbuf, "%s: type=0x%04X, typestr=%s, len=%u",
+		wiphy_name(adev->ieee->wiphy), type, typestr, len);
+
 	if (likely(res == OK))
 		log(L_CTL,  "%s: OK\n", msgbuf);
 	 else
@@ -1823,20 +1817,18 @@ int acx_interrogate_debug(acx_device_t *adev, void *pdr, int type,
 	else
 		len = adev->ie_len_dot11[type - 0x1000];
 
-	log(L_CTL, "%s: (type:%s,len:%u)\n", __func__, typestr, len);
+	log(L_CTL, "(type:%s,len:%u)\n", typestr, len);
 
 	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
 	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
 	res = acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
-		pr_info("%s: %s: (type:%s) FAILED\n", __func__,
-			wiphy_name(adev->ieee->wiphy),
-			typestr);
+		pr_info("%s: (type:%s) FAILED\n",
+			wiphy_name(adev->ieee->wiphy), typestr);
 #else
-		pr_info("%s: %s: (type:0x%X) FAILED\n", __func__,
-			wiphy_name(adev->ieee->wiphy),
-			type);
+		pr_info("%s: (type:0x%X) FAILED\n",
+			wiphy_name(adev->ieee->wiphy), type);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}
@@ -3363,7 +3355,7 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
  * ==================================================
  */
 static int acx_init_max_template_generic(acx_device_t *adev, unsigned int len,
-				unsigned int cmd)
+				unsigned int cmdarg)
 {
 	int res;
 	union {
@@ -3376,7 +3368,7 @@ static int acx_init_max_template_generic(acx_device_t *adev, unsigned int len,
 
 	memset(&templ, 0, len);
 	templ.null.size = cpu_to_le16(len - 2);
-	res = acx_issue_cmd(adev, cmd, &templ, len);
+	res = acx_issue_cmd(adev, cmdarg, &templ, len);
 	return res;
 }
 
@@ -3671,8 +3663,7 @@ failed_acx100:
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
 failed:
-	pr_info("%s: %s() FAILED\n",
-		wiphy_name(adev->ieee->wiphy), __func__);
+	pr_info("%s: FAILED\n", wiphy_name(adev->ieee->wiphy));
 
 success:
 	FN_EXIT1(result);
@@ -4659,7 +4650,7 @@ static ssize_t acx_proc_write_debug(struct file *file,
 		acx_debug = val;
 	}
 
-	log(L_ANY, "%s: acx_debug=0x%04x\n", __func__, acx_debug);
+	log(L_ANY, "acx_debug=0x%04x\n", acx_debug);
 
 	FN_EXIT0;
 	return ret;
@@ -4921,7 +4912,7 @@ static int acx_proc_open(struct inode *inode, struct file *file)
 			    file->f_path.dentry->d_name.name))
 			break;
 	}
-	/* log(L_ANY, "%s: proc filename=%s\n", __func__, proc_files[i]); */
+	/* log(L_ANY, "proc filename=%s\n", proc_files[i]); */
 
 	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
 }
@@ -5185,12 +5176,7 @@ out:
  * acx_compat, and hiding this #if/else.  OTOH, inclusion doesnt care
  * about old kernels
  */
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-int
-#else
-void
-#endif
-acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	acx_device_t *adev = ieee2adev(hw);
 
@@ -5201,11 +5187,7 @@ acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
 		acx_stop_queue(adev->ieee, NULL);
 
-	#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-	return NETDEV_TX_OK;
-	#else
-	return;
-	#endif
+	return OP_TX_RET_OK;
 }
 
 void acx_tx_work(struct work_struct *work)
@@ -5361,8 +5343,7 @@ tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len)
 	if (IS_MEM(adev))
 		return acxmem_alloc_tx(adev, len);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 	return (NULL);
 }
 
@@ -5373,8 +5354,7 @@ static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 	if (IS_MEM(adev))
 		acxmem_dealloc_tx (adev, tx_opaque);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 	return;
 }
 
@@ -5385,8 +5365,7 @@ static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 	if (IS_USB(adev))
 		return acxusb_get_txbuf(adev, tx_opaque);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 	return (NULL);
 }
 
@@ -5400,8 +5379,8 @@ static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	if (IS_MEM(adev))
 		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb);
 
-	log(L_ANY, "%s: Unsupported dev_type=%i\n",
-		__func__, (adev)->dev_type);
+	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
+
 	return;
 }
 
@@ -6087,8 +6066,8 @@ void acx_after_interrupt_task(acx_device_t *adev)
 	/* others */
 	if(adev->after_interrupt_jobs)
 	{
-		pr_info("%s: Jobs still to be run: 0x%02X\n",
-			__func__, adev->after_interrupt_jobs);
+		pr_info("Jobs still to be run: 0x%02X\n",
+			adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
 end_no_lock:
@@ -6187,7 +6166,7 @@ void acx_set_timer(acx_device_t *adev, int timeout_us)
 {
 	FN_ENTER;
 
-	log(L_DEBUG | L_IRQ, "%s(%u ms)\n", __func__, timeout_us / 1000);
+	log(L_DEBUG | L_IRQ, "(%u ms)\n", timeout_us / 1000);
 	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		pr_info("attempt to set the timer "
 		       "when the card interface is not up!\n");
@@ -6476,12 +6455,11 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
         case ALG_WEP:
                 if (key->keylen == 5) {
                     algorithm = ACX_SEC_ALGO_WEP;
-                    log(L_INIT, "%s: algorithm=%i: %s\n",
-			    __func__, algorithm, "ACX_SEC_ALGO_WEP");
+                    log(L_INIT, "algorithm=%i: %s\n",
+			    algorithm, "ACX_SEC_ALGO_WEP");
                 } else {
                     algorithm = ACX_SEC_ALGO_WEP104;
-                    log(L_INIT, "%s: algorithm=%i: %s\n",
-			    __func__, algorithm, "ACX_SEC_ALGO_WEP104");
+                    log(L_INIT, "algorithm=%i: %s\n", "ACX_SEC_ALGO_WEP104");
                 }
                 /* OW Let's try WEP in mac80211 sw */
                 err = -EOPNOTSUPP;
@@ -6489,15 +6467,14 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 #else
 	case WLAN_CIPHER_SUITE_WEP40:
 	        algorithm = ACX_SEC_ALGO_WEP;
-                log(L_INIT, "%s: algorithm=%i: %s\n",
-			__func__, algorithm, "ACX_SEC_ALGO_WEP");
+                log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_WEP");
                 err = -EOPNOTSUPP;
                 break;
 
         case WLAN_CIPHER_SUITE_WEP104:
                 algorithm = ACX_SEC_ALGO_WEP104;
-                log(L_INIT, "%s: algorithm=%i: %s\n",
-			__func__, algorithm, "ACX_SEC_ALGO_WEP104");
+                log(L_INIT, "algorithm=%i: %s\n",
+			algorithm, "ACX_SEC_ALGO_WEP104");
                 err = -EOPNOTSUPP;
                 break;
 #endif
@@ -6508,8 +6485,8 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	case WLAN_CIPHER_SUITE_TKIP:
 #endif
 	        algorithm = ACX_SEC_ALGO_TKIP;
-	        log(L_INIT, "%s: algorithm=%i: %s\n",
-			__func__, algorithm, "ACX_SEC_ALGO_TKIP");
+	        log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_TKIP");
+
 	        err = -EOPNOTSUPP;
 	        break;
 
@@ -6519,8 +6496,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	case WLAN_CIPHER_SUITE_CCMP:
 #endif
 		algorithm = ACX_SEC_ALGO_AES;
-		log(L_INIT, "%s: algorithm=%i: %s\n",
-			__func__, algorithm, "ACX_SEC_ALGO_AES");
+		log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_AES");
 		err = -EOPNOTSUPP;
 		break;
 
@@ -6959,6 +6935,7 @@ static struct kernel_param_ops acx_debug_flag_ops = {
         .set = acx_debug_flag_set,
 };
 module_param_cb(debugflags, &acx_debug_flag_ops, "str", 0644);
+MODULE_PARM_DESC(debugflags, "read/set flag names: +L_CTL,-L_BUFT etc");
 
 #endif	/* implement /sys/module/acx_mac80211/parameters/debugflags */
 #endif	/* ACX_DEBUG */
