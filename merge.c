@@ -1575,7 +1575,7 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-int acxmem_wait_cmd_status(acx_device_t *adev, unsigned cmd,
+int acx_wait_cmd_status(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
 			unsigned cmd_timeout, const char *cmdstr,
 			const char *devname)
@@ -1590,7 +1590,12 @@ int acxmem_wait_cmd_status(acx_device_t *adev, unsigned cmd,
 		if (!cmd_status)
 			break;
 
-		udelay(1000);
+		if (IS_MEM(adev))
+			// mem under lock, may not sleep
+			udelay(1000);
+		else 	// pci not under lock, may sleep
+			acx_mwait(1);
+
 	} while (likely(--counter));
 
 	if (!counter) {
@@ -1603,53 +1608,6 @@ int acxmem_wait_cmd_status(acx_device_t *adev, unsigned cmd,
 		/* if waited > 10ms ... */
 		pr_info("waited %d ms on cmd: %s Please report\n",
 			199-counter, cmdstr);
-	else
-		log(L_CTL | L_DEBUG, "waited for IDLE %d ms after cmd: %s\n",
-			199 - counter, cmdstr);
-
-	return 0;
-}
-
-/* ugly version of above - take literally as possible now, clean up later */
-
-int acxpci_wait_cmd_status(acx_device_t *adev, unsigned cmd,
-			void *buffer, unsigned buflen,
-			unsigned cmd_timeout, const char *cmdstr,
-			const char *devname)
-{
-	unsigned long timeout;
-	unsigned counter;
-	u16 cmd_status = -1;
-
-        /* wait for firmware to become idle for our command submission */
-        timeout = HZ / 5;
-        counter = (timeout * 1000 / HZ) - 1;    /* in ms */
-        timeout += jiffies;
-        do {
-                cmd_status = acx_read_cmd_type_status(adev);
-                /* Test for IDLE state */
-                if (!cmd_status)
-                        break;
-                if (counter % 8 == 0) {
-                        if (time_after(jiffies, timeout)) {
-                                counter = 0;
-                                break;
-                        }
-                        /* we waited 8 iterations, no luck. Sleep 8 ms */
-                        acx_mwait(8);
-                }
-        } while (likely(--counter));
-
-        if (!counter) {
-                /* the card doesn't get idle, we're in trouble */
-                pr_acx("%s: cmd_status is not IDLE: 0x%04X!=0\n",
-                        devname, cmd_status);
-		return -1;
-        }
-        else if (counter < 190)
-		/* if waited > 10ms ... */
-		pr_info("waited %d ms on cmd: %s Please report\n",
-			199 - counter, cmdstr);
 	else
 		log(L_CTL | L_DEBUG, "waited for IDLE %d ms after cmd: %s\n",
 			199 - counter, cmdstr);
@@ -1719,12 +1677,8 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	}
 
 	/* wait for firmware to become idle for our command submission */
-	if (1 || IS_MEM(adev))
-		rc = acxmem_wait_cmd_status(adev, cmd, buffer, buflen,
-				cmd_timeout, cmdstr, devname);
-	else
-		rc = acxpci_wait_cmd_status(adev, cmd, buffer, buflen,
-				cmd_timeout, cmdstr, devname);
+	rc = acx_wait_cmd_status(adev, cmd, buffer, buflen,
+			cmd_timeout, cmdstr, devname);
 	if (rc)
 		goto bad;
 
