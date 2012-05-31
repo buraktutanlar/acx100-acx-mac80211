@@ -2178,7 +2178,12 @@ fail:
 
 int acx_setup_modes(acx_device_t *adev)
 {
+	int i;
+
 	FN_ENTER;
+
+	for (i=0; i<ARRAY_SIZE(channels); i++)
+		channels[i].max_power = TX_CFG_MAX_DBM_POWER;
 
 	if (IS_ACX100(adev)) {
 		adev->ieee->wiphy->bands[IEEE80211_BAND_2GHZ] =
