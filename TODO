@@ -223,3 +223,11 @@ after)
 
 * Add WDS support
 
+Fixes
+===
+
+* Writing to tx_level in debugfs (e.g. echo 1>/debug/acx_mac80211/phy14/tx_level)
+---
+[ 6876.976340] BUG: unable to handle kernel NULL pointer dereference at 00000034
+[ 6876.980018] IP: [<f8bc66f2>] acx111_proc_write_tx_level+0x28/0xed [acx_mac80211]
+---
