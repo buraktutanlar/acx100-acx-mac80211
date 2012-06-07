@@ -5012,9 +5012,11 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 }
 #else
 static inline void acx_proc_init(void) {}
-
 #endif	/* ACX_WANT_PROC_FILES_ANYWAY */
-#endif	/* defined(CONFIG_PROC_FS) || defined(CONFIG_DEBUG_FS) */
+#else
+static inline void acx_proc_init(void) {}
+#endif	/* (defined CONFIG_PROC_FS  &&  defined ACX_WANT_PROC_FILES_ANYWAY) \
+	 || (defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES) */
 
 /* should have a real cleanup func */
 static inline void acx_proc_exit(void) {}
