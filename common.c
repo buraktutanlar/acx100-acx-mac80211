@@ -6253,7 +6253,8 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 
 	/* Reconfigure mac-address globally, affecting all vifs */
 	if (!mac_is_equal(mac_vif, adev->dev_addr)) {
-
+		memcpy(adev->dev_addr, mac_vif, ETH_ALEN);
+		memcpy(adev->bssid, mac_vif, ETH_ALEN);
 		acx1xx_set_station_id(adev, mac_vif);
 		SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	}
@@ -6406,6 +6407,9 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	if (changed & BSS_CHANGED_BSSID) {
 		MAC_COPY(adev->bssid, info->bssid);
+
+		logf0(L_ANY, "Redoing join following bssid update\n");
+		acx_cmd_join_bssid(adev, adev->bssid);
 	}
 
 	/* BOM BSS_CHANGED_BEACON */
@@ -6419,8 +6423,8 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			return;
 		}
 
-		acx_set_beacon(adev, beacon);
 		adev->beacon_interval = info->beacon_int;
+		acx_set_beacon(adev, beacon);
 
 		dev_kfree_skb(beacon);
 	}
