@@ -3341,7 +3341,7 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 	 * 0x80 bit in ratevector from STA.  We can 'fix' it by not
 	 * using this template and sending probe responses by
 	 * hand. TODO --vda */
-	res = acx_set_probe_response_template(adev, beacon->data, len_wo_tim);
+	res = acx_set_probe_response_template(adev, beacon->data, beacon->len);
 	if (res)
 		goto out;
 	/* acx_s_set_probe_response_template_off(adev); */
