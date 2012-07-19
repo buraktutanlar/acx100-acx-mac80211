@@ -305,8 +305,6 @@ struct acx_device {
 	char		firmware_version[FW_ID_SIZE+1];
 	u32		firmware_numver;
 	u32		firmware_id;
-	const u16	*ie_len;
-	const u16	*ie_len_dot11;
 
 	/*** Device state ***/
 	u16		dev_state_mask;

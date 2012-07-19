@@ -43,6 +43,7 @@
 #include "mem.h"
 #include "pci.h"
 #include "cmd.h"
+#include "ie.h"
 
 /*
  * BOM Config
@@ -371,163 +372,6 @@ acx_reg_domain_strings[] = {
 	[7] = "  3-9 Israel (not all firmware versions)",
 	[8] = NULL,	/* needs to remain as last entry */
 };
-
-/* FIXME: the lengths given here probably aren't always correct.
- * They should be gradually replaced by proper "sizeof(acx1XX_ie_XXXX)-4",
- * unless the firmware actually expects a different length than the struct length */
-static const u16 acx100_ie_len[] = {
-	0,
-	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx100_ie_powersave_t) - 4,	/* is that 6 or 8??? */
-	ACX1xx_IE_QUEUE_CONFIG_LEN,
-	ACX100_IE_BLOCK_SIZE_LEN,
-	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_RATE_FALLBACK_LEN,
-	ACX100_IE_WEP_OPTIONS_LEN,
-	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
-	0,
-	ACX1xx_IE_ASSOC_ID_LEN,
-	0,
-	ACX111_IE_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_FWREV_LEN,
-	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
-	ACX1xx_IE_MEDIUM_USAGE_LEN,
-	ACX1xx_IE_RXCONFIG_LEN,
-	0,
-	0,
-	sizeof(fw_stats_t) - 4,
-	0,
-	ACX1xx_IE_FEATURE_CONFIG_LEN,
-	ACX111_IE_KEY_CHOOSE_LEN,
-	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
-	ACX1FF_IE_WONE_CONFIG_LEN,
-	0,
-	ACX1FF_IE_TID_CONFIG_LEN,
-	0,
-	0,
-	0,
-	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
-	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
-	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
-	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
-	0,
-	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
-	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
-	ACX1FF_IE_CCA_THRESHOLD_LEN,
-	ACX1FF_IE_EVENT_MASK_LEN,
-	ACX1FF_IE_DTIM_PERIOD_LEN,
-	0,
-	ACX1FF_IE_ACI_CONFIG_SET_LEN,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	ACX1FF_IE_EEPROM_VER_LEN,
-};
-
-static const u16 acx100_ie_len_dot11[] = {
-	0,
-	ACX1xx_IE_DOT11_STATION_ID_LEN,
-	0,
-	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
-	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
-	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
-	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
-	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
-	0,
-	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
-	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
-	0,
-	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
-	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
-	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
-	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
-	0,
-	0,
-	0,
-};
-
-static const u16 acx111_ie_len[] = {
-	0,
-	ACX100_IE_ACX_TIMER_LEN,
-	sizeof(acx111_ie_powersave_t) - 4,
-	ACX1xx_IE_QUEUE_CONFIG_LEN,
-	ACX100_IE_BLOCK_SIZE_LEN,
-	ACX1xx_IE_MEMORY_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_RATE_FALLBACK_LEN,
-	ACX100_IE_WEP_OPTIONS_LEN,
-	ACX1xx_IE_MEMORY_MAP_LEN,	/*    ACX1xx_IE_SSID_LEN, */
-	0,
-	ACX1xx_IE_ASSOC_ID_LEN,
-	0,
-	ACX111_IE_CONFIG_OPTIONS_LEN,
-	ACX1xx_IE_FWREV_LEN,
-	ACX1xx_IE_FCS_ERROR_COUNT_LEN,
-	ACX1xx_IE_MEDIUM_USAGE_LEN,
-	ACX1xx_IE_RXCONFIG_LEN,
-	0,
-	0,
-	sizeof(fw_stats_t) - 4,
-	0,
-	ACX1xx_IE_FEATURE_CONFIG_LEN,
-	ACX111_IE_KEY_CHOOSE_LEN,
-	ACX1FF_IE_MISC_CONFIG_TABLE_LEN,
-	ACX1FF_IE_WONE_CONFIG_LEN,
-	0,
-	ACX1FF_IE_TID_CONFIG_LEN,
-	0,
-	0,
-	0,
-	ACX1FF_IE_CALIB_ASSESSMENT_LEN,
-	ACX1FF_IE_BEACON_FILTER_OPTIONS_LEN,
-	ACX1FF_IE_LOW_RSSI_THRESH_OPT_LEN,
-	ACX1FF_IE_NOISE_HISTOGRAM_RESULTS_LEN,
-	0,
-	ACX1FF_IE_PACKET_DETECT_THRESH_LEN,
-	ACX1FF_IE_TX_CONFIG_OPTIONS_LEN,
-	ACX1FF_IE_CCA_THRESHOLD_LEN,
-	ACX1FF_IE_EVENT_MASK_LEN,
-	ACX1FF_IE_DTIM_PERIOD_LEN,
-	0,
-	ACX1FF_IE_ACI_CONFIG_SET_LEN,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	ACX1FF_IE_EEPROM_VER_LEN,
-};
-BUILD_BUG_DECL(acx111_ie_len__VS__acx100_ie_len,
-	ARRAY_SIZE(acx111_ie_len) != ARRAY_SIZE(acx100_ie_len));
-
-static const u16 acx111_ie_len_dot11[] = {
-	0,
-	ACX1xx_IE_DOT11_STATION_ID_LEN,
-	0,
-	ACX100_IE_DOT11_BEACON_PERIOD_LEN,
-	ACX1xx_IE_DOT11_DTIM_PERIOD_LEN,
-	ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN,
-	ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN,
-	ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE_LEN,
-	ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN,
-	0,
-	ACX1xx_IE_DOT11_CURRENT_REG_DOMAIN_LEN,
-	ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN,
-	0,
-	ACX1xx_IE_DOT11_TX_POWER_LEVEL_LEN,
-	ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN,
-	ACX100_IE_DOT11_ED_THRESHOLD_LEN,
-	ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET_LEN,
-	0,
-	0,
-	0,
-};
-BUILD_BUG_DECL(acx111_ie_len_dot11__VS__acx100_ie_len_dot11,
-	ARRAY_SIZE(acx111_ie_len_dot11) != ARRAY_SIZE(acx100_ie_len_dot11));
 
 /* BOM Rate and channel definition
  * ---
@@ -2036,14 +1880,6 @@ int acx_init_mac(acx_device_t * adev)
 
 	FN_ENTER;
 
-	if (IS_ACX111(adev)) {
-		adev->ie_len = acx111_ie_len;
-		adev->ie_len_dot11 = acx111_ie_len_dot11;
-	} else {
-		adev->ie_len = acx100_ie_len;
-		adev->ie_len_dot11 = acx100_ie_len_dot11;
-	}
-
 	if (IS_PCI(adev)) {
 		adev->memblocksize = 256;	/* 256 is default */
 		/* try to load radio for both ACX100 and ACX111, since both
@@ -2508,7 +2344,7 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 static int acx1xx_get_antenna(acx_device_t *adev)
 {
 	int res;
-	u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
 
 	FN_ENTER;
 
@@ -2540,7 +2376,7 @@ static int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1)
 static int acx1xx_update_antenna(acx_device_t *adev)
 {
 	int res;
-	u8 antenna[4 + ACX1xx_IE_DOT11_CURRENT_ANTENNA_LEN];
+	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
 
 	FN_ENTER;
 
@@ -2669,7 +2505,7 @@ void acx_update_capabilities(acx_device_t * adev)
 
 static int acx1xx_get_station_id(acx_device_t *adev)
 {
-	u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+	u8 stationID[4 + acx_ie_descs[ACX1xx_IE_DOT11_STATION_ID].len];
 	const u8 *paddr;
 	int i, res;
 
@@ -2705,7 +2541,7 @@ static int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr)
 
 static int acx1xx_update_station_id(acx_device_t *adev)
 {
-	u8 stationID[4 + ACX1xx_IE_DOT11_STATION_ID_LEN];
+	u8 stationID[4 + acx_ie_descs[ACX1xx_IE_DOT11_STATION_ID].len];
 	u8 *paddr;
 	int i, res;
 
@@ -2750,7 +2586,7 @@ static int acx1xx_get_ed_threshold(acx_device_t *adev)
 static int acx100_get_ed_threshold(acx_device_t *adev)
 {
 	int res;
-	u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
 
 	FN_ENTER;
 	memset(ed_threshold, 0, sizeof(ed_threshold));
@@ -2796,7 +2632,7 @@ static int acx1xx_update_ed_threshold(acx_device_t *adev)
 static int acx100_update_ed_threshold(acx_device_t *adev)
 {
 	int res;
-	u8 ed_threshold[4 + ACX100_IE_DOT11_ED_THRESHOLD_LEN];
+	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
 
 	FN_ENTER;
 	memset(ed_threshold, 0, sizeof(ed_threshold));
@@ -2829,7 +2665,7 @@ static int acx1xx_get_cca(acx_device_t *adev)
 static int acx100_get_cca(acx_device_t *adev)
 {
 	int res;
-	u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
 	FN_ENTER;
 
 	memset(cca, 0, sizeof(cca));
@@ -2875,7 +2711,7 @@ static int acx1xx_update_cca(acx_device_t *adev)
 static int acx100_update_cca(acx_device_t *adev)
 {
 	int res;
-	u8 cca[4 + ACX1xx_IE_DOT11_CURRENT_CCA_MODE_LEN];
+	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
 
 	FN_ENTER;
 
@@ -2892,7 +2728,7 @@ static int acx100_update_cca(acx_device_t *adev)
 static int acx1xx_get_rate_fallback(acx_device_t *adev)
 {
 	int res = NOT_OK;
-	u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
+	u8 rate[4 + acx_ie_descs[ACX1xx_IE_RATE_FALLBACK].len];
 
 	FN_ENTER;
 	memset(rate, 0, sizeof(rate));
@@ -2918,7 +2754,7 @@ static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto)
 static int acx1xx_update_rate_fallback(acx_device_t *adev)
 {
 	int res;
-	u8 rate[4 + ACX1xx_IE_RATE_FALLBACK_LEN];
+	u8 rate[4 + acx_ie_descs[ACX1xx_IE_RATE_FALLBACK].len];
 
 	FN_ENTER;
 	/* configure to not do fallbacks when not in auto rate mode */
@@ -3002,8 +2838,8 @@ static int acx1xx_update_rx(acx_device_t *adev)
 static int acx1xx_update_retry(acx_device_t *adev)
 {
 	int res;
-	u8 short_retry[4 + ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT_LEN];
-	u8 long_retry[4 + ACX1xx_IE_DOT11_LONG_RETRY_LIMIT_LEN];
+	u8 short_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT].len];
+	u8 long_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_LONG_RETRY_LIMIT].len];
 
 	FN_ENTER;
 
@@ -3025,7 +2861,7 @@ static int acx1xx_update_retry(acx_device_t *adev)
 static int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 {
 	int res = NOT_OK;
-	u8 xmt_msdu_lifetime[4 + ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME_LEN];
+	u8 xmt_msdu_lifetime[4 + acx_ie_descs[ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME].len];
 	FN_ENTER;
 
 	log(L_INIT, "Updating the tx MSDU lifetime: %u\n",

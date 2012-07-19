@@ -53,6 +53,7 @@
 #include "merge.h"
 #include "io-acx.h"
 #include "cmd.h"
+#include "ie.h"
 
 /*
  * BOM Config

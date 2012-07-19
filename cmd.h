@@ -2,10 +2,8 @@
 #define _ACX_CMD_H_
 
 #include "acx.h"
+#include "ie.h"
 
-int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
-#define acx_configure(adev,pdr,type) \
-	acx_configure_debug(adev,pdr,type,#type)
 enum acx_cmd {
 	ACX1xx_CMD_RESET,
 	ACX1xx_CMD_INTERROGATE,
@@ -46,14 +44,12 @@ struct acx_cmd_desc {
 	const char* name;
 };
 
-int acx_interrogate_debug(acx_device_t *adev, void *pdr,
-			int type, const char* str);
-#define acx_interrogate(adev,pdr,type) \
-	acx_interrogate_debug(adev,pdr,type,#type)
 extern const struct acx_cmd_desc acx_cmd_descs[];
 
 int acx_issue_cmd_timeo(acx_device_t *adev, enum acx_cmd cmd, void *buffer,
                         unsigned buflen, unsigned cmd_timeout);
 int acx_issue_cmd(acx_device_t *adev, enum acx_cmd cmd, void *param, unsigned len);
+int acx_configure(acx_device_t *adev, void *pdr, enum acx_ie type);
+int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type);
 
 #endif

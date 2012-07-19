@@ -30,7 +30,8 @@ ifneq ($(KERNELRELEASE),)
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_PCI) += pci.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
-	acx-mac80211-objs := common.o $(acx-mac80211-obj-y) $(acx-mac80211-obj-m) merge.o debugfs.o cmd.o
+	acx-mac80211-objs := $(acx-mac80211-obj-y) $(acx-mac80211-obj-m) 
+	acx-mac80211-objs += common.o merge.o debugfs.o cmd.o ie.o 
 
 else
 # Otherwise we were called directly from the command line: the kernel build
@@ -82,6 +83,7 @@ clean:
 
 help:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) help
+
 
 .PHONY: modules modules_install clean help
 

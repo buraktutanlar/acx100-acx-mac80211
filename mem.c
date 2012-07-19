@@ -71,6 +71,7 @@
 #include "merge.h"
 #include "mem.h"
 #include "cmd.h"
+#include "ie.h"
 
 /*
  * BOM Config
