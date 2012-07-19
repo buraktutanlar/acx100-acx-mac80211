@@ -42,6 +42,7 @@
 #include "merge.h"
 #include "mem.h"
 #include "pci.h"
+#include "cmd.h"
 
 /*
  * BOM Config
@@ -91,14 +92,11 @@ int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 /* CMDs (Control Path) */
-int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param, unsigned len, unsigned timeout, const char* cmdstr);
-int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
 static int acx111_get_feature_config(acx_device_t *adev, u32 * feature_options, u32 * data_flow_options);
 static int acx111_set_feature_config(acx_device_t *adev, u32 feature_options, u32 data_flow_options, unsigned int mode);
 static inline int acx111_feature_off(acx_device_t *adev, u32 f, u32 d);
 static inline int acx111_feature_on(acx_device_t *adev, u32 f, u32 d);
 static inline int acx111_feature_set(acx_device_t *adev, u32 f, u32 d);
-int acx_interrogate_debug(acx_device_t *adev, void *pdr, int type, const char *typestr);
 static inline unsigned int acx_rate111to5bits(unsigned int rate);
 int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
@@ -1651,53 +1649,7 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
  * BOM CMDs (Control Path)
  * ==================================================
  */
-int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void *param,
-		unsigned len, unsigned timeout, const char* cmdstr)
-{
-	if (IS_PCI(adev) || IS_MEM(adev))
-		return _acx_issue_cmd_timeo_debug(adev, cmd, param, len,
-						timeout, cmdstr);
-	if (IS_USB(adev))
-		return acxusb_issue_cmd_timeo_debug(adev, cmd, param, len,
-						timeout, cmdstr);
 
-	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
-
-	return (NOT_OK);
-}
-
-int acx_configure_debug(acx_device_t *adev, void *pdr, int type,
-		      const char *typestr)
-{
-	u16 len;
-	int res;
-	char msgbuf[255];
-
-	FN_ENTER;
-
-	if (type < 0x1000)
-		len = adev->ie_len[type];
-	else
-		len = adev->ie_len_dot11[type - 0x1000];
-
-	if (unlikely(!len))
-		log(L_DEBUG, "zero-length type %s?!\n", typestr);
-
-	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
-	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
-
-	sprintf(msgbuf, "%s: type=0x%04X, typestr=%s, len=%u",
-		wiphy_name(adev->ieee->wiphy), type, typestr, len);
-
-	if (likely(res == OK))
-		log(L_CTL,  "%s: OK\n", msgbuf);
-	 else
-		log(L_ANY,  "%s: FAILED\n", msgbuf);
-
-	FN_EXIT0;
-	return res;
-}
 
 static int acx111_get_feature_config(acx_device_t *adev,
 			    u32 *feature_options, u32 *data_flow_options)
@@ -1802,39 +1754,6 @@ static inline int acx111_feature_set(acx_device_t *adev, u32 f, u32 d)
 	return acx111_set_feature_config(adev, f, d, 2);
 }
 
-int acx_interrogate_debug(acx_device_t *adev, void *pdr, int type,
-			const char *typestr)
-{
-	u16 len;
-	int res;
-
-	FN_ENTER;
-
-	/* FIXME: no check whether this exceeds the array yet.
-	 * We should probably remember the number of entries... */
-	if (type < 0x1000)
-		len = adev->ie_len[type];
-	else
-		len = adev->ie_len_dot11[type - 0x1000];
-
-	log(L_CTL, "(type:%s,len:%u)\n", typestr, len);
-
-	((acx_ie_generic_t *) pdr)->type = cpu_to_le16(type);
-	((acx_ie_generic_t *) pdr)->len = cpu_to_le16(len);
-	res = acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, pdr, len + 4);
-	if (unlikely(OK != res)) {
-#if ACX_DEBUG
-		pr_info("%s: (type:%s) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), typestr);
-#else
-		pr_info("%s: (type:0x%X) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), type);
-#endif
-		/* dump_stack() is already done in issue_cmd() */
-	}
-	FN_EXIT1(res);
-	return res;
-}
 
 /* OW TODO Helper for acx_s_cmd_join_bssid below */
 /* Looks scary, eh?

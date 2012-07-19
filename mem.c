@@ -70,6 +70,7 @@
 #include "acx.h"
 #include "merge.h"
 #include "mem.h"
+#include "cmd.h"
 
 /*
  * BOM Config

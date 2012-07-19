@@ -19,6 +19,9 @@
 #define _ACX_STRUCT_HW_H_
 
 #include <linux/version.h>
+#include <linux/if_ether.h>
+#include <linux/ieee80211.h>
+#include <linux/wireless.h>
 
 /***********************************************************************
 ** BOM Forward declarations of types

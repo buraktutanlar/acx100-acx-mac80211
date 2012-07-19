@@ -262,25 +262,6 @@ void acx_parse_configoption(acx_device_t *adev,
  * int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
  */
 
-/* BOM CMDs (Common:Control Path)
- * -----
- */
-
-/* int acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd, void //- *param, unsigned len, unsigned timeout, const char* cmdstr); */
-
-#define acx_issue_cmd(adev,cmd,param,len) \
-	acx_issue_cmd_timeo_debug(adev,cmd,param,len,ACX_CMD_TIMEOUT_DEFAULT,#cmd)
-#define acx_issue_cmd_timeo(adev,cmd,param,len,timeo) \
-	acx_issue_cmd_timeo_debug(adev,cmd,param,len,timeo,#cmd)
-
-/* int acx_configure_debug(acx_device_t *adev, void *pdr, int type, const char* str); */
-#define acx_configure(adev,pdr,type) \
-	acx_configure_debug(adev,pdr,type,#type)
-
-int acx_interrogate_debug(acx_device_t *adev, void *pdr,
-			int type, const char* str);
-#define acx_interrogate(adev,pdr,type) \
-	acx_interrogate_debug(adev,pdr,type,#type)
 
 /* int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid); */
 
@@ -571,9 +552,6 @@ static inline struct ieee80211_hdr* acx_get_wlan_hdr(acx_device_t *adev,
  * - 
  * CMDs (Control Path)
  */
-int acx_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
-		void *buffer, unsigned buflen, unsigned cmd_timeout,
-		const char *cmdstr);
 /* - 
  * Init, Configuration (Control Path)
  * - 

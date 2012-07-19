@@ -52,6 +52,7 @@
 #include "pci.h"
 #include "merge.h"
 #include "io-acx.h"
+#include "cmd.h"
 
 /*
  * BOM Config

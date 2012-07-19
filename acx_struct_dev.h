@@ -19,6 +19,8 @@
 #define _ACX_STRUCT_DEV_H_
 
 #include "acx_struct_hw.h"
+#include <linux/wireless.h>
+#include <net/mac80211.h>
 
 /*
  * BOM Debug / log functionality

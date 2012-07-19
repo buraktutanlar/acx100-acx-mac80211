@@ -40,6 +40,7 @@
 #include "mem.h"
 #include "io-acx.h"
 #include "inlines.h"
+#include "cmd.h"
 
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
