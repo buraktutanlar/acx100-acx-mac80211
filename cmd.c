@@ -71,16 +71,18 @@ inline int acx_issue_cmd(acx_device_t *adev, enum acx_cmd cmd, void *param, unsi
 	        ACX_CMD_TIMEOUT_DEFAULT);
 }
 
-int acx_configure(acx_device_t *adev, void *pdr, enum acx_ie type)
+inline int acx_configure(acx_device_t *adev, void *pdr, enum acx_ie type)
+{
+	return acx_configure_len(adev, pdr, type, acx_ie_descs[type].len);
+}
+
+int acx_configure_len(acx_device_t *adev, void *pdr, enum acx_ie type, u16 len)
 {
 	int res;
 	char msgbuf[255];
 
 	const u16 typeval = acx_ie_descs[type].val;
 	const char *typestr = acx_ie_descs[type].name;
-	const u16 len = acx_ie_descs[type].len;
-
-	FN_ENTER;
 
 	if (unlikely(!len))
 		log(L_DEBUG, "zero-length type %s?!\n", typestr);
@@ -97,7 +99,6 @@ int acx_configure(acx_device_t *adev, void *pdr, enum acx_ie type)
 	 else
 		log(L_ANY,  "%s: FAILED\n", msgbuf);
 
-	FN_EXIT0;
 	return res;
 }
 

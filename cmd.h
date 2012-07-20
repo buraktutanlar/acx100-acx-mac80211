@@ -46,10 +46,14 @@ struct acx_cmd_desc {
 
 extern const struct acx_cmd_desc acx_cmd_descs[];
 
+int acx_issue_cmd(acx_device_t *adev, enum acx_cmd cmd, void *param,
+                  unsigned len);
 int acx_issue_cmd_timeout(acx_device_t *adev, enum acx_cmd cmd, void *buffer,
-                        unsigned buflen, unsigned cmd_timeout);
-int acx_issue_cmd(acx_device_t *adev, enum acx_cmd cmd, void *param, unsigned len);
+                          unsigned buflen, unsigned cmd_timeout);
+
 int acx_configure(acx_device_t *adev, void *pdr, enum acx_ie type);
+int acx_configure_len(acx_device_t *adev, void *pdr, enum acx_ie type, u16 len);
+
 int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type);
 
 #endif
