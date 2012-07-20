@@ -72,6 +72,7 @@
 #include "mem.h"
 #include "cmd.h"
 #include "ie.h"
+#include "init.h"
 
 /*
  * BOM Config

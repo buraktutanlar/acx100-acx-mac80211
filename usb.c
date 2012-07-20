@@ -56,6 +56,7 @@
 #include "usb.h"
 #include "cmd.h"
 #include "ie.h"
+#include "init.h"
 
 
 /* OW, 20091205, TODO, Info on TNETW1450 support:

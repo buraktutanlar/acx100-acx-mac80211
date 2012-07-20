@@ -54,6 +54,7 @@
 #include "io-acx.h"
 #include "cmd.h"
 #include "ie.h"
+#include "init.h"
 
 /*
  * BOM Config
