@@ -29,10 +29,12 @@ const struct acx_ie_desc acx_ie_descs[] = {
 	DEF_IE(ACX111_IE_POWER_MGMT,		0x0002, sizeof(acx111_ie_powersave_t)-4),
 								/* TNETW1450: length 0x18!! */
 
-	DEF_IE(ACX1xx_IE_QUEUE_CONFIG,		0x0003,0x20), 	// prev len 0x1c
+	DEF_IE(ACX100_IE_QUEUE_CONFIG,		0x0003,0x1c),
+	DEF_IE(ACX111_IE_QUEUE_CONFIG,		0x0005,0x20), 	// TODO Crypto: prev len 0x1c
 	DEF_IE(ACX100_IE_BLOCK_SIZE,		0x0004,0x02),
 	DEF_IE(ACX1FF_IE_SLOT_TIME,		0x0004,0x08), 	/* later firmware versions only? */
-	DEF_IE(ACX1xx_IE_MEMORY_CONFIG_OPTIONS,	0x0005,0x24), 	// prev len 0x14
+	DEF_IE(ACX100_IE_MEMORY_CONFIG_OPTIONS,	0x0005,0x14),
+	DEF_IE(ACX111_IE_MEMORY_CONFIG_OPTIONS,	0x0003,0x24), 	// TODO Crypto: prev len 0x14
 	DEF_IE(ACX1FF_IE_QUEUE_HEAD,		0x0005,0x14),	/* FIXME: length? */
 	DEF_IE(ACX1xx_IE_RATE_FALLBACK,		0x0006,0x01),	/* TNETW1450: length 2 */
 	DEF_IE(ACX100_IE_WEP_OPTIONS,		0x0007,0x03),

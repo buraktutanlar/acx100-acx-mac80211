@@ -833,7 +833,7 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 	/* alert the device to our decision */
 	if (OK !=
 	    acx_configure(adev, &MemoryConfigOption,
-			    ACX1xx_IE_MEMORY_CONFIG_OPTIONS))
+			    ACX100_IE_MEMORY_CONFIG_OPTIONS))
 		goto bad;
 
 	/* and tell the device to kick it into gear */
@@ -906,7 +906,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	/* sets the beginning of the next queue */
 	queueconf.HostQueueEnd =
 	    cpu_to_le32(le32_to_cpu(queueconf.QueueEnd) + 8);
-	if (OK != acx_configure(adev, &queueconf, ACX1xx_IE_QUEUE_CONFIG))
+	if (OK != acx_configure(adev, &queueconf, ACX100_IE_QUEUE_CONFIG))
 		goto fail;
 
 	if (IS_PCI(adev)) {
@@ -1023,18 +1023,11 @@ static int acx111_create_dma_regions(acx_device_t *adev)
 	memconf.tx_queue1_count_descs = TX_CNT;
 	/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
 
-	/* NB1: this looks wrong: (memconf,ACX1xx_IE_QUEUE_CONFIG),
-	 * (queueconf,ACX1xx_IE_MEMORY_CONFIG_OPTIONS) look swapped, eh?
-	 * But it is actually correct wrt IE numbers.
-	 * NB2: sizeof(memconf) == 28 == 0x1c but
-	 *configure(ACX1xx_IE_QUEUE_CONFIG) * writes 0x20 bytes
-	 *(because same IE for acx100 uses struct
-	 *acx100_ie_queueconfig * which is 4 bytes larger. what a
-	 *mess. TODO: clean it up) */
-	if (OK != acx_configure(adev, &memconf, ACX1xx_IE_QUEUE_CONFIG))
+	if (OK != acx_configure(adev, &memconf, ACX111_IE_MEMORY_CONFIG_OPTIONS))
 		goto fail;
 
-	acx_interrogate(adev, &queueconf, ACX1xx_IE_MEMORY_CONFIG_OPTIONS);
+	memset(&queueconf, 0, sizeof(queueconf));
+	acx_interrogate(adev, &queueconf, ACX111_IE_QUEUE_CONFIG);
 
 	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
