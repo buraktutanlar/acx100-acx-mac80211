@@ -3496,7 +3496,7 @@ static int acx111_update_recalib_auto(acx_device_t *adev)
 		cal.interval = 0;
 	}
 
-	return acx_issue_cmd_timeo(adev, ACX111_CMD_RADIOCALIB,
+	return acx_issue_cmd_timeout(adev, ACX111_CMD_RADIOCALIB,
 			&cal, sizeof(cal),
 			CMD_TIMEOUT_MS(100));
 }

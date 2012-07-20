@@ -47,7 +47,7 @@ const struct acx_cmd_desc acx_cmd_descs[] = {
         DEF_CMD(ACX1FF_CMD_CONTROL_DBG_TRACE, 	0x21), /* new firmware? TNETW1450? */
 };
 
-int acx_issue_cmd_timeo(acx_device_t *adev, enum acx_cmd cmd, void *param,
+int acx_issue_cmd_timeout(acx_device_t *adev, enum acx_cmd cmd, void *param,
 		unsigned len, unsigned timeout)
 {
 	const unsigned int cmdval = acx_cmd_descs[cmd].val;
@@ -67,7 +67,7 @@ int acx_issue_cmd_timeo(acx_device_t *adev, enum acx_cmd cmd, void *param,
 
 inline int acx_issue_cmd(acx_device_t *adev, enum acx_cmd cmd, void *param, unsigned len)
 {
-	return acx_issue_cmd_timeo(adev, cmd, param, len,
+	return acx_issue_cmd_timeout(adev, cmd, param, len,
 	        ACX_CMD_TIMEOUT_DEFAULT);
 }
 

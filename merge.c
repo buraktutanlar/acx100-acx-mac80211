@@ -173,7 +173,7 @@ static int acx_upload_radio(acx_device_t *adev, char *filename)
 		goto fail;
 
 	/* will take a moment so let's have a big timeout */
-	acx_issue_cmd_timeo(adev, ACX1xx_CMD_RADIOINIT, &radioinit,
+	acx_issue_cmd_timeout(adev, ACX1xx_CMD_RADIOINIT, &radioinit,
 			sizeof(radioinit), CMD_TIMEOUT_MS(1000));
 
 	res = acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
