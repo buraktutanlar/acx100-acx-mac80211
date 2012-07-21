@@ -91,8 +91,6 @@ static int acx111_set_feature_config(acx_device_t *adev, u32 feature_options, u3
 static inline int acx111_feature_off(acx_device_t *adev, u32 f, u32 d);
 static inline int acx111_feature_on(acx_device_t *adev, u32 f, u32 d);
 static inline int acx111_feature_set(acx_device_t *adev, u32 f, u32 d);
-static inline unsigned int acx_rate111to5bits(unsigned int rate);
-int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
 
 /* Configuration (Control Path) */
 //-void acx_set_defaults(acx_device_t *adev);
@@ -408,7 +406,7 @@ static struct ieee80211_supported_band acx111_band_2GHz = {
 	.n_bitrates	= ARRAY_SIZE(acx111_rates),
 };
 
-static const u8 bitpos2genframe_txrate[] = {
+const u8 bitpos2genframe_txrate[] = {
 	[0] = 10,		/*  1 Mbit/s */
 	[1] = 20,		/*  2 Mbit/s */
 	[2] = 55,		/*  5*5 Mbit/s */
@@ -1193,98 +1191,7 @@ static inline int acx111_feature_set(acx_device_t *adev, u32 f, u32 d)
 }
 
 
-/* OW TODO Helper for acx_s_cmd_join_bssid below */
-/* Looks scary, eh?
-** Actually, each one compiled into one AND and one SHIFT,
-** 31 bytes in x86 asm (more if uints are replaced by u16/u8) */
-static inline unsigned int acx_rate111to5bits(unsigned int rate)
-{
-	return (rate & 0x7)
-	    | ((rate & RATE111_11) / (RATE111_11 / JOINBSS_RATES_11))
-	    | ((rate & RATE111_22) / (RATE111_22 / JOINBSS_RATES_22));
-}
 
-/*
- * acx_cmd_join_bssid
- *
- * Common code for both acx100 and acx111.
- */
-/* NB: does NOT match RATE100_nn but matches ACX[111]_SCAN_RATE_n */
-int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
-{
-	int res;
-        acx_joinbss_t tmp;
-        int dtim_interval;
-        int i;
-
-        if (mac_is_zero(bssid))
-                return OK;
-
-        FN_ENTER;
-
-        dtim_interval = (ACX_MODE_0_ADHOC == adev->mode) ?
-                        1 : adev->dtim_interval;
-
-        memset(&tmp, 0, sizeof(tmp));
-
-        for (i = 0; i < ETH_ALEN; i++) {
-                tmp.bssid[i] = bssid[ETH_ALEN-1 - i];
-        }
-
-        tmp.beacon_interval = cpu_to_le16(adev->beacon_interval);
-
-        /* Basic rate set. Control frame responses (such as ACK or CTS
-	 * frames) are sent with one of these rates */
-        if (IS_ACX111(adev)) {
-                /* It was experimentally determined that rates_basic
-		 * can take 11g rates as well, not only rates defined
-		 * with JOINBSS_RATES_BASIC111_nnn.  Just use
-		 * RATE111_nnn constants... */
-                tmp.u.acx111.dtim_interval = dtim_interval;
-                tmp.u.acx111.rates_basic = cpu_to_le16(adev->rate_basic);
-                log(L_ASSOC, "rates_basic:%04X, rates_supported:%04X\n",
-                        adev->rate_basic, adev->rate_oper);
-        } else {
-                tmp.u.acx100.dtim_interval = dtim_interval;
-                tmp.u.acx100.rates_basic =
-			acx_rate111to5bits(adev->rate_basic);
-                tmp.u.acx100.rates_supported =
-			acx_rate111to5bits(adev->rate_oper);
-                log(L_ASSOC, "rates_basic:%04X->%02X, "
-                        "rates_supported:%04X->%02X\n",
-                        adev->rate_basic, tmp.u.acx100.rates_basic,
-                        adev->rate_oper, tmp.u.acx100.rates_supported);
-        }
-
-        /* Setting up how Beacon, Probe Response, RTS, and PS-Poll
-	 * frames will be sent (rate/modulation/preamble) */
-        tmp.genfrm_txrate = bitpos2genframe_txrate[lowest_bit(adev->rate_basic)];
-        tmp.genfrm_mod_pre = 0;
-        /* FIXME: was = adev->capab_short (which was always 0); */
-
-        /* we can use short pre *if* all peers can understand it */
-        /* FIXME #2: we need to correctly set PBCC/OFDM bits here too */
-
-        /* we switch fw to STA mode in MONITOR mode, it seems to be
-	 * the only mode where fw does not emit beacons by itself but
-	 * allows us to send anything (we really want to retain
-	 * ability to tx arbitrary frames in MONITOR mode)
-	 */
-        tmp.macmode = (adev->mode != ACX_MODE_MONITOR
-		? adev->mode : ACX_MODE_2_STA);
-        tmp.channel = adev->channel;
-        tmp.essid_len = adev->essid_len;
-
-        memcpy(tmp.essid, adev->essid, tmp.essid_len);
-        res = acx_issue_cmd(adev, ACX1xx_CMD_JOIN, &tmp, tmp.essid_len + 0x11);
-
-        log(L_ASSOC|L_DEBUG, "BSS_Type = %u\n", tmp.macmode);
-        acxlog_mac(L_ASSOC|L_DEBUG, "JoinBSSID MAC:", adev->bssid, "\n");
-
-	/* acx_update_capabilities(adev); */
-        FN_EXIT0;
-        return res;
-}
 
 /*
  * BOM Configuration (Control Path)
