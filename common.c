@@ -44,6 +44,7 @@
 #include "pci.h"
 #include "cmd.h"
 #include "ie.h"
+#include "utils.h"
 
 /*
  * BOM Config
@@ -69,9 +70,6 @@ static inline const char *acx_sanitize_str(const char *s);
 void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
 void log_fn_exitv(const char *funcname, int v);
-char *acx_print_mac(char *buf, const u8 *mac);
-void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
-void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
 //-void acx_dump_bytes(const void *data, int num);
 //-const char *acx_cmd_status_str(unsigned int state);
 
@@ -634,54 +632,6 @@ void log_fn_exitv(const char *funcname, int v)
 		funcname, v);
 }
 #endif /* ACX_DEBUG > 1 */
-
-char* acx_print_mac(char *buf, const u8 *mac)
-{
-	sprintf(buf, MACSTR, MAC(mac));
-	return(buf);
-}
-
-void acx_print_mac2(const char *head, const u8 *mac, const char *tail)
-{
-	pr_info("%s" MACSTR "%s", head, MAC(mac), tail);
-}
-
-void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail)
-{
-	if (acx_debug & level)
-		acx_print_mac2(head, mac, tail);
-}
-
-void acx_dump_bytes(const void *data, int num)
-{
-	const u8 *ptr = (const u8 *)data;
-
-	FN_ENTER;
-
-	if (num <= 0) {
-		printk("\n");
-		return;
-	}
-
-	while (num >= 16) {
-		printk("%02X %02X %02X %02X %02X %02X %02X %02X "
-		       "%02X %02X %02X %02X %02X %02X %02X %02X\n",
-		       ptr[0], ptr[1], ptr[2], ptr[3],
-		       ptr[4], ptr[5], ptr[6], ptr[7],
-		       ptr[8], ptr[9], ptr[10], ptr[11],
-		       ptr[12], ptr[13], ptr[14], ptr[15]);
-		num -= 16;
-		ptr += 16;
-	}
-	if (num > 0) {
-		while (--num > 0)
-			printk("%02X ", *ptr++);
-		printk("%02X\n", *ptr);
-	}
-
-	FN_EXIT0;
-
-}
 
 const char *acx_cmd_status_str(unsigned int state)
 {

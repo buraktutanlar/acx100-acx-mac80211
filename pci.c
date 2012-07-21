@@ -55,6 +55,7 @@
 #include "cmd.h"
 #include "ie.h"
 #include "init.h"
+#include "utils.h"
 
 /*
  * BOM Config

@@ -4,6 +4,7 @@
 #include "usb.h"
 #include "merge.h"
 #include "cmd.h"
+#include "utils.h"
 
 /* Controller Commands
  * Can be found in the cmdTable table on the "Rev. 1.5.0" (FW150) firmware

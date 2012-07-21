@@ -176,7 +176,6 @@ void log_fn_exitv(const char *funcname, int v);
  * void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
  */
 
-void acx_dump_bytes(const void *data, int num);
 const char *acx_cmd_status_str(unsigned int state);
 
 #define FN_ENTER				\
