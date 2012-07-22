@@ -249,9 +249,6 @@ struct rx_desc_pair {
 	struct desc_info buf;
 };
 
-/* FIXME: this should be named something like struct acx_priv
- * (typedef'd to acx_priv_t) */
-
 /* non-firmware struct, no packing necessary */
 struct acx_device {
 	/* most frequent accesses first (dereferencing and cache line!) */
