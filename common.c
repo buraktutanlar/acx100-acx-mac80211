@@ -4784,66 +4784,6 @@ static void acx_set_wepkey(acx_device_t * adev)
 
 /* OW, 20100704, Obselete, TBC for cleanup */
 #if 0
-static void acx_keymac_write(acx_device_t *adev, u16 index, const u32 *addr)
-{
-	/* for keys 0-3 there is no associated mac address */
-	if (index < 4)
-		return;
-
-	index -= 4;
-	if (1) {
-		TODO();
-/*
-                bcm43xx_shm_write32(bcm,
-                                    BCM43xx_SHM_HWMAC,
-                                    index * 2,
-                                    cpu_to_be32(*addr));
-                bcm43xx_shm_write16(bcm,
-                                    BCM43xx_SHM_HWMAC,
-                                    (index * 2) + 1,
-                                    cpu_to_be16(*((u16 *)(addr + 1))));
-*/
-	} else {
-		if (index < 8)
-			TODO();	/* Put them in the macaddress filter */
-		else
-			TODO();
-			/* Put them BCM43xx_SHM_SHARED, stating index 0x0120.
-			   Keep in mind to update the count of keymacs in 0x003 */
-	}
-}
-
-int acx_clear_keys(acx_device_t *adev)
-{
-	static const u32 zero_mac[2] = { 0 };
-	unsigned int i, j, nr_keys = 54;
-	u16 offset;
-
-	/* FixMe:Check for Number of Keys available */
-
-/*        assert(nr_keys <= ARRAY_SIZE(adev->key)); */
-
-	for (i = 0; i < nr_keys; i++) {
-		adev->key[i].enabled = 0;
-		/* returns for i < 4 immediately */
-		acx_keymac_write(adev, i, zero_mac);
-/*
-                bcm43xx_shm_write16(adev, BCM43xx_SHM_SHARED,
-                                    0x100 + (i * 2), 0x0000);
-*/
-		for (j = 0; j < 8; j++) {
-			offset =
-			    adev->security_offset + (j * 4)
-				+ (i * ACX_SEC_KEYSIZE);
-/*
-                        bcm43xx_shm_write16(bcm, BCM43xx_SHM_SHARED,
-                                            offset, 0x0000);
-*/
-		}
-	}
-	return 1;
-}
-
 int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm,
 		const struct ieee80211_key_conf *key, const u8 *mac_addr)
 {
