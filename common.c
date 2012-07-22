@@ -1422,10 +1422,6 @@ static int acx_update_mode(acx_device_t *adev)
 	case ACX_MODE_2_STA:
 	case ACX_MODE_0_ADHOC:
 	case ACX_MODE_3_AP:
-		if (IS_ACX111(adev)) {
-			res += acx111_feature_on(adev, 0,
-					FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
-		}
 		res += acx_update_rx_config(adev);
 
 		acx1xx_set_rx_enable(adev, 1);
