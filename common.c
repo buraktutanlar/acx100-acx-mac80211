@@ -4771,33 +4771,6 @@ static void acx100_set_wepkey(acx_device_t *adev)
 	}
 }
 
-static void acx111_set_wepkey(acx_device_t * adev)
-{
-	acx111WEPDefaultKey_t dk;
-	int i;
-
-	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
-		if (adev->wep_keys[i].size != 0) {
-			log(L_INIT, "setting WEP key: %d with "
-				"total size: %d\n", i,
-				(int)adev->wep_keys[i].size);
-			memset(&dk, 0, sizeof(dk));
-			dk.action = cpu_to_le16(1);
-			/* "add key"; yes, that's a 16bit value */
-			dk.keySize = adev->wep_keys[i].size;
-
-			/* are these two lines necessary? */
-			dk.type = 0;	/* default WEP key */
-			dk.index = 0;	/* ignored when setting default key */
-
-			dk.defaultKeyNum = i;
-			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
-			acx_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk,
-				sizeof(dk));
-		}
-	}
-}
-
 static void acx_set_wepkey(acx_device_t * adev)
 {
 	if (IS_ACX111(adev))
