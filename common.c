@@ -171,6 +171,9 @@ static int acx_update_wep_options(acx_device_t *adev);
 static int acx100_update_wep_options(acx_device_t *adev);
 #endif
 
+static int acx_set_hw_encryption_on(acx_device_t *adev);
+static int acx_set_hw_encryption_off(acx_device_t *adev);
+
 /* Templates */
 static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon);
 static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len);
@@ -2552,6 +2555,38 @@ static int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon)
 	res = acx_cmd_join_bssid(adev, adev->bssid);
 
 	out:
+	return res;
+}
+
+static int acx_set_hw_encryption_on(acx_device_t *adev)
+{
+	int res;
+
+	if(adev->hw_encrypt_enabled)
+		return OK;
+
+	log(L_INIT, "Enabling hw-encryption\n");
+
+	res = acx111_feature_off(adev, 0,
+				FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+	adev->hw_encrypt_enabled=1;
+
+	return res;
+}
+
+static int acx_set_hw_encryption_off(acx_device_t *adev)
+{
+	int res;
+
+	if(!adev->hw_encrypt_enabled)
+		return OK;
+
+	log(L_INIT, "Disabling hw-encryption\n");
+
+	res = acx111_feature_on(adev, 0,
+				FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+	adev->hw_encrypt_enabled=0;
+
 	return res;
 }
 

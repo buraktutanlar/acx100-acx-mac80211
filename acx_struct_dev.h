@@ -453,8 +453,8 @@ struct acx_device {
 	u8		wep_restricted;
 	u8		wep_current_index;
 	wep_key_t	wep_keys[DOT11_MAX_DEFAULT_WEP_KEYS];	/* the default WEP keys */
-
 	key_struct_t	wep_key_struct[10];
+	int		hw_encrypt_enabled;
 
 	/*** Unknown ***/
 	u8		dtim_interval;
