@@ -4225,7 +4225,8 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	 */
 	status->signal = level;
 
-	status->flag = 0;
+	if(adev->hw_encrypt_enabled)
+		status->flag = RX_FLAG_DECRYPTED | RX_FLAG_IV_STRIPPED;
 
 	status->freq = adev->rx_status.freq;
 	status->band = adev->rx_status.band;
