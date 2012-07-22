@@ -998,11 +998,11 @@ static void acxusb_complete_rx(struct urb *urb)
 		ieee80211_tx_status(adev->ieee, skb);
 
 		tx->busy = 0;
-		adev->tx_free++;
+		adev->hw_tx_queue[0].free++;
 
-		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+		if ((adev->hw_tx_queue[0].free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
 			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
-					adev->tx_free);
+				adev->hw_tx_queue[0].free);
 			acx_wake_queue(adev->ieee, NULL);
 			ieee80211_queue_work(adev->ieee, &adev->tx_work);
 		}
@@ -1185,7 +1185,7 @@ tx_t *acxusb_alloc_tx(acx_device_t *adev)
 
 	FN_ENTER;
 
-	head = adev->tx_head;
+	head =adev->hw_tx_queue[0].head;
 	do {
 		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!adev->usb_tx[head].busy) {
@@ -1193,15 +1193,15 @@ tx_t *acxusb_alloc_tx(acx_device_t *adev)
 				"acx: allocated tx %d\n", head);
 			tx = &adev->usb_tx[head];
 			tx->busy = 1;
-			adev->tx_free--;
+			adev->hw_tx_queue[0].free--;
 			goto end;
 		}
-	} while (likely(head != adev->tx_head));
+	} while (likely(head != adev->hw_tx_queue[0].head));
 	tx = NULL;
 	printk_ratelimited("acxusb: tx buffers full\n");
 
 	end:
-	adev->tx_head = head;
+	adev->hw_tx_queue[0].head = head;
 	FN_EXIT0;
 	return (tx_t *) tx;
 }
@@ -1252,7 +1252,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	txnum = tx - adev->usb_tx;
 
 	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
-	    txnum, adev->tx_free, wlanpkt_len);
+	    txnum, adev->hw_tx_queue[0].free, wlanpkt_len);
 
 	/* fill the USB transfer header */
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
@@ -1305,7 +1305,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 		 */
 		adev->stats.tx_errors++;
 		tx->busy = 0;
-		adev->tx_free++;
+		adev->hw_tx_queue[0].free++;
 		/* needed? if (adev->tx_free > TX_START_QUEUE) acx_wake_queue(...) */
 	}
 	FN_EXIT0;
@@ -1425,7 +1425,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 		adev->usb_tx[i].urb->status = 0;
 		adev->usb_tx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	/* put the ACX100 out of sleep mode */
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -1493,7 +1493,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 		acxusb_unlink_urb(adev->usb_rx[i].urb);
 		adev->usb_rx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	/* Must do this outside of lock */
 	del_timer_sync(&adev->mgmt_timer);
@@ -1745,7 +1745,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		adev->usb_tx[i].adev = adev;
 		adev->usb_tx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	usb_set_intfdata(intf, adev);
 	SET_IEEE80211_DEV(ieee, &intf->dev);

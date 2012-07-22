@@ -86,6 +86,7 @@ typedef struct txhostdesc txhostdesc_t;
 #define WLAN_A3FR_MAXLEN_WEP_FCS	(WLAN_A3FR_MAXLEN_FCS + 8)
 #define WLAN_A4FR_MAXLEN_WEP_FCS	(WLAN_A4FR_MAXLEN_FCS + 8)
 
+#define BUF_LEN_HOSTDESC1	WLAN_HDR_A3_LEN
 
 
 /***********************************************************************
@@ -108,6 +109,10 @@ typedef struct txhostdesc txhostdesc_t;
 #define DOT11RATEBYTE_54_G	(54*2)
 #define DOT11RATEBYTE_BASIC	0x80	/* flags rates included in basic rate set */
 
+#define ACX100_NUM_HW_TX_QUEUES	1
+/* 4 traffic queues + 1 queue for unencrypted frames (e.g. mgmt-frames) */
+#define ACX111_NUM_HW_TX_QUEUES	5
+#define ACX111_MAX_NUM_HW_TX_QUEUES ACX111_NUM_HW_TX_QUEUES
 
 /***********************************************************************
 ** BOM rxbuffer_t
@@ -930,19 +935,6 @@ typedef struct acx100_ie_queueconfig {
 	u16	pad2;
 } ACX_PACKED acx100_ie_queueconfig_t;
 
-typedef struct acx111_ie_queueconfig {
-	u16	type;
-	u16	len;
-	u32	tx_memory_block_address;
-	u32	rx_memory_block_address;
-	u32	rx1_queue_address;
-	u32	reserved1;
-	u32	tx1_queue_address;
-	u8	tx1_attributes;
-	u16	reserved2;
-	u8	reserved3;
-} ACX_PACKED acx111_ie_queueconfig_t;
-
 typedef struct acx100_ie_memconfigoption {
 	u16	type;
 	u16	len;
@@ -953,6 +945,31 @@ typedef struct acx100_ie_memconfigoption {
 	u16	RxBlockNum;
 	u16	TxBlockNum;
 } ACX_PACKED acx100_ie_memconfigoption_t;
+
+struct acx111_ie_queueconfig_tx_queue {
+	u32 	address;
+	u8 	attributes;
+	u16 	reserved1;
+	u8 	reserved2;
+} ACX_PACKED;
+
+typedef struct acx111_ie_queueconfig {
+	u16	type;
+	u16	len;
+	u32	tx_memory_block_address;
+	u32	rx_memory_block_address;
+	u32	rx1_queue_address;
+	u32	reserved1;
+	struct acx111_ie_queueconfig_tx_queue tx_queue[ACX111_NUM_HW_TX_QUEUES];
+
+} ACX_PACKED acx111_ie_queueconfig_t;
+
+struct acx111_ie_memoryconfig_tx_queue {
+	u8 	count_descs;
+	u8 	reserved1;
+	u8 	reserved2;
+	u8 	attributes;
+} ACX_PACKED;
 
 typedef struct acx111_ie_memoryconfig {
 	u16	type;
@@ -967,6 +984,7 @@ typedef struct acx111_ie_memoryconfig {
 	u16	reserved1;
 	u8	reserved2;
 
+	// TODO Put in own struct like tx_queue, even if we only use one rx_queue currenly
 	/* start of rx1 block */
 	u8	rx_queue1_count_descs;
 	u8	rx_queue1_reserved1;
@@ -975,12 +993,8 @@ typedef struct acx111_ie_memoryconfig {
 	acx_ptr	rx_queue1_host_rx_start;
 	/* end of rx1 block */
 
-	/* start of tx1 block */
-	u8	tx_queue1_count_descs;
-	u8	tx_queue1_reserved1;
-	u8	tx_queue1_reserved2;
-	u8	tx_queue1_attributes;
-	/* end of tx1 block */
+	struct acx111_ie_memoryconfig_tx_queue tx_queue[ACX111_NUM_HW_TX_QUEUES];
+
 } ACX_PACKED acx111_ie_memoryconfig_t;
 
 typedef struct acx_ie_memmap {

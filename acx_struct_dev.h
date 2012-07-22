@@ -231,7 +231,9 @@ struct desc_info {
 
 /* tx fields refactored */
 struct tx_desc_pair {
+	unsigned int 	head;
 	unsigned int	tail;
+	unsigned int 	free;
 	txdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of txdesc */
 
@@ -463,8 +465,6 @@ struct acx_device {
 	u16		rx_config_1;
 	u16		rx_config_2;
 	u16		memblocksize;
-	unsigned int	tx_free;
-	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
 
 	/* debugfs */
@@ -473,7 +473,6 @@ struct acx_device {
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
-
 #if (1 || defined(CONFIG_ACX_MAC80211_MEM))
 	u32 acx_txbuf_start;
 	int acx_txbuf_numblocks;
@@ -482,14 +481,14 @@ struct acx_device {
 	queueindicator_t *acx_queue_indicator;
 #endif
 
+	struct rx_desc_pair hw_rx_queue;
+	int num_hw_tx_queues;
+	/* pointers to tx buffers, tx host descriptors (in host
+	 * memory) and tx descs in device memory, same for rx */
+	struct tx_desc_pair hw_tx_queue[ACX111_MAX_NUM_HW_TX_QUEUES];
+
 	/*** PCI stuff ***/
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
-
-	/* pointers to tx buffers, tx host descriptors (in host
-	 * memory) and tx descs in device memory, same for rx
-	 */
-	struct tx_desc_pair tx;
-	struct rx_desc_pair rx;
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */

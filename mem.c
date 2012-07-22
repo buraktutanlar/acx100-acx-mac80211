@@ -856,10 +856,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 #endif
 
 	seq_printf(file, "** Rx buf **\n");
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx.tail) ? " [tail]" : "";
+			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
 			Ctl_8 = read_slavemem8(adev, (uintptr_t)
 					&(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
@@ -903,11 +903,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 		adev->acx_txbuf_free);
 
-	txdesc = adev->tx.desc_start;
+	txdesc = adev->hw_tx_queue[0].desc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
-			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx.tail) ? " [tail]" : "";
+			thd = (i == adev->hw_tx_queue[0].head) ? " [head]" : "";
+			ttl = (i == adev->hw_tx_queue[0].tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
 						 (uintptr_t) txdesc, sizeof(txd));
 
@@ -968,7 +968,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			}
 #endif
 
-			txdesc = acx_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1, 0);
 		}
 	}
 
@@ -1008,14 +1008,14 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->tx.buf.txstart, adev->tx.buf.size, adev->tx.desc_size,
-		adev->tx.desc_start, adev->tx.host.txstart,
-		adev->tx.host.size, adev->acx_txbuf_start,
+		adev->hw_tx_queue[0].buf.txstart, adev->hw_tx_queue[0].buf.size, adev->hw_tx_queue[0].desc_size,
+		adev->hw_tx_queue[0].desc_start, adev->hw_tx_queue[0].host.txstart,
+		adev->hw_tx_queue[0].host.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
-		adev->rx.desc_start,
-		adev->rx.host.rxstart, adev->rx.host.size,
-		adev->rx.buf.rxstart, adev->rx.buf.size);
+		adev->hw_rx_queue.desc_start,
+		adev->hw_rx_queue.host.rxstart, adev->hw_rx_queue.host.size,
+		adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size);
 
 	acxmem_unlock();
 	FN_EXIT0;
@@ -1051,11 +1051,11 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to
 	 * handle. */
-	tail = adev->rx.tail;
+	tail = adev->hw_rx_queue.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rx.host.rxstart[tail];
-		rxdesc = &adev->rx.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		rxdesc = &adev->hw_rx_queue.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -1143,8 +1143,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rx.host.rxstart[tail];
-		rxdesc = &adev->rx.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		rxdesc = &adev->hw_rx_queue.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
 
@@ -1155,7 +1155,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 	}
 	end:
-		adev->rx.tail = tail;
+		adev->hw_rx_queue.tail = tail;
 		FN_EXIT0;
 }
 #endif
@@ -1814,7 +1814,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -1837,7 +1837,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rx.host.rxstart;
+		rxhostdesc = adev->hw_rx_queue.host.rxstart;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)

@@ -170,17 +170,20 @@ success:
  */
 static int acx111_create_dma_regions(acx_device_t *adev)
 {
+	int i;
+
 	struct acx111_ie_memoryconfig memconf;
 	struct acx111_ie_queueconfig queueconf;
-	u32 tx_queue_start, rx_queue_start;
+	u32 rx_queue_start;
+	u32 tx_queue_start[ACX111_NUM_HW_TX_QUEUES];
 
-	FN_ENTER;
+	adev->num_hw_tx_queues = ACX111_NUM_HW_TX_QUEUES;
 
 	/* Calculate memory positions and queue sizes */
 
 	/* Set up our host descriptor pool + data pool */
 	if (IS_PCI(adev) || IS_MEM(adev)) {
-		if (OK != acx_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev, ACX111_NUM_HW_TX_QUEUES))
 			goto fail;
 	}
 
@@ -197,7 +200,7 @@ static int acx111_create_dma_regions(acx_device_t *adev)
 	 ** NB: struct acx111_ie_memoryconfig shall be modified
 	 ** if we ever will switch to more than one rx and/or tx queue */
 	memconf.count_rx_queues = 1;
-	memconf.count_tx_queues = 1;
+	memconf.count_tx_queues = ACX111_NUM_HW_TX_QUEUES;
 	/* 0 == Busmaster Indirect Memory Organization, which is what
 	 * we want (using linked host descs with their allocated mem).
 	 * 2 == Generic Bus Slave */
@@ -213,20 +216,25 @@ static int acx111_create_dma_regions(acx_device_t *adev)
 	if (IS_PCI(adev)) {
 		#if defined(CONFIG_ACX_MAC80211_PCI)
 		memconf.rx_queue1_host_rx_start =
-		    cpu2acx(adev->rx.host.phy);
+		    cpu2acx(adev->hw_rx_queue.host.phy);
 		#endif
 	}
 	else if (IS_MEM(adev)) {
 		#if defined(CONFIG_ACX_MAC80211_MEM)
 		memconf.rx_queue1_host_rx_start =
-			cpu2acx(adev->rx.host.phy);
+			cpu2acx(adev->hw_rx_queue.host.phy);
 		#endif
 	}
 
 	/* Tx descriptor queue config */
-	memconf.tx_queue1_count_descs = TX_CNT;
+	for (i = 0; i < ACX111_NUM_HW_TX_QUEUES; i++) {
+		memconf.tx_queue[i].count_descs = TX_CNT;
 
-	/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
+		// TODO check if prio if up- or downwards
+		/* done by memset: memconf.tx_queue1_attributes = 0; lowest priority */
+		memconf.tx_queue[i].attributes = ACX111_NUM_HW_TX_QUEUES - 1 - i;
+	}
+
 
 	if (OK != acx_configure(adev, &memconf, ACX111_IE_MEMORY_CONFIG_OPTIONS))
 		goto fail;
@@ -234,34 +242,29 @@ static int acx111_create_dma_regions(acx_device_t *adev)
 	memset(&queueconf, 0, sizeof(queueconf));
 	acx_interrogate(adev, &queueconf, ACX111_IE_QUEUE_CONFIG);
 
-	tx_queue_start = le32_to_cpu(queueconf.tx1_queue_address);
 	rx_queue_start = le32_to_cpu(queueconf.rx1_queue_address);
 
-	log(L_INIT, "dump queue head (from card):\n"
-	    "acx: len: %u\n"
-	    "acx: tx_memory_block_address: %X\n"
-	    "acx: rx_memory_block_address: %X\n"
-	    "acx: tx1_queue address: %X\n"
-	    "acx: rx1_queue address: %X\n",
+	for (i=0; i<ACX111_NUM_HW_TX_QUEUES; i++)
+		tx_queue_start[i] = le32_to_cpu(queueconf.tx_queue[i].address);
 
+	log(L_INIT,
+	    "Queue head: len=%u, tx_memory_block_address=%X, rx_memory_block_address=%X\n",
 	    le16_to_cpu(queueconf.len),
 	    le32_to_cpu(queueconf.tx_memory_block_address),
-	    le32_to_cpu(queueconf.rx_memory_block_address),
+	    le32_to_cpu(queueconf.rx_memory_block_address));
+	log(L_INIT, "Queue head: rx_queue_start=%X\n", rx_queue_start);
+	for (i=0; i<ACX111_NUM_HW_TX_QUEUES; i++)
+		log(L_INIT, "Queue head: tx_queue_start[%d]=%X\n", i, tx_queue_start[i]);
 
-	    tx_queue_start,
-	    rx_queue_start
-	    );
+	acx_create_desc_queues(adev, rx_queue_start, tx_queue_start,
+	        ACX111_NUM_HW_TX_QUEUES);
 
-	acx_create_desc_queues(adev, tx_queue_start, rx_queue_start);
-
-	FN_EXIT1(OK);
 	return OK;
 
 fail:
 	if (IS_PCI(adev) || IS_MEM(adev))
 		acx_free_desc_queues(adev);
 
-	FN_EXIT1(NOT_OK);
 	return NOT_OK;
 }
 
@@ -409,10 +412,10 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 		MemoryConfigOption.DMA_config = cpu_to_le32(0x30000);
 		/* Declare start of the Rx host pool */
 		MemoryConfigOption.pRxHostDesc =
-		    cpu2acx(adev->rx.host.phy);
+		    cpu2acx(adev->hw_rx_queue.host.phy);
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 		    acx2cpu(MemoryConfigOption.pRxHostDesc),
-		    (long)adev->rx.host.phy);
+		    (long)adev->hw_rx_queue.host.phy);
 		#endif
 	}
 	else if(IS_MEM(adev)) {
@@ -425,7 +428,7 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 		MemoryConfigOption.pRxHostDesc = cpu2acx(0);
 		log(L_DEBUG, "pRxHostDesc 0x%08X, rxhostdesc_startphy 0x%lX\n",
 			acx2cpu(MemoryConfigOption.pRxHostDesc),
-			(long)adev->rx.host.phy);
+			(long)adev->hw_rx_queue.host.phy);
 		#endif
 	}
 	else
@@ -498,7 +501,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	int res = NOT_OK;
 	u32 tx_queue_start, rx_queue_start;
 
-	FN_ENTER;
+	adev->num_hw_tx_queues = ACX100_NUM_HW_TX_QUEUES;
 
 	/* read out the acx100 physical start address for the queues */
 	if (OK != acx_interrogate(adev, &memmap, ACX1xx_IE_MEMORY_MAP))
@@ -507,7 +510,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	tx_queue_start = le32_to_cpu(memmap.QueueStart);
 	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
 
-	log(L_DEBUG, "initializing Queue Indicator\n");
+	log(L_DEBUG, "Initializing Queue Indicator\n");
 
 	memset(&queueconf, 0, sizeof(queueconf));
 
@@ -539,9 +542,10 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	if (IS_PCI(adev)) {
 		/* sets the beginning of the rx descriptor queue,
 		 * after the tx descrs */
-		if (OK != acx_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev, ACX100_NUM_HW_TX_QUEUES))
 			goto fail;
-		acx_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+		acx_create_desc_queues(adev, rx_queue_start, &tx_queue_start,
+		                       ACX100_NUM_HW_TX_QUEUES);
 	}
 #ifdef CONFIG_ACX_MAC80211_MEM
 	else if (IS_MEM(adev)) {
@@ -550,10 +554,11 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 		adev->acx_queue_indicator = (queueindicator_t *)
 			(uintptr_t)le32_to_cpu (queueconf.QueueEnd);
 
-		if (OK != acx_create_hostdesc_queues(adev))
+		if (OK != acx_create_hostdesc_queues(adev, ACX100_NUM_HW_TX_QUEUES))
 			goto fail;
 
-		acx_create_desc_queues(adev, tx_queue_start, rx_queue_start);
+		acx_create_desc_queues(adev, rx_queue_start, &tx_queue_start,
+		                       ACX100_NUM_HW_TX_QUEUES);
 	}
 #endif
 
@@ -578,7 +583,6 @@ fail:
 	if (IS_PCI(adev) || IS_MEM(adev))
 		acx_free_desc_queues(adev);
 end:
-	FN_EXIT1(res);
 	return res;
 }
 
@@ -587,8 +591,6 @@ end:
 int acx_init_mac(acx_device_t * adev)
 {
 	int result = NOT_OK;
-
-	FN_ENTER;
 
 	if (IS_PCI(adev)) {
 		adev->memblocksize = 256;	/* 256 is default */
@@ -620,6 +622,7 @@ int acx_init_mac(acx_device_t * adev)
 			       wiphy_name(adev->ieee->wiphy));
 			goto fail;
 		}
+
 	} else {
 		if (OK != acx100_init_wep(adev))
 			goto fail;
@@ -637,7 +640,7 @@ int acx_init_mac(acx_device_t * adev)
 fail:
 	if (result)
 		pr_info("init_mac() FAILED\n");
-	FN_EXIT1(result);
+
 	return result;
 }
 

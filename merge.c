@@ -259,28 +259,28 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	FN_ENTER;
 
 	/* allocate the RX host descriptor queue pool */
-	adev->rx.host.size = RX_CNT * sizeof(*hostdesc);
-	rc = acx_allocate(adev, &adev->rx.host, "rxhostdesc_start");
+	adev->hw_rx_queue.host.size = RX_CNT * sizeof(*hostdesc);
+	rc = acx_allocate(adev, &adev->hw_rx_queue.host, "rxhostdesc_start");
 	if (rc)
 		goto fail;
 
 	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->rx.host.rxstart & 3) {
+	if ((long)adev->hw_rx_queue.host.rxstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
-	adev->rx.buf.size = RX_CNT * RX_BUFFER_SIZE;
-	rc = acx_allocate(adev, &adev->rx.buf, "rxbuf_start");
+	adev->hw_rx_queue.buf.size = RX_CNT * RX_BUFFER_SIZE;
+	rc = acx_allocate(adev, &adev->hw_rx_queue.buf, "rxbuf_start");
 	if (rc)
 		goto fail;
 
-	rxbuf = (rxbuffer_t*) adev->rx.buf.rxstart;
-	rxbuf_phy = adev->rx.buf.phy;
-	hostdesc = adev->rx.host.rxstart;
-	hostdesc_phy = adev->rx.host.phy;
+	rxbuf = (rxbuffer_t*) adev->hw_rx_queue.buf.rxstart;
+	rxbuf_phy = adev->hw_rx_queue.buf.phy;
+	hostdesc = adev->hw_rx_queue.host.rxstart;
+	hostdesc_phy = adev->hw_rx_queue.host.phy;
 
 	/* don't make any popular C programming pointer arithmetic
 	 * mistakes here, otherwise I'll kill you...  (and don't dare
@@ -297,7 +297,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->rx.host.phy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->hw_rx_queue.host.phy);
 	FN_EXIT1(OK);
 	return OK;
       fail:
@@ -307,7 +307,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	return NOT_OK;
 }
 
-static int acx_create_tx_host_desc_queue(acx_device_t *adev)
+static int acx_create_tx_host_desc_queue(acx_device_t *adev, struct tx_desc_pair *tx)
 {
 	txhostdesc_t *hostdesc;
 	u8 *txbuf;
@@ -318,29 +318,27 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 	FN_ENTER;
 
 	/* allocate TX buffer */
-	/* OW 20100513 adev->tx.buf.size = TX_CNT
-	 * *WLAN_A4FR_MAXLEN_WEP_FCS  (30 + 2312 + 4); */
-	adev->tx.buf.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	rc = acx_allocate(adev, &adev->tx.buf, "txbuf_start");
+	tx->buf.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
+	rc = acx_allocate(adev, &tx->buf, "txbuf_start");
 	if (rc)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
-	adev->tx.host.size = TX_CNT * 2 * sizeof(*hostdesc);
-	rc = acx_allocate(adev, &adev->tx.host, "txhostdesc_start");
+	tx->host.size = TX_CNT * 2 * sizeof(*hostdesc);
+	rc = acx_allocate(adev, &tx->host, "txhostdesc_start");
 	if (rc)
 		goto fail;
 
 	/* check for proper alignment of TX host descriptor pool */
-	if ((long)adev->tx.host.txstart & 3) {
+	if ((long)tx->host.txstart & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
-	hostdesc = adev->tx.host.txstart;
-	hostdesc_phy = adev->tx.host.phy;
-	txbuf = (u8*) adev->tx.buf.txstart;
-	txbuf_phy = adev->tx.buf.phy;
+	hostdesc = tx->host.txstart;
+	hostdesc_phy = tx->host.phy;
+	txbuf = (u8*) tx->buf.txstart;
+	txbuf_phy = tx->buf.phy;
 
 #if 0	/* tx-buffer */
 /* Each tx buffer is accessed by hardware via txdesc -> txhostdesc(s)
@@ -365,7 +363,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 			hostdesc->hd.Ctl_16 = cpu_to_le16(DESC_CTL_HOSTOWN);
 			/* hostdesc->hd.length = ... */
 			hostdesc->hd.desc_phy_next = cpu2acx(hostdesc_phy);
-			hostdesc->pNext = ptr2acx(NULL);
+			hostdesc->hd.pNext = ptr2acx(NULL);
 			/* hostdesc->Status = ... */
 			/* below: non-hardware fields */
 			hostdesc->data = txbuf;
@@ -387,6 +385,7 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 		hostdesc++;
 	}
 #endif	/* tx-buffer */
+
 	/* We initialize two hostdescs so that they point to adjacent
 	 * memory areas. Thus txbuf is really just a contiguous memory
 	 * area */
@@ -405,25 +404,18 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev)
 		hostdesc->data = txbuf;
 
 		if (!(i & 1)) {
-			/* OW 20100513 txbuf += 24 // WLAN_HDR_A3_LEN */
-			/* OW 20100513 txbuf_phy += 24 // WLAN_HDR_A3_LEN */
-			txbuf += WLAN_HDR_A3_LEN;
-			txbuf_phy += WLAN_HDR_A3_LEN;
+			txbuf += BUF_LEN_HOSTDESC1;
+			txbuf_phy += BUF_LEN_HOSTDESC1;
 		} else {
-			/* OW 20100513 txbuf += 30 + 2132 + 4 - 24 //
-			 * WLAN_A4FR_MAXLEN_WEP_FCS -
-			 * WLAN_HDR_A3_LEN */;
-			/* OW 20100513 txbuf_phy += 30 + 2132 + 4 -
-			 * 24 // WLAN_A4FR_MAXLEN_WEP_FCS -
-			 * WLAN_HDR_A3_LEN */;
-			txbuf +=  WLAN_A4FR_MAXLEN_WEP_FCS - WLAN_HDR_A3_LEN;
+			txbuf +=  WLAN_A4FR_MAXLEN_WEP_FCS - BUF_LEN_HOSTDESC1;
 			txbuf_phy += WLAN_A4FR_MAXLEN_WEP_FCS
-				- WLAN_HDR_A3_LEN;
+				- BUF_LEN_HOSTDESC1;
 		}
 		hostdesc++;
 	}
+
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->tx.host.phy);
+	hostdesc->hd.desc_phy_next = cpu2acx(tx->host.phy);
 
 	FN_EXIT1(OK);
 	return OK;
@@ -434,18 +426,22 @@ fail:
 	return NOT_OK;
 }
 
-int acx_create_hostdesc_queues(acx_device_t *adev)
+int acx_create_hostdesc_queues(acx_device_t *adev, int num_tx)
 {
-        int result;
+        int res;
+        int i;
 
 	pr_notice("notice IS_PCI(%p): %d\n", adev, IS_PCI(adev));
 
-	result = acx_create_tx_host_desc_queue(adev);
-        if (OK != result)
-                return result;
+	for(i=0; i<num_tx; i++)
+	{
+		res = acx_create_tx_host_desc_queue(adev, &adev->hw_tx_queue[i]);
+		if (OK != res)
+			return res;
+	}
 
-        result = acx_create_rx_host_desc_queue(adev);
-        return result;
+        res = acx_create_rx_host_desc_queue(adev);
+        return res;
 }
 
 /* ########################################## */
@@ -467,32 +463,32 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		/* rxdesc_start already set here */
 
 		if (IS_PCI(adev))
-			adev->rx.desc_start = (rxdesc_t *)
+			adev->hw_rx_queue.desc_start = (rxdesc_t *)
 				(adev->iobase2 + rx_queue_start);
 		else
-			adev->rx.desc_start = (rxdesc_t *)
+			adev->hw_rx_queue.desc_start = (rxdesc_t *)
 				((u8 *) (uintptr_t)rx_queue_start);
 
-		rxdesc = adev->rx.desc_start;
+		rxdesc = adev->hw_rx_queue.desc_start;
 
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 
 			if (IS_PCI(adev))
-				adev->rx.desc_start = (rxdesc_t *)
+				adev->hw_rx_queue.desc_start = (rxdesc_t *)
 					((u8 *)(uintptr_t)adev->iobase2
 						+ acx2cpu(rxdesc->pNextDesc));
 			else
-				adev->rx.desc_start = (rxdesc_t *)
+				adev->hw_rx_queue.desc_start = (rxdesc_t *)
 				   ((u8 *)(ulong)acx2cpu(rxdesc->pNextDesc));
 
-			rxdesc = adev->rx.desc_start;
+			rxdesc = adev->hw_rx_queue.desc_start;
 		}
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
-		adev->rx.desc_start = (rxdesc_t *)
-			((u8 *) adev->tx.desc_start
+		adev->hw_rx_queue.desc_start = (rxdesc_t *)
+			((u8 *) adev->hw_tx_queue[0].desc_start
 				+ (TX_CNT * sizeof(txdesc_t)));
 
 		/* NB: sizeof(txdesc_t) above is valid because we know
@@ -500,18 +496,18 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		 * elsewhere!  acx111's txdesc is larger! */
 
 		if (IS_PCI(adev))
-			memset(adev->rx.desc_start, 0,
+			memset(adev->hw_rx_queue.desc_start, 0,
 				RX_CNT * sizeof(*rxdesc));
 		else { // IS_MEM
-			mem_offs = (uintptr_t) adev->rx.desc_start;
-			while (mem_offs < (uintptr_t) adev->rx.desc_start
+			mem_offs = (uintptr_t) adev->hw_rx_queue.desc_start;
+			while (mem_offs < (uintptr_t) adev->hw_rx_queue.desc_start
 				+ (RX_CNT * sizeof(*rxdesc))) {
 				write_slavemem32(adev, mem_offs, 0);
 				mem_offs += 4;
 			}
 		}
 		/* loop over whole receive pool */
-		rxdesc = adev->rx.desc_start;
+		rxdesc = adev->hw_rx_queue.desc_start;
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
@@ -548,8 +544,11 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 	FN_EXIT0;
 }
 
-static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
+static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int queue_id)
 {
+
+	struct tx_desc_pair *tx = &adev->hw_tx_queue[queue_id];
+
 	txdesc_t *txdesc;
         txhostdesc_t *hostdesc;
         dma_addr_t hostmemptr = 0; // mem.c - init quiets warning
@@ -560,29 +559,29 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	FN_ENTER;
 
 	if (IS_ACX100(adev))
-		adev->tx.desc_size = sizeof(*txdesc);
+		tx->desc_size = sizeof(*txdesc);
 	else
 		/* the acx111 txdesc is 4 bytes larger */
-		adev->tx.desc_size = sizeof(*txdesc) + 4;
+		tx->desc_size = sizeof(*txdesc) + 4;
 
 	/* This refers to an ACX address, not one of ours */
-	adev->tx.desc_start = (IS_PCI(adev))
+	tx->desc_start = (IS_PCI(adev))
 		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
 		: (txdesc_t *) (uintptr_t)tx_queue_start;
 
-	log(L_DEBUG, "adev->iobase2=%p\n"
-                "tx_queue_start=%08X\n"
-		"adev->tx.desc_start=%p\n",
-                adev->iobase2, tx_queue_start, adev->tx.desc_start);
+	log(L_INIT, "adev->iobase2=%p, "
+                "tx_queue_start=%08X, "
+		"tx->desc_start=%p",
+                adev->iobase2, tx_queue_start, tx->desc_start);
 
-	adev->tx_free = TX_CNT;
+	adev->hw_tx_queue[queue_id].free = TX_CNT;
 	/* done by memset: adev->tx_head = 0; */
 	/* done by memset: adev->tx.tail = 0; */
-	txdesc = adev->tx.desc_start;
+	txdesc = tx->desc_start;
 	if (IS_PCI(adev)) {
 		mem_offs = tx_queue_start;
-		hostmemptr = adev->tx.host.phy;
-		hostdesc = adev->tx.host.txstart;
+		hostmemptr = tx->host.phy;
+		hostdesc = tx->host.txstart;
 	}
 	if (IS_ACX111(adev)) {
 		/* ACX111 has a preinitialized Tx buffer! */
@@ -597,20 +596,20 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
 			}
-			txdesc = acx_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
 		/* clear whole send pool. sizeof is safe here (we are
 		 * acx100) */
 		if (IS_PCI(adev))
-			memset(adev->tx.desc_start, 0,
+			memset(tx->desc_start, 0,
 				TX_CNT * sizeof(*txdesc));
 		else {
-			/* adev->tx.desc_start refers to device memory,
+			/* tx->desc_start refers to device memory,
 			  so we can't write directly to it. */
-			clr = (uintptr_t) adev->tx.desc_start;
-			while (clr < (uintptr_t) adev->tx.desc_start
+			clr = (uintptr_t) tx->desc_start;
+			while (clr < (uintptr_t) tx->desc_start
 				+ (TX_CNT * sizeof(*txdesc))) {
 				write_slavemem32(adev, clr, 0);
 				clr += 4;
@@ -620,7 +619,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
 			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
-				"size: 0x%X\n", txdesc, adev->tx.desc_size);
+				"size: 0x%X\n", txdesc, tx->desc_size);
 
 			if (IS_PCI(adev)) {
 				/* pointer to hostdesc memory */
@@ -634,12 +633,12 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				/* done by memset(0): txdesc->Ctl2_8 = 0; */
 				/* point to next txdesc */
 				txdesc->pNextDesc =
-					cpu2acx(mem_offs + adev->tx.desc_size);
+					cpu2acx(mem_offs + tx->desc_size);
 				/* reserve two (hdr desc and payload desc) */
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
 				/* go to the next one */
-				mem_offs += adev->tx.desc_size;
+				mem_offs += tx->desc_size;
 				/* ++ is safe here (we are acx100) */
 				txdesc++;
 
@@ -655,7 +654,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 				/* point to next txdesc */
 				write_slavemem32(adev, (uintptr_t) &(txdesc->pNextDesc),
 						(u32)cpu_to_le32((uintptr_t)(u8 *)txdesc
-						+ adev->tx.desc_size));
+						+ tx->desc_size));
 
 				/* go to the next one */
 				/* ++ is safe here (we are acx100) */
@@ -674,8 +673,8 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start)
 	FN_EXIT0;
 }
 
-void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-			u32 rx_queue_start)
+void acx_create_desc_queues(acx_device_t *adev, u32 rx_queue_start,
+                            u32 *tx_queue_start, int num_tx)
 {
 	u32 *p;
 	int i;
@@ -683,18 +682,19 @@ void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
 	acxmem_lock_flags;
 	acxmem_lock();
 
-	acx_create_tx_desc_queue(adev, tx_queue_start);
+	for(i=0; i<num_tx; i++)
+		acx_create_tx_desc_queue(adev, tx_queue_start[i], i);
+
 	acx_create_rx_desc_queue(adev, rx_queue_start);
 
-	if (IS_PCI(adev))
-		goto out;
-
-	p = (u32 *) adev->acx_queue_indicator;
-	for (i = 0; i < 4; i++) {
-		write_slavemem32(adev, (uintptr_t) p, 0);
-		p++;
+	if (IS_MEM(adev)){
+		p = (u32 *) adev->acx_queue_indicator;
+		for (i = 0; i < 4; i++) {
+			write_slavemem32(adev, (uintptr_t) p, 0);
+			p++;
+		}
 	}
-out:
+
 	acxmem_unlock();
 }
 
@@ -729,15 +729,18 @@ static inline void acx_free_desc_queue(acx_device_t *adev,
  */
 void acx_free_desc_queues(acx_device_t *adev)
 {
-	FN_ENTER;
+	int i;
 
-	acx_free_desc_queue(adev, &adev->tx.host);
-	acx_free_desc_queue(adev, &adev->tx.buf);
-	adev->tx.desc_start = NULL;
+	for (i=0; i<adev->num_hw_tx_queues; i++)
+	{
+		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].host);
+		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].buf);
+		adev->hw_tx_queue[i].desc_start = NULL;
+	}
 
-	acx_free_desc_queue(adev, &adev->rx.host);
-	acx_free_desc_queue(adev, &adev->rx.buf);
-	adev->rx.desc_start = NULL;
+	acx_free_desc_queue(adev, &adev->hw_rx_queue.host);
+	acx_free_desc_queue(adev, &adev->hw_rx_queue.buf);
+	adev->hw_rx_queue.desc_start = NULL;
 
 	FN_EXIT0;
 }
@@ -780,7 +783,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 	pr_debug("entry\n");
 
-	rxhostdesc = adev->rx.host.rxstart;
+	rxhostdesc = adev->hw_rx_queue.host.rxstart;
 	if (unlikely(!rxhostdesc))
 		return;
 
@@ -792,28 +795,23 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 	}
 }
 
-void acx_log_txbuffer(acx_device_t *adev)
+void acx_log_txbuffer(acx_device_t *adev, int queue_id)
 {
 	txdesc_t *txdesc;
 	int i;
 	u8 Ctl_8;
 
-	/* no FN_ENTER here, we don't want that */
-	/* no locks here, since it's entirely non-critical code */
-
-	pr_debug("entry\n");
-
-	txdesc = adev->tx.desc_start;
+	txdesc = adev->hw_tx_queue[queue_id].desc_start;
 	if (unlikely(!txdesc))
 			return;
 
-	pr_acx("tx: desc->Ctl8's: ");
+	pr_acx("tx[%d]: desc->Ctl8's: ", queue_id);
 	for (i = 0; i < TX_CNT; i++) {
 		Ctl_8 = (IS_MEM(adev))
 			? read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8))
 			: txdesc->Ctl_8;
 		printk("%02X ", Ctl_8);
-		txdesc = acx_advance_txdesc(adev, txdesc, 1);
+		txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
 	}
 	printk("\n");
 }
@@ -2295,12 +2293,12 @@ static void acx_process_rxdesc(acx_device_t *adev)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to
 	 * handle. */
-	tail = adev->rx.tail;
+	tail = adev->hw_rx_queue.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rx.host.rxstart[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
 		if (IS_MEM(adev))
-			rxdesc = &adev->rx.desc_start[tail];
+			rxdesc = &adev->hw_rx_queue.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -2350,7 +2348,7 @@ static void acx_process_rxdesc(acx_device_t *adev)
 
 			/* ok, descriptor is handled, now check the
 			 * next descriptor */
-			hostdesc = &adev->rx.host.rxstart[tail];
+			hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
 
 			/* if next descriptor is empty, then bail out */
 			if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
@@ -2424,8 +2422,8 @@ static void acx_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rx.host.rxstart[tail];
-		rxdesc = &adev->rx.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		rxdesc = &adev->hw_rx_queue.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16
 			= read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
@@ -2437,7 +2435,7 @@ static void acx_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 	}
 end:
-	adev->rx.tail = tail;
+	adev->hw_rx_queue.tail = tail;
 	FN_EXIT0;
 }
 
@@ -2478,7 +2476,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	FN_ENTER;
 	acxmem_lock();
 
-	if (unlikely(!adev->tx_free)) {
+	if (unlikely(!adev->hw_tx_queue[0].free)) {
 		log(L_ANY, "BUG: no free txdesc left\n");
 		/*
 		 * Probably the ACX ignored a transmit attempt and now
@@ -2539,11 +2537,11 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 		goto end;
 	}
 
-	head = adev->tx_head;
+	head = adev->hw_tx_queue[0].head;
 	/*
 	 * txdesc points to ACX memory
 	 */
-	txdesc = acx_get_txdesc(adev, head);
+	txdesc = acx_get_txdesc(adev, head, 0);
 	ctl8 = read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8));
 
 	/*
@@ -2569,11 +2567,11 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	/* Needed in case txdesc won't be eventually submitted for tx */
 	write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
 
-	adev->tx_free--;
-	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->tx_free);
+	adev->hw_tx_queue[0].free--;
+	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->hw_tx_queue[0].free);
 
 	/* returning current descriptor, so advance to next free one */
-	adev->tx_head = (head + 1) % TX_CNT;
+	adev->hw_tx_queue[0].head = (head + 1) % TX_CNT;
 
 	end:
 
@@ -2621,10 +2619,11 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	 * This is only called immediately after we've allocated, so
 	 * we should be able to set the head back to this descriptor.
 	 */
-	index = ((u8*) txdesc - (u8*) adev->tx.desc_start) / adev->tx.desc_size;
+	index = ((u8*) txdesc - (u8*) adev->hw_tx_queue[0].desc_start) /
+		adev->hw_tx_queue[0].desc_size;
 	pr_info("acx_dealloc: moving head from %d to %d\n",
-		adev->tx_head, index);
-	adev->tx_head = index;
+	        adev->hw_tx_queue[0].head, index);
+	adev->hw_tx_queue[0].head = index;
 
 	acxmem_unlock();
 
@@ -2748,17 +2747,17 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 }
 
 
-static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
+static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc, int queue_id)
 {
-	int index = (u8 *) txdesc - (u8 *) adev->tx.desc_start;
+	int index = (u8 *) txdesc - (u8 *) adev->hw_tx_queue[queue_id].desc_start;
 
 	FN_ENTER;
 
-	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
+	if (unlikely(ACX_DEBUG && (index % adev->hw_tx_queue[queue_id].desc_size))) {
 		pr_acx("bad txdesc ptr %p\n", txdesc);
 		return NULL;
 	}
-	index /= adev->tx.desc_size;
+	index /= adev->hw_tx_queue[queue_id].desc_size;
 	if (unlikely(ACX_DEBUG && (index >= TX_CNT))) {
 		pr_acx("bad txdesc ptr %p\n", txdesc);
 		return NULL;
@@ -2766,12 +2765,12 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc)
 
 	FN_EXIT0;
 
-	return &adev->tx.host.txstart[index * 2];
+	return &adev->hw_tx_queue[queue_id].host.txstart[index * 2];
 }
 
-void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
+void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque, int q)
 {
-	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque)->data;
+	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque, q)->data;
 }
 
 /*
@@ -2787,7 +2786,7 @@ void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
  */
 #if 1	// pci version merge started
 void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-		struct ieee80211_tx_info *info, struct sk_buff *skb)
+		struct ieee80211_tx_info *info, struct sk_buff *skb, int queue_id)
 {
 	/*
 	 * txdesc is the address on the ACX
@@ -2950,9 +2949,9 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 				write_slavemem16(adev, (uintptr_t) &(txdesc->total_length), 0);
 				write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_HOSTOWN
 						| DESC_CTL_FIRSTFRAG);
-				adev->tx_head = ((u8*) txdesc - (u8*) adev->tx.desc_start)
-						/ adev->tx.desc_size;
-				adev->tx_free++;
+				adev->hw_tx_queue[queue_id].head = ((u8*) txdesc - (u8*) adev->hw_tx_queue[queue_id].desc_start)
+						/ adev->hw_tx_queue[queue_id].desc_size;
+				adev->hw_tx_queue[queue_id].free++;
 				goto end_of_chain;
 			}
 			/*
@@ -3053,7 +3052,7 @@ end_of_chain:
  * be cleaned is.
  */
 /* OW TODO Very similar with pci: possible merging. */
-unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
+unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id)
 {
 	txdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
@@ -3079,9 +3078,9 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 		tmptxdesc.u.r1.rate = 0x0a;
 	}
 	if (unlikely(acx_debug & L_DEBUG))
-		acx_log_txbuffer(adev);
+		acx_log_txbuffer(adev, queue_id);
 
-	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->tx.tail);
+	log(L_BUFT, "tx: cleaning up bufs from %u\n", adev->hw_tx_queue[queue_id].tail);
 
 	/* We know first descr which is not free yet. We advance it as
 	 * far as we see correct bits set in following descs (if next
@@ -3090,10 +3089,10 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 	 * descs.  We will catch up when all intermediate descs will
 	 * be freed also */
 
-	finger = adev->tx.tail;
+	finger = adev->hw_tx_queue[queue_id].tail;
 	num_cleaned = 0;
-	while (likely(finger != adev->tx_head)) {
-		txdesc = acx_get_txdesc(adev, finger);
+	while (likely(finger != adev->hw_tx_queue[queue_id].head)) {
+		txdesc = acx_get_txdesc(adev, finger, queue_id);
 
 		/* If we allocated txdesc on tx path but then decided
 		 * to NOT use it, then it will be left as a free
@@ -3112,8 +3111,10 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 			/* maybe remove if wrapper */
 			if (unlikely(!num_cleaned) && (acx_debug & L_BUFT))
 				pr_warn("clean_txdesc: tail isn't free. "
-					"finger=%d, tail=%d, head=%d\n", finger,
-				        adev->tx.tail, adev->tx_head);
+					"q=%d finger=%d, tail=%d, head=%d\n",
+				        queue_id, finger,
+				        adev->hw_tx_queue[queue_id].tail,
+				        adev->hw_tx_queue[queue_id].head);
 			break;
 		}
 
@@ -3144,12 +3145,12 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 			"acx: tx: cleaned %u: !ACK=%u !RTS=%u RTS=%u"
 			" r100=%u r111=%04X tx_free=%u\n",
 			finger, ack_failures, rts_failures, rts_ok,
-			r100, r111, adev->tx_free);
+			r100, r111, adev->hw_tx_queue[queue_id].free);
 
 		/* need to check for certain error conditions before
 		 * we clean the descriptor: we still need valid descr
 		 * data here */
-		hostdesc = acx_get_txhostdesc(adev, txdesc);
+		hostdesc = acx_get_txhostdesc(adev, txdesc, queue_id);
 
 		txstatus = IEEE80211_SKB_CB(hostdesc->skb);
 
@@ -3187,9 +3188,10 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 			 * already knows descriptor is finished since
 			 * it set Ctl_8 accordin
 			 */
+
 			txdesc->Ctl_8 = DESC_CTL_HOSTOWN;
 		}
-		adev->tx_free++;
+		adev->hw_tx_queue[queue_id].free++;
 		num_cleaned++;
 
 		/* do error checking, rate handling and logging
@@ -3215,7 +3217,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev)
 		finger = (finger + 1) % TX_CNT;
 	}
 	/* remember last position */
-	adev->tx.tail = finger;
+	adev->hw_tx_queue[queue_id].tail = finger;
 
 	FN_EXIT1(num_cleaned);
 	return num_cleaned;
@@ -3231,7 +3233,7 @@ void acx_clean_txdesc_emergency(acx_device_t *adev)
 	FN_ENTER;
 
 	for (i = 0; i < TX_CNT; i++) {
-		txd = acx_get_txdesc(adev, i);
+		txd = acx_get_txdesc(adev, i, 0);
 
 		/* free it */
 		if (IS_PCI(adev)) {
@@ -3261,7 +3263,7 @@ void acx_clean_txdesc_emergency(acx_device_t *adev)
 #endif
 		write_slavemem32(adev, (uintptr_t) &(txd->AcxMemPtr), 0);
 	}
-	adev->tx_free = TX_CNT;
+	adev->hw_tx_queue[0].free = TX_CNT;
 
 	if (IS_MEM(adev))
 		acxmem_init_acx_txbuf2(adev);
@@ -3393,6 +3395,23 @@ void acx_handle_info_irq(acx_device_t *adev); // reorder later
 
 #if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
 
+static int acx_is_hw_tx_queue_start_limit(acx_device_t *adev)
+{
+	int i;
+
+	for (i=0; i<adev->num_hw_tx_queues; i++)
+	{
+		if (!(adev->hw_tx_queue[i].free >= TX_START_QUEUE))
+		{
+			log(L_BUF, "Queue under start limie: queue_id=%d, free=%d\n",
+				i, adev->hw_tx_queue[i].free);
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 #define IRQ_ITERATE 0 // mem.c has it 1, but thats in #if0d code.
 
 /* Interrupt handler bottom-half */
@@ -3403,6 +3422,7 @@ void acx_irq_work(struct work_struct *work)
 	int irqmasked;
 	acxmem_lock_flags;
 	unsigned int irqcnt = 0; // but always do-while once, see IRQ_ITERATE
+	int i;
 
 	FN_ENTER;
 
@@ -3467,21 +3487,19 @@ void acx_irq_work(struct work_struct *work)
 			 * resolved this problem.  Now WPA assoc
 			 * succeeds directly and robust.
 			 */
-			acx_tx_clean_txdesc(adev);
+			for (i=0; i<adev->num_hw_tx_queues; i++)
+				acx_tx_clean_txdesc(adev, i);
 
 			/* Restart queue if stopped and enough tx-descr free */
-			if ((adev->tx_free >= TX_START_QUEUE)
-				&& acx_queue_stopped(adev->ieee)) {
-				log(L_BUF,
-					"tx: wake queue (avail. Tx desc %u)\n",
-					adev->tx_free);
+			if (acx_is_hw_tx_queue_start_limit(adev) &&
+				acx_queue_stopped(adev->ieee))
+			{
+				log(L_BUF,"tx: wake queue\n");
 				acx_wake_queue(adev->ieee, NULL);
-				/* Schedule the tx. Doesn't harm.
-				   Required in case of irq-iteration.
-				*/
-				ieee80211_queue_work(adev->ieee,
-						&adev->tx_work);
+				/* Schedule the tx, since it doesn't harm. Required in case of irq-iteration. */
+				ieee80211_queue_work(adev->ieee, &adev->tx_work);
 			}
+
 		}
 
 		/* Rx processing TODO - examine merged flags !!! */
@@ -4134,7 +4152,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -4158,7 +4176,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rx.host.rxstart;
+		rxhostdesc = adev->hw_rx_queue.host.rxstart;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)

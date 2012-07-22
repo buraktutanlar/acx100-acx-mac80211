@@ -24,7 +24,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
 /* Rx Path
  * Tx Path
  */
-tx_t *acxpci_alloc_tx(acx_device_t *adev);
+tx_t *acxpci_alloc_tx(acx_device_t *adev, int q);
 
 /* Irq Handling, Timer */
 

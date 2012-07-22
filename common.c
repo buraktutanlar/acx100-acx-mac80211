@@ -224,12 +224,12 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
 //-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
 //-int acx_queue_stopped(struct ieee80211_hw *ieee);
 //-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
-tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len);
+tx_t *acx_alloc_tx(acx_device_t *adev, unsigned int len, int q);
 static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
-static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque);
+static void *acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque, int q);
 static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque,
 			int len, struct ieee80211_tx_info *ieeectl,
-			struct sk_buff *skb);
+			struct sk_buff *skb, int q);
 void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
 			unsigned int finger,
 			struct ieee80211_tx_info *info);
@@ -4279,6 +4279,22 @@ out:
 	return;
 }
 
+static int acx_is_hw_tx_queue_stop_limit(acx_device_t *adev)
+{
+	int i;
+	for (i=0; i<adev->num_hw_tx_queues; i++)
+	{
+		if (adev->hw_tx_queue[i].free < TX_STOP_QUEUE)
+		{
+			logf1(L_BUF, "Tx_free < TX_STOP_QUEUE (queue_id=%d: %u tx desc left):"
+				" Stop queue.\n", i, adev->hw_tx_queue[i].free);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 void acx_tx_queue_go(acx_device_t *adev)
 {
 	struct sk_buff *skb;
@@ -4304,9 +4320,8 @@ void acx_tx_queue_go(acx_device_t *adev)
 		/* Keep a few free descs between head and tail of tx
 		 * ring. It is not absolutely needed, just feels
 		 * safer */
-		if (adev->tx_free < TX_STOP_QUEUE) {
-			logf1(L_BUF, "Tx_free<TX_STOP_QUEUE (%u tx desc left):"
-				" Stop queue.\n", adev->tx_free);
+		if (acx_is_hw_tx_queue_stop_limit(adev))
+		{
 			acx_stop_queue(adev->ieee, NULL);
 			goto out;
 		}
@@ -4320,16 +4335,19 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb)
 	tx_t *tx;
 	void *txbuf;
 	struct ieee80211_tx_info *ctl;
+
+	int q=0;
+
 	ctl = IEEE80211_SKB_CB(skb);
 
-	tx = acx_alloc_tx(adev, skb->len);
+	tx = acx_alloc_tx(adev, skb->len, q);
 
 	if (unlikely(!tx)) {
 		logf0(L_BUFT, "No tx available\n");
 		return (-EBUSY);
 	}
 
-	txbuf = acx_get_txbuf(adev, tx);
+	txbuf = acx_get_txbuf(adev, tx, q);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
@@ -4347,8 +4365,8 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb)
 
 	memcpy(txbuf, skb->data, skb->len);
 
-	acx_tx_data(adev, tx, skb->len, ctl, skb);
 
+	acx_tx_data(adev, tx, skb->len, ctl, skb, q);
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
 
@@ -4399,10 +4417,10 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
  * OW Included skb->len to check required blocks upfront in
  * acx_l_alloc_tx This should perhaps also go into pci and usb ?
  */
-tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len)
+tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len, int q)
 {
 	if (IS_PCI(adev))
-		return acxpci_alloc_tx(adev);
+		return acxpci_alloc_tx(adev, q);
 	if (IS_USB(adev))
 		return acxusb_alloc_tx(adev);
 	if (IS_MEM(adev))
@@ -4423,10 +4441,10 @@ static void acx_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 	return;
 }
 
-static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
+static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque, int q)
 {
 	if (IS_PCI(adev) || IS_MEM(adev))
-		return _acx_get_txbuf(adev, tx_opaque);
+		return _acx_get_txbuf(adev, tx_opaque, q);
 	if (IS_USB(adev))
 		return acxusb_get_txbuf(adev, tx_opaque);
 
@@ -4435,14 +4453,14 @@ static void* acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque)
 }
 
 static void acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-	struct ieee80211_tx_info *ieeectl, struct sk_buff *skb)
+	struct ieee80211_tx_info *ieeectl, struct sk_buff *skb, int q)
 {
 	if (IS_PCI(adev))
-		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb, q);
 	if (IS_USB(adev))
 		return acxusb_tx_data(adev, tx_opaque, len, ieeectl, skb);
 	if (IS_MEM(adev))
-		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb);
+		return _acx_tx_data(adev, tx_opaque, len, ieeectl, skb, q);
 
 	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 
@@ -4462,15 +4480,8 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 
 	int debug = acx_debug & L_BUFT;
 
-	if (debug) {
-		#if defined(CONFIG_ACX_MAC80211_PCI) || \
-			defined(CONFIG_ACX_MAC80211_MEM)
-		i = ((u8*) txdesc - (u8*) adev->tx.desc_start)
-			/ adev->tx.desc_size;
-		sprintf(tmpstr, "txdesc=%i: rates in info"
-			"[bitrate,hw_value,count]: ", i);
-		#endif
-	}
+	if (debug)
+		sprintf(tmpstr, "rates in info [bitrate,hw_value,count]: ");
 
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 		if (info->control.rates[i].idx < 0)
