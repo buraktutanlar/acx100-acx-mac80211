@@ -4168,13 +4168,12 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	buflen = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	/* Allocate our skb */
-	skb = dev_alloc_skb(buflen + 2);
+	skb = dev_alloc_skb(buflen);
 	if (!skb) {
 		pr_info("skb allocation FAILED\n");
 		goto out;
 	}
 
-	skb_reserve(skb, 2);
 	skb_put(skb, buflen);
 	memcpy(skb->data, w_hdr, buflen);
 
