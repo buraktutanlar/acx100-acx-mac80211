@@ -405,7 +405,10 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw* ieee,
 
 int acx_op_set_tim(struct ieee80211_hw *hw,
 		struct ieee80211_sta *sta, bool set);
-		
+
+int acx111_set_default_key(acx_device_t *adev, u8 key_id);
+
+
 /* - 
  * BOM Helpers (Common)
  * -----
@@ -551,6 +554,7 @@ static inline struct ieee80211_hdr* acx_get_wlan_hdr(acx_device_t *adev,
  * - 
  * CMDs (Control Path)
  */
+
 /* - 
  * Init, Configuration (Control Path)
  * - 

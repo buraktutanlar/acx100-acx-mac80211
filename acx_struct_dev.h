@@ -447,6 +447,7 @@ struct acx_device {
 	u8		rate_supported[13];
 
 	/*** Encryption settings (WEP) ***/
+	u8 		default_key;
 	u32		auth_alg;		/* used in transmit_authen1 */
 	u8		wep_enabled;
 	u8		wep_restricted;
