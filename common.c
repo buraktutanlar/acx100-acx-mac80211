@@ -2337,6 +2337,7 @@ static int acx_update_rx_config(acx_device_t *adev)
 
 	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
+		log(L_INIT, "acx_update_rx_config: ACX_MODE_MONITOR\n");
 		adev->rx_config_1 = (u16) (0
 		   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
 		   /* | RX_CFG1_FILTER_SSID        */
@@ -2365,7 +2366,40 @@ static int acx_update_rx_config(acx_device_t *adev)
 		   | RX_CFG2_RCV_OTHER
 		   );
 		break;
+
+	case ACX_MODE_3_AP:
+		log(L_INIT, "acx_update_rx_config: ACX_MODE_3_AP\n");
+		adev->rx_config_1 = (u16) (0
+		   /* | RX_CFG1_INCLUDE_RXBUF_HDR */
+		   /* | RX_CFG1_FILTER_SSID       */
+		   /* | RX_CFG1_FILTER_BCAST      */
+		   /* | RX_CFG1_RCV_MC_ADDR1      */
+		   /* | RX_CFG1_RCV_MC_ADDR0      */
+		   /* | RX_CFG1_FILTER_ALL_MULTI  */
+		   /* | RX_CFG1_FILTER_BSSID      */
+		   | RX_CFG1_FILTER_MAC
+		   /* | RX_CFG1_RCV_PROMISCUOUS   */
+		   /* | RX_CFG1_INCLUDE_FCS       */
+		   /* | RX_CFG1_INCLUDE_PHY_HDR   */
+		   );
+		adev->rx_config_2 = (u16) (0
+		   | RX_CFG2_RCV_ASSOC_REQ
+		   | RX_CFG2_RCV_AUTH_FRAMES
+		   /*| RX_CFG2_RCV_BEACON_FRAMES  */
+		   | RX_CFG2_RCV_CONTENTION_FREE
+		   | RX_CFG2_RCV_CTRL_FRAMES
+		   | RX_CFG2_RCV_DATA_FRAMES
+		   /*| RX_CFG2_RCV_BROKEN_FRAMES  */
+		   | RX_CFG2_RCV_MGMT_FRAMES
+		   /* | RX_CFG2_RCV_PROBE_REQ     */
+		   | RX_CFG2_RCV_PROBE_RESP
+		   /*| RX_CFG2_RCV_ACK_FRAMES     */
+		   | RX_CFG2_RCV_OTHER
+		   );
+		break;
+
 	default:
+		log(L_INIT, "acx_update_rx_config: default\n");
 		adev->rx_config_1 = (u16) (0
 		   /* | RX_CFG1_INCLUDE_RXBUF_HDR  */
 		   /* | RX_CFG1_FILTER_SSID        */
@@ -2388,9 +2422,9 @@ static int acx_update_rx_config(acx_device_t *adev)
 		   | RX_CFG2_RCV_DATA_FRAMES
 		   /*| RX_CFG2_RCV_BROKEN_FRAMES   */
 		   | RX_CFG2_RCV_MGMT_FRAMES
-		   /* | RX_CFG2_RCV_PROBE_REQ */
+		   /* | RX_CFG2_RCV_PROBE_REQ      */
 		   | RX_CFG2_RCV_PROBE_RESP
-		   /*| RX_CFG2_RCV_ACK_FRAMES*/
+		   /*| RX_CFG2_RCV_ACK_FRAMES      */
 		   | RX_CFG2_RCV_OTHER
 		   );
 		break;
