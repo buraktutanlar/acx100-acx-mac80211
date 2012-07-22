@@ -4165,7 +4165,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	}
 
 	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
-	buflen = RXBUF_BYTES_USED(rxbuf) - ((u8*)w_hdr - (u8*)rxbuf);
+	buflen = RXBUF_BYTES_RCVD(adev, rxbuf);
 
 	/* Allocate our skb */
 	skb = dev_alloc_skb(buflen + 2);
