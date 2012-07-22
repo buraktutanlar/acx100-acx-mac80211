@@ -5221,6 +5221,10 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 	}
 
 	acx_update_mode(adev);
+
+	logf0(L_ANY, "Redoing cmd_join_bssid() after add_interface\n");
+	acx_cmd_join_bssid(adev, adev->bssid);
+
 	acx_debugfs_add_adev(adev);
 
 	pr_info("Virtual interface added (type: 0x%08X, MAC: %s)\n",
