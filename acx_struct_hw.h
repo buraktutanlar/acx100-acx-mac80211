@@ -109,10 +109,15 @@ typedef struct txhostdesc txhostdesc_t;
 #define DOT11RATEBYTE_54_G	(54*2)
 #define DOT11RATEBYTE_BASIC	0x80	/* flags rates included in basic rate set */
 
+/* Hw Tx-Queues */
+
 #define ACX100_NUM_HW_TX_QUEUES	1
 /* 4 traffic queues + 1 queue for unencrypted frames (e.g. mgmt-frames) */
 #define ACX111_NUM_HW_TX_QUEUES	5
 #define ACX111_MAX_NUM_HW_TX_QUEUES ACX111_NUM_HW_TX_QUEUES
+
+/* We foresee queue_id 0 for unencrypted frames, e.g. mgmt-frames */
+#define NOENC_QUEUE_ID	0
 
 /***********************************************************************
 ** BOM rxbuffer_t

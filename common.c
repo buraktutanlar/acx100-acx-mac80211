@@ -4334,19 +4334,26 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb)
 	tx_t *tx;
 	void *txbuf;
 	struct ieee80211_tx_info *ctl;
+	struct ieee80211_hdr *hdr;
 
-	int q=0;
+	/* Default queue_id for data-frames */
+	int queue_id=1;
 
 	ctl = IEEE80211_SKB_CB(skb);
+	hdr = (struct ieee80211_hdr*) skb->data;
 
-	tx = acx_alloc_tx(adev, skb->len, q);
+	/* Sent unencrypted frames (e.g. mgmt- and eapol-frames) on NOENC_QUEUE_ID */
+	if (!(hdr->frame_control & IEEE80211_FCTL_PROTECTED))
+		queue_id=NOENC_QUEUE_ID;
+
+	tx = acx_alloc_tx(adev, skb->len, queue_id);
 
 	if (unlikely(!tx)) {
 		logf0(L_BUFT, "No tx available\n");
 		return (-EBUSY);
 	}
 
-	txbuf = acx_get_txbuf(adev, tx, q);
+	txbuf = acx_get_txbuf(adev, tx, queue_id);
 
 	if (unlikely(!txbuf)) {
 		/* Card was removed */
@@ -4358,14 +4365,13 @@ int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb)
 		return (-ENXIO);
 	}
 
-	/* OW, 20100930: FIXME: Is this required for mem. txbuf is actually not containing to the data
-	 * for the, but actually "addr = acxmem_allocate_acx_txbuf_space in acxmem_tx_data().
+	/* FIXME: Is this required for mem ? txbuf is actually not containing to the data
+	 * for the device, but actually "addr = acxmem_allocate_acx_txbuf_space in acxmem_tx_data().
 	 */
-
 	memcpy(txbuf, skb->data, skb->len);
 
+	acx_tx_data(adev, tx, skb->len, ctl, skb, queue_id);
 
-	acx_tx_data(adev, tx, skb->len, ctl, skb, q);
 	adev->stats.tx_packets++;
 	adev->stats.tx_bytes += skb->len;
 
