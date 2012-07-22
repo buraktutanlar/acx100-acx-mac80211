@@ -1312,6 +1312,9 @@ void acx_set_defaults(acx_device_t *adev)
 		/* start with sensitivity level 2 out of 3: */
 		adev->sensitivity = 2;
 
+	/* Enable hw-encryption (normally by default enabled) */
+	acx_set_hw_encryption_on(adev);
+
 /* #define ENABLE_POWER_SAVE */
 #ifdef ENABLE_POWER_SAVE
 	adev->ps_wakeup_cfg = PS_CFG_ENABLE | PS_CFG_WAKEUP_ALL_BEAC;
