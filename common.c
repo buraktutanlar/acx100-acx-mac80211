@@ -34,6 +34,7 @@
 #include <linux/pci.h>
 #include <linux/nl80211.h>
 #include <linux/ieee80211.h>
+#include <linux/etherdevice.h>
 
 #include <net/mac80211.h>
 
@@ -5477,25 +5478,109 @@ int acx111_set_default_key(acx_device_t *adev, u8 key_id)
 	return res;
 }
 
+static int acx111_set_key_type(acx_device_t *adev, acx111WEPDefaultKey_t *key,
+                               struct ieee80211_key_conf *mac80211_key,
+                               const u8 *addr)
+{
+	switch (mac80211_key->cipher) {
+#if 0
+	case WLAN_CIPHER_SUITE_WEP40:
+	case WLAN_CIPHER_SUITE_WEP104:
+		if (is_broadcast_ether_addr(addr))
+			key->type = KEY_WEP_DEFAULT;
+		else
+			key->type = KEY_WEP_ADDR;
+
+		mac80211_key->hw_key_idx = mac80211_key->keyidx;
+		break;
+	case WLAN_CIPHER_SUITE_TKIP:
+		if (is_broadcast_ether_addr(addr))
+			key->type = KEY_TKIP_MIC_GROUP;
+		else
+			key->type = KEY_TKIP_MIC_PAIRWISE;
+
+		mac80211_key->hw_key_idx = mac80211_key->keyidx;
+		break;
+#endif
+	case WLAN_CIPHER_SUITE_CCMP:
+		if (is_broadcast_ether_addr(addr))
+			key->type = KEY_AES_GROUP;
+		else
+			key->type = KEY_AES_PAIRWISE;
+
+		break;
+	default:
+		log(L_INIT, "Unknown key cipher 0x%x", mac80211_key->cipher);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+
+static int acx111_set_key(acx_device_t *adev, enum set_key_cmd cmd,
+                          const u8 *addr, struct ieee80211_key_conf *key)
+{
+	int ret = -1;
+	acx111WEPDefaultKey_t dk;
+
+	memset(&dk, 0, sizeof(dk));
+
+	switch (cmd) {
+	case SET_KEY:
+		dk.action = cpu_to_le16(KEY_ADD_OR_REPLACE);
+		break;
+	case DISABLE_KEY:
+		dk.action = cpu_to_le16(KEY_REMOVE);
+		break;
+	default:
+		log(L_INIT, "Unsupported key cmd 0x%x", cmd);
+		break;
+	}
+
+	ret = acx111_set_key_type(adev, &dk, key, addr);
+	if (ret < 0) {
+		log(L_INIT, "Set KEY type failed");
+		return ret;
+	}
+
+	memcpy(dk.MacAddr, addr, ETH_ALEN);
+
+	dk.keySize = key->keylen;
+	dk.defaultKeyNum = key->keyidx; /* ignored when setting default key */
+	dk.index = 0;
+
+	memcpy(dk.key, key->key, dk.keySize);
+
+	ret = acx_issue_cmd(adev, ACX1xx_CMD_WEP_MGMT, &dk, sizeof(dk));
+
+	return ret;
+}
+
 int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
-		struct ieee80211_vif *vif, struct ieee80211_sta *sta,
-		struct ieee80211_key_conf *key)
+                   struct ieee80211_vif *vif, struct ieee80211_sta *sta,
+                   struct ieee80211_key_conf *key)
 {
 	struct acx_device *adev = ieee2adev(hw);
-	/* unsigned long flags; */
 	u8 algorithm;
-	/* u16 index; */
-	int err = -EINVAL;
+	int ret=0;
 
-	FN_ENTER;
+	const u8 *addr;
+	static const u8 bcast_addr[ETH_ALEN] =
+		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 	acx_sem_lock(adev);
 
-	/* OW Mac80211 SW crypto support:
-	 *
-	 * For the moment we do all crypto in sw with mac80211.
-	 * Cpu cycles are cheap, and acx100 can do only WEP in hw anyway.
-	 * TODO WEP hw support can still be added later, if required.
-	 */
+	addr = sta ? sta->addr : bcast_addr;
+
+	log(L_DEBUG, "cmd=%d\n", cmd);
+	log(L_DEBUG, "addr=" MACSTR, MAC(addr));
+	log(L_DEBUG, "key->: cipher=%08x, icv_len=%d, iv_len=%d, hw_key_idx=%d, "
+			"flags=%02x, keyidx=%d, keylen=%d\n", key->cipher, key->icv_len,
+	        key->iv_len, key->hw_key_idx, key->flags, key->keyidx,
+	        key->keylen);
+	if (acx_debug & L_DEBUG)
+		hexdump("key->: key", key->key, key->keylen);
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
         switch (key->alg) {
@@ -5513,21 +5598,26 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
                     algorithm = ACX_SEC_ALGO_WEP104;
                     log(L_INIT, "algorithm=%i: %s\n", "ACX_SEC_ALGO_WEP104");
                 }
-                /* OW Let's try WEP in mac80211 sw */
-                err = -EOPNOTSUPP;
+
+		acx_set_hw_encryption_off(adev);
+                ret = -EOPNOTSUPP;
                 break;
 #else
 	case WLAN_CIPHER_SUITE_WEP40:
 	        algorithm = ACX_SEC_ALGO_WEP;
                 log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_WEP");
-                err = -EOPNOTSUPP;
+
+                acx_set_hw_encryption_off(adev);
+                ret = -EOPNOTSUPP;
                 break;
 
         case WLAN_CIPHER_SUITE_WEP104:
                 algorithm = ACX_SEC_ALGO_WEP104;
                 log(L_INIT, "algorithm=%i: %s\n",
 			algorithm, "ACX_SEC_ALGO_WEP104");
-                err = -EOPNOTSUPP;
+
+                acx_set_hw_encryption_off(adev);
+                ret = -EOPNOTSUPP;
                 break;
 #endif
 
@@ -5539,7 +5629,8 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	        algorithm = ACX_SEC_ALGO_TKIP;
 	        log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_TKIP");
 
-	        err = -EOPNOTSUPP;
+	        acx_set_hw_encryption_off(adev);
+	        ret = -EOPNOTSUPP;
 	        break;
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
@@ -5549,67 +5640,22 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 #endif
 		algorithm = ACX_SEC_ALGO_AES;
 		log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_AES");
-		err = -EOPNOTSUPP;
+
+		acx_set_hw_encryption_on(adev);
+		acx111_set_key(adev, cmd, addr, key);
+		ret = 0;
 		break;
 
 	default:
-		FIXME();
 		algorithm = ACX_SEC_ALGO_NONE;
-		err = -EOPNOTSUPP;
+
+		acx_set_hw_encryption_off(adev);
+		ret = 0;
+		break;
 	}
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
-	return err;
-
-	/* OW Everything below this lines, doesn't matter anymore for the moment. */
-#if 0
-	index = (u8) (key->keyidx);
-	if (index >= ARRAY_SIZE(adev->key))
-		goto out;
-
-	acx_lock(adev, flags);
-
-	switch (cmd) {
-	case SET_KEY:
-		err = acx_key_write(adev, index, algorithm, key, addr);
-		if (err != -EINPROGRESS)
-			goto out_unlock;
-
-		key->hw_key_idx = index;
-
-		/* CLEAR_BIT(key->flags, IEEE80211_KEY_FORCE_SW_ENCRYPT); */
-		/* if (CHECK_BIT(key->flags, IEEE80211_KEY_DEFAULT_TX_KEY))
-		 adev->default_key_idx = index;*/
-
-		SET_BIT(key->flags, IEEE80211_KEY_FLAG_GENERATE_IV);
-		adev->key[index].enabled = 1;
-		err = 0;
-
-		break;
-
-	case DISABLE_KEY:
-		adev->key[index].enabled = 0;
-		err = 0;
-		break;
-		/* case ENABLE_COMPRESSION:
-		 case DISABLE_COMPRESSION:
-		 err = 0;
-		 break; */
-	}
-
-	out_unlock:
-	acx_unlock(adev, flags);
-
-	if (adev->wep_enabled) {
-		SET_BIT(adev->set_mask, GETSET_WEP);
-		acx_update_card_settings(adev);
-		/* acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_CARD_CFG); */
-	}
-out:
-	FN_EXIT0;
-	return err;
-#endif
+	return ret;
 }
 
 void acx_op_configure_filter(struct ieee80211_hw *hw,
