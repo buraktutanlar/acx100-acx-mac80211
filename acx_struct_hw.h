@@ -1343,6 +1343,7 @@ typedef struct acx_ie_generic {
  * Code for WEP key setting in HW should be taken from 20080210 version.
  */
 #define ACX_SEC_KEYSIZE                     16
+
 /* Security algorithms. */
 enum {
         ACX_SEC_ALG,
@@ -1353,6 +1354,25 @@ enum {
         ACX_SEC_ALGO_WEP104,
         ACX_SEC_ALGO_TKIP,
 };
+
+/* Based on wl1251 definitions, TBC: ToBeCheck (not yet verified) */
+enum acx111_cmd_key_type {
+	/* TBC: KEY_WEP_DEFAULT       = 0, */
+	/* TBC: KEY_WEP_ADDR          = 1, */
+	KEY_AES_GROUP         	 = 4,
+	KEY_AES_PAIRWISE      	 = 5,
+	/* TBC: KEY_WEP_GROUP         = 6, */
+	/* TBC: KEY_TKIP_MIC_GROUP    = 10,*/
+	/* TBC: KEY_TKIP_MIC_PAIRWISE = 11,*/
+};
+
+enum acx111_cmd_key_action {
+	KEY_ADD_OR_REPLACE = 1,
+	KEY_REMOVE         = 2,
+	KEY_SET_ID         = 3,
+	MAX_KEY_ACTION     = 0xffff,
+};
+
 
 /***********************************************************************
 */
