@@ -467,6 +467,9 @@ struct acx_device {
 	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
 
+	/* debugfs */
+	struct dentry	*debugfs_dir;
+
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
@@ -532,7 +535,6 @@ struct acx_device {
 	int		bulkoutep;	/* bulk-out endpoint */
 	int		rxtruncsize;
 #endif
-	struct dentry	*debugfs_dir;
 };
 /* --- */
 
