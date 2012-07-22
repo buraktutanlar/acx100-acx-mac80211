@@ -2808,12 +2808,10 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		goto end;
 	 */
 
-	hostdesc1 = acx_get_txhostdesc(adev, txdesc);
-
-	/* FIXME Cleanup?: wireless_header = (struct ieee80211_hdr *) hostdesc1->data; */
+	hostdesc1 = acx_get_txhostdesc(adev, txdesc, queue_id);
 
 	/* wlhdr_len = ieee80211_hdrlen(le16_to_cpu(wireless_header->frame_control)); */
-	wlhdr_len = WLAN_HDR_A3_LEN;
+	wlhdr_len = BUF_LEN_HOSTDESC1;
 
 	/* modify flag status in separate variable to be able to write
 	 * it back in one big swoop later (also in order to have less
@@ -2832,7 +2830,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 		write_slavemem16(adev, (uintptr_t)&(txdesc->total_length),
 				cpu_to_le16(len));
 
-	hostdesc2->hd.length = cpu_to_le16(len - wlhdr_len);
+	hostdesc2->hd.length = (len - wlhdr_len) > 0 ? cpu_to_le16(len - wlhdr_len) : 0;
 
 	/* DON'T simply set Ctl field to 0 here globally, it needs to
 	 * maintain a consistent flag status (those are state
@@ -2977,7 +2975,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	}
 	/* write back modified flags */
 	/* At this point Ctl_8 should just be FIRSTFRAG */
-	CLEAR_BIT(Ctl2_8, DESC_CTL2_WEP);
+
 	if (IS_MEM(adev)) {
 		write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl2_8), Ctl2_8);
 		write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), Ctl_8);
