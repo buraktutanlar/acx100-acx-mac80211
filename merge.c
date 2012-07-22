@@ -2334,7 +2334,7 @@ static void acx_process_rxdesc(acx_device_t *adev)
 	/* now process descriptors, starting with the first we figured out */
 	if (IS_PCI(adev)) {
 		while (1) {
-			log(L_BUFR, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
+			log(L_BUF, "rx: tail=%u Ctl_16=%04X Status=%08X\n",
 				tail, hostdesc->hd.Ctl_16, hostdesc->Status);
 
 			acx_process_rxbuf(adev, hostdesc->data);
