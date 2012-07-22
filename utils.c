@@ -45,3 +45,13 @@ void acx_dump_bytes(const void *data, int num)
 	}
 
 }
+
+// OWI: Maybe could replace acx_dump_bytes() ? ... avail in all kernel versions ?
+void hexdump(char *note, unsigned char *buf, unsigned int len)
+{
+               printk(KERN_INFO "%s:\n", note);
+               print_hex_dump(KERN_CONT, "", DUMP_PREFIX_OFFSET, 16, 1, buf, len,
+                       false);
+}
+
+
