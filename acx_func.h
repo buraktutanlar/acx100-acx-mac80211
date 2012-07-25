@@ -256,11 +256,9 @@ firmware_image_t *acx_read_fw(struct device *dev,
 		const char *file, u32 *size);
 void acx_parse_configoption(acx_device_t *adev,
 		const acx111_ie_configoption_t *pcfg);
-/*
- * int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
- * int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
- */
 
+int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
+int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 /* int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid); */
 
@@ -273,19 +271,6 @@ void acx_start(acx_device_t * adev);
 int acx_setup_modes(acx_device_t *adev);
 /* int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
  * void acx_update_capabilities(acx_device_t *adev);
- */
-
-/* BOM Template (Common:Control Path)
- * -----
- */
-int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
-
-/* BOM Recalibration (Common:Control Path)
- * -----
- */
-
-/* BOM Other (Common:Control Path)
- * -----
  */
 
 /* BOM Proc, Debug (Common)

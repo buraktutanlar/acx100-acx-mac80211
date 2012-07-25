@@ -56,6 +56,7 @@
 #include "ie.h"
 #include "init.h"
 #include "utils.h"
+#include "cardsetting.h"
 
 /*
  * BOM Config

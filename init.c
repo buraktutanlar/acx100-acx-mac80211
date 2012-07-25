@@ -8,6 +8,7 @@
 #include "cmd.h"
 #include "ie.h"
 #include "init.h"
+#include "cardsetting.h"
 
 #define ACX111_PERCENT(percent) ((percent)/5)
 

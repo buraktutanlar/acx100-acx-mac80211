@@ -43,6 +43,7 @@
 #include "cmd.h"
 #include "ie.h"
 #include "utils.h"
+#include "cardsetting.h"
 
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
