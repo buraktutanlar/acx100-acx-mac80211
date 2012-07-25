@@ -207,6 +207,7 @@ struct ieee80211_rate acx111_rates[] = {
 	{ .bitrate = 480, .hw_value = RATE111_48, },
 	{ .bitrate = 540, .hw_value = RATE111_54, },
 };
+const int acx111_rates_sizeof=ARRAY_SIZE(acx111_rates);
 
 static struct ieee80211_channel channels[] = {
 	{ .center_freq = 2412, .hw_value = 1, },

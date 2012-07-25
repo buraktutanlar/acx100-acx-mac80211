@@ -8,6 +8,7 @@
 #include "tx.h"
 
 extern struct ieee80211_rate acx111_rates[];
+extern const int acx111_rates_sizeof;
 
 static int acx_is_hw_tx_queue_stop_limit(acx_device_t *adev)
 {
@@ -191,7 +192,7 @@ int acx_rate111_hwvalue_to_rateindex(u16 hw_value)
 {
 	int i, r=-1;
 
-	for (i = 0; i < ARRAY_SIZE(acx111_rates); i++) {
+	for (i = 0; i < acx111_rates_sizeof; i++) {
 		if (acx111_rates[i].hw_value == hw_value) {
 			r = i;
 			break;
