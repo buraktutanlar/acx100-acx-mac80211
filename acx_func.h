@@ -402,12 +402,6 @@ void acx_mwait(int ms);
  * void great_inquisitor(acx_device_t *adev);
  */
 
-#if !ACX_DEBUG
-static inline const char *acx_get_packet_type_string(u16 fc) { return ""; }
-#else
-const char *acx_get_packet_type_string(u16 fc);
-#endif
-
 /* MAC address helpers
  * ---
  */
