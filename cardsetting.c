@@ -1250,43 +1250,6 @@ static int acx100_update_wep_options(acx_device_t *adev)
 #endif
 
 
-/*
- * acx_set_tim_template
- *
- * FIXME: In full blown driver we will regularly update partial
- * virtual bitmap by calling this function (it can be done by irq
- * handler on each DTIM irq or by timer...)
-
-[802.11 7.3.2.6] TIM information element:
-- 1 EID
-- 1 Length
-1 1 DTIM Count
-    indicates how many beacons (including this) appear before next DTIM
-    (0=this one is a DTIM)
-2 1 DTIM Period
-    number of beacons between successive DTIMs
-    (0=reserved, 1=all TIMs are DTIMs, 2=every other, etc)
-3 1 Bitmap Control
-    bit0: Traffic Indicator bit associated with Assoc ID 0 (Bcast AID?)
-    set to 1 in TIM elements with a value of 0 in the DTIM Count field
-    when one or more broadcast or multicast frames are buffered at the AP.
-    bit1-7: Bitmap Offset (logically Bitmap_Offset = Bitmap_Control & 0xFE).
-4 n Partial Virtual Bitmap
-    Visible part of traffic-indication bitmap.
-    Full bitmap consists of 2008 bits (251 octets) such that bit number N
-    (0<=N<=2007) in the bitmap corresponds to bit number (N mod 8)
-    in octet number N/8 where the low-order bit of each octet is bit0,
-    and the high order bit is bit7.
-    Each set bit in virtual bitmap corresponds to traffic buffered by AP
-    for a specific station (with corresponding AID?).
-    Partial Virtual Bitmap shows a part of bitmap which has non-zero.
-    Bitmap Offset is a number of skipped zero octets (see above).
-    'Missing' octets at the tail are also assumed to be zero.
-    Example: Length=6, Bitmap_Offset=2, Partial_Virtual_Bitmap=55 55 55
-    This means that traffic-indication bitmap is:
-    00000000 00000000 01010101 01010101 01010101 00000000 00000000...
-    (is bit0 in the map is always 0 and real value is in Bitmap Control bit0?)
-*/
 int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 {
 	acx_template_tim_t templ;
