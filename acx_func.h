@@ -176,8 +176,6 @@ void log_fn_exitv(const char *funcname, int v);
  * void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
  */
 
-const char *acx_cmd_status_str(unsigned int state);
-
 #define FN_ENTER				\
 	do { \
 		if (unlikely(acx_debug & L_FUNC)) { \

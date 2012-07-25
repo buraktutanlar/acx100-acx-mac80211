@@ -440,31 +440,6 @@ void log_fn_exitv(const char *funcname, int v)
 }
 #endif /* ACX_DEBUG > 1 */
 
-const char *acx_cmd_status_str(unsigned int state)
-{
-	static const char *const cmd_error_strings[] = {
-		"Idle",
-		"Success",
-		"Unknown Command",
-		"Invalid Information Element",
-		"Channel rejected",
-		"Channel invalid in current regulatory domain",
-		"MAC invalid",
-		"Command rejected (read-only information element)",
-		"Command rejected",
-		"Already asleep",
-		"TX in progress",
-		"Already awake",
-		"Write only",
-		"RX in progress",
-		"Invalid parameter",
-		"Scan in progress",
-		"Failed"
-	};
-	return state < ARRAY_SIZE(cmd_error_strings) ?
-	    cmd_error_strings[state] : "?";
-}
-
 /*
  * BOM Firmware, EEPROM, Phy
  * ==================================================

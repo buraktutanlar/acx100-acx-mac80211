@@ -48,6 +48,31 @@ const struct acx_cmd_desc acx_cmd_descs[] = {
         DEF_CMD(ACX1FF_CMD_CONTROL_DBG_TRACE, 	0x21), /* new firmware? TNETW1450? */
 };
 
+const char *acx_cmd_status_str(unsigned int state)
+{
+	static const char *const cmd_error_strings[] = {
+		"Idle",
+		"Success",
+		"Unknown Command",
+		"Invalid Information Element",
+		"Channel rejected",
+		"Channel invalid in current regulatory domain",
+		"MAC invalid",
+		"Command rejected (read-only information element)",
+		"Command rejected",
+		"Already asleep",
+		"TX in progress",
+		"Already awake",
+		"Write only",
+		"RX in progress",
+		"Invalid parameter",
+		"Scan in progress",
+		"Failed"
+	};
+	return state < ARRAY_SIZE(cmd_error_strings) ?
+	    cmd_error_strings[state] : "?";
+}
+
 int acx_issue_cmd_timeout(acx_device_t *adev, enum acx_cmd cmd, void *param,
 		unsigned len, unsigned timeout)
 {
