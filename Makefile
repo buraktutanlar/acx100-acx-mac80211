@@ -31,7 +31,7 @@ ifneq ($(KERNELRELEASE),)
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
 	acx-mac80211-objs := $(acx-mac80211-obj-y) $(acx-mac80211-obj-m) 
-	acx-mac80211-objs += common.o merge.o debugfs.o cmd.o ie.o init.o utils.o cardsetting.o tx.o rx.o
+	acx-mac80211-objs += common.o merge.o debugfs.o cmd.o ie.o init.o utils.o cardsetting.o tx.o rx.o debug.o
 
 else
 # Otherwise we were called directly from the command line: the kernel build
