@@ -47,6 +47,7 @@
 #include "ie.h"
 #include "utils.h"
 #include "cardsetting.h"
+#include "main.h"
 
 /*
  * BOM Config
@@ -169,9 +170,6 @@ static void __exit acx_cleanup_module(void);
  * BOM Defines, static vars, etc.
  * ==================================================
  */
-
-/* minutes to wait until next radio recalibration: */
-#define RECALIB_PAUSE	5
 
 /* BOM Rate and channel definition
  * ---
