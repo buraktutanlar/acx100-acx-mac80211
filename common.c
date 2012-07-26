@@ -61,15 +61,6 @@
  * ==================================================
  */
 
-/* Locking */
-#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
-void acx_lock_unhold(void);
-void acx_sem_unhold(void);
-void acx_lock_debug(acx_device_t *adev, const char *where);
-void acx_unlock_debug(acx_device_t *adev, const char *where);
-static inline const char *acx_sanitize_str(const char *s);
-#endif
-
 /* Logging */
 void log_fn_enter(const char *funcname);
 void log_fn_exit(const char *funcname);
@@ -106,85 +97,6 @@ int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee
 static int __init acx_init_module(void);
 static void __exit acx_cleanup_module(void);
 
-
-
-/*
- * BOM Locking
- * ==================================================
- */
-#define DEBUG_TSC 0
-#if DEBUG_TSC && defined(CONFIG_X86)
-#define TIMESTAMP(d) unsigned long d; rdtscl(d)
-#else
-#define TIMESTAMP(d) unsigned long d = jiffies
-#endif
-
-#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
-#ifdef PARANOID_LOCKING
-static unsigned max_lock_time;
-static unsigned max_sem_time;
-
-/* Obvious or linux kernel specific derived code follows: */
-
-void acx_lock_unhold()
-{
-	max_lock_time = 0;
-}
-
-void acx_sem_unhold()
-{
-	max_sem_time = 0;
-}
-
-static inline const char *acx_sanitize_str(const char *s)
-{
-	const char *t = strrchr(s, '/');
-	if (t)
-		return t + 1;
-	return s;
-}
-
-void acx_lock_debug(acx_device_t * adev, const char *where)
-{
-	unsigned int count = 100 * 1000 * 1000;
-	TIMESTAMP(lock_start);
-	where = acx_sanitize_str(where);
-	while (--count) {
-		if (!spin_is_locked(&adev->spinlock))
-			break;
-		cpu_relax();
-	}
-	if (!count) {
-		pr_emerg("LOCKUP: already taken at %s!\n",
-		       adev->last_lock);
-		BUG();
-	}
-	adev->last_lock = where;
-	adev->lock_time = lock_start;
-}
-
-void acx_unlock_debug(acx_device_t * adev, const char *where)
-{
-#ifdef SMP
-	if (!spin_is_locked(&adev->spinlock)) {
-		where = acx_sanitize_str(where);
-		pr_emerg("STRAY UNLOCK at %s!\n", where);
-		BUG();
-	}
-#endif
-	if (acx_debug & L_LOCK) {
-		TIMESTAMP(diff);
-		diff -= adev->lock_time;
-		if (diff > max_lock_time) {
-			where = acx_sanitize_str(where);
-			pr_notice("max lock hold time %ld CPU ticks from %s "
-			       "to %s\n", diff, adev->last_lock, where);
-			max_lock_time = diff;
-		}
-	}
-}
-#endif /* PARANOID_LOCKING */
-#endif
 
 /*
  * BOM CMDs (Control Path)
