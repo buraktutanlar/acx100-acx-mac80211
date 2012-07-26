@@ -167,34 +167,12 @@ void acx_lock_unhold(void);
 
 /* Debug build */
 #if ACX_DEBUG
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exitv(const char *funcname, int v);
+
 /* 
  * char *acx_print_mac(char *buf, const u8 *mac);
  * void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
  * void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
  */
-
-#define FN_ENTER				\
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_enter(__func__); \
-		} \
-	} while (0)
-
-#define FN_EXIT1(v) \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exitv(__func__, v); \
-		} \
-	} while (0)
-#define FN_EXIT0 \
-	do { \
-		if (unlikely(acx_debug & L_FUNC)) { \
-			log_fn_exit(__func__); \
-		} \
-	} while (0)
 
 #define log(chan, args...) \
 	do { \
@@ -213,10 +191,6 @@ void log_fn_exitv(const char *funcname, int v);
  * OW 20100405: An none-debug build is currently probably broken
  */
 #else
-
-#define FN_ENTER do {} while(0)
-#define FN_EXIT1(v) do {} while(0)
-#define FN_EXIT0 do {} while(0)
 
 #define log(chan, args...)
 /* Standard way of log flood prevention */

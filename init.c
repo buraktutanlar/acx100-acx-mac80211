@@ -93,7 +93,7 @@ static int acx_init_packet_templates(acx_device_t *adev)
 	acx_ie_memmap_t mm;	/* ACX100 only */
 	int result = NOT_OK;
 
-	FN_ENTER;
+
 
 	log(L_DEBUG | L_INIT, "initializing max packet templates\n");
 
@@ -159,7 +159,7 @@ failed:
 	pr_info("%s: FAILED\n", wiphy_name(adev->ieee->wiphy));
 
 success:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -285,7 +285,7 @@ static int acx100_init_wep(acx_device_t * adev)
 	acx_ie_memmap_t pt;
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 
 	if (OK != acx_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP))
 		goto fail;
@@ -364,7 +364,7 @@ static int acx100_init_wep(acx_device_t * adev)
 	res = OK;
 
 fail:
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -379,7 +379,7 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 	int TxBlockNum;
 	int TotalTxBlockSize;
 
-	FN_ENTER;
+
 
 	/* Let's see if we can follow this:
 	   first we select our memory block size (which I think is
@@ -481,10 +481,10 @@ static int acx100_init_memory_pools(acx_device_t *adev,
 	adev->acx_txbuf_numblocks = MemoryConfigOption.TxBlockNum;
 #endif
 
-	FN_EXIT1(OK);
+
 	return OK;
 bad:
-	FN_EXIT1(NOT_OK);
+
 	return NOT_OK;
 }
 

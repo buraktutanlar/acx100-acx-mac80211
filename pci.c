@@ -171,7 +171,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	u16 cmd_status=-1;
 	unsigned long timeout;
 
-	FN_ENTER;
+
 
 	devname = wiphy_name(adev->ieee->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
@@ -333,7 +333,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	log(L_DEBUG, "%s: took %ld jiffies to complete\n",
 		cmdstr, jiffies - start);
 
-	FN_EXIT1(OK);
+
 	return OK;
 
      bad:
@@ -346,7 +346,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		acx_cmd_status_str(cmd_status)
 	);
 	/* dump_stack(); */
-	FN_EXIT1(NOT_OK);
+
 
 	return NOT_OK;
 }
@@ -371,7 +371,7 @@ void acxpci_reset_mac(acx_device_t * adev)
 {
 	u16 temp;
 
-	FN_ENTER;
+
 
 	/* halt eCPU */
 	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
@@ -392,7 +392,7 @@ void acxpci_reset_mac(acx_device_t * adev)
 	write_reg16(adev, IO_ACX_EE_START, temp);
 	write_flush(adev);
 
-	FN_EXIT0;
+
 }
 
 /*
@@ -438,7 +438,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	int i;
 	int queue_id;
 
-	FN_ENTER;
+
 
 	seq_printf(file, "** Rx buf **\n");
 	rxhostdesc = adev->hw_rx_queue.host.rxstart;
@@ -499,7 +499,7 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 		           (unsigned long long)adev->hw_rx_queue.buf.phy);
 	}
 
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -528,7 +528,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev, int queue_id)
 	unsigned head;
 	u8 ctl8;
 
-	FN_ENTER;
+
 
 	if (unlikely(!adev->hw_tx_queue[queue_id].free)) {
 		pr_acx("BUG: no free txdesc left\n");
@@ -562,7 +562,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev, int queue_id)
 	/* returning current descriptor, so advance to next free one */
 	adev->hw_tx_queue[queue_id].head = (head + 1) % TX_CNT;
 end:
-	FN_EXIT0;
+
 
 	return (tx_t *) txdesc;
 }
@@ -999,7 +999,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	u8 chip_type;
 	struct ieee80211_hw *ieee;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
@@ -1335,7 +1335,7 @@ fail_ieee80211_alloc_hw:
 	ieee80211_free_hw(ieee);
 	
 done:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -1355,11 +1355,11 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long mem_region1, mem_region2;
 
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
-		goto end_no_lock;
+		return;
 	}
 
 	/* Unregister ieee80211 device */
@@ -1444,8 +1444,6 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
-	end_no_lock:
-	FN_EXIT0;
 }
 
 
@@ -1458,7 +1456,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 	pr_acx("suspend handler is experimental!\n");
 	pr_acx("sus: dev %p\n", hw);
 
@@ -1480,7 +1478,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	pci_set_power_state(pdev, PCI_D3hot);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -1489,7 +1487,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 
 	pr_acx("resume handler is experimental!\n");
 	pr_acx("rsm: got dev %p\n", hw);
@@ -1529,7 +1527,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
       end_unlock:
 	acx_sem_unlock(adev);
 	/* we need to return OK here anyway, right? */
-	FN_EXIT0;
+
 	return OK;
 }
 #endif /* CONFIG_PM */
@@ -1676,7 +1674,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
@@ -1904,7 +1902,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
     fail_vlynq_ieee80211_alloc_hw:
 
 	done:
-		FN_EXIT1(result);
+
 
 	return result;
 }
@@ -1913,11 +1911,11 @@ static void vlynq_remove(struct vlynq_device *vdev)
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
 	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
-		goto end_no_lock;
+		return;
 	}
 
 	/* Unregister ieee80211 device */
@@ -1968,8 +1966,6 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	end_no_lock:
-	FN_EXIT0;
 }
 
 static struct vlynq_driver vlynq_acx = {
@@ -1990,7 +1986,7 @@ int __init acxpci_init_module(void)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	pr_acx(IO_COMPILE_NOTE);
@@ -2006,7 +2002,7 @@ int __init acxpci_init_module(void)
 	if (res)
 		pr_err("can't register pci/vlynq driver\n");
 
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -2019,7 +2015,7 @@ int __init acxpci_init_module(void)
  */
 void __exit acxpci_cleanup_module(void)
 {
-	FN_ENTER;
+
 
 #if defined(CONFIG_PCI)
 	pci_unregister_driver(&acxpci_driver);
@@ -2028,5 +2024,5 @@ void __exit acxpci_cleanup_module(void)
 #endif
 	log(L_INIT,
 	    "acxpci: PCI module unloaded\n");
-	FN_EXIT0;
+
 }

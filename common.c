@@ -187,71 +187,6 @@ void acx_unlock_debug(acx_device_t * adev, const char *where)
 #endif
 
 /*
- * BOM Logging
- * ==================================================
- */
-
-/* ----- */
-#if ACX_DEBUG > 1
-
-static int acx_debug_func_indent;
-#define ACX_DEBUG_FUNC_INDENT_INCREMENT 2
-static const char acx_debug_spaces[] = "          " "          ";	/* Nx10 spaces */
-
-void log_fn_enter(const char *funcname)
-{
-	int indent;
-	TIMESTAMP(d);
-
-	indent = acx_debug_func_indent;
-	if (indent >= sizeof(acx_debug_spaces))
-		indent = sizeof(acx_debug_spaces) - 1;
-
-	pr_info("%08ld %s==> %s\n", d % 100000000,
-		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
-		funcname);
-
-	acx_debug_func_indent += ACX_DEBUG_FUNC_INDENT_INCREMENT;
-}
-
-void log_fn_exit(const char *funcname)
-{
-	int indent;
-	TIMESTAMP(d);
-
-	/* OW Handle underflow */
-	if (acx_debug_func_indent >= ACX_DEBUG_FUNC_INDENT_INCREMENT)
-		acx_debug_func_indent -= ACX_DEBUG_FUNC_INDENT_INCREMENT;
-	else
-		acx_debug_func_indent = 0;
-
-	indent = acx_debug_func_indent;
-	if (indent >= sizeof(acx_debug_spaces))
-		indent = sizeof(acx_debug_spaces) - 1;
-
-	pr_info(" %08ld %s<== %s\n", d % 100000000,
-		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
-		funcname);
-}
-
-void log_fn_exitv(const char *funcname, int v)
-{
-	int indent;
-	TIMESTAMP(d);
-
-	acx_debug_func_indent -= ACX_DEBUG_FUNC_INDENT_INCREMENT;
-
-	indent = acx_debug_func_indent;
-	if (indent >= sizeof(acx_debug_spaces))
-		indent = sizeof(acx_debug_spaces) - 1;
-
-	pr_info("%08ld %s<== %s: %08X\n", d % 100000000,
-		acx_debug_spaces + (sizeof(acx_debug_spaces) - 1) - indent,
-		funcname, v);
-}
-#endif /* ACX_DEBUG > 1 */
-
-/*
  * BOM CMDs (Control Path)
  * ==================================================
  */
@@ -260,13 +195,13 @@ void log_fn_exitv(const char *funcname, int v)
 int acx_net_reset(struct ieee80211_hw *ieee)
 {
 	acx_device_t *adev = ieee2adev(ieee);
-	FN_ENTER;
+
 	if (IS_PCI(adev) || IS_MEM(adev))
 		acx_reset_dev(adev);
 	else
 		TODO();
 
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -430,9 +365,9 @@ int acx111_set_default_key(acx_device_t *adev, u8 key_id)
  */
 void acx_mwait(int ms)
 {
-	FN_ENTER;
+
 	msleep(ms);
-	FN_EXIT0;
+
 }
 
 
@@ -447,7 +382,7 @@ void great_inquisitor(acx_device_t * adev)
 	} ACX_PACKED ie;
 	u16 type;
 
-	FN_ENTER;
+
 
 	/* 0..0x20, 0x1000..0x1020 */
 	for (type = 0; type <= 0x1020; type++) {
@@ -457,7 +392,7 @@ void great_inquisitor(acx_device_t * adev)
 		ie.len = cpu_to_le16(sizeof(ie) - 4);
 		acx_issue_cmd(adev, ACX1xx_CMD_INTERROGATE, &ie, sizeof(ie));
 	}
-	FN_EXIT0;
+
 }
 #endif
 

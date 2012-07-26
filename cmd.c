@@ -137,7 +137,7 @@ int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type)
 	const u16 len = acx_ie_descs[type].len;
 
 
-	FN_ENTER;
+
 
 	/* FIXME: no check whether this exceeds the array yet.
 	 * We should probably remember the number of entries... */
@@ -157,7 +157,7 @@ int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type)
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -189,7 +189,7 @@ int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         if (mac_is_zero(bssid))
                 return OK;
 
-        FN_ENTER;
+
 
         dtim_interval = (ACX_MODE_0_ADHOC == adev->mode) ?
                         1 : adev->dtim_interval;
@@ -251,7 +251,7 @@ int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         acxlog_mac(L_ASSOC|L_DEBUG, "JoinBSSID MAC:", adev->bssid, "\n");
 
 	/* acx_update_capabilities(adev); */
-        FN_EXIT0;
+
         return res;
 }
 

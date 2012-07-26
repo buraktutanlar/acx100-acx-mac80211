@@ -19,7 +19,7 @@ void acx_get_firmware_version(acx_device_t * adev)
 	const char *num;
 	char c;
 
-	FN_ENTER;
+
 
 	memset(fw.fw_id, 'E', FW_ID_SIZE);
 	acx_interrogate(adev, &fw, ACX1xx_IE_FWREV);
@@ -88,7 +88,7 @@ void acx_get_firmware_version(acx_device_t * adev)
 			"please report\n", adev->firmware_id);
 		break;
 	}
-	FN_EXIT0;
+
 }
 
 /*
@@ -100,7 +100,7 @@ void acx_display_hardware_details(acx_device_t *adev)
 {
 	const char *radio_str, *form_str;
 
-	FN_ENTER;
+
 
 	switch (adev->radio_type) {
 	case RADIO_0D_MAXIM_MAX2820:
@@ -164,7 +164,7 @@ void acx_display_hardware_details(acx_device_t *adev)
 	       adev->form_factor, form_str, adev->eeprom_version,
 	       adev->firmware_version);
 
-	FN_EXIT0;
+
 }
 
 /*

@@ -46,7 +46,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	fw_stats_aes_t *aes = NULL;
 	fw_stats_event_t *evt = NULL;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	if (IS_PCI(adev))
@@ -104,7 +104,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 
 	fw_stats = kzalloc(sizeof(*fw_stats), GFP_KERNEL);
 	if (!fw_stats) {
-		FN_EXIT1(0);
+
 		return 0;
 	}
 	st = (u8 *) fw_stats;
@@ -391,7 +391,7 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	kfree(fw_stats);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -410,7 +410,7 @@ static ssize_t acx_proc_write_diag(struct file *file,
 	unsigned int val;
 	size_t size, len;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	len = min(count, sizeof(buf) - 1);
@@ -459,7 +459,7 @@ static ssize_t acx_proc_write_diag(struct file *file,
 
 exit_unlock:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -478,7 +478,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t*) file->private;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	seq_printf(file,
@@ -499,7 +499,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v)
 		adev->firmware_version, adev->firmware_numver);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -510,7 +510,7 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v)
 	int length;
 	char *buf, *p;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	if (IS_PCI(adev) || IS_MEM(adev))
@@ -524,7 +524,7 @@ static int acx_proc_show_eeprom(struct seq_file *file, void *v)
 	kfree(buf);
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -537,7 +537,7 @@ static int acx_proc_show_phy(struct seq_file *file, void *v)
 	/* OW Hopefully enough */
 	const int buf_size = 1024*64;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	buf = kmalloc(buf_size, GFP_KERNEL);
@@ -562,19 +562,19 @@ static int acx_proc_show_phy(struct seq_file *file, void *v)
 	kfree(buf);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 
 	return 0;
 }
 
 static int acx_proc_show_debug(struct seq_file *file, void *v)
 {
-	FN_ENTER;
+
 	/* No sem locking required, since debug is global for all devices */
 
 	seq_printf(file, "acx_debug: 0x%04x\n", acx_debug);
 
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -594,7 +594,7 @@ static ssize_t acx_proc_write_debug(struct file *file,
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
 
-	FN_ENTER;
+
 	/* No sem locking required, since debug is global for all devices */
 
 	if (count == size) {
@@ -604,7 +604,7 @@ static ssize_t acx_proc_write_debug(struct file *file,
 
 	log(L_ANY, "acx_debug=0x%04x\n", acx_debug);
 
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -612,14 +612,14 @@ static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	acx_get_sensitivity(adev);
 	seq_printf(file, "acx_sensitivity: %d\n", adev->sensitivity);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -636,7 +636,7 @@ static ssize_t acx_proc_write_sensitivity(struct file *file,
 	unsigned long val;
 	size_t size, len;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	len = min(count, sizeof(buf) - 1);
@@ -656,7 +656,7 @@ static ssize_t acx_proc_write_sensitivity(struct file *file,
 
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -664,14 +664,14 @@ static int acx_proc_show_tx_level(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	acx1xx_get_tx_level(adev);
 	seq_printf(file, "tx_level_dbm: %d\n", adev->tx_level_dbm);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -687,7 +687,7 @@ static ssize_t acx111_proc_write_tx_level(struct file *file,
 	unsigned long val;
 	size_t size, len;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	len = min(count, sizeof(buf) - 1);
@@ -707,7 +707,7 @@ static ssize_t acx111_proc_write_tx_level(struct file *file,
 
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -715,14 +715,14 @@ static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	acx_get_reg_domain(adev);
 	seq_printf(file, "reg_dom_id: 0x%02x\n", adev->reg_dom_id);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -738,7 +738,7 @@ static ssize_t acx_proc_write_reg_domain(struct file *file,
 	unsigned long val;
 	size_t size, len;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	len = min(count, sizeof(buf) - 1);
@@ -757,7 +757,7 @@ static ssize_t acx_proc_write_reg_domain(struct file *file,
 
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -765,7 +765,7 @@ static int acx_proc_show_antenna(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	acx1xx_get_antenna(adev);
@@ -773,7 +773,7 @@ static int acx_proc_show_antenna(struct seq_file *file, void *v)
 		adev->antenna[0], adev->antenna[1]);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -790,7 +790,7 @@ static ssize_t acx_proc_write_antenna(struct file *file,
 	u8 val0, val1;
 	size_t size, len;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	len = min(count, sizeof(buf) - 1);
@@ -811,7 +811,7 @@ static ssize_t acx_proc_write_antenna(struct file *file,
 
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return ret;
 }
 
@@ -892,7 +892,7 @@ int acx_proc_register_entries(struct ieee80211_hw *hw)
 	int i;
 	struct proc_dir_entry *pe;
 
-	FN_ENTER;
+
 
 	/* Sub-dir for this acx_phy[0-9] instance */
 
@@ -929,7 +929,7 @@ int acx_proc_register_entries(struct ieee80211_hw *hw)
 		}
 		pe->data = adev;
 	}
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -940,7 +940,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 	char procbuf2[80];
 	int i;
 
-	FN_ENTER;
+
 
 	/* Subdir for this acx instance */
 	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s",
@@ -954,7 +954,7 @@ int acx_proc_unregister_entries(struct ieee80211_hw *hw)
 	}
 	remove_proc_entry(procbuf2, NULL);
 
-	FN_EXIT0;
+
 	return OK;
 }
 #else

@@ -101,11 +101,11 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	int buflen;
 	int level;
 
-	FN_ENTER;
+
 
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		pr_info("asked to receive a packet but the interface is down??\n");
-		goto out;
+		return;
 	}
 
 	w_hdr = acx_get_wlan_hdr(adev, rxbuf);
@@ -115,7 +115,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	skb = dev_alloc_skb(buflen);
 	if (!skb) {
 		pr_info("skb allocation FAILED\n");
-		goto out;
+		return;
 	}
 
 	skb_put(skb, buflen);
@@ -172,8 +172,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 
 	adev->stats.rx_packets++;
 	adev->stats.rx_bytes += skb->len;
-out:
-	FN_EXIT0;
+
 }
 
 /*
@@ -186,7 +185,7 @@ void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf)
 	struct ieee80211_hdr *hdr;
 	u16 fc, buf_len;
 
-	FN_ENTER;
+
 
 	hdr = acx_get_wlan_hdr(adev, rxbuf);
 	fc = le16_to_cpu(hdr->frame_control);
@@ -231,5 +230,5 @@ void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf)
 	/* TODO: only the RSSI seems to be reported */
 	adev->rx_status.signal = acx_signal_to_winlevel(rxbuf->phy_level);
 
-	FN_EXIT0;
+
 }

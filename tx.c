@@ -155,11 +155,11 @@ void acx_tx_queue_flush(acx_device_t *adev)
 
 void acx_stop_queue(struct ieee80211_hw *hw, const char *msg)
 {
-	FN_ENTER;
+
 	ieee80211_stop_queues(hw);
 	if (msg)
 		log(L_BUFT, "tx: stop queue %s\n", msg);
-	FN_EXIT0;
+
 }
 
 int acx_queue_stopped(struct ieee80211_hw *ieee)
@@ -169,11 +169,11 @@ int acx_queue_stopped(struct ieee80211_hw *ieee)
 
 void acx_wake_queue(struct ieee80211_hw *hw, const char *msg)
 {
-	FN_ENTER;
+
 	ieee80211_wake_queues(hw);
 	if (msg)
 		log(L_BUFT, "tx: wake queue %s\n", msg);
-	FN_EXIT0;
+
 }
 
 
@@ -456,7 +456,7 @@ void acx_tx_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, tx_work);
 
-	FN_ENTER;
+
 
 	acx_sem_lock(adev);
 
@@ -472,7 +472,7 @@ void acx_tx_work(struct work_struct *work)
 	acx_tx_queue_go(adev);
 out:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return;
 }
 

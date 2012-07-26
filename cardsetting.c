@@ -34,7 +34,7 @@ int acx111_get_feature_config(acx_device_t *adev,
 {
 	struct acx111_ie_feature_config feat;
 
-	FN_ENTER;
+
 
 	if (!IS_ACX111(adev))
 		return NOT_OK;
@@ -42,7 +42,7 @@ int acx111_get_feature_config(acx_device_t *adev,
 	memset(&feat, 0, sizeof(feat));
 
 	if (OK != acx_interrogate(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
-		FN_EXIT1(NOT_OK);
+
 		return NOT_OK;
 	}
 	log(L_DEBUG,
@@ -54,7 +54,7 @@ int acx111_get_feature_config(acx_device_t *adev,
 	if (data_flow_options)
 		*data_flow_options = le32_to_cpu(feat.data_flow_options);
 
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -66,15 +66,15 @@ int acx111_set_feature_config(acx_device_t *adev,
 	struct acx111_ie_feature_config feat;
 	int i;
 
-	FN_ENTER;
+
 
 	if (!IS_ACX111(adev)) {
-		FN_EXIT1(NOT_OK);
+
 		return NOT_OK;
 	}
 
 	if ((mode < 0) || (mode > 2)) {
-		FN_EXIT1(NOT_OK);
+
 		return NOT_OK;
 	}
 
@@ -112,10 +112,10 @@ int acx111_set_feature_config(acx_device_t *adev,
 	    le32_to_cpu(feat.data_flow_options));
 
 	if (OK != acx_configure(adev, &feat, ACX1xx_IE_FEATURE_CONFIG)) {
-		FN_EXIT1(NOT_OK);
+
 		return NOT_OK;
 	}
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -138,7 +138,7 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 {
 	int res = 0;
 
-	FN_ENTER;
+
 
 	adev->rx_status.freq = freq;
 	adev->rx_status.band = IEEE80211_BAND_2GHZ;
@@ -153,7 +153,7 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 
 	acx_wake_queue(adev->ieee, NULL);
 
-	FN_EXIT0;
+
 	return res ? NOT_OK : OK;
 }
 
@@ -379,7 +379,7 @@ int acx1xx_get_tx_level(acx_device_t *adev)
 {
 	struct acx1xx_ie_tx_level tx_level;
 
-	FN_ENTER;
+
 
 	if (IS_USB(adev)) {
 		logf0(L_ANY, "Get tx-level not yet supported on usb\n");
@@ -390,13 +390,13 @@ int acx1xx_get_tx_level(acx_device_t *adev)
 
 	if (OK != acx_interrogate(adev, &tx_level,
 					ACX1xx_IE_DOT11_TX_POWER_LEVEL)) {
-		FN_EXIT1(NOT_OK);
+
 		return NOT_OK;
 	}
 	adev->tx_level_val = tx_level.level;
 	log(L_ANY, "Got tx-power-level: %d\n", adev->tx_level_val);
 end:
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -546,7 +546,7 @@ int acx1xx_get_antenna(acx_device_t *adev)
 	int res;
 	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
 
-	FN_ENTER;
+
 
 	memset(antenna, 0, sizeof(antenna));
 	res = acx_interrogate(adev, antenna,
@@ -555,7 +555,7 @@ int acx1xx_get_antenna(acx_device_t *adev)
 	adev->antenna[1] = antenna[5];
 	log(L_INIT, "Got antenna[0,1]: 0x%02X 0x%02X\n", adev->antenna[0], adev->antenna[1]);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -563,13 +563,13 @@ int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	adev->antenna[0] = val0;
 	adev->antenna[1] = val1;
 	res = acx1xx_update_antenna(adev);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -578,7 +578,7 @@ int acx1xx_update_antenna(acx_device_t *adev)
 	int res;
 	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
 
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating antenna[0,1]: 0x%02X 0x%02X\n",
 		adev->antenna[0], adev->antenna[1]);
@@ -588,7 +588,7 @@ int acx1xx_update_antenna(acx_device_t *adev)
 	res = acx_configure(adev, &antenna,
 			ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -601,7 +601,7 @@ static int acx100_set_rx_antenna(acx_device_t *adev, u8 val)
 {
 	int result;
 
-	FN_ENTER;
+
 
 	if (val > 3) {
 		result = -EINVAL;
@@ -620,7 +620,7 @@ static int acx100_set_rx_antenna(acx_device_t *adev, u8 val)
 
 	acx_sem_unlock(adev);
 end:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -633,7 +633,7 @@ static int acx100_set_tx_antenna(acx_device_t *adev, u8 val)
 	int result;
 	u8 val2;
 
-	FN_ENTER;
+
 
 	if (val > 1) {
 		result = -EINVAL;
@@ -665,7 +665,7 @@ static int acx100_set_tx_antenna(acx_device_t *adev, u8 val)
 
 	acx_sem_unlock(adev);
 end:
-	FN_EXIT1(result);
+
 	return result;
 }
 #endif
@@ -709,7 +709,7 @@ static int acx1xx_get_station_id(acx_device_t *adev)
 	const u8 *paddr;
 	int i, res;
 
-	FN_ENTER;
+
 
 	res = acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 	paddr = &stationID[4];
@@ -722,7 +722,7 @@ static int acx1xx_get_station_id(acx_device_t *adev)
 
 	log(L_INIT, "Got station_id: " MACSTR "\n", MAC(adev->dev_addr));
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -730,12 +730,12 @@ int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	MAC_COPY(adev->dev_addr, new_addr);
 	res = acx1xx_update_station_id(adev);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -745,7 +745,7 @@ int acx1xx_update_station_id(acx_device_t *adev)
 	u8 *paddr;
 	int i, res;
 
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating station_id to: " MACSTR "\n",
 		MAC(adev->dev_addr));
@@ -759,7 +759,7 @@ int acx1xx_update_station_id(acx_device_t *adev)
 	}
 	res = acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -768,13 +768,13 @@ static int acx100_get_ed_threshold(acx_device_t *adev)
 	int res;
 	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
 
-	FN_ENTER;
+
 	memset(ed_threshold, 0, sizeof(ed_threshold));
 	res = acx_interrogate(adev, ed_threshold,
 			  ACX100_IE_DOT11_ED_THRESHOLD);
 	adev->ed_threshold = ed_threshold[4];
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -782,7 +782,7 @@ static int acx1xx_get_ed_threshold(acx_device_t *adev)
 {
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 
 	if (IS_ACX100(adev)) {
 		res = acx100_get_ed_threshold(adev);
@@ -794,7 +794,7 @@ static int acx1xx_get_ed_threshold(acx_device_t *adev)
 	log(L_INIT, "Got Energy Detect (ED) threshold %u\n",
 	    adev->ed_threshold);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -803,11 +803,11 @@ static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold)
 {
 	int res;
 
-	FN_ENTER;
+
 	adev->ed_threshold=ed_threshold;
 	res = acx1xx_update_ed_threshold(adev);
 
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -817,13 +817,13 @@ static int acx100_update_ed_threshold(acx_device_t *adev)
 	int res;
 	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
 
-	FN_ENTER;
+
 	memset(ed_threshold, 0, sizeof(ed_threshold));
 	ed_threshold[4] = adev->ed_threshold;
 	res = acx_configure(adev, &ed_threshold,
 			ACX100_IE_DOT11_ED_THRESHOLD);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -831,7 +831,7 @@ int acx1xx_update_ed_threshold(acx_device_t *adev)
 {
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 	log(L_INIT, "Updating the Energy Detect (ED) threshold: %u\n",
 	    adev->ed_threshold);
 
@@ -840,7 +840,7 @@ int acx1xx_update_ed_threshold(acx_device_t *adev)
 	else
 		log(L_INIT, "acx111 doesn't support ED threshold\n");
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -848,14 +848,14 @@ static int acx100_get_cca(acx_device_t *adev)
 {
 	int res;
 	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
-	FN_ENTER;
+
 
 	memset(cca, 0, sizeof(cca));
 	res = acx_interrogate(adev, cca,
 			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 	adev->cca = cca[4];
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -863,7 +863,7 @@ static int acx1xx_get_cca(acx_device_t *adev)
 {
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 	if (IS_ACX100(adev))
 		acx100_get_cca(adev);
 	else {
@@ -873,7 +873,7 @@ static int acx1xx_get_cca(acx_device_t *adev)
 	log(L_INIT, "Got Channel Clear Assessment (CCA) value %u\n",
 		adev->cca);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -882,12 +882,12 @@ static int acx1xx_set_cca(acx_device_t *adev, u8 cca)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	adev->cca = cca;
 	res = acx1xx_update_cca(adev);
 
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -897,14 +897,14 @@ static int acx100_update_cca(acx_device_t *adev)
 	int res;
 	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
 
-	FN_ENTER;
+
 
 	memset(cca, 0, sizeof(cca));
 	cca[4] = adev->cca;
 	res = acx_configure(adev, &cca,
 			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -912,7 +912,7 @@ int acx1xx_update_cca(acx_device_t *adev)
 {
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 	log(L_INIT, "Updating the Channel Clear Assessment (CCA) value: "
 			"0x%02X\n", adev->cca);
 	if (IS_ACX100(adev))
@@ -920,7 +920,7 @@ int acx1xx_update_cca(acx_device_t *adev)
 	else
 		log(L_INIT, "acx111 doesn't support CCA\n");
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -930,23 +930,23 @@ static int acx1xx_get_rate_fallback(acx_device_t *adev)
 	int res = NOT_OK;
 	u8 rate[4 + acx_ie_descs[ACX1xx_IE_RATE_FALLBACK].len];
 
-	FN_ENTER;
+
 	memset(rate, 0, sizeof(rate));
 	res = acx_interrogate(adev, &rate,
 			ACX1xx_IE_RATE_FALLBACK);
 	adev->rate_auto = rate[4];
 
-	FN_EXIT0;
+
 	return res;
 }
 
 static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto)
 {
 	int res;
-	FN_ENTER;
+
 	adev->rate_auto = rate_auto;
 	res = acx1xx_update_rate_fallback(adev);
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -956,14 +956,14 @@ int acx1xx_update_rate_fallback(acx_device_t *adev)
 	int res;
 	u8 rate[4 + acx_ie_descs[ACX1xx_IE_RATE_FALLBACK].len];
 
-	FN_ENTER;
+
 	/* configure to not do fallbacks when not in auto rate mode */
 	rate[4] = (adev->rate_auto) /* adev->txrate_fallback_retries */
 		? 1 : 0;
 	log(L_INIT, "Updating Tx fallback to %u retries\n", rate[4]);
 
 	res = acx_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -971,10 +971,10 @@ int acx1xx_update_rate_fallback(acx_device_t *adev)
 static int acx1xx_set_channel(acx_device_t *adev, u8 channel)
 {
 	int res;
-	FN_ENTER;
+
 	adev->channel = channel;
 	res = acx1xx_update_tx(adev);
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -982,17 +982,17 @@ static int acx1xx_set_channel(acx_device_t *adev, u8 channel)
 static int acx1xx_set_tx_enable(acx_device_t *adev, u8 tx_enabled)
 {
 	int res;
-	FN_ENTER;
+
 	adev->tx_enabled = tx_enabled;
 	res = acx1xx_update_tx(adev);
-	FN_EXIT0;
+
 	return res;
 }
 
 int acx1xx_update_tx(acx_device_t *adev)
 {
 	int res;
-	FN_ENTER;
+
 
 	log(L_XFER, "Updating TX: %s, channel=%d\n",
 		adev->tx_enabled ? "enable" : "disable", adev->channel);
@@ -1003,24 +1003,24 @@ int acx1xx_update_tx(acx_device_t *adev)
 	else
 		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 
-	FN_EXIT0;
+
 	return res;
 }
 
 static int acx1xx_set_rx_enable(acx_device_t *adev, u8 rx_enabled)
 {
 	int res;
-	FN_ENTER;
+
 	adev->rx_enabled = rx_enabled;
 	res = acx1xx_update_rx(adev);
-	FN_EXIT0;
+
 	return res;
 }
 
 int acx1xx_update_rx(acx_device_t *adev)
 {
 	int res;
-	FN_ENTER;
+
 
 	log(L_XFER, "Updating RX: %s, channel=%d\n",
 		adev->rx_enabled ? "enable" : "disable", adev->channel);
@@ -1031,7 +1031,7 @@ int acx1xx_update_rx(acx_device_t *adev)
 	else
 		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1041,7 +1041,7 @@ int acx1xx_update_retry(acx_device_t *adev)
 	u8 short_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT].len];
 	u8 long_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_LONG_RETRY_LIMIT].len];
 
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating the short retry limit: %u, "
 		"long retry limit: %u\n",
@@ -1054,7 +1054,7 @@ int acx1xx_update_retry(acx_device_t *adev)
 	res += acx_configure(adev, &long_retry,
 			ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1062,7 +1062,7 @@ int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 {
 	int res = NOT_OK;
 	u8 xmt_msdu_lifetime[4 + acx_ie_descs[ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME].len];
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating the tx MSDU lifetime: %u\n",
 		adev->msdu_lifetime);
@@ -1071,7 +1071,7 @@ int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 		(u32) adev->msdu_lifetime);
 	res = acx_configure(adev, &xmt_msdu_lifetime,
 	                ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1178,7 +1178,7 @@ static int acx_update_wep(acx_device_t *adev)
 	int res = NOT_OK;
 	ie_dot11WEPDefaultKeyID_t dkey;
 
-	FN_ENTER;
+
 
 #ifdef DEBUG_WEP
 	struct {
@@ -1201,7 +1201,7 @@ static int acx_update_wep(acx_device_t *adev)
 #endif
 	}
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1209,7 +1209,7 @@ static int acx_update_wep_options(acx_device_t *adev)
 {
 	int res = NOT_OK;
 
-	FN_ENTER;
+
 
 	if (IS_ACX111(adev))
 		log(L_DEBUG, "setting WEP Options for acx111"
@@ -1217,7 +1217,7 @@ static int acx_update_wep_options(acx_device_t *adev)
 	else
 		res = acx100_update_wep_options(adev);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1226,7 +1226,7 @@ static int acx100_update_wep_options(acx_device_t *adev)
 	int res = NOT_OK;
 	acx100_ie_wep_options_t options;
 
-	FN_ENTER;
+
 	log(L_INIT, "acx100: setting WEP Options\n");
 
 	/* let's choose maximum setting: 4 default keys,
@@ -1244,7 +1244,7 @@ static int acx100_update_wep_options(acx_device_t *adev)
 
 	res = acx_configure(adev, &options, ACX100_IE_WEP_OPTIONS);
 
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -1255,7 +1255,7 @@ int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 	acx_template_tim_t templ;
 	int res;
 
-	FN_ENTER;
+
 
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "data, len=%d:\n", len);
@@ -1274,7 +1274,7 @@ int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM, &templ,
 			sizeof(templ));
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -1284,14 +1284,14 @@ static int acx_s_set_tim_template_off(acx_device_t *adev)
 	acx_template_nullframe_t templ;
 	int result;
 
-	FN_ENTER;
+
 	memset(&templ, 0, sizeof(templ));
 	templ.size = cpu_to_le16(sizeof(templ) - 2);;
 
 	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_TIM,
 			&templ, sizeof(templ));
 
-	FN_EXIT1(result);
+
 	return result;
 }
 #endif
@@ -1302,7 +1302,7 @@ static int acx_s_set_null_data_template(acx_device_t *adev)
 	struct acx_template_nullframe b;
 	int result;
 
-	FN_ENTER;
+
 
 	/* memset(&b, 0, sizeof(b)); not needed, setting all members */
 
@@ -1317,7 +1317,7 @@ static int acx_s_set_null_data_template(acx_device_t *adev)
 	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_NULL_DATA,
 			&b, sizeof(b));
 
-	FN_EXIT1(result);
+
 	return result;
 }
 #endif
@@ -1327,7 +1327,7 @@ static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 	struct acx_template_beacon templ;
 	int res;
 
-	FN_ENTER;
+
 
 	if (acx_debug & L_DEBUG) {
 		logf1(L_ANY, "data, len=%d, sizeof(struct"
@@ -1342,7 +1342,7 @@ static int acx_set_beacon_template(acx_device_t *adev, u8 *data, int len)
 	/* +2: include 'u16 size' field */
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_BEACON, &templ, len+2);
 
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -1352,7 +1352,7 @@ static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
 	struct acx_template_proberesp templ;
 	int res;
 
-	FN_ENTER;
+
 
 	memcpy((u8*) &templ.fc, data, len);
 	templ.fc = cpu_to_le16(IEEE80211_FTYPE_MGMT
@@ -1363,7 +1363,7 @@ static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE,
 			&templ, len+2);
 
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -1470,14 +1470,14 @@ static int acx_s_set_probe_response_template_off(acx_device_t *adev)
 	acx_template_nullframe_t templ;
 	int result;
 
-	FN_ENTER;
+
 	memset(&templ, 0, sizeof(templ));
 	templ.size = cpu_to_le16(sizeof(templ) - 2);;
 
 	result = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_RESPONSE,
 			&templ, sizeof(templ));
 
-	FN_EXIT1(result);
+
 	return result;
 }
 #endif
@@ -1491,7 +1491,7 @@ static int acx_s_set_probe_request_template(acx_device_t *adev)
 	int res;
 	int frame_len;
 
-	FN_ENTER;
+
 
 	memset(&probereq, 0, sizeof(probereq));
 
@@ -1511,7 +1511,7 @@ static int acx_s_set_probe_request_template(acx_device_t *adev)
 
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_REQUEST,
 			&probereq, frame_len);
-	FN_EXIT0;
+
 	return res;
 }
 #endif
@@ -1529,7 +1529,7 @@ static void acx_update_ratevector(acx_device_t *adev)
 	u8 *supp = adev->rate_supported;
 	const u8 *dot11 = acx_bitpos2ratebyte;
 
-	FN_ENTER;
+
 
 	while (ocfg) {
 		if (ocfg & 1) {
@@ -1548,7 +1548,7 @@ static void acx_update_ratevector(acx_device_t *adev)
 		pr_info("new ratevector: ");
 		acx_dump_bytes(adev->rate_supported, adev->rate_supported_len);
 	}
-	FN_EXIT0;
+
 }
 
 
@@ -1562,7 +1562,7 @@ static int acx_update_rx_config(acx_device_t *adev)
 		u16 rx_cfg2;
 	} ACX_PACKED cfg;
 
-	FN_ENTER;
+
 
 	switch (adev->mode) {
 	case ACX_MODE_MONITOR:
@@ -1675,7 +1675,7 @@ static int acx_update_rx_config(acx_device_t *adev)
 	cfg.rx_cfg2 = cpu_to_le16(adev->rx_config_2);
 	res = acx_configure(adev, &cfg, ACX1xx_IE_RXCONFIG);
 
-	FN_EXIT0;
+
 	return res;
 }
 
@@ -1688,7 +1688,7 @@ int acx_set_mode(acx_device_t *adev, u16 mode)
 int acx_update_mode(acx_device_t *adev)
 {
 	int res = 0;
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating to mode=0x%04x\n", adev->mode);
 
@@ -1715,14 +1715,14 @@ int acx_update_mode(acx_device_t *adev)
 		return NOT_OK;
 	}
 
-	FN_EXIT0;
+
 	return res ? NOT_OK : OK;
 }
 
 void acx_set_defaults(acx_device_t *adev)
 {
 	struct eeprom_cfg *acfg = &adev->cfgopt;
-	FN_ENTER;
+
 
 	/* do it before getting settings, prevent bogus channel 0 warning */
 	adev->channel = 1;
@@ -1848,5 +1848,5 @@ void acx_set_defaults(acx_device_t *adev)
 	adev->ps_hangover_period = 0;
 	adev->ps_enhanced_transition_time = 0;
 #endif
-	FN_EXIT0;
+
 }

@@ -137,7 +137,7 @@ int acx_setup_modes(acx_device_t *adev)
 {
 	int i;
 
-	FN_ENTER;
+
 
 	for (i=0; i<ARRAY_SIZE(channels); i++)
 		channels[i].max_power = TX_CFG_MAX_DBM_POWER;
@@ -154,7 +154,7 @@ int acx_setup_modes(acx_device_t *adev)
 			return -1;
 		}
 	}
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -326,10 +326,10 @@ void acx_init_task_scheduler(acx_device_t *adev)
 
 void acx_after_interrupt_task(acx_device_t *adev)
 {
-	FN_ENTER;
+
 
 	if (!adev->after_interrupt_jobs || !adev->initialized)
-		goto end_no_lock;	/* no jobs to do */
+		return;	/* no jobs to do */
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
@@ -391,8 +391,7 @@ void acx_after_interrupt_task(acx_device_t *adev)
 			adev->after_interrupt_jobs);
 		adev->after_interrupt_jobs = 0;
 	}
-end_no_lock:
-	FN_EXIT0;
+
 }
 
 void acx_log_irq(u16 irqtype)
@@ -469,12 +468,12 @@ void acx_timer(unsigned long address)
 {
 	/* acx_device_t *adev = (acx_device_t *) address; */
 
-	FN_ENTER;
+
 
 	FIXME();
 	/* We need calibration and stats gather tasks to perform here */
 
-	FN_EXIT0;
+
 }
 
 /*
@@ -485,13 +484,13 @@ void acx_timer(unsigned long address)
  */
 void acx_set_timer(acx_device_t *adev, int timeout_us)
 {
-	FN_ENTER;
+
 
 	log(L_DEBUG | L_IRQ, "(%u ms)\n", timeout_us / 1000);
 	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
 		pr_info("attempt to set the timer "
 		       "when the card interface is not up!\n");
-		goto end;
+		return;
 	}
 
 	/* first check if the timer was already initialized, THEN modify it */
@@ -499,13 +498,12 @@ void acx_set_timer(acx_device_t *adev, int timeout_us)
 		mod_timer(&adev->mgmt_timer,
 			  jiffies + (timeout_us * HZ / 1000000));
 	}
-end:
-	FN_EXIT0;
+
 }
 
 void acx_start(acx_device_t *adev)
 {
-	FN_ENTER;
+
 
 	log(L_INIT, "Updating initial settings\n");
 
@@ -534,7 +532,7 @@ void acx_start(acx_device_t *adev)
 		acx111_set_recalib_auto(adev, 1);
 	}
 
-	FN_EXIT0;
+
 }
 
 
@@ -554,7 +552,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 
 	int vif_type;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	vif_type = vif->type;
@@ -623,7 +621,7 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 
 out_unlock:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return err;
 }
 
@@ -634,7 +632,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 	char mac[MACSTR_SIZE];
 	u8 *mac_vif;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 	acx_debugfs_remove_adev(adev);
 
@@ -656,7 +654,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 		vif->type, acx_print_mac(mac, mac_vif));
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 }
 
 int acx_op_config(struct ieee80211_hw *hw, u32 changed)
@@ -666,7 +664,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 
 	u32 changed_not_done = changed;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	if (!adev->initialized)
@@ -702,7 +700,7 @@ change_channel_done:
 
 end_sem_unlock:
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -715,7 +713,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	struct sk_buff *beacon;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	logf1(L_DEBUG, "changed=%04X\n", changed);
@@ -750,7 +748,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 end_sem_unlock:
 	acx_sem_unlock(adev);
-	FN_EXIT1(err);
+
 	return;
 }
 
@@ -940,7 +938,7 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	FN_ENTER;
+
 
 	acx_sem_lock(adev);
 
@@ -954,7 +952,7 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 	logf1(L_DEBUG, "2: *total_flags=0x%08x\n", *total_flags);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 }
 
 #if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
@@ -966,11 +964,11 @@ int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 #endif
 {
 	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
+
 	acx_sem_lock(adev);
     /* TODO */
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -989,13 +987,13 @@ int acx_op_get_stats(struct ieee80211_hw *hw,
 {
 	acx_device_t *adev = ieee2adev(hw);
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	memcpy(stats, &adev->ieee_stats, sizeof(*stats));
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -1007,7 +1005,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 	acx_device_t *adev = ieee2adev(hw);
 	int err = -ENODEV;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	stats->len = 0;
@@ -1015,7 +1013,7 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 	stats->count = 0;
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return err;
 }
 #endif

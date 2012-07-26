@@ -485,7 +485,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 	acxmem_lock();
 
 	devname = wiphy_name(adev->ieee->wiphy);
@@ -654,7 +654,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		cmdstr, jiffies - start);
 
 	acxmem_unlock();
-	FN_EXIT1(OK);
+
 	return OK;
 
 	bad:
@@ -668,7 +668,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	);
 
 	acxmem_unlock();
-	FN_EXIT1(NOT_OK);
+
 	return NOT_OK;
 }
 #endif // acxmem_issue_cmd_timeo_debug()
@@ -752,7 +752,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
-	FN_ENTER;
+
 
 	/* OW Bit setting done differently in pci.c */
 	/* halt eCPU */
@@ -785,7 +785,7 @@ void acxmem_reset_mac(acx_device_t *adev)
 
 	write_reg32(adev, 0x808, 0x10000);
 
-	FN_EXIT0;
+
 }
 
 /***********************************************************************
@@ -798,7 +798,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
-	FN_ENTER;
+
 
 	acx_lock(adev, flags);
 
@@ -822,7 +822,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
 
 	acx_unlock(adev, flags);
 
-	FN_EXIT0;
+
 }
 #endif
 
@@ -851,7 +851,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 	acxmem_lock();
 
 #if DUMP_MEM_DURING_DIAG > 0
@@ -1022,7 +1022,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size);
 
 	acxmem_unlock();
-	FN_EXIT0;
+
 	return 0;
 }
 #endif // acxmem_proc_diag_output()
@@ -1046,7 +1046,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 	u32 addr;
 	u8 Ctl_8;
 
-	FN_ENTER;
+
 
 	if (unlikely(acx_debug & L_BUFR))
 		acx_log_rxbuffer(adev);
@@ -1160,7 +1160,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 	}
 	end:
 		adev->hw_rx_queue.tail = tail;
-		FN_EXIT0;
+
 }
 #endif
 
@@ -1331,7 +1331,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev)
 	unsigned long flags;
 	unsigned int tx_num_cleaned;
 
-	FN_ENTER;
+
 
 	acx_lock(adev, flags);
 
@@ -1365,7 +1365,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev)
 
 	acx_unlock(adev, flags);
 
-	FN_EXIT0;
+
 }
 #endif
 
@@ -1407,7 +1407,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	register u16 irqtype;
 	u16 unmasked;
 
-	FN_ENTER;
+
 
 	if (!adev)
 		return IRQ_NONE;
@@ -1436,7 +1436,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 
 	/* Done here because IRQ_NONEs taking three lines of log
 	 ** drive me crazy */
-	FN_ENTER;
+
 
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
@@ -1565,12 +1565,12 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	/* handled: */
 	/* write_flush(adev); - not needed, last op was read anyway */
 	acx_unlock(adev, flags);
-	FN_EXIT0;
+
 	return IRQ_HANDLED;
 
 	none:
 	acx_unlock(adev, flags);
-	FN_EXIT0;
+
 	return IRQ_NONE;
 }
 #endif
@@ -2016,7 +2016,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	struct ieee80211_hw *ieee;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxmem_hw_ops);
@@ -2257,7 +2257,7 @@ fail_ieee80211_alloc_hw:
 	ieee80211_free_hw(ieee);
 
 done:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -2277,7 +2277,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
@@ -2357,7 +2357,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	pr_acxmem("done\n");
 
 end_no_lock:
-	FN_EXIT0;
+
 	return(0);
 }
 
@@ -2372,7 +2372,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 	struct ieee80211_hw *hw
 		= (struct ieee80211_hw *) platform_get_drvdata(pdev);
 
-	FN_ENTER;
+
 	pr_acx("suspend handler is experimental!\n");
 	pr_acx("sus: dev %p\n", hw);
 
@@ -2401,7 +2401,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -2411,7 +2411,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 		platform_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 
 	pr_acx("resume handler is experimental!\n");
 	pr_acx("rsm: got dev %p\n", hw);
@@ -2460,7 +2460,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 	return OK;
 }
 #endif /* CONFIG_PM */
@@ -2489,7 +2489,7 @@ int __init acxmem_init_module(void)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	pr_acx(IO_COMPILE_NOTE);
@@ -2498,7 +2498,7 @@ int __init acxmem_init_module(void)
 		"waiting for cards to probe...\n");
 
 	res = platform_driver_register(&acxmem_driver);
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -2510,12 +2510,12 @@ int __init acxmem_init_module(void)
  */
 void __exit acxmem_cleanup_module(void)
 {
-	FN_ENTER;
+
 
 	pr_acxmem("cleanup_module\n");
 	platform_driver_unregister(&acxmem_driver);
 
-	FN_EXIT0;
+
 }
 
 MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );
