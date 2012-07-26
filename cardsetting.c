@@ -5,6 +5,8 @@
 #include "cmd.h"
 #include "ie.h"
 #include "utils.h"
+#include "tx.h"
+#include "boot.h"
 #include "cardsetting.h"
 
 /* Please keep acx_reg_domain_ids_len in sync... */

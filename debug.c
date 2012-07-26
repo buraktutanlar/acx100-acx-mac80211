@@ -9,6 +9,7 @@
 #include "cmd.h"
 #include "cardsetting.h"
 #include "main.h"
+#include "boot.h"
 #include "debug.h"
 
 

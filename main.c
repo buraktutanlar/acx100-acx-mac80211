@@ -12,6 +12,7 @@
 #include "ie.h"
 #include "utils.h"
 #include "cardsetting.h"
+#include "tx.h"
 #include "main.h"
 #include "debug.h"
 

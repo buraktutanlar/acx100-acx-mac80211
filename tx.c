@@ -5,6 +5,7 @@
 #include "mem.h"
 #include "merge.h"
 #include "usb.h"
+#include "main.h"
 #include "tx.h"
 
 extern struct ieee80211_rate acx111_rates[];

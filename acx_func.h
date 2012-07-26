@@ -77,60 +77,6 @@
 #define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
 #define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
 
-#ifdef OW_20100613_OBSELETE_ACXLOCK_REMOVE
-#if defined(PARANOID_LOCKING) /* Lock debugging */
-
-/* - void acx_lock_debug(acx_device_t *adev, const char* where);
- * - void acx_unlock_debug(acx_device_t *adev, const char* where);
- */
-void acx_lock_unhold(void);
-/* - void acx_sem_unhold(void);
- * - 
- * - static inline void
- * - acx_lock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
- * - {
- * - 	acx_lock_debug(adev, where);
- * - 	spin_lock_irqsave(&adev->spinlock, *fp);
- * - }
- * - static inline void
- * - acx_unlock_helper(acx_device_t *adev, unsigned long *fp, const char* where)
- * - {
- * - 	acx_unlock_debug(adev, where);
- * - 	spin_unlock_irqrestore(&adev->spinlock, *fp);
- * - }
- */
-
-#ifdef OBSELETE_OW20100613
-/* - #define acx_lock(adev, flags)	acx_lock_helper(adev, &(flags),  * - __FILE__ ":" STRING(__LINE__))
- * - #define acx_unlock(adev, flags)	acx_unlock_helper(adev, &(flags),  * - __FILE__ ":" STRING(__LINE__))
-  */
-#endif
-/* -  */
-#elif defined(DO_LOCKING)
-
-/* #define acx_lock(adev, flags)	spin_lock_irqsave(&adev->spinlock,  * - flags)
- * #define acx_unlock(adev, flags)	 * - spin_unlock_irqrestore(&adev->spinlock, flags)
- * - #define acx_lock(adev, flags)	((void)0)
- * - #define acx_unlock(adev, flags)	((void)0)
- * - 
- * - #define acx_sem_lock(adev)	mutex_lock(&(adev)->mutex)
- * - #define acx_sem_unlock(adev)	mutex_unlock(&(adev)->mutex)
- * - #define acx_lock_unhold()	((void)0)
- * - #define acx_sem_unhold()	((void)0)
- * - 
-  */
-#else /* no locking! :( */
-/* - 
- * - #define acx_lock(adev, flags)	((void)0)
- * - #define acx_unlock(adev, flags)	((void)0)
- * - #define acx_sem_lock(adev)	((void)0)
- * - #define acx_sem_unlock(adev)	((void)0)
- * - #define acx_lock_unhold()	((void)0)
- * - #define acx_sem_unhold()	((void)0)
- * - 
- */
-#endif
-#endif
 /*
  * BOM Logging (Common)
  *
@@ -167,12 +113,6 @@ void acx_lock_unhold(void);
 
 /* Debug build */
 #if ACX_DEBUG
-
-/* 
- * char *acx_print_mac(char *buf, const u8 *mac);
- * void acx_print_mac2(const char *head, const u8 *mac, const char *tail);
- * void acxlog_mac(int level, const char *head, const u8 *mac, const char *tail);
- */
 
 #define log(chan, args...) \
 	do { \
@@ -215,26 +155,6 @@ do { \
 			__FUNCTION__, __FILE__, __LINE__);			\
         } while (0)
 
-/* BOM Data Access (Common)
- * -----
- */
-
-/* BOM Firmware, EEPROM, Phy (Common)
- * -----
- */
-void acx_get_firmware_version(acx_device_t *adev);
-void acx_display_hardware_details(acx_device_t *adev);
-firmware_image_t *acx_read_fw(struct device *dev,
-		const char *file, u32 *size);
-void acx_parse_configoption(acx_device_t *adev,
-		const acx111_ie_configoption_t *pcfg);
-
-int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
-int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
-
-/* int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid); */
-
-
 /* BOM Proc, Debug (Common)
  * -----
  */
@@ -250,63 +170,7 @@ DECL_OR_STUB(PROC_ENTRIES,
 	int acx_proc_unregister_entries(struct ieee80211_hw *ieee),
 	{ return 0; })
 	
-/* - 
- * BOM Rx Path (Common)
- * -----
- */
-void acx_process_rxbuf(acx_device_t *adev, rxbuffer_t *rxbuf);
-
-
-/* BOM Tx Path (Common)
- * -----
- */
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
-#else
-void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
-#endif
-
-void acx_tx_work(struct work_struct *work);
-/* - void acx_tx_queue_go(acx_device_t *adev);
- * - int acx_tx_frame(acx_device_t *adev, struct sk_buff *skb);
- */
-void acx_tx_queue_flush(acx_device_t *adev);
-void acx_stop_queue(struct ieee80211_hw *hw, const char *msg);
-int acx_queue_stopped(struct ieee80211_hw *ieee);
-void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
-/* - tx_t* acx_alloc_tx(acx_device_t *adev, unsigned int len); */
-void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
-		unsigned int finger, struct ieee80211_tx_info *info);
-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
-		struct ieee80211_tx_info *info);
-void acx111_tx_build_txstatus(acx_device_t *adev, 
-		struct ieee80211_tx_info *txstatus, u16 r111, u8 ack_failures);
-/* - u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
- * - int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
- * - 
- * void acx_l_handle_txrate_auto(acx_device_t *adev, struct client *txc,
- * 		u16 intended_rate, u8 rate100, u16 rate111, u8 error,
- * 		int pkts_to_ignore);
- * - 
- * - 
- * BOM Crypto (Common)
- * -----
- * - int acx_clear_keys(acx_device_t * adev);
- * - int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const  * - struct ieee80211_key_conf *key, const u8 *mac_addr);
- * - 
- * BOM Irq Handling, Timer (Common)
- * -----
- */
-void acx_init_task_scheduler(acx_device_t *adev);
-void acx_after_interrupt_task(acx_device_t *adev);
-void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
-void acx_log_irq(u16 irqtype);
-void acx_timer(unsigned long address);
-/* - void acx_set_timer(acx_device_t * adev, int timeout_us);
- * - 
- * BOM Mac80211 Ops (Common)
- * -----
- * - 
+/* Mac80211 Ops (Common)
  */
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_op_add_interface(struct ieee80211_hw* ieee,
@@ -356,18 +220,15 @@ int acx_op_set_tim(struct ieee80211_hw *hw,
 int acx111_set_default_key(acx_device_t *adev, u8 key_id);
 
 
-/* - 
+/*
  * BOM Helpers (Common)
- * -----
+ *
  */
 
 void acx_mwait(int ms);
-/* - u8 acx_signal_determine_quality(u8 signal, u8 noise);
- * void great_inquisitor(acx_device_t *adev);
- */
 
-/* MAC address helpers
- * ---
+/*
+ * MAC address helpers
  */
 static inline void MAC_COPY(u8 *mac, const u8 *src)
 {
@@ -478,92 +339,14 @@ static inline struct ieee80211_hdr* acx_get_wlan_hdr(acx_device_t *adev,
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
 
-/* BOM Driver, Module (Common)
- * -----
- */
-
 
 /*
- * BOM PCI prototypes
+ * Mem prototypes
  * ==================================================
  */
 
-/* Firmware, EEPROM, Phy
- * - int acxpci_upload_radio(acx_device_t * adev);
- * =int acxpci_read_eeprom_byte(acx_device_t * adev, u32 addr, u8 * charbuf);
- * int acxpci_s_write_eeprom(acx_device_t * adev, u32 addr, u32 len, const u8 * charbuf);
- * - 
- * CMDs (Control Path)
- */
-
-/* - 
- * Init, Configuration (Control Path)
- * - 
- * Other (Control Path)
- * - 
- * Proc, Debug
- * - int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
- * - 
- * Rx Path
- * Tx Path
- * - tx_t *acxpci_alloc_tx(acx_device_t * adev);
- * - int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm);
- * - 
- * Irq Handling, Timer
- * - void acxpci_set_interrupt_mask(acx_device_t * adev);
- * - 
- * Mac80211 Ops
- * - 
- * Ioctls
- * - int acx111pci_ioctl_info(struct net_device *ndev, struct iw_request_info  * - *info, struct iw_param *vwrq, char *extra);
- * - int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev, struct  * - iw_request_info *info, struct iw_param *vwrq, char *extra);
- * - 
- */
-
-/*
- * BOM Mem prototypes
- * ==================================================
- */
-
-/*
- * Firmware, EEPROM, Phy
- * - int acxmem_upload_radio(acx_device_t *adev);
- */
-#ifdef UNUSED
-/*
- * int acx_write_eeprom(acx_device_t *adev, u32 addr, u32 len,
- * 			const u8 *charbuf);
- */
-#endif
-/*
- * CMDs (Control Path)
- */
 int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout,
 		const char* cmdstr);
-/* - 
- * Init, Configure (Control Path)
- * - 
- * Other (Control Path)
- * - 
- * Proc, Debug
- * - int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
- * - 
- * Rx Path
- * Tx Path
- * =void acxmem_init_acx_txbuf2(acx_device_t *adev);
- * - 
- * =void acxmem_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,  * - struct ieee80211_tx_info *ieeectl, struct sk_buff *skb);
- * - 
- * - void acxmem_update_queue_indicator(acx_device_t *adev, int txqueue);
- * - int acx100mem_set_tx_level(acx_device_t *adev, u8 level_dbm);
- * - 
- * Irq Handling, Timer
- * - void acxmem_set_interrupt_mask(acx_device_t *adev);
- * - 
- * Ioctls
- * int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
- * int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw, struct iw_request_info *info, struct iw_param *vwrq, char *extra);
- */
 
 #endif /* _ACX_FUNC_H_ */

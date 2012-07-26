@@ -45,6 +45,7 @@
 #include "utils.h"
 #include "cardsetting.h"
 #include "rx.h"
+#include "tx.h"
 #include "main.h"
 #include "boot.h"
 
