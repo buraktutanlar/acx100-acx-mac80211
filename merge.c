@@ -46,6 +46,7 @@
 #include "cardsetting.h"
 #include "rx.h"
 #include "main.h"
+#include "boot.h"
 
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
