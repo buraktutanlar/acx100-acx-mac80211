@@ -34,10 +34,6 @@
 	#define CONFIG_ACX_MAC80211_VERSION LINUX_VERSION_CODE
 #endif
 
-#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 2, 0)
-#include <net/iw_handler.h>
-#endif
-
 /*
  * BOM Config
  * ==================================================
@@ -288,15 +284,5 @@ static inline struct ieee80211_hdr* acx_get_wlan_hdr(acx_device_t *adev,
 {
 	return (struct ieee80211_hdr *)((u8 *)&rxbuf->hdr_a3 + adev->phy_header_len);
 }
-
-
-/*
- * Mem prototypes
- * ==================================================
- */
-
-int acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
-		void *buffer, unsigned buflen, unsigned cmd_timeout,
-		const char* cmdstr);
 
 #endif /* _ACX_FUNC_H_ */
