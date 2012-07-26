@@ -50,81 +50,17 @@
 #include "main.h"
 #include "debug.h"
 
-/*
- * BOM Config
- * ==================================================
- */
-
-/*
- * BOM Prototypes
- * ... static and also none-static for overview reasons (maybe not best practice ...)
- * ==================================================
- */
-
-/* Logging */
-void log_fn_enter(const char *funcname);
-void log_fn_exit(const char *funcname);
-void log_fn_exitv(const char *funcname, int v);
-//-void acx_dump_bytes(const void *data, int num);
-//-const char *acx_cmd_status_str(unsigned int state);
-
 /* Firmware, EEPROM, Phy */
 MODULE_FIRMWARE("tiacx111");
 MODULE_FIRMWARE("tiacx111c16");
 MODULE_FIRMWARE("tiacx111r16");
 
-/* Rx Path */
-
-/* Crypto */
-#ifdef UNUSED
-static void acx100_set_wepkey(acx_device_t * adev);
-static void acx111_set_wepkey(acx_device_t * adev);
-static void acx_set_wepkey(acx_device_t * adev);
-#endif
-
-/* OW, 20100704, Obselete, TBC for cleanup */
-#if 0
-static void acx_keymac_write(acx_device_t * adev, u16 index, const u32 * addr);
-int acx_clear_keys(acx_device_t * adev);
-int acx_key_write(acx_device_t *adev, u16 index, u8 algorithm, const struct ieee80211_key_conf *key, const u8 *mac_addr);
-#endif
-
-/* Helpers */
-//-void acx_mwait(int ms);
-/* void great_inquisitor(acx_device_t * adev); */
-
 /* Driver, Module */
 static int __init acx_init_module(void);
 static void __exit acx_cleanup_module(void);
 
-
 /*
- * BOM CMDs (Control Path)
- * ==================================================
- */
-
-
-int acx_net_reset(struct ieee80211_hw *ieee)
-{
-	acx_device_t *adev = ieee2adev(ieee);
-
-	if (IS_PCI(adev) || IS_MEM(adev))
-		acx_reset_dev(adev);
-	else
-		TODO();
-
-
-	return 0;
-}
-
-
-/*
- * BOM Other (Control Path)
- * ==================================================
- */
-
-/*
- * BOM Helpers
+ * Helpers
  * ==================================================
  */
 
