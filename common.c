@@ -270,34 +270,6 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 #endif
 
 
-int acx111_set_default_key(acx_device_t *adev, u8 key_id)
-{
-	int res;
-	ie_dot11WEPDefaultKeyID_t dkey;
-
-#if defined DEBUG_WEP
-	struct {
-		u16 type;
-		u16 len;
-		u8 val;
-	}ACX_PACKED keyindic;
-#endif
-
-	dkey.KeyID = key_id;
-	log(L_INIT, "Setting key %u as default\n", dkey.KeyID);
-	res = acx_configure(adev, &dkey,
-		ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
-
-#if defined DEBUG_WEP
-	keyindic.val = key_id;
-	acx_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
-#endif
-
-	adev->default_key = key_id;
-
-	return res;
-}
-
 /*
  * BOM Helpers
  * ==================================================

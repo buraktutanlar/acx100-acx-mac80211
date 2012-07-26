@@ -1109,36 +1109,6 @@ int acx_set_hw_encryption_off(acx_device_t *adev)
 	return res;
 }
 
-#ifdef UNUSED
-static void acx100_set_wepkey(acx_device_t *adev)
-{
-	ie_dot11WEPDefaultKey_t dk;
-	int i;
-
-	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
-		if (adev->wep_keys[i].size != 0) {
-			log(L_INIT, "setting WEP key: %d with "
-				"total size: %d\n", i,
-				(int)adev->wep_keys[i].size);
-			dk.action = 1;
-			dk.keySize = adev->wep_keys[i].size;
-			dk.defaultKeyNum = i;
-			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
-			acx_configure(adev, &dk,
-				ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
-		}
-	}
-}
-
-static void acx_set_wepkey(acx_device_t * adev)
-{
-	if (IS_ACX111(adev))
-		acx111_set_wepkey(adev);
-	else
-		acx100_set_wepkey(adev);
-}
-#endif
-
 
 static int acx111_update_recalib_auto(acx_device_t *adev)
 {
@@ -1175,6 +1145,62 @@ int acx111_set_recalib_auto(acx_device_t *adev, int enable)
 }
 
 #ifdef UNUSED
+static void acx100_set_wepkey(acx_device_t *adev)
+{
+	ie_dot11WEPDefaultKey_t dk;
+	int i;
+
+	for (i = 0; i < DOT11_MAX_DEFAULT_WEP_KEYS; i++) {
+		if (adev->wep_keys[i].size != 0) {
+			log(L_INIT, "setting WEP key: %d with "
+				"total size: %d\n", i,
+				(int)adev->wep_keys[i].size);
+			dk.action = 1;
+			dk.keySize = adev->wep_keys[i].size;
+			dk.defaultKeyNum = i;
+			memcpy(dk.key, adev->wep_keys[i].key, dk.keySize);
+			acx_configure(adev, &dk,
+				ACX100_IE_DOT11_WEP_DEFAULT_KEY_WRITE);
+		}
+	}
+}
+
+static void acx_set_wepkey(acx_device_t * adev)
+{
+	if (IS_ACX111(adev))
+		acx111_set_wepkey(adev);
+	else
+		acx100_set_wepkey(adev);
+}
+
+int acx111_set_default_key(acx_device_t *adev, u8 key_id)
+{
+	int res;
+	ie_dot11WEPDefaultKeyID_t dkey;
+
+#if defined DEBUG_WEP
+	struct {
+		u16 type;
+		u16 len;
+		u8 val;
+	}ACX_PACKED keyindic;
+#endif
+
+	dkey.KeyID = key_id;
+	log(L_INIT, "Setting key %u as default\n", dkey.KeyID);
+	res = acx_configure(adev, &dkey,
+		ACX1xx_IE_DOT11_WEP_DEFAULT_KEY_SET);
+
+#if defined DEBUG_WEP
+	keyindic.val = key_id;
+	acx_configure(adev, &keyindic, ACX111_IE_KEY_CHOOSE);
+#endif
+
+	adev->default_key = key_id;
+
+	return res;
+}
+
 static int acx_update_wep(acx_device_t *adev)
 {
 	int res = NOT_OK;
@@ -1250,7 +1276,6 @@ static int acx100_update_wep_options(acx_device_t *adev)
 	return res;
 }
 #endif
-
 
 int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 {
