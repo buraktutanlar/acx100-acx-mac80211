@@ -52,6 +52,15 @@
 #include "pci.h"
 #include "merge.h"
 #include "io-acx.h"
+#include "cmd.h"
+#include "ie.h"
+#include "init.h"
+#include "utils.h"
+#include "cardsetting.h"
+#include "rx.h"
+#include "tx.h"
+#include "main.h"
+#include "boot.h"
 
 /*
  * BOM Config
@@ -163,7 +172,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	u16 cmd_status=-1;
 	unsigned long timeout;
 
-	FN_ENTER;
+
 
 	devname = wiphy_name(adev->ieee->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
@@ -325,7 +334,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 	log(L_DEBUG, "%s: took %ld jiffies to complete\n",
 		cmdstr, jiffies - start);
 
-	FN_EXIT1(OK);
+
 	return OK;
 
      bad:
@@ -338,7 +347,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 		acx_cmd_status_str(cmd_status)
 	);
 	/* dump_stack(); */
-	FN_EXIT1(NOT_OK);
+
 
 	return NOT_OK;
 }
@@ -363,7 +372,7 @@ void acxpci_reset_mac(acx_device_t * adev)
 {
 	u16 temp;
 
-	FN_ENTER;
+
 
 	/* halt eCPU */
 	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
@@ -384,7 +393,7 @@ void acxpci_reset_mac(acx_device_t * adev)
 	write_reg16(adev, IO_ACX_EE_START, temp);
 	write_flush(adev);
 
-	FN_EXIT0;
+
 }
 
 /*
@@ -428,14 +437,15 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 	rxhostdesc_t *rxhostdesc;
 	txdesc_t *txdesc;
 	int i;
+	int queue_id;
 
-	FN_ENTER;
+
 
 	seq_printf(file, "** Rx buf **\n");
-	rxhostdesc = adev->rx.host.rxstart;
+	rxhostdesc = adev->hw_rx_queue.host.rxstart;
 	if (rxhostdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx.tail) ? " [tail]" : "";
+			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
 			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
 			    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
 				seq_printf(file, "%02u FULL%s\n", i, rtl);
@@ -444,50 +454,53 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
 			rxhostdesc++;
 		}
 
-	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
-			adev->tx_free,
+	for(queue_id=0; queue_id<adev->num_hw_tx_queues; queue_id++){
+
+		seq_printf(file, "** Tx buf (q=%d, free %d, Ieee80211 queue: %s) **\n",
+			queue_id, adev->hw_tx_queue[queue_id].free,
 			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
 
-	txdesc = adev->tx.desc_start;
-	if (txdesc)
-		for (i = 0; i < TX_CNT; i++) {
-			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx.tail) ? " [tail]" : "";
+		txdesc = adev->hw_tx_queue[queue_id].desc_start;
+		if (txdesc)
+			for (i = 0; i < TX_CNT; i++) {
+				thd = (i == adev->hw_tx_queue[queue_id].head) ? " [head]" : "";
+				ttl = (i == adev->hw_tx_queue[queue_id].tail) ? " [tail]" : "";
 
-			if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
-				seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
+				if (txdesc->Ctl_8 & DESC_CTL_ACXDONE)
+					seq_printf(file, "%02u Ready to free (%02X)%s%s", i, txdesc->Ctl_8,
 						thd, ttl);
-			else if (txdesc->Ctl_8 & DESC_CTL_HOSTOWN)
-				seq_printf(file, "%02u Available     (%02X)%s%s", i, txdesc->Ctl_8,
+				else if (txdesc->Ctl_8 & DESC_CTL_HOSTOWN)
+					seq_printf(file, "%02u Available     (%02X)%s%s", i, txdesc->Ctl_8,
 						thd, ttl);
-			else
-				seq_printf(file, "%02u Busy          (%02X)%s%s", i, txdesc->Ctl_8,
+				else
+					seq_printf(file, "%02u Busy          (%02X)%s%s", i, txdesc->Ctl_8,
 						thd, ttl);
-			seq_printf(file, "\n");
+				seq_printf(file, "\n");
 
-			txdesc = acx_advance_txdesc(adev, txdesc, 1);
-		}
-	seq_printf(file,
-		"\n"
-		"** PCI data **\n"
-		"txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
-		"txdesc_size %u, txdesc_start %p\n"
-		"txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
-		"rxdesc_start %p\n"
-		"rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
-		"rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		adev->tx.buf.txstart, adev->tx.buf.size,
-		(unsigned long long)adev->tx.buf.phy,
-		adev->tx.desc_size, adev->tx.desc_start,
-		adev->tx.host.txstart, adev->tx.host.size,
-		(unsigned long long)adev->tx.host.phy,
-		adev->rx.desc_start,
-		adev->rx.host.rxstart, adev->rx.host.size,
-		(unsigned long long)adev->rx.host.phy,
-		adev->rx.buf.rxstart, adev->rx.buf.size,
-		(unsigned long long)adev->rx.buf.phy);
+				txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
+			}
+		seq_printf(file,
+		           "\n"
+		           "** PCI data **\n"
+		           "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
+		           "txdesc_size %u, txdesc_start %p\n"
+		           "txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
+		           "rxdesc_start %p\n"
+		           "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
+		           "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
+		           adev->hw_tx_queue[queue_id].buf.txstart, adev->hw_tx_queue[queue_id].buf.size,
+		           (unsigned long long)adev->hw_tx_queue[queue_id].buf.phy,
+		           adev->hw_tx_queue[queue_id].desc_size, adev->hw_tx_queue[queue_id].desc_start,
+		           adev->hw_tx_queue[queue_id].host.txstart, adev->hw_tx_queue[queue_id].host.size,
+		           (unsigned long long)adev->hw_tx_queue[queue_id].host.phy,
+		           adev->hw_rx_queue.desc_start,
+		           adev->hw_rx_queue.host.rxstart, adev->hw_rx_queue.host.size,
+		           (unsigned long long)adev->hw_rx_queue.host.phy,
+		           adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size,
+		           (unsigned long long)adev->hw_rx_queue.buf.phy);
+	}
 
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -510,22 +523,22 @@ int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
  * figuring out how many we need and whether we still have
  * sufficiently many.
  */
-tx_t* acxpci_alloc_tx(acx_device_t * adev)
+tx_t* acxpci_alloc_tx(acx_device_t * adev, int queue_id)
 {
 	struct txdesc *txdesc;
 	unsigned head;
 	u8 ctl8;
 
-	FN_ENTER;
 
-	if (unlikely(!adev->tx_free)) {
+
+	if (unlikely(!adev->hw_tx_queue[queue_id].free)) {
 		pr_acx("BUG: no free txdesc left\n");
 		txdesc = NULL;
 		goto end;
 	}
 
-	head = adev->tx_head;
-	txdesc = acx_get_txdesc(adev, head);
+	head = adev->hw_tx_queue[queue_id].head;
+	txdesc = acx_get_txdesc(adev, head, queue_id);
 	ctl8 = txdesc->Ctl_8;
 
 	/* 2005-10-11: there were several bug reports on this
@@ -544,13 +557,13 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev)
 	/* Needed in case txdesc won't be eventually submitted for tx */
 	txdesc->Ctl_8 = DESC_CTL_ACXDONE_HOSTOWN;
 
-	adev->tx_free--;
-	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->tx_free);
+	adev->hw_tx_queue[queue_id].free--;
+	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->hw_tx_queue[queue_id].free);
 
 	/* returning current descriptor, so advance to next free one */
-	adev->tx_head = (head + 1) % TX_CNT;
+	adev->hw_tx_queue[queue_id].head = (head + 1) % TX_CNT;
 end:
-	FN_EXIT0;
+
 
 	return (tx_t *) txdesc;
 }
@@ -787,7 +800,7 @@ int acx111pci_ioctl_info(struct net_device *ndev,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -811,7 +824,7 @@ int acx111pci_ioctl_info(struct net_device *ndev,
 
 	/* dump host rx descriptor ring buffer */
 
-	rxhostdesc = adev->rx.host.rxstart;
+	rxhostdesc = adev->hw_rx_queue.host.rxstart;
 
 	/* loop over complete receive pool */
 	if (rxhostdesc)
@@ -987,7 +1000,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	u8 chip_type;
 	struct ieee80211_hw *ieee;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
@@ -1323,7 +1336,7 @@ fail_ieee80211_alloc_hw:
 	ieee80211_free_hw(ieee);
 	
 done:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -1343,11 +1356,11 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	acx_device_t *adev = ieee2adev(hw);
 	unsigned long mem_region1, mem_region2;
 
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
-		goto end_no_lock;
+		return;
 	}
 
 	/* Unregister ieee80211 device */
@@ -1432,8 +1445,6 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
-	end_no_lock:
-	FN_EXIT0;
 }
 
 
@@ -1446,7 +1457,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 	pr_acx("suspend handler is experimental!\n");
 	pr_acx("sus: dev %p\n", hw);
 
@@ -1468,7 +1479,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 	pci_set_power_state(pdev, PCI_D3hot);
 
 	acx_sem_unlock(adev);
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -1477,7 +1488,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 
 	pr_acx("resume handler is experimental!\n");
 	pr_acx("rsm: got dev %p\n", hw);
@@ -1517,7 +1528,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
       end_unlock:
 	acx_sem_unlock(adev);
 	/* we need to return OK here anyway, right? */
-	FN_EXIT0;
+
 	return OK;
 }
 #endif /* CONFIG_PM */
@@ -1664,7 +1675,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
@@ -1892,7 +1903,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
     fail_vlynq_ieee80211_alloc_hw:
 
 	done:
-		FN_EXIT1(result);
+
 
 	return result;
 }
@@ -1901,11 +1912,11 @@ static void vlynq_remove(struct vlynq_device *vdev)
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
 	acx_device_t *adev = ieee2adev(hw);
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
-		goto end_no_lock;
+		return;
 	}
 
 	/* Unregister ieee80211 device */
@@ -1956,8 +1967,6 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	 * expecting to see a working dev...) */
 	ieee80211_free_hw(adev->ieee);
 
-	end_no_lock:
-	FN_EXIT0;
 }
 
 static struct vlynq_driver vlynq_acx = {
@@ -1978,7 +1987,7 @@ int __init acxpci_init_module(void)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	pr_acx(IO_COMPILE_NOTE);
@@ -1994,7 +2003,7 @@ int __init acxpci_init_module(void)
 	if (res)
 		pr_err("can't register pci/vlynq driver\n");
 
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -2007,7 +2016,7 @@ int __init acxpci_init_module(void)
  */
 void __exit acxpci_cleanup_module(void)
 {
-	FN_ENTER;
+
 
 #if defined(CONFIG_PCI)
 	pci_unregister_driver(&acxpci_driver);
@@ -2016,5 +2025,5 @@ void __exit acxpci_cleanup_module(void)
 #endif
 	log(L_INIT,
 	    "acxpci: PCI module unloaded\n");
-	FN_EXIT0;
+
 }

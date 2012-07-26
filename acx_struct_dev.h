@@ -19,6 +19,8 @@
 #define _ACX_STRUCT_DEV_H_
 
 #include "acx_struct_hw.h"
+#include <linux/wireless.h>
+#include <net/mac80211.h>
 
 /*
  * BOM Debug / log functionality
@@ -229,7 +231,9 @@ struct desc_info {
 
 /* tx fields refactored */
 struct tx_desc_pair {
+	unsigned int 	head;
 	unsigned int	tail;
+	unsigned int 	free;
 	txdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of txdesc */
 
@@ -244,9 +248,6 @@ struct rx_desc_pair {
 	struct desc_info host;
 	struct desc_info buf;
 };
-
-/* FIXME: this should be named something like struct acx_priv
- * (typedef'd to acx_priv_t) */
 
 /* non-firmware struct, no packing necessary */
 struct acx_device {
@@ -303,8 +304,6 @@ struct acx_device {
 	char		firmware_version[FW_ID_SIZE+1];
 	u32		firmware_numver;
 	u32		firmware_id;
-	const u16	*ie_len;
-	const u16	*ie_len_dot11;
 
 	/*** Device state ***/
 	u16		dev_state_mask;
@@ -448,13 +447,14 @@ struct acx_device {
 	u8		rate_supported[13];
 
 	/*** Encryption settings (WEP) ***/
+	u8 		default_key;
 	u32		auth_alg;		/* used in transmit_authen1 */
 	u8		wep_enabled;
 	u8		wep_restricted;
 	u8		wep_current_index;
 	wep_key_t	wep_keys[DOT11_MAX_DEFAULT_WEP_KEYS];	/* the default WEP keys */
-
 	key_struct_t	wep_key_struct[10];
+	int		hw_encrypt_enabled;
 
 	/*** Unknown ***/
 	u8		dtim_interval;
@@ -463,14 +463,14 @@ struct acx_device {
 	u16		rx_config_1;
 	u16		rx_config_2;
 	u16		memblocksize;
-	unsigned int	tx_free;
-	unsigned int	tx_head; /* keep as close as possible to Tx stuff below (cache line) */
 	u16		phy_header_len;
+
+	/* debugfs */
+	struct dentry	*debugfs_dir;
 
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
-
 #if (1 || defined(CONFIG_ACX_MAC80211_MEM))
 	u32 acx_txbuf_start;
 	int acx_txbuf_numblocks;
@@ -479,14 +479,14 @@ struct acx_device {
 	queueindicator_t *acx_queue_indicator;
 #endif
 
+	struct rx_desc_pair hw_rx_queue;
+	int num_hw_tx_queues;
+	/* pointers to tx buffers, tx host descriptors (in host
+	 * memory) and tx descs in device memory, same for rx */
+	struct tx_desc_pair hw_tx_queue[ACX111_MAX_NUM_HW_TX_QUEUES];
+
 	/*** PCI stuff ***/
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
-
-	/* pointers to tx buffers, tx host descriptors (in host
-	 * memory) and tx descs in device memory, same for rx
-	 */
-	struct tx_desc_pair tx;
-	struct rx_desc_pair rx;
 
 	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
@@ -532,7 +532,6 @@ struct acx_device {
 	int		bulkoutep;	/* bulk-out endpoint */
 	int		rxtruncsize;
 #endif
-	struct dentry	*debugfs_dir;
 };
 /* --- */
 

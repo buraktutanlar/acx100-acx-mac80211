@@ -36,12 +36,12 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 #endif
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	void acx_create_desc_queues(acx_device_t *adev, u32 tx_queue_start,
-				u32 rx_queue_start),
+               void acx_create_desc_queues(acx_device_t *adev, u32 rx_queue_start,
+                                           u32 *tx_queue_start, int num_tx),
 	{ } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	int acx_create_hostdesc_queues(acx_device_t *adev),
+	int acx_create_hostdesc_queues(acx_device_t *adev, int num_tx),
 	{ return 0; } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
@@ -85,7 +85,7 @@ DECL_OR_STUB ( PCI_OR_MEM,
 	{ } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	unsigned int acx_tx_clean_txdesc(acx_device_t *adev),
+	unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id),
 	{ return 0; } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
@@ -107,7 +107,7 @@ DECL_OR_STUB ( PCI_OR_MEM,
 
 DECL_OR_STUB ( PCI_OR_MEM,
 	void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
-			struct ieee80211_tx_info *info, struct sk_buff *skb),
+			struct ieee80211_tx_info *info, struct sk_buff *skb, int queue_id),
 	{ } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
@@ -162,28 +162,28 @@ DECL_OR_STUB ( PCI_OR_MEM,
 	{ } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	void acx_log_txbuffer(acx_device_t *adev),
+	void acx_log_txbuffer(acx_device_t *adev, int queue_id),
 	{ } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque),
+	void *_acx_get_txbuf(acx_device_t * adev, tx_t * tx_opaque, int queue_id),
 	{ return (void*) NULL; } )
 
 
 #if (defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM)
 
 
-static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index)
+static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index, int queue_id)
 {
-	return (txdesc_t*) (((u8*) adev->tx.desc_start)
-			+ index * adev->tx.desc_size);
+	return (txdesc_t*) (((u8*) adev->hw_tx_queue[queue_id].desc_start)
+			+ index * adev->hw_tx_queue[queue_id].desc_size);
 }
 
 static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
-					txdesc_t* txdesc, int inc)
+					txdesc_t* txdesc, int inc, int queue_id)
 {
 	return (txdesc_t*) (((u8*) txdesc)
-			+ inc * adev->tx.desc_size);
+			+ inc * adev->hw_tx_queue[queue_id].desc_size);
 }
 
 #else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */

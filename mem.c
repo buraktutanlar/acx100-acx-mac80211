@@ -70,6 +70,15 @@
 #include "acx.h"
 #include "merge.h"
 #include "mem.h"
+#include "cmd.h"
+#include "ie.h"
+#include "init.h"
+#include "utils.h"
+#include "cardsetting.h"
+#include "rx.h"
+#include "tx.h"
+#include "main.h"
+#include "boot.h"
 
 /*
  * BOM Config
@@ -477,7 +486,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 	acxmem_lock();
 
 	devname = wiphy_name(adev->ieee->wiphy);
@@ -646,7 +655,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		cmdstr, jiffies - start);
 
 	acxmem_unlock();
-	FN_EXIT1(OK);
+
 	return OK;
 
 	bad:
@@ -660,7 +669,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	);
 
 	acxmem_unlock();
-	FN_EXIT1(NOT_OK);
+
 	return NOT_OK;
 }
 #endif // acxmem_issue_cmd_timeo_debug()
@@ -744,7 +753,7 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
-	FN_ENTER;
+
 
 	/* OW Bit setting done differently in pci.c */
 	/* halt eCPU */
@@ -777,7 +786,7 @@ void acxmem_reset_mac(acx_device_t *adev)
 
 	write_reg32(adev, 0x808, 0x10000);
 
-	FN_EXIT0;
+
 }
 
 /***********************************************************************
@@ -790,7 +799,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
 	acx_device_t *adev = ndev2adev(ndev);
 	unsigned long flags;
 
-	FN_ENTER;
+
 
 	acx_lock(adev, flags);
 
@@ -814,7 +823,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
 
 	acx_unlock(adev, flags);
 
-	FN_EXIT0;
+
 }
 #endif
 
@@ -843,7 +852,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 	acxmem_lock();
 
 #if DUMP_MEM_DURING_DIAG > 0
@@ -852,10 +861,10 @@ int acxmem_proc_diag_output(struct seq_file *file,
 #endif
 
 	seq_printf(file, "** Rx buf **\n");
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
-			rtl = (i == adev->rx.tail) ? " [tail]" : "";
+			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
 			Ctl_8 = read_slavemem8(adev, (uintptr_t)
 					&(rxdesc->Ctl_8));
 			if (Ctl_8 & DESC_CTL_HOSTOWN)
@@ -899,11 +908,11 @@ int acxmem_proc_diag_output(struct seq_file *file,
 		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 		adev->acx_txbuf_free);
 
-	txdesc = adev->tx.desc_start;
+	txdesc = adev->hw_tx_queue[0].desc_start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
-			thd = (i == adev->tx_head) ? " [head]" : "";
-			ttl = (i == adev->tx.tail) ? " [tail]" : "";
+			thd = (i == adev->hw_tx_queue[0].head) ? " [head]" : "";
+			ttl = (i == adev->hw_tx_queue[0].tail) ? " [tail]" : "";
 			acxmem_copy_from_slavemem(adev, (u8 *) &txd,
 						 (uintptr_t) txdesc, sizeof(txd));
 
@@ -964,7 +973,7 @@ int acxmem_proc_diag_output(struct seq_file *file,
 			}
 #endif
 
-			txdesc = acx_advance_txdesc(adev, txdesc, 1);
+			txdesc = acx_advance_txdesc(adev, txdesc, 1, 0);
 		}
 	}
 
@@ -1004,17 +1013,17 @@ int acxmem_proc_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->tx.buf.txstart, adev->tx.buf.size, adev->tx.desc_size,
-		adev->tx.desc_start, adev->tx.host.txstart,
-		adev->tx.host.size, adev->acx_txbuf_start,
+		adev->hw_tx_queue[0].buf.txstart, adev->hw_tx_queue[0].buf.size, adev->hw_tx_queue[0].desc_size,
+		adev->hw_tx_queue[0].desc_start, adev->hw_tx_queue[0].host.txstart,
+		adev->hw_tx_queue[0].host.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
-		adev->rx.desc_start,
-		adev->rx.host.rxstart, adev->rx.host.size,
-		adev->rx.buf.rxstart, adev->rx.buf.size);
+		adev->hw_rx_queue.desc_start,
+		adev->hw_rx_queue.host.rxstart, adev->hw_rx_queue.host.size,
+		adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size);
 
 	acxmem_unlock();
-	FN_EXIT0;
+
 	return 0;
 }
 #endif // acxmem_proc_diag_output()
@@ -1038,7 +1047,7 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 	u32 addr;
 	u8 Ctl_8;
 
-	FN_ENTER;
+
 
 	if (unlikely(acx_debug & L_BUFR))
 		acx_log_rxbuffer(adev);
@@ -1047,11 +1056,11 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 	 * full, just in case there's a mismatch between our current
 	 * rx_tail and the full descriptor we're supposed to
 	 * handle. */
-	tail = adev->rx.tail;
+	tail = adev->hw_rx_queue.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->rx.host.rxstart[tail];
-		rxdesc = &adev->rx.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		rxdesc = &adev->hw_rx_queue.desc_start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -1139,8 +1148,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->rx.host.rxstart[tail];
-		rxdesc = &adev->rx.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		rxdesc = &adev->hw_rx_queue.desc_start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
 
@@ -1151,8 +1160,8 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 	}
 	end:
-		adev->rx.tail = tail;
-		FN_EXIT0;
+		adev->hw_rx_queue.tail = tail;
+
 }
 #endif
 
@@ -1323,7 +1332,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev)
 	unsigned long flags;
 	unsigned int tx_num_cleaned;
 
-	FN_ENTER;
+
 
 	acx_lock(adev, flags);
 
@@ -1357,7 +1366,7 @@ static void acxmem_i_tx_timeout(struct net_device *ndev)
 
 	acx_unlock(adev, flags);
 
-	FN_EXIT0;
+
 }
 #endif
 
@@ -1399,7 +1408,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	register u16 irqtype;
 	u16 unmasked;
 
-	FN_ENTER;
+
 
 	if (!adev)
 		return IRQ_NONE;
@@ -1428,7 +1437,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 
 	/* Done here because IRQ_NONEs taking three lines of log
 	 ** drive me crazy */
-	FN_ENTER;
+
 
 #define IRQ_ITERATE 1
 #if IRQ_ITERATE
@@ -1557,12 +1566,12 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 	/* handled: */
 	/* write_flush(adev); - not needed, last op was read anyway */
 	acx_unlock(adev, flags);
-	FN_EXIT0;
+
 	return IRQ_HANDLED;
 
 	none:
 	acx_unlock(adev, flags);
-	FN_EXIT0;
+
 	return IRQ_NONE;
 }
 #endif
@@ -1810,7 +1819,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 	acx_lock(adev, flags);
 
 	/* dump acx111 internal rx descriptor ring buffer */
-	rxdesc = adev->rx.desc_start;
+	rxdesc = adev->hw_rx_queue.desc_start;
 
 	/* loop over complete receive pool */
 	if (rxdesc)
@@ -1833,7 +1842,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 		/* dump host rx descriptor ring buffer */
 
-		rxhostdesc = adev->rx.host.rxstart;
+		rxhostdesc = adev->hw_rx_queue.host.rxstart;
 
 		/* loop over complete receive pool */
 		if (rxhostdesc)
@@ -2008,7 +2017,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	struct ieee80211_hw *ieee;
 
-	FN_ENTER;
+
 
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxmem_hw_ops);
@@ -2249,7 +2258,7 @@ fail_ieee80211_alloc_hw:
 	ieee80211_free_hw(ieee);
 
 done:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -2269,7 +2278,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
-	FN_ENTER;
+
 
 	if (!hw) {
 		log(L_DEBUG, "card is unused. Skipping any release code\n");
@@ -2349,7 +2358,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	pr_acxmem("done\n");
 
 end_no_lock:
-	FN_EXIT0;
+
 	return(0);
 }
 
@@ -2364,7 +2373,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 	struct ieee80211_hw *hw
 		= (struct ieee80211_hw *) platform_get_drvdata(pdev);
 
-	FN_ENTER;
+
 	pr_acx("suspend handler is experimental!\n");
 	pr_acx("sus: dev %p\n", hw);
 
@@ -2393,7 +2402,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 	return OK;
 }
 
@@ -2403,7 +2412,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 		platform_get_drvdata(pdev);
 	acx_device_t *adev;
 
-	FN_ENTER;
+
 
 	pr_acx("resume handler is experimental!\n");
 	pr_acx("rsm: got dev %p\n", hw);
@@ -2452,7 +2461,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 	return OK;
 }
 #endif /* CONFIG_PM */
@@ -2481,7 +2490,7 @@ int __init acxmem_init_module(void)
 {
 	int res;
 
-	FN_ENTER;
+
 
 	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	pr_acx(IO_COMPILE_NOTE);
@@ -2490,7 +2499,7 @@ int __init acxmem_init_module(void)
 		"waiting for cards to probe...\n");
 
 	res = platform_driver_register(&acxmem_driver);
-	FN_EXIT1(res);
+
 	return res;
 }
 
@@ -2502,12 +2511,12 @@ int __init acxmem_init_module(void)
  */
 void __exit acxmem_cleanup_module(void)
 {
-	FN_ENTER;
+
 
 	pr_acxmem("cleanup_module\n");
 	platform_driver_unregister(&acxmem_driver);
 
-	FN_EXIT0;
+
 }
 
 MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );

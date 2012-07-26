@@ -54,6 +54,15 @@
 
 #include "acx.h"
 #include "usb.h"
+#include "cmd.h"
+#include "ie.h"
+#include "init.h"
+#include "utils.h"
+#include "cardsetting.h"
+#include "rx.h"
+#include "tx.h"
+#include "main.h"
+#include "boot.h"
 
 /* OW, 20091205, TODO, Info on TNETW1450 support:
  * Firmware loads, device shows activity, however RX and TX paths are broken.
@@ -157,7 +166,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 {
 	/* mem_read_write_t mem; */
 
-	FN_ENTER;
+
 
 	pr_acxusb("doesn't seem to work yet, disabled.\n");
 
@@ -170,7 +179,7 @@ int acxusb_read_phy_reg(acx_device_t * adev, u32 reg, u8 * charbuf)
 	   log(L_DEBUG, "read radio PHY[0x%04X]=0x%02X\n", reg, *charbuf);
 	 */
 
-	FN_EXIT1(OK);
+
 	return OK;
 }
 
@@ -178,7 +187,7 @@ int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 {
 	mem_read_write_t mem;
 
-	FN_ENTER;
+
 
 	mem.addr = cpu_to_le16(reg);
 	mem.type = cpu_to_le16(0x82);
@@ -187,7 +196,7 @@ int acxusb_write_phy_reg(acx_device_t * adev, u32 reg, u8 value)
 	acx_issue_cmd(adev, ACX1xx_CMD_MEM_WRITE, &mem, sizeof(mem));
 	log(L_DEBUG, "write radio PHY[0x%04X]=0x%02X\n", reg, value);
 
-	FN_EXIT1(OK);
+
 	return OK;
 }
 
@@ -239,7 +248,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 	int result = -EIO;
 	int i;
 
-	FN_ENTER;
+
 
 	/* dump_device(usbdev); */
 
@@ -478,7 +487,7 @@ acxusb_boot(struct usb_device *usbdev, int is_tnetw1450, int *radio_type)
 	vfree(fw_image);
 	kfree(usbbuf);
 
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -521,7 +530,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 	int cmd_status;
 	int result;
 
-	FN_ENTER;
+
 
 	devname = wiphy_name(adev->ieee->wiphy);
 	/* no "wlan%%d: ..." please */
@@ -645,7 +654,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 
   good:
 	kfree(loc);
-	FN_EXIT1(OK);
+
 	return OK;
 
   bad:
@@ -654,7 +663,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 
 	//dump_stack();
 	kfree(loc);
-	FN_EXIT1(NOT_OK);
+
 	return NOT_OK;
 }
 
@@ -829,7 +838,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	struct ieee80211_tx_info *txstatus;
 	// unsigned long flags;
 
-	FN_ENTER;
+
 
 	BUG_ON(!urb->context);
 
@@ -847,7 +856,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		log(L_USBRXTX,
 			"acx: rx: device is down, not doing anything\n");
-		goto end_unlock;
+		return;
 	}
 
 	inbuf = &rx->bulkin;
@@ -873,25 +882,25 @@ static void acxusb_complete_rx(struct urb *urb)
 	case -EOVERFLOW:
 		pr_err("rx data overrun\n");
 		adev->rxtruncsize = 0;	/* Not valid anymore. */
-		goto end_unlock;
+		return;
 	case -ECONNRESET:
 		adev->rxtruncsize = 0;
-		goto end_unlock;
+		return;
 	case -ESHUTDOWN:	/* rmmod */
 		adev->rxtruncsize = 0;
-		goto end_unlock;
+		return;
 	default:
 		adev->rxtruncsize = 0;
 		adev->stats.rx_errors++;
 		pr_acx("rx error (urb status=%d)\n", urb->status);
-		goto end_unlock;
+		return;
 	}
 
 	if (unlikely(!size))
 		pr_acx("warning, encountered zerolength rx packet\n");
 
 	if (urb->transfer_buffer != inbuf)
-		goto end_unlock;
+		return;
 
 	/* check if previous frame was truncated
 	 ** FIXME: this code can only handle truncation
@@ -994,11 +1003,11 @@ static void acxusb_complete_rx(struct urb *urb)
 		ieee80211_tx_status(adev->ieee, skb);
 
 		tx->busy = 0;
-		adev->tx_free++;
+		adev->hw_tx_queue[0].free++;
 
-		if ((adev->tx_free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+		if ((adev->hw_tx_queue[0].free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
 			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
-					adev->tx_free);
+				adev->hw_tx_queue[0].free);
 			acx_wake_queue(adev->ieee, NULL);
 			ieee80211_queue_work(adev->ieee, &adev->tx_work);
 		}
@@ -1045,11 +1054,6 @@ static void acxusb_complete_rx(struct urb *urb)
 
 	}
 
-    end_unlock:
-	//spin_unlock_irqrestore(&adev->spinlock, flags);
-
-	/* end: */
-	FN_EXIT0;
 }
 
 /*
@@ -1063,7 +1067,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 	int errcode, rxnum;
 	unsigned int inpipe;
 
-	FN_ENTER;
+
 
 	rxurb = rx->urb;
 	usbdev = adev->usbdev;
@@ -1079,7 +1083,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 		usb_unlink_urb(rxurb);
 	} else if (unlikely(rxurb->status == -ECONNRESET)) {
 		log(L_USBRXTX, "_poll_rx: connection reset\n");
-		goto end;
+		return;
 	}
 	rxurb->actual_length = 0;
 	usb_fill_bulk_urb(rxurb, usbdev, inpipe, &rx->bulkin,	/* dataptr */
@@ -1095,8 +1099,7 @@ static void acxusb_poll_rx(acx_device_t * adev, usb_rx_t * rx)
 	log(L_USBRXTX,
 		"acx: SUBMIT RX (%d) inpipe=0x%X size=%d errcode=%d\n",
 		rxnum, inpipe, (int)RXBUFSIZE, errcode);
-      end:
-	FN_EXIT0;
+
 }
 
 /*
@@ -1124,7 +1127,7 @@ static void acxusb_complete_tx(struct urb *urb)
 	usb_tx_t *tx;
 	//unsigned long flags;
 
-	FN_ENTER;
+
 
 	BUG_ON(!urb->context);
 
@@ -1141,7 +1144,7 @@ static void acxusb_complete_tx(struct urb *urb)
 	 */
 	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
 		pr_acx("tx: device is down, not doing anything\n");
-		goto end_unlock;
+		return;
 	}
 
 	//	pr_acx("RETURN TX (%d): status=%d size=%d\n",
@@ -1152,10 +1155,10 @@ static void acxusb_complete_tx(struct urb *urb)
 	case 0:		/* No error */
 		break;
 	case -ESHUTDOWN:
-		goto end_unlock;
+		return;
 		break;
 	case -ECONNRESET:
-		goto end_unlock;
+		return;
 		break;
 		/* FIXME: real error-handling code here please */
 	default:
@@ -1163,11 +1166,6 @@ static void acxusb_complete_tx(struct urb *urb)
 		/* FIXME: real error-handling code here please */
 	}
 
-    end_unlock:
-	//spin_unlock_irqrestore(&adev->spinlock, flags);
-
-    /* end: */
-	FN_EXIT0;
 }
 
 /*
@@ -1179,9 +1177,9 @@ tx_t *acxusb_alloc_tx(acx_device_t *adev)
 	usb_tx_t *tx;
 	unsigned head;
 
-	FN_ENTER;
 
-	head = adev->tx_head;
+
+	head =adev->hw_tx_queue[0].head;
 	do {
 		head = (head + 1) % ACX_TX_URB_CNT;
 		if (!adev->usb_tx[head].busy) {
@@ -1189,16 +1187,16 @@ tx_t *acxusb_alloc_tx(acx_device_t *adev)
 				"acx: allocated tx %d\n", head);
 			tx = &adev->usb_tx[head];
 			tx->busy = 1;
-			adev->tx_free--;
+			adev->hw_tx_queue[0].free--;
 			goto end;
 		}
-	} while (likely(head != adev->tx_head));
+	} while (likely(head != adev->hw_tx_queue[0].head));
 	tx = NULL;
 	printk_ratelimited("acxusb: tx buffers full\n");
 
 	end:
-	adev->tx_head = head;
-	FN_EXIT0;
+	adev->hw_tx_queue[0].head = head;
+
 	return (tx_t *) tx;
 }
 
@@ -1236,7 +1234,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	int ucode, txnum;
 	u8 rate_100;
 
-	FN_ENTER;
+
 
 	tx = ((usb_tx_t *) tx_opaque);
 
@@ -1248,7 +1246,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	txnum = tx - adev->usb_tx;
 
 	log(L_DEBUG, "using buf#%d free=%d len=%d\n",
-	    txnum, adev->tx_free, wlanpkt_len);
+	    txnum, adev->hw_tx_queue[0].free, wlanpkt_len);
 
 	/* fill the USB transfer header */
 	txbuf->desc = cpu_to_le16(USB_TXBUF_TXDESC);
@@ -1301,10 +1299,10 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 		 */
 		adev->stats.tx_errors++;
 		tx->busy = 0;
-		adev->tx_free++;
+		adev->hw_tx_queue[0].free++;
 		/* needed? if (adev->tx_free > TX_START_QUEUE) acx_wake_queue(...) */
 	}
-	FN_EXIT0;
+
 }
 
 /*
@@ -1357,7 +1355,7 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 	unsigned long flags;
 	int i;
 
-	FN_ENTER;
+
 
 	acx_lock(adev, flags);
 */	/* unlink the URBs */
@@ -1369,7 +1367,7 @@ void acxusb_i_tx_timeout(struct net_device *ndev)
 */	/* TODO: stats update */
 /*	acx_unlock(adev, flags);
 
-	FN_EXIT0;
+
 }
 */
 #endif
@@ -1406,7 +1404,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	acx_device_t *adev = ieee2adev(hw);
 	int i;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	adev->initialized = 0;
@@ -1421,7 +1419,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 		adev->usb_tx[i].urb->status = 0;
 		adev->usb_tx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	/* put the ACX100 out of sleep mode */
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
@@ -1442,7 +1440,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 	return 0;
 }
 
@@ -1460,7 +1458,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	acx_device_t *adev = ieee2adev(hw);
 	int i;
 
-	FN_ENTER;
+
 	acx_sem_lock(adev);
 
 	acx_stop_queue(adev->ieee, "on ifdown");
@@ -1489,7 +1487,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 		acxusb_unlink_urb(adev->usb_rx[i].urb);
 		adev->usb_rx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	/* Must do this outside of lock */
 	del_timer_sync(&adev->mgmt_timer);
@@ -1501,7 +1499,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 
 	acx_sem_unlock(adev);
 
-	FN_EXIT0;
+
 }
 
 static const struct ieee80211_ops acxusb_hw_ops = {
@@ -1574,7 +1572,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
 	struct ieee80211_hw *ieee;
 
-	FN_ENTER;
+
 
 	if (is_tnetw1450) {
 		/* Boot the device (i.e. upload the firmware) */
@@ -1741,7 +1739,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		adev->usb_tx[i].adev = adev;
 		adev->usb_tx[i].busy = 0;
 	}
-	adev->tx_free = ACX_TX_URB_CNT;
+	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	usb_set_intfdata(intf, adev);
 	SET_IEEE80211_DEV(ieee, &intf->dev);
@@ -1823,7 +1821,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	result = -EIO;
 
   end:
-	FN_EXIT1(result);
+
 	return result;
 }
 
@@ -1840,11 +1838,11 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	int i;
 	acx_device_t *adev = usb_get_intfdata(intf);
 
-	FN_ENTER;
+
 
 	/* No WLAN device... no sense */
 	if (!adev)
-		goto end;
+		return;
 
 	/* Unregister network device
 	 *
@@ -1882,8 +1880,6 @@ static void acxusb_disconnect(struct usb_interface *intf)
 
 	ieee80211_free_hw(adev->ieee);
 
-	end:
-	FN_EXIT0;
 }
 
 /* USB driver data structure as required by the kernel's USB core */
