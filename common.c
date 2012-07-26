@@ -269,63 +269,6 @@ static void acx_s_update_80211_powersave_mode(acx_device_t * adev)
 }
 #endif
 
-/* TODO Verify these functions: translation rxbuffer.phy_plcp_signal to rate_idx */
-#if 0
-
-/** Rate values **/
-#define ACX_CCK_RATE_1MB            0
-#define ACX_CCK_RATE_2MB            1
-#define ACX_CCK_RATE_5MB            2
-#define ACX_CCK_RATE_11MB           3
-#define ACX_OFDM_RATE_6MB           4
-#define ACX_OFDM_RATE_9MB           5
-#define ACX_OFDM_RATE_12MB          6
-#define ACX_OFDM_RATE_18MB          7
-#define ACX_OFDM_RATE_24MB          8
-#define ACX_OFDM_RATE_36MB          9
-#define ACX_OFDM_RATE_48MB          10
-#define ACX_OFDM_RATE_54MB          11
-
-static u8 acx_plcp_get_bitrate_cck(u8 plcp)
-{
-        switch (plcp) {
-        case 0x0A:
-                return ACX_CCK_RATE_1MB;
-        case 0x14:
-                return ACX_CCK_RATE_2MB;
-        case 0x37:
-                return ACX_CCK_RATE_5MB;
-        case 0x6E:
-                return ACX_CCK_RATE_11MB;
-        }
-        return 0;
-}
-
-/* Extract the bitrate out of an OFDM PLCP header. */
-static u8 acx_plcp_get_bitrate_ofdm(u8 plcp)
-{
-        switch (plcp & 0xF) {
-        case 0xB:
-                return ACX_OFDM_RATE_6MB;
-        case 0xF:
-                return ACX_OFDM_RATE_9MB;
-        case 0xA:
-                return ACX_OFDM_RATE_12MB;
-        case 0xE:
-                return ACX_OFDM_RATE_18MB;
-        case 0x9:
-                return ACX_OFDM_RATE_24MB;
-        case 0xD:
-                return ACX_OFDM_RATE_36MB;
-        case 0x8:
-                return ACX_OFDM_RATE_48MB;
-        case 0xC:
-                return ACX_OFDM_RATE_54MB;
-        }
-        return 0;
-}
-#endif
-
 
 int acx111_set_default_key(acx_device_t *adev, u8 key_id)
 {
