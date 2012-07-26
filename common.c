@@ -221,11 +221,8 @@ int acx_net_reset(struct ieee80211_hw *ieee)
  */
 void acx_mwait(int ms)
 {
-
 	msleep(ms);
-
 }
-
 
 #if CMD_DISCOVERY
 void great_inquisitor(acx_device_t * adev)
