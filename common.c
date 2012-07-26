@@ -17,26 +17,7 @@
  */
 #include "acx_debug.h"
 
-#include <linux/version.h>
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/delay.h>
-#include <linux/proc_fs.h>
-#include <linux/netdevice.h>
-#include <linux/wireless.h>
-#include <linux/pm.h>
-#include <linux/vmalloc.h>
-#include <linux/firmware.h>
-#include <linux/ethtool.h>
-#include <linux/pci.h>
-#include <linux/nl80211.h>
-#include <linux/ieee80211.h>
-#include <linux/etherdevice.h>
-
-#include <net/mac80211.h>
 
 #include "acx.h"
 #include "usb.h"
