@@ -260,13 +260,6 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
 /* int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid); */
 
-/* BOM Configuration (Common:Control Path)
- * -----
- */
-void acx_set_defaults(acx_device_t * adev);
-/* int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
- * void acx_update_capabilities(acx_device_t *adev);
- */
 
 /* BOM Proc, Debug (Common)
  * -----
