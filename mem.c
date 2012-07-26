@@ -76,6 +76,7 @@
 #include "utils.h"
 #include "cardsetting.h"
 #include "rx.h"
+#include "main.h"
 
 /*
  * BOM Config
