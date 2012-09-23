@@ -14,19 +14,6 @@ typedef ssize_t ((acx_proc_write_t)(struct file *, const char __user *,
 extern acx_proc_show_t *const acx_proc_show_funcs[];
 extern acx_proc_write_t *const acx_proc_write_funcs[];
 
-/* debugfs.c API used by common.c */
-#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
-int acx_debugfs_add_adev(struct acx_device *adev);
-void acx_debugfs_remove_adev(struct acx_device *adev);
-int __init acx_debugfs_init(void);
-void __exit acx_debugfs_exit(void);
-#else
-static int acx_debugfs_add_adev(struct acx_device *adev) { return 0; }
-static void acx_debugfs_remove_adev(struct acx_device *adev) { }
-static int __init acx_debugfs_init(void)  { return 0; }
-static void __exit acx_debugfs_exit(void) { }
-#endif /* defined CONFIG_DEBUG_FS */
-
 int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout,
 		const char *cmdstr);

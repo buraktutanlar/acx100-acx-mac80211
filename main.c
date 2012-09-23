@@ -612,8 +612,6 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 	logf0(L_ANY, "Redoing cmd_join_bssid() after add_interface\n");
 	acx_cmd_join_bssid(adev, adev->bssid);
 
-	acx_debugfs_add_adev(adev);
-
 	pr_info("Virtual interface added (type: 0x%08X, MAC: %s)\n",
 		adev->vif_type,	acx_print_mac(mac, mac_vif));
 
@@ -634,7 +632,6 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 
 
 	acx_sem_lock(adev);
-	acx_debugfs_remove_adev(adev);
 
 	mac_vif = VIF_addr(vif);
 

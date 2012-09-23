@@ -22,6 +22,7 @@
 #include "acx.h"
 #include "usb.h"
 #include "merge.h"
+#include "debugfs.h"
 #include "mem.h"
 #include "pci.h"
 #include "cmd.h"
@@ -103,6 +104,9 @@ static int __init acx_init_module(void)
 	       "go to http://acx100.sourceforge.net/wiki for "
 	       "further information\n");
 
+	acx_proc_init();
+	acx_debugfs_init();
+
 	r1 = r2 = r3 = -EINVAL;
 
 	r1 = acxpci_init_module();
@@ -111,25 +115,27 @@ static int __init acx_init_module(void)
 
 	if (r3 && r2 && r1) {		/* all three failed! */
 		pr_info("r1_pci=%i, r2_usb=%i, r3_mem=%i\n", r1, r2, r3);
-		return -EINVAL;
+		goto errout;
 	}
-
-	acx_proc_init();
-	acx_debugfs_init();
 
 	/* return success if at least one succeeded */
 	return 0;
+
+	errout:
+	acx_debugfs_exit();
+	acx_proc_exit();
+
+	return -EINVAL;
 }
 
 static void __exit acx_cleanup_module(void)
 {
-	/* TODO Check, that interface isn't still up */
-	acx_debugfs_exit();
-	acx_proc_exit();
-
 	acxpci_cleanup_module();
 	acxusb_cleanup_module();
 	acxmem_cleanup_module();
+
+	acx_debugfs_exit();
+	acx_proc_exit();
 }
 
 /*

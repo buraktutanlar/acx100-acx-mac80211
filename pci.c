@@ -51,6 +51,7 @@
 #include "acx.h"
 #include "pci.h"
 #include "merge.h"
+#include "debugfs.h"
 #include "io-acx.h"
 #include "cmd.h"
 #include "ie.h"
@@ -1233,10 +1234,8 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
-	/* Register the card, AFTER everything else has been set up,
-	 * since otherwise an ioctl could step on our feet due to
-	 * firmware operations happening in parallel or uninitialized
-	 * data */
+	// Debug and proc-fs
+	acx_debugfs_add_adev(adev);
 
 	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_proc_register_entries;
@@ -1403,8 +1402,9 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 
 	}
 
-	/* Proc */
+	/* Debug and proc-fs */
 	acx_proc_unregister_entries(adev->ieee);
+	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */
 	acx_irq_disable(adev);
@@ -1827,10 +1827,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
-	/* Register the card, AFTER everything else has been set up,
-	 * since otherwise an ioctl could step on our feet due to
-	 * firmware operations happening in parallel or uninitialized
-	 * data */
+	// Debug and proc-fs
+	acx_debugfs_add_adev(adev);
 
 	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_vlynq_proc_register_entries;
@@ -1941,8 +1939,9 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		/* OW PCI still does something here (although also need to be reviewed). */
 	}
 
-	/* Proc */
+	/* Debug and proc-fs */
 	acx_proc_unregister_entries(adev->ieee);
+	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */
 	acx_irq_disable(adev);

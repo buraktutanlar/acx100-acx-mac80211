@@ -53,6 +53,7 @@
 #include <net/mac80211.h>
 
 #include "acx.h"
+#include "debugfs.h"
 #include "usb.h"
 #include "cmd.h"
 #include "ie.h"
@@ -1784,6 +1785,8 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		goto end_nomem;
 	}
 
+	// Debug and proc-fs
+	acx_debugfs_add_adev(adev);
 	acx_proc_register_entries(ieee);
 
 	pr_acx("USB module loaded successfully\n");
@@ -1854,8 +1857,10 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	 * _close() will try to grab it as well if it's called,
 	 * deadlocking the machine.
 	 */
-	acx_proc_unregister_entries(adev->ieee);
 	ieee80211_unregister_hw(adev->ieee);
+
+	acx_proc_unregister_entries(adev->ieee);
+	acx_debugfs_remove_adev(adev);
 
 	acx_sem_lock(adev);
 	/* This device exists no more */

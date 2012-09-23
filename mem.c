@@ -69,6 +69,7 @@
 
 #include "acx.h"
 #include "merge.h"
+#include "debugfs.h"
 #include "mem.h"
 #include "cmd.h"
 #include "ie.h"
@@ -2181,11 +2182,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 */
 	acx_set_defaults(adev);
 
-	/* Register the card, AFTER everything else has been set up,
-	 * since otherwise an ioctl could step on our feet due to
-	 * firmware operations happening in parallel or uninitialized
-	 * data */
-
+	acx_debugfs_add_adev(adev);
 	if (acx_proc_register_entries(ieee) != OK)
 		goto fail_proc_register_entries;
 
@@ -2331,8 +2328,9 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 		acxmem_unlock();
 	}
 
-	/* Proc */
+	// Debug and proc-fs
 	acx_proc_unregister_entries(adev->ieee);
+	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */
 	acxmem_lock();
