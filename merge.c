@@ -436,8 +436,6 @@ int acx_create_hostdesc_queues(acx_device_t *adev, int num_tx)
         int res;
         int i;
 
-	pr_notice("notice IS_PCI(%p): %d\n", adev, IS_PCI(adev));
-
 	for(i=0; i<num_tx; i++)
 	{
 		res = acx_create_tx_host_desc_queue(adev, &adev->hw_tx_queue[i]);
@@ -574,8 +572,8 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
 		: (txdesc_t *) (uintptr_t)tx_queue_start;
 
-	log(L_INIT, "adev->iobase2=%p, "
-                "tx_queue_start=%08X, "
+	log(L_INIT, "adev->iobase2=%p,"
+                "tx_queue_start=%08X,"
 		"tx->desc_start=%p",
                 adev->iobase2, tx_queue_start, tx->desc_start);
 
