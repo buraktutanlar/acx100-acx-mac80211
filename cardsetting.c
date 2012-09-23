@@ -1084,6 +1084,11 @@ int acx_set_hw_encryption_on(acx_device_t *adev)
 	if(adev->hw_encrypt_enabled)
 		return OK;
 
+	if (IS_ACX100(adev)){
+		log(L_INIT, "acx100: hw-encryption not supported\n");
+		return -EOPNOTSUPP;
+	}
+
 	log(L_INIT, "Enabling hw-encryption\n");
 
 	res = acx111_feature_off(adev, 0,
@@ -1099,6 +1104,11 @@ int acx_set_hw_encryption_off(acx_device_t *adev)
 
 	if(!adev->hw_encrypt_enabled)
 		return OK;
+
+	if (IS_ACX100(adev)){
+		log(L_INIT, "acx100: hw-encryption not supported\n");
+		return OK;
+	}
 
 	log(L_INIT, "Disabling hw-encryption\n");
 
