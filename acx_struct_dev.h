@@ -351,7 +351,6 @@ struct acx_device {
 	 * (ifconfig) when it makes sense only */
 	u8		dev_addr[MAX_ADDR_LEN];
 	u8		bssid[ETH_ALEN];	/* the BSSID after having joined */
-	u8		ap[ETH_ALEN];		/* The AP we want, FF:FF:FF:FF:FF:FF is any */
 	u16		aid;			/* The Association ID sent from the AP / last used AID if we're an AP */
 	u16		mode;			/* mode from iwconfig */
 	int		monitor_type;		/* ARPHRD_IEEE80211 or ARPHRD_IEEE80211_PRISM */

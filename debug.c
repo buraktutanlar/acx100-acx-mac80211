@@ -75,7 +75,6 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 		     adev->wep_current_index);
 	seq_printf(file, "dev_addr  " MACSTR "\n", MAC(adev->dev_addr));
 	seq_printf(file, "bssid     " MACSTR "\n", MAC(adev->bssid));
-	seq_printf(file, "ap_filter " MACSTR "\n", MAC(adev->ap));
 
 	seq_printf(file, "tx_queue len: %d\n", skb_queue_len(&adev->tx_queue));
 

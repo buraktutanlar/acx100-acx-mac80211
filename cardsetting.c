@@ -1783,7 +1783,6 @@ void acx_set_defaults(acx_device_t *adev)
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
 	adev->brange_time_last_state_change = jiffies;
 
-	MAC_BCAST(adev->ap);
 	adev->essid_len =
 		snprintf(adev->essid, sizeof(adev->essid), "ACXSTA%02X%02X%02X",
 			adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);
