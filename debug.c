@@ -1,5 +1,7 @@
 #include "acx_debug.h"
 
+#include <linux/proc_fs.h>
+
 #include "acx.h"
 #include "pci.h"
 #include "mem.h"
