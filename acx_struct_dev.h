@@ -293,6 +293,7 @@ struct acx_device {
 	/*** Hardware identification ***/
 	const char		*chip_name;
 	u8			dev_type;
+	u8			dev_is_vlynq;
 	u8			chip_type;
 	u8			form_factor;
 	u8			radio_type;

@@ -1714,6 +1714,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
+	adev->dev_is_vlynq = 1;
 
 	/* Finished with private interface */
 

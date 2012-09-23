@@ -1995,12 +1995,8 @@ int acx_reset_dev(acx_device_t *adev)
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 
-	/* This really must be CONFIG_PCI (not CONFIG_ACX_MAC80211_PCI),
-	 * because it may not be executed on vlynq (vlynq probe breaks
-	 * otherwise) */
-#ifdef CONFIG_PCI
-        acxpci_reset_mac(adev);
-#endif
+	if (IS_PCI(adev) && !adev->dev_is_vlynq)
+		acxpci_reset_mac(adev);
 
 	/* Windows driver (MEM) does some funny things here */
 
