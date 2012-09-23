@@ -605,7 +605,6 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 		memcpy(adev->dev_addr, mac_vif, ETH_ALEN);
 		memcpy(adev->bssid, mac_vif, ETH_ALEN);
 		acx1xx_set_station_id(adev, mac_vif);
-		SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	}
 
 	acx_update_mode(adev);

@@ -1763,6 +1763,8 @@ void acx_set_defaults(acx_device_t *adev)
 	acx1xx_get_station_id(adev);
 	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 
+	MAC_COPY(adev->bssid, adev->dev_addr);
+
 	acx_get_reg_domain(adev);
 
 	/* Only ACX100 supports ED and CCA */
@@ -1781,13 +1783,7 @@ void acx_set_defaults(acx_device_t *adev)
 	adev->brange_max_quality = 60;	/* LED blink max quality is 60 */
 	adev->brange_time_last_state_change = jiffies;
 
-	/* copy the MAC address we just got from the card into our MAC
-	 * address used during current 802.11 session */
-	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	MAC_BCAST(adev->ap);
-
-	MAC_COPY(adev->bssid, adev->dev_addr);
-
 	adev->essid_len =
 		snprintf(adev->essid, sizeof(adev->essid), "ACXSTA%02X%02X%02X",
 			adev->dev_addr[3], adev->dev_addr[4], adev->dev_addr[5]);

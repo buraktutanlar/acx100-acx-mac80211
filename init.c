@@ -636,7 +636,6 @@ int acx_init_mac(acx_device_t * adev)
 		}
 	}
 
-	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 	result = OK;
 fail:
 	if (result)
