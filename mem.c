@@ -2488,8 +2488,6 @@ int __init acxmem_init_module(void)
 {
 	int res;
 
-
-
 	pr_info("built with CONFIG_ACX_MAC80211_MEM\n");
 	pr_acx(IO_COMPILE_NOTE);
 	log(L_INIT, ENDIAN_STR
@@ -2509,12 +2507,8 @@ int __init acxmem_init_module(void)
  */
 void __exit acxmem_cleanup_module(void)
 {
-
-
 	pr_acxmem("cleanup_module\n");
 	platform_driver_unregister(&acxmem_driver);
-
-
 }
 
 MODULE_AUTHOR( "Todd Blumer <todd@sdgsystems.com>" );

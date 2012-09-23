@@ -1001,8 +1001,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	u8 chip_type;
 	struct ieee80211_hw *ieee;
 
-
-
 	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
 	if (!ieee) {
@@ -1986,8 +1984,6 @@ int __init acxpci_init_module(void)
 {
 	int res;
 
-
-
 	pr_info("built with CONFIG_ACX_MAC80211_PCI\n");
 	pr_acx(IO_COMPILE_NOTE);
 	log(L_INIT, ENDIAN_STR
@@ -2001,7 +1997,6 @@ int __init acxpci_init_module(void)
 
 	if (res)
 		pr_err("can't register pci/vlynq driver\n");
-
 
 	return res;
 }

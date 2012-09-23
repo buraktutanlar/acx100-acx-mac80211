@@ -553,7 +553,6 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 
 	int vif_type;
 
-
 	acx_sem_lock(adev);
 
 	vif_type = vif->type;

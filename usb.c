@@ -1573,8 +1573,6 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
 	struct ieee80211_hw *ieee;
 
-
-
 	if (is_tnetw1450) {
 		/* Boot the device (i.e. upload the firmware) */
 		acxusb_boot(usbdev, is_tnetw1450, &radio_type);
