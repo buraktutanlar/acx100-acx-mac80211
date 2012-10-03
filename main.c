@@ -1038,3 +1038,51 @@ OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 	return OP_TX_RET_OK;
 }
 
+int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+                   struct cfg80211_scan_request *req)
+{
+	acx_device_t *adev = ieee2adev(hw);
+	struct sk_buff *skb;
+	size_t ssid_len = 0;
+	u8 *ssid = NULL;
+	int ret;
+
+	if (req->n_ssids) {
+		ssid = req->ssids[0].ssid;
+		ssid_len = req->ssids[0].ssid_len;
+	}
+
+	acx_sem_lock(adev);
+
+	if (adev->scanning) {
+		log(L_INIT, "scan already in progress\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	skb = ieee80211_probereq_get(adev->ieee, adev->vif, ssid, ssid_len,
+	        req->ie, req->ie_len);
+	if (!skb) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = acx_set_probe_request_template(adev, skb->data, skb->len);
+	dev_kfree_skb(skb);
+	if (ret < 0)
+		goto out;
+
+        log(L_INIT, "scan start\n");
+	adev->scanning = true;
+	ret = acx_cmd_scan(adev);
+	if (ret < 0) {
+		adev->scanning = false;
+		goto out;
+	}
+
+	out:
+	acx_sem_unlock(adev);
+
+	return ret;
+}
+

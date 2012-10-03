@@ -1314,6 +1314,25 @@ int acx_set_tim_template(acx_device_t *adev, u8 *data, int len)
 	return res;
 }
 
+int acx_set_probe_request_template(acx_device_t *adev, unsigned char *data, unsigned int len)
+{
+        struct acx_template_probereq probereq;
+        int res;
+
+        if (len > sizeof(probereq)-2)
+        {
+        	WARN_ONCE(1, "size of acx_template_probereq too small!");
+        	return -1;
+        }
+
+        memcpy(&probereq.fc, data, len);
+
+        probereq.size = cpu_to_le16(len);
+        res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIG_PROBE_REQUEST, &probereq, len+2);
+        return res;
+}
+
+
 #ifdef UNUSED_BUT_USEFULL
 static int acx_s_set_tim_template_off(acx_device_t *adev)
 {

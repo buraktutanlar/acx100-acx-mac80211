@@ -48,5 +48,7 @@ int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
 #endif
 
+int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+                   struct cfg80211_scan_request *req);
 
 #endif

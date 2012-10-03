@@ -42,6 +42,7 @@ int acx_set_hw_encryption_off(acx_device_t *adev);
 
 int acx_set_beacon(acx_device_t *adev, struct sk_buff *beacon);
 int acx_set_tim_template(acx_device_t *adev, u8 *data, int len);
+int acx_set_probe_request_template(acx_device_t *adev, unsigned char *data, unsigned int len);
 
 int acx_set_mode(acx_device_t *adev, u16 mode);
 int acx_update_mode(acx_device_t *adev);

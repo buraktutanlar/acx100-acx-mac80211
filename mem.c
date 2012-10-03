@@ -1581,6 +1581,7 @@ static const struct ieee80211_ops acxmem_hw_ops = {
 	.remove_interface	= acx_op_remove_interface,
 	.configure_filter	= acx_op_configure_filter,
 	.bss_info_changed	= acx_op_bss_info_changed,
+	.hw_scan		= acx_op_hw_scan,
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
@@ -2021,6 +2022,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
 					| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
+	ieee->wiphy->max_scan_ssids = 1;
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was

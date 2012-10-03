@@ -1179,7 +1179,7 @@ typedef struct acx_template_probereq {
 	u16	seq;		/* 16 2 Sequence Control */
 				/* 18 n SSID * */
 				/* nn n Supported Rates * */
-	u8	variable[0x44 - 2-2-6-6-6-2];
+	u8	variable[128];
 } ACX_PACKED acx_template_probereq_t;
 
 typedef struct acx_template_proberesp {

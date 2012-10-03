@@ -3509,11 +3509,11 @@ void acx_irq_work(struct work_struct *work)
 
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
-			log(L_IRQ, "got Scan_Complete IRQ\n");
-			/* need to do that in process context */
-			/* remember that fw is not scanning anymore */
-			SET_BIT(adev->irq_status,
-					HOST_INT_SCAN_COMPLETE);
+			if (adev->scanning) {
+				ieee80211_scan_completed(adev->ieee, false);
+				log(L_INIT, "scan completed\n");
+				adev->scanning = false;
+			}
 		}
 
 		/* These we just log, but either they happen rarely
@@ -3870,8 +3870,13 @@ void acx_op_stop(struct ieee80211_hw *hw)
 	acx_device_t *adev = ieee2adev(hw);
 	acxmem_lock_flags;
 
-
 	acx_sem_lock(adev);
+
+	if (adev->scanning) {
+		ieee80211_scan_completed(adev->ieee, true);
+		acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
+		adev->scanning = false;
+	}
 
 	acx_stop_queue(adev->ieee, "on ifdown");
 

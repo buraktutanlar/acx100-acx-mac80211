@@ -255,3 +255,41 @@ int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid)
         return res;
 }
 
+int acx_cmd_scan(acx_device_t *adev)
+{
+	int res;
+
+        union {
+                acx111_scan_t acx111;
+                acx100_scan_t acx100;
+        } s;
+
+	res = acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
+
+        memset(&s, 0, sizeof(s));
+        /* first common positions... */
+
+        s.acx111.count = cpu_to_le16(adev->scan_count);
+        s.acx111.rate = adev->scan_rate;
+        s.acx111.options = adev->scan_mode;
+        s.acx111.chan_duration = cpu_to_le16(adev->scan_duration);
+        s.acx111.max_probe_delay = cpu_to_le16(adev->scan_probe_delay);
+
+        /* ...then differences */
+
+        if (IS_ACX111(adev)) {
+                s.acx111.channel_list_select = 0; /* scan every allowed channel */
+                /*s.acx111.channel_list_select = 1;*/ /* scan given channels */
+                /*s.acx111.modulation = 0x40;*/ /* long preamble? OFDM? -> only for active scan */
+                s.acx111.modulation = 0;
+                /*s.acx111.channel_list[0] = 6;
+                s.acx111.channel_list[1] = 4;*/
+        } else {
+                s.acx100.start_chan = cpu_to_le16(1);
+                s.acx100.flags = cpu_to_le16(0x8000);
+        }
+
+        res = acx_issue_cmd(adev, ACX1xx_CMD_SCAN, &s, sizeof(s));
+
+        return res;
+}

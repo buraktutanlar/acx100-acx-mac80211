@@ -59,5 +59,6 @@ int acx_configure_len(acx_device_t *adev, void *pdr, enum acx_ie type, u16 len);
 int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type);
 
 int acx_cmd_join_bssid(acx_device_t *adev, const u8 *bssid);
+int acx_cmd_scan(acx_device_t *adev);
 
 #endif
