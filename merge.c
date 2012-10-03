@@ -1659,8 +1659,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	const char *devname;
 	u16 irqtype;
 	u16 cmd_status = -1;
-	int i, j, rc;
-	u8 *p;
+	int rc;
 
 	acxmem_lock_flags;
 
@@ -1803,26 +1802,6 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		 * WARNING: this will trash stack in case of illegally
 		 * large input length! */
 
-		if (IS_PCI(adev))
-			goto skip_mem_stuff;
-
-		if (buflen > 388) {
-			/*
-			 * 388 is maximum command length
-			 */
-			log(L_ANY, "invalid length 0x%08x\n", buflen);
-			buflen = 388;
-		}
-		p = (u8 *) buffer;
-		for (i = 0; i < buflen; i += 16) {
-			printk("%04x:", i);
-			for (j = 0; (j < 16) && (i + j < buflen); j++) {
-				printk(" %02x", *p++);
-			}
-			printk("\n");
-		}
-
-	skip_mem_stuff:
 		if (buffer && buflen)
 			memset(buffer, 0, buflen);
 		goto bad;
