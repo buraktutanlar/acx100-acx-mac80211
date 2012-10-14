@@ -94,5 +94,7 @@ static inline void __exit acxmem_cleanup_module(void)
 
 static inline void acxmem_init_mboxes(acx_device_t *adev) { }
 
+static inline void acxmem_process_rxdesc(acx_device_t *adev) { };
+
 #endif /* defined(CONFIG_ACX_MAC80211_MEM) */
 #endif /* _MEM_H_ */

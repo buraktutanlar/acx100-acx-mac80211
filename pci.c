@@ -569,6 +569,64 @@ end:
 	return (tx_t *) txdesc;
 }
 
+void acxpci_process_rxdesc(acx_device_t *adev)
+{
+	register rxhostdesc_t *hostdesc;
+	unsigned count, tail;
+
+	if (unlikely(acx_debug & L_BUFR))
+		acx_log_rxbuffer(adev);
+
+	/* First, have a loop to determine the first descriptor that's
+	 * full, just in case there's a mismatch between our current
+	 * rx_tail and the full descriptor we're supposed to
+	 * handle. */
+	tail = adev->hw_rx_queue.tail;
+	count = RX_CNT;
+	while (1) {
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+
+		/* advance tail regardless of outcome of the below test */
+		tail = (tail + 1) % RX_CNT;
+
+		if ((hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		        && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break; /* found it! */
+
+		if (unlikely(!--count))
+			/* hmm, no luck: all descs empty, bail out */
+			goto end;
+	}
+
+	/* now process descriptors, starting with the first we figured out */
+	while (1) {
+		log(L_BUF,
+		        "rx: tail=%u Ctl_16=%04X Status=%08X\n", tail, hostdesc->hd.Ctl_16, hostdesc->Status);
+
+		acx_process_rxbuf(adev, hostdesc->data);
+		hostdesc->Status = 0;
+
+		/* flush all writes before adapter sees CTL_HOSTOWN change */
+		wmb();
+
+		/* Host no longer owns this, needs to be LAST */
+		CLEAR_BIT(hostdesc->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
+
+		/* ok, descriptor is handled, now check the next descriptor */
+		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+
+		/* if next descriptor is empty, then bail out */
+		if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
+		        || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			break;
+
+		tail = (tail + 1) % RX_CNT;
+	}
+
+	end:
+	adev->hw_rx_queue.tail = tail;
+}
+
 
 
 /*
