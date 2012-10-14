@@ -1751,6 +1751,9 @@ int acx_update_mode(acx_device_t *adev)
 	case ACX_MODE_2_STA:
 	case ACX_MODE_0_ADHOC:
 	case ACX_MODE_3_AP:
+		/* Rx should be disabled before changing rx_config. This improved
+		   a lot ifup stability on acx100/mem with the hx4700 */
+		acx1xx_set_rx_enable(adev, 0);
 		res += acx_update_rx_config(adev);
 
 		acx1xx_set_rx_enable(adev, 1);
