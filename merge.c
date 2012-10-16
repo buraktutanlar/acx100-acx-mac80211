@@ -52,6 +52,10 @@
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
 
+#define PATCH_AROUND_BAD_SPOTS 1
+#define HX4700_FIRMWARE_CHECKSUM 0x0036862e
+#define HX4700_ALTERNATE_FIRMWARE_CHECKSUM 0x00368a75
+
 /* identical from pci.c, mem.c */
 irqreturn_t acx_interrupt(int irq, void *dev_id)
 {
