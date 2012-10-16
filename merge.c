@@ -1538,10 +1538,11 @@ void acx_show_card_eeprom_id(acx_device_t *adev)
 {
 	unsigned char buffer[CARD_EEPROM_ID_SIZE];
 	int i, rc;
-
-
+	acxmem_lock_flags;
 
 	memset(&buffer, 0, CARD_EEPROM_ID_SIZE);
+
+	acxmem_lock();
 	/* use direct EEPROM access */
 	for (i = 0; i < CARD_EEPROM_ID_SIZE; i++) {
 		if (IS_MEM(adev) || IS_PCI(adev))
@@ -1555,6 +1556,7 @@ void acx_show_card_eeprom_id(acx_device_t *adev)
 			break;
 		}
 	}
+	acxmem_unlock();
 
 	for (i = 0; i < ARRAY_SIZE(device_ids); i++) {
 		if (!memcmp(&buffer, device_ids[i].id, CARD_EEPROM_ID_SIZE)) {
