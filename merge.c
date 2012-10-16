@@ -3874,14 +3874,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 	/* ifup device */
 	acx_up(hw);
 
-	/* We don't currently have to do anything else.  The setup of
-	 * the MAC should be subsequently completed via the mlme
-	 * commands.  Higher layers know we're ready from
-	 * dev->start==1 and dev->tbusy==0.  Our rx path knows to pass
-	 * up received/ frames because of dev->flags&IFF_UP is true.
-	 */
-
-	ieee80211_wake_queues(adev->ieee);
+	acx_wake_queue(adev->ieee, NULL);
 
 	adev->initialized = 1;
 
