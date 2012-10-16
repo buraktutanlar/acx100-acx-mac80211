@@ -89,10 +89,10 @@
 
 #if ACXMEM_SPIN_CHECK
 #define ACXMEM_WARN_NOT_SPIN_LOCKED					\
-	(if (!spin_is_locked(&adev->spinlock)) {			\
+	if (!spin_is_locked(&adev->spinlock)) {				\
 		logf0(L_ANY, "mem: warning: data access not locked!\n");\
 		dump_stack();						\
-	})
+	}
 #else
 #define ACXMEM_WARN_NOT_SPIN_LOCKED do { } while (0)
 #endif
