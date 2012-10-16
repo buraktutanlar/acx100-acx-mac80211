@@ -2274,12 +2274,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * ==================================================
  */
 
-/*
- * acx_process_rxdesc
- *
- * Called from IRQ handlers (acx_irq_work, #if0d acxmem_interrupt)
- */
-static void acx_process_rxdesc(acx_device_t *adev)
+static void _acx_process_rxdesc(acx_device_t *adev)
 {
 	register rxhostdesc_t *hostdesc;
 	register rxdesc_t *rxdesc = NULL; // silence uninit warning
@@ -2439,6 +2434,15 @@ static void acx_process_rxdesc(acx_device_t *adev)
 	}
 end:
 	adev->hw_rx_queue.tail = tail;
+
+}
+
+static void acx_process_rxdesc(acx_device_t *adev)
+{
+	if(IS_PCI(adev))
+		_acx_process_rxdesc(adev);
+	else
+		acxmem_process_rxdesc(adev);
 
 }
 
