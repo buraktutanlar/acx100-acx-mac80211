@@ -2124,7 +2124,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	log(L_IRQ | L_INIT, "using IRQ %d\n", adev->irq);
 	/* request shared IRQ handler */
 	if (request_irq(adev->irq, acx_interrupt,
-			IRQF_SHARED,
+			IRQF_SHARED | IRQF_TRIGGER_FALLING,
 			KBUILD_MODNAME,
 			adev)) {
 		pr_acx("%s: request_irq FAILED\n",
@@ -2132,7 +2132,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
-	irq_set_irq_type(adev->irq, IRQF_TRIGGER_FALLING);
 
 	log(L_ANY, "request_irq %d successful\n", adev->irq);
 	/* Acx irqs shall be off and are enabled later in acx_up */
