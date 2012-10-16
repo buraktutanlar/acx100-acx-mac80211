@@ -1008,7 +1008,7 @@ int acx1xx_update_tx(acx_device_t *adev)
 	return res;
 }
 
-static int acx1xx_set_rx_enable(acx_device_t *adev, u8 rx_enabled)
+int acx1xx_set_rx_enable(acx_device_t *adev, u8 rx_enabled)
 {
 	int res;
 
