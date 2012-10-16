@@ -153,7 +153,6 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 	res += acx1xx_update_tx(adev);
 	res += acx1xx_update_rx(adev);
 
-	acx_wake_queue(adev->ieee, NULL);
 
 
 	return res ? NOT_OK : OK;
