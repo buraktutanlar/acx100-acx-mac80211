@@ -229,7 +229,7 @@ static int acx_allocate(acx_device_t *adev, struct desc_info *di,
 			adev->bus_dev, di->size, (void*) di->phy, ptr);
 	}
 	else {
-		ptr = kmalloc(di->size, GFP_KERNEL);
+		ptr = vmalloc(di->size);
 		/*
 		 * The ACX can't use the physical address, so we'll
 		 * have to fa later and it might be handy to have the
@@ -720,7 +720,7 @@ static inline void acx_free_desc_queue(acx_device_t *adev,
 			dma_free_coherent(NULL, dinfo->size, dinfo->start,
 					dinfo->phy);
 		} else
-			kfree(dinfo->start);
+			vfree(dinfo->start);
 
 		dinfo->start = NULL;
 		dinfo->size = 0;
