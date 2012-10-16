@@ -1027,21 +1027,13 @@ int acxmem_proc_diag_output(struct seq_file *file,
  * ==================================================
  */
 
-#if 0
-/*
- * acxmem_process_rxdesc
- *
- * Called directly and only from the IRQ handler
- */
-static void acxmem_process_rxdesc(acx_device_t *adev)
+void acxmem_process_rxdesc(acx_device_t *adev)
 {
-	register rxhostdesc_t *hostdesc;
-	register rxdesc_t *rxdesc;
+	rxhostdesc_t *hostdesc;
+	rxdesc_t *rxdesc;
 	unsigned count, tail;
 	u32 addr;
 	u8 Ctl_8;
-
-
 
 	if (unlikely(acx_debug & L_BUFR))
 		acx_log_rxbuffer(adev);
@@ -1157,7 +1149,6 @@ static void acxmem_process_rxdesc(acx_device_t *adev)
 		adev->hw_rx_queue.tail = tail;
 
 }
-#endif
 
 static int acxmem_get_txbuf_space_needed(acx_device_t *adev,
 					unsigned int len)
