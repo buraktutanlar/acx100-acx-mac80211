@@ -637,13 +637,9 @@ struct hostdesc {
 
 struct txhostdesc {
 	struct hostdesc hd;
-
-/* From here on you can use this area as you want (variable length, too!) */
+	u32	Status;			/* 0x14, unused on Tx */
+	/* From here on you can use this area as you want (variable length, too!) */
 	u8	*data;
-
-	/* OW ieee80211_tx_status not really required here
-	 * struct ieee80211_tx_status txstatus;
-	 */
 	struct sk_buff *skb;
 
 } ACX_PACKED;
