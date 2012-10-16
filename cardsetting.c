@@ -1767,12 +1767,12 @@ void acx_set_defaults(acx_device_t *adev)
 	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
 	 * query is REQUIRED, otherwise the card won't work correctly! */
 
-	acx1xx_get_antenna(adev);
-
 	acx1xx_get_station_id(adev);
 	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
 
 	MAC_COPY(adev->bssid, adev->dev_addr);
+
+	acx1xx_get_antenna(adev);
 
 	acx_get_reg_domain(adev);
 
