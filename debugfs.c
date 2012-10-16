@@ -104,6 +104,8 @@ static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
 			file->f_path.dentry->d_name.name);
 		return -ENOENT;
 	}
+
+	// FIXME This crashes, since acx_proc_write_funcs expect PDE()->data to be set
 	return (acx_proc_write_funcs[fidx])(file, buf, count, ppos);
 }
 
