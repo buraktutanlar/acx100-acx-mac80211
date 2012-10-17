@@ -677,6 +677,7 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.remove_interface	= acx_op_remove_interface,
 	.configure_filter	= acx_op_configure_filter,
 	.bss_info_changed	= acx_op_bss_info_changed,
+	.hw_scan		= acx_op_hw_scan,
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
@@ -1081,6 +1082,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
+	ieee->wiphy->max_scan_ssids = 1;
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was
@@ -1750,6 +1752,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
+	ieee->wiphy->max_scan_ssids = 1;
 
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
