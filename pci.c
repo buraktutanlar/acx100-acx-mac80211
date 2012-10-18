@@ -1083,6 +1083,8 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
 	ieee->wiphy->max_scan_ssids = 1;
+	ieee->channel_change_time = 10000;
+
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was
@@ -1753,6 +1755,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 			BIT(NL80211_IFTYPE_AP);
 	ieee->queues = 1;
 	ieee->wiphy->max_scan_ssids = 1;
+	ieee->channel_change_time = 10000;
 
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
