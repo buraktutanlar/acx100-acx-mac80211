@@ -2023,6 +2023,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 					| BIT(NL80211_IFTYPE_ADHOC);
 	ieee->queues = 1;
 	ieee->wiphy->max_scan_ssids = 1;
+	ieee->channel_change_time = 10000;
+
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
 	/* TODO: although in the original driver the maximum value was
