@@ -69,7 +69,7 @@
 
 #include "acx.h"
 #include "merge.h"
-#include "debugfs.h"
+#include "debug.h"
 #include "mem.h"
 #include "cmd.h"
 #include "ie.h"
@@ -2169,9 +2169,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 */
 	acx_set_defaults(adev);
 
-	acx_debugfs_add_adev(adev);
-	if (acx_proc_register_entries(ieee) != OK)
-		goto fail_proc_register_entries;
+	if (acx_debugfs_add_adev(adev))
+		goto fail_debugfs;
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a
@@ -2223,8 +2222,7 @@ fail_ieee80211_register_hw:
 
 fail_acx_setup_modes:
 
-fail_proc_register_entries:
-	acx_proc_unregister_entries(ieee);
+fail_debugfs:
 
 fail_complete_hw_reset:
 
@@ -2315,8 +2313,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 		acxmem_unlock();
 	}
 
-	// Debug and proc-fs
-	acx_proc_unregister_entries(adev->ieee);
+	/* Debugfs entries */
 	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */

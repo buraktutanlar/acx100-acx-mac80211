@@ -151,26 +151,6 @@ do { \
 			__FUNCTION__, __FILE__, __LINE__);			\
         } while (0)
 
-/* BOM Proc, Debug (Common)
- * -----
- */
-
-#if defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY
-#  define PROC_ENTRIES
-#endif
-
-DECL_OR_STUB(PROC_ENTRIES,
-	int acx_proc_register_entries(struct ieee80211_hw *ieee),
-	{ return 0; })
-DECL_OR_STUB(PROC_ENTRIES,
-	int acx_proc_unregister_entries(struct ieee80211_hw *ieee),
-	{ return 0; })
-
-/*
- * BOM Helpers (Common)
- *
- */
-
 void acx_mwait(int ms);
 
 /*

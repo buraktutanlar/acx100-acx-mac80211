@@ -22,7 +22,7 @@
 #include "acx.h"
 #include "usb.h"
 #include "merge.h"
-#include "debugfs.h"
+#include "debug.h"
 #include "mem.h"
 #include "pci.h"
 #include "cmd.h"
@@ -104,7 +104,6 @@ static int __init acx_init_module(void)
 	       "go to http://acx100.sourceforge.net/wiki for "
 	       "further information\n");
 
-	acx_proc_init();
 	acx_debugfs_init();
 
 	r1 = r2 = r3 = -EINVAL;
@@ -123,7 +122,6 @@ static int __init acx_init_module(void)
 
 	errout:
 	acx_debugfs_exit();
-	acx_proc_exit();
 
 	return -EINVAL;
 }
@@ -135,7 +133,6 @@ static void __exit acx_cleanup_module(void)
 	acxmem_cleanup_module();
 
 	acx_debugfs_exit();
-	acx_proc_exit();
 }
 
 /*

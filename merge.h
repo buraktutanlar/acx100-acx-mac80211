@@ -4,16 +4,6 @@
 #include <linux/irq.h>
 #include "acx.h"
 
-/* these 2 externs are defined in common.c (but we dont have a
- * common.h), so expose them here.  Theyre used in debugfs.c
- */
-typedef int acx_proc_show_t(struct seq_file *file, void *v);
-typedef ssize_t ((acx_proc_write_t)(struct file *, const char __user *,
-				    size_t, loff_t *));
-
-extern acx_proc_show_t *const acx_proc_show_funcs[];
-extern acx_proc_write_t *const acx_proc_write_funcs[];
-
 int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		void *buffer, unsigned buflen, unsigned cmd_timeout,
 		const char *cmdstr);

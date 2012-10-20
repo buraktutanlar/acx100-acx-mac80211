@@ -51,7 +51,7 @@
 #include "acx.h"
 #include "pci.h"
 #include "merge.h"
-#include "debugfs.h"
+#include "debug.h"
 #include "io-acx.h"
 #include "cmd.h"
 #include "ie.h"
@@ -1294,11 +1294,9 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
-	// Debug and proc-fs
-	acx_debugfs_add_adev(adev);
-
-	if (acx_proc_register_entries(ieee) != OK)
-		goto fail_proc_register_entries;
+	/* Debugfs */
+	if (acx_debugfs_add_adev(adev))
+		goto fail_debugfs;
 
 	pr_acx("net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
@@ -1343,9 +1341,7 @@ fail_ieee80211_register_hw:
 	/* err = acx_setup_modes(adev) */
 fail_setup_modes:
 
-	/* acx_proc_register_entries(ieee, 0) */
-fail_proc_register_entries:
-	acx_proc_unregister_entries(ieee);
+fail_debugfs:
 
 	/* acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version) */
 fail_read_eeprom_byte:
@@ -1462,8 +1458,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 
 	}
 
-	/* Debug and proc-fs */
-	acx_proc_unregister_entries(adev->ieee);
+	/* Debugfs */
 	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */
@@ -1890,11 +1885,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
 
-	// Debug and proc-fs
-	acx_debugfs_add_adev(adev);
-
-	if (acx_proc_register_entries(ieee) != OK)
-		goto fail_vlynq_proc_register_entries;
+	// Debugfs entries
+	if (acx_debugfs_add_adev(adev))
+		goto fail_debugfs;
 
 	/* Now we have our device, so make sure the kernel doesn't try
 	 * to send packets even though we're not associated to a
@@ -1935,8 +1928,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	fail_vlynq_setup_modes:
 
-	fail_vlynq_proc_register_entries:
-		acx_proc_unregister_entries(ieee);
+	fail_debugfs:
 
     fail_vlynq_read_eeprom_version:
 
@@ -2002,8 +1994,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 		/* OW PCI still does something here (although also need to be reviewed). */
 	}
 
-	/* Debug and proc-fs */
-	acx_proc_unregister_entries(adev->ieee);
+	/* Debugfs entries */
 	acx_debugfs_remove_adev(adev);
 
 	/* IRQs */

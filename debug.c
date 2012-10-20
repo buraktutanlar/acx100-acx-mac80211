@@ -16,9 +16,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "acx_debug.h"
+/*
+ * debugfs API to rest of driver is prototyped in merge.h, including
+ * the stubs.
+ */
+#if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
 
-#include <linux/proc_fs.h>
+#define pr_fmt(fmt) "acx.%s: " fmt, __func__
+
+#include <linux/version.h>
+#include <linux/wireless.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#include <net/mac80211.h>
 
 #include "acx.h"
 #include "pci.h"
@@ -32,18 +42,44 @@
 #include "boot.h"
 #include "debug.h"
 
-
-/* ##################################################
- * Proc, Debug:
+/*
+ * debugfs files are created under $DBGMNT/acx_mac80211/phyX by
+ * acx_debugfs_add_dev(), where phyX is the vif of each wlanY ifupd on
+ * the driver.  The acx_device *ptr is attached to the phyX directory.
+ * acx_debugfs_add_dev() is called by acx_op_add_interface(); this
+ * may be the wrong lifecyle, but is close, and works for now.
+ * Each file gets a file_index, attached by debugfs_create_file() to
+ * the inode's private data.
  *
- * File read/write handlers for both procfs, debugfs.  Procfs is
- * deprecated for new files, so proc-files are disabled by default;
- * ACX_WANT_PROC_FILES_ANYWAY enables them.  Debugfs is enabled, it
- * can be disabled by ACX_NO_DEBUG_FILES.
+ * A single open() handler uses the attached file_index to select the
+ * right read callback, this avoids a linear scan of filenames to
+ * match/strcmp against the callback.  The acx_device *ptr is
+ * retrieved from the file's parent's private data, and passed to the
+ * callback so it knows what vif to print data for.
+ *
+ * Similarly, a singe write handler retrieves the acx_device_t pointer
+ * and file-index, and dispatches to the file handler for that index.
  */
 
-#if (defined CONFIG_PROC_FS  &&  defined ACX_WANT_PROC_FILES_ANYWAY) \
- || (defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES)
+enum file_index {
+	INFO, DIAG, EEPROM, PHY, DEBUG,
+	SENSITIVITY, TX_LEVEL, ANTENNA, REG_DOMAIN,
+};
+static const char *const dbgfs_files[] = {
+	[INFO]		= "info",
+	[DIAG]		= "diag",
+	[EEPROM]	= "eeprom",
+	[PHY]		= "phy",
+	[DEBUG]		= "debug",
+	[SENSITIVITY]	= "sensitivity",
+	[TX_LEVEL]	= "tx_level",
+	[ANTENNA]	= "antenna",
+	[REG_DOMAIN]	= "reg_domain",
+};
+BUILD_BUG_DECL(dbgfs_files__VS__enum_REG_DOMAIN,
+	ARRAY_SIZE(dbgfs_files) != REG_DOMAIN + 1);
+
+static struct dentry *acx_dbgfs_dir;
 
 static int acx_proc_show_diag(struct seq_file *file, void *v)
 {
@@ -418,12 +454,9 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 /*
  * A write on acx_diag executes different operations for debugging
  */
-static ssize_t acx_proc_write_diag(struct file *file,
-				const char __user *ubuf,
-				size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_diag(acx_device_t *adev, struct file *file,
+                                   const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	struct proc_dir_entry *pde = PDE(file->f_path.dentry->d_inode);
-	acx_device_t *adev = (acx_device_t *) pde->data;
 
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
@@ -598,9 +631,8 @@ static int acx_proc_show_debug(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_debug(struct file *file,
-				const char __user *ubuf,
-				size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_debug(acx_device_t *adev, struct file *file,
+                                    const char __user *ubuf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
@@ -643,14 +675,10 @@ static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_sensitivity(struct file *file,
-					const char __user *ubuf,
-					size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_sensitivity(acx_device_t *adev, struct file *file,
+                                          const char __user *ubuf, size_t count, loff_t *ppos)
 
 {
-	acx_device_t *adev = (acx_device_t *)
-		PDE(file->f_path.dentry->d_inode)->data;
-
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
 	unsigned long val;
@@ -695,13 +723,9 @@ static int acx_proc_show_tx_level(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx111_proc_write_tx_level(struct file *file,
-					const char __user *ubuf,
-					size_t count, loff_t *ppos)
+static ssize_t acx111_proc_write_tx_level(acx_device_t *adev, struct file *file,
+                                          const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	acx_device_t *adev = (acx_device_t *)
-		PDE(file->f_path.dentry->d_inode)->data;
-
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
 	unsigned long val;
@@ -746,13 +770,9 @@ static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_reg_domain(struct file *file,
-					const char __user *ubuf,
-					size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_reg_domain(acx_device_t *adev, struct file *file,
+                                         const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	acx_device_t *adev = (acx_device_t *)
-		PDE(file->f_path.dentry->d_inode)->data;
-
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
 	unsigned long val;
@@ -797,13 +817,9 @@ static int acx_proc_show_antenna(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_antenna(struct file *file,
-				const char __user *ubuf,
-				size_t count, loff_t *ppos)
+static ssize_t acx_proc_write_antenna(acx_device_t *adev, struct file *file,
+                                      const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	acx_device_t *adev = (acx_device_t *)
-		PDE(file->f_path.dentry->d_inode)->data;
-
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
 	unsigned long val;
@@ -861,129 +877,137 @@ acx_proc_write_t *const acx_proc_write_funcs[] = {
 BUILD_BUG_DECL(acx_proc_show_funcs__VS__acx_proc_write_funcs,
 	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(acx_proc_write_funcs));
 
+static int acx_dbgfs_open(struct inode *inode, struct file *file)
+{
+	size_t fidx = (size_t) inode->i_private;
+	struct acx_device *adev = (struct acx_device *)
+		file->f_path.dentry->d_parent->d_inode->i_private;
 
-#if (defined CONFIG_PROC_FS && defined ACX_WANT_PROC_FILES_ANYWAY)
-/*
- * procfs has been explicitly enabled
- */
-static const char *const proc_files[] = {
-	"info", "diag", "eeprom", "phy", "debug",
-	"sensitivity", "tx_level", "antenna", "reg_domain",
+	switch (fidx) {
+	case INFO:
+	case DIAG:
+	case EEPROM:
+	case PHY:
+	case DEBUG:
+	case SENSITIVITY:
+	case TX_LEVEL:
+	case ANTENNA:
+	case REG_DOMAIN:
+		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
+			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
+		break;
+	default:
+		pr_err("unknown file @ %d: %s\n", (int)fidx,
+			file->f_path.dentry->d_name.name);
+		return -ENOENT;
+	}
+	return single_open(file, acx_proc_show_funcs[fidx], adev);
+}
+
+static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
+			size_t count, loff_t *ppos)
+{
+	/* retrieve file-index and adev from private fields */
+	size_t fidx = (size_t) file->f_path.dentry->d_inode->i_private;
+	struct acx_device *adev = (struct acx_device *)
+		file->f_path.dentry->d_parent->d_inode->i_private;
+
+	switch (fidx) {
+	case INFO:
+	case DIAG:
+	case EEPROM:
+	case PHY:
+	case DEBUG:
+	case SENSITIVITY:
+	case TX_LEVEL:
+	case ANTENNA:
+	case REG_DOMAIN:
+		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
+			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
+		break;
+	default:
+		pr_err("unknown file @ %d: %s\n", (int)fidx,
+			file->f_path.dentry->d_name.name);
+		return -ENOENT;
+	}
+
+	// FIXME This crashes, since acx_proc_write_funcs expect PDE()->data to be set
+	return (acx_proc_write_funcs[fidx])(adev, file, buf, count, ppos);
+}
+
+static const struct file_operations acx_fops = {
+	.read		= seq_read,
+	.write		= acx_dbgfs_write,
+	.open		= acx_dbgfs_open,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+	.llseek		= noop_llseek,
+#endif
 };
-BUILD_BUG_DECL(acx_proc_show_funcs__VS__proc_files,
-	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(proc_files));
 
-static struct file_operations acx_e_proc_ops[ARRAY_SIZE(proc_files)];
-
-static int acx_proc_open(struct inode *inode, struct file *file)
+int acx_debugfs_add_adev(struct acx_device *adev)
 {
-	int i;
+	size_t i;
+	int fmode;
+	struct dentry *file;
+	const char *devname = wiphy_name(adev->ieee->wiphy);
+	struct dentry *acx_dbgfs_devdir
+		= debugfs_create_dir(devname, acx_dbgfs_dir);
 
-	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-		if (!strcmp(proc_files[i],
-			    file->f_path.dentry->d_name.name))
-			break;
+	if (!acx_dbgfs_devdir) {
+		pr_err("debugfs_create_dir() failed\n");
+		return -ENOMEM;
 	}
-	/* log(L_ANY, "proc filename=%s\n", proc_files[i]); */
+	pr_info("adev:%p nm:%s dirp:%p\n", adev, devname,
+		acx_dbgfs_devdir);
 
-	return single_open(file, acx_proc_show_funcs[i], PDE(inode)->data);
+	if (acx_dbgfs_devdir->d_inode->i_private) {
+		/* this shouldnt happen */
+		pr_err("dentry->d_inode->i_private already set: %p\n",
+			acx_dbgfs_devdir->d_inode->i_private);
+		goto fail;
+	}
+	/* save adev in dir's private field */
+	acx_dbgfs_devdir->d_inode->i_private = (void*) adev;
+
+	for (i = 0; i < ARRAY_SIZE(dbgfs_files); i++) {
+
+		fmode = (acx_proc_write_funcs[i])
+			? 0644 : 0444;
+		/* save file-index in in file's private field */
+		file = debugfs_create_file(dbgfs_files[i], fmode,
+					acx_dbgfs_devdir,
+					(void*) i, &acx_fops);
+		if (!file)
+			goto fail;
+	}
+	adev->debugfs_dir = acx_dbgfs_devdir;
+	return 0;
+fail:
+	debugfs_remove_recursive(acx_dbgfs_devdir);
+	return -ENOENT;
 }
 
-static void acx_proc_init(void)
+void acx_debugfs_remove_adev(struct acx_device *adev)
 {
-	int i;
-
-	/* acx_e_proc_ops init */
-	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-		acx_e_proc_ops[i].owner = THIS_MODULE;
-		acx_e_proc_ops[i].open = acx_proc_open;
-		acx_e_proc_ops[i].read = seq_read;
-		acx_e_proc_ops[i].llseek = seq_lseek;
-		acx_e_proc_ops[i].release = single_release;
-		acx_e_proc_ops[i].write = acx_proc_write_funcs[i];
-	}
+	debugfs_remove_recursive(adev->debugfs_dir);
+	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy),
+		adev->debugfs_dir);
+	adev->debugfs_dir = NULL;
 }
 
-int acx_proc_register_entries(struct ieee80211_hw *hw)
+
+int __init acx_debugfs_init(void)
 {
-	acx_device_t *adev = ieee2adev(hw);
-	char procbuf[80];
-	char procbuf2[80];
-	int i;
-	struct proc_dir_entry *pe;
+	acx_dbgfs_dir = debugfs_create_dir(KBUILD_MODNAME, NULL);
+	if (!acx_dbgfs_dir)
+		return -ENOMEM;
 
-
-
-	/* Sub-dir for this acx_phy[0-9] instance */
-
-	/* I tried to create a /proc/driver/acx sub-dir in acx_proc_init()
-	 * to put the phy[0-9] into, but for some bizarre reason the proc-fs
-	 * refuses then to create the phy[0-9] dirs in /proc/driver/acx !?
-	 * It only works, if /proc/driver/acx is created here in
-	 * acx_proc_register_entries().
-	 * ... Anyway, we should swap to sysfs.
-	 */
-	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s",
-		wiphy_name(adev->ieee->wiphy));
-
-	proc_mkdir(procbuf2, NULL);
-
-	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-		snprintf(procbuf, sizeof(procbuf), "%s/%s",
-			procbuf2, proc_files[i]);
-		log(L_INIT, "creating proc entry /proc/%s\n", procbuf);
-
-		/* Read-only */
-		if (acx_proc_write_funcs[i] == NULL)
-			pe = proc_create(procbuf, 0444, NULL,
-					&acx_e_proc_ops[i]);
-		/* Read-Write */
-		else
-			pe = proc_create(procbuf, 0644, NULL,
-					&acx_e_proc_ops[i]);
-
-		if (!pe) {
-			pr_info("cannot register proc entry /proc/%s\n",
-				procbuf);
-			return NOT_OK;
-		}
-		pe->data = adev;
-	}
-
-	return OK;
+	return 0;
 }
 
-int acx_proc_unregister_entries(struct ieee80211_hw *hw)
+void __exit acx_debugfs_exit(void)
 {
-	acx_device_t *adev = ieee2adev(hw);
-	char procbuf[80];
-	char procbuf2[80];
-	int i;
-
-
-
-	/* Subdir for this acx instance */
-	snprintf(procbuf2, sizeof(procbuf2), "driver/acx_%s",
-		wiphy_name(adev->ieee->wiphy));
-
-	for (i = 0; i < ARRAY_SIZE(proc_files); i++) {
-		snprintf(procbuf, sizeof(procbuf), "%s/%s", procbuf2,
-			proc_files[i]);
-		log(L_INIT, "removing proc entry /proc/%s\n", procbuf);
-		remove_proc_entry(procbuf, NULL);
-	}
-	remove_proc_entry(procbuf2, NULL);
-
-
-	return OK;
+	debugfs_remove_recursive(acx_dbgfs_dir);
 }
-#else
-inline void acx_proc_init(void) {}
-#endif	/* ACX_WANT_PROC_FILES_ANYWAY */
-#else
-inline void acx_proc_init(void) {}
-#endif	/* (defined CONFIG_PROC_FS  &&  defined ACX_WANT_PROC_FILES_ANYWAY) \
-	 || (defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES) */
 
-/* should have a real cleanup func */
-inline void acx_proc_exit(void) {}
+#endif /* CONFIG_DEBUG_FS && ! ACX_NO_DEBUG_FILES */

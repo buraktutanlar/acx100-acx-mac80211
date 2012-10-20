@@ -31,8 +31,8 @@ ifneq ($(KERNELRELEASE),)
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_USB) += usb.o
 	acx-mac80211-obj-$(CONFIG_ACX_MAC80211_MEM) += mem.o
 	acx-mac80211-objs := $(acx-mac80211-obj-y) $(acx-mac80211-obj-m) 
-	acx-mac80211-objs += common.o merge.o debugfs.o cmd.o ie.o init.o 
-	acx-mac80211-objs += utils.o cardsetting.o tx.o rx.o debug.o main.o
+	acx-mac80211-objs += common.o merge.o debug.o cmd.o ie.o init.o
+	acx-mac80211-objs += utils.o cardsetting.o tx.o rx.o main.o
 	acx-mac80211-objs += boot.o 
 
 else
