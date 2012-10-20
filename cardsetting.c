@@ -1041,7 +1041,7 @@ int acx1xx_update_rx(acx_device_t *adev)
 	int res;
 
 
-	log(L_XFER, "Updating RX: %s, channel=%d\n",
+	log(L_CTL, "Updating RX: %s, channel=%d\n",
 		adev->rx_enabled ? "enable" : "disable", adev->channel);
 
 	if (adev->rx_enabled)
@@ -1049,7 +1049,6 @@ int acx1xx_update_rx(acx_device_t *adev)
 				&adev->channel, 1);
 	else
 		res = acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-
 
 	return res;
 }
