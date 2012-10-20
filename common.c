@@ -158,8 +158,8 @@ MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");
 /* implement /sys/module/acx_mac80211/parameters/debugflags */
 
 static const char *flag_names[] = {
-	"L_LOCK", "L_INIT", "L_IRQ", "L_ASSOC", "L_FUNC", "L_XFER",
-	"L_DATA", "L_DEBUG", "L_IOCTL", "L_CTL", "L_BUFR", "L_XFER_BEACON",
+	"L_LOCK", "L_INIT", "L_IRQ", "L_ASSOC", "undef", "L_XFER",
+	"L_DATA", "L_DEBUG", "L_IOCTL", "L_CTL", "L_BUFR", "undef",
 	"L_BUFT", "L_USBRXTX", "L_BUF",
 };
 /* should check enum debug_flags, but no suitable val is set */

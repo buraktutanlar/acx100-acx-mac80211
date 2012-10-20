@@ -31,14 +31,12 @@ enum debug_flags {
 	L_INIT		= (ACX_DEBUG>0)*0x0002,	/* special card initialization logging */
 	L_IRQ		= (ACX_DEBUG>0)*0x0004,	/* interrupt stuff */
 	L_ASSOC		= (ACX_DEBUG>0)*0x0008,	/* assocation (network join) and station log */
-	L_FUNC		= (ACX_DEBUG>1)*0x0020,	/* logging of function enter / leave */
 	L_XFER		= (ACX_DEBUG>1)*0x0080,	/* logging of transfers and mgmt */
 	L_DATA		= (ACX_DEBUG>1)*0x0100,	/* logging of transfer data */
 	L_DEBUG		= (ACX_DEBUG>1)*0x0200,	/* log of debug info */
 	L_IOCTL		= (ACX_DEBUG>0)*0x0400,	/* log ioctl calls */
 	L_CTL		= (ACX_DEBUG>1)*0x0800,	/* log of low-level ctl commands */
 	L_BUFR		= (ACX_DEBUG>1)*0x1000,	/* debug rx buffer mgmt (ring buffer etc.) */
-	L_XFER_BEACON	= (ACX_DEBUG>1)*0x2000,	/* also log beacon packets */
 	L_BUFT		= (ACX_DEBUG>1)*0x4000,	/* debug tx buffer mgmt (ring buffer etc.) */
 	L_USBRXTX	= (ACX_DEBUG>0)*0x8000,	/* debug USB rx/tx operations */
 	L_BUF		= L_BUFR + L_BUFT,
