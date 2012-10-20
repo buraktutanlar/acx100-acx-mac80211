@@ -75,17 +75,6 @@
 #define FW_NO_AUTO_INCREMENT	1
 
 /*
- * BOM Prototypes
- * ... static and also none-static for overview reasons (maybe not best practice ...)
- * ==================================================
- */
-
-#ifdef CONFIG_VLYNQ
-static int vlynq_probe(struct vlynq_device *vdev, struct vlynq_device_id *id);
-static void vlynq_remove(struct vlynq_device *vdev);
-#endif // CONFIG_VLYNQ
-
-/*
  * BOM Defines, static vars, etc.
  * ==================================================
  */
