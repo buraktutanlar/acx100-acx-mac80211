@@ -11,7 +11,7 @@ void acxpci_init_mboxes(acx_device_t *adev);
 
 tx_t *acxpci_alloc_tx(acx_device_t *adev, int q);
 
-int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev);
 
 #if defined(CONFIG_ACX_MAC80211_PCI)
 

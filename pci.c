@@ -432,7 +432,7 @@ static void update_link_quality_led(acx_device_t * adev)
  * ==================================================
  */
 
-int acxpci_proc_diag_output(struct seq_file *file, acx_device_t *adev)
+int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;
 	rxhostdesc_t *rxhostdesc;

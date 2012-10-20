@@ -16,10 +16,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * debugfs API to rest of driver is prototyped in merge.h, including
- * the stubs.
- */
 #if defined CONFIG_DEBUG_FS && !defined ACX_NO_DEBUG_FILES
 
 #define pr_fmt(fmt) "acx.%s: " fmt, __func__
@@ -42,25 +38,6 @@
 #include "boot.h"
 #include "debug.h"
 
-/*
- * debugfs files are created under $DBGMNT/acx_mac80211/phyX by
- * acx_debugfs_add_dev(), where phyX is the vif of each wlanY ifupd on
- * the driver.  The acx_device *ptr is attached to the phyX directory.
- * acx_debugfs_add_dev() is called by acx_op_add_interface(); this
- * may be the wrong lifecyle, but is close, and works for now.
- * Each file gets a file_index, attached by debugfs_create_file() to
- * the inode's private data.
- *
- * A single open() handler uses the attached file_index to select the
- * right read callback, this avoids a linear scan of filenames to
- * match/strcmp against the callback.  The acx_device *ptr is
- * retrieved from the file's parent's private data, and passed to the
- * callback so it knows what vif to print data for.
- *
- * Similarly, a singe write handler retrieves the acx_device_t pointer
- * and file-index, and dispatches to the file handler for that index.
- */
-
 enum file_index {
 	INFO, DIAG, EEPROM, PHY, DEBUG,
 	SENSITIVITY, TX_LEVEL, ANTENNA, REG_DOMAIN,
@@ -81,7 +58,7 @@ BUILD_BUG_DECL(dbgfs_files__VS__enum_REG_DOMAIN,
 
 static struct dentry *acx_dbgfs_dir;
 
-static int acx_proc_show_diag(struct seq_file *file, void *v)
+static int acx_dbgfs_show_diag(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
@@ -107,9 +84,9 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	acx_sem_lock(adev);
 
 	if (IS_PCI(adev))
-		acxpci_proc_diag_output(file, adev);
+		acxpci_dbgfs_diag_output(file, adev);
 	else if (IS_MEM(adev))
-		acxmem_proc_diag_output(file, adev);
+		acxmem_dbgfs_diag_output(file, adev);
 
 	seq_printf(file,
 		     "\n"
@@ -451,10 +428,8 @@ static int acx_proc_show_diag(struct seq_file *file, void *v)
 	return 0;
 }
 
-/*
- * A write on acx_diag executes different operations for debugging
- */
-static ssize_t acx_proc_write_diag(acx_device_t *adev, struct file *file,
+/* Writing to acx_diag triggers different actions for debugging */
+static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
                                    const char __user *ubuf, size_t count, loff_t *ppos)
 {
 
@@ -516,18 +491,7 @@ exit_unlock:
 	return ret;
 }
 
-/*
- * acx_e_read_proc_XXXX
- * Handle our /proc entry
- *
- * Arguments:
- *	standard kernel read_proc interface
- * Returns:
- *	number of bytes written to buf
- * Side effects:
- *	none
- */
-static int acx_proc_show_acx(struct seq_file *file, void *v)
+static int acx_dbgfs_show_acx(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t*) file->private;
 
@@ -556,7 +520,7 @@ static int acx_proc_show_acx(struct seq_file *file, void *v)
 	return 0;
 }
 
-static int acx_proc_show_eeprom(struct seq_file *file, void *v)
+static int acx_dbgfs_show_eeprom(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
@@ -581,7 +545,7 @@ out:
 	return 0;
 }
 
-static int acx_proc_show_phy(struct seq_file *file, void *v)
+static int acx_dbgfs_show_phy(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
@@ -616,22 +580,17 @@ static int acx_proc_show_phy(struct seq_file *file, void *v)
 
 	acx_sem_unlock(adev);
 
-
 	return 0;
 }
 
-static int acx_proc_show_debug(struct seq_file *file, void *v)
+static int acx_dbgfs_show_debug(struct seq_file *file, void *v)
 {
-
 	/* No sem locking required, since debug is global for all devices */
-
 	seq_printf(file, "acx_debug: 0x%04x\n", acx_debug);
-
-
 	return 0;
 }
 
-static ssize_t acx_proc_write_debug(acx_device_t *adev, struct file *file,
+static ssize_t acx_dbgfs_write_debug(acx_device_t *adev, struct file *file,
                                     const char __user *ubuf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
@@ -646,7 +605,6 @@ static ssize_t acx_proc_write_debug(acx_device_t *adev, struct file *file,
 	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
 
-
 	/* No sem locking required, since debug is global for all devices */
 
 	if (count == size) {
@@ -656,14 +614,12 @@ static ssize_t acx_proc_write_debug(acx_device_t *adev, struct file *file,
 
 	log(L_ANY, "acx_debug=0x%04x\n", acx_debug);
 
-
 	return ret;
 }
 
-static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
+static int acx_dbgfs_show_sensitivity(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
-
 
 	acx_sem_lock(adev);
 
@@ -675,7 +631,7 @@ static int acx_proc_show_sensitivity(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_sensitivity(acx_device_t *adev, struct file *file,
+static ssize_t acx_dbgfs_write_sensitivity(acx_device_t *adev, struct file *file,
                                           const char __user *ubuf, size_t count, loff_t *ppos)
 
 {
@@ -708,10 +664,9 @@ out:
 	return ret;
 }
 
-static int acx_proc_show_tx_level(struct seq_file *file, void *v)
+static int acx_dbgfs_show_tx_level(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
-
 
 	acx_sem_lock(adev);
 
@@ -723,7 +678,7 @@ static int acx_proc_show_tx_level(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx111_proc_write_tx_level(acx_device_t *adev, struct file *file,
+static ssize_t acx_dbgfs_write_tx_level(acx_device_t *adev, struct file *file,
                                           const char __user *ubuf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
@@ -755,10 +710,9 @@ out:
 	return ret;
 }
 
-static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
+static int acx_dbgfs_show_reg_domain(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
-
 
 	acx_sem_lock(adev);
 
@@ -770,7 +724,7 @@ static int acx_proc_show_reg_domain(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_reg_domain(acx_device_t *adev, struct file *file,
+static ssize_t acx_dbgfs_write_reg_domain(acx_device_t *adev, struct file *file,
                                          const char __user *ubuf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
@@ -801,7 +755,7 @@ out:
 	return ret;
 }
 
-static int acx_proc_show_antenna(struct seq_file *file, void *v)
+static int acx_dbgfs_show_antenna(struct seq_file *file, void *v)
 {
 	acx_device_t *adev = (acx_device_t *) file->private;
 
@@ -817,7 +771,7 @@ static int acx_proc_show_antenna(struct seq_file *file, void *v)
 	return 0;
 }
 
-static ssize_t acx_proc_write_antenna(acx_device_t *adev, struct file *file,
+static ssize_t acx_dbgfs_write_antenna(acx_device_t *adev, struct file *file,
                                       const char __user *ubuf, size_t count, loff_t *ppos)
 {
 	ssize_t ret = -EINVAL;
@@ -851,31 +805,31 @@ out:
 	return ret;
 }
 
-acx_proc_show_t *const acx_proc_show_funcs[] = {
-	acx_proc_show_acx,
-	acx_proc_show_diag,
-	acx_proc_show_eeprom,
-	acx_proc_show_phy,
-	acx_proc_show_debug,
-	acx_proc_show_sensitivity,
-	acx_proc_show_tx_level,
-	acx_proc_show_antenna,
-	acx_proc_show_reg_domain,
+acx_dbgfs_show_t *const acx_dbgfs_show_funcs[] = {
+	acx_dbgfs_show_acx,
+	acx_dbgfs_show_diag,
+	acx_dbgfs_show_eeprom,
+	acx_dbgfs_show_phy,
+	acx_dbgfs_show_debug,
+	acx_dbgfs_show_sensitivity,
+	acx_dbgfs_show_tx_level,
+	acx_dbgfs_show_antenna,
+	acx_dbgfs_show_reg_domain,
 };
 
-acx_proc_write_t *const acx_proc_write_funcs[] = {
+acx_dbgfs_write_t *const acx_dbgfs_write_funcs[] = {
 	NULL,
-	acx_proc_write_diag,
+	acx_dbgfs_write_diag,
 	NULL,
 	NULL,
-	acx_proc_write_debug,
-	acx_proc_write_sensitivity,
-	acx111_proc_write_tx_level,
-	acx_proc_write_antenna,
-	acx_proc_write_reg_domain,
+	acx_dbgfs_write_debug,
+	acx_dbgfs_write_sensitivity,
+	acx_dbgfs_write_tx_level,
+	acx_dbgfs_write_antenna,
+	acx_dbgfs_write_reg_domain,
 };
 BUILD_BUG_DECL(acx_proc_show_funcs__VS__acx_proc_write_funcs,
-	ARRAY_SIZE(acx_proc_show_funcs) != ARRAY_SIZE(acx_proc_write_funcs));
+	ARRAY_SIZE(acx_dbgfs_show_funcs) != ARRAY_SIZE(acx_dbgfs_write_funcs));
 
 static int acx_dbgfs_open(struct inode *inode, struct file *file)
 {
@@ -893,7 +847,7 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 	case TX_LEVEL:
 	case ANTENNA:
 	case REG_DOMAIN:
-		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
+		pr_devel("opening filename=%s fmode=%o fidx=%d adev=%p\n",
 			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
 		break;
 	default:
@@ -901,7 +855,7 @@ static int acx_dbgfs_open(struct inode *inode, struct file *file)
 			file->f_path.dentry->d_name.name);
 		return -ENOENT;
 	}
-	return single_open(file, acx_proc_show_funcs[fidx], adev);
+	return single_open(file, acx_dbgfs_show_funcs[fidx], adev);
 }
 
 static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
@@ -922,7 +876,7 @@ static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
 	case TX_LEVEL:
 	case ANTENNA:
 	case REG_DOMAIN:
-		pr_info("opening filename=%s fmode=%o fidx=%d adev=%p\n",
+		pr_devel("opening filename=%s fmode=%o fidx=%d adev=%p\n",
 			dbgfs_files[fidx], file->f_mode, (int)fidx, adev);
 		break;
 	default:
@@ -931,8 +885,7 @@ static ssize_t acx_dbgfs_write(struct file *file, const char __user *buf,
 		return -ENOENT;
 	}
 
-	// FIXME This crashes, since acx_proc_write_funcs expect PDE()->data to be set
-	return (acx_proc_write_funcs[fidx])(adev, file, buf, count, ppos);
+	return (acx_dbgfs_write_funcs[fidx])(adev, file, buf, count, ppos);
 }
 
 static const struct file_operations acx_fops = {
@@ -971,7 +924,7 @@ int acx_debugfs_add_adev(struct acx_device *adev)
 
 	for (i = 0; i < ARRAY_SIZE(dbgfs_files); i++) {
 
-		fmode = (acx_proc_write_funcs[i])
+		fmode = (acx_dbgfs_write_funcs[i])
 			? 0644 : 0444;
 		/* save file-index in in file's private field */
 		file = debugfs_create_file(dbgfs_files[i], fmode,

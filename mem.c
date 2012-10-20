@@ -832,7 +832,7 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
  * ==================================================
  */
 #if 1 // copied to merge, but needs work
-int acxmem_proc_diag_output(struct seq_file *file,
+int acxmem_dbgfs_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;

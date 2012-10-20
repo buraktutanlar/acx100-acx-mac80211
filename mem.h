@@ -30,7 +30,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 
 void acxmem_reset_mac(acx_device_t *adev);
 
-int acxmem_proc_diag_output(struct seq_file *file, acx_device_t *adev);
+int acxmem_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev);
 
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len);
 void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque);
@@ -69,7 +69,7 @@ static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 static inline void acxmem_reset_mac(acx_device_t *adev)
 { }
 
-static inline int acxmem_proc_diag_output(struct seq_file *file,
+static inline int acxmem_dbgfs_diag_output(struct seq_file *file,
 		acx_device_t *adev)
 { return 0; }
 
