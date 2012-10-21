@@ -168,7 +168,7 @@ void acx_tx_queue_flush(acx_device_t *adev)
 		if (!(info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS))
 			continue;
 
-		ieee80211_tx_status(adev->ieee, skb);
+		ieee80211_tx_status(adev->hw, skb);
 	}
 }
 
@@ -254,7 +254,7 @@ u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
 		if (info->control.rates[i].idx < 0)
 			break;
 
-		tmpbitrate = &adev->ieee->wiphy->bands[info->band]
+		tmpbitrate = &adev->hw->wiphy->bands[info->band]
 			->bitrates[info->control.rates[i].idx];
 		tmpcount = info->control.rates[i].count;
 
@@ -372,7 +372,7 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
 					"drift might be caused by increasing "
 					"card temperature, please check the "
 					"card before it's too late!\n",
-					wiphy_name(adev->ieee->wiphy));
+					wiphy_name(adev->hw->wiphy));
 
 				if (adev->retry_errors_msg_ratelimit == 20)
 					logf0(L_DEBUG,
@@ -410,10 +410,10 @@ void acxpcimem_handle_tx_error(acx_device_t *adev, u8 error,
 
 	if (adev->stats.tx_errors <= 20)
 		log(log_level, "%s: tx error 0x%02X, buf %02u! (%s)\n",
-			wiphy_name(adev->ieee->wiphy), error, finger, err);
+			wiphy_name(adev->hw->wiphy), error, finger, err);
 	else
 		log(log_level, "%s: tx error 0x%02X, buf %02u!\n",
-			wiphy_name(adev->ieee->wiphy), error, finger);
+			wiphy_name(adev->hw->wiphy), error, finger);
 }
 
 /*
@@ -507,13 +507,13 @@ void acx_tx_queue_go(acx_device_t *adev)
 
 		if (ret == -EBUSY) {
 			logf0(L_BUFT, "EBUSY: Stop queue. Requeuing skb.\n");
-			acx_stop_queue(adev->ieee, NULL);
+			acx_stop_queue(adev->hw, NULL);
 			skb_queue_head(&adev->tx_queue, skb);
 			goto out;
 		} else if (ret < 0) {
 			logf0(L_BUF, "Other ERR: (Card was removed ?!):"
 				" Stop queue. Dealloc skb.\n");
-			acx_stop_queue(adev->ieee, NULL);
+			acx_stop_queue(adev->hw, NULL);
 			dev_kfree_skb(skb);
 			goto out;
 		}
@@ -523,7 +523,7 @@ void acx_tx_queue_go(acx_device_t *adev)
 		 * safer */
 		if (acx_is_hw_tx_queue_stop_limit(adev))
 		{
-			acx_stop_queue(adev->ieee, NULL);
+			acx_stop_queue(adev->hw, NULL);
 			goto out;
 		}
 	}

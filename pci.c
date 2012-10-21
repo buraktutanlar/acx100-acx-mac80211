@@ -164,7 +164,7 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
 
 
 
-	devname = wiphy_name(adev->ieee->wiphy);
+	devname = wiphy_name(adev->hw->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
@@ -448,7 +448,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 
 		seq_printf(file, "** Tx buf (q=%d, free %d, Ieee80211 queue: %s) **\n",
 			queue_id, adev->hw_tx_queue[queue_id].free,
-			acx_queue_stopped(adev->ieee) ? "STOPPED" : "running");
+			acx_queue_stopped(adev->hw) ? "STOPPED" : "running");
 
 		txdesc = adev->hw_tx_queue[queue_id].desc_start;
 		if (txdesc)
@@ -1047,32 +1047,32 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	int result = -EIO;
 	int err;
 	u8 chip_type;
-	struct ieee80211_hw *ieee;
+	struct ieee80211_hw *hw;
 
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
-	if (!ieee) {
+	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
 		goto fail_ieee80211_alloc_hw;
 	}
 
 	/* Initialize driver private data */
-	SET_IEEE80211_DEV(ieee, &pdev->dev);
-	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	SET_IEEE80211_DEV(hw, &pdev->dev);
+	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 	/* TODO: mainline doesn't support the following flags yet */
 	/*
 	 ~IEEE80211_HW_MONITOR_DURING_OPER &
 	 ~IEEE80211_HW_WEP_INCLUDE_IV;
 	 */
 
-	ieee->wiphy->interface_modes =
+	hw->wiphy->interface_modes =
 			BIT(NL80211_IFTYPE_STATION) |
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
-	ieee->queues = 1;
-	ieee->wiphy->max_scan_ssids = 1;
-	ieee->channel_change_time = 10000;
+	hw->queues = 1;
+	hw->wiphy->max_scan_ssids = 1;
+	hw->channel_change_time = 10000;
 
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
@@ -1098,10 +1098,10 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
 	 */
-	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	ieee->max_signal = 100;
+	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	hw->max_signal = 100;
 
-	adev = ieee2adev(ieee);
+	adev = hw2adev(hw);
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
@@ -1113,7 +1113,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	 * _presume_ that we're under sem (instead of actually taking
 	 * it): */
 	/* acx_sem_lock(adev); */
-	adev->ieee = ieee;
+	adev->hw = hw;
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1121,7 +1121,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 /** Finished with private interface **/
 
 /** begin board specific inits **/
-	pci_set_drvdata(pdev, ieee);
+	pci_set_drvdata(pdev, hw);
 
 	/* Enable the PCI device */
 	if (pci_enable_device(pdev)) {
@@ -1223,7 +1223,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	/* request shared IRQ handler */
 	if (request_irq(adev->irq, acx_interrupt, IRQF_SHARED, KBUILD_MODNAME,
 			adev)) {
-		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->hw->wiphy));
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
@@ -1289,7 +1289,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 
 	pr_acx("net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
-	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+	       wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	/** done with board specific setup **/
 
@@ -1304,7 +1304,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 		goto fail_setup_modes;
 	}
 
-	err = ieee80211_register_hw(ieee);
+	err = ieee80211_register_hw(hw);
 	if (OK != err) {
 		pr_acx("ieee80211_register_hw() FAILED: %d\n", err);
 		goto fail_ieee80211_register_hw;
@@ -1325,7 +1325,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 
 	/* err = ieee80211_register_hw(ieee); */
 fail_ieee80211_register_hw:
-	ieee80211_unregister_hw(ieee);
+	ieee80211_unregister_hw(hw);
 
 	/* err = acx_setup_modes(adev) */
 fail_setup_modes:
@@ -1377,7 +1377,7 @@ fail_pci_enable_device:
 
 	/* ieee80211_alloc_hw */
 fail_ieee80211_alloc_hw:
-	ieee80211_free_hw(ieee);
+	ieee80211_free_hw(hw);
 	
 done:
 
@@ -1397,7 +1397,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw
 		= (struct ieee80211_hw *) pci_get_drvdata(pdev);
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	unsigned long mem_region1, mem_region2;
 
 
@@ -1408,8 +1408,8 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	}
 
 	/* Unregister ieee80211 device */
-	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
+	ieee80211_unregister_hw(adev->hw);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
@@ -1482,7 +1482,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	/* Free netdev (quite late, since otherwise we might get
 	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
-	ieee80211_free_hw(adev->ieee);
+	ieee80211_free_hw(adev->hw);
 
 	/* put device into ACPI D3 mode (shutdown) */
 #ifdef CONFIG_PM
@@ -1508,7 +1508,7 @@ static int acxpci_e_suspend(struct pci_dev *pdev, pm_message_t state)
 /*	if (!netif_running(ndev))
 		goto end;
 */
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_acx("sus: adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -1538,7 +1538,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	pr_acx("rsm: got dev %p\n", hw);
 
 
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_acx("rsm: got adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -1713,41 +1713,39 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 {
 	int result = -EIO, i;
 	u32 addr;
-	struct ieee80211_hw *ieee;
+	struct ieee80211_hw *hw;
 	acx_device_t *adev = NULL;
 	acx111_ie_configoption_t co;
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
-
-
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxpci_hw_ops);
-	if (!ieee) {
+	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       dev_name(&vdev->dev));
 		goto fail_vlynq_ieee80211_alloc_hw;
 	}
 
 	/* Initialize driver private data */
-	SET_IEEE80211_DEV(ieee, &vdev->dev);
-	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	SET_IEEE80211_DEV(hw, &vdev->dev);
+	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 
-	ieee->wiphy->interface_modes =
+	hw->wiphy->interface_modes =
 			BIT(NL80211_IFTYPE_STATION)	|
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
-	ieee->queues = 1;
-	ieee->wiphy->max_scan_ssids = 1;
-	ieee->channel_change_time = 10000;
+	hw->queues = 1;
+	hw->wiphy->max_scan_ssids = 1;
+	hw->channel_change_time = 10000;
 
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
 	 */
-	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	ieee->max_signal = 100;
+	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	hw->max_signal = 100;
 
-	adev = ieee2adev(ieee);
+	adev = hw2adev(hw);
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
@@ -1758,7 +1756,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * _presume_ that we're under sem (instead of actually taking
 	 * it): */
 	/* acx_sem_lock(adev); */
-	adev->ieee = ieee;
+	adev->hw = hw;
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1771,7 +1769,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	if (result)
 		goto fail_vlynq_enable_device;
 
-	vlynq_set_drvdata(vdev, ieee);
+	vlynq_set_drvdata(vdev, hw);
 
 	match = &vlynq_known_devices[id->driver_data];
 
@@ -1831,7 +1829,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	/* request shared IRQ handler */
 	if (request_irq
 	    (adev->irq, acx_interrupt, IRQF_SHARED, KBUILD_MODNAME, adev)) {
-		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->ieee->wiphy));
+		pr_acx("%s: request_irq FAILED\n", wiphy_name(adev->hw->wiphy));
 		result = -EAGAIN;
 		goto done;
 	}
@@ -1889,7 +1887,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	pr_acx("net device %s, driver compiled "
 	       "against wireless extensions %d and Linux %s\n",
-	       wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+	       wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
 	/** done with board specific setup **/
 
@@ -1899,7 +1897,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		goto fail_vlynq_setup_modes;
 	}
 
-	result = ieee80211_register_hw(adev->ieee);
+	result = ieee80211_register_hw(adev->hw);
 	if (OK != result) {
 		pr_acx("ieee80211_register_hw() FAILED: %d\n", result);
 		goto fail_vlynq_ieee80211_register_hw;
@@ -1940,7 +1938,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 		vlynq_set_drvdata(vdev, NULL);
 
     fail_vlynq_enable_device:
-		ieee80211_free_hw(ieee);
+		ieee80211_free_hw(hw);
 
     fail_vlynq_ieee80211_alloc_hw:
 
@@ -1953,7 +1951,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 static void vlynq_remove(struct vlynq_device *vdev)
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 
 	if (!hw) {
@@ -1962,8 +1960,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	}
 
 	/* Unregister ieee80211 device */
-	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
+	ieee80211_unregister_hw(adev->hw);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
@@ -2007,7 +2005,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* Free netdev (quite late, since otherwise we might get
 	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
-	ieee80211_free_hw(adev->ieee);
+	ieee80211_free_hw(adev->hw);
 
 }
 

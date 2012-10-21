@@ -276,7 +276,7 @@ struct acx_device {
 #ifdef WIRELESS_EXT
 /* 	struct iw_statistics	wstats;		// wireless statistics */
 #endif
-	struct ieee80211_hw	*ieee;
+	struct ieee80211_hw	*hw;
 	/* FIXME OW 20100616 rx_status is reported for each skb. Check
 	 * if this field is really required */
 	struct ieee80211_rx_status rx_status;
@@ -534,7 +534,7 @@ struct acx_device {
 };
 /* --- */
 
-static inline acx_device_t* ieee2adev(struct ieee80211_hw *hw)
+static inline acx_device_t* hw2adev(struct ieee80211_hw *hw)
 {
         return hw->priv;
 }

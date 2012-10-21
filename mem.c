@@ -483,7 +483,7 @@ acxmem_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	acxmem_lock();
 
-	devname = wiphy_name(adev->ieee->wiphy);
+	devname = wiphy_name(adev->hw->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
@@ -895,7 +895,7 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 
 	seq_printf(file, "** Tx buf (free %d, Ieee80211 queue: %s) **\n",
 		adev->acx_txbuf_free,
-		acx_queue_stopped(adev->ieee) ? "STOPPED" : "Running");
+		acx_queue_stopped(adev->hw) ? "STOPPED" : "Running");
 
 	seq_printf(file,
 		"** Tx buf %d blocks total, %d available, free list head %04x\n",
@@ -1640,7 +1640,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 {
 #if ACX_DEBUG > 1
 
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	rxdesc_t *rxdesc;
 	txdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
@@ -1925,7 +1925,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 		struct iw_param *vwrq, char *extra)
 {
 	/* OW */
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	unsigned long flags;
 	u16 gpio_old;
 
@@ -1957,7 +1957,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 
 	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
 	pr_acx("%s: PHY power amplifier bias: old:%d, new:%d\n",
-		wiphy_name(adev->ieee->wiphy),
+		wiphy_name(adev->hw->wiphy),
 		(gpio_old & 0x0700) >> 8, (unsigned char) *extra);
 
 	acx_sem_unlock(adev);
@@ -2001,29 +2001,27 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	acxmem_lock_flags;
 
-	struct ieee80211_hw *ieee;
+	struct ieee80211_hw *hw;
 
-
-
-	ieee = ieee80211_alloc_hw(sizeof(struct acx_device),
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device),
 				&acxmem_hw_ops);
-	if (!ieee) {
+	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 			pdev->name);
 		goto fail_ieee80211_alloc_hw;
 	}
-	SET_IEEE80211_DEV(ieee, &pdev->dev);
-	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	SET_IEEE80211_DEV(hw, &pdev->dev);
+	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 	/* TODO: mainline doesn't support the following flags yet */
 	/*
 	 ~IEEE80211_HW_MONITOR_DURING_OPER &
 	 ~IEEE80211_HW_WEP_INCLUDE_IV;
 	 */
-	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
 					| BIT(NL80211_IFTYPE_ADHOC);
-	ieee->queues = 1;
-	ieee->wiphy->max_scan_ssids = 1;
-	ieee->channel_change_time = 10000;
+	hw->queues = 1;
+	hw->wiphy->max_scan_ssids = 1;
+	hw->channel_change_time = 10000;
 
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
@@ -2049,10 +2047,10 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
 	 */
-	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	ieee->max_signal = 100;
+	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	hw->max_signal = 100;
 
-	adev = ieee2adev(ieee);
+	adev = hw2adev(hw);
 
 	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
@@ -2063,7 +2061,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 * _presume_ that we're under sem (instead of actually taking
 	 * it): */
 	/* acx_sem_lock(adev); */
-	adev->ieee = ieee;
+	adev->hw = hw;
 	adev->pdevmem = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_MEM;
@@ -2072,7 +2070,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 
 	/** begin board specific inits **/
-	platform_set_drvdata(pdev, ieee);
+	platform_set_drvdata(pdev, hw);
 
 	/* chiptype is u8 but id->driver_data is ulong
 	 * Works for now (possible values are 1 and 2) */
@@ -2132,7 +2130,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 			KBUILD_MODNAME,
 			adev)) {
 		pr_acx("%s: request_irq FAILED\n",
-			wiphy_name(adev->ieee->wiphy));
+			wiphy_name(adev->hw->wiphy));
 		result = -EAGAIN;
 		goto fail_request_irq;
 	}
@@ -2186,9 +2184,9 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	pr_acx("net device %s, driver compiled "
 		"against wireless extensions %d and Linux %s\n",
-		wiphy_name(adev->ieee->wiphy), WIRELESS_EXT, UTS_RELEASE);
+		wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
 
-	MAC_COPY(adev->ieee->wiphy->perm_addr, adev->dev_addr);
+	MAC_COPY(adev->hw->wiphy->perm_addr, adev->dev_addr);
 
 	/** done with board specific setup **/
 
@@ -2203,7 +2201,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 		goto fail_acx_setup_modes;
 	}
 
-	err = ieee80211_register_hw(ieee);
+	err = ieee80211_register_hw(hw);
 	if (OK != err) {
 		pr_acx("ieee80211_register_hw() FAILED: %d\n", err);
 		goto fail_ieee80211_register_hw;
@@ -2237,7 +2235,7 @@ fail_unknown_chiptype:
 fail_ieee80211_alloc_hw:
 	acx_delete_dma_regions(adev);
 	platform_set_drvdata(pdev, NULL);
-	ieee80211_free_hw(ieee);
+	ieee80211_free_hw(hw);
 
 done:
 
@@ -2257,7 +2255,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
 		platform_get_drvdata(pdev);
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	acxmem_lock_flags;
 
 
@@ -2268,8 +2266,8 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	}
 
 	/* Unregister ieee80211 device */
-	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
+	ieee80211_unregister_hw(adev->hw);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
@@ -2335,7 +2333,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	/* Free netdev (quite late, since otherwise we might get
 	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
-	ieee80211_free_hw(adev->ieee);
+	ieee80211_free_hw(adev->hw);
 
 	pr_acxmem("done\n");
 
@@ -2363,7 +2361,7 @@ static int acxmem_e_suspend(struct platform_device *pdev,
 	 goto end;
 	 */
 
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_info("sus: adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -2403,7 +2401,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 	 return;
 	 */
 
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_acx("rsm: got adev %p\n", adev);
 
 	acx_sem_lock(adev);

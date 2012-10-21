@@ -533,7 +533,7 @@ acxusb_issue_cmd_timeo_debug(acx_device_t * adev,
 
 
 
-	devname = wiphy_name(adev->ieee->wiphy);
+	devname = wiphy_name(adev->hw->wiphy);
 	/* no "wlan%%d: ..." please */
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
@@ -1001,16 +1001,16 @@ static void acxusb_complete_rx(struct urb *urb)
 		txstatus->status.rates[0].count = stat->ack_failures + 1;
 
 		// report upstream
-		ieee80211_tx_status(adev->ieee, skb);
+		ieee80211_tx_status(adev->hw, skb);
 
 		tx->busy = 0;
 		adev->hw_tx_queue[0].free++;
 
-		if ((adev->hw_tx_queue[0].free >= TX_START_QUEUE) && acx_queue_stopped(adev->ieee)) {
+		if ((adev->hw_tx_queue[0].free >= TX_START_QUEUE) && acx_queue_stopped(adev->hw)) {
 			log(L_BUF, "tx: wake queue (avail. Tx desc %u)\n",
 				adev->hw_tx_queue[0].free);
-			acx_wake_queue(adev->ieee, NULL);
-			ieee80211_queue_work(adev->ieee, &adev->tx_work);
+			acx_wake_queue(adev->hw, NULL);
+			ieee80211_queue_work(adev->hw, &adev->tx_work);
 		}
 
 			goto next;
@@ -1255,7 +1255,7 @@ void acxusb_tx_data(acx_device_t *adev, tx_t *tx_opaque, int wlanpkt_len,
 	txbuf->queue_index = 1;
 
 	// FIXME OW 20100619 acx111 handling missing here
-	rate_100 = ieee80211_get_tx_rate(adev->ieee, ieeectl)->bitrate;
+	rate_100 = ieee80211_get_tx_rate(adev->hw, ieeectl)->bitrate;
 	txbuf->rate = rate_100 ;
 
 	txbuf->hostdata = (u32) txnum;
@@ -1402,7 +1402,7 @@ void acxusb_irq_work(struct work_struct *work)
  */
 static int acxusb_op_start(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	int i;
 
 
@@ -1435,7 +1435,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	acxusb_poll_rx(adev, &adev->usb_rx[0]);
 
-	acx_wake_queue(adev->ieee, NULL);
+	acx_wake_queue(adev->hw, NULL);
 
 	adev->initialized = 1;
 
@@ -1456,13 +1456,13 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
  */
 static void acxusb_op_stop(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	int i;
 
 
 	acx_sem_lock(adev);
 
-	acx_stop_queue(adev->ieee, "on ifdown");
+	acx_stop_queue(adev->hw, "on ifdown");
 
 	/* Make sure we don't get any more rx requests */
 	acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -1571,7 +1571,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* this one needs to be more precise in case there appears
 	 * a TNETW1450 from the same vendor */
 	int is_tnetw1450 = (usbdev->descriptor.idVendor != ACX100_VENDOR_ID);
-	struct ieee80211_hw *ieee;
+	struct ieee80211_hw *hw;
 
 	if (is_tnetw1450) {
 		/* Boot the device (i.e. upload the firmware) */
@@ -1609,33 +1609,33 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* Allocate memory for a network device */
 
-	ieee = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
-	if (!ieee) {
+	hw = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
+	if (!hw) {
 		msg = "acx: no memory for ieee80211_dev\n";
 		goto end_nomem;
 	}
 
 
-	ieee->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 	/* TODO: mainline doesn't support the following flags yet */
 	/*
 	 ~IEEE80211_HW_MONITOR_DURING_OPER &
 	 ~IEEE80211_HW_WEP_INCLUDE_IV;
 	 */
-	ieee->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
 			| BIT(NL80211_IFTYPE_ADHOC);
-	ieee->queues = 1;
+	hw->queues = 1;
 	// OW TODO Check if RTS/CTS threshold can be included here
 
 	// We base signal quality on winlevel approach of previous driver
 	// TODO OW 20100615 This should into a common init code
-	ieee->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	ieee->max_signal = 100;
+	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+	hw->max_signal = 100;
 
 	/* Setup private driver context */
 
-	adev = ieee2adev(ieee);
-	adev->ieee = ieee;
+	adev = hw2adev(hw);
+	adev->hw = hw;
 
 	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
@@ -1741,7 +1741,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	usb_set_intfdata(intf, adev);
-	SET_IEEE80211_DEV(ieee, &intf->dev);
+	SET_IEEE80211_DEV(hw, &intf->dev);
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
 	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
@@ -1776,7 +1776,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* Register the network device */
 	log(L_INIT, "registering network device\n");
-	result = ieee80211_register_hw(adev->ieee);
+	result = ieee80211_register_hw(adev->hw);
 	if (result) {
 		msg = "acx: failed to register USB network device "
 		    "(error %d)\n";
@@ -1799,7 +1799,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
   end_nomem:
 	printk(msg, result);
 
-	if (ieee) {
+	if (hw) {
 		if (adev->usb_rx) {
 			for (i = 0; i < ACX_RX_URB_CNT; i++)
 				usb_free_urb(adev->usb_rx[i].urb);
@@ -1810,7 +1810,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 				usb_free_urb(adev->usb_tx[i].urb);
 			kfree(adev->usb_tx);
 		}
-		ieee80211_free_hw(ieee);
+		ieee80211_free_hw(hw);
 	}
 
 	result = -ENOMEM;
@@ -1854,7 +1854,7 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	 * _close() will try to grab it as well if it's called,
 	 * deadlocking the machine.
 	 */
-	ieee80211_unregister_hw(adev->ieee);
+	ieee80211_unregister_hw(adev->hw);
 
 	acx_debugfs_remove_adev(adev);
 
@@ -1879,7 +1879,7 @@ static void acxusb_disconnect(struct usb_interface *intf)
 
 	acx_sem_unlock(adev);
 
-	ieee80211_free_hw(adev->ieee);
+	ieee80211_free_hw(adev->hw);
 
 }
 

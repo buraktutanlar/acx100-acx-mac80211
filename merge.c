@@ -877,7 +877,7 @@ int acx_read_eeprom_byte(acx_device_t *adev, u32 addr, u8 *charbuf)
 		 * delay). */
 		if (unlikely(!--count)) {
 			pr_acx("%s: timeout waiting for EEPROM read\n",
-				wiphy_name(adev->ieee->wiphy));
+				wiphy_name(adev->hw->wiphy));
 			result = NOT_OK;
 			goto fail;
 		}
@@ -1053,7 +1053,7 @@ int _acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf)
 		 * delay). */
 		if (unlikely(!--count)) {
 			pr_acx("%s: timeout waiting for phy read\n",
-				wiphy_name(adev->ieee->wiphy));
+				wiphy_name(adev->hw->wiphy));
 			*charbuf = 0;
 			goto fail;
 		}
@@ -1104,7 +1104,7 @@ int _acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 		 * delay). */
 		if (unlikely(!--count)) {
 			pr_acx("%s: timeout waiting for phy read\n",
-				wiphy_name(adev->ieee->wiphy));
+				wiphy_name(adev->hw->wiphy));
 			goto fail;
 		}
 		cpu_relax();
@@ -1683,7 +1683,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 
 	acxmem_lock();
 
-	devname = wiphy_name(adev->ieee->wiphy);
+	devname = wiphy_name(adev->hw->wiphy);
 	if (!devname || !devname[0] || devname[4] == '%')
 		devname = "acx";
 
@@ -1933,7 +1933,7 @@ static void acx_init_mboxes(acx_device_t *adev)
 
 void acx_up(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	acxmem_lock_flags;
 
 
@@ -2044,7 +2044,7 @@ int acx_reset_dev(acx_device_t *adev)
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
 		pr_acx("%s: %s: eCPU did not start after boot (SOR), "
 			"is this fatal?\n", adev->ndev->name,
-			wiphy_name(adev->ieee->wiphy));
+			wiphy_name(adev->hw->wiphy));
 	}
 #endif	// IO_ACX_SOR_CFG
 
@@ -2375,7 +2375,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 			"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
 			"Stopping queue.\n",
 			len, blocks_needed, adev->acx_txbuf_blocks_free);
-		acx_stop_queue(adev->ieee, NULL);
+		acx_stop_queue(adev->hw, NULL);
 		goto end;
 	}
 
@@ -2718,7 +2718,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	else {
 
 		/* Get rate for acx100, single rate only for acx100 */
-		rateset = ieee80211_get_tx_rate(adev->ieee, info)->hw_value;
+		rateset = ieee80211_get_tx_rate(adev->hw, info)->hw_value;
 		logf1(L_BUFT, "rateset=%u\n", rateset);
 
 		if (IS_PCI(adev))
@@ -3043,14 +3043,14 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id)
 		/* And finally report upstream */
 
 		if (IS_MEM(adev))
-			ieee80211_tx_status_irqsafe(adev->ieee, hostdesc->skb);
+			ieee80211_tx_status_irqsafe(adev->hw, hostdesc->skb);
 		else {
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
 			local_bh_disable();
-			ieee80211_tx_status(adev->ieee, hostdesc->skb);
+			ieee80211_tx_status(adev->hw, hostdesc->skb);
 			local_bh_enable();
 #else
-			ieee80211_tx_status_ni(adev->ieee, hostdesc->skb);
+			ieee80211_tx_status_ni(adev->hw, hostdesc->skb);
 #endif
 		}
 		/* update pointer for descr to be cleaned next */
@@ -3332,12 +3332,12 @@ void acx_irq_work(struct work_struct *work)
 
 			/* Restart queue if stopped and enough tx-descr free */
 			if (acx_is_hw_tx_queue_start_limit(adev) &&
-				acx_queue_stopped(adev->ieee))
+				acx_queue_stopped(adev->hw))
 			{
 				log(L_BUF,"tx: wake queue\n");
-				acx_wake_queue(adev->ieee, NULL);
+				acx_wake_queue(adev->hw, NULL);
 				/* Schedule the tx, since it doesn't harm. Required in case of irq-iteration. */
-				ieee80211_queue_work(adev->ieee, &adev->tx_work);
+				ieee80211_queue_work(adev->hw, &adev->tx_work);
 			}
 
 		}
@@ -3353,7 +3353,7 @@ void acx_irq_work(struct work_struct *work)
 		/* Tx new frames, after rx processing.  If queue is
 		 * running. We indirectly use this as indicator, that
 		 * tx_free >= TX_START_QUEUE */
-		if (!acx_queue_stopped(adev->ieee))
+		if (!acx_queue_stopped(adev->hw))
 			acx_tx_queue_go(adev);
 #endif	/* IRQ_ITERATE */
 
@@ -3364,7 +3364,7 @@ void acx_irq_work(struct work_struct *work)
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
 			if (adev->scanning) {
-				ieee80211_scan_completed(adev->ieee, false);
+				ieee80211_scan_completed(adev->hw, false);
 				log(L_INIT, "scan completed\n");
 				adev->scanning = false;
 			}
@@ -3696,7 +3696,7 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 
 int acx_op_start(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	int result = OK;
 
 
@@ -3709,7 +3709,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 	/* ifup device */
 	acx_up(hw);
 
-	acx_wake_queue(adev->ieee, NULL);
+	acx_wake_queue(adev->hw, NULL);
 
 	adev->initialized = 1;
 
@@ -3721,18 +3721,18 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 void acx_op_stop(struct ieee80211_hw *hw)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	acxmem_lock_flags;
 
 	acx_sem_lock(adev);
 
 	if (adev->scanning) {
-		ieee80211_scan_completed(adev->ieee, true);
+		ieee80211_scan_completed(adev->hw, true);
 		acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
 		adev->scanning = false;
 	}
 
-	acx_stop_queue(adev->ieee, "on ifdown");
+	acx_stop_queue(adev->hw, "on ifdown");
 
 	/* disable all IRQs, release shared IRQ handler */
 	acxmem_lock();			// null in pci
@@ -3825,7 +3825,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 {
 #if ACX_DEBUG > 1 /* in acx111pci_ioctl_info body */
 
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	rxdesc_t *rxdesc;
 	txdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
@@ -4111,7 +4111,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 		struct iw_request_info *info,
 		struct iw_param *vwrq, char *extra) {
 	/* OW */
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	unsigned long flags;
 	u16 gpio_old;
 
@@ -4143,7 +4143,7 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
 
 	log(L_DEBUG, "gpio_old: 0x%04X\n", gpio_old);
 	pr_acx("%s: PHY power amplifier bias: old:%d, new:%d\n",
-		wiphy_name(adev->ieee->wiphy), (gpio_old & 0x0700) >> 8,
+		wiphy_name(adev->hw->wiphy), (gpio_old & 0x0700) >> 8,
 		(unsigned char) *extra);
 
 	acx_sem_unlock(adev);
@@ -4196,7 +4196,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
 		platform_get_drvdata(pdev);
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	acxmem_lock_flags;
 
 
@@ -4207,8 +4207,8 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	}
 
 	/* Unregister ieee80211 device */
-	log(L_INIT, "removing device %s\n", wiphy_name(adev->ieee->wiphy));
-	ieee80211_unregister_hw(adev->ieee);
+	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
+	ieee80211_unregister_hw(adev->hw);
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	/* If device wasn't hot unplugged... */
@@ -4253,7 +4253,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	}
 
 	/* Proc */
-	acx_proc_unregister_entries(adev->ieee);
+	acx_proc_unregister_entries(adev->hw);
 
 	/* IRQs */
 	acxmem_lock();
@@ -4274,7 +4274,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	/* Free netdev (quite late, since otherwise we might get
 	 * caught off-guard by a netdev timeout handler execution
 	 * expecting to see a working dev...) */
-	ieee80211_free_hw(adev->ieee);
+	ieee80211_free_hw(adev->hw);
 
 end_no_lock:
 	pr_acx("done\n");
@@ -4303,7 +4303,7 @@ acxmem_e_suspend(struct platform_device *pdev, pm_message_t state)
 	 goto end;
 	 */
 
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_info("sus: adev %p\n", adev);
 
 	acx_sem_lock(adev);
@@ -4343,7 +4343,7 @@ static int acxmem_e_resume(struct platform_device *pdev)
 	 return;
 	 */
 
-	adev = ieee2adev(hw);
+	adev = hw2adev(hw);
 	pr_acx("rsm: got adev %p\n", adev);
 
 	acx_sem_lock(adev);

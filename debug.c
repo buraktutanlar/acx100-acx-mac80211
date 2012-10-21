@@ -902,7 +902,7 @@ int acx_debugfs_add_adev(struct acx_device *adev)
 	size_t i;
 	int fmode;
 	struct dentry *file;
-	const char *devname = wiphy_name(adev->ieee->wiphy);
+	const char *devname = wiphy_name(adev->hw->wiphy);
 	struct dentry *acx_dbgfs_devdir
 		= debugfs_create_dir(devname, acx_dbgfs_dir);
 
@@ -943,7 +943,7 @@ fail:
 void acx_debugfs_remove_adev(struct acx_device *adev)
 {
 	debugfs_remove_recursive(adev->debugfs_dir);
-	pr_info("%s %p\n", wiphy_name(adev->ieee->wiphy),
+	pr_info("%s %p\n", wiphy_name(adev->hw->wiphy),
 		adev->debugfs_dir);
 	adev->debugfs_dir = NULL;
 }

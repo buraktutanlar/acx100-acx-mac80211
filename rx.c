@@ -176,15 +176,15 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	if (IS_PCI(adev)) {
 #if CONFIG_ACX_MAC80211_VERSION <= KERNEL_VERSION(2, 6, 32)
 		local_bh_disable();
-		ieee80211_rx(adev->ieee, skb);
+		ieee80211_rx(adev->hw, skb);
 		local_bh_enable();
 #else
-		ieee80211_rx_ni(adev->ieee, skb);
+		ieee80211_rx_ni(adev->hw, skb);
 #endif
 	}
 	/* Usb Rx is happening in_interupt() */
 	else if (IS_USB(adev) || IS_MEM(adev))
-		ieee80211_rx_irqsafe(adev->ieee, skb);
+		ieee80211_rx_irqsafe(adev->hw, skb);
 	else
 		logf0(L_ANY, "ERROR: Undefined device type !?\n");
 

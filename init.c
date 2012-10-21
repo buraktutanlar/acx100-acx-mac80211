@@ -174,7 +174,7 @@ failed_acx100:
 	    le32_to_cpu(mm.PacketTemplateEnd));
 
 failed:
-	pr_info("%s: FAILED\n", wiphy_name(adev->ieee->wiphy));
+	pr_info("%s: FAILED\n", wiphy_name(adev->hw->wiphy));
 
 success:
 
@@ -365,7 +365,7 @@ static int acx100_init_wep(acx_device_t * adev)
 	/* now retrieve the updated WEPCacheEnd pointer... */
 	if (OK != acx_interrogate(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		pr_info("%s: ACX1xx_IE_MEMORY_MAP read #2 FAILED\n",
-		       wiphy_name(adev->ieee->wiphy));
+		       wiphy_name(adev->hw->wiphy));
 		goto fail;
 	}
 #endif
@@ -376,7 +376,7 @@ static int acx100_init_wep(acx_device_t * adev)
 
 	if (OK != acx_configure(adev, &pt, ACX1xx_IE_MEMORY_MAP)) {
 		pr_info("%s: ACX1xx_IE_MEMORY_MAP write #2 FAILED\n",
-		       wiphy_name(adev->ieee->wiphy));
+		       wiphy_name(adev->hw->wiphy));
 		goto fail;
 	}
 	res = OK;
@@ -638,7 +638,7 @@ int acx_init_mac(acx_device_t * adev)
 			goto fail;
 		if (OK != acx111_create_dma_regions(adev)) {
 			pr_info("%s: acx111_create_dma_regions FAILED\n",
-			       wiphy_name(adev->ieee->wiphy));
+			       wiphy_name(adev->hw->wiphy));
 			goto fail;
 		}
 
@@ -649,7 +649,7 @@ int acx_init_mac(acx_device_t * adev)
 			goto fail;
 		if (OK != acx100_create_dma_regions(adev)) {
 			pr_info("%s: acx100_create_dma_regions FAILED\n",
-			       wiphy_name(adev->ieee->wiphy));
+			       wiphy_name(adev->hw->wiphy));
 			goto fail;
 		}
 	}

@@ -182,7 +182,7 @@ static void acx111_sens_radio_16_17(acx_device_t *adev)
 
 	if ((adev->sensitivity < 1) || (adev->sensitivity > 3)) {
 		pr_info("%s: invalid sensitivity setting (1..3), "
-		       "setting to 1\n", wiphy_name(adev->ieee->wiphy));
+		       "setting to 1\n", wiphy_name(adev->hw->wiphy));
 		adev->sensitivity = 1;
 	}
 	acx111_get_feature_config(adev, &feature1, &feature2);
@@ -284,7 +284,7 @@ static void acx_set_sane_reg_domain(acx_device_t *adev, int do_set)
 			if (adev->reg_dom_chanmask & mask) {
 				pr_info("%s: Adjusting the selected channel from %d "
 					"to %d due to the new regulatory domain\n",
-					wiphy_name(adev->ieee->wiphy), adev->channel, i);
+					wiphy_name(adev->hw->wiphy), adev->channel, i);
 				adev->channel = i;
 				break;
 			}
@@ -527,11 +527,11 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 	default:
 		pr_info("%s: unknown/unsupported radio type, "
 		       "cannot modify tx power level yet!\n",
-			wiphy_name(adev->ieee->wiphy));
+			wiphy_name(adev->hw->wiphy));
 		return NOT_OK;
 	}
 	pr_info("%s: changing radio power level to %u dBm (%u)\n",
-	       wiphy_name(adev->ieee->wiphy), level_dbm, table[level_dbm]);
+	       wiphy_name(adev->hw->wiphy), level_dbm, table[level_dbm]);
 	acx_write_phy_reg(adev, 0x11, table[level_dbm]);
 	return OK;
 }
@@ -1807,7 +1807,7 @@ void acx_set_defaults(acx_device_t *adev)
 	 * query is REQUIRED, otherwise the card won't work correctly! */
 
 	acx1xx_get_station_id(adev);
-	SET_IEEE80211_PERM_ADDR(adev->ieee, adev->dev_addr);
+	SET_IEEE80211_PERM_ADDR(adev->hw, adev->dev_addr);
 
 	MAC_COPY(adev->bssid, adev->dev_addr);
 

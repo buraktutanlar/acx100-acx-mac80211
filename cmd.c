@@ -136,7 +136,7 @@ int acx_configure_len(acx_device_t *adev, void *pdr, enum acx_ie type, u16 len)
 	res = acx_issue_cmd(adev, ACX1xx_CMD_CONFIGURE, pdr, len + 4);
 
 	sprintf(msgbuf, "%s: type=0x%04X, typestr=%s, len=%u",
-		wiphy_name(adev->ieee->wiphy), typeval, typestr, len);
+		wiphy_name(adev->hw->wiphy), typeval, typestr, len);
 
 	if (likely(res == OK))
 		log(L_INIT,  "%s: OK\n", msgbuf);
@@ -168,10 +168,10 @@ int acx_interrogate(acx_device_t *adev, void *pdr, enum acx_ie type)
 	if (unlikely(OK != res)) {
 #if ACX_DEBUG
 		pr_info("%s: (type:%s) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), typestr);
+			wiphy_name(adev->hw->wiphy), typestr);
 #else
 		pr_info("%s: (type:0x%X) FAILED\n",
-			wiphy_name(adev->ieee->wiphy), typeval);
+			wiphy_name(adev->hw->wiphy), typeval);
 #endif
 		/* dump_stack() is already done in issue_cmd() */
 	}

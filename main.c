@@ -162,11 +162,11 @@ int acx_setup_modes(acx_device_t *adev)
 		channels[i].max_power = TX_CFG_MAX_DBM_POWER;
 
 	if (IS_ACX100(adev)) {
-		adev->ieee->wiphy->bands[IEEE80211_BAND_2GHZ] =
+		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
 			&acx100_band_2GHz;
 	} else {
 		if (IS_ACX111(adev))
-			adev->ieee->wiphy->bands[IEEE80211_BAND_2GHZ] =
+			adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
 				&acx111_band_2GHz;
 		else {
 			logf0(L_ANY, "Error: Unknown device");
@@ -190,10 +190,10 @@ static int acx_do_job_update_tim(acx_device_t *adev)
 	u16 tim_length;
 
 #if CONFIG_ACX_MAC80211_VERSION > KERNEL_VERSION(2, 6, 32)
-	beacon = ieee80211_beacon_get_tim(adev->ieee, adev->vif, &tim_offset,
+	beacon = ieee80211_beacon_get_tim(adev->hw, adev->vif, &tim_offset,
 			&tim_length);
 #else
-	beacon = ieee80211_beacon_get(adev->ieee, adev->vif);
+	beacon = ieee80211_beacon_get(adev->hw, adev->vif);
 	if (!beacon)
 		goto out;
 
@@ -262,7 +262,7 @@ static void acx_after_interrupt_recalib(acx_device_t *adev)
 			logf1(L_ANY, "%s: less than " STRING(RECALIB_PAUSE)
 			       " minutes since last radio recalibration, "
 			       "not recalibrating (maybe the card is too hot?)\n",
-			       wiphy_name(adev->ieee->wiphy));
+			       wiphy_name(adev->hw->wiphy));
 			adev->recalib_msg_ratelimit++;
 			if (adev->recalib_msg_ratelimit == 5)
 				logf0(L_ANY, "disabling the above message until next recalib\n");
@@ -277,7 +277,7 @@ static void acx_after_interrupt_recalib(acx_device_t *adev)
 	res = acx_recalib_radio(adev);
 	if (res == OK) {
 		pr_info("%s: successfully recalibrated radio\n",
-		       wiphy_name(adev->ieee->wiphy));
+		       wiphy_name(adev->hw->wiphy));
 		adev->recalib_time_last_success = jiffies;
 		adev->recalib_failure_count = 0;
 	} else {
@@ -477,7 +477,7 @@ void acx_log_irq(u16 irqtype)
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag)
 {
 	SET_BIT(adev->after_interrupt_jobs, set_flag);
-	ieee80211_queue_work(adev->ieee, &adev->irq_work);
+	ieee80211_queue_work(adev->hw, &adev->irq_work);
 }
 
 /*
@@ -563,7 +563,7 @@ void acx_start(acx_device_t *adev)
 
 int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 {
-	acx_device_t *adev = ieee2adev(ieee);
+	acx_device_t *adev = hw2adev(ieee);
 	int err = -EOPNOTSUPP;
 
 	u8 *mac_vif;
@@ -642,7 +642,7 @@ out_unlock:
 
 void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 	char mac[MACSTR_SIZE];
 	u8 *mac_vif;
@@ -673,7 +673,7 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 
 int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	struct ieee80211_conf *conf = &hw->conf;
 
 	u32 changed_not_done = changed;
@@ -721,7 +721,7 @@ end_sem_unlock:
 void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *info, u32 changed)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 	int err = -ENODEV;
 
@@ -849,7 +849,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
                    struct ieee80211_vif *vif, struct ieee80211_sta *sta,
                    struct ieee80211_key_conf *key)
 {
-	struct acx_device *adev = ieee2adev(hw);
+	struct acx_device *adev = hw2adev(hw);
 	u8 algorithm;
 	int ret=0;
 
@@ -954,7 +954,7 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 			unsigned int changed_flags,
 			unsigned int *total_flags, u64 multicast)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 
 
@@ -981,7 +981,7 @@ int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 		const struct ieee80211_tx_queue_params *params)
 #endif
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 	acx_sem_lock(adev);
     /* TODO */
@@ -992,7 +992,7 @@ int acx_conf_tx(struct ieee80211_hw *hw, u16 queue,
 
 int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 	acx_schedule_task(adev, ACX_AFTER_IRQ_UPDATE_TIM);
 
@@ -1003,7 +1003,7 @@ int acx_op_set_tim(struct ieee80211_hw *hw, struct ieee80211_sta *sta, bool set)
 int acx_op_get_stats(struct ieee80211_hw *hw,
 		struct ieee80211_low_level_stats *stats)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 
 	acx_sem_lock(adev);
@@ -1020,7 +1020,7 @@ int acx_op_get_stats(struct ieee80211_hw *hw,
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 			 struct ieee80211_tx_queue_stats *stats)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	int err = -ENODEV;
 
 
@@ -1044,14 +1044,14 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
  */
 OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 
 	skb_queue_tail(&adev->tx_queue, skb);
 
-	ieee80211_queue_work(adev->ieee, &adev->tx_work);
+	ieee80211_queue_work(adev->hw, &adev->tx_work);
 
 	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
-		acx_stop_queue(adev->ieee, NULL);
+		acx_stop_queue(adev->hw, NULL);
 
 	return OP_TX_RET_OK;
 }
@@ -1059,7 +1059,7 @@ OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
                    struct cfg80211_scan_request *req)
 {
-	acx_device_t *adev = ieee2adev(hw);
+	acx_device_t *adev = hw2adev(hw);
 	struct sk_buff *skb;
 	size_t ssid_len = 0;
 	u8 *ssid = NULL;
@@ -1078,7 +1078,7 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		goto out;
 	}
 
-	skb = ieee80211_probereq_get(adev->ieee, adev->vif, ssid, ssid_len,
+	skb = ieee80211_probereq_get(adev->hw, adev->vif, ssid, ssid_len,
 	        req->ie, req->ie_len);
 	if (!skb) {
 		ret = -ENOMEM;
