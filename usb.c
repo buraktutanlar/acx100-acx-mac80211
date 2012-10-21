@@ -1605,38 +1605,26 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		}
 	}
 
-/* Ok, so it's our device and it has already booted */
+	/* Ok, so it's our device and it has already booted */
 
-	/* Allocate memory for a network device */
-
+	/* Initialize ieee80211_hw  */
 	hw = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
 	if (!hw) {
 		msg = "acx: no memory for ieee80211_dev\n";
 		goto end_nomem;
 	}
+	adev = hw2adev(hw);
+	memset(adev, 0, sizeof(*adev));
 
+	acx_init_ieee80211(adev, hw);
 
-	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
-	/* TODO: mainline doesn't support the following flags yet */
-	/*
-	 ~IEEE80211_HW_MONITOR_DURING_OPER &
-	 ~IEEE80211_HW_WEP_INCLUDE_IV;
-	 */
+	usb_set_intfdata(intf, adev);
+	SET_IEEE80211_DEV(hw, &intf->dev);
+
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
-			| BIT(NL80211_IFTYPE_ADHOC);
-	hw->queues = 1;
-	// OW TODO Check if RTS/CTS threshold can be included here
-
-	// We base signal quality on winlevel approach of previous driver
-	// TODO OW 20100615 This should into a common init code
-	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	hw->max_signal = 100;
+	        | BIT(NL80211_IFTYPE_ADHOC);
 
 	/* Setup private driver context */
-
-	adev = hw2adev(hw);
-	adev->hw = hw;
-
 	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
 	if (is_tnetw1450) {
@@ -1739,9 +1727,6 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 		adev->usb_tx[i].busy = 0;
 	}
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
-
-	usb_set_intfdata(intf, adev);
-	SET_IEEE80211_DEV(hw, &intf->dev);
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
 	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */

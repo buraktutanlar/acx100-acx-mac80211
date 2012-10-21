@@ -1049,71 +1049,30 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	u8 chip_type;
 	struct ieee80211_hw *hw;
 
-	hw = ieee80211_alloc_hw(sizeof(struct acx_device),
-				&acxpci_hw_ops);
+	/* Initialize ieee80211_hw  */
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
 		goto fail_ieee80211_alloc_hw;
 	}
 
-	/* Initialize driver private data */
-	SET_IEEE80211_DEV(hw, &pdev->dev);
-	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
-	/* TODO: mainline doesn't support the following flags yet */
-	/*
-	 ~IEEE80211_HW_MONITOR_DURING_OPER &
-	 ~IEEE80211_HW_WEP_INCLUDE_IV;
-	 */
+	adev = hw2adev(hw);
+	memset(adev, 0, sizeof(*adev));
 
+	acx_init_ieee80211(adev, hw);
+	SET_IEEE80211_DEV(hw, &pdev->dev);
 	hw->wiphy->interface_modes =
 			BIT(NL80211_IFTYPE_STATION) |
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
-	hw->queues = 1;
-	hw->wiphy->max_scan_ssids = 1;
-	hw->channel_change_time = 10000;
 
-	/* OW TODO Check if RTS/CTS threshold can be included here */
-
-	/* TODO: although in the original driver the maximum value was
-	 * 100, the OpenBSD driver assigns maximum values depending on
-	 * the type of radio transceiver (i.e. Radia, Maxim,
-	 * etc.). This value is always a positive integer which most
-	 * probably indicates the gain of the AGC in the rx path of
-	 * the chip, in dB steps (0.625 dB, for example?).  The
-	 * mapping of this rssi value to dBm is still unknown, but it
-	 * can nevertheless be used as a measure of relative signal
-	 * strength. The other two values, i.e. max_signal and
-	 * max_noise, do not seem to be supported on my acx111 card
-	 * (they are always 0), although iwconfig reports them (in
-	 * dBm) when using ndiswrapper with the Windows XP driver. The
-	 * GPL-licensed part of the AVM FRITZ!WLAN USB Stick driver
-	 * sources (for the TNETW1450, though) seems to also indicate
-	 * that only the RSSI is supported. In conclusion, the
-	 * max_signal and max_noise values will not be initialised by
-	 * now, as they do not seem to be supported or how to acquire
-	 * them is still unknown. */
-
-	/* We base signal quality on winlevel approach of previous driver
-	 * TODO OW 20100615 This should into a common init code
-	 */
-	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	hw->max_signal = 100;
-
-	adev = hw2adev(hw);
-
-	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
 	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	pr_acx("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
 	mutex_init(&adev->mutex);
-	/* since nobody can see new netdev yet, we can as well just
-	 * _presume_ that we're under sem (instead of actually taking
-	 * it): */
-	/* acx_sem_lock(adev); */
-	adev->hw = hw;
+
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1719,44 +1678,29 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
-	hw = ieee80211_alloc_hw(sizeof(struct acx_device),
-				&acxpci_hw_ops);
+	/* Initialize ieee80211_hw  */
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       dev_name(&vdev->dev));
 		goto fail_vlynq_ieee80211_alloc_hw;
 	}
 
-	/* Initialize driver private data */
-	SET_IEEE80211_DEV(hw, &vdev->dev);
-	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+	adev = hw2adev(hw);
+	memset(adev, 0, sizeof(*adev));
 
+	acx_init_ieee80211(adev, hw);
+	SET_IEEE80211_DEV(hw, &vdev->dev);
 	hw->wiphy->interface_modes =
 			BIT(NL80211_IFTYPE_STATION)	|
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
-	hw->queues = 1;
-	hw->wiphy->max_scan_ssids = 1;
-	hw->channel_change_time = 10000;
 
-	/* We base signal quality on winlevel approach of previous driver
-	 * TODO OW 20100615 This should into a common init code
-	 */
-	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
-	hw->max_signal = 100;
-
-	adev = hw2adev(hw);
-
-	memset(adev, 0, sizeof(*adev));
 	/** Set up our private interface **/
 	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
 	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
 	mutex_init(&adev->mutex);
-	/* since nobody can see new netdev yet, we can as well just
-	 * _presume_ that we're under sem (instead of actually taking
-	 * it): */
-	/* acx_sem_lock(adev); */
-	adev->hw = hw;
+
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
