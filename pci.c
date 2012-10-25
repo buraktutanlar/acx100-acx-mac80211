@@ -666,7 +666,10 @@ static const struct ieee80211_ops acxpci_hw_ops = {
 	.remove_interface	= acx_op_remove_interface,
 	.configure_filter	= acx_op_configure_filter,
 	.bss_info_changed	= acx_op_bss_info_changed,
+
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 1, 0)
 	.hw_scan		= acx_op_hw_scan,
+#endif
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 	.get_tx_stats = acx_e_op_get_tx_stats,
