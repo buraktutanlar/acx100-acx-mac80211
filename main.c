@@ -802,27 +802,18 @@ static int acx111_set_key_type(acx_device_t *adev, acx111WEPDefaultKey_t *key,
                                struct ieee80211_key_conf *mac80211_key,
                                const u8 *addr)
 {
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        switch (mac80211_key->alg) {
+#else
 	switch (mac80211_key->cipher) {
-#if 0
-	case WLAN_CIPHER_SUITE_WEP40:
-	case WLAN_CIPHER_SUITE_WEP104:
-		if (is_broadcast_ether_addr(addr))
-			key->type = KEY_WEP_DEFAULT;
-		else
-			key->type = KEY_WEP_ADDR;
-
-		mac80211_key->hw_key_idx = mac80211_key->keyidx;
-		break;
-	case WLAN_CIPHER_SUITE_TKIP:
-		if (is_broadcast_ether_addr(addr))
-			key->type = KEY_TKIP_MIC_GROUP;
-		else
-			key->type = KEY_TKIP_MIC_PAIRWISE;
-
-		mac80211_key->hw_key_idx = mac80211_key->keyidx;
-		break;
 #endif
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
+        case ALG_CCMP:
+#else
 	case WLAN_CIPHER_SUITE_CCMP:
+#endif
 		if (is_broadcast_ether_addr(addr))
 			key->type = KEY_AES_GROUP;
 		else
@@ -830,7 +821,9 @@ static int acx111_set_key_type(acx_device_t *adev, acx111WEPDefaultKey_t *key,
 
 		break;
 	default:
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(2, 6, 37)
 		log(L_INIT, "Unknown key cipher 0x%x", mac80211_key->cipher);
+#endif
 		return -EOPNOTSUPP;
 	}
 
