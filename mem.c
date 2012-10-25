@@ -855,7 +855,7 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 #endif
 
 	seq_printf(file, "** Rx buf **\n");
-	rxdesc = adev->hw_rx_queue.desc_start;
+	rxdesc = adev->hw_rx_queue.acxdescinfo.start;
 	if (rxdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
@@ -1012,9 +1012,9 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 		adev->hw_tx_queue[0].host.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
-		adev->hw_rx_queue.desc_start,
-		adev->hw_rx_queue.host.rxstart, adev->hw_rx_queue.host.size,
-		adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size);
+		adev->hw_rx_queue.acxdescinfo.start,
+		adev->hw_rx_queue.hostdescinfo.start, adev->hw_rx_queue.hostdescinfo.size,
+		adev->hw_rx_queue.bufinfo.start, adev->hw_rx_queue.bufinfo.size);
 
 	acxmem_unlock();
 
@@ -1045,8 +1045,8 @@ void acxmem_process_rxdesc(acx_device_t *adev)
 	tail = adev->hw_rx_queue.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
-		rxdesc = &adev->hw_rx_queue.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.hostdescinfo.start[tail];
+		rxdesc = &adev->hw_rx_queue.acxdescinfo.start[tail];
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
 
@@ -1134,8 +1134,8 @@ void acxmem_process_rxdesc(acx_device_t *adev)
 		write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_RXPRC);
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
-		rxdesc = &adev->hw_rx_queue.desc_start[tail];
+		hostdesc = &adev->hw_rx_queue.hostdescinfo.start[tail];
+		rxdesc = &adev->hw_rx_queue.acxdescinfo.start[tail];
 
 		Ctl_8 = hostdesc->hd.Ctl_16 = read_slavemem8(adev, (uintptr_t) &(rxdesc->Ctl_8));
 

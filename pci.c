@@ -432,7 +432,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 
 
 	seq_printf(file, "** Rx buf **\n");
-	rxhostdesc = adev->hw_rx_queue.host.rxstart;
+	rxhostdesc = adev->hw_rx_queue.hostdescinfo.start;
 	if (rxhostdesc)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
@@ -483,11 +483,11 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 		           adev->hw_tx_queue[queue_id].desc_size, adev->hw_tx_queue[queue_id].desc_start,
 		           adev->hw_tx_queue[queue_id].host.txstart, adev->hw_tx_queue[queue_id].host.size,
 		           (unsigned long long)adev->hw_tx_queue[queue_id].host.phy,
-		           adev->hw_rx_queue.desc_start,
-		           adev->hw_rx_queue.host.rxstart, adev->hw_rx_queue.host.size,
-		           (unsigned long long)adev->hw_rx_queue.host.phy,
-		           adev->hw_rx_queue.buf.rxstart, adev->hw_rx_queue.buf.size,
-		           (unsigned long long)adev->hw_rx_queue.buf.phy);
+		           adev->hw_rx_queue.acxdescinfo.start,
+		           adev->hw_rx_queue.hostdescinfo.start, adev->hw_rx_queue.hostdescinfo.size,
+		           (unsigned long long)adev->hw_rx_queue.hostdescinfo.phy,
+		           adev->hw_rx_queue.bufinfo.start, adev->hw_rx_queue.bufinfo.size,
+		           (unsigned long long)adev->hw_rx_queue.bufinfo.phy);
 	}
 
 
@@ -573,7 +573,7 @@ void acxpci_process_rxdesc(acx_device_t *adev)
 	tail = adev->hw_rx_queue.tail;
 	count = RX_CNT;
 	while (1) {
-		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		hostdesc = &adev->hw_rx_queue.hostdescinfo.start[tail];
 
 		/* advance tail regardless of outcome of the below test */
 		tail = (tail + 1) % RX_CNT;
@@ -602,7 +602,7 @@ void acxpci_process_rxdesc(acx_device_t *adev)
 		CLEAR_BIT(hostdesc->hd.Ctl_16, cpu_to_le16(DESC_CTL_HOSTOWN));
 
 		/* ok, descriptor is handled, now check the next descriptor */
-		hostdesc = &adev->hw_rx_queue.host.rxstart[tail];
+		hostdesc = &adev->hw_rx_queue.hostdescinfo.start[tail];
 
 		/* if next descriptor is empty, then bail out */
 		if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))

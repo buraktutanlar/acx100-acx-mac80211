@@ -195,6 +195,28 @@ enum {
 #define ACX_STATUS_4_ASSOCIATED		4
 
 
+struct hw_rx_queue {
+	unsigned int tail;
+
+	struct {
+		// TODO rxacxdesc
+		struct rxdesc *start;
+		size_t size; /* size of rxdesc */
+	} acxdescinfo;
+
+	struct {
+		struct rxhostdesc *start;
+		size_t size; /* hostdesc_area_size; */
+		dma_addr_t phy; /* hostdesc_startphy; */
+	} hostdescinfo;
+
+	struct {
+		void *start;
+		size_t size;
+		dma_addr_t phy;
+	} bufinfo;
+};
+
 /* desc allocation info for both rx,tx hostdesc,desc */
 struct desc_info {
 	union { /* points to PCI-mapped memory */
@@ -457,7 +479,7 @@ struct acx_device {
 	queueindicator_t *acx_queue_indicator;
 #endif
 
-	struct rx_desc_pair hw_rx_queue;
+	struct hw_rx_queue hw_rx_queue;
 	int num_hw_tx_queues;
 	/* pointers to tx buffers, tx host descriptors (in host
 	 * memory) and tx descs in device memory, same for rx */

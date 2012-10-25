@@ -66,6 +66,8 @@
 #include "main.h"
 #include "boot.h"
 
+#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
+
 /* from mem.c:98 */
 #define FW_NO_AUTO_INCREMENT 1
 
@@ -230,44 +232,32 @@ int acxpci_upload_radio(acx_device_t *adev)
 	return acx_upload_radio(adev, filename);
 }
 
-/* ########################################## */
-/* host_desc_queue creation */
-
-static int acx_allocate(acx_device_t *adev, struct desc_info *di,
-			const char *msg)
+static int acx_allocate(acx_device_t *adev, unsigned int size, dma_addr_t *phy,
+                        void **start, const char *msg)
 {
 	void *ptr;
 
 	if (IS_PCI(adev)) {
-		ptr = dma_alloc_coherent(adev->bus_dev,
-					di->size, &di->phy, GFP_KERNEL);
-
-		pr_info("bdev:%p size:%d phy:%p ptr:%p\n",
-			adev->bus_dev, di->size, (void*) di->phy, ptr);
-	}
-	else {
-		ptr = vmalloc(di->size);
-		/*
-		 * The ACX can't use the physical address, so we'll
-		 * have to fa later and it might be handy to have the
-		 * virtual address.
-		 */
-		di->phy = (dma_addr_t) NULL;
+		ptr = dma_alloc_coherent(adev->bus_dev, size, phy, GFP_KERNEL);
+		log(L_INIT, "bdev:%p size:%d phy:%p ptr:%p\n", adev->bus_dev, size,
+			(void*) *phy, ptr);
+	} else {
+		ptr = vmalloc(size);
+		*phy = (dma_addr_t) NULL;
 	}
 
-	if (ptr) {
-		log(L_DEBUG, "%s sz=%u adr=0x%p phy=0x%08llx\n", msg,
-			di->size, ptr, (unsigned long long)di->phy);
-		memset(ptr, 0, di->size);
-		di->start = ptr;
-		return 0;
+	if (!ptr) {
+		pr_err("%s: allocation FAILED (%u bytes)\n", msg, size);
+		return -ENOMEM;
 	}
-	pr_err("%s allocation FAILED (%u bytes)\n", msg, di->size);
 
-	return -ENOMEM;
+	log(L_DEBUG, "%s: size=%u ptr=0x%p phy=0x%08llx\n", msg, size, ptr, (unsigned long long) *phy);
+	memset(ptr, 0, size);
+	*start = ptr;
+	return 0;
+
 }
 
-#define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 /*
  * acx_create_rx_host_desc_queue()
  *
@@ -285,28 +275,32 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 
 
 	/* allocate the RX host descriptor queue pool */
-	adev->hw_rx_queue.host.size = RX_CNT * sizeof(*hostdesc);
-	rc = acx_allocate(adev, &adev->hw_rx_queue.host, "rxhostdesc_start");
+	adev->hw_rx_queue.hostdescinfo.size = RX_CNT * sizeof(*hostdesc);
+	rc = acx_allocate(adev, adev->hw_rx_queue.hostdescinfo.size,
+	        &adev->hw_rx_queue.hostdescinfo.phy,
+	        (void**) &adev->hw_rx_queue.hostdescinfo.start, "rxhostdesc_start");
 	if (rc)
 		goto fail;
 
 	/* check for proper alignment of RX host descriptor pool */
-	if ((long)adev->hw_rx_queue.host.rxstart & 3) {
+	if ((long)adev->hw_rx_queue.hostdescinfo.start & 3) {
 		pr_acx("driver bug: dma alloc returns unaligned address\n");
 		goto fail;
 	}
 
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
-	adev->hw_rx_queue.buf.size = RX_CNT * RX_BUFFER_SIZE;
-	rc = acx_allocate(adev, &adev->hw_rx_queue.buf, "rxbuf_start");
+	adev->hw_rx_queue.bufinfo.size = RX_CNT * RX_BUFFER_SIZE;
+	rc = acx_allocate(adev, adev->hw_rx_queue.bufinfo.size,
+	        &adev->hw_rx_queue.bufinfo.phy,
+	        &adev->hw_rx_queue.bufinfo.start, "rxbuf_start");
 	if (rc)
 		goto fail;
 
-	rxbuf = (rxbuffer_t*) adev->hw_rx_queue.buf.rxstart;
-	rxbuf_phy = adev->hw_rx_queue.buf.phy;
-	hostdesc = adev->hw_rx_queue.host.rxstart;
-	hostdesc_phy = adev->hw_rx_queue.host.phy;
+	rxbuf = (rxbuffer_t*) adev->hw_rx_queue.bufinfo.start;
+	rxbuf_phy = adev->hw_rx_queue.bufinfo.phy;
+	hostdesc = adev->hw_rx_queue.hostdescinfo.start;
+	hostdesc_phy = adev->hw_rx_queue.hostdescinfo.phy;
 
 	/* don't make any popular C programming pointer arithmetic
 	 * mistakes here, otherwise I'll kill you...  (and don't dare
@@ -323,7 +317,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 		hostdesc++;
 	}
 	hostdesc--;
-	hostdesc->hd.desc_phy_next = cpu2acx(adev->hw_rx_queue.host.phy);
+	hostdesc->hd.desc_phy_next = cpu2acx(adev->hw_rx_queue.hostdescinfo.phy);
 
 	return OK;
       fail:
@@ -333,6 +327,7 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 	return NOT_OK;
 }
 
+// TODO rename into acx_create_tx_hostdesc_queue
 static int acx_create_tx_host_desc_queue(acx_device_t *adev, struct tx_desc_pair *tx)
 {
 	txhostdesc_t *hostdesc;
@@ -345,13 +340,13 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev, struct tx_desc_pair
 
 	/* allocate TX buffer */
 	tx->buf.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	rc = acx_allocate(adev, &tx->buf, "txbuf_start");
+	rc = acx_allocate(adev, tx->buf.size, &tx->buf.phy, &tx->buf.start, "txbuf_start");
 	if (rc)
 		goto fail;
 
 	/* allocate the TX host descriptor queue pool */
 	tx->host.size = TX_CNT * 2 * sizeof(*hostdesc);
-	rc = acx_allocate(adev, &tx->host, "txhostdesc_start");
+	rc = acx_allocate(adev, tx->host.size, &tx->host.phy, &tx->host.start, "txhostdesc_start");
 	if (rc)
 		goto fail;
 
@@ -468,9 +463,7 @@ int acx_create_hostdesc_queues(acx_device_t *adev, int num_tx)
         return res;
 }
 
-/* ########################################## */
-/* non-host desc_queue creation */
-
+// TODO rename into acx_create_rx_acxdesc_queue
 static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 {
 	rxdesc_t *rxdesc;
@@ -487,31 +480,31 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		/* rxdesc_start already set here */
 
 		if (IS_PCI(adev))
-			adev->hw_rx_queue.desc_start = (rxdesc_t *)
+			adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
 				(adev->iobase2 + rx_queue_start);
 		else
-			adev->hw_rx_queue.desc_start = (rxdesc_t *)
+			adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
 				((u8 *) (uintptr_t)rx_queue_start);
 
-		rxdesc = adev->hw_rx_queue.desc_start;
+		rxdesc = adev->hw_rx_queue.acxdescinfo.start;
 
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 
 			if (IS_PCI(adev))
-				adev->hw_rx_queue.desc_start = (rxdesc_t *)
+				adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
 					((u8 *)(uintptr_t)adev->iobase2
 						+ acx2cpu(rxdesc->pNextDesc));
 			else
-				adev->hw_rx_queue.desc_start = (rxdesc_t *)
+				adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
 				   ((u8 *)(ulong)acx2cpu(rxdesc->pNextDesc));
 
-			rxdesc = adev->hw_rx_queue.desc_start;
+			rxdesc = adev->hw_rx_queue.acxdescinfo.start;
 		}
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
-		adev->hw_rx_queue.desc_start = (rxdesc_t *)
+		adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
 			((u8 *) adev->hw_tx_queue[0].desc_start
 				+ (TX_CNT * sizeof(txdesc_t)));
 
@@ -520,18 +513,18 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		 * elsewhere!  acx111's txdesc is larger! */
 
 		if (IS_PCI(adev))
-			memset(adev->hw_rx_queue.desc_start, 0,
+			memset(adev->hw_rx_queue.acxdescinfo.start, 0,
 				RX_CNT * sizeof(*rxdesc));
 		else { // IS_MEM
-			mem_offs = (uintptr_t) adev->hw_rx_queue.desc_start;
-			while (mem_offs < (uintptr_t) adev->hw_rx_queue.desc_start
+			mem_offs = (uintptr_t) adev->hw_rx_queue.acxdescinfo.start;
+			while (mem_offs < (uintptr_t) adev->hw_rx_queue.acxdescinfo.start
 				+ (RX_CNT * sizeof(*rxdesc))) {
 				write_slavemem32(adev, mem_offs, 0);
 				mem_offs += 4;
 			}
 		}
 		/* loop over whole receive pool */
-		rxdesc = adev->hw_rx_queue.desc_start;
+		rxdesc = adev->hw_rx_queue.acxdescinfo.start;
 		mem_offs = rx_queue_start;
 		for (i = 0; i < RX_CNT; i++) {
 			log(L_DEBUG, "rx descriptor @ 0x%p\n", rxdesc);
@@ -722,26 +715,18 @@ void acx_create_desc_queues(acx_device_t *adev, u32 rx_queue_start,
 	acxmem_unlock();
 }
 
-/* ########################################## */
-/* free desc_queue stuff */
-
-static inline void acx_free_desc_queue(acx_device_t *adev,
-					struct desc_info *dinfo)
+static inline void acx_free_desc_queue(acx_device_t *adev, unsigned int *size,
+                                       void **start, dma_addr_t phy)
 {
-	if (dinfo->start) {
-		if (IS_PCI(adev)) {
+	pr_info("size:%d, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
 
-			pr_info("size:%d, vaddr:%p, dma_handle:%p\n",
-				dinfo->size, dinfo->start, (void*) dinfo->phy);
+	if (IS_PCI(adev))
+		dma_free_coherent(NULL, *size, *start, phy);
+	else
+		vfree(*start);
 
-			dma_free_coherent(NULL, dinfo->size, dinfo->start,
-					dinfo->phy);
-		} else
-			vfree(dinfo->start);
-
-		dinfo->start = NULL;
-		dinfo->size = 0;
-	}
+	*size=0;
+	*start=NULL;
 }
 
 /*
@@ -755,17 +740,27 @@ void acx_free_desc_queues(acx_device_t *adev)
 {
 	int i;
 
-	for (i=0; i<adev->num_hw_tx_queues; i++)
-	{
-		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].host);
-		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].buf);
+	for (i = 0; i < adev->num_hw_tx_queues; i++) {
+		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].host.size,
+		        &adev->hw_tx_queue[i].host.start,
+		        adev->hw_tx_queue[i].host.phy);
+
+		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].buf.size,
+		        &adev->hw_tx_queue[i].buf.start,
+		        adev->hw_tx_queue[i].buf.phy);
+
 		adev->hw_tx_queue[i].desc_start = NULL;
+		adev->hw_tx_queue[i].desc_size = 0;
 	}
 
-	acx_free_desc_queue(adev, &adev->hw_rx_queue.host);
-	acx_free_desc_queue(adev, &adev->hw_rx_queue.buf);
-	adev->hw_rx_queue.desc_start = NULL;
+	acx_free_desc_queue(adev, &adev->hw_rx_queue.hostdescinfo.size,
+	        (void**) &adev->hw_rx_queue.hostdescinfo.start,
+	        adev->hw_rx_queue.hostdescinfo.phy);
+	acx_free_desc_queue(adev, &adev->hw_rx_queue.bufinfo.size,
+	        &adev->hw_rx_queue.bufinfo.start, adev->hw_rx_queue.bufinfo.phy);
 
+	adev->hw_rx_queue.acxdescinfo.start = NULL;
+	adev->hw_rx_queue.acxdescinfo.size = 0;
 
 }
 
@@ -807,7 +802,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 	pr_debug("entry\n");
 
-	rxhostdesc = adev->hw_rx_queue.host.rxstart;
+	rxhostdesc = adev->hw_rx_queue.hostdescinfo.start;
 	if (unlikely(!rxhostdesc))
 		return;
 
