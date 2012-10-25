@@ -40,7 +40,7 @@ int acx_op_get_stats(struct ieee80211_hw *hw,
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 34)
 int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
-			 struct ieee80211_tx_queue_stats *stats)
+			 struct ieee80211_tx_queue_stats *stats);
 #endif
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
