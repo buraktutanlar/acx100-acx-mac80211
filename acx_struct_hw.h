@@ -773,6 +773,28 @@ typedef struct co_fixed {
 	u8	table_count;
 } ACX_PACKED co_fixed_t;
 
+struct eeprom_cfg {
+	/*** Config retrieved from EEPROM ***/
+	char			NVSv[8];
+	u16			NVS_vendor_offs;
+	u8			MAC[6];
+	u16			probe_delay;
+	u32			eof_memory;
+	u8			dot11CCAModes;
+	u8			dot11Diversity;
+	u8			dot11ShortPreambleOption;
+	u8			dot11PBCCOption;
+	u8			dot11ChannelAgility;
+	u8			dot11PhyType;
+	u8			dot11TempType;
+	co_antennas_t		antennas;
+	co_powerlevels_t	power_levels;
+	co_datarates_t		data_rates;
+	co_domains_t		domains;
+	co_product_id_t		product_id;
+	co_manuf_t		manufacturer;
+};
+
 typedef struct acx111_ie_configoption {
 	u16			type;
 	u16			len;
