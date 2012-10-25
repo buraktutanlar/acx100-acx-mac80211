@@ -1441,7 +1441,7 @@ static int acx_set_probe_response_template(acx_device_t *adev, u8* data,
 
 
 /* Find position of TIM IE */
-static u8* acx_beacon_find_tim(struct sk_buff *beacon_skb)
+u8* acx_beacon_find_tim(struct sk_buff *beacon_skb)
 {
 	u8 *p1, *p2, *tim;
 	int len1;
