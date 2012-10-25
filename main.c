@@ -886,6 +886,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 
 	addr = sta ? sta->addr : bcast_addr;
 
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(2, 6, 37)
 	log(L_DEBUG, "cmd=%d\n", cmd);
 	log(L_DEBUG, "addr=" MACSTR, MAC(addr));
 	log(L_DEBUG, "key->: cipher=%08x, icv_len=%d, iv_len=%d, hw_key_idx=%d, "
@@ -894,6 +895,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 	        key->keylen);
 	if (acx_debug & L_DEBUG)
 		hexdump("key->: key", key->key, key->keylen);
+#endif
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 37)
         switch (key->alg) {
