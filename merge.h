@@ -152,15 +152,15 @@ DECL_OR_STUB ( PCI_OR_MEM,
 
 static inline txdesc_t* acx_get_txdesc(acx_device_t *adev, int index, int queue_id)
 {
-	return (txdesc_t*) (((u8*) adev->hw_tx_queue[queue_id].desc_start)
-			+ index * adev->hw_tx_queue[queue_id].desc_size);
+	return (txdesc_t*) (((u8*) adev->hw_tx_queue[queue_id].acxdescinfo.start)
+			+ index * adev->hw_tx_queue[queue_id].acxdescinfo.size);
 }
 
 static inline txdesc_t* acx_advance_txdesc(acx_device_t *adev,
 					txdesc_t* txdesc, int inc, int queue_id)
 {
 	return (txdesc_t*) (((u8*) txdesc)
-			+ inc * adev->hw_tx_queue[queue_id].desc_size);
+			+ inc * adev->hw_tx_queue[queue_id].acxdescinfo.size);
 }
 
 #else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */

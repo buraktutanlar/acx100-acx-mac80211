@@ -902,7 +902,7 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 		adev->acx_txbuf_numblocks, adev->acx_txbuf_blocks_free,
 		adev->acx_txbuf_free);
 
-	txdesc = adev->hw_tx_queue[0].desc_start;
+	txdesc = adev->hw_tx_queue[0].acxdescinfo.start;
 	if (txdesc) {
 		for (i = 0; i < TX_CNT; i++) {
 			thd = (i == adev->hw_tx_queue[0].head) ? " [head]" : "";
@@ -1007,9 +1007,9 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 
 		adev->irq_mask,	adev->irq_status, read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
-		adev->hw_tx_queue[0].buf.txstart, adev->hw_tx_queue[0].buf.size, adev->hw_tx_queue[0].desc_size,
-		adev->hw_tx_queue[0].desc_start, adev->hw_tx_queue[0].host.txstart,
-		adev->hw_tx_queue[0].host.size, adev->acx_txbuf_start,
+		adev->hw_tx_queue[0].bufinfo.start, adev->hw_tx_queue[0].bufinfo.size, adev->hw_tx_queue[0].acxdescinfo.size,
+		adev->hw_tx_queue[0].acxdescinfo.start, adev->hw_tx_queue[0].hostdescinfo.start,
+		adev->hw_tx_queue[0].hostdescinfo.size, adev->acx_txbuf_start,
 		adev->acx_txbuf_numblocks * adev->memblocksize,
 
 		adev->hw_rx_queue.acxdescinfo.start,

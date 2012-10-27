@@ -450,7 +450,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 			queue_id, adev->hw_tx_queue[queue_id].free,
 			acx_queue_stopped(adev->hw) ? "STOPPED" : "running");
 
-		txdesc = adev->hw_tx_queue[queue_id].desc_start;
+		txdesc = adev->hw_tx_queue[queue_id].acxdescinfo.start;
 		if (txdesc)
 			for (i = 0; i < TX_CNT; i++) {
 				thd = (i == adev->hw_tx_queue[queue_id].head) ? " [head]" : "";
@@ -478,11 +478,11 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 		           "rxdesc_start %p\n"
 		           "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
 		           "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
-		           adev->hw_tx_queue[queue_id].buf.txstart, adev->hw_tx_queue[queue_id].buf.size,
-		           (unsigned long long)adev->hw_tx_queue[queue_id].buf.phy,
-		           adev->hw_tx_queue[queue_id].desc_size, adev->hw_tx_queue[queue_id].desc_start,
-		           adev->hw_tx_queue[queue_id].host.txstart, adev->hw_tx_queue[queue_id].host.size,
-		           (unsigned long long)adev->hw_tx_queue[queue_id].host.phy,
+		           adev->hw_tx_queue[queue_id].bufinfo.start, adev->hw_tx_queue[queue_id].bufinfo.size,
+		           (unsigned long long)adev->hw_tx_queue[queue_id].bufinfo.phy,
+		           adev->hw_tx_queue[queue_id].acxdescinfo.size, adev->hw_tx_queue[queue_id].acxdescinfo.start,
+		           adev->hw_tx_queue[queue_id].hostdescinfo.start, adev->hw_tx_queue[queue_id].hostdescinfo.size,
+		           (unsigned long long)adev->hw_tx_queue[queue_id].hostdescinfo.phy,
 		           adev->hw_rx_queue.acxdescinfo.start,
 		           adev->hw_rx_queue.hostdescinfo.start, adev->hw_rx_queue.hostdescinfo.size,
 		           (unsigned long long)adev->hw_rx_queue.hostdescinfo.phy,

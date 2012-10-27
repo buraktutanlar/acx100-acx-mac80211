@@ -194,6 +194,29 @@ enum {
 #define ACX_STATUS_3_AUTHENTICATED	3
 #define ACX_STATUS_4_ASSOCIATED		4
 
+struct hw_tx_queue {
+	unsigned int head;
+	unsigned int tail;
+	unsigned int free;
+
+	struct {
+		// TODO txacxdesc
+		struct txdesc *start;
+		size_t size; /* size of txdesc */
+	} acxdescinfo;
+
+	struct {
+		struct txhostdesc *start;
+		size_t size; /* hostdesc_area_size; */
+		dma_addr_t phy; /* hostdesc_startphy; */
+	} hostdescinfo;
+
+	struct {
+		void *start;
+		size_t size;
+		dma_addr_t phy;
+	} bufinfo;
+};
 
 struct hw_rx_queue {
 	unsigned int tail;
@@ -483,7 +506,7 @@ struct acx_device {
 	int num_hw_tx_queues;
 	/* pointers to tx buffers, tx host descriptors (in host
 	 * memory) and tx descs in device memory, same for rx */
-	struct tx_desc_pair hw_tx_queue[ACX111_MAX_NUM_HW_TX_QUEUES];
+	struct hw_tx_queue hw_tx_queue[ACX111_MAX_NUM_HW_TX_QUEUES];
 
 	/*** PCI stuff ***/
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
