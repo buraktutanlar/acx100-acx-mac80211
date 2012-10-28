@@ -717,8 +717,8 @@ void acx_create_desc_queues(acx_device_t *adev, u32 rx_queue_start,
 	acxmem_unlock();
 }
 
-static inline void acx_free_desc_queue(acx_device_t *adev, unsigned int *size,
-                                       void **start, dma_addr_t phy)
+static inline void acx_free(acx_device_t *adev, unsigned int *size,
+                            void **start, dma_addr_t phy)
 {
 	pr_info("size:%d, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
 
@@ -743,11 +743,11 @@ void acx_free_desc_queues(acx_device_t *adev)
 	int i;
 
 	for (i = 0; i < adev->num_hw_tx_queues; i++) {
-		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].hostdescinfo.size,
+		acx_free(adev, &adev->hw_tx_queue[i].hostdescinfo.size,
 		        (void**) &adev->hw_tx_queue[i].hostdescinfo.start,
 		        adev->hw_tx_queue[i].hostdescinfo.phy);
 
-		acx_free_desc_queue(adev, &adev->hw_tx_queue[i].bufinfo.size,
+		acx_free(adev, &adev->hw_tx_queue[i].bufinfo.size,
 		        &adev->hw_tx_queue[i].bufinfo.start,
 		        adev->hw_tx_queue[i].bufinfo.phy);
 
@@ -755,10 +755,10 @@ void acx_free_desc_queues(acx_device_t *adev)
 		adev->hw_tx_queue[i].acxdescinfo.size = 0;
 	}
 
-	acx_free_desc_queue(adev, &adev->hw_rx_queue.hostdescinfo.size,
+	acx_free(adev, &adev->hw_rx_queue.hostdescinfo.size,
 	        (void**) &adev->hw_rx_queue.hostdescinfo.start,
 	        adev->hw_rx_queue.hostdescinfo.phy);
-	acx_free_desc_queue(adev, &adev->hw_rx_queue.bufinfo.size,
+	acx_free(adev, &adev->hw_rx_queue.bufinfo.size,
 	        &adev->hw_rx_queue.bufinfo.start, adev->hw_rx_queue.bufinfo.phy);
 
 	adev->hw_rx_queue.acxdescinfo.start = NULL;
