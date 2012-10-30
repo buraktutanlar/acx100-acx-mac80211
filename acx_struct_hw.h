@@ -28,7 +28,8 @@
 */
 typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
-typedef struct rxdesc rxdesc_t;
+
+typedef struct rxacxdesc rxacxdesc_t;
 typedef struct txdesc txdesc_t;
 typedef struct rxhostdesc rxhostdesc_t;
 typedef struct txhostdesc txhostdesc_t;
@@ -532,7 +533,7 @@ struct txdesc {
 /* NB: acx111 txdesc structure is 4 byte larger */
 /* All these 4 extra bytes are reserved. tx alloc code takes them into account */
 
-struct rxdesc {
+struct rxacxdesc {
 	acx_ptr	pNextDesc;			/* 0x00 */
 	acx_ptr	HostMemPtr;			/* 0x04 */
 	acx_ptr	ACXMemPtr;			/* 0x08 */

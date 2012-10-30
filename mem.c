@@ -838,11 +838,11 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 	const char *rtl, *thd, *ttl;
 	txdesc_t *txdesc;
 	u8 Ctl_8;
-	rxdesc_t *rxdesc;
+	rxacxdesc_t *rxdesc;
 	int i;
 	u32 tmp, tmp2;
 	txdesc_t txd;
-	rxdesc_t rxd;
+	rxacxdesc_t rxd;
 
 	acxmem_lock_flags;
 
@@ -1030,7 +1030,7 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 void acxmem_process_rxdesc(acx_device_t *adev)
 {
 	rxhostdesc_t *hostdesc;
-	rxdesc_t *rxdesc;
+	rxacxdesc_t *rxdesc;
 	unsigned count, tail;
 	u32 addr;
 	u8 Ctl_8;
@@ -1644,7 +1644,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 #if ACX_DEBUG > 1
 
 	acx_device_t *adev = hw2adev(hw);
-	rxdesc_t *rxdesc;
+	rxacxdesc_t *rxdesc;
 	txdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
 	txhostdesc_t *txhostdesc;

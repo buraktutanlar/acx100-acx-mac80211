@@ -468,7 +468,7 @@ int acx_create_hostdesc_queues(acx_device_t *adev, int num_tx)
 // TODO rename into acx_create_rx_acxdesc_queue
 static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 {
-	rxdesc_t *rxdesc;
+	rxacxdesc_t *rxdesc;
 	u32 mem_offs;
 	int i;
 
@@ -482,10 +482,10 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		/* rxdesc_start already set here */
 
 		if (IS_PCI(adev))
-			adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
+			adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 				(adev->iobase2 + rx_queue_start);
 		else
-			adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
+			adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 				((u8 *) (uintptr_t)rx_queue_start);
 
 		rxdesc = adev->hw_rx_queue.acxdescinfo.start;
@@ -494,11 +494,11 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 			log(L_DEBUG, "rx descriptor %d @ 0x%p\n", i, rxdesc);
 
 			if (IS_PCI(adev))
-				adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
+				adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 					((u8 *)(uintptr_t)adev->iobase2
 						+ acx2cpu(rxdesc->pNextDesc));
 			else
-				adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
+				adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 				   ((u8 *)(ulong)acx2cpu(rxdesc->pNextDesc));
 
 			rxdesc = adev->hw_rx_queue.acxdescinfo.start;
@@ -506,7 +506,7 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 	} else {
 		/* we didn't pre-calculate rxdesc_start in case of ACX100 */
 		/* rxdesc_start should be right AFTER Tx pool */
-		adev->hw_rx_queue.acxdescinfo.start = (rxdesc_t *)
+		adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 			((u8 *) adev->hw_tx_queue[0].acxdescinfo.start
 				+ (TX_CNT * sizeof(txdesc_t)));
 
@@ -3823,7 +3823,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 #if ACX_DEBUG > 1 /* in acx111pci_ioctl_info body */
 
 	acx_device_t *adev = hw2adev(hw);
-	rxdesc_t *rxdesc;
+	rxacxdesc_t *rxdesc;
 	txdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
 	txhostdesc_t *txhostdesc;

@@ -223,7 +223,7 @@ struct hw_rx_queue {
 
 	struct {
 		// TODO rxacxdesc
-		struct rxdesc *start;
+		struct rxacxdesc *start;
 		size_t size; /* size of rxdesc */
 	} acxdescinfo;
 
@@ -264,7 +264,7 @@ struct tx_desc_pair {
 };
 struct rx_desc_pair {
 	unsigned int	tail;
-	rxdesc_t	*desc_start;
+	rxacxdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of rxdesc */
 
 	struct desc_info host;
