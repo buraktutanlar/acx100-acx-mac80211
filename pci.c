@@ -425,7 +425,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;
 	rxhostdesc_t *rxhostdesc;
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	int i;
 	int queue_id;
 
@@ -467,7 +467,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 						thd, ttl);
 				seq_printf(file, "\n");
 
-				txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
+				txdesc = acx_advance_txacxdesc(adev, txdesc, 1, queue_id);
 			}
 		seq_printf(file,
 		           "\n"
@@ -515,7 +515,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
  */
 tx_t* acxpci_alloc_tx(acx_device_t * adev, int queue_id)
 {
-	struct txdesc *txdesc;
+	struct txacxdesc *txdesc;
 	unsigned head;
 	u8 ctl8;
 
@@ -528,7 +528,7 @@ tx_t* acxpci_alloc_tx(acx_device_t * adev, int queue_id)
 	}
 
 	head = adev->hw_tx_queue[queue_id].head;
-	txdesc = acx_get_txdesc(adev, head, queue_id);
+	txdesc = acx_get_txacxdesc(adev, head, queue_id);
 	ctl8 = txdesc->Ctl_8;
 
 	/* 2005-10-11: there were several bug reports on this
@@ -703,7 +703,7 @@ int acx111pci_ioctl_info(struct net_device *ndev,
 #if ACX_DEBUG > 1
 	acx_device_t *adev = ndev2adev(ndev);
 	rxdesc_t *rxdesc;
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
 	txhostdesc_t *txhostdesc;
 	struct acx111_ie_memoryconfig memconf;

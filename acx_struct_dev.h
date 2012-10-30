@@ -200,8 +200,7 @@ struct hw_tx_queue {
 	unsigned int free;
 
 	struct {
-		// TODO txacxdesc
-		struct txdesc *start;
+		struct txacxdesc *start;
 		size_t size; /* size of txdesc */
 	} acxdescinfo;
 
@@ -256,7 +255,7 @@ struct tx_desc_pair {
 	unsigned int 	head;
 	unsigned int	tail;
 	unsigned int 	free;
-	txdesc_t	*desc_start;
+	txacxdesc_t	*desc_start;
 	unsigned int	desc_size;	/* size of txdesc */
 
 	struct desc_info host;

@@ -836,12 +836,12 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 			acx_device_t *adev)
 {
 	const char *rtl, *thd, *ttl;
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	u8 Ctl_8;
 	rxacxdesc_t *rxdesc;
 	int i;
 	u32 tmp, tmp2;
-	txdesc_t txd;
+	txacxdesc_t txd;
 	rxacxdesc_t rxd;
 
 	acxmem_lock_flags;
@@ -967,7 +967,7 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 			}
 #endif
 
-			txdesc = acx_advance_txdesc(adev, txdesc, 1, 0);
+			txdesc = acx_advance_txacxdesc(adev, txdesc, 1, 0);
 		}
 	}
 
@@ -1287,7 +1287,7 @@ void acxmem_init_acx_txbuf2(acx_device_t *adev)
 
 #if 0 // acxmem_get_txhostdesc()
 static txhostdesc_t*
-acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc)
+acxmem_get_txhostdesc(acx_device_t *adev, txacxdesc_t* txdesc)
 {
 	int index = (u8*) txdesc - (u8*) adev->tx.desc_start;
 	if (unlikely(ACX_DEBUG && (index % adev->tx.desc_size))) {
@@ -1645,7 +1645,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw,
 
 	acx_device_t *adev = hw2adev(hw);
 	rxacxdesc_t *rxdesc;
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
 	txhostdesc_t *txhostdesc;
 	struct acx111_ie_memoryconfig memconf;

@@ -30,7 +30,8 @@ typedef struct tx tx_t;
 typedef struct acx_device acx_device_t;
 
 typedef struct rxacxdesc rxacxdesc_t;
-typedef struct txdesc txdesc_t;
+typedef struct txacxdesc txacxdesc_t;
+
 typedef struct rxhostdesc rxhostdesc_t;
 typedef struct txhostdesc txhostdesc_t;
 
@@ -500,7 +501,7 @@ typedef struct {
 
 /* Outside of "#ifdef PCI" because USB needs to know sizeof()
 ** of txdesc and rxdesc: */
-struct txdesc {
+struct txacxdesc {
 	acx_ptr	pNextDesc;	/* pointer to next txdesc */
 	acx_ptr	HostMemPtr;			/* 0x04 */
 	acx_ptr	AcxMemPtr;			/* 0x08 */
@@ -714,7 +715,6 @@ typedef struct usb_rx {
 	u8 padding[4*1024 - sizeof(struct usb_rx_plain)];
 } usb_rx_t;
 #endif /* ACX_USB */
-
 
 /* BOM Config Option structs */
 
@@ -1400,7 +1400,7 @@ enum acx111_cmd_key_action {
 static inline void
 acx_struct_size_check(void)
 {
-	CHECK_SIZEOF(txdesc_t, 0x30);
+	CHECK_SIZEOF(txacxdesc_t, 0x30);
 	CHECK_SIZEOF(acx100_ie_memconfigoption_t, 24);
 	CHECK_SIZEOF(acx100_ie_queueconfig_t, 0x20);
 	CHECK_SIZEOF(acx_joinbss_t, 0x30);

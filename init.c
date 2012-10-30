@@ -527,7 +527,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 		goto fail;
 
 	tx_queue_start = le32_to_cpu(memmap.QueueStart);
-	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txdesc_t);
+	rx_queue_start = tx_queue_start + TX_CNT * sizeof(txacxdesc_t);
 
 	log(L_DEBUG, "Initializing Queue Indicator\n");
 
@@ -540,7 +540,7 @@ static int acx100_create_dma_regions(acx_device_t * adev)
 	}
 
 	/* calculate size of queues */
-	queueconf.AreaSize = cpu_to_le32(TX_CNT * sizeof(txdesc_t) +
+	queueconf.AreaSize = cpu_to_le32(TX_CNT * sizeof(txacxdesc_t) +
 					 RX_CNT * sizeof(rxacxdesc_t) + 8);
 	queueconf.NumTxQueues = 1;	/* number of tx queues */
 	/* sets the beginning of the tx descriptor queue */

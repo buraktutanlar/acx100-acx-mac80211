@@ -8,7 +8,7 @@ void acx_wake_queue(struct ieee80211_hw *hw, const char *msg);
 
 int acx_rate111_hwvalue_to_rateindex(u16 hw_value);
 u16 acx_rate111_hwvalue_to_bitrate(u16 hw_value);
-u16 acx111_tx_build_rateset(acx_device_t *adev, txdesc_t *txdesc,
+u16 acx111_tx_build_rateset(acx_device_t *adev, txacxdesc_t *txdesc,
 			struct ieee80211_tx_info *info);
 
 void acx111_tx_build_txstatus(acx_device_t *adev,

@@ -508,7 +508,7 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 		/* rxdesc_start should be right AFTER Tx pool */
 		adev->hw_rx_queue.acxdescinfo.start = (rxacxdesc_t *)
 			((u8 *) adev->hw_tx_queue[0].acxdescinfo.start
-				+ (TX_CNT * sizeof(txdesc_t)));
+				+ (TX_CNT * sizeof(txacxdesc_t)));
 
 		/* NB: sizeof(txdesc_t) above is valid because we know
 		 * we are in if (acx100) block. Beware of cut-n-pasting
@@ -568,7 +568,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 
 	struct hw_tx_queue *tx = &adev->hw_tx_queue[queue_id];
 
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
         txhostdesc_t *hostdesc;
         dma_addr_t hostmemptr = 0; // mem.c - init quiets warning
 	u32 clr;
@@ -585,8 +585,8 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 
 	/* This refers to an ACX address, not one of ours */
 	tx->acxdescinfo.start = (IS_PCI(adev))
-		? (txdesc_t *) (adev->iobase2 + tx_queue_start)
-		: (txdesc_t *) (uintptr_t)tx_queue_start;
+		? (txacxdesc_t *) (adev->iobase2 + tx_queue_start)
+		: (txacxdesc_t *) (uintptr_t)tx_queue_start;
 
 	log(L_INIT, "adev->iobase2=%p,"
                 "tx_queue_start=%08X,"
@@ -615,7 +615,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 				hostdesc += 2;
 				hostmemptr += 2 * sizeof(*hostdesc);
 			}
-			txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
+			txdesc = acx_advance_txacxdesc(adev, txdesc, 1, queue_id);
 		}
 	} else {
 		/* ACX100 Tx buffer needs to be initialized by us */
@@ -818,7 +818,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 void acx_log_txbuffer(acx_device_t *adev, int queue_id)
 {
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	int i;
 	u8 Ctl_8;
 
@@ -832,7 +832,7 @@ void acx_log_txbuffer(acx_device_t *adev, int queue_id)
 			? read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8))
 			: txdesc->Ctl_8;
 		printk("%02X ", Ctl_8);
-		txdesc = acx_advance_txdesc(adev, txdesc, 1, queue_id);
+		txdesc = acx_advance_txacxdesc(adev, txdesc, 1, queue_id);
 	}
 	printk("\n");
 }
@@ -2305,7 +2305,7 @@ static int acxmem_get_txbuf_space_needed(acx_device_t *adev, unsigned int len) {
  /* OW TODO Align with pci.c */
 #if 1	// acxmem_alloc_tx()
 tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
-	struct txdesc *txdesc;
+	struct txacxdesc *txdesc;
 	unsigned head;
 	u8 ctl8;
 	static int txattempts = 0;
@@ -2380,7 +2380,7 @@ tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
 	/*
 	 * txdesc points to ACX memory
 	 */
-	txdesc = acx_get_txdesc(adev, head, 0);
+	txdesc = acx_get_txacxdesc(adev, head, 0);
 	ctl8 = read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8));
 
 	/*
@@ -2436,8 +2436,8 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 	/*
 	 * txdesc is the address of the descriptor on the ACX.
 	 */
-	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
-	txdesc_t tmptxdesc;
+	txacxdesc_t *txdesc = (txacxdesc_t*) tx_opaque;
+	txacxdesc_t tmptxdesc;
 	int index;
 
 	acxmem_lock_flags;
@@ -2586,7 +2586,7 @@ static void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr) {
 }
 
 
-static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc, int queue_id)
+static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txacxdesc_t *txdesc, int queue_id)
 {
 	int index = (u8 *) txdesc - (u8 *) adev->hw_tx_queue[queue_id].acxdescinfo.start;
 
@@ -2609,7 +2609,7 @@ static txhostdesc_t *acx_get_txhostdesc(acx_device_t *adev, txdesc_t *txdesc, in
 
 void *_acx_get_txbuf(acx_device_t *adev, tx_t *tx_opaque, int q)
 {
-	return acx_get_txhostdesc(adev, (txdesc_t *) tx_opaque, q)->data;
+	return acx_get_txhostdesc(adev, (txacxdesc_t *) tx_opaque, q)->data;
 }
 
 /*
@@ -2630,7 +2630,7 @@ void _acx_tx_data(acx_device_t *adev, tx_t *tx_opaque, int len,
 	/*
 	 * txdesc is the address on the ACX
 	 */
-	txdesc_t *txdesc = (txdesc_t*) tx_opaque;
+	txacxdesc_t *txdesc = (txacxdesc_t*) tx_opaque;
 	/* FIXME Cleanup?: struct ieee80211_hdr *wireless_header; */
 	txhostdesc_t *hostdesc1, *hostdesc2;
 	u16 rateset;
@@ -2891,14 +2891,14 @@ end_of_chain:
 /* OW TODO Very similar with pci: possible merging. */
 unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id)
 {
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	txhostdesc_t *hostdesc;
 	unsigned finger;
 	int num_cleaned;
 	u16 r111;
 	u8 error, ack_failures, rts_failures, rts_ok, r100, Ctl_8;
 	u32 acxmem;
-	txdesc_t tmptxdesc;
+	txacxdesc_t tmptxdesc;
 
 	struct ieee80211_tx_info *txstatus;
 
@@ -2929,7 +2929,7 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id)
 	finger = adev->hw_tx_queue[queue_id].tail;
 	num_cleaned = 0;
 	while (likely(finger != adev->hw_tx_queue[queue_id].head)) {
-		txdesc = acx_get_txdesc(adev, finger, queue_id);
+		txdesc = acx_get_txacxdesc(adev, finger, queue_id);
 
 		/* If we allocated txdesc on tx path but then decided
 		 * to NOT use it, then it will be left as a free
@@ -3064,13 +3064,13 @@ unsigned int acx_tx_clean_txdesc(acx_device_t *adev, int queue_id)
  * Used for brute-force reset handling. */
 void acx_clean_txdesc_emergency(acx_device_t *adev)
 {
-	txdesc_t *txd;
+	txacxdesc_t *txd;
 	int i;
 
 
 
 	for (i = 0; i < TX_CNT; i++) {
-		txd = acx_get_txdesc(adev, i, 0);
+		txd = acx_get_txacxdesc(adev, i, 0);
 
 		/* free it */
 		if (IS_PCI(adev)) {
@@ -3824,7 +3824,7 @@ int acx111pci_ioctl_info(struct ieee80211_hw *hw, struct iw_request_info *info,
 
 	acx_device_t *adev = hw2adev(hw);
 	rxacxdesc_t *rxdesc;
-	txdesc_t *txdesc;
+	txacxdesc_t *txdesc;
 	rxhostdesc_t *rxhostdesc;
 	txhostdesc_t *txhostdesc;
 	struct acx111_ie_memoryconfig memconf;
