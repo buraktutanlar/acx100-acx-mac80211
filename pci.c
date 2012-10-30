@@ -437,7 +437,7 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 		for (i = 0; i < RX_CNT; i++) {
 			rtl = (i == adev->hw_rx_queue.tail) ? " [tail]" : "";
 			if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-			    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+			    && (rxhostdesc->hd.Status & cpu_to_le32(DESC_STATUS_FULL)))
 				seq_printf(file, "%02u FULL%s\n", i, rtl);
 			else
 				seq_printf(file, "%02u empty%s\n", i, rtl);
@@ -579,7 +579,7 @@ void acxpci_process_rxdesc(acx_device_t *adev)
 		tail = (tail + 1) % RX_CNT;
 
 		if ((hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		        && (hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+		        && (hostdesc->hd.Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break; /* found it! */
 
 		if (unlikely(!--count))
@@ -590,10 +590,10 @@ void acxpci_process_rxdesc(acx_device_t *adev)
 	/* now process descriptors, starting with the first we figured out */
 	while (1) {
 		log(L_BUF,
-		        "rx: tail=%u Ctl_16=%04X Status=%08X\n", tail, hostdesc->hd.Ctl_16, hostdesc->Status);
+		        "rx: tail=%u Ctl_16=%04X Status=%08X\n", tail, hostdesc->hd.Ctl_16, hostdesc->hd.Status);
 
 		acx_process_rxbuf(adev, hostdesc->data);
-		hostdesc->Status = 0;
+		hostdesc->hd.Status = 0;
 
 		/* flush all writes before adapter sees CTL_HOSTOWN change */
 		wmb();
@@ -606,7 +606,7 @@ void acxpci_process_rxdesc(acx_device_t *adev)
 
 		/* if next descriptor is empty, then bail out */
 		if (!(hostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		        || !(hostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+		        || !(hostdesc->hd.Status & cpu_to_le32(DESC_STATUS_FULL)))
 			break;
 
 		tail = (tail + 1) % RX_CNT;

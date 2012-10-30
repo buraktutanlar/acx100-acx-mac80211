@@ -810,7 +810,7 @@ void acx_log_rxbuffer(const acx_device_t *adev)
 
 	for (i = 0; i < RX_CNT; i++) {
 		if ((rxhostdesc->hd.Ctl_16 & cpu_to_le16(DESC_CTL_HOSTOWN))
-		    && (rxhostdesc->Status & cpu_to_le32(DESC_STATUS_FULL)))
+		    && (rxhostdesc->hd.Status & cpu_to_le32(DESC_STATUS_FULL)))
 			pr_acx("rx: buf %d full\n", i);
 		rxhostdesc++;
 	}

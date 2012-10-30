@@ -1117,7 +1117,7 @@ void acxmem_process_rxdesc(acx_device_t *adev)
 		} else
 			log(L_ANY, "rx reclaim only!\n");
 
-		hostdesc->Status = 0;
+		hostdesc->hd.Status = 0;
 
 		/*
 		 * Let the ACX know we're done.
