@@ -1750,18 +1750,10 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			break;
 		}
 
-		if (1 || IS_MEM(adev))
+		if (IS_MEM(adev))
 			udelay(1000);
 		else
-			/* another pci waitloop kludge */
-			if (counter % 8 == 0) {
-				if (time_after(jiffies, timeout)) {
-					counter = 0;
-					break;
-				}
-				/* we waited 8 iterations, no luck. Sleep 8 ms */
-				acx_mwait(8);
-			}
+			msleep(1);
 
 	} while (likely(--counter));
 
