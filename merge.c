@@ -2019,13 +2019,10 @@ int acx_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
 	int result = NOT_OK;
-	u16 hardware_info;
 	u16 ecpu_ctrl;
-	int count;
 	acxmem_lock_flags;
 
 	acxmem_lock();
-
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 	if (IS_PCI(adev))
@@ -2038,29 +2035,8 @@ int acx_reset_dev(acx_device_t *adev)
 		msg = "acx: eCPU is already running. ";
 		goto end_fail;
 	}
-
-	/* need to know radio type before fw load */
-	/* Need to wait for arrival of this information in a loop,
-	 * most probably since eCPU runs some init code from EEPROM
-	 * (started burst read in reset_mac()) which also sets the
-	 * radio type ID */
-
-	count = 0xffff;
-	do {
-		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
-		if (!--count) {
-			msg = "acx: eCPU didn't indicate radio type";
-			goto end_fail;
-		}
-		cpu_relax();
-	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
-
-	pr_acx("ACX radio type 0x%02x\n", (hardware_info >> 8) & 0xff);
-	/* printk("DEBUG: count %d\n", count); */
-	adev->form_factor = hardware_info & 0xff;
-	adev->radio_type = hardware_info >> 8;
-
 	acxmem_unlock();
+
 	/* load the firmware */
 	result = (IS_MEM(adev))
 		? acxmem_upload_fw(adev)

@@ -2108,6 +2108,10 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
+	/* --- */
+	acx_get_hardware_info(adev);
+
+
 	/* OK init parts from pci.c are done in acxmem_complete_hw_reset(adev) */
 	if (OK != acxmem_complete_hw_reset(adev))
 		goto fail_complete_hw_reset;
