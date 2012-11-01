@@ -2117,39 +2117,6 @@ end:
 	return result;
 }
 
-/*
- * Initialize the pieces managing the transmit buffer pool on the ACX.
- * The transmit buffer is a circular queue with one 32 bit word
- * reserved at the beginning of each block.  The upper 13 bits are a
- * control field, of which only 0x02000000 has any meaning.  The lower
- * 19 bits are the address of the next block divided by 32.
- */
-#if 0	// acxmem_init_acx_txbuf()
-static void acxmem_init_acx_txbuf(acx_device_t *adev)
-{
-	/*
-	 * acx100_s_init_memory_pools set up txbuf_start and
-	 * txbuf_numblocks for us.  All we need to do is reset the
-	 * rest of the bookeeping.
-	 */
-
-	adev->acx_txbuf_free = adev->acx_txbuf_start;
-	adev->acx_txbuf_blocks_free = adev->acx_txbuf_numblocks;
-
-	/*
-	 * Initialization leaves the last transmit pool block without
-	 * a pointer back to the head of the list, but marked as the
-	 * end of the list.  That's how we want to see it, too, so
-	 * leave it alone.  This is only ever called after a firmware
-	 * reset, so the ACX memory is in the state we want.
-	 */
-}
-#endif	// acxmem_init_acx_txbuf()
-
-/*
- * Most of the acx specific pieces of hardware reset.
- */
-
 #if 0	// acxmem_i_set_multicast_list()
 /***********************************************************************
  ** acxmem_i_set_multicast_list
