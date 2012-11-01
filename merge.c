@@ -1726,9 +1726,6 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	/* now write the actual command type */
 	acx_write_cmd_type_status(adev, cmd, 0);
 
-	/* clear CMD_COMPLETE bit. can be set only by IRQ handler: */
-	CLEAR_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
-
 	/* execute command */
 	write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_CMD);
 	write_flush(adev);
@@ -1752,9 +1749,6 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 			write_reg16(adev, IO_ACX_IRQ_ACK, HOST_INT_CMD_COMPLETE);
 			break;
 		}
-
-		if (adev->irq_status & HOST_INT_CMD_COMPLETE)
-			break;
 
 		if (1 || IS_MEM(adev))
 			udelay(1000);
@@ -1781,10 +1775,10 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 	if (counter == 0) { // pci == -1, trivial
 
 		log(L_ANY, "%s: Timed out %s for CMD_COMPLETE. "
-			"irq bits:0x%02X irq_status:0x%04X timeout:%dms "
+			"irq bits:0x%02X timeout:%dms "
 			"cmd_status:%d (%s)\n", devname,
 		       (adev->irqs_active) ? "waiting" : "polling",
-		       irqtype, adev->irq_status, cmd_timeout,
+		       irqtype, cmd_timeout,
 		       cmd_status, acx_cmd_status_str(cmd_status));
 		log(L_ANY,
 			"timeout: counter:%d cmd_timeout:%d cmd_timeout-counter:%d\n",
@@ -2052,11 +2046,6 @@ int acx_reset_dev(acx_device_t *adev)
 		msg = "acx: eCPU is already running. ";
 		goto end_fail;
 	}
-
-	/* scan, if any, is stopped now, setting corresponding IRQ bit */
-	(IS_MEM(adev))
-		? adev->irq_status |= HOST_INT_SCAN_COMPLETE
-		: SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
 
 	/* need to know radio type before fw load */
 	/* Need to wait for arrival of this information in a loop,
@@ -3245,7 +3234,6 @@ void acx_irq_work(struct work_struct *work)
 		if (irqmasked & HOST_INT_CMD_COMPLETE) {
 			log(L_IRQ, "got Command_Complete IRQ\n");
 			/* save the state for the running issue_cmd() */
-			SET_BIT(adev->irq_status, HOST_INT_CMD_COMPLETE);
 		}
 
 		/* Tx reporting */

@@ -334,7 +334,6 @@ struct acx_device {
 	u32		set_mask;	/* mask of settings to write to the card */
 	u32		initialized:1;
 	/* Barely used in USB case */
-	u16		irq_status;
 #ifdef UNUSED
 	int		irq_savedstate;
 #endif	
