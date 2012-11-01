@@ -2102,13 +2102,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 * to unconfigured interface (ifup) */
 	adev->mgmt_timer.function = (void(*)(unsigned long)) 0x0000dead;
 
-#if defined(NONESSENTIAL_FEATURES)
-	acx_show_card_eeprom_id(adev);
-#endif /* NONESSENTIAL_FEATURES */
-
-	/* Device setup is finished, now start initializing the card */
-	/* --- */
-
 	acx_init_task_scheduler(adev);
 
 	/* Mac80211 Tx_queue */
