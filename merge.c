@@ -1971,7 +1971,57 @@ void acx_up(struct ieee80211_hw *hw)
  *	This resets the device using low level hardware calls
  *	as well as uploads and verifies the firmware to the card
  */
-int acx_verify_init(acx_device_t *adev);
+static int acx_verify_init(acx_device_t *adev)
+{
+        int result = NOT_OK;
+        unsigned long timeout;
+	acxmem_lock_flags;
+
+
+
+        timeout = jiffies + 2 * HZ;
+	/* if-then differ primarily by irqstat size */
+	if (IS_PCI(adev))
+		for (;;) {
+			u16 irqstat = read_reg16(adev,
+					IO_ACX_IRQ_STATUS_NON_DES);
+			if (irqstat & HOST_INT_FCS_THRESHOLD) {
+				result = OK;
+				write_reg16(adev, IO_ACX_IRQ_ACK,
+					HOST_INT_FCS_THRESHOLD);
+				break;
+			}
+			if (time_after(jiffies, timeout))
+				break;
+			/* Init may take up to ~0.5 sec total */
+			acx_mwait(50);
+		}
+	else
+		for (;;) {
+			u32 irqstat;
+			acxmem_lock();
+			irqstat = read_reg32(adev,
+					IO_ACX_IRQ_STATUS_NON_DES);
+			if ((irqstat != 0xFFFFFFFF)
+				&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
+				result = OK;
+				write_reg32(adev, IO_ACX_IRQ_ACK,
+					HOST_INT_FCS_THRESHOLD);
+				acxmem_unlock();
+				break;
+			}
+			acxmem_unlock();
+
+			if (time_after(jiffies, timeout))
+				break;
+			/* Init may take up to ~0.5 sec total */
+			acx_mwait(50);
+		}
+
+
+        return result;
+}
+
 
 int acx_reset_dev(acx_device_t *adev)
 {
@@ -2127,58 +2177,6 @@ end:
 
 	return result;
 }
-
-int acx_verify_init(acx_device_t *adev)
-{
-        int result = NOT_OK;
-        unsigned long timeout;
-	acxmem_lock_flags;
-
-
-
-        timeout = jiffies + 2 * HZ;
-	/* if-then differ primarily by irqstat size */
-	if (IS_PCI(adev))
-		for (;;) {
-			u16 irqstat = read_reg16(adev,
-					IO_ACX_IRQ_STATUS_NON_DES);
-			if (irqstat & HOST_INT_FCS_THRESHOLD) {
-				result = OK;
-				write_reg16(adev, IO_ACX_IRQ_ACK,
-					HOST_INT_FCS_THRESHOLD);
-				break;
-			}
-			if (time_after(jiffies, timeout))
-				break;
-			/* Init may take up to ~0.5 sec total */
-			acx_mwait(50);
-		}
-	else
-		for (;;) {
-			u32 irqstat;
-			acxmem_lock();
-			irqstat = read_reg32(adev,
-					IO_ACX_IRQ_STATUS_NON_DES);
-			if ((irqstat != 0xFFFFFFFF)
-				&& (irqstat & HOST_INT_FCS_THRESHOLD)) {
-				result = OK;
-				write_reg32(adev, IO_ACX_IRQ_ACK,
-					HOST_INT_FCS_THRESHOLD);
-				acxmem_unlock();
-				break;
-			}
-			acxmem_unlock();
-
-			if (time_after(jiffies, timeout))
-				break;
-			/* Init may take up to ~0.5 sec total */
-			acx_mwait(50);
-		}
-
-
-        return result;
-}
-
 
 /*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
