@@ -1955,22 +1955,6 @@ void acx_up(struct ieee80211_hw *hw)
 
 }
 
-/*
- * acx_reset_dev
- *
- * Arguments:
- *	netdevice that contains the adev variable
- * Returns:
- *	NOT_OK on fail
- *	OK on success
- * Side effects:
- *	device is hard reset
- * Call context:
- *	acxmem_e_probe
- * Comment:
- *	This resets the device using low level hardware calls
- *	as well as uploads and verifies the firmware to the card
- */
 static int acx_verify_init(acx_device_t *adev)
 {
         int result = NOT_OK;
@@ -2022,6 +2006,28 @@ static int acx_verify_init(acx_device_t *adev)
         return result;
 }
 
+void acx_base_reset_mac(acx_device_t *adev, int middelay)
+{
+	int count;
+
+	/* halt eCPU */
+	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+
+	/* now do soft reset of eCPU, set bit */
+	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+	log(L_DEBUG, "enable soft reset...\n");
+
+	for (count = 0; count < middelay; count++)
+		udelay(50);
+
+	/* now clear bit again: deassert eCPU reset */
+	log(L_DEBUG, "disable soft reset and go to init mode...\n");
+	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
+
+	/* now start a burst read from initial EEPROM */
+	set_regbits(adev, IO_ACX_EE_START, 0x1);
+}
+
 
 int acx_reset_dev(acx_device_t *adev)
 {
@@ -2030,56 +2036,27 @@ int acx_reset_dev(acx_device_t *adev)
 	u16 hardware_info;
 	u16 ecpu_ctrl;
 	int count;
-	u32 tmp;
 	acxmem_lock_flags;
-
 
 	acxmem_lock();
 
 	/*
 	 write_reg32 (adev, IO_ACX_SLV_MEM_CP, 0);
 	 */
+
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
-
-	if (IS_PCI(adev) && !adev->dev_is_vlynq)
-		acxpci_reset_mac(adev);
-
-	/* Windows driver (MEM) does some funny things here */
-
-	/* clear bit 0x200 in register 0x2A0 */
-	if (IS_MEM(adev))
-		clear_regbits(adev, 0x2A0, 0x200);
-
 	if (IS_PCI(adev))
-		ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
-
-	if (IS_MEM(adev)) {
-
-		/* Set bit 0x200 in ACX_GPIO_OUT */
-		set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
-
-		/*
-		 * read register 0x900 until its value is 0x8400104C,
-		 * sleeping in between reads if it's not immediate
-		 */
-		tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-		count = 500;
-		while (count-- && (tmp != ACX_VENDOR_ID)) {
-			mdelay (10);
-			tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
-		}
-
-		/* end what Windows driver does */
-
+		acxpci_reset_mac(adev);
+	else
 		acxmem_reset_mac(adev);
 
-		ecpu_ctrl = read_reg32(adev, IO_ACX_ECPU_CTRL) & 1;
-		if (!ecpu_ctrl) {
-			msg = "acx: eCPU is already running. ";
-			goto end_fail;
-		}
-	} // IS_MEM
+	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
+	if (!ecpu_ctrl) {
+		msg = "acx: eCPU is already running. ";
+		goto end_fail;
+	}
+
 #if 0	// IO_ACX_SOR_CFG
 	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
 		/* eCPU most likely means "embedded CPU" */

@@ -9,7 +9,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		const char *cmdstr);
 
 #if defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM
-# define PCI_OR_MEM
+#define PCI_OR_MEM
 #endif
 
 DECL_OR_STUB ( PCI_OR_MEM,
@@ -149,7 +149,6 @@ DECL_OR_STUB ( PCI_OR_MEM,
 
 #if (defined CONFIG_ACX_MAC80211_PCI || defined CONFIG_ACX_MAC80211_MEM)
 
-
 static inline txacxdesc_t* acx_get_txacxdesc(acx_device_t *adev, int index, int queue_id)
 {
 	return (txacxdesc_t*) (((u8*) adev->hw_tx_queue[queue_id].acxdescinfo.start)
@@ -162,6 +161,8 @@ static inline txacxdesc_t* acx_advance_txacxdesc(acx_device_t *adev,
 	return (txacxdesc_t*) (((u8*) txdesc)
 			+ inc * adev->hw_tx_queue[queue_id].acxdescinfo.size);
 }
+
+void acx_base_reset_mac(acx_device_t *adev, int middelay);
 
 #else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
 

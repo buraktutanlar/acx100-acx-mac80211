@@ -349,41 +349,13 @@ acxpci_issue_cmd_timeo_debug(acx_device_t * adev, unsigned cmd,
  */
 
 
-/*
- * acxpci_reset_mac
- *
- * MAC will be reset
- * Call context: reset_dev
- *
- * Origin: Standard Read/Write to IO
- */
-/* static */
 void acxpci_reset_mac(acx_device_t * adev)
 {
-	u16 temp;
+	/* Vlynq doesn't do this reset sequence; it even crashes if done */
+	if (adev->dev_is_vlynq)
+		return;
 
-
-
-	/* halt eCPU */
-	temp = read_reg16(adev, IO_ACX_ECPU_CTRL) | 0x1;
-	write_reg16(adev, IO_ACX_ECPU_CTRL, temp);
-
-	/* now do soft reset of eCPU, set bit */
-	temp = read_reg16(adev, IO_ACX_SOFT_RESET) | 0x1;
-	log(L_DEBUG, "enable soft reset\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp);
-	write_flush(adev);
-
-	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "disable soft reset and go to init mode\n");
-	write_reg16(adev, IO_ACX_SOFT_RESET, temp & ~0x1);
-
-	/* now start a burst read from initial EEPROM */
-	temp = read_reg16(adev, IO_ACX_EE_START) | 0x1;
-	write_reg16(adev, IO_ACX_EE_START, temp);
-	write_flush(adev);
-
-
+	acx_base_reset_mac(adev, 0);
 }
 
 /*

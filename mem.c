@@ -738,49 +738,41 @@ static int acxmem_complete_hw_reset(acx_device_t *adev)
 	return 0;
 }
 
-/*
- * acxmem_reset_mac
- *
- * MAC will be reset
- * Call context: reset_dev
- */
 void acxmem_reset_mac(acx_device_t *adev)
 {
 	int count;
+	u32 tmp;
 
+	/* Windows driver (MEM) does some funny things here */
 
-	/* OW Bit setting done differently in pci.c */
-	/* halt eCPU */
-	set_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
+	/* clear bit 0x200 in register 0x2A0 */
+	clear_regbits(adev, 0x2A0, 0x200);
 
-	/* now do soft reset of eCPU, set bit */
-	set_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-	log(L_DEBUG, "enable soft reset...\n");
-
-	/* Windows driver sleeps here for a while with this sequence */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
-	}
-
-	/* now clear bit again: deassert eCPU reset */
-	log(L_DEBUG, "disable soft reset and go to init mode...\n");
-	clear_regbits(adev, IO_ACX_SOFT_RESET, 0x1);
-
-	/* now start a burst read from initial EEPROM */
-	set_regbits(adev, IO_ACX_EE_START, 0x1);
+	/* Set bit 0x200 in ACX_GPIO_OUT */
+	set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
 
 	/*
-	 * Windows driver sleeps here for a while with this sequence
+	 * read register 0x900 until its value is 0x8400104C,
+	 * sleeping in between reads if it's not immediate
 	 */
-	for (count = 0; count < 200; count++) {
-		udelay (50);
+	tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
+	count = 500;
+	while (count-- && (tmp != ACX_VENDOR_ID)) {
+		mdelay (10);
+		tmp = read_reg32(adev, REG_ACX_VENDOR_ID);
 	}
 
+	/* end what Windows driver does */
+
+	/* middelay=200: Windows driver does sleeps here for a while with this sequence */
+	acx_base_reset_mac(adev, 200);
+
+	/* Windows driver sleeps here for a while with this sequence */
+	for (count = 0; count < 200; count++)
+		udelay(50);
+
 	/* Windows driver writes 0x10000 to register 0x808 here */
-
 	write_reg32(adev, 0x808, 0x10000);
-
-
 }
 
 /***********************************************************************
