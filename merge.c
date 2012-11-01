@@ -2117,6 +2117,59 @@ end:
 	return result;
 }
 
+int acx_get_hardware_info(acx_device_t *adev)
+{
+	int res = 0;
+	u16 hardware_info;
+	u16 ecpu_ctrl;
+	int count;
+	acxmem_lock_flags;
+
+	acxmem_lock();
+
+	/* reset the device to make sure the eCPU is stopped
+	 * to upload the firmware correctly */
+	if (IS_PCI(adev))
+		acxpci_reset_mac(adev);
+	else
+		acxmem_reset_mac(adev);
+
+	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
+	if (!ecpu_ctrl) {
+		pr_err("acx: eCPU is already running");
+		goto end_fail;
+	}
+
+	/* Need to wait for arrival of this information in a loop,
+	 * most probably since eCPU runs some init code from EEPROM
+	 * (started burst read in reset_mac()) which also sets the
+	 * radio type ID */
+	count = 0xffff;
+	do {
+		hardware_info = read_reg16(adev, IO_ACX_EEPROM_INFORMATION);
+		if (!--count) {
+			pr_err("acx: eCPU didn't indicate radio type");
+			goto end_fail;
+		}
+		cpu_relax();
+	} while (!(hardware_info & 0xff00)); /* radio type still zero? */
+
+	adev->form_factor = hardware_info & 0xff;
+	adev->radio_type = hardware_info >> 8;
+	log(L_ANY, "form_factor=0x%02x, radio_type=0x%02x\n", adev->form_factor, adev->radio_type);
+
+	goto end;
+
+	end_fail:
+	res = 1;
+
+	end:
+	acxmem_unlock();
+
+	return res;
+}
+
+
 #if 0	// acxmem_i_set_multicast_list()
 /***********************************************************************
  ** acxmem_i_set_multicast_list
