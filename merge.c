@@ -2040,10 +2040,6 @@ int acx_reset_dev(acx_device_t *adev)
 
 	acxmem_lock();
 
-	/*
-	 write_reg32 (adev, IO_ACX_SLV_MEM_CP, 0);
-	 */
-
 	/* reset the device to make sure the eCPU is stopped
 	 * to upload the firmware correctly */
 	if (IS_PCI(adev))
@@ -2056,21 +2052,6 @@ int acx_reset_dev(acx_device_t *adev)
 		msg = "acx: eCPU is already running. ";
 		goto end_fail;
 	}
-
-#if 0	// IO_ACX_SOR_CFG
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 2) {
-		/* eCPU most likely means "embedded CPU" */
-		msg = "acx: eCPU did not start after boot from flash. ";
-		goto end_unlock;
-	}
-
-	/* check sense on reset flags */
-	if (read_reg16(adev, IO_ACX_SOR_CFG) & 0x10) {
-		pr_acx("%s: %s: eCPU did not start after boot (SOR), "
-			"is this fatal?\n", adev->ndev->name,
-			wiphy_name(adev->hw->wiphy));
-	}
-#endif	// IO_ACX_SOR_CFG
 
 	/* scan, if any, is stopped now, setting corresponding IRQ bit */
 	(IS_MEM(adev))
