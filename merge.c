@@ -2157,18 +2157,6 @@ static void acxmem_i_set_multicast_list(struct net_device *ndev)
 
 
 /*
- * BOM Other (Control Path)
- * ==================================================
- */
-
-#define DUMP_MEM_DURING_DIAG 0
-
-/*
- * BOM Proc, Debug
- * ==================================================
- */
-
-/*
  * BOM Rx Path
  * ==================================================
  */
