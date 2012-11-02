@@ -104,6 +104,9 @@
 #define MEM_RADIO_IMAGE_FILENAME	"RADIO%02x.BIN"
 #define MEM_FIRMWARE_FILENAME_MAXLEN 	16
 
+#define PATCH_AROUND_BAD_SPOTS 1
+#define HX4700_FIRMWARE_CHECKSUM 0x0036862e
+#define HX4700_ALTERNATE_FIRMWARE_CHECKSUM 0x00368a75
 
 /*
  * BOM Prototypes
@@ -790,6 +793,84 @@ int acxmem_load_firmware(acx_device_t *adev)
 
 	return acx_load_firmware(adev, fw_image_filename, radio_image_filename);
 }
+
+#if PATCH_AROUND_BAD_SPOTS
+/*
+ * arm-linux-objdump -d patch.bin, or
+ * od -Ax -t x4 patch.bin after finding the bounds
+ * of the .text section with arm-linux-objdump -s patch.bin
+ */
+static const u32 patch[] = {
+	0xe584c030, 0xe59fc008, 0xe92d1000, 0xe59fc004, 0xe8bd8000,
+	0x0000080c, 0x0000aa68, 0x605a2200, 0x2c0a689c, 0x2414d80a,
+	0x2f00689f, 0x1c27d007, 0x06241e7c, 0x2f000e24, 0xe000d1f6,
+	0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
+	0xffff0808
+};
+
+int acxmem_patch_around_bad_spots(acx_device_t *adev)
+{
+	u32 offset;
+	int i;
+
+	firmware_image_t *fw_image = adev->fw_image;
+
+	acxmem_lock_flags;
+
+	acxmem_lock();
+	/*
+	 * Only want to do this if the firmware is exactly what we
+	 * expect for an iPaq 4700; otherwise, bad things would ensue.
+	 */
+	if ((HX4700_FIRMWARE_CHECKSUM == fw_image->chksum)
+		|| (HX4700_ALTERNATE_FIRMWARE_CHECKSUM == fw_image->chksum)) {
+		/*
+		 * Put the patch after the main firmware image.
+		 * 0x950c contains the ACX's idea of the end of the
+		 * firmware.  Use that location to load ours (which
+		 * depends on that location being 0xab58) then update
+		 * that location to point to after ours.
+		 */
+
+		offset = read_slavemem32(adev, 0x950c);
+
+		log (L_DEBUG, "patching in at 0x%04x\n", offset);
+
+		for (i = 0; i < sizeof(patch) / sizeof(patch[0]); i++) {
+			write_slavemem32(adev, offset, patch[i]);
+			offset += sizeof(u32);
+		}
+
+		/*
+		 * Patch the instruction at 0x0804 to branch to our
+		 * ARM patch at 0xab58
+		 */
+		write_slavemem32(adev, 0x0804, 0xea000000 + (0xab58 - 0x0804 - 8) / 4);
+
+		/*
+		 * Patch the instructions at 0x1f40 to branch to our
+		 * Thumb patch at 0xab74
+		 *
+		 * 4a00 ldr r2, [pc, #0]
+		 * 4710 bx  r2
+		 * .data 0xab74+1
+		 */
+		write_slavemem32(adev, 0x1f40, 0x47104a00);
+		write_slavemem32(adev, 0x1f44, 0x0000ab74 + 1);
+
+		/*
+		 * Bump the end of the firmware up to beyond our patch.
+		 */
+		write_slavemem32(adev, 0x950c, offset);
+
+	}
+	acxmem_unlock();
+
+	return 0;
+}
+#else
+int acxmem_patch_around_bad_spots(acx_device_t *adev) { return 0; }
+#endif
 
 #if 0
 static void acxmem_i_set_multicast_list(struct net_device *ndev)

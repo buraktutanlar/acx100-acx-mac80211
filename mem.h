@@ -29,6 +29,7 @@ void acxmem_chaincopy_from_slavemem(acx_device_t *adev, u8 *destination,
 			u32 source, int count);
 
 void acxmem_reset_mac(acx_device_t *adev);
+int acxmem_patch_around_bad_spots(acx_device_t *adev);
 
 int acxmem_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev);
 
