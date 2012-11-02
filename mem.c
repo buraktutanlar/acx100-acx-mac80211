@@ -1359,6 +1359,180 @@ void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
 
 }
 
+/*
+ * acxmem_l_alloc_tx
+ * Actually returns a txdesc_t* ptr
+ *
+ * FIXME: in case of fragments, should allocate multiple descrs
+ * after figuring out how many we need and whether we still have
+ * sufficiently many.
+ */
+ /* OW TODO Align with pci.c */
+tx_t *acxmem_alloc_tx(acx_device_t *adev, unsigned int len) {
+	struct txacxdesc *txdesc;
+	unsigned head;
+	u8 ctl8;
+	static int txattempts = 0;
+	int blocks_needed;
+	acxmem_lock_flags;
+
+
+	acxmem_lock();
+
+	if (unlikely(!adev->hw_tx_queue[0].free)) {
+		log(L_ANY, "BUG: no free txdesc left\n");
+		/*
+		 * Probably the ACX ignored a transmit attempt and now
+		 * there's a packet sitting in the queue we think
+		 * should be transmitting but the ACX doesn't know
+		 * about.  On the first pass, send the ACX a TxProc
+		 * interrupt to try moving things along, and if that
+		 * doesn't work (ie, we get called again) completely
+		 * flush the transmit queue.
+		 */
+		if (txattempts < 10) {
+			txattempts++;
+			log(L_ANY, "trying to wake up ACX\n");
+			write_reg16(adev, IO_ACX_INT_TRIG, INT_TRIG_TXPRC);
+			write_flush(adev);
+		} else {
+			txattempts = 0;
+			log(L_ANY, "flushing transmit queue.\n");
+			acx_clean_txdesc_emergency(adev);
+		}
+		txdesc = NULL;
+		goto end;
+	}
+
+	/*
+	 * Make a quick check to see if there is transmit buffer space
+	 * on the ACX.  This can't guarantee there is enough space for
+	 * the packet since we don't yet know how big it is, but it
+	 * will prevent at least some annoyances.
+	 */
+
+	/* OW 20090815
+	 * Make a detailed check of required tx_buf blocks, to avoid
+	 * 'out of tx_buf' situation.
+	 *
+	 * The empty tx_buf and reuse trick in acxmem_l_tx_data doen't
+	 * wotk well.  I think it confused mac80211, that was
+	 * supposing the packet was send, but actually it was
+	 * dropped. According to mac80211 dropping should not happen,
+	 * altough a bit of dropping seemed to be ok.
+	 *
+	 * What we do now is simpler and clean I think:
+	 * - first check the number of required blocks
+	 * - and if there are not enough: Stop the queue and report NOT_OK.
+	 *
+	 * Reporting NOT_OK here shouldn't be done neither according
+	 * to mac80211, but it seems to work better here.
+	 */
+
+	blocks_needed=acxmem_get_txbuf_space_needed(adev, len);
+	if (!(blocks_needed <= adev->acx_txbuf_blocks_free)) {
+		txdesc = NULL;
+		log(L_BUFT, "!(blocks_needed <= adev->acx_txbuf_blocks_free), "
+			"len=%i, blocks_needed=%i, acx_txbuf_blocks_free=%i: "
+			"Stopping queue.\n",
+			len, blocks_needed, adev->acx_txbuf_blocks_free);
+		acx_stop_queue(adev->hw, NULL);
+		goto end;
+	}
+
+	head = adev->hw_tx_queue[0].head;
+	/*
+	 * txdesc points to ACX memory
+	 */
+	txdesc = acx_get_txacxdesc(adev, head, 0);
+	ctl8 = read_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8));
+
+	/*
+	 * If we don't own the buffer (HOSTOWN) it is certainly not
+	 * free; however, we may have previously thought we had enough
+	 * memory to send a packet, allocated the buffer then gave up
+	 * when we found not enough transmit buffer space on the
+	 * ACX. In that case, HOSTOWN and ACXDONE will both be set.
+	 */
+
+	/* TODO OW Check if this is correct
+	 * TODO 20100115 Changed to DESC_CTL_ACXDONE_HOSTOWN like in pci.c
+	 */
+	if (unlikely(DESC_CTL_HOSTOWN != (ctl8 & DESC_CTL_ACXDONE_HOSTOWN))) {
+		/* whoops, descr at current index is not free, so probably
+		 * ring buffer already full */
+		log(L_ANY, "BUG: tx_head:%d Ctl8:0x%02X - failed to find free txdesc\n",
+			head, ctl8);
+		txdesc = NULL;
+		goto end;
+	}
+
+	/* Needed in case txdesc won't be eventually submitted for tx */
+	write_slavemem8(adev, (uintptr_t) &(txdesc->Ctl_8), DESC_CTL_ACXDONE_HOSTOWN);
+
+	adev->hw_tx_queue[0].free--;
+	log(L_BUFT, "tx: got desc %u, %u remain\n", head, adev->hw_tx_queue[0].free);
+
+	/* returning current descriptor, so advance to next free one */
+	adev->hw_tx_queue[0].head = (head + 1) % TX_CNT;
+
+	end:
+
+	acxmem_unlock();
+
+
+	return (tx_t*) txdesc;
+}
+
+/*
+ * Return buffer space back to the pool by following the next pointers
+ * until we find the block marked as the end.  Point the last block to
+ * the head of the free list, then update the head of the free list to
+ * point to the newly freed memory.  This routine gets called in
+ * interrupt context, so it shouldn't block to protect the integrity
+ * of the linked list.  The ISR already holds the lock.
+ */
+void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr)
+{
+	u32 cur, last, next;
+
+	if ((blockptr >= adev->acx_txbuf_start) &&
+		(blockptr <= adev->acx_txbuf_start +
+		(adev->acx_txbuf_numblocks - 1)	* adev->memblocksize)) {
+		cur = blockptr;
+		do {
+			last = cur;
+			next = read_slavemem32(adev, cur);
+
+			/*
+			 * Advance to the next block in this allocation
+			 */
+			cur = (next & 0x7ffff) << 5;
+
+			/*
+			 * This block now counts as free.
+			 */
+			adev->acx_txbuf_blocks_free++;
+		} while (!(next & 0x02000000));
+
+		/*
+		 * last now points to the last block of that
+		 * allocation.  Update the pointer in that block to
+		 * point to the free list and reset the free list to
+		 * the first block of the free call.  If there were no
+		 * free blocks, make sure the new end of the list
+		 * marks itself as truly the end.
+		 */
+		if (adev->acx_txbuf_free) {
+			write_slavemem32(adev, last, adev->acx_txbuf_free >> 5);
+		} else {
+			write_slavemem32(adev, last, 0x02000000);
+		}
+		adev->acx_txbuf_free = blockptr;
+	}
+
+}
+
 
 /*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
