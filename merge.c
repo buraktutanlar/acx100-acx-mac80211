@@ -1951,10 +1951,7 @@ int acx_reset_dev(acx_device_t *adev)
 	acxmem_lock();
 
 	/* now start eCPU by clearing bit */
-	(IS_MEM(adev))
-		? clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1)
-		: write_reg16(adev, IO_ACX_ECPU_CTRL, ecpu_ctrl & ~0x1);
-
+	clear_regbits(adev, IO_ACX_ECPU_CTRL, 0x1);
 	log(L_DEBUG, "booted eCPU up and waiting for completion...\n");
 
 	if (IS_MEM(adev)) { // windows
@@ -1965,6 +1962,7 @@ int acx_reset_dev(acx_device_t *adev)
 		set_regbits(adev, IO_ACX_GPIO_OUT, 0x200);
 	}
 	acxmem_unlock();
+
 	/* wait for eCPU bootup */
 	result = acx_verify_init(adev);
 	if (OK != result) {
@@ -1974,13 +1972,9 @@ int acx_reset_dev(acx_device_t *adev)
 	acxmem_lock();
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
-	if (IS_MEM(adev)) {
-		acx_init_mboxes(adev);
-		acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
-	} else {
-		acx_init_mboxes(adev);
-		acx_write_cmd_type_status(adev, 0, 0);
-	}
+	acx_init_mboxes(adev);
+	acx_write_cmd_type_status(adev, ACX1xx_CMD_RESET, 0);
+
 	/* test that EEPROM is readable */
 	acx_read_eeprom_area(adev);
 
@@ -1989,7 +1983,7 @@ int acx_reset_dev(acx_device_t *adev)
 
 	/* Finish error message. Indicate which function failed */
 end_fail:
-	pr_acx("%sreset_dev() FAILED\n", msg);
+	pr_acx("%s: reset_dev() FAILED\n", msg);
 end:
 	acxmem_unlock();
 
