@@ -73,10 +73,6 @@
 #define PCI_RADIO_FILENAME_FORMAT 		"tiacx%sr%02X"
 #define PCI_FIRMWARE_FILENAME_MAXLEN 		16
 
-/* Pick one */
-/* #define INLINE_IO static */
-#define INLINE_IO static inline
-
 /*
  * BOM Defines, static vars, etc.
  * ==================================================
