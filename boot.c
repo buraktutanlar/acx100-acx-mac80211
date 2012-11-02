@@ -185,16 +185,7 @@ void acx_display_hardware_details(acx_device_t *adev)
 
 }
 
-/*
- * acx_s_read_fw
- *
- * Loads a firmware image
- * Returns:
- *  0:						unable to load file
- *  pointer to firmware:	success
- */
-firmware_image_t *acx_read_fw(struct device *dev, const char *file,
-				u32 * size)
+firmware_image_t *acx_read_fw(struct device *dev, const char *file, u32 * size)
 {
 	firmware_image_t *res;
 	const struct firmware *fw_entry;
@@ -206,27 +197,27 @@ firmware_image_t *acx_read_fw(struct device *dev, const char *file,
 		if (fw_entry->size >= 8)
 			*size = 8 + le32_to_cpu(*(u32 *) (fw_entry->data + 4));
 		if (fw_entry->size != *size) {
-			pr_info("firmware size does not match "
+			pr_err("firmware size does not match "
 				"firmware header: %d != %d, "
-				"aborting fw upload\n",
-				(int)fw_entry->size, (int)*size);
+				"aborting fw upload\n", (int) fw_entry->size,
+			        (int) *size);
 			goto release_ret;
 		}
 		res = vmalloc(*size);
 		if (!res) {
-			pr_info("no memory for firmware "
-			       "(%u bytes)\n", *size);
+			pr_err("no memory for firmware "
+				"(%u bytes)\n", *size);
 			goto release_ret;
 		}
 		memcpy(res, fw_entry->data, fw_entry->size);
-	      release_ret:
+
+		release_ret:
 		release_firmware(fw_entry);
 		return res;
 	}
-	pr_info("firmware image '%s' was not provided. "
-	       "Check your hotplug scripts\n", file);
 
-	/* checksum will be verified in write_fw, so don't bother here */
+	pr_err("firmware image '%s' was not provided", file);
+
 	return res;
 }
 

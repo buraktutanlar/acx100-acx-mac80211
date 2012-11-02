@@ -100,6 +100,11 @@
 
 #define MAX_IRQLOOPS_PER_JIFFY  (20000/HZ)
 
+#define MEM_FIRMWARE_IMAGE_FILENAME	"WLANGEN.BIN"
+#define MEM_RADIO_IMAGE_FILENAME	"RADIO%02x.BIN"
+#define MEM_FIRMWARE_FILENAME_MAXLEN 	16
+
+
 /*
  * BOM Prototypes
  * ... static and also none-static for overview reasons (maybe not best practice ...)
@@ -775,11 +780,18 @@ void acxmem_reset_mac(acx_device_t *adev)
 	write_reg32(adev, 0x808, 0x10000);
 }
 
-/***********************************************************************
- ** acxmem_i_set_multicast_list
- ** FIXME: most likely needs refinement
- */
-#if 0 // or mem.c:2019:2: error: implicit declaration of function 'ndev2adev'
+int acxmem_load_firmware(acx_device_t *adev)
+{
+	char *fw_image_filename = MEM_FIRMWARE_IMAGE_FILENAME;
+	char radio_image_filename[MEM_FIRMWARE_FILENAME_MAXLEN];
+
+	snprintf(radio_image_filename, sizeof(radio_image_filename),
+	        MEM_RADIO_IMAGE_FILENAME, adev->radio_type);
+
+	return acx_load_firmware(adev, fw_image_filename, radio_image_filename);
+}
+
+#if 0
 static void acxmem_i_set_multicast_list(struct net_device *ndev)
 {
 	acx_device_t *adev = ndev2adev(ndev);
@@ -2110,6 +2122,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	/* --- */
 	acx_get_hardware_info(adev);
+	if (acxmem_load_firmware(adev))
+		goto fail_load_firmware;
 
 
 	/* OK init parts from pci.c are done in acxmem_complete_hw_reset(adev) */
@@ -2177,6 +2191,9 @@ fail_acx_setup_modes:
 fail_debugfs:
 
 fail_complete_hw_reset:
+
+fail_load_firmware:
+	acx_free_firmware(adev);
 
 fail_request_irq:
 	free_irq(adev->irq, adev);
@@ -2274,6 +2291,9 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	acxmem_unlock();
 
 	synchronize_irq(adev->irq);
+
+	acx_free_firmware(adev);
+
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */

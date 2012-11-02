@@ -164,6 +164,9 @@ static inline txacxdesc_t* acx_advance_txacxdesc(acx_device_t *adev,
 
 void acx_base_reset_mac(acx_device_t *adev, int middelay);
 int acx_get_hardware_info(acx_device_t *adev);
+int acx_load_firmware(acx_device_t *adev, char *fw_image_filename, char *radio_image_filename);
+int acx_free_firmware(acx_device_t *adev);
+int acx_upload_radio(acx_device_t *adev);
 
 #else /* !(CONFIG_ACX_MAC80211_PCI || CONFIG_ACX_MAC80211_MEM) */
 

@@ -17,10 +17,11 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev);
 
 void acxpci_process_rxdesc(acx_device_t *adev);
 
+void acxpci_reset_mac(acx_device_t *adev);
+int acxpci_load_firmware(acx_device_t *adev);
+
 int __init acxpci_init_module(void);
 void __exit acxpci_cleanup_module(void);
-
-void acxpci_reset_mac(acx_device_t *adev);
 
 #else /* !CONFIG_ACX_MAC80211_PCI */
 

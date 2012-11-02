@@ -68,12 +68,16 @@
  * ==================================================
  */
 
+#define PCI_FIRMWARE_COMBINED_FILENAME_FORMAT 	"tiacx%sc%02X"
+#define PCI_FIRMWARE_BASE_FILENAME_FORMAT 	"tiacx%s"
+#define PCI_RADIO_FILENAME_FORMAT 		"tiacx%sr%02X"
+#define PCI_FIRMWARE_FILENAME_MAXLEN 		16
+
 /* Pick one */
 /* #define INLINE_IO static */
 #define INLINE_IO static inline
 
 #define FW_NO_AUTO_INCREMENT	1
-
 /*
  * BOM Defines, static vars, etc.
  * ==================================================
@@ -528,6 +532,41 @@ end:
 
 
 	return (tx_t *) txdesc;
+}
+
+int acxpci_load_firmware(acx_device_t *adev)
+{
+	char fw_combined_filename[PCI_FIRMWARE_FILENAME_MAXLEN];
+	char fw_base_filename[PCI_FIRMWARE_FILENAME_MAXLEN];
+	char radio_filename[PCI_FIRMWARE_FILENAME_MAXLEN];
+	int rc;
+
+	snprintf(fw_combined_filename, sizeof(fw_combined_filename), PCI_FIRMWARE_COMBINED_FILENAME_FORMAT,
+		 IS_ACX111(adev) ? "111" : "100", adev->radio_type);
+
+	snprintf(fw_base_filename, sizeof(fw_base_filename), PCI_FIRMWARE_BASE_FILENAME_FORMAT,
+		 IS_ACX111(adev) ? "111" : "100");
+        snprintf(radio_filename, sizeof(radio_filename), PCI_RADIO_FILENAME_FORMAT,
+                 IS_ACX111(adev) ? "111" : "100", adev->radio_type);
+
+	/* print exact chipset and radio ID to make sure people really
+	 * get a clue on which files exactly they need to provide. */
+	pr_acx("Need firmware for acx%s chipset with radio ID 0x%02X: "
+		"either combined firmware (single file '%s'), "
+		"or two files: base-fw file '%s' + radio-fw file '%s'\n",
+		IS_ACX111(adev) ? "111" : "100", adev->radio_type,
+		fw_combined_filename, fw_base_filename, radio_filename
+		);
+
+	/* First try combined, ... */
+	rc=acx_load_firmware(adev, fw_combined_filename, NULL);
+	if (!rc)
+		return rc;
+
+	/*... then base + radio image */
+	rc = acx_load_firmware(adev, fw_base_filename, radio_filename);
+
+	return rc;
 }
 
 void acxpci_process_rxdesc(acx_device_t *adev)
@@ -1189,6 +1228,12 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	 * reset_dev(), since the firmware which directly controls
 	 * large parts of the I/O registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
+
+	acx_get_hardware_info(adev);
+
+	if (acxpci_load_firmware(adev))
+		goto fail_load_firmware;
+
 	if (OK != acx_reset_dev(adev))
 		goto fail_reset_dev;
 
@@ -1275,6 +1320,9 @@ fail_init_mac:
 	/* acx_reset_dev(adev) */
 fail_reset_dev:
 
+fail_load_firmware:
+	acx_free_firmware(adev);
+
 	/* request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, */
 fail_request_irq:
 	free_irq(adev->irq, adev);
@@ -1317,7 +1365,6 @@ done:
 
 	return result;
 }
-
 
 /*
  * acxpci_remove
@@ -1387,6 +1434,9 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	/* IRQs */
 	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
+
+	acx_free_firmware(adev);
+
 	free_irq(adev->irq, adev);
 
 	/* Mem regions */
@@ -1774,6 +1824,12 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	 * reset_dev(), since the firmware which directly controls
 	 * large parts of the I/O registers isn't initialized yet.
 	 * acx100 seems to be more affected than acx111 */
+
+	acx_get_hardware_info(adev);
+
+	if (acxpci_load_firmware(adev))
+		goto fail_load_firmware;
+
 	if (OK != acx_reset_dev(adev))
 		goto fail_vlynq_reset_dev;
 
@@ -1842,6 +1898,9 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
     fail_vlynq_reset_dev:
 
+    fail_load_firmware:
+    	acx_free_firmware(adev);
+
 	fail_vlynq_irq:
       iounmap(adev->iobase);
 
@@ -1906,6 +1965,9 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* IRQs */
 	acx_irq_disable(adev);
 	synchronize_irq(adev->irq);
+
+	acx_free_firmware(adev);
+
 	free_irq(adev->irq, adev);
 
 	/* finally, clean up PCI bus state */

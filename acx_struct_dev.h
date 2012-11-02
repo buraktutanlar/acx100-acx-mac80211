@@ -489,6 +489,10 @@ struct acx_device {
 	/* debugfs */
 	struct dentry	*debugfs_dir;
 
+	/* Firmware */
+	firmware_image_t *fw_image;
+	firmware_image_t *radio_image;
+
 /*************************************************************************
  *** PCI/USB/... must be last or else hw agnostic code breaks horribly ***
  *************************************************************************/
@@ -506,10 +510,10 @@ struct acx_device {
 	 * memory) and tx descs in device memory, same for rx */
 	struct hw_tx_queue hw_tx_queue[ACX111_MAX_NUM_HW_TX_QUEUES];
 
+
+
 	/*** PCI stuff ***/
 #if (defined(CONFIG_ACX_MAC80211_PCI) || defined(CONFIG_ACX_MAC80211_MEM))
-
-	u8		need_radio_fw;
 	u8		irqs_active;	/* whether irq sending is activated */
 
 	const u16	*io;		/* points to ACX100 or ACX111 PCI I/O register address set */

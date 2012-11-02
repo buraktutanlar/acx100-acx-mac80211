@@ -134,49 +134,30 @@ none:
 	return IRQ_NONE;
 }
 
-/*
- * modified from acxmem_upload_radio, and wrapped below
- */
-static int acx_upload_radio(acx_device_t *adev, char *filename)
+int acx_upload_radio(acx_device_t *adev)
 {
 	acx_ie_memmap_t mm;
-	firmware_image_t *radio_image;
 	acx_cmd_radioinit_t radioinit;
 	int res = NOT_OK;
 	int try;
 	u32 offset;
-	u32 size;
-
 	acxmem_lock_flags;
 
-	if (!adev->need_radio_fw)
+	firmware_image_t *radio_image=adev->radio_image;
+
+	if (!radio_image)
 		return OK;
-
-
-
-	pr_notice("firmware: %s\n", filename);
 
 	acx_interrogate(adev, &mm, ACX1xx_IE_MEMORY_MAP);
 	offset = le32_to_cpu(mm.CodeEnd);
 
-	radio_image = acx_read_fw(adev->bus_dev, filename, &size);
-	if (!radio_image) {
-		pr_acx("can't load radio module '%s'\n", filename);
-		goto fail;
-	}
-
 	acx_issue_cmd(adev, ACX1xx_CMD_SLEEP, NULL, 0);
 
 	for (try = 1; try <= 5; try++) {
-		/* JC: merge mem vs pci here. */
 		acxmem_lock();
-		if (IS_MEM(adev))
-			res = acx_write_fw(adev, radio_image, offset);
-		else if (IS_PCI(adev))
-			res = acx_write_fw(adev, radio_image, offset);
-		else BUG();
-
+		res = acx_write_fw(adev, radio_image, offset);
 		log(L_DEBUG|L_INIT, "acx_write_fw (radio): %d\n", res);
+
 		if (OK == res) {
 			res = acx_validate_fw(adev, radio_image, offset);
 			log(L_DEBUG|L_INIT, "acx_validate_fw (radio): %d\n", res);
@@ -196,8 +177,6 @@ static int acx_upload_radio(acx_device_t *adev, char *filename)
 	/* no endian conversion needed, remains in card CPU area: */
 	radioinit.len = radio_image->size;
 
-	vfree(radio_image);
-
 	if (OK != res)
 		goto fail;
 
@@ -212,25 +191,6 @@ fail:
 	return res;
 }
 
-/* exported wrapper for acx_upload_radio() */
-int acxmem_upload_radio(acx_device_t *adev)
-{
-	char filename[sizeof("RADIONN.BIN")];
-
-	snprintf(filename, sizeof(filename), "RADIO%02x.BIN",
-		adev->radio_type);
-	return acx_upload_radio(adev, filename);
-}
-
-/* exported wrapper for acx_upload_radio() */
-int acxpci_upload_radio(acx_device_t *adev)
-{
-        char filename[sizeof("tiacx1NNrNN")];
-
-        snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
-		IS_ACX111(adev) * 11, adev->radio_type);
-	return acx_upload_radio(adev, filename);
-}
 
 static int acx_allocate(acx_device_t *adev, unsigned int size, dma_addr_t *phy,
                         void **start, const char *msg)
@@ -1313,8 +1273,6 @@ int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 	return result;
 }
 
-#if 1	/* used for mem.c only */
-
 #ifdef PATCH_AROUND_BAD_SPOTS
 /*
  * arm-linux-objdump -d patch.bin, or
@@ -1328,63 +1286,16 @@ static const u32 patch[] = {
 	0x602e6018, 0x23036468, 0x480203db, 0x60ca6003, 0xbdf0750a,
 	0xffff0808
 };
-#endif	// PATCH_AROUND_BAD_SPOTS
 
-static int _acx_upload_fw(acx_device_t *adev, char *filename)
+int acxmem_patch_around_bad_spots(acx_device_t *adev)
 {
-	firmware_image_t *fw_image = NULL;
-	int res = NOT_OK;
-	int try;
-	u32 file_size;
+	u32 offset;
+	int i;
+
+	firmware_image_t *fw_image = adev->fw_image;
 
 	acxmem_lock_flags;
 
-#ifdef PATCH_AROUND_BAD_SPOTS
-	u32 offset;
-	int i;
-#endif	/* PATCH_AROUND_BAD_SPOTS */
-
-
-
-	if (IS_PCI(adev) && adev->need_radio_fw) {
-		filename[sizeof("tiacx1NN") - 1] = '\0';
-		fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
-		if (!fw_image) {
-
-			return NOT_OK;
-		}
-	}
-
-	fw_image = acx_read_fw(adev->bus_dev, filename, &file_size);
-	if (!fw_image) {
-
-		return NOT_OK;
-	}
-
-	for (try = 1; try <= 5; try++) {
-
-		acxmem_lock();
-		res = acx_write_fw(adev, fw_image, 0);
-		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
-		if (OK == res) {
-			res = acx_validate_fw(adev, fw_image, 0);
-			log(L_DEBUG|L_INIT, "acx_validate_fw "
-					"(main): %d\n", res);
-		}
-		acxmem_unlock();
-
-		if (OK == res) {
-			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
-			break;
-		}
-		pr_acx("firmware upload attempt #%d FAILED, "
-			"retrying...\n", try);
-		acx_mwait(1000); /* better wait for a while... */
-	}
-
-	if (IS_MEM(adev)) {
-
-#ifdef PATCH_AROUND_BAD_SPOTS
 	acxmem_lock();
 	/*
 	 * Only want to do this if the firmware is exactly what we
@@ -1433,83 +1344,92 @@ static int _acx_upload_fw(acx_device_t *adev, char *filename)
 
 	}
 	acxmem_unlock();
+
+	return 0;
+}
 #endif	// PATCH_AROUND_BAD_SPOTS
-	} // IS_MEM
 
-	vfree(fw_image);
+static int _acx_upload_fw(acx_device_t *adev)
+{
+	int res = NOT_OK;
+	int try;
 
+	firmware_image_t *fw_image = adev->fw_image;
+
+	acxmem_lock_flags;
+
+	for (try = 1; try <= 5; try++) {
+
+		acxmem_lock();
+		res = acx_write_fw(adev, fw_image, 0);
+		log(L_DEBUG|L_INIT, "acx_write_fw (main): %d\n", res);
+		if (OK == res) {
+			res = acx_validate_fw(adev, fw_image, 0);
+			log(L_DEBUG|L_INIT, "acx_validate_fw "
+					"(main): %d\n", res);
+		}
+		acxmem_unlock();
+
+		if (OK == res) {
+			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
+			break;
+		}
+		pr_acx("firmware upload attempt #%d FAILED, "
+			"retrying...\n", try);
+		acx_mwait(1000); /* better wait for a while... */
+	}
+
+#ifdef PATCH_AROUND_BAD_SPOTS
+	if (IS_MEM(adev))
+		acxmem_patch_around_bad_spots(adev);
+#endif
 
 	return res;
 }
 
-static int acxmem_upload_fw(acx_device_t *adev)
+
+int acx_free_firmware(acx_device_t *adev)
 {
-	char *filename = "WLANGEN.BIN";
-	int rc;
+	if(adev->fw_image)
+		vfree(adev->fw_image);
+	adev->fw_image = NULL;
 
+	if(adev->radio_image)
+		vfree(adev->radio_image);
+	adev->radio_image = NULL;
 
-	/* No combined image; tell common we need the radio firmware, too */
-	adev->need_radio_fw = 1;
-	rc = _acx_upload_fw(adev, filename);
-
-	return rc;
+	return 0;
 }
 
-static int acxpci_upload_fw(acx_device_t *adev)
+int acx_load_firmware(acx_device_t *adev, char *fw_image_filename, char *radio_image_filename)
 {
-	char filename[sizeof("tiacx1NNcNN")];
-	int rc;
+	int res = 0;
+	u32 file_size;
 
+	log(L_ANY, "Required firmware: fw_image=\'%s\', radio_image=\'%s\'\n",
+	    fw_image_filename, radio_image_filename);
 
-	/* print exact chipset and radio ID to make sure people really
-	 * get a clue on which files exactly they need to provide.
-	 * Firmware loading is a frequent end-user PITA with these
-	 * chipsets.
-	 */
-	pr_acx("need firmware for acx1%02d chipset with radio ID %02X\n"
-		"Please provide via firmware hotplug:\n"
-		"either combined firmware (single file named "
-		"'tiacx1%02dc%02X')\n"
-		"or two files (base firmware file 'tiacx1%02d' "
-		"+ radio fw 'tiacx1%02dr%02X')\n",
-		IS_ACX111(adev)*11, adev->radio_type,
-		IS_ACX111(adev)*11, adev->radio_type,
-		IS_ACX111(adev)*11,
-		IS_ACX111(adev)*11, adev->radio_type
-		);
+	adev->fw_image = acx_read_fw(adev->bus_dev, fw_image_filename, &file_size);
+	if (!adev->fw_image)
+		goto err;
 
-	/* print exact chipset and radio ID to make sure people really
-	 * get a clue on which files exactly they are supposed to
-	 * provide, since firmware loading is the biggest enduser PITA
-	 * with these chipsets.  Not printing radio ID in 0xHEX in
-	 * order to not confuse them into wrong file naming
-	 */
-	pr_acx("need to load firmware for acx1%02d chipset with radio "
-		"ID %02x, please provide via firmware hotplug:\n"
-		"either one file only (<c>ombined firmware image file, "
-		"radio-specific) or two files (radio-less base image "
-		"file *plus* separate <r>adio-specific extension file)\n",
-		IS_ACX111(adev)*11, adev->radio_type);
+	if (!radio_image_filename)
+		goto end;
 
-	/* Try combined, then main image */
-	adev->need_radio_fw = 0;
-	snprintf(filename, sizeof(filename), "tiacx1%02dc%02X",
-		 IS_ACX111(adev) * 11, adev->radio_type);
+	adev->radio_image = acx_read_fw(adev->bus_dev, radio_image_filename, &file_size);
+	if (!adev->radio_image)
+		goto err;
 
-	rc = _acx_upload_fw(adev, filename);
-	if (!rc) {
+	goto end;
 
-		return rc;
-	}
-	adev->need_radio_fw = 1;
-	snprintf(filename, sizeof(filename), "tiacx1%02dr%02X",
-		 IS_ACX111(adev) * 11, adev->radio_type);
+	err:
+	res = -1;
+	acx_free_firmware(adev);
 
-	rc = _acx_upload_fw(adev, filename);
-
-	return rc;
+	end:
+	return res;
 }
-#endif	// acx_upload_fw()
+
 
 #if defined(NONESSENTIAL_FEATURES)
 
@@ -2014,7 +1934,6 @@ void acx_base_reset_mac(acx_device_t *adev, int middelay)
 	set_regbits(adev, IO_ACX_EE_START, 0x1);
 }
 
-
 int acx_reset_dev(acx_device_t *adev)
 {
 	const char* msg = "";
@@ -2038,14 +1957,11 @@ int acx_reset_dev(acx_device_t *adev)
 	acxmem_unlock();
 
 	/* load the firmware */
-	result = (IS_MEM(adev))
-		? acxmem_upload_fw(adev)
-		: acxpci_upload_fw(adev);
+	result = _acx_upload_fw(adev);
 	if (OK != result)
 		goto end_fail;
-	acxmem_lock();
 
-	/* acx_s_mwait(10);	this one really shouldn't be required */
+	acxmem_lock();
 
 	/* now start eCPU by clearing bit */
 	(IS_MEM(adev))

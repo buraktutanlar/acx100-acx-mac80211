@@ -611,22 +611,16 @@ int acx_init_mac(acx_device_t * adev)
 {
 	int result = NOT_OK;
 
-	if (IS_PCI(adev)) {
+	if (IS_PCI(adev) || IS_MEM(adev) ) {
 		adev->memblocksize = 256;	/* 256 is default */
 		/* try to load radio for both ACX100 and ACX111, since both
 		 * chips have at least some firmware versions making use of an
 		 * external radio module */
-		acxpci_upload_radio(adev);
+		acx_upload_radio(adev);
 	}
-	else if (IS_MEM(adev)){
-		adev->memblocksize = 256; /* 256 is default */
-		/* try to load radio for both ACX100 and ACX111, since both
-		 * chips have at least some firmware versions making use of an
-		 * external radio module */
-		acxmem_upload_radio(adev);
-	}
-	else
+	else {
 		adev->memblocksize = 128;
+	}
 
 	if (IS_ACX111(adev)) {
 		/* for ACX111, the order is different from ACX100
