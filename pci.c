@@ -77,7 +77,6 @@
 /* #define INLINE_IO static */
 #define INLINE_IO static inline
 
-#define FW_NO_AUTO_INCREMENT	1
 /*
  * BOM Defines, static vars, etc.
  * ==================================================
