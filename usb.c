@@ -1552,7 +1552,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	int numconfigs, numfaces, numep;
 	int result = OK;
 	int i;
-	int err;
+
 	/* yes indeed, the radio_type variable shouldn't be static, but OTOH
 	   we read the radio type upon booting (1st .probe()) only, whereas
 	   assignment to adev->radio_type can be done on 2nd .probe() only...
@@ -1600,7 +1600,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* Ok, so it's our device and it has already booted */
 
-	/* Initialize ieee80211_hw  */
+	/* Alloc ieee80211_hw  */
 	hw = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
 	if (!hw) {
 		msg = "acx: no memory for ieee80211_dev\n";
@@ -1608,20 +1608,15 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 	adev = hw2adev(hw);
 	memset(adev, 0, sizeof(*adev));
-
-	acx_init_ieee80211(adev, hw);
+	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);
 
 	/* Usb host interface setup  */
-	usb_set_intfdata(intf, adev);
 	SET_IEEE80211_DEV(hw, &intf->dev);
+	usb_set_intfdata(intf, adev);
 
-	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
-	        | BIT(NL80211_IFTYPE_ADHOC);
-
-	/* Setup private driver context */
 	adev->dev_type = DEVTYPE_USB;
 	adev->radio_type = radio_type;
 	if (is_tnetw1450) {
@@ -1740,25 +1735,24 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
 
-/*	MAC_COPY(ndev->dev_addr, adev->dev_addr); */
+	// Debug and proc-fs
+	acx_debugfs_add_adev(adev);
 
 	err = acx_setup_modes(adev);
 	if (err) {
 		msg = "acx: can't register hwmode\n";
 		goto end_nomem;
 	}
+	/* Init ieee80211_hw  */
+	acx_init_ieee80211(adev, hw);
+	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+	        | BIT(NL80211_IFTYPE_ADHOC);
 
-	/* Register the network device */
-	log(L_INIT, "registering network device\n");
-	result = ieee80211_register_hw(adev->hw);
-	if (result) {
+	if ((result = ieee80211_register_hw(adev->hw))) {
 		msg = "acx: failed to register USB network device "
 		    "(error %d)\n";
 		goto end_nomem;
 	}
-
-	// Debug and proc-fs
-	acx_debugfs_add_adev(adev);
 
 	pr_acx("USB module loaded successfully\n");
 

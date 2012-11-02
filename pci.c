@@ -1058,35 +1058,26 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	u8 chip_type;
 	struct ieee80211_hw *hw;
 
-	/* Initialize ieee80211_hw  */
+	/* Alloc ieee80211_hw  */
 	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       pci_name(pdev));
 		goto fail_ieee80211_alloc_hw;
 	}
-
 	adev = hw2adev(hw);
 	memset(adev, 0, sizeof(*adev));
-
-	acx_init_ieee80211(adev, hw);
-	SET_IEEE80211_DEV(hw, &pdev->dev);
-	hw->wiphy->interface_modes =
-			BIT(NL80211_IFTYPE_STATION) |
-			BIT(NL80211_IFTYPE_ADHOC) |
-			BIT(NL80211_IFTYPE_AP);
+	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);
 
 	/* PCI host interface setup */
+	SET_IEEE80211_DEV(hw, &pdev->dev);
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
 
-/** Finished with private interface **/
-
-/** begin board specific inits **/
 	pci_set_drvdata(pdev, hw);
 
 	/* Enable the PCI device */
@@ -1206,6 +1197,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	/* PCI setup is finished, now start initializing the card */
 	/* ----- */
 
+	// TODO cleanup comment
 	/* NB: read_reg() reads may return bogus data before
 	 * reset_dev(), since the firmware which directly controls
 	 * large parts of the I/O registers isn't initialized yet.
@@ -1243,16 +1235,11 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	acx_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
 	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
 	acx_display_hardware_details(adev);
+	/** done with board specific setup **/
 
 	/* Debugfs */
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
-
-	pr_acx("net device %s, driver compiled "
-	       "against wireless extensions %d and Linux %s\n",
-	       wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
-
-	/** done with board specific setup **/
 
 	/* need to be able to restore PCI state after a suspend */
 #ifdef CONFIG_PM
@@ -1264,12 +1251,18 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 		pr_acx("can't setup hwmode\n");
 		goto fail_setup_modes;
 	}
+	/* Init ieee80211_hw  */
+	acx_init_ieee80211(adev, hw);
+	hw->wiphy->interface_modes =
+			BIT(NL80211_IFTYPE_STATION) |
+			BIT(NL80211_IFTYPE_ADHOC) |
+			BIT(NL80211_IFTYPE_AP);
 
-	err = ieee80211_register_hw(hw);
-	if (OK != err) {
+	if ((err=ieee80211_register_hw(hw))) {
 		pr_acx("ieee80211_register_hw() FAILED: %d\n", err);
 		goto fail_ieee80211_register_hw;
 	}
+
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
 #endif
@@ -1278,13 +1271,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	goto done;
 
 	/* error paths: undo everything in reverse order... */
-
-	/* TODO FIXME OW 20100507
-	 * Check if reverse doing is correct. e.g. if alloc failed, no dealloc is required !!
-	 * => See vlynq probe
-	 */
-
-	/* err = ieee80211_register_hw(ieee); */
 fail_ieee80211_register_hw:
 	ieee80211_unregister_hw(hw);
 
@@ -1685,28 +1671,22 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
-	/* Initialize ieee80211_hw  */
+	/* Alloc ieee80211_hw  */
 	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
 	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 		       dev_name(&vdev->dev));
 		goto fail_vlynq_ieee80211_alloc_hw;
 	}
-
 	adev = hw2adev(hw);
 	memset(adev, 0, sizeof(*adev));
-
-	acx_init_ieee80211(adev, hw);
-	SET_IEEE80211_DEV(hw, &vdev->dev);
-	hw->wiphy->interface_modes =
-			BIT(NL80211_IFTYPE_STATION)	|
-			BIT(NL80211_IFTYPE_ADHOC) |
-			BIT(NL80211_IFTYPE_AP);
+	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);
 
 	/* Vlynq host interface setup */
+	SET_IEEE80211_DEV(hw, &vdev->dev);
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1822,19 +1802,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
 
-	/* Now we have our device, so make sure the kernel doesn't try
-	 * to send packets even though we're not associated to a
-	 * network yet */
-
-	/* after register_netdev() userspace may start working with
-	 * dev (in particular, on other CPUs), we only need to up the
-	 * sem */
-	/* acx_sem_unlock(adev); */
-
-	pr_acx("net device %s, driver compiled "
-	       "against wireless extensions %d and Linux %s\n",
-	       wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
-
 	/** done with board specific setup **/
 
 	result = acx_setup_modes(adev);
@@ -1842,12 +1809,18 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	pr_acx("can't register hwmode\n");
 		goto fail_vlynq_setup_modes;
 	}
+	/* Init ieee80211_hw  */
+	acx_init_ieee80211(adev, hw);
+	hw->wiphy->interface_modes =
+			BIT(NL80211_IFTYPE_STATION)	|
+			BIT(NL80211_IFTYPE_ADHOC) |
+			BIT(NL80211_IFTYPE_AP);
 
-	result = ieee80211_register_hw(adev->hw);
-	if (OK != result) {
+	if ((result=ieee80211_register_hw(adev->hw))) {
 		pr_acx("ieee80211_register_hw() FAILED: %d\n", result);
 		goto fail_vlynq_ieee80211_register_hw;
 	}
+
 #if CMD_DISCOVERY
 	great_inquisitor(adev);
 #endif

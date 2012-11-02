@@ -2286,7 +2286,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	acx_device_t *adev = NULL;
 	const char *chip_name;
 	int result = -EIO;
-	int err;
 	int i;
 
 	struct resource *iomem;
@@ -2297,26 +2296,22 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	struct ieee80211_hw *hw;
 
-	/* Initialize ieee80211_hw  */
+	/* Alloc ieee80211_hw  */
 	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
 	if (!hw) {
 		pr_acx("could not allocate ieee80211 structure %s\n",
 			pdev->name);
 		goto fail_ieee80211_alloc_hw;
 	}
-
 	adev = hw2adev(hw);
 	memset(adev, 0, sizeof(*adev));
-
-	acx_init_ieee80211(adev, hw);
-	SET_IEEE80211_DEV(hw, &pdev->dev);
-	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
-					| BIT(NL80211_IFTYPE_ADHOC);
+	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);
 
 	/* Slave memory host interface setup */
+	SET_IEEE80211_DEV(hw, &pdev->dev);
 	adev->pdevmem = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_MEM;
@@ -2408,30 +2403,25 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 */
 	acx_set_defaults(adev);
 
+	/** done with board specific setup **/
+
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
 
-	/* Now we have our device, so make sure the kernel doesn't try
-	 * to send packets even though we're not associated to a
-	 * network yet */
-
-	pr_acx("net device %s, driver compiled "
-		"against wireless extensions %d and Linux %s\n",
-		wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
-
 	MAC_COPY(adev->hw->wiphy->perm_addr, adev->dev_addr);
-
-	/** done with board specific setup **/
-
 	err = acx_setup_modes(adev);
 	if (err) {
 		pr_acx("can't setup hwmode\n");
 		goto fail_acx_setup_modes;
 	}
+	/* Init ieee80211_hw  */
+	acx_init_ieee80211(adev, hw);
+	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
+					| BIT(NL80211_IFTYPE_ADHOC);
 
-	err = ieee80211_register_hw(hw);
-	if (OK != err) {
-		pr_acx("ieee80211_register_hw() FAILED: %d\n", err);
+	if ((result = ieee80211_register_hw(hw)))
+	{
+		pr_acx("ieee80211_register_hw() FAILED: %d\n", result);
 		goto fail_ieee80211_register_hw;
 	}
 

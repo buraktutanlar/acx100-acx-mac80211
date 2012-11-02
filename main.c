@@ -487,8 +487,6 @@ void acx_start(acx_device_t *adev)
 
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 {
-	adev->hw = hw;
-
 	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 	hw->queues = 1;
 	hw->wiphy->max_scan_ssids = 1;
