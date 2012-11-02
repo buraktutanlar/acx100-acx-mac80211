@@ -1314,6 +1314,53 @@ u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count)
 }
 
 /*
+ * acxmem_l_dealloc_tx
+ *
+ * Clears out a previously allocatedvoid acxmem_l_dealloc_tx(tx_t
+ * *tx_opaque); transmit descriptor.  The ACX can get confused if we
+ * skip transmit descriptors in the queue, so when we don't need a
+ * descriptor return it to its original state and move the queue head
+ * pointer back.
+ *
+ */
+void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque) {
+	/*
+	 * txdesc is the address of the descriptor on the ACX.
+	 */
+	txacxdesc_t *txdesc = (txacxdesc_t*) tx_opaque;
+	txacxdesc_t tmptxdesc;
+	int index;
+
+	acxmem_lock_flags;
+	acxmem_lock();
+
+	memset (&tmptxdesc, 0, sizeof(tmptxdesc));
+	tmptxdesc.Ctl_8 = DESC_CTL_HOSTOWN | DESC_CTL_FIRSTFRAG;
+	tmptxdesc.u.r1.rate = 0x0a;
+
+	/*
+	 * Clear out all of the transmit descriptor except for the next pointer
+	 */
+	acxmem_copy_to_slavemem(adev, (uintptr_t) &(txdesc->HostMemPtr),
+			(u8 *) &(tmptxdesc.HostMemPtr), sizeof(tmptxdesc)
+					- sizeof(tmptxdesc.pNextDesc));
+
+	/*
+	 * This is only called immediately after we've allocated, so
+	 * we should be able to set the head back to this descriptor.
+	 */
+	index = ((u8*) txdesc - (u8*) adev->hw_tx_queue[0].acxdescinfo.start) /
+		adev->hw_tx_queue[0].acxdescinfo.size;
+	pr_info("acx_dealloc: moving head from %d to %d\n",
+	        adev->hw_tx_queue[0].head, index);
+	adev->hw_tx_queue[0].head = index;
+
+	acxmem_unlock();
+
+}
+
+
+/*
  * Initialize the pieces managing the transmit buffer pool on the ACX.
  * The transmit buffer is a circular queue with one 32 bit word
  * reserved at the beginning of each block.  The upper 13 bits are a
