@@ -1425,10 +1425,6 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	/* put the ACX100 out of sleep mode */
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
-	init_timer(&adev->mgmt_timer);
-	adev->mgmt_timer.function = acx_timer;
-	adev->mgmt_timer.data = (unsigned long)adev;
-
 	/* acx_start needs it */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	acx_start(adev);
@@ -1489,9 +1485,6 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 		adev->usb_rx[i].busy = 0;
 	}
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
-
-	/* Must do this outside of lock */
-	del_timer_sync(&adev->mgmt_timer);
 
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 	adev->initialized = 0;

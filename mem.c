@@ -2176,10 +2176,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	acx_irq_disable(adev);
 	acxmem_unlock();
 
-	/* to find crashes due to weird driver access
-	 * to unconfigured interface (ifup) */
-	adev->mgmt_timer.function = (void(*)(unsigned long)) 0x0000dead;
-
 	acx_init_task_scheduler(adev);
 
 	/* Mac80211 Tx_queue */

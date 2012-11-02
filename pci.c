@@ -1200,11 +1200,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	/* Acx irqs shall be off and are enabled later in acx_up */
 	acx_irq_disable(adev);
 
-	/* to find crashes due to weird driver access
-	 * to unconfigured interface (ifup) */
-	adev->mgmt_timer.function = (void (*)(unsigned long))0x0000dead;
-
-
 #ifdef NONESSENTIAL_FEATURES
 	acx_show_card_eeprom_id(adev);
 #endif /* NONESSENTIAL_FEATURES */
@@ -1801,10 +1796,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* Acx irqs shall be off and are enabled later in acx_up */
 	acx_irq_disable(adev);
-
-	/* to find crashes due to weird driver access
-	 * to unconfigured interface (ifup) */
-	adev->mgmt_timer.function = (void (*)(unsigned long))0x0000dead;
 
 	/* PCI setup is finished, now start initializing the card */
 	/* ----- */

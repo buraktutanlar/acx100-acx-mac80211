@@ -490,31 +490,6 @@ void acx_timer(unsigned long address)
 
 }
 
-/*
- * acx_set_timer
- *
- * Sets the 802.11 state management timer's timeout.
- *
- */
-void acx_set_timer(acx_device_t *adev, int timeout_us)
-{
-
-
-	log(L_DEBUG | L_IRQ, "(%u ms)\n", timeout_us / 1000);
-	if (!(adev->dev_state_mask & ACX_STATE_IFACE_UP)) {
-		pr_info("attempt to set the timer "
-		       "when the card interface is not up!\n");
-		return;
-	}
-
-	/* first check if the timer was already initialized, THEN modify it */
-	if (adev->mgmt_timer.function) {
-		mod_timer(&adev->mgmt_timer,
-			  jiffies + (timeout_us * HZ / 1000000));
-	}
-
-}
-
 void acx_start(acx_device_t *adev)
 {
 

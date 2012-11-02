@@ -308,9 +308,6 @@ struct acx_device {
 	/*** Power managment ***/
 	struct pm_dev		*pm;		/* PM crap */
 
-	/*** Management timer ***/
-	struct timer_list	mgmt_timer;
-
 	/*** Hardware identification ***/
 	const char		*chip_name;
 	u8			dev_type;
