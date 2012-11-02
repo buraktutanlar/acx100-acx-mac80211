@@ -2408,12 +2408,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
 
-	MAC_COPY(adev->hw->wiphy->perm_addr, adev->dev_addr);
-	err = acx_setup_modes(adev);
-	if (err) {
-		pr_acx("can't setup hwmode\n");
-		goto fail_acx_setup_modes;
-	}
 	/* Init ieee80211_hw  */
 	acx_init_ieee80211(adev, hw);
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
@@ -2435,8 +2429,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	/* error paths: undo everything in reverse order... */
 fail_ieee80211_register_hw:
-
-fail_acx_setup_modes:
 
 fail_debugfs:
 

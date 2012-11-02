@@ -1738,11 +1738,6 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	// Debug and proc-fs
 	acx_debugfs_add_adev(adev);
 
-	err = acx_setup_modes(adev);
-	if (err) {
-		msg = "acx: can't register hwmode\n";
-		goto end_nomem;
-	}
 	/* Init ieee80211_hw  */
 	acx_init_ieee80211(adev, hw);
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)

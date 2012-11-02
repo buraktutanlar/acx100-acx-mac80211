@@ -1246,11 +1246,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	pci_save_state(pdev);
 #endif
 
-	err = acx_setup_modes(adev);
-	if (err) {
-		pr_acx("can't setup hwmode\n");
-		goto fail_setup_modes;
-	}
 	/* Init ieee80211_hw  */
 	acx_init_ieee80211(adev, hw);
 	hw->wiphy->interface_modes =
@@ -1273,9 +1268,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	/* error paths: undo everything in reverse order... */
 fail_ieee80211_register_hw:
 	ieee80211_unregister_hw(hw);
-
-	/* err = acx_setup_modes(adev) */
-fail_setup_modes:
 
 fail_debugfs:
 
@@ -1804,11 +1796,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/** done with board specific setup **/
 
-	result = acx_setup_modes(adev);
-	if (result) {
-	pr_acx("can't register hwmode\n");
-		goto fail_vlynq_setup_modes;
-	}
 	/* Init ieee80211_hw  */
 	acx_init_ieee80211(adev, hw);
 	hw->wiphy->interface_modes =
@@ -1831,8 +1818,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	/* error paths: undo everything in reverse order... */
 
 	fail_vlynq_ieee80211_register_hw:
-
-	fail_vlynq_setup_modes:
 
 	fail_debugfs:
 

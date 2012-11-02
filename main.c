@@ -66,20 +66,20 @@ struct ieee80211_rate acx111_rates[] = {
 const int acx111_rates_sizeof=ARRAY_SIZE(acx111_rates);
 
 static struct ieee80211_channel channels[] = {
-	{ .center_freq = 2412, .hw_value = 1, },
-	{ .center_freq = 2417, .hw_value = 2, },
-	{ .center_freq = 2422, .hw_value = 3, },
-	{ .center_freq = 2427, .hw_value = 4, },
-	{ .center_freq = 2432, .hw_value = 5, },
-	{ .center_freq = 2437, .hw_value = 6, },
-	{ .center_freq = 2442, .hw_value = 7, },
-	{ .center_freq = 2447, .hw_value = 8, },
-	{ .center_freq = 2452, .hw_value = 9, },
-	{ .center_freq = 2457, .hw_value = 10, },
-	{ .center_freq = 2462, .hw_value = 11, },
-	{ .center_freq = 2467, .hw_value = 12, },
-	{ .center_freq = 2472, .hw_value = 13, },
-	{ .center_freq = 2484, .hw_value = 14, },
+	{ .center_freq = 2412, .hw_value = 1, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2417, .hw_value = 2, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2422, .hw_value = 3, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2427, .hw_value = 4, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2432, .hw_value = 5, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2437, .hw_value = 6, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2442, .hw_value = 7, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2447, .hw_value = 8, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2452, .hw_value = 9, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2457, .hw_value = 10, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2462, .hw_value = 11, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2467, .hw_value = 12, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2472, .hw_value = 13, .max_power = TX_CFG_MAX_DBM_POWER },
+	{ .center_freq = 2484, .hw_value = 14, .max_power = TX_CFG_MAX_DBM_POWER },
 };
 
 static struct ieee80211_supported_band acx100_band_2GHz = {
@@ -151,31 +151,6 @@ const u8 acx_bitpos2rate100[] = {
 };
 BUILD_BUG_DECL(Rates, ARRAY_SIZE(acx_bitpos2rate100)
 		   != ARRAY_SIZE(bitpos2genframe_txrate));
-
-int acx_setup_modes(acx_device_t *adev)
-{
-	int i;
-
-
-
-	for (i=0; i<ARRAY_SIZE(channels); i++)
-		channels[i].max_power = TX_CFG_MAX_DBM_POWER;
-
-	if (IS_ACX100(adev)) {
-		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
-			&acx100_band_2GHz;
-	} else {
-		if (IS_ACX111(adev))
-			adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
-				&acx111_band_2GHz;
-		else {
-			logf0(L_ANY, "Error: Unknown device");
-			return -1;
-		}
-	}
-
-	return 0;
-}
 
 static int acx_do_job_update_tim(acx_device_t *adev)
 {
@@ -518,6 +493,17 @@ int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 	 */
 	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
 	hw->max_signal = 100;
+
+	if (IS_ACX100(adev)) {
+		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
+			&acx100_band_2GHz;
+	} else if (IS_ACX111(adev))
+		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
+			&acx111_band_2GHz;
+	else {
+		log(L_ANY, "Error: Unknown device");
+		return -1;
+	}
 
 	return 0;
 }
