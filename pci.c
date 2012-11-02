@@ -1076,12 +1076,10 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 
-	/** Set up our private interface **/
-	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
-	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	pr_acx("mutex_init(&adev->mutex); // adev = 0x%px\n", adev);
-	mutex_init(&adev->mutex);
+	/* Driver locking and queue mechanics */
+	acx_probe_init_mechanics(adev);
 
+	/* PCI host interface setup */
 	adev->pdev = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1207,12 +1205,6 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 
 	/* PCI setup is finished, now start initializing the card */
 	/* ----- */
-
-	acx_init_task_scheduler(adev);
-
-	/* Mac80211 Tx_queue */
-	INIT_WORK(&adev->tx_work, acx_tx_work);
-	skb_queue_head_init(&adev->tx_queue);
 
 	/* NB: read_reg() reads may return bogus data before
 	 * reset_dev(), since the firmware which directly controls
@@ -1711,11 +1703,10 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 			BIT(NL80211_IFTYPE_ADHOC) |
 			BIT(NL80211_IFTYPE_AP);
 
-	/** Set up our private interface **/
-	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
-	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	mutex_init(&adev->mutex);
+	/* Driver locking and queue mechanics */
+	acx_probe_init_mechanics(adev);
 
+	/* Vlynq host interface setup */
 	adev->vdev = vdev;
 	adev->bus_dev = &vdev->dev;
 	adev->dev_type = DEVTYPE_PCI;
@@ -1799,12 +1790,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	/* PCI setup is finished, now start initializing the card */
 	/* ----- */
-
-	acx_init_task_scheduler(adev);
-
-	/* Mac80211 Tx_queue */
-	INIT_WORK(&adev->tx_work, acx_tx_work);
-	skb_queue_head_init(&adev->tx_queue);
 
 	/* NB: read_reg() reads may return bogus data before
 	 * reset_dev(), since the firmware which directly controls

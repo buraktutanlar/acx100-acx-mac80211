@@ -6,7 +6,6 @@
 
 
 int acx_setup_modes(acx_device_t *adev);
-void acx_init_task_scheduler(acx_device_t *adev);
 void acx_after_interrupt_task(acx_device_t *adev);
 void acx_log_irq(u16 irqtype);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);

@@ -1611,6 +1611,10 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	acx_init_ieee80211(adev, hw);
 
+	/* Driver locking and queue mechanics */
+	acx_probe_init_mechanics(adev);
+
+	/* Usb host interface setup  */
 	usb_set_intfdata(intf, adev);
 	SET_IEEE80211_DEV(hw, &intf->dev);
 
@@ -1630,8 +1634,6 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	}
 
 	adev->usbdev = usbdev;
-	spin_lock_init(&adev->spinlock);	/* initial state: unlocked */
-	mutex_init(&adev->mutex);
 
 	/* Check that this is really the hardware we know about.
 	 ** If not sure, at least notify the user that he
@@ -1723,12 +1725,6 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 
 	/* TODO: move all of fw cmds to open()? But then we won't know our MAC addr
 	   until ifup (it's available via reading ACX1xx_IE_DOT11_STATION_ID)... */
-
-	acx_init_task_scheduler(adev);
-
-	// Mac80211 Tx_queue
-	INIT_WORK(&adev->tx_work, acx_tx_work);
-	skb_queue_head_init(&adev->tx_queue);
 
 	/* put acx out of sleep mode and initialize it */
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);

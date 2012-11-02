@@ -2313,17 +2313,13 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION)
 					| BIT(NL80211_IFTYPE_ADHOC);
 
-	/** Set up our private interface **/
-	spin_lock_init(&adev->spinlock); /* initial state: unlocked */
-	/* We do not start with downed sem: we want PARANOID_LOCKING to work */
-	mutex_init(&adev->mutex);
+	/* Driver locking and queue mechanics */
+	acx_probe_init_mechanics(adev);
 
+	/* Slave memory host interface setup */
 	adev->pdevmem = pdev;
 	adev->bus_dev = &pdev->dev;
 	adev->dev_type = DEVTYPE_MEM;
-
-	/** Finished with private interface **/
-
 
 	/** begin board specific inits **/
 	platform_set_drvdata(pdev, hw);
@@ -2392,16 +2388,11 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	}
 
 	log(L_ANY, "request_irq %d successful\n", adev->irq);
+
 	/* Acx irqs shall be off and are enabled later in acx_up */
 	acxmem_lock();
 	acx_irq_disable(adev);
 	acxmem_unlock();
-
-	acx_init_task_scheduler(adev);
-
-	/* Mac80211 Tx_queue */
-	INIT_WORK(&adev->tx_work, acx_tx_work);
-	skb_queue_head_init(&adev->tx_queue);
 
 	/* --- */
 	acx_get_hardware_info(adev);

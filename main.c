@@ -299,45 +299,6 @@ static void acx_after_interrupt_recalib(acx_device_t *adev)
 	}
 }
 
-
-
-void acx_init_task_scheduler(acx_device_t *adev)
-{
-	/* configure task scheduler */
-#if defined(CONFIG_ACX_MAC80211_PCI)
-	if (IS_PCI(adev)) {
-		pr_info("device IS_PCI\n");
-		INIT_WORK(&adev->irq_work, acx_irq_work);
-		return;
-	}
-#endif
-#if defined(CONFIG_ACX_MAC80211_USB)
-	if (IS_USB(adev)) {
-		pr_info("device IS_USB\n");
-		INIT_WORK(&adev->irq_work, acxusb_irq_work);
-		return;
-	}
-#endif
-#if defined(CONFIG_ACX_MAC80211_MEM)
-	if (IS_MEM(adev)) {
-		pr_info("device IS_MEM\n");
-		INIT_WORK(&adev->irq_work, acx_irq_work);
-		return;
-	}
-#endif
-
-	logf0(L_ANY, "Unhandled adev device type!\n");
-	BUG();
-
-	/* OW TODO Interrupt handling ... */
-	/* OW In case of of tasklet ... but workqueues seem to be prefered
-	 tasklet_init(&adev->interrupt_tasklet,
-	 (void(*)(unsigned long)) acx_interrupt_tasklet,
-	 (unsigned long) adev);
-	 */
-
-}
-
 void acx_after_interrupt_task(acx_device_t *adev)
 {
 
