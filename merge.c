@@ -1182,18 +1182,7 @@ int acx_write_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 #endif	// acx_write_fw()
 
 /*
- * acx_validate_fw
- *
- * Compare the firmware image given with
- * the firmware image written into the card.
- *
- * Arguments:
- *	adev		wlan device structure
- *	fw_image	firmware image.
- *
- * Returns:
- *	NOT_OK	firmware image corrupted or not correctly written
- *	OK	success
+ * Compare the firmware image given with the firmware image written into the card.
  */
 int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 		u32 offset)
@@ -1203,8 +1192,6 @@ int acx_validate_fw(acx_device_t *adev, const firmware_image_t *fw_image,
 	int result = OK;
 	/* we skip the first four bytes which contain the control sum */
 	const u8 *p = (u8*) fw_image + 4;
-
-
 
 	/* start the image checksum by adding the image size value */
 	sum = p[0] + p[1] + p[2] + p[3];
