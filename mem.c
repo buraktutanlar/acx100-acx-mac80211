@@ -1979,21 +1979,6 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * ==================================================
  */
 
-/*
- * acxmem_e_probe
- *
- * Probe routine called when a PCI device w/ matching ID is found.
- * Here's the sequence:
- *   - Allocate the PCI resources.
- *   - Read the PCMCIA attribute memory to make sure we have a WLAN card
- *   - Reset the MAC
- *   - Initialize the dev and wlan data
- *   - Initialize the MAC
- *
- * pdev - ptr to pci device structure containing info about pci
- *	  configuration
- * id	- ptr to the device id entry that matched this device
- */
 static int __devinit acxmem_probe(struct platform_device *pdev)
 {
 	acx_device_t *adev = NULL;
@@ -2125,7 +2110,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	if (acxmem_load_firmware(adev))
 		goto fail_load_firmware;
 
-
 	/* OK init parts from pci.c are done in acxmem_complete_hw_reset(adev) */
 	if (OK != acxmem_complete_hw_reset(adev))
 		goto fail_complete_hw_reset;
@@ -2142,14 +2126,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	 * to send packets even though we're not associated to a
 	 * network yet */
 
-/* OW FIXME Check if acx_stop_queue, acx_carrier_off should be included
- * OW Rest can be cleaned up
- */
-#if 0
-	acx_stop_queue(ndev, "on probe");
-	acx_carrier_off(ndev, "on probe");
-#endif
-
 	pr_acx("net device %s, driver compiled "
 		"against wireless extensions %d and Linux %s\n",
 		wiphy_name(adev->hw->wiphy), WIRELESS_EXT, UTS_RELEASE);
@@ -2157,11 +2133,6 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	MAC_COPY(adev->hw->wiphy->perm_addr, adev->dev_addr);
 
 	/** done with board specific setup **/
-
-	/* need to be able to restore PCI state after a suspend */
-#ifdef CONFIG_PM
-	/* pci_save_state(pdev); */
-#endif
 
 	err = acx_setup_modes(adev);
 	if (err) {
