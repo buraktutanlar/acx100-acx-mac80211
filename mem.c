@@ -2303,7 +2303,7 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_probe_init_mechanics(adev);
+	acx_init_mechanics(adev);
 
 	/* Slave memory host interface setup */
 	SET_IEEE80211_DEV(hw, &pdev->dev);

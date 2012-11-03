@@ -656,23 +656,3 @@ fail:
 
 	return result;
 }
-/* Locking, queueing, etc. mechanics */
-int acx_probe_init_mechanics(acx_device_t *adev)
-{
-	/* Locking */
-	spin_lock_init(&adev->spinlock);
-	mutex_init(&adev->mutex);
-
-	/* Irq work */
-	if (IS_USB(adev))
-		INIT_WORK(&adev->irq_work, acxusb_irq_work);
-	else
-		INIT_WORK(&adev->irq_work, acx_irq_work);
-
-	/* Skb tx-queue from mac80211 */
-	INIT_WORK(&adev->tx_work, acx_tx_work);
-	skb_queue_head_init(&adev->tx_queue);
-
-	return 0;
-}
-

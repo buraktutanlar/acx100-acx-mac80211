@@ -478,6 +478,26 @@ struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops)
 	return hw;
 }
 
+/* Locking, queueing, etc. mechanics */
+int acx_init_mechanics(acx_device_t *adev)
+{
+	/* Locking */
+	spin_lock_init(&adev->spinlock);
+	mutex_init(&adev->mutex);
+
+	/* Irq work */
+	if (IS_USB(adev))
+		INIT_WORK(&adev->irq_work, acxusb_irq_work);
+	else
+		INIT_WORK(&adev->irq_work, acx_irq_work);
+
+	/* Skb tx-queue from mac80211 */
+	INIT_WORK(&adev->tx_work, acx_tx_work);
+	skb_queue_head_init(&adev->tx_queue);
+
+	return 0;
+}
+
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 {
 	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;

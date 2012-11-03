@@ -1607,7 +1607,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_probe_init_mechanics(adev);
+	acx_init_mechanics(adev);
 
 	/* Usb host interface setup  */
 	SET_IEEE80211_DEV(hw, &intf->dev);

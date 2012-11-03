@@ -1065,7 +1065,7 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_probe_init_mechanics(adev);
+	acx_init_mechanics(adev);
 
 	/* PCI host interface setup */
 	SET_IEEE80211_DEV(hw, &pdev->dev);
@@ -1665,7 +1665,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_probe_init_mechanics(adev);
+	acx_init_mechanics(adev);
 
 	/* Vlynq host interface setup */
 	SET_IEEE80211_DEV(hw, &vdev->dev);
