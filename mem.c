@@ -2297,15 +2297,10 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	struct ieee80211_hw *hw;
 
 	/* Alloc ieee80211_hw  */
-	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxmem_hw_ops);
-	if (!hw) {
-		pr_acx("could not allocate ieee80211 structure %s\n",
-			pdev->name);
+	hw = acx_alloc_hw(&acxmem_hw_ops);
+	if (!hw)
 		goto fail_ieee80211_alloc_hw;
-	}
 	adev = hw2adev(hw);
-	memset(adev, 0, sizeof(*adev));
-	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);

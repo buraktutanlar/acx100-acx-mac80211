@@ -1059,15 +1059,10 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	struct ieee80211_hw *hw;
 
 	/* Alloc ieee80211_hw  */
-	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
-	if (!hw) {
-		pr_acx("could not allocate ieee80211 structure %s\n",
-		       pci_name(pdev));
+	hw = acx_alloc_hw(&acxpci_hw_ops);
+	if (!hw)
 		goto fail_ieee80211_alloc_hw;
-	}
 	adev = hw2adev(hw);
-	memset(adev, 0, sizeof(*adev));
-	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);
@@ -1664,15 +1659,10 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	struct vlynq_known *match = NULL;
 
 	/* Alloc ieee80211_hw  */
-	hw = ieee80211_alloc_hw(sizeof(struct acx_device), &acxpci_hw_ops);
-	if (!hw) {
-		pr_acx("could not allocate ieee80211 structure %s\n",
-		       dev_name(&vdev->dev));
+	hw = acx_alloc_hw(&acxpci_hw_ops);
+	if (!hw)
 		goto fail_vlynq_ieee80211_alloc_hw;
-	}
 	adev = hw2adev(hw);
-	memset(adev, 0, sizeof(*adev));
-	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);

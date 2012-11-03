@@ -460,6 +460,24 @@ void acx_start(acx_device_t *adev)
 
 }
 
+struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops)
+{
+	acx_device_t *adev;
+	struct ieee80211_hw *hw;
+
+	hw = ieee80211_alloc_hw(sizeof(struct acx_device), hw_ops);
+	if (!hw) {
+		pr_err("ieee80211_alloc_hw failed\n");
+		return hw;
+	}
+	adev = hw2adev(hw);
+	memset(adev, 0, sizeof(*adev));
+	adev->hw = hw;
+	pr_info("wiphy: %s", wiphy_name(adev->hw->wiphy));
+
+	return hw;
+}
+
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 {
 	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;

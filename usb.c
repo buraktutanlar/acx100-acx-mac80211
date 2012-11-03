@@ -1548,7 +1548,7 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	struct usb_endpoint_descriptor *epdesc;
 	struct usb_host_endpoint *ep;
 	struct usb_interface_descriptor *ifdesc;
-	const char *msg;
+	const char *msg="acx: err";
 	int numconfigs, numfaces, numep;
 	int result = OK;
 	int i;
@@ -1601,14 +1601,10 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	/* Ok, so it's our device and it has already booted */
 
 	/* Alloc ieee80211_hw  */
-	hw = ieee80211_alloc_hw(sizeof(*adev), &acxusb_hw_ops);
-	if (!hw) {
-		msg = "acx: no memory for ieee80211_dev\n";
+	hw = acx_alloc_hw(&acxusb_hw_ops);
+	if (!hw)
 		goto end_nomem;
-	}
 	adev = hw2adev(hw);
-	memset(adev, 0, sizeof(*adev));
-	adev->hw = hw;
 
 	/* Driver locking and queue mechanics */
 	acx_probe_init_mechanics(adev);

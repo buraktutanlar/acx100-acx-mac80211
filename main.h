@@ -4,6 +4,7 @@
 /* Minutes to wait until next radio recalibration: */
 #define RECALIB_PAUSE	5
 
+struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops);
 
 void acx_after_interrupt_task(acx_device_t *adev);
 void acx_log_irq(u16 irqtype);
