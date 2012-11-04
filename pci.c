@@ -1614,7 +1614,6 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	u32 addr;
 	struct ieee80211_hw *hw;
 	acx_device_t *adev = NULL;
-	acx111_ie_configoption_t co;
 	struct vlynq_mapping mapping[4] = { { 0, }, };
 	struct vlynq_known *match = NULL;
 
@@ -1723,24 +1722,10 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	if (acxpci_load_firmware(adev))
 		goto fail_load_firmware;
 
-	if (OK != acx_reset_dev(adev))
-		goto fail_vlynq_reset_dev;
+	if (acx_reset_on_probe(adev))
+		goto fail_reset_on_probe;
 
-	if (OK != acx_init_mac(adev))
-		goto fail_vlynq_init_mac;
-
-	acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	/* TODO: merge them into one function, they are called just
-	 * once and are the same for pci & usb */
-	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		goto fail_vlynq_read_eeprom_version;
-
-	acx_parse_configoption(adev, &co);
-	acx_set_defaults(adev);
-	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
-	acx_display_hardware_details(adev);
-
-	// Debugfs entries
+	/* Debugfs  */
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
 
@@ -1771,33 +1756,29 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 
 	fail_debugfs:
 
-    fail_vlynq_read_eeprom_version:
+	fail_reset_on_probe:
 
-	fail_vlynq_init_mac:
-
-    fail_vlynq_reset_dev:
-
-    fail_load_firmware:
-    	acx_free_firmware(adev);
+	fail_load_firmware:
+	acx_free_firmware(adev);
 
 	fail_vlynq_irq:
-      iounmap(adev->iobase);
+	iounmap(adev->iobase);
 
-    fail_vlynq_ioremap2:
-		release_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start);
+	fail_vlynq_ioremap2:
+	release_mem_region(vdev->mem_start, vdev->mem_end - vdev->mem_start);
 
-    fail_vlynq_request_mem_region:
+	fail_vlynq_request_mem_region:
 
-    fail_vlynq_ioremap1:
+	fail_vlynq_ioremap1:
 
-    fail_vlynq_known_devices:
-		vlynq_disable_device(vdev);
-		vlynq_set_drvdata(vdev, NULL);
+	fail_vlynq_known_devices:
+	vlynq_disable_device(vdev);
+	vlynq_set_drvdata(vdev, NULL);
 
-    fail_vlynq_enable_device:
-		ieee80211_free_hw(hw);
+	fail_vlynq_enable_device:
+	ieee80211_free_hw(hw);
 
-    fail_vlynq_ieee80211_alloc_hw:
+	fail_vlynq_ieee80211_alloc_hw:
 
 	done:
 
