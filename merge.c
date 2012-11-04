@@ -449,9 +449,7 @@ static void acx_create_rx_desc_queue(acx_device_t *adev, u32 rx_queue_start)
 	u32 mem_offs;
 	int i;
 
-
-
-	/* done by memset: adev->rx.tail = 0; */
+	adev->hw_rx_queue.tail=0;
 
 	/* ACX111 doesn't need any further config: preconfigures itself.
 	 * Simply print ring buffer for debugging */
@@ -570,9 +568,10 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 		"tx->desc_start=%p",
                 adev->iobase2, tx_queue_start, tx->acxdescinfo.start);
 
+	adev->hw_tx_queue[queue_id].head = 0;
+	adev->hw_tx_queue[queue_id].tail = 0;
 	adev->hw_tx_queue[queue_id].free = TX_CNT;
-	/* done by memset: adev->tx_head = 0; */
-	/* done by memset: adev->tx.tail = 0; */
+
 	txdesc = tx->acxdescinfo.start;
 	if (IS_PCI(adev)) {
 		mem_offs = tx_queue_start;
