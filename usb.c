@@ -1731,6 +1731,9 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	acx_get_firmware_version(adev);
 	acx_display_hardware_details(adev);
 
+	acx1xx_get_station_id(adev);
+	SET_IEEE80211_PERM_ADDR(adev->hw, adev->dev_addr);
+
 	// Debug and proc-fs
 	acx_debugfs_add_adev(adev);
 

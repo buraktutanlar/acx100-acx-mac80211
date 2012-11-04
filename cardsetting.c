@@ -722,7 +722,7 @@ void acx_update_capabilities(acx_device_t * adev)
 }
 #endif
 
-static int acx1xx_get_station_id(acx_device_t *adev)
+int acx1xx_get_station_id(acx_device_t *adev)
 {
 	u8 stationID[4 + acx_ie_descs[ACX1xx_IE_DOT11_STATION_ID].len];
 	const u8 *paddr;
@@ -1805,9 +1805,6 @@ void acx_set_defaults(acx_device_t *adev)
 	/* query some settings from the card.
 	 * NOTE: for some settings, e.g. CCA and ED (ACX100!), an initial
 	 * query is REQUIRED, otherwise the card won't work correctly! */
-
-	acx1xx_get_station_id(adev);
-	SET_IEEE80211_PERM_ADDR(adev->hw, adev->dev_addr);
 
 	MAC_COPY(adev->bssid, adev->dev_addr);
 

@@ -27,6 +27,7 @@ int acx1xx_update_tx_level(acx_device_t *adev);
 int acx1xx_get_antenna(acx_device_t *adev);
 int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1);
 int acx1xx_update_antenna(acx_device_t *adev);
+int acx1xx_get_station_id(acx_device_t *adev);
 int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr);
 int acx1xx_update_station_id(acx_device_t *adev);
 int acx1xx_update_ed_threshold(acx_device_t *adev);
