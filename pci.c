@@ -1042,7 +1042,6 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
 static int __devinit acxpci_probe(struct pci_dev *pdev,
 				const struct pci_device_id *id)
 {
-	acx111_ie_configoption_t co;
 	unsigned long mem_region1 = 0;
 	unsigned long mem_region2 = 0;
 	unsigned long mem_region1_size;
@@ -1190,47 +1189,15 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 
 
 	/* PCI setup is finished, now start initializing the card */
-	/* ----- */
 
-	// TODO cleanup comment
-	/* NB: read_reg() reads may return bogus data before
-	 * reset_dev(), since the firmware which directly controls
-	 * large parts of the I/O registers isn't initialized yet.
-	 * acx100 seems to be more affected than acx111 */
-
+	/* Load firmware */
 	acx_get_hardware_info(adev);
 
 	if (acxpci_load_firmware(adev))
 		goto fail_load_firmware;
 
-	if (OK != acx_reset_dev(adev))
-		goto fail_reset_dev;
-
-	if (IS_ACX100(adev)) {
-		/* ACX100: configopt struct in cmd mailbox - directly
-		 * after reset */
-		memcpy_fromio(&co, adev->cmd_area, sizeof(co));
-	}
-
-	if (OK != acx_init_mac(adev))
-		goto fail_init_mac;
-
-	if (IS_ACX111(adev)) {
-		/* ACX111: configopt struct needs to be queried after
-		 * full init */
-		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
-	}
-
-	/* TODO: merge them into one function, they are called just
-	 * once and are the same for pci & usb */
-	if (OK != acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version))
-		goto fail_read_eeprom_byte;
-
-	acx_parse_configoption(adev, &co);
-	acx_set_defaults(adev); // TODO OW may put this after acx_display_hardware_details(adev);
-	acx_get_firmware_version(adev);	/* needs to be after acx_init_mac() */
-	acx_display_hardware_details(adev);
-	/** done with board specific setup **/
+	if (acx_reset_on_probe(adev))
+		goto fail_reset_on_probe;
 
 	/* Debugfs */
 	if (acx_debugfs_add_adev(adev))
@@ -1261,49 +1228,42 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	goto done;
 
 	/* error paths: undo everything in reverse order... */
-fail_ieee80211_register_hw:
+	fail_ieee80211_register_hw:
 	ieee80211_unregister_hw(hw);
 
-fail_debugfs:
+	fail_debugfs:
 
-	/* acxpci_read_eeprom_byte(adev, 0x05, &adev->eeprom_version) */
-fail_read_eeprom_byte:
+	fail_reset_on_probe:
 
-	/* acx_init_mac(adev) */
-fail_init_mac:
-
-	/* acx_reset_dev(adev) */
-fail_reset_dev:
-
-fail_load_firmware:
+	fail_load_firmware:
 	acx_free_firmware(adev);
 
 	/* request_irq(adev->irq, acxpci_i_interrupt, IRQF_SHARED, KBUILD_MODNAME, */
-fail_request_irq:
+	fail_request_irq:
 	free_irq(adev->irq, adev);
-
-fail_no_irq:
 	
+	fail_no_irq:
+
 	/* pci_iomap(pdev, mem_region2, 0) */
-fail_iomap2:
+	fail_iomap2:
 	pci_iounmap(pdev, mem2);
 
 	/* pci_iomap(pdev, mem_region1, 0) */
-fail_iomap1:
+	fail_iomap1:
 	pci_iounmap(pdev, mem1);
 
 	/*	err = pci_request_region(pdev, mem_region2, "acx_2"); */
-fail_request_mem_region2:
+	fail_request_mem_region2:
 	pci_release_region(pdev, mem_region2);
 
 	/* err = pci_request_region(pdev, mem_region1, "acx_1"); */
-fail_request_mem_region1:
+	fail_request_mem_region1:
 	pci_release_region(pdev, mem_region1);
 
-fail_unknown_chiptype:
+	fail_unknown_chiptype:
 
 	/* pci_enable_device(pdev) */
-fail_pci_enable_device:
+	fail_pci_enable_device:
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 
@@ -1313,10 +1273,10 @@ fail_pci_enable_device:
 #endif
 
 	/* ieee80211_alloc_hw */
-fail_ieee80211_alloc_hw:
+	fail_ieee80211_alloc_hw:
 	ieee80211_free_hw(hw);
 	
-done:
+	done:
 
 	return result;
 }
