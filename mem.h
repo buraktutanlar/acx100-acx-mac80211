@@ -70,6 +70,9 @@ static inline void acxmem_chaincopy_from_slavemem(acx_device_t *adev,
 static inline void acxmem_reset_mac(acx_device_t *adev)
 { }
 
+static inline int acxmem_patch_around_bad_spots(acx_device_t *adev)
+{ return 0; }
+
 static inline int acxmem_dbgfs_diag_output(struct seq_file *file,
 		acx_device_t *adev)
 { return 0; }
@@ -83,6 +86,12 @@ static inline void acxmem_dealloc_tx(acx_device_t *adev, tx_t *tx_opaque)
 static inline u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev,
 		int count)
 { return 0; }
+
+static inline void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr)
+{ }
+
+static inline void acxmem_init_acx_txbuf(acx_device_t *adev)
+{ }
 
 static inline void acxmem_init_acx_txbuf2(acx_device_t *adev)
 { }
