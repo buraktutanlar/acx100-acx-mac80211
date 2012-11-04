@@ -1027,7 +1027,12 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
  * acx_compat, and hiding this #if/else.  OTOH, inclusion doesnt care
  * about old kernels
  */
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 7, 0)
 OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+#else
+void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
+	       struct sk_buff *skb)
+#endif
 {
 	acx_device_t *adev = hw2adev(hw);
 

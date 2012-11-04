@@ -45,8 +45,11 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 
 #if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
 int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
-#else
+#elif CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 7, 0)
 void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb);
+#else
+void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
+	       struct sk_buff *skb);
 #endif
 
 int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
