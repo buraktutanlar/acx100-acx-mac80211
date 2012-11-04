@@ -65,6 +65,7 @@
 #include "tx.h"
 #include "main.h"
 #include "boot.h"
+#include "interrupt-masks.h"
 
 #define RX_BUFFER_SIZE (sizeof(rxbuffer_t) + 32)
 
@@ -2912,19 +2913,16 @@ void acx_handle_info_irq(acx_device_t *adev)
 		);
 }
 
-#include "interrupt-masks.h"
 void acx_set_interrupt_mask(acx_device_t *adev)
 {
+	if (acx_debug & L_DEBUG)
+		interrupt_sanity_checks(adev);
 
-
-	interrupt_sanity_checks(adev);
 	pr_notice("adev->irq_mask: before: %d devtype:%d chiptype:%d tobe: %d\n",
 		adev->irq_mask, (adev)->dev_type, (adev)->chip_type,
 		interrupt_masks[(adev)->dev_type][(adev)->chip_type]);
 
 	adev->irq_mask = interrupt_masks[(adev)->dev_type][(adev)->chip_type];
-
-
 }
 
 /* OW FIXME Old interrupt handler
