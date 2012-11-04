@@ -214,6 +214,21 @@ static int acx_allocate(acx_device_t *adev, unsigned int size, dma_addr_t *phy,
 
 }
 
+static inline void acx_free(acx_device_t *adev, unsigned int *size,
+                            void **start, dma_addr_t phy)
+{
+	pr_info("size:%d, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
+
+	if (IS_PCI(adev))
+		dma_free_coherent(NULL, *size, *start, phy);
+	else
+		vfree(*start);
+
+	*size=0;
+	*start=NULL;
+}
+
+
 /*
  * acx_create_rx_host_desc_queue()
  *
@@ -671,20 +686,6 @@ void acx_create_desc_queues(acx_device_t *adev, u32 rx_queue_start,
 	}
 
 	acxmem_unlock();
-}
-
-static inline void acx_free(acx_device_t *adev, unsigned int *size,
-                            void **start, dma_addr_t phy)
-{
-	pr_info("size:%d, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
-
-	if (IS_PCI(adev))
-		dma_free_coherent(NULL, *size, *start, phy);
-	else
-		vfree(*start);
-
-	*size=0;
-	*start=NULL;
 }
 
 /*
