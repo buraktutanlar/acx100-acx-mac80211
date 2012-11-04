@@ -122,7 +122,6 @@ void acxmem_dump_mem(acx_device_t *adev, u32 start, int length);
 void acxmem_copy_from_slavemem(acx_device_t *adev, u8 *destination,
 		u32 source, int count);
 
-static void acxmem_init_acx_txbuf(acx_device_t *adev);
 // txhostdesc_t *acxmem_get_txhostdesc(acx_device_t *adev, txdesc_t* txdesc);
 static char acxmem_printable(char c);
 
@@ -1541,7 +1540,7 @@ void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr)
  * control field, of which only 0x02000000 has any meaning.  The lower
  * 19 bits are the address of the next block divided by 32.
  */
-static void acxmem_init_acx_txbuf(acx_device_t *adev)
+void acxmem_init_acx_txbuf(acx_device_t *adev)
 {
 	/*
 	 * acx100_init_memory_pools set up txbuf_start and

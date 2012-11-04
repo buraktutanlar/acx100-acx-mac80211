@@ -28,6 +28,10 @@
 #include "ie.h"
 #include "utils.h"
 #include "debug.h"
+#include "inlines.h"
+#include "init.h"
+#include "mem.h"
+#include "cardsetting.h"
 
 void acx_get_firmware_version(acx_device_t * adev)
 {
@@ -438,5 +442,102 @@ int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value)
 	log(L_ANY, "Unsupported dev_type=%i\n", (adev)->dev_type);
 
 	return (NOT_OK);
+}
+
+
+int acx_full_reset(acx_device_t *adev)
+{
+	int res=0;
+	acxmem_lock_flags;
+
+	if ((res=acx_reset_dev(adev)))
+		goto end_fail;
+
+	if ((res=acx_init_mac(adev)))
+		goto end_fail;
+	// TODO Move into acx100_init_memory_pools ?
+	if (IS_MEM(adev))
+		acxmem_init_acx_txbuf(adev);
+
+	if (IS_MEM(adev))
+	{
+		acxmem_lock();
+		/*
+		 * Windows driver writes 0x01000000 to register 0x288,
+		 * RADIO_CTL, if the form factor is 3.  It also write protects
+		 * the EEPROM by writing 1<<9 to GPIO_OUT
+		 */
+		if (adev->form_factor == 3) {
+			set_regbits(adev, 0x288, 0x01000000);
+			set_regbits(adev, 0x298, 1 << 9);
+		}
+		acxmem_unlock();
+	}
+
+	goto end;
+
+	end_fail:
+	pr_err("full_reset failed: res=%d", res);
+
+	end:
+	return res;
+
+}
+
+int acx_reset_on_probe(acx_device_t *adev)
+{
+	int res=0;
+	acx111_ie_configoption_t co;
+	acxmem_lock_flags;
+
+	/* reset_dev */
+	if ((res=acx_reset_dev(adev)))
+		goto end_fail;
+
+	/* ACX100: configopt struct in cmd mailbox - directly after reset */
+	if (IS_ACX100(adev)) {
+		if (IS_PCI(adev))
+		{
+			memcpy_fromio(&co, adev->cmd_area, sizeof(co));
+		}
+		else if (IS_MEM(adev)) {
+			acxmem_lock();
+			acxmem_copy_from_slavemem(adev, (u8*) &co, (uintptr_t) adev->cmd_area, sizeof(co));
+			acxmem_unlock();
+		}
+	}
+
+	/* init_mac */
+	if ((res=acx_init_mac(adev)))
+		goto end_fail;
+	// TODO Move into acx100_init_memory_pools ?
+	if (IS_MEM(adev))
+		acxmem_init_acx_txbuf(adev);
+
+	/* adev->eeprom_version required in acx_parse_configoption() */
+	acxmem_lock();
+	res=acx_read_eeprom_byte(adev, 0x05, &adev->eeprom_version);
+	acxmem_unlock();
+	if (res)
+		goto end_fail;
+
+	/* ACX111: configopt struct needs to be queried after full init */
+	if (IS_ACX111(adev))
+		acx_interrogate(adev, &co, ACX111_IE_CONFIG_OPTIONS);
+
+	acx_parse_configoption(adev, &co);
+	acx_get_firmware_version(adev);
+	acx_display_hardware_details(adev);
+
+	acx1xx_get_station_id(adev);
+	SET_IEEE80211_PERM_ADDR(adev->hw, adev->dev_addr);
+
+	goto end;
+
+	end_fail:
+	pr_err("Reset on probe failed: res=%d", res);
+
+	end:
+	return res;
 }
 

@@ -39,6 +39,7 @@ void acxmem_reclaim_acx_txbuf_space(acx_device_t *adev, u32 blockptr);
 
 u32 acxmem_allocate_acx_txbuf_space(acx_device_t *adev, int count);
 
+void acxmem_init_acx_txbuf(acx_device_t *adev);
 void acxmem_init_acx_txbuf2(acx_device_t *adev);
 
 void acxmem_process_rxdesc(acx_device_t *adev);

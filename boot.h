@@ -10,4 +10,7 @@ void acx_parse_configoption(acx_device_t *adev,
 int acx_read_phy_reg(acx_device_t *adev, u32 reg, u8 *charbuf);
 int acx_write_phy_reg(acx_device_t *adev, u32 reg, u8 value);
 
+int acx_full_reset(acx_device_t *adev);
+int acx_reset_on_probe(acx_device_t *adev);
+
 #endif
