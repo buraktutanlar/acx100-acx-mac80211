@@ -2382,23 +2382,17 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	acxmem_lock();
 	acx_irq_disable(adev);
 	acxmem_unlock();
+	/** done with board specific setup **/
 
 	/* --- */
 	acx_get_hardware_info(adev);
 	if (acxmem_load_firmware(adev))
 		goto fail_load_firmware;
 
-	/* OK init parts from pci.c are done in acxmem_complete_hw_reset(adev) */
-	if (OK != acxmem_complete_hw_reset(adev))
-		goto fail_complete_hw_reset;
+	if (acx_reset_on_probe(adev))
+		goto fail_reset_on_probe;
 
-	/*
-	 * Set up default things for most of the card settings.
-	 */
-	acx_set_defaults(adev);
-
-	/** done with board specific setup **/
-
+	/* Debug fs */
 	if (acx_debugfs_add_adev(adev))
 		goto fail_debugfs;
 
@@ -2422,29 +2416,30 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 
 	/* error paths: undo everything in reverse order... */
-fail_ieee80211_register_hw:
+	fail_ieee80211_register_hw:
 
-fail_debugfs:
+	fail_debugfs:
 
-fail_complete_hw_reset:
+	fail_reset_on_probe:
 
-fail_load_firmware:
+	fail_load_firmware:
 	acx_free_firmware(adev);
 
-fail_request_irq:
+	fail_request_irq:
 	free_irq(adev->irq, adev);
 
-fail_ioremap:
+	fail_ioremap:
 	if (adev->iobase)
 		iounmap(adev->iobase);
 
-fail_unknown_chiptype:
-fail_ieee80211_alloc_hw:
+	fail_unknown_chiptype:
+
+	fail_ieee80211_alloc_hw:
 	acx_delete_dma_regions(adev);
 	platform_set_drvdata(pdev, NULL);
 	ieee80211_free_hw(hw);
 
-done:
+	done:
 
 	return result;
 }
