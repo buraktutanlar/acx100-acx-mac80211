@@ -3127,14 +3127,15 @@ int acx_op_start(struct ieee80211_hw *hw)
 	acx_device_t *adev = hw2adev(hw);
 	int result = OK;
 
-
 	acx_sem_lock(adev);
 
 	adev->initialized = 0;
 
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
-	/* ifup device */
+	acx_full_reset(adev);
+	acx_set_defaults(adev);
+
 	acx_up(hw);
 
 	acx_wake_queue(adev->hw, NULL);
