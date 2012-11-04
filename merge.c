@@ -245,13 +245,15 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 
 
 
-	/* allocate the RX host descriptor queue pool */
-	adev->hw_rx_queue.hostdescinfo.size = RX_CNT * sizeof(*hostdesc);
-	rc = acx_allocate(adev, adev->hw_rx_queue.hostdescinfo.size,
-	        &adev->hw_rx_queue.hostdescinfo.phy,
-	        (void**) &adev->hw_rx_queue.hostdescinfo.start, "rxhostdesc_start");
-	if (rc)
-		goto fail;
+	/* allocate the RX host descriptor queue pool, if not already done */
+	if (!adev->hw_rx_queue.hostdescinfo.start) {
+		adev->hw_rx_queue.hostdescinfo.size = RX_CNT * sizeof(*hostdesc);
+		rc = acx_allocate(adev, adev->hw_rx_queue.hostdescinfo.size,
+			&adev->hw_rx_queue.hostdescinfo.phy,
+			(void**) &adev->hw_rx_queue.hostdescinfo.start, "rxhostdesc_start");
+		if (rc)
+			goto fail;
+	}
 
 	/* check for proper alignment of RX host descriptor pool */
 	if ((long)adev->hw_rx_queue.hostdescinfo.start & 3) {
@@ -261,12 +263,14 @@ static int acx_create_rx_host_desc_queue(acx_device_t *adev)
 
 	/* allocate Rx buffer pool which will be used by the acx
 	 * to store the whole content of the received frames in it */
-	adev->hw_rx_queue.bufinfo.size = RX_CNT * RX_BUFFER_SIZE;
-	rc = acx_allocate(adev, adev->hw_rx_queue.bufinfo.size,
-	        &adev->hw_rx_queue.bufinfo.phy,
-	        &adev->hw_rx_queue.bufinfo.start, "rxbuf_start");
-	if (rc)
-		goto fail;
+	if (!adev->hw_rx_queue.bufinfo.start) {
+		adev->hw_rx_queue.bufinfo.size = RX_CNT * RX_BUFFER_SIZE;
+		rc = acx_allocate(adev, adev->hw_rx_queue.bufinfo.size,
+			&adev->hw_rx_queue.bufinfo.phy,
+			&adev->hw_rx_queue.bufinfo.start, "rxbuf_start");
+		if (rc)
+			goto fail;
+	}
 
 	rxbuf = (rxbuffer_t*) adev->hw_rx_queue.bufinfo.start;
 	rxbuf_phy = adev->hw_rx_queue.bufinfo.phy;
@@ -307,21 +311,23 @@ static int acx_create_tx_host_desc_queue(acx_device_t *adev, struct hw_tx_queue 
 	dma_addr_t txbuf_phy;
 	int i, rc;
 
-
-
-	/* allocate TX buffer */
-	tx->bufinfo.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
-	rc = acx_allocate(adev, tx->bufinfo.size, &tx->bufinfo.phy,
-	        &tx->bufinfo.start, "txbuf_start");
-	if (rc)
-		goto fail;
+	/* allocate TX buffer, if not already done */
+	if (!tx->bufinfo.start) {
+		tx->bufinfo.size = TX_CNT * WLAN_A4FR_MAXLEN_WEP_FCS;
+		rc = acx_allocate(adev, tx->bufinfo.size, &tx->bufinfo.phy,
+			&tx->bufinfo.start, "txbuf_start");
+		if (rc)
+			goto fail;
+	}
 
 	/* allocate the TX host descriptor queue pool */
-	tx->hostdescinfo.size = TX_CNT * 2 * sizeof(*hostdesc);
-	rc = acx_allocate(adev, tx->hostdescinfo.size, &tx->hostdescinfo.phy,
-	        (void**) &tx->hostdescinfo.start, "txhostdesc_start");
-	if (rc)
-		goto fail;
+	if (!tx->hostdescinfo.start) {
+		tx->hostdescinfo.size = TX_CNT * 2 * sizeof(*hostdesc);
+		rc = acx_allocate(adev, tx->hostdescinfo.size, &tx->hostdescinfo.phy,
+			(void**) &tx->hostdescinfo.start, "txhostdesc_start");
+		if (rc)
+			goto fail;
+	}
 
 	/* check for proper alignment of TX host descriptor pool */
 	if ((long)tx->hostdescinfo.start & 3) {
