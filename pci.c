@@ -443,12 +443,12 @@ int acxpci_dbgfs_diag_output(struct seq_file *file, acx_device_t *adev)
 		seq_printf(file,
 		           "\n"
 		           "** PCI data **\n"
-		           "txbuf_start %p, txbuf_area_size %u, txbuf_startphy %08llx\n"
-		           "txdesc_size %u, txdesc_start %p\n"
-		           "txhostdesc_start %p, txhostdesc_area_size %u, txhostdesc_startphy %08llx\n"
+		           "txbuf_start %p, txbuf_area_size %zu, txbuf_startphy %08llx\n"
+		           "txdesc_size %zu, txdesc_start %p\n"
+		           "txhostdesc_start %p, txhostdesc_area_size %zu, txhostdesc_startphy %08llx\n"
 		           "rxdesc_start %p\n"
-		           "rxhostdesc_start %p, rxhostdesc_area_size %u, rxhostdesc_startphy %08llx\n"
-		           "rxbuf_start %p, rxbuf_area_size %u, rxbuf_startphy %08llx\n",
+		           "rxhostdesc_start %p, rxhostdesc_area_size %zu, rxhostdesc_startphy %08llx\n"
+		           "rxbuf_start %p, rxbuf_area_size %zu, rxbuf_startphy %08llx\n",
 		           adev->hw_tx_queue[queue_id].bufinfo.start, adev->hw_tx_queue[queue_id].bufinfo.size,
 		           (unsigned long long)adev->hw_tx_queue[queue_id].bufinfo.phy,
 		           adev->hw_tx_queue[queue_id].acxdescinfo.size, adev->hw_tx_queue[queue_id].acxdescinfo.start,
