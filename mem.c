@@ -1015,15 +1015,15 @@ int acxmem_dbgfs_diag_output(struct seq_file *file,
 		"** Generic slave data **\n"
 		"irq_mask 0x%04x irq on acx 0x%04x\n"
 
-		"txbuf_start 0x%p, txbuf_area_size %u\n"
+		"txbuf_start 0x%p, txbuf_area_size %zu\n"
 		/* OW TODO Add also the acx tx_buf size available */
-		"txdesc_size %u, txdesc_start 0x%p\n"
-		"txhostdesc_start 0x%p, txhostdesc_area_size %u\n"
+		"txdesc_size %zu, txdesc_start 0x%p\n"
+		"txhostdesc_start 0x%p, txhostdesc_area_size %zu\n"
 		"txbuf start 0x%04x, txbuf size %d\n"
 
 		"rxdesc_start 0x%p\n"
-		"rxhostdesc_start 0x%p, rxhostdesc_area_size %u\n"
-		"rxbuf_start 0x%p, rxbuf_area_size %u\n",
+		"rxhostdesc_start 0x%p, rxhostdesc_area_size %zu\n"
+		"rxbuf_start 0x%p, rxbuf_area_size %zu\n",
 
 		adev->irq_mask,	read_reg32(adev, IO_ACX_IRQ_STATUS_NON_DES),
 
