@@ -215,10 +215,10 @@ static int acx_allocate(acx_device_t *adev, unsigned int size, dma_addr_t *phy,
 
 }
 
-static inline void acx_free(acx_device_t *adev, unsigned int *size,
+static inline void acx_free(acx_device_t *adev, size_t *size,
                             void **start, dma_addr_t phy)
 {
-	pr_info("size:%d, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
+	pr_info("size:%zu, vaddr:%p, dma_handle:%p\n", *size, *start, (void*) phy);
 
 	if (IS_PCI(adev))
 		dma_free_coherent(NULL, *size, *start, phy);
