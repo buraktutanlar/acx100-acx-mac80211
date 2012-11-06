@@ -615,7 +615,7 @@ static void acx_create_tx_desc_queue(acx_device_t *adev, u32 tx_queue_start, int
 		/* loop over whole send pool */
 		for (i = 0; i < TX_CNT; i++) {
 			log(L_DEBUG, "configure card tx descriptor: 0x%p, "
-				"size: 0x%X\n", txdesc, tx->acxdescinfo.size);
+				"size: %zu\n", txdesc, tx->acxdescinfo.size);
 
 			if (IS_PCI(adev)) {
 				/* pointer to hostdesc memory */
