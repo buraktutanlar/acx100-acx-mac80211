@@ -3131,7 +3131,10 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
-	acx_full_reset(adev);
+	/* With vlynq a full reset doesn't work yet */
+	if (!IS_VLYNQ(adev))
+		acx_full_reset(adev);
+
 	acx_set_defaults(adev);
 
 	acx_up(hw);

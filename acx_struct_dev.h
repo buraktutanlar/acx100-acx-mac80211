@@ -110,6 +110,7 @@ enum {
  #define IS_MEM(adev)	0
 #endif
 
+#define IS_VLYNQ(adev)	((adev)->dev_is_vlynq)
 
 /* Driver defaults */
 #define DEFAULT_DTIM_INTERVAL	10
