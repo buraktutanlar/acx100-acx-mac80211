@@ -1097,6 +1097,9 @@ int acx_set_hw_encryption_on(acx_device_t *adev)
 {
 	int res;
 
+	if (!acx_hwcrypto)
+		return -EOPNOTSUPP;
+
 	if(adev->hw_encrypt_enabled)
 		return OK;
 
@@ -1117,14 +1120,6 @@ int acx_set_hw_encryption_on(acx_device_t *adev)
 int acx_set_hw_encryption_off(acx_device_t *adev)
 {
 	int res;
-
-	if(!adev->hw_encrypt_enabled)
-		return OK;
-
-	if (IS_ACX100(adev)){
-		log(L_INIT, "acx100: hw-encryption not supported\n");
-		return OK;
-	}
 
 	log(L_INIT, "Disabling hw-encryption\n");
 
@@ -1898,7 +1893,11 @@ void acx_set_defaults(acx_device_t *adev)
 		adev->sensitivity = 2;
 
 	/* Enable hw-encryption (normally by default enabled) */
-	acx_set_hw_encryption_on(adev);
+	if (acx_hwcrypto)
+		acx_set_hw_encryption_on(adev);
+	else
+		acx_set_hw_encryption_off(adev);
+
 
 /* #define ENABLE_POWER_SAVE */
 #ifdef ENABLE_POWER_SAVE

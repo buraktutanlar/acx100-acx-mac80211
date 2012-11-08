@@ -143,10 +143,15 @@ static void __exit acx_cleanup_module(void)
 module_init(acx_init_module);
 module_exit(acx_cleanup_module);
 
+unsigned int acx_hwcrypto = 1;
+module_param_named(hwcrypto, acx_hwcrypto, uint, 0644);
+MODULE_PARM_DESC(debug, "Enable hw encryption support");
+
 #if ACX_DEBUG
 
 /* will add __read_mostly later */
 unsigned int acx_debug = ACX_DEFAULT_MSG;
+
 /* parameter is 'debug', corresponding var is acx_debug */
 module_param_named(debug, acx_debug, uint, 0644);
 MODULE_PARM_DESC(debug, "Debug level mask (see L_xxx constants)");

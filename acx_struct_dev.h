@@ -56,6 +56,8 @@ enum {
 	ACX_DIAG_OP_REINIT_TX_BUF = 0x0003
 };
 
+extern unsigned int acx_hwcrypto;
+
 /*
  * BOM Constants
  * ==================================================
