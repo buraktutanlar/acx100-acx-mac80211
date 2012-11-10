@@ -718,7 +718,7 @@ void acxmem_reset_mac(acx_device_t *adev)
 	write_reg32(adev, 0x808, 0x10000);
 }
 
-int acxmem_load_firmware(acx_device_t *adev)
+static int acxmem_load_firmware(acx_device_t *adev)
 {
 	char *fw_image_filename = MEM_FIRMWARE_IMAGE_FILENAME;
 	char radio_image_filename[MEM_FIRMWARE_FILENAME_MAXLEN];
