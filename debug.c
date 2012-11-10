@@ -805,7 +805,7 @@ out:
 	return ret;
 }
 
-acx_dbgfs_show_t *const acx_dbgfs_show_funcs[] = {
+static acx_dbgfs_show_t *const acx_dbgfs_show_funcs[] = {
 	acx_dbgfs_show_acx,
 	acx_dbgfs_show_diag,
 	acx_dbgfs_show_eeprom,
@@ -817,7 +817,7 @@ acx_dbgfs_show_t *const acx_dbgfs_show_funcs[] = {
 	acx_dbgfs_show_reg_domain,
 };
 
-acx_dbgfs_write_t *const acx_dbgfs_write_funcs[] = {
+static acx_dbgfs_write_t *const acx_dbgfs_write_funcs[] = {
 	NULL,
 	acx_dbgfs_write_diag,
 	NULL,
