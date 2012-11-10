@@ -1607,7 +1607,8 @@ acxusb_probe(struct usb_interface *intf, const struct usb_device_id *devID)
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_init_mechanics(adev);
+	if(acx_init_mechanics(adev))
+		goto end_nomem;
 
 	/* Usb host interface setup  */
 	SET_IEEE80211_DEV(hw, &intf->dev);
@@ -1840,6 +1841,8 @@ static void acxusb_disconnect(struct usb_interface *intf)
 	kfree(adev->usb_tx);
 
 	acx_sem_unlock(adev);
+
+	acx_free_mechanics(adev);
 
 	ieee80211_free_hw(adev->hw);
 

@@ -85,4 +85,6 @@ struct acx_ie_desc {
 
 extern const struct acx_ie_desc acx_ie_descs[];
 
+int acx_ie_get_max_len(void);
+
 #endif

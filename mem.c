@@ -2238,7 +2238,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_init_mechanics(adev);
+	if(acx_init_mechanics(adev))
+		goto fail_init_mechanics;
 
 	/* Slave memory host interface setup */
 	SET_IEEE80211_DEV(hw, &pdev->dev);
@@ -2370,6 +2371,8 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
 
 	fail_unknown_chiptype:
 
+	fail_init_mechanics:
+
 	fail_ieee80211_alloc_hw:
 	acx_delete_dma_regions(adev);
 	platform_set_drvdata(pdev, NULL);
@@ -2471,9 +2474,8 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	/* remove dev registration */
 	platform_set_drvdata(pdev, NULL);
 
-	/* Free netdev (quite late, since otherwise we might get
-	 * caught off-guard by a netdev timeout handler execution
-	 * expecting to see a working dev...) */
+	acx_free_mechanics(adev);
+
 	ieee80211_free_hw(adev->hw);
 
 	pr_acxmem("done\n");

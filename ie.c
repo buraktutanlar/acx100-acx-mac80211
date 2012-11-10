@@ -283,3 +283,16 @@ DEF_IE(111_IE_DOT11_UNKNOWN_1011,		0x1011, 1); /* 11100100 20 */
 DEF_IE(111_IE_DOT11_INVAL_1012,			0x1012, -1);
 DEF_IE(111_IE_DOT11_INVAL_1013,			0x1013, -1);
 #endif
+
+int acx_ie_get_max_len(void)
+{
+	int l=0;
+	int i;
+
+	for(i=0; i<ARRAY_SIZE(acx_ie_descs); i++) {
+		if (acx_ie_descs[i].len > l)
+			l=acx_ie_descs[i].len;
+	}
+
+	return l;
+}

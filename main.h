@@ -6,6 +6,7 @@
 
 struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops);
 int acx_init_mechanics(acx_device_t *adev);
+int acx_free_mechanics(acx_device_t *adev);
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw);
 
 void acx_after_interrupt_task(acx_device_t *adev);

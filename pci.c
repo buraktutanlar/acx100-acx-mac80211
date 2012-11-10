@@ -1064,7 +1064,8 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_init_mechanics(adev);
+	if(acx_init_mechanics(adev))
+		goto fail_init_mechanics;
 
 	/* PCI host interface setup */
 	SET_IEEE80211_DEV(hw, &pdev->dev);
@@ -1272,9 +1273,11 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
 	pci_set_power_state(pdev, PCI_D3hot);
 #endif
 
+	fail_init_mechanics:
+	ieee80211_free_hw(hw);
+
 	/* ieee80211_alloc_hw */
 	fail_ieee80211_alloc_hw:
-	ieee80211_free_hw(hw);
 	
 	done:
 
@@ -1377,6 +1380,8 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 
 	/* remove dev registration */
 	pci_set_drvdata(pdev, NULL);
+
+	acx_free_mechanics(adev);
 
 	/* Free netdev (quite late, since otherwise we might get
 	 * caught off-guard by a netdev timeout handler execution
@@ -1624,7 +1629,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	adev = hw2adev(hw);
 
 	/* Driver locking and queue mechanics */
-	acx_init_mechanics(adev);
+	if(acx_init_mechanics(adev))
+		goto fail_init_mechanics;
 
 	/* Vlynq host interface setup */
 	SET_IEEE80211_DEV(hw, &vdev->dev);
@@ -1776,6 +1782,8 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	vlynq_set_drvdata(vdev, NULL);
 
 	fail_vlynq_enable_device:
+
+	fail_init_mechanics:
 	ieee80211_free_hw(hw);
 
 	fail_vlynq_ieee80211_alloc_hw:
@@ -1843,9 +1851,8 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* remove dev registration */
 	vlynq_set_drvdata(vdev, NULL);
 
-	/* Free netdev (quite late, since otherwise we might get
-	 * caught off-guard by a netdev timeout handler execution
-	 * expecting to see a working dev...) */
+	acx_free_mechanics(adev);
+
 	ieee80211_free_hw(adev->hw);
 
 }

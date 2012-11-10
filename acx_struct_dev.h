@@ -290,6 +290,9 @@ struct acx_device {
 #endif
 #endif
 
+	u8 *ie_cmd_buf;
+	int ie_cmd_buf_len;
+
 	/*** Linux network device ***/
 	/* struct device	*dev;		// pointer to linux netdevice */
 

@@ -563,17 +563,14 @@ int acx100pci_set_tx_level(acx_device_t * adev, u8 level_dbm)
 int acx1xx_get_antenna(acx_device_t *adev)
 {
 	int res;
-	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
+	u8 *antenna=adev->ie_cmd_buf;
 
-
-
-	memset(antenna, 0, sizeof(antenna));
+	memset(antenna, 0, adev->ie_cmd_buf_len);
 	res = acx_interrogate(adev, antenna,
 			  ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 	adev->antenna[0] = antenna[4];
 	adev->antenna[1] = antenna[5];
 	log(L_INIT, "Got antenna[0,1]: 0x%02X 0x%02X\n", adev->antenna[0], adev->antenna[1]);
-
 
 	return res;
 }
@@ -582,12 +579,9 @@ int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1)
 {
 	int res;
 
-
-
 	adev->antenna[0] = val0;
 	adev->antenna[1] = val1;
 	res = acx1xx_update_antenna(adev);
-
 
 	return res;
 }
@@ -595,16 +589,14 @@ int acx1xx_set_antenna(acx_device_t *adev, u8 val0, u8 val1)
 int acx1xx_update_antenna(acx_device_t *adev)
 {
 	int res;
-	u8 antenna[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_ANTENNA].len];
-
-
+	u8 *antenna = adev->ie_cmd_buf;
 
 	log(L_INIT, "Updating antenna[0,1]: 0x%02X 0x%02X\n",
 		adev->antenna[0], adev->antenna[1]);
 	memset(antenna, 0, sizeof(antenna));
 	antenna[4] = adev->antenna[0];
 	antenna[5] = adev->antenna[1];
-	res = acx_configure(adev, &antenna,
+	res = acx_configure(adev, antenna,
 			ACX1xx_IE_DOT11_CURRENT_ANTENNA);
 
 
@@ -724,13 +716,11 @@ void acx_update_capabilities(acx_device_t * adev)
 
 int acx1xx_get_station_id(acx_device_t *adev)
 {
-	u8 stationID[4 + acx_ie_descs[ACX1xx_IE_DOT11_STATION_ID].len];
+	u8 *stationID = adev->ie_cmd_buf;
 	const u8 *paddr;
 	int i, res;
 
-
-
-	res = acx_interrogate(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+	res = acx_interrogate(adev, stationID, ACX1xx_IE_DOT11_STATION_ID);
 	paddr = &stationID[4];
 	for (i = 0; i < ETH_ALEN; i++) {
 		/* we copy the MAC address (reversed in the card) to
@@ -760,11 +750,9 @@ int acx1xx_set_station_id(acx_device_t *adev, u8 *new_addr)
 
 int acx1xx_update_station_id(acx_device_t *adev)
 {
-	u8 stationID[4 + acx_ie_descs[ACX1xx_IE_DOT11_STATION_ID].len];
+	u8 *stationID = adev->ie_cmd_buf;
 	u8 *paddr;
 	int i, res;
-
-
 
 	log(L_INIT, "Updating station_id to: " MACSTR "\n",
 		MAC(adev->dev_addr));
@@ -776,7 +764,7 @@ int acx1xx_update_station_id(acx_device_t *adev)
 		 * (reversed in the card!) */
 		paddr[i] = adev->dev_addr[ETH_ALEN - 1 - i];
 	}
-	res = acx_configure(adev, &stationID, ACX1xx_IE_DOT11_STATION_ID);
+	res = acx_configure(adev, stationID, ACX1xx_IE_DOT11_STATION_ID);
 
 
 	return res;
@@ -785,10 +773,9 @@ int acx1xx_update_station_id(acx_device_t *adev)
 static int acx100_get_ed_threshold(acx_device_t *adev)
 {
 	int res;
-	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
+	u8 *ed_threshold = adev->ie_cmd_buf;
 
-
-	memset(ed_threshold, 0, sizeof(ed_threshold));
+	memset(ed_threshold, 0, sizeof(adev->ie_cmd_buf_len));
 	res = acx_interrogate(adev, ed_threshold,
 			  ACX100_IE_DOT11_ED_THRESHOLD);
 	adev->ed_threshold = ed_threshold[4];
@@ -834,10 +821,9 @@ static int acx1xx_set_ed_threshold(acx_device_t *adev, u8 ed_threshold)
 static int acx100_update_ed_threshold(acx_device_t *adev)
 {
 	int res;
-	u8 ed_threshold[4 + acx_ie_descs[ACX100_IE_DOT11_ED_THRESHOLD].len];
+	u8 *ed_threshold = adev->ie_cmd_buf;
 
-
-	memset(ed_threshold, 0, sizeof(ed_threshold));
+	memset(ed_threshold, 0, sizeof(adev->ie_cmd_buf_len));
 	ed_threshold[4] = adev->ed_threshold;
 	res = acx_configure(adev, &ed_threshold,
 			ACX100_IE_DOT11_ED_THRESHOLD);
@@ -866,14 +852,12 @@ int acx1xx_update_ed_threshold(acx_device_t *adev)
 static int acx100_get_cca(acx_device_t *adev)
 {
 	int res;
-	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
+	u8 *cca = adev->ie_cmd_buf;
 
-
-	memset(cca, 0, sizeof(cca));
+	memset(cca, 0, sizeof(adev->ie_cmd_buf_len));
 	res = acx_interrogate(adev, cca,
 			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 	adev->cca = cca[4];
-
 
 	return res;
 }
@@ -914,13 +898,11 @@ static int acx1xx_set_cca(acx_device_t *adev, u8 cca)
 static int acx100_update_cca(acx_device_t *adev)
 {
 	int res;
-	u8 cca[4 + acx_ie_descs[ACX1xx_IE_DOT11_CURRENT_CCA_MODE].len];
+	u8 *cca = adev->ie_cmd_buf;
 
-
-
-	memset(cca, 0, sizeof(cca));
+	memset(cca, 0, sizeof(adev->ie_cmd_buf_len));
 	cca[4] = adev->cca;
-	res = acx_configure(adev, &cca,
+	res = acx_configure(adev, cca,
 			ACX1xx_IE_DOT11_CURRENT_CCA_MODE);
 
 
@@ -973,15 +955,14 @@ static int acx1xx_set_rate_fallback(acx_device_t *adev, u8 rate_auto)
 int acx1xx_update_rate_fallback(acx_device_t *adev)
 {
 	int res;
-	u8 rate[4 + acx_ie_descs[ACX1xx_IE_RATE_FALLBACK].len];
-
+	u8 *rate = adev->ie_cmd_buf;
 
 	/* configure to not do fallbacks when not in auto rate mode */
 	rate[4] = (adev->rate_auto) /* adev->txrate_fallback_retries */
 		? 1 : 0;
 	log(L_INIT, "Updating Tx fallback to %u retries\n", rate[4]);
 
-	res = acx_configure(adev, &rate, ACX1xx_IE_RATE_FALLBACK);
+	res = acx_configure(adev, rate, ACX1xx_IE_RATE_FALLBACK);
 
 	return res;
 }
@@ -1056,22 +1037,20 @@ int acx1xx_update_rx(acx_device_t *adev)
 int acx1xx_update_retry(acx_device_t *adev)
 {
 	int res;
-	u8 short_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT].len];
-	u8 long_retry[4 + acx_ie_descs[ACX1xx_IE_DOT11_LONG_RETRY_LIMIT].len];
-
-
+	u8 *short_retry = adev->ie_cmd_buf;
+	u8 *long_retry = adev->ie_cmd_buf;
 
 	log(L_INIT, "Updating the short retry limit: %u, "
 		"long retry limit: %u\n",
 		adev->short_retry, adev->long_retry);
 
 	short_retry[0x4] = adev->short_retry;
-	long_retry[0x4] = adev->long_retry;
-	res = acx_configure(adev, &short_retry,
+	res = acx_configure(adev, short_retry,
 			ACX1xx_IE_DOT11_SHORT_RETRY_LIMIT);
-	res += acx_configure(adev, &long_retry,
-			ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
 
+	long_retry[0x4] = adev->long_retry;
+	res += acx_configure(adev, long_retry,
+			ACX1xx_IE_DOT11_LONG_RETRY_LIMIT);
 
 	return res;
 }
@@ -1079,7 +1058,7 @@ int acx1xx_update_retry(acx_device_t *adev)
 int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 {
 	int res = NOT_OK;
-	u8 xmt_msdu_lifetime[4 + acx_ie_descs[ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME].len];
+	u8 *xmt_msdu_lifetime = adev->ie_cmd_buf;
 
 
 	log(L_INIT, "Updating the tx MSDU lifetime: %u\n",
@@ -1087,7 +1066,7 @@ int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 
 	*(u32 *) &xmt_msdu_lifetime[4] = cpu_to_le32(
 		(u32) adev->msdu_lifetime);
-	res = acx_configure(adev, &xmt_msdu_lifetime,
+	res = acx_configure(adev, xmt_msdu_lifetime,
 	                ACX1xx_IE_DOT11_MAX_XMIT_MSDU_LIFETIME);
 
 	return res;

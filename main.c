@@ -495,8 +495,24 @@ int acx_init_mechanics(acx_device_t *adev)
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
 
+	/* Allocate IE cmd buffer */
+	adev->ie_cmd_buf_len=acx_ie_get_max_len()+4;
+	log(L_INIT, "ie_cmd_buf_len=%d\n", adev->ie_cmd_buf_len);
+
+	adev->ie_cmd_buf=kmalloc(adev->ie_cmd_buf_len, GFP_KERNEL);
+	if (!adev->ie_cmd_buf)
+		return -1;
+
 	return 0;
 }
+
+int acx_free_mechanics(acx_device_t *adev)
+{
+	kfree(adev->ie_cmd_buf);
+
+	return 0;
+}
+
 
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 {
