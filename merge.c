@@ -1857,6 +1857,7 @@ int acx_reset_dev(acx_device_t *adev)
 	ecpu_ctrl = read_reg16(adev, IO_ACX_ECPU_CTRL) & 1;
 	if (!ecpu_ctrl) {
 		msg = "acx: eCPU is already running. ";
+		acxmem_unlock();
 		goto end_fail;
 	}
 	acxmem_unlock();
@@ -1887,6 +1888,7 @@ int acx_reset_dev(acx_device_t *adev)
 		msg = "acx: timeout waiting for eCPU. ";
 		goto end_fail;
 	}
+
 	acxmem_lock();
 
 	log(L_DEBUG, "eCPU has woken up, card is ready to be configured\n");
@@ -1896,15 +1898,17 @@ int acx_reset_dev(acx_device_t *adev)
 	/* test that EEPROM is readable */
 	acx_read_eeprom_area(adev);
 
+	acxmem_unlock();
+
 	result = OK;
 	goto end;
 
 	/* Finish error message. Indicate which function failed */
+
 end_fail:
 	pr_acx("%s: reset_dev() FAILED\n", msg);
-end:
-	acxmem_unlock();
 
+end:
 	return result;
 }
 
