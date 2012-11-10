@@ -1431,7 +1431,7 @@ static inline void acx_show_card_eeprom_id(acx_device_t *adev) {}
  * ==================================================
  */
 
-int acx_wait_cmd_status(acx_device_t *adev, unsigned cmd,
+static int acx_wait_cmd_status(acx_device_t *adev, unsigned cmd,
 			void *buffer, unsigned buflen,
 			unsigned cmd_timeout, const char *cmdstr,
 			const char *devname)
