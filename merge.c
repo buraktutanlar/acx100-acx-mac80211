@@ -1745,26 +1745,6 @@ static void acx_init_mboxes(acx_device_t *adev)
  * ==================================================
  */
 
-
-void acx_up(struct ieee80211_hw *hw)
-{
-	acx_device_t *adev = hw2adev(hw);
-	acxmem_lock_flags;
-
-
-
-	acxmem_lock();
-	acx_irq_enable(adev);
-	acxmem_unlock();
-
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-
-
-
-}
-
 static int acx_verify_init(acx_device_t *adev)
 {
         int result = NOT_OK;
@@ -3126,6 +3106,8 @@ static irqreturn_t acxmem_interrupt(int irq, void *dev_id)
 int acx_op_start(struct ieee80211_hw *hw)
 {
 	acx_device_t *adev = hw2adev(hw);
+	acxmem_lock_flags;
+
 	int result = OK;
 
 	acx_sem_lock(adev);
@@ -3138,10 +3120,15 @@ int acx_op_start(struct ieee80211_hw *hw)
 	if (!IS_VLYNQ(adev))
 		acx_full_reset(adev);
 
-	acx_set_defaults(adev);
+	acxmem_lock();
+	acx_irq_enable(adev);
+	acxmem_unlock();
+
+	/* Need to set ACX_STATE_IFACE_UP first, or else
+	 ** timer won't be started by acx_set_status() */
+	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
 	acx_update_settings(adev);
-	acx_up(hw);
 
 	acx_wake_queue(adev->hw, NULL);
 

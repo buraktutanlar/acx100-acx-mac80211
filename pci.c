@@ -1459,7 +1459,7 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 		goto end_unlock;
 	pr_acx("rsm: init MAC done\n");
 
-	acx_up(hw);
+	//acx_up(hw);
 	pr_acx("rsm: acx up done\n");
 
 	/* now even reload all card parameters as they were before

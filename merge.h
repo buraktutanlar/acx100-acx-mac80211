@@ -50,10 +50,6 @@ DECL_OR_STUB ( PCI_OR_MEM,
 	{ return (char*) NULL; } )
 
 DECL_OR_STUB ( PCI_OR_MEM,
-	void acx_up(struct ieee80211_hw *hw),
-	{ } )
-
-DECL_OR_STUB ( PCI_OR_MEM,
 	void acx_set_interrupt_mask(acx_device_t *adev),
 	{ } )
 

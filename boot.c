@@ -532,6 +532,8 @@ int acx_reset_on_probe(acx_device_t *adev)
 	acx1xx_get_station_id(adev);
 	SET_IEEE80211_PERM_ADDR(adev->hw, adev->dev_addr);
 
+	acx_set_defaults(adev);
+
 	goto end;
 
 	end_fail:
