@@ -1761,7 +1761,6 @@ void acx_up(struct ieee80211_hw *hw)
 	 ** timer won't be started by acx_set_status() */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
 
-	acx_start(adev);
 
 
 }
@@ -3141,6 +3140,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	acx_set_defaults(adev);
 
+	acx_update_settings(adev);
 	acx_up(hw);
 
 	acx_wake_queue(adev->hw, NULL);

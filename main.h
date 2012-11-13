@@ -14,7 +14,6 @@ void acx_log_irq(u16 irqtype);
 void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 
 void acx_timer(unsigned long address);
-void acx_start(acx_device_t *adev);
 
 int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif);
 void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif);

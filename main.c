@@ -426,40 +426,6 @@ void acx_timer(unsigned long address)
 
 }
 
-void acx_start(acx_device_t *adev)
-{
-
-
-	log(L_INIT, "Updating initial settings\n");
-
-	acx1xx_update_station_id(adev);
-
-	acx1xx_update_rate_fallback(adev);
-	acx1xx_update_tx_level(adev);
-	acx1xx_update_antenna(adev);
-
-	acx1xx_update_ed_threshold(adev);
-	acx1xx_update_cca(adev);
-
-	acx1xx_update_tx(adev);
-	acx1xx_update_rx(adev);
-
-	acx1xx_update_retry(adev);
-	acx1xx_update_msdu_lifetime(adev);
-	acx_update_reg_domain(adev);
-
-	acx_update_mode(adev);
-
-	/* For the acx100, we leave the firmware sensitivity and it
-	   doesn't support auto recalib, so don't set it */
-	if (IS_ACX111(adev)) {
-		acx_update_sensitivity(adev);
-		acx111_set_recalib_auto(adev, 1);
-	}
-
-
-}
-
 struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops)
 {
 	acx_device_t *adev;

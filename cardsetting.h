@@ -51,5 +51,6 @@ u8* acx_beacon_find_tim(struct sk_buff *beacon_skb);
 int acx_set_mode(acx_device_t *adev, u16 mode);
 int acx_update_mode(acx_device_t *adev);
 void acx_set_defaults(acx_device_t *adev);
+void acx_update_settings(acx_device_t *adev);
 
 #endif

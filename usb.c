@@ -1427,7 +1427,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	/* acx_start needs it */
 	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
-	acx_start(adev);
+	acx_update_settings(adev);
 
 	acxusb_poll_rx(adev, &adev->usb_rx[0]);
 
