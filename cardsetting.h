@@ -39,6 +39,7 @@ int acx1xx_update_rx(acx_device_t *adev);
 int acx1xx_update_retry(acx_device_t *adev);
 int acx1xx_update_msdu_lifetime(acx_device_t *adev);
 int acx111_set_recalib_auto(acx_device_t *adev, int enable);
+int acx_update_hw_encryption(acx_device_t *adev);
 int acx_set_hw_encryption_on(acx_device_t *adev);
 int acx_set_hw_encryption_off(acx_device_t *adev);
 

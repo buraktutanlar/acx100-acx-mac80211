@@ -1072,10 +1072,26 @@ int acx1xx_update_msdu_lifetime(acx_device_t *adev)
 	return res;
 }
 
-int acx_set_hw_encryption_on(acx_device_t *adev)
+int acx_update_hw_encryption(acx_device_t *adev)
 {
 	int res;
 
+	if(adev->hw_encrypt_enabled) {
+		log(L_INIT, "Enabling hw-encryption\n");
+		res = acx111_feature_off(adev, 0,
+					FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+	}
+	else {
+		log(L_INIT, "Disabling hw-encryption\n");
+		res = acx111_feature_on(adev, 0,
+					FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
+	}
+
+	return res;
+}
+
+int acx_set_hw_encryption_on(acx_device_t *adev)
+{
 	if (!acx_hwcrypto)
 		return -EOPNOTSUPP;
 
@@ -1087,26 +1103,14 @@ int acx_set_hw_encryption_on(acx_device_t *adev)
 		return -EOPNOTSUPP;
 	}
 
-	log(L_INIT, "Enabling hw-encryption\n");
-
-	res = acx111_feature_off(adev, 0,
-				FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
 	adev->hw_encrypt_enabled=1;
-
-	return res;
+	return acx_update_hw_encryption(adev);
 }
 
 int acx_set_hw_encryption_off(acx_device_t *adev)
 {
-	int res;
-
-	log(L_INIT, "Disabling hw-encryption\n");
-
-	res = acx111_feature_on(adev, 0,
-				FEATURE2_NO_TXCRYPT | FEATURE2_SNIFFER);
 	adev->hw_encrypt_enabled=0;
-
-	return res;
+	return acx_update_hw_encryption(adev);
 }
 
 
