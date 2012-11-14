@@ -12,7 +12,7 @@ int acx111_feature_off(acx_device_t *adev, u32 f, u32 d);
 int acx111_feature_on(acx_device_t *adev, u32 f, u32 d);
 int acx111_feature_set(acx_device_t *adev, u32 f, u32 d);
 
-int acx_selectchannel(acx_device_t *adev, u8 channel, int freq);
+int acx_set_channel(acx_device_t *adev, u8 channel, int freq);
 void acx_get_sensitivity(acx_device_t *adev);
 void acx_set_sensitivity(acx_device_t *adev, u8 sensitivity);
 void acx_update_sensitivity(acx_device_t *adev);

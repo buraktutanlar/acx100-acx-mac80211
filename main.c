@@ -677,7 +677,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 		if (conf->channel->hw_value == adev->channel)
 			goto change_channel_done;
 
-		acx_selectchannel(adev, conf->channel->hw_value,
+		acx_set_channel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
 	}
 change_channel_done:

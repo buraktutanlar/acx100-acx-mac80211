@@ -154,11 +154,9 @@ inline int acx111_feature_set(acx_device_t *adev, u32 f, u32 d)
 
 
 
-int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
+int acx_set_channel(acx_device_t *adev, u8 channel, int freq)
 {
 	int res = 0;
-
-
 
 	adev->rx_status.freq = freq;
 	adev->rx_status.band = IEEE80211_BAND_2GHZ;
@@ -170,8 +168,6 @@ int acx_selectchannel(acx_device_t *adev, u8 channel, int freq)
 
 	res += acx1xx_update_tx(adev);
 	res += acx1xx_update_rx(adev);
-
-
 
 	return res ? NOT_OK : OK;
 }
