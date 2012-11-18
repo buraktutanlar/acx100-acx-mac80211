@@ -20,6 +20,8 @@
 
 #include "acx.h"
 
+#include "utils.h"
+
 char* acx_print_mac(char *buf, const u8 *mac)
 {
 	sprintf(buf, MACSTR, MAC(mac));
