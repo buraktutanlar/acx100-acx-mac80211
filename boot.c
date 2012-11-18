@@ -32,6 +32,7 @@
 #include "init.h"
 #include "mem.h"
 #include "cardsetting.h"
+#include "boot.h"
 
 void acx_get_firmware_version(acx_device_t * adev)
 {
