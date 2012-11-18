@@ -26,9 +26,6 @@
 #include "main.h"
 #include "tx.h"
 
-extern struct ieee80211_rate acx111_rates[];
-extern const int acx111_rates_sizeof;
-
 static int acx_is_hw_tx_queue_stop_limit(acx_device_t *adev)
 {
 	int i;

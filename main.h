@@ -4,6 +4,10 @@
 /* Minutes to wait until next radio recalibration: */
 #define RECALIB_PAUSE	5
 
+extern struct ieee80211_rate acx111_rates[];
+extern const int acx111_rates_sizeof;
+extern const u8 bitpos2genframe_txrate[];
+
 struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops);
 int acx_init_mechanics(acx_device_t *adev);
 int acx_free_mechanics(acx_device_t *adev);

@@ -23,6 +23,7 @@
 #include "merge.h"
 #include "cmd.h"
 #include "utils.h"
+#include "main.h"
 
 /* Controller Commands
  * Can be found in the cmdTable table on the "Rev. 1.5.0" (FW150) firmware
@@ -188,8 +189,6 @@ static inline unsigned int acx_rate111to5bits(unsigned int rate)
 	    | ((rate & RATE111_11) / (RATE111_11 / JOINBSS_RATES_11))
 	    | ((rate & RATE111_22) / (RATE111_22 / JOINBSS_RATES_22));
 }
-
-extern const u8 bitpos2genframe_txrate[];
 
 /*
  * acx_cmd_join_bssid
