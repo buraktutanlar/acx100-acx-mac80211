@@ -706,7 +706,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	if (changed & BSS_CHANGED_BSSID) {
 		MAC_COPY(adev->bssid, info->bssid);
 
-		logf0(L_ANY, "Redoing join following bssid update\n");
+		logf0(L_INIT, "Join following bssid update\n");
 		acx_cmd_join_bssid(adev, adev->bssid);
 	}
 
@@ -716,8 +716,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		/* TODO Use ieee80211_beacon_get_tim instead */
 		beacon = ieee80211_beacon_get(hw, vif);
 		if (!beacon) {
-			logf0(L_ANY,
-				"Error: BSS_CHANGED_BEACON: skb_tmp==NULL");
+			pr_err("Error: BSS_CHANGED_BEACON: skb_tmp==NULL");
 			goto end_sem_unlock;
 		}
 
