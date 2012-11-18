@@ -990,7 +990,7 @@ int acx1xx_update_tx(acx_device_t *adev)
 	int res;
 
 
-	log(L_CTL, "Updating TX: %s, channel=%d\n",
+	log(L_INIT, "Updating TX: %s, channel=%d\n",
 		adev->tx_enabled ? "enable" : "disable", adev->channel);
 
 	if (adev->tx_enabled)
@@ -1018,7 +1018,7 @@ int acx1xx_update_rx(acx_device_t *adev)
 	int res;
 
 
-	log(L_CTL, "Updating RX: %s, channel=%d\n",
+	log(L_INIT, "Updating RX: %s, channel=%d\n",
 		adev->rx_enabled ? "enable" : "disable", adev->channel);
 
 	if (adev->rx_enabled)
