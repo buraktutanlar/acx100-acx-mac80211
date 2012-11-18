@@ -3172,6 +3172,8 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 
+	adev->channel = 1;
+
 	adev->initialized = 0;
 
 	log(L_INIT, "acxpci: closed device\n");

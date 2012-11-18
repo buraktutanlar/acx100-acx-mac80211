@@ -1487,6 +1487,9 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
 	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+
+	adev->channel = 1;
+
 	adev->initialized = 0;
 
 	log(L_INIT, "acxusb: closed device\n");
