@@ -718,7 +718,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		if (!beacon) {
 			logf0(L_ANY,
 				"Error: BSS_CHANGED_BEACON: skb_tmp==NULL");
-			return;
+			goto end_sem_unlock;
 		}
 
 		adev->beacon_interval = info->beacon_int;
