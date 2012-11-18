@@ -1092,7 +1092,7 @@ int acx_set_hw_encryption_on(acx_device_t *adev)
 		return -EOPNOTSUPP;
 
 	if(adev->hw_encrypt_enabled)
-		return OK;
+		return 0;
 
 	if (IS_ACX100(adev)){
 		log(L_INIT, "acx100: hw-encryption not supported\n");

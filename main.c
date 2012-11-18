@@ -892,7 +892,7 @@ int acx_op_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 		algorithm = ACX_SEC_ALGO_AES;
 		log(L_INIT, "algorithm=%i: %s\n", algorithm, "ACX_SEC_ALGO_AES");
 
-		if(acx_set_hw_encryption_on(adev)){
+		if(!adev->hw_encrypt_enabled){
 			ret=-EOPNOTSUPP;
 		} else {
 			acx111_set_key(adev, cmd, addr, key);
