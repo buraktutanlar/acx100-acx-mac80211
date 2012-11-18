@@ -667,20 +667,16 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 		acx1xx_set_tx_level_dbm(adev, conf->power_level);
 	}
 
-	/* IEEE80211_CONF_CHANGE_CHANNEL */
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
-		changed_not_done &= ~IEEE80211_CONF_CHANGE_CHANNEL;
-
-		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_CHANNEL, "
+		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_CHANNEL,"
 			"channel->hw_value=%i\n", conf->channel->hw_value);
-
-		if (conf->channel->hw_value == adev->channel)
-			goto change_channel_done;
 
 		acx_set_channel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
+
+		changed_not_done &= ~IEEE80211_CONF_CHANGE_CHANNEL;
 	}
-change_channel_done:
+
 	if (changed_not_done)
 		logf1(L_DEBUG, "changed_not_done=%08X\n", changed_not_done);
 
