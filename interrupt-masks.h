@@ -36,7 +36,7 @@ static u16 interrupt_masks[DEVTYPE_MAX][CHIPTYPE_MAX] = {
 			),
 
 		[ CHIPTYPE_ACX111 ]
-		= (u16) ~ (0
+		= (u16)	(0xffff) & ~( 0
 			| HOST_INT_RX_DATA
 			| HOST_INT_TX_COMPLETE
 			/* | HOST_INT_TX_XFER        */
