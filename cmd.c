@@ -139,7 +139,7 @@ int acx_configure_len(acx_device_t *adev, void *pdr, enum acx_ie type, u16 len)
 		wiphy_name(adev->hw->wiphy), typeval, typestr, len);
 
 	if (likely(res == OK))
-		log(L_INIT,  "%s: OK\n", msgbuf);
+		log(L_DEBUG,  "%s: OK\n", msgbuf);
 	 else
 		log(L_ANY,  "%s: FAILED\n", msgbuf);
 
