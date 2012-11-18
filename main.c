@@ -1030,7 +1030,7 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	struct sk_buff *skb;
 	size_t ssid_len = 0;
 	u8 *ssid = NULL;
-	int ret;
+	int ret=0;
 
 	if (req->n_ssids) {
 		ssid = req->ssids[0].ssid;
@@ -1045,12 +1045,16 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		goto out;
 	}
 
+#if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 1, 0)
 	skb = ieee80211_probereq_get(adev->hw, adev->vif, ssid, ssid_len,
 	        req->ie, req->ie_len);
 	if (!skb) {
 		ret = -ENOMEM;
 		goto out;
 	}
+#else
+	goto out;
+#endif
 
 	ret = acx_set_probe_request_template(adev, skb->data, skb->len);
 	dev_kfree_skb(skb);
@@ -1064,7 +1068,6 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		adev->scanning = false;
 		goto out;
 	}
-
 	out:
 	acx_sem_unlock(adev);
 
