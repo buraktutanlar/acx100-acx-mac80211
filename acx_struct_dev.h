@@ -310,9 +310,6 @@ struct acx_device {
 	struct ieee80211_rx_status rx_status;
 	struct ieee80211_vif	*vif;
 
-	/*** Power managment ***/
-	struct pm_dev		*pm;		/* PM crap */
-
 	/*** Hardware identification ***/
 	const char		*chip_name;
 	u8			dev_type;
