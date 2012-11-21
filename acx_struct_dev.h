@@ -292,9 +292,6 @@ struct acx_device {
 	u8 *ie_cmd_buf;
 	int ie_cmd_buf_len;
 
-	/*** Linux network device ***/
-	/* struct device	*dev;		// pointer to linux netdevice */
-
 	/* wireless device statistics */
 	struct ieee80211_low_level_stats	ieee_stats;
 
