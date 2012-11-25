@@ -473,16 +473,6 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
 		acx_schedule_task(adev, 0);
 	} else
-	/* Execute operation */
-	if (val & ACX_DIAG_OP_REINIT_TX_BUF) {
-		if (IS_MEM(adev)) {
-			logf0(L_ANY, "ACX_DIAG_OP_REINIT_TX_BUF\n");
-			acxmem_init_acx_txbuf2(adev);
-		} else
-			logf0(L_ANY, "ACX_DIAG_OP_REINIT_TX_BUF: Only valid for mem device\n");
-	}
-	/* Unknown */
-	else
 		logf1(L_ANY, "Unknown command: 0x%04x\n", val);
 
 exit_unlock:
