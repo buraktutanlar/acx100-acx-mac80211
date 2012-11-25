@@ -1465,8 +1465,8 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	/* now even reload all card parameters as they were before
 	 * suspend, and possibly be back in the network again already
 	 * :-) */
-		adev->set_mask = GETSET_ALL;
 	if (test_bit(ACX_FLAG_IFACE_UP, &adev->flags)) {
+		/* adev->set_mask = GETSET_ALL; */
 		/* acx_update_card_settings(adev); */
 		pr_acx("rsm: settings updated\n");
 	}

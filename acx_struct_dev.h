@@ -328,8 +328,6 @@ struct acx_device {
 	/*** Device state ***/
 	unsigned long 	flags;
 	u8		led_power;	/* power LED status */
-	u32		get_mask;	/* mask of settings to fetch from the card */
-	u32		set_mask;	/* mask of settings to write to the card */
 	u32		initialized:1;
 	/* Barely used in USB case */
 #ifdef UNUSED
