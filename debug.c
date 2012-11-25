@@ -435,7 +435,7 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 
 	ssize_t ret = -EINVAL;
 	char *after, buf[32];
-	unsigned int val;
+	unsigned long val;
 	size_t size, len;
 
 
@@ -445,7 +445,7 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 	if (unlikely(copy_from_user(buf, ubuf, len)))
 		return -EFAULT;
 
-	val = (unsigned int) simple_strtoul(buf, &after, 0);
+	val = simple_strtoul(buf, &after, 0);
 	size = after - buf + 1;
 
 	if (count == size)
@@ -453,16 +453,13 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 	else
 		goto exit_unlock;
 
-	logf1(L_ANY, "acx_diag: 0x%04x\n", val);
+	logf1(L_ANY, "acx_diag: 0x%08lx\n", val);
 
-	/* Execute operation */
-	if (val == ACX_DIAG_OP_RECALIB) {
+	if (test_bit(ACX_DIAG_OP_RECALIB, &val)) {
 		logf0(L_ANY, "ACX_DIAG_OP_RECALIB: Scheduling immediate radio recalib\n");
 		adev->recalib_time_last_success = jiffies - RECALIB_PAUSE * 60 * HZ;
 		acx_schedule_task(adev, ACX_AFTER_IRQ_CMD_RADIO_RECALIB);
-	} else
-	/* Execute operation */
-	if (val & ACX_DIAG_OP_PROCESS_TX_RX) {
+	} else if (test_bit(ACX_DIAG_OP_PROCESS_TX_RX, &val)) {
 		logf0(L_ANY, "ACX_DIAG_OP_PROCESS_TX_RX: Scheduling immediate Rx, Tx processing\n");
 
 		if (IS_PCI(adev))
@@ -473,7 +470,7 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
 		acx_schedule_task(adev, 0);
 	} else
-		logf1(L_ANY, "Unknown command: 0x%04x\n", val);
+		logf1(L_ANY, "Unknown command: 0x%08lx\n", val);
 
 exit_unlock:
 	acx_sem_unlock(adev);

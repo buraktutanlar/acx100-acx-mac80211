@@ -49,10 +49,10 @@ extern unsigned int acx_debug;
 enum { acx_debug = 0 };
 #endif
 
-/* BOM Operations by writing to acx_diag */
+/* Operations by writing to acx_diag */
 enum {
-	ACX_DIAG_OP_RECALIB = 0x0001,
-	ACX_DIAG_OP_PROCESS_TX_RX = 0x0002,
+ 	ACX_DIAG_OP_RECALIB,
+	ACX_DIAG_OP_PROCESS_TX_RX,
 };
 
 extern unsigned int acx_hwcrypto;
