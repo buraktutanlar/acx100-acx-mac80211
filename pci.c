@@ -1315,10 +1315,10 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	if (acxpci_adev_present(adev)) {
 
 		/* Disable both Tx and Rx to shut radio down properly */
-		if (adev->initialized) {
+		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			adev->initialized = 0;
+			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 		}
 
 #ifdef REDUNDANT
@@ -1814,10 +1814,10 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	if (acxpci_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
-		if (adev->initialized) {
+		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			adev->initialized = 0;
+			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 		}
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");

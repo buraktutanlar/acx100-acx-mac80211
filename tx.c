@@ -482,7 +482,7 @@ void acx_tx_work(struct work_struct *work)
 	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags)))
 		goto out;
 
-	if (unlikely(!adev->initialized))
+	if (unlikely(!test_bit(ACX_FLAG_INITIALIZED, &adev->flags)))
 		goto out;
 
 	acx_tx_queue_go(adev);

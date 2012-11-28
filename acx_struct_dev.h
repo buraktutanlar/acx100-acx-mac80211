@@ -176,6 +176,7 @@ enum {
  */
 enum acx_flags {
 	ACX_FLAG_FW_LOADED,
+	ACX_FLAG_INITIALIZED,
 	ACX_FLAG_IFACE_UP,
 };
 
@@ -327,7 +328,6 @@ struct acx_device {
 	/*** Device state ***/
 	unsigned long 	flags;
 	u8		led_power;	/* power LED status */
-	u32		initialized:1;
 	/* Barely used in USB case */
 #ifdef UNUSED
 	int		irq_savedstate;

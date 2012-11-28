@@ -3112,7 +3112,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	acx_sem_lock(adev);
 
-	adev->initialized = 0;
+	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
 
@@ -3132,7 +3132,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	acx_wake_queue(adev->hw, NULL);
 
-	adev->initialized = 1;
+	set_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	acx_sem_unlock(adev);
 
@@ -3174,7 +3174,7 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	adev->channel = 1;
 
-	adev->initialized = 0;
+	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	log(L_INIT, "acxpci: closed device\n");
 

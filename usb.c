@@ -1408,7 +1408,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	acx_sem_lock(adev);
 
-	adev->initialized = 0;
+	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	/* Reset URBs status */
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
@@ -1433,7 +1433,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 
 	acx_wake_queue(adev->hw, NULL);
 
-	adev->initialized = 1;
+	set_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	acx_sem_unlock(adev);
 
@@ -1490,7 +1490,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 
 	adev->channel = 1;
 
-	adev->initialized = 0;
+	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	log(L_INIT, "acxusb: closed device\n");
 

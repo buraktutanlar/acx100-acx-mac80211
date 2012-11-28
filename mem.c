@@ -2415,10 +2415,10 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	if (acxmem_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
-		if (adev->initialized) {
+		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			adev->initialized = 0;
+			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 		}
 
 #ifdef REDUNDANT

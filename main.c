@@ -278,7 +278,7 @@ void acx_after_interrupt_task(acx_device_t *adev)
 {
 
 
-	if (!adev->after_interrupt_jobs || !adev->initialized)
+	if (!adev->after_interrupt_jobs || !test_bit(ACX_FLAG_INITIALIZED, &adev->flags))
 		return;	/* no jobs to do */
 
 	/* we see lotsa tx errors */
@@ -653,7 +653,7 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 
 	acx_sem_lock(adev);
 
-	if (!adev->initialized)
+	if (!test_bit(ACX_FLAG_INITIALIZED, &adev->flags))
 		goto end_sem_unlock;
 
 	logf1(L_DEBUG, "changed=%08X\n", changed);
