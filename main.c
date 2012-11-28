@@ -1039,7 +1039,7 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	acx_sem_lock(adev);
 
-	if (adev->scanning) {
+	if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
 		log(L_INIT, "scan already in progress\n");
 		ret = -EINVAL;
 		goto out;
@@ -1062,10 +1062,10 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		goto out;
 
         log(L_INIT, "scan start\n");
-	adev->scanning = true;
+        set_bit(ACX_FLAG_SCANNING, &adev->flags);
 	ret = acx_cmd_scan(adev);
 	if (ret < 0) {
-		adev->scanning = false;
+		clear_bit(ACX_FLAG_SCANNING, &adev->flags);
 		goto out;
 	}
 	out:

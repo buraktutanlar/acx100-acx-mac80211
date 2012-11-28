@@ -2775,10 +2775,10 @@ void acx_irq_work(struct work_struct *work)
 
 		/* HOST_INT_SCAN_COMPLETE */
 		if (irqmasked & HOST_INT_SCAN_COMPLETE) {
-			if (adev->scanning) {
+			if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
 				ieee80211_scan_completed(adev->hw, false);
 				log(L_INIT, "scan completed\n");
-				adev->scanning = false;
+				clear_bit(ACX_FLAG_SCANNING, &adev->flags);
 			}
 		}
 
@@ -3147,10 +3147,10 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	acx_sem_lock(adev);
 
-	if (adev->scanning) {
+	if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
 		ieee80211_scan_completed(adev->hw, true);
 		acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
-		adev->scanning = false;
+		clear_bit(ACX_FLAG_SCANNING, &adev->flags);
 	}
 
 	acx_stop_queue(adev->hw, "on ifdown");

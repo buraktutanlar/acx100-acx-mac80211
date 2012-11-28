@@ -178,6 +178,7 @@ enum acx_flags {
 	ACX_FLAG_FW_LOADED,
 	ACX_FLAG_INITIALIZED,
 	ACX_FLAG_IFACE_UP,
+	ACX_FLAG_SCANNING,
 };
 
 /* MAC mode (BSS type) defines
@@ -345,7 +346,6 @@ struct acx_device {
 	u8		scan_rate;
 	u16		scan_duration;
 	u16		scan_probe_delay;
-	bool 		scanning;
 #if WIRELESS_EXT > 15
 /* 	struct iw_spy_data	spy_data;	// FIXME: needs to be implemented! */
 #endif
