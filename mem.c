@@ -2409,7 +2409,7 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxmem_adev_present(adev)) {

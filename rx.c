@@ -121,7 +121,7 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 
 
 
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
 		pr_info("asked to receive a packet but the interface is down??\n");
 		return;
 	}

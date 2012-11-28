@@ -479,7 +479,7 @@ void acx_tx_work(struct work_struct *work)
 	if (unlikely(!adev))
 		goto out;
 
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP)))
+	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags)))
 		goto out;
 
 	if (unlikely(!adev->initialized))

@@ -1285,7 +1285,7 @@ static int _acx_upload_fw(acx_device_t *adev)
 		acxmem_unlock();
 
 		if (OK == res) {
-			SET_BIT(adev->dev_state_mask, ACX_STATE_FW_LOADED);
+			set_bit(ACX_FLAG_FW_LOADED, &adev->flags);
 			break;
 		}
 		pr_acx("firmware upload attempt #%d FAILED, "
@@ -1520,7 +1520,7 @@ int _acx_issue_cmd_timeo_debug(acx_device_t *adev, unsigned cmd,
 		cmdstr, cmd, buflen, cmd_timeout,
 		buffer ? le16_to_cpu(((acx_ie_generic_t *)buffer)->type) : -1);
 
-	if (!(adev->dev_state_mask & ACX_STATE_FW_LOADED)) {
+	if (!test_bit(ACX_FLAG_FW_LOADED, &adev->flags)) {
 		pr_acx("%s: firmware is not loaded yet, cannot execute commands!\n",
 			devname);
 		goto bad;
@@ -3126,7 +3126,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	/* Need to set ACX_STATE_IFACE_UP first, or else
 	 ** timer won't be started by acx_set_status() */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	set_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	acx_update_settings(adev);
 
@@ -3168,7 +3168,7 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	acx_tx_queue_flush(adev);
 
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
 

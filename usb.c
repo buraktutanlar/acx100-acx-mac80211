@@ -854,7 +854,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	 * Happens on disconnect or close. Don't play with the urb.
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
 		log(L_USBRXTX,
 			"acx: rx: device is down, not doing anything\n");
 		return;
@@ -1143,7 +1143,7 @@ static void acxusb_complete_tx(struct urb *urb)
 	 * If the iface isn't up, we don't have any right
 	 * to play with them. The urb may get unlinked.
 	 */
-	if (unlikely(!(adev->dev_state_mask & ACX_STATE_IFACE_UP))) {
+	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
 		pr_acx("tx: device is down, not doing anything\n");
 		return;
 	}
@@ -1426,7 +1426,7 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	/* acx_start needs it */
-	SET_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	set_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 	acx_update_settings(adev);
 
 	acxusb_poll_rx(adev, &adev->usb_rx[0]);
@@ -1486,7 +1486,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	}
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	adev->channel = 1;
 

@@ -175,8 +175,10 @@ enum {
  * BOM Main acx per-device data structure
  * ==================================================
  */
-#define ACX_STATE_FW_LOADED	0x01
-#define ACX_STATE_IFACE_UP	0x02
+enum acx_flags {
+	ACX_FLAG_FW_LOADED,
+	ACX_FLAG_IFACE_UP,
+};
 
 /* MAC mode (BSS type) defines
  * Note that they shouldn't be redefined, since they are also used
@@ -324,7 +326,7 @@ struct acx_device {
 	u32		firmware_id;
 
 	/*** Device state ***/
-	u16		dev_state_mask;
+	unsigned long 	flags;
 	u8		led_power;	/* power LED status */
 	u32		get_mask;	/* mask of settings to fetch from the card */
 	u32		set_mask;	/* mask of settings to write to the card */

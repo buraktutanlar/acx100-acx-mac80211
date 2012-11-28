@@ -91,10 +91,10 @@ static int acx_dbgfs_show_diag(struct seq_file *file, void *v)
 	seq_printf(file,
 		     "\n"
 		     "** network status **\n"
-		     "dev_state_mask 0x%04X\n"
+		     "flags 0x%08lx\n"
 		     "mode %u, channel %u, "
 		     "reg_dom_id 0x%02X, reg_dom_chanmask 0x%04X, ",
-		     adev->dev_state_mask,
+		     adev->flags,
 		     adev->mode, adev->channel,
 		     adev->reg_dom_id, adev->reg_dom_chanmask);
 

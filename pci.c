@@ -1309,7 +1309,7 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
@@ -1465,8 +1465,8 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	/* now even reload all card parameters as they were before
 	 * suspend, and possibly be back in the network again already
 	 * :-) */
-	if (ACX_STATE_IFACE_UP & adev->dev_state_mask) {
 		adev->set_mask = GETSET_ALL;
+	if (test_bit(ACX_FLAG_IFACE_UP, &adev->flags)) {
 		/* acx_update_card_settings(adev); */
 		pr_acx("rsm: settings updated\n");
 	}
@@ -1808,7 +1808,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	CLEAR_BIT(adev->dev_state_mask, ACX_STATE_IFACE_UP);
+	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
