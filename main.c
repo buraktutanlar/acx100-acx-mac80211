@@ -551,10 +551,9 @@ int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif)
 
 	if (vif_type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor++;
-	else if (adev->vif_operating)
+	else if (adev->vif)
 		goto out_unlock;
 
-	adev->vif_operating = 1;
 	adev->vif = VIF_vif(vif);
 	mac_vif = VIF_addr(vif);
 
@@ -627,14 +626,12 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 	if (vif->type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor--;
 	else {
-		adev->vif_operating = 0;
 		adev->vif = NULL;
 	}
 
 	acx_set_mode(adev, ACX_MODE_OFF);
 
-	log(L_DEBUG, "vif_operating=%d, vif->type=%d\n",
-		adev->vif_operating, vif->type);
+	log(L_DEBUG, "vif->type=%d\n", vif->type);
 
 	log(L_ANY, "Virtual interface removed: type=%d, MAC=%s\n",
 		vif->type, acx_print_mac(mac, mac_vif));
@@ -700,7 +697,7 @@ void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	logf1(L_DEBUG, "changed=%04X\n", changed);
 
-	if (!adev->vif_operating)
+	if (!adev->vif)
 		goto end_sem_unlock;
 
 	if (changed & BSS_CHANGED_BSSID) {

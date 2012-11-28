@@ -358,10 +358,6 @@ struct acx_device {
 	/* TODO FIXME Review if required / usage */
 	int vif_monitor;
 
-	/* Is the card operating in AP, STA or IBSS mode? */
-	/* TODO FIXME Review if required / usage */
-	unsigned int vif_operating:1;
-
 	/*** Wireless network settings ***/
 	/* copy of the device address (ifconfig hw ether) that we actually use
 	 * for 802.11; copied over from the network device's MAC address
