@@ -987,6 +987,12 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
 	acx_sem_lock(adev);
 
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags)))
+	{
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
 		log(L_INIT, "scan already in progress\n");
 		ret = -EINVAL;
