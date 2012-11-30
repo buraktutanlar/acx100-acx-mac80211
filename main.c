@@ -287,46 +287,6 @@ void acx_after_interrupt_task(acx_device_t *adev)
 		acx_after_interrupt_recalib(adev);
 	}
 
-	/* 1) we detected that no Scan_Complete IRQ came from fw, or
-	 * 2) we found too many STAs */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_STOP_SCAN) {
-		log(L_IRQ, "sending a stop scan cmd...\n");
-
-		/* OW Scanning is done by mac80211 */
-#if 0
-		acx_unlock(adev, flags);
-		acx_issue_cmd(adev, ACX1xx_CMD_STOP_SCAN, NULL, 0);
-		acx_lock(adev, flags);
-		/* HACK: set the IRQ bit, since we won't get a scan
-		 * complete IRQ any more on ACX111 (works on ACX100!),
-		 * since _we_, not a fw, have stopped the scan */
-		SET_BIT(adev->irq_status, HOST_INT_SCAN_COMPLETE);
-#endif
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_CMD_STOP_SCAN);
-	}
-
-	/* either fw sent Scan_Complete or we detected that no
-	 * Scan_Complete IRQ came from fw. Finish scanning, pick join
-	 * partner if any */
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_COMPLETE_SCAN) {
-		/* + scan kills current join status - restore it
-		 *   (do we need it for STA?) */
-		/* + does it happen only with active scans?
-		 *   active and passive scans? ALL scans including
-		 *   background one? */
-		/* + was not verified that everything is restored
-		 *   (but at least we start to emit beacons again) */
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_COMPLETE_SCAN);
-	}
-
-	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_RESTART_SCAN) {
-		log(L_IRQ, "sending a start_scan cmd...\n");
-		CLEAR_BIT(adev->after_interrupt_jobs,
-			  ACX_AFTER_IRQ_RESTART_SCAN);
-	}
-
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_UPDATE_TIM) {
 		log(L_IRQ, "ACX_AFTER_IRQ_UPDATE_TIM\n");
 		acx_do_job_update_tim(adev);

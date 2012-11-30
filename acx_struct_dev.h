@@ -128,9 +128,6 @@ extern unsigned int acx_hwcrypto;
 /* BOM 'After Interrupt' Commands  */
 #define ACX_AFTER_IRQ_CMD_RADIO_RECALIB	0x01
 #define ACX_AFTER_IRQ_UPDATE_TIM	0x02
-#define ACX_AFTER_IRQ_COMPLETE_SCAN	0x04
-#define ACX_AFTER_IRQ_RESTART_SCAN	0x08
-#define ACX_AFTER_IRQ_CMD_STOP_SCAN	0x10
 
 /*
  * BOM  Tx/Rx buffer sizes and watermarks
