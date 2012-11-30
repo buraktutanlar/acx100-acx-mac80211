@@ -277,9 +277,11 @@ static void acx_after_interrupt_recalib(acx_device_t *adev)
 void acx_after_interrupt_task(acx_device_t *adev)
 {
 
+	if (!test_bit(ACX_FLAG_HW_UP, &adev->flags))
+		return;
 
-	if (!adev->after_interrupt_jobs || !test_bit(ACX_FLAG_INITIALIZED, &adev->flags))
-		return;	/* no jobs to do */
+	if (!adev->after_interrupt_jobs)
+		return;
 
 	/* we see lotsa tx errors */
 	if (adev->after_interrupt_jobs & ACX_AFTER_IRQ_CMD_RADIO_RECALIB) {
@@ -578,7 +580,6 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 	char mac[MACSTR_SIZE];
 	u8 *mac_vif;
 
-
 	acx_sem_lock(adev);
 
 	mac_vif = VIF_addr(vif);
@@ -591,13 +592,10 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 
 	acx_set_mode(adev, ACX_MODE_OFF);
 
-	log(L_DEBUG, "vif->type=%d\n", vif->type);
-
 	log(L_ANY, "Virtual interface removed: type=%d, MAC=%s\n",
 		vif->type, acx_print_mac(mac, mac_vif));
 
 	acx_sem_unlock(adev);
-
 }
 
 int acx_op_config(struct ieee80211_hw *hw, u32 changed)
@@ -607,17 +605,11 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 
 	u32 changed_not_done = changed;
 
-
 	acx_sem_lock(adev);
-
-	if (!test_bit(ACX_FLAG_INITIALIZED, &adev->flags))
-		goto end_sem_unlock;
 
 	logf1(L_DEBUG, "changed=%08X\n", changed);
 
-	/* Tx-Power
-	 * power_level: requested transmit power (in dBm)
-	 */
+	/* Tx-Power power_level: requested transmit power (in dBm) */
 	if (changed & IEEE80211_CONF_CHANGE_POWER) {
 		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_POWER: %d\n",
 			conf->power_level);
@@ -637,7 +629,6 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 	if (changed_not_done)
 		logf1(L_DEBUG, "changed_not_done=%08X\n", changed_not_done);
 
-end_sem_unlock:
 	acx_sem_unlock(adev);
 
 	return 0;

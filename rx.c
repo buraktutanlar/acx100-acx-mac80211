@@ -119,10 +119,8 @@ static void acx_rx(acx_device_t *adev, rxbuffer_t *rxbuf)
 	int buflen;
 	int level;
 
-
-
-	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
-		pr_info("asked to receive a packet but the interface is down??\n");
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags))) {
+		pr_info("asked to receive a packet while hw down\n");
 		return;
 	}
 

@@ -854,7 +854,7 @@ static void acxusb_complete_rx(struct urb *urb)
 	 * Happens on disconnect or close. Don't play with the urb.
 	 * Don't resubmit it. It will get unlinked by close()
 	 */
-	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags))) {
 		log(L_USBRXTX,
 			"acx: rx: device is down, not doing anything\n");
 		return;
@@ -1143,7 +1143,7 @@ static void acxusb_complete_tx(struct urb *urb)
 	 * If the iface isn't up, we don't have any right
 	 * to play with them. The urb may get unlinked.
 	 */
-	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags))) {
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags))) {
 		pr_acx("tx: device is down, not doing anything\n");
 		return;
 	}
@@ -1405,10 +1405,9 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	acx_device_t *adev = hw2adev(hw);
 	int i;
 
-
 	acx_sem_lock(adev);
 
-	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
+	clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 
 	/* Reset URBs status */
 	for (i = 0; i < ACX_RX_URB_CNT; i++) {
@@ -1426,17 +1425,15 @@ static int acxusb_op_start(struct ieee80211_hw *hw)
 	acx_issue_cmd(adev, ACX1xx_CMD_WAKE, NULL, 0);
 
 	/* acx_start needs it */
-	set_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 	acx_update_settings(adev);
 
 	acxusb_poll_rx(adev, &adev->usb_rx[0]);
 
+	set_bit(ACX_FLAG_HW_UP, &adev->flags);
+
 	acx_wake_queue(adev->hw, NULL);
 
-	set_bit(ACX_FLAG_INITIALIZED, &adev->flags);
-
 	acx_sem_unlock(adev);
-
 
 	return 0;
 }
@@ -1455,10 +1452,11 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	acx_device_t *adev = hw2adev(hw);
 	int i;
 
-
 	acx_sem_lock(adev);
 
 	acx_stop_queue(adev->hw, "on ifdown");
+
+	clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 
 	/* Make sure we don't get any more rx requests */
 	acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
@@ -1486,11 +1484,7 @@ static void acxusb_op_stop(struct ieee80211_hw *hw)
 	}
 	adev->hw_tx_queue[0].free = ACX_TX_URB_CNT;
 
-	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
-
 	adev->channel = 1;
-
-	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
 
 	log(L_INIT, "acxusb: closed device\n");
 

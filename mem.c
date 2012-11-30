@@ -2409,16 +2409,15 @@ static int __devexit acxmem_remove(struct platform_device *pdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxmem_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
-		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
+		if (test_bit(ACX_FLAG_HW_UP, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
+			clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 		}
 
 #ifdef REDUNDANT

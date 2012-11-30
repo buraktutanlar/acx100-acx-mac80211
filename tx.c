@@ -472,21 +472,14 @@ void acx_tx_work(struct work_struct *work)
 {
 	acx_device_t *adev = container_of(work, struct acx_device, tx_work);
 
-
-
 	acx_sem_lock(adev);
 
-	if (unlikely(!adev))
-		goto out;
-
-	if (unlikely(!test_bit(ACX_FLAG_IFACE_UP, &adev->flags)))
-		goto out;
-
-	if (unlikely(!test_bit(ACX_FLAG_INITIALIZED, &adev->flags)))
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags)))
 		goto out;
 
 	acx_tx_queue_go(adev);
-out:
+
+	out:
 	acx_sem_unlock(adev);
 
 	return;

@@ -3112,9 +3112,7 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	acx_sem_lock(adev);
 
-	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
-
-	/* TODO: pci_set_power_state(pdev, PCI_D0); ? */
+	clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 
 	/* With vlynq a full reset doesn't work yet */
 	if (!IS_VLYNQ(adev))
@@ -3124,18 +3122,13 @@ int acx_op_start(struct ieee80211_hw *hw)
 	acx_irq_enable(adev);
 	acxmem_unlock();
 
-	/* Need to set ACX_STATE_IFACE_UP first, or else
-	 ** timer won't be started by acx_set_status() */
-	set_bit(ACX_FLAG_IFACE_UP, &adev->flags);
-
 	acx_update_settings(adev);
+
+	set_bit(ACX_FLAG_HW_UP, &adev->flags);
 
 	acx_wake_queue(adev->hw, NULL);
 
-	set_bit(ACX_FLAG_INITIALIZED, &adev->flags);
-
 	acx_sem_unlock(adev);
-
 
 	return result;
 }
@@ -3155,6 +3148,8 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	acx_stop_queue(adev->hw, "on ifdown");
 
+	clear_bit(ACX_FLAG_HW_UP, &adev->flags);
+
 	/* disable all IRQs, release shared IRQ handler */
 	acxmem_lock();			// null in pci
 	acx_irq_disable(adev);
@@ -3168,15 +3163,9 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	acx_tx_queue_flush(adev);
 
-	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
-
-	/* TODO: pci_set_power_state(pdev, PCI_D3hot); ? */
-
 	adev->channel = 1;
 
-	clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
-
-	log(L_INIT, "acxpci: closed device\n");
+	log(L_INIT, "acx: closed device\n");
 
 	acx_sem_unlock(adev);
 

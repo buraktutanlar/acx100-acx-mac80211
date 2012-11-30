@@ -173,8 +173,7 @@ enum {
  */
 enum acx_flags {
 	ACX_FLAG_FW_LOADED,
-	ACX_FLAG_INITIALIZED,
-	ACX_FLAG_IFACE_UP,
+	ACX_FLAG_HW_UP,
 	ACX_FLAG_SCANNING,
 };
 

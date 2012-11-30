@@ -1309,16 +1309,15 @@ static void __devexit acxpci_remove(struct pci_dev *pdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
 
 		/* Disable both Tx and Rx to shut radio down properly */
-		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
+		if (test_bit(ACX_FLAG_HW_UP, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
+			clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 		}
 
 #ifdef REDUNDANT
@@ -1462,14 +1461,6 @@ static int acxpci_e_resume(struct pci_dev *pdev)
 	//acx_up(hw);
 	pr_acx("rsm: acx up done\n");
 
-	/* now even reload all card parameters as they were before
-	 * suspend, and possibly be back in the network again already
-	 * :-) */
-	if (test_bit(ACX_FLAG_IFACE_UP, &adev->flags)) {
-		/* adev->set_mask = GETSET_ALL; */
-		/* acx_update_card_settings(adev); */
-		pr_acx("rsm: settings updated\n");
-	}
 	ieee80211_register_hw(hw);
 	pr_acx("rsm: device attached\n");
 
@@ -1808,16 +1799,15 @@ static void vlynq_remove(struct vlynq_device *vdev)
 	/* Unregister ieee80211 device */
 	log(L_INIT, "removing device %s\n", wiphy_name(adev->hw->wiphy));
 	ieee80211_unregister_hw(adev->hw);
-	clear_bit(ACX_FLAG_IFACE_UP, &adev->flags);
 
 	/* If device wasn't hot unplugged... */
 	if (acxpci_adev_present(adev)) {
 
 		/* disable both Tx and Rx to shut radio down properly */
-		if (test_bit(ACX_FLAG_INITIALIZED, &adev->flags)) {
+		if (test_bit(ACX_FLAG_HW_UP, &adev->flags)) {
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_TX, NULL, 0);
 			acx_issue_cmd(adev, ACX1xx_CMD_DISABLE_RX, NULL, 0);
-			clear_bit(ACX_FLAG_INITIALIZED, &adev->flags);
+			clear_bit(ACX_FLAG_HW_UP, &adev->flags);
 		}
 		/* disable power LED to save power :-) */
 		log(L_INIT, "switching off power LED to save power\n");
