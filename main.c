@@ -602,10 +602,17 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 {
 	acx_device_t *adev = hw2adev(hw);
 	struct ieee80211_conf *conf = &hw->conf;
+	int ret=0;
 
 	u32 changed_not_done = changed;
 
 	acx_sem_lock(adev);
+
+	if (unlikely(!test_bit(ACX_FLAG_HW_UP, &adev->flags)))
+	{
+		ret = -EINVAL;
+		goto out;
+	}
 
 	logf1(L_DEBUG, "changed=%08X\n", changed);
 
@@ -629,9 +636,10 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 	if (changed_not_done)
 		logf1(L_DEBUG, "changed_not_done=%08X\n", changed_not_done);
 
+	out:
 	acx_sem_unlock(adev);
 
-	return 0;
+	return ret;
 }
 
 void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
