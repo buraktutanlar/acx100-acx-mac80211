@@ -3133,12 +3133,9 @@ int acx_op_start(struct ieee80211_hw *hw)
 	return result;
 }
 
-void acx_op_stop(struct ieee80211_hw *hw)
+void acx_stop(acx_device_t *adev)
 {
-	acx_device_t *adev = hw2adev(hw);
 	acxmem_lock_flags;
-
-	acx_sem_lock(adev);
 
 	if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
 		ieee80211_scan_completed(adev->hw, true);
@@ -3164,6 +3161,18 @@ void acx_op_stop(struct ieee80211_hw *hw)
 	acx_tx_queue_flush(adev);
 
 	adev->channel = 1;
+}
+
+
+void acx_op_stop(struct ieee80211_hw *hw)
+{
+	acx_device_t *adev = hw2adev(hw);
+
+	log(L_ANY, "");
+
+	acx_sem_lock(adev);
+
+	acx_stop(adev);
 
 	log(L_INIT, "acx: closed device\n");
 
