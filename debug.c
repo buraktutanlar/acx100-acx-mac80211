@@ -469,10 +469,16 @@ static ssize_t acx_dbgfs_write_diag(acx_device_t *adev, struct file *file,
 
 		SET_BIT(adev->irq_reason, HOST_INT_TX_COMPLETE);
 		acx_schedule_task(adev, 0);
-	} else
+	}
+	if (test_bit(ACX_DIAG_OP_RECOVER_HW, &val)) {
+		logf0(L_ANY, "ACX_DIAG_OP_RECOVER_HW: \n");
+		acx_recover_hw(adev);
+		goto exit_unlock;
+	}
+	else
 		logf1(L_ANY, "Unknown command: 0x%08lx\n", val);
 
-exit_unlock:
+	exit_unlock:
 	acx_sem_unlock(adev);
 
 	return ret;

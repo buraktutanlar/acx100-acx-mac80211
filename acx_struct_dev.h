@@ -53,6 +53,7 @@ enum { acx_debug = 0 };
 enum {
  	ACX_DIAG_OP_RECALIB,
 	ACX_DIAG_OP_PROCESS_TX_RX,
+	ACX_DIAG_OP_RECOVER_HW,
 };
 
 extern unsigned int acx_hwcrypto;
