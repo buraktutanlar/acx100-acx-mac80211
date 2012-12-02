@@ -573,17 +573,8 @@ out_unlock:
 	return err;
 }
 
-void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
+void acx_remove_interface(acx_device_t *adev, struct ieee80211_VIF *vif)
 {
-	acx_device_t *adev = hw2adev(hw);
-
-	char mac[MACSTR_SIZE];
-	u8 *mac_vif;
-
-	acx_sem_lock(adev);
-
-	mac_vif = VIF_addr(vif);
-
 	if (vif->type == NL80211_IFTYPE_MONITOR)
 		adev->vif_monitor--;
 	else {
@@ -591,6 +582,19 @@ void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
 	}
 
 	acx_set_mode(adev, ACX_MODE_OFF);
+}
+
+void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif)
+{
+	acx_device_t *adev = hw2adev(hw);
+	char mac[MACSTR_SIZE];
+	u8 *mac_vif;
+
+	acx_sem_lock(adev);
+
+	mac_vif = VIF_addr(vif);
+
+	acx_remove_interface(adev, vif);
 
 	log(L_ANY, "Virtual interface removed: type=%d, MAC=%s\n",
 		vif->type, acx_print_mac(mac, mac_vif));
