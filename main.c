@@ -410,6 +410,7 @@ struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops)
 }
 
 #define ACX_WATCHDOG_DELAY	1
+#define ACX_SCAN_TIMEOUT	5
 
 int acx_start_watchdog(acx_device_t *adev)
 {
@@ -439,6 +440,17 @@ static void acx_watchdog_work(struct work_struct *work)
 
 	if (!test_bit(ACX_FLAG_HW_UP, &adev->flags))
 		return;
+
+	/* Check ongoing scan timeout */
+	if (test_bit(ACX_FLAG_SCANNING, &adev->flags)) {
+		if (jiffies - adev->scan_start > ACX_SCAN_TIMEOUT * HZ) {
+			log(L_ANY,
+			        "Scan completion timeout: triggering hw-recovery\n");
+			acx_sem_lock(adev);
+			acx_recover_hw(adev);
+			acx_sem_unlock(adev);
+		}
+	}
 
 	schedule_delayed_work(&adev->watchdog_work, HZ*ACX_WATCHDOG_DELAY);
 
@@ -1070,6 +1082,7 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 
         log(L_INIT, "scan start\n");
         set_bit(ACX_FLAG_SCANNING, &adev->flags);
+        adev->scan_start=jiffies;
 	ret = acx_cmd_scan(adev);
 	if (ret < 0) {
 		clear_bit(ACX_FLAG_SCANNING, &adev->flags);

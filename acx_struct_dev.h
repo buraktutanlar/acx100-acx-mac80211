@@ -346,6 +346,9 @@ struct acx_device {
 	u8		scan_rate;
 	u16		scan_duration;
 	u16		scan_probe_delay;
+
+	unsigned long 	scan_start;
+
 #if WIRELESS_EXT > 15
 /* 	struct iw_spy_data	spy_data;	// FIXME: needs to be implemented! */
 #endif
