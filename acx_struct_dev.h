@@ -176,6 +176,7 @@ enum acx_flags {
 	ACX_FLAG_FW_LOADED,
 	ACX_FLAG_HW_UP,
 	ACX_FLAG_SCANNING,
+	ACX_FLAG_WATCHDOG_RUNNING
 };
 
 /* MAC mode (BSS type) defines
@@ -333,9 +334,11 @@ struct acx_device {
 	int		irq_reason;
 	u8		after_interrupt_jobs;	/* mini job list for doing actions after an interrupt occurred */
 
-	struct work_struct	irq_work;	/* our task for after interrupt actions */
-
+	struct work_struct irq_work;
 	unsigned int	irq;
+
+	struct delayed_work 	watchdog_work;
+	unsigned long 		watchdog_last;
 
 	/*** scanning ***/
 	u16		scan_count;	/* number of times to do channel scan */

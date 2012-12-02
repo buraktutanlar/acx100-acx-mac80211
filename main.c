@@ -409,6 +409,42 @@ struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops)
 	return hw;
 }
 
+#define ACX_WATCHDOG_DELAY	1
+
+int acx_start_watchdog(acx_device_t *adev)
+{
+	schedule_delayed_work(&adev->watchdog_work, HZ*ACX_WATCHDOG_DELAY);
+	set_bit(ACX_FLAG_WATCHDOG_RUNNING, &adev->flags);
+	return 0;
+}
+
+int acx_stop_watchdog(acx_device_t *adev)
+{
+	clear_bit(ACX_FLAG_WATCHDOG_RUNNING, &adev->flags);
+	cancel_delayed_work_sync(&adev->watchdog_work);
+
+	return 0;
+}
+
+static void acx_watchdog_work(struct work_struct *work)
+{
+	acx_device_t *adev = container_of(work, struct acx_device, watchdog_work.work);
+
+	if (!test_bit(ACX_FLAG_WATCHDOG_RUNNING, &adev->flags))
+		return;
+
+	adev->watchdog_last = jiffies;
+
+	log(L_DEBUG, "\n");
+
+	if (!test_bit(ACX_FLAG_HW_UP, &adev->flags))
+		return;
+
+	schedule_delayed_work(&adev->watchdog_work, HZ*ACX_WATCHDOG_DELAY);
+
+	return;
+}
+
 /* Locking, queueing, etc. mechanics */
 int acx_init_mechanics(acx_device_t *adev)
 {
@@ -425,6 +461,8 @@ int acx_init_mechanics(acx_device_t *adev)
 	/* Skb tx-queue from mac80211 */
 	INIT_WORK(&adev->tx_work, acx_tx_work);
 	skb_queue_head_init(&adev->tx_queue);
+
+	INIT_DELAYED_WORK(&adev->watchdog_work, acx_watchdog_work);
 
 	/* Allocate IE cmd buffer */
 	adev->ie_cmd_buf_len=acx_ie_get_max_len()+4;

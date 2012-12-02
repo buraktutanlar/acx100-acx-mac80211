@@ -9,6 +9,10 @@ extern const int acx111_rates_sizeof;
 extern const u8 bitpos2genframe_txrate[];
 
 struct ieee80211_hw* acx_alloc_hw(const struct ieee80211_ops *hw_ops);
+
+int acx_start_watchdog(acx_device_t *adev);
+int acx_stop_watchdog(acx_device_t *adev);
+
 int acx_init_mechanics(acx_device_t *adev);
 int acx_free_mechanics(acx_device_t *adev);
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw);
