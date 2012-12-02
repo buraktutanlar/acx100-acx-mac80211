@@ -34,6 +34,9 @@
 #include "main.h"
 #include "debug.h"
 
+#include "acx_func.h"
+#include "boot.h"
+
 /*
  * General Mac-related Definitions
  * ==================================================
@@ -1040,3 +1043,14 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	return ret;
 }
 
+int acx_recover_hw(acx_device_t *adev)
+{
+	log(L_ANY, "");
+
+	acx_remove_interface(adev, adev->vif);
+	acx_stop(adev);
+
+	ieee80211_restart_hw(adev->hw);
+
+	return 0;
+}
