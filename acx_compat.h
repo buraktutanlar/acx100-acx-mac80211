@@ -49,17 +49,6 @@ do { \
 #  define VIF_addr(vif) vif->addr
 #endif
 
-/* hide some of the version dependent function signature changes in
- * struct ieee80211_ops; starting with acx_op_tx().
- */
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
-#  define OP_TX_RET_TYPE int
-#  define OP_TX_RET_OK   NETDEV_TX_OK
-#else
-#  define OP_TX_RET_TYPE void
-#  define OP_TX_RET_OK   /* void */
-#endif
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
 /* map new name to old */
 #  define irq_set_irq_type set_irq_type

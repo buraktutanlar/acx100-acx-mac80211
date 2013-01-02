@@ -1013,12 +1013,10 @@ int acx_e_op_get_tx_stats(struct ieee80211_hw *hw,
 
 
 
-/* TODO: consider defining OP_TX_RET_TYPE, OP_TX_RET_VAL in
- * acx_compat, and hiding this #if/else.  OTOH, inclusion doesnt care
- * about old kernels
- */
-#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 7, 0)
-OP_TX_RET_TYPE acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
+int acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
+#elif CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 7, 0)
+void acx_op_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 #else
 void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	       struct sk_buff *skb)
@@ -1033,7 +1031,11 @@ void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	if (skb_queue_len(&adev->tx_queue) >= ACX_TX_QUEUE_MAX_LENGTH)
 		acx_stop_queue(adev->hw, NULL);
 
-	return OP_TX_RET_OK;
+	#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(2, 6, 39)
+	return 0;
+	#else
+	return;
+	#endif
 }
 
 int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
@@ -1065,8 +1067,14 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 	}
 
 #if CONFIG_ACX_MAC80211_VERSION >= KERNEL_VERSION(3, 1, 0)
+
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 8, 0)
 	skb = ieee80211_probereq_get(adev->hw, adev->vif, ssid, ssid_len,
 	        req->ie, req->ie_len);
+#else
+	skb = ieee80211_probereq_get(adev->hw, adev->vif, ssid, ssid_len,
+		req->ie_len);
+#endif
 	if (!skb) {
 		ret = -ENOMEM;
 		goto out;
