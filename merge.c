@@ -3128,7 +3128,8 @@ int acx_op_start(struct ieee80211_hw *hw)
 
 	acx_wake_queue(adev->hw, NULL);
 
-	acx_start_watchdog(adev);
+	if (acx_watchdog_enable)
+		acx_start_watchdog(adev);
 
 	acx_sem_unlock(adev);
 
@@ -3176,7 +3177,8 @@ void acx_op_stop(struct ieee80211_hw *hw)
 
 	acx_stop(adev);
 
-	acx_stop_watchdog(adev);
+	if (acx_watchdog_enable)
+		acx_stop_watchdog(adev);
 
 	log(L_INIT, "acx: closed device\n");
 

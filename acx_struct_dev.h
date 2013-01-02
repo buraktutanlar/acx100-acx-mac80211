@@ -57,6 +57,7 @@ enum {
 };
 
 extern unsigned int acx_hwcrypto;
+extern unsigned int acx_watchdog_enable;
 
 /*
  * BOM Constants

@@ -147,6 +147,10 @@ unsigned int acx_hwcrypto = 1;
 module_param_named(hwcrypto, acx_hwcrypto, uint, 0644);
 MODULE_PARM_DESC(debug, "Enable hw encryption support");
 
+unsigned int acx_watchdog_enable = 0;
+module_param_named(watchdog, acx_watchdog_enable, uint, 0644);
+MODULE_PARM_DESC(debug, "Enable watchdog");
+
 #if ACX_DEBUG
 
 /* will add __read_mostly later */
