@@ -951,7 +951,7 @@ int __init acx_debugfs_init(void)
 	return 0;
 }
 
-void __exit acx_debugfs_exit(void)
+void acx_debugfs_exit(void)
 {
 	debugfs_remove_recursive(acx_dbgfs_dir);
 }
