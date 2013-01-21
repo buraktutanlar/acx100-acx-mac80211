@@ -24,7 +24,7 @@ void acx_schedule_task(acx_device_t *adev, unsigned int set_flag);
 void acx_timer(unsigned long address);
 
 int acx_op_add_interface(struct ieee80211_hw *ieee, struct ieee80211_VIF *vif);
-void acx_remove_interface(acx_device_t *adev, struct ieee80211_VIF *vif);
+void acx_remove_interface(acx_device_t *adev, struct ieee80211_vif *vif);
 void acx_op_remove_interface(struct ieee80211_hw *hw, struct ieee80211_VIF *vif);
 int acx_op_config(struct ieee80211_hw *hw, u32 changed);
 void acx_op_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
