@@ -1785,7 +1785,7 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	return result;
 }
 
-static void vlynq_remove(struct vlynq_device *vdev)
+static __devexit void vlynq_remove(struct vlynq_device *vdev)
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
 	acx_device_t *adev = hw2adev(hw);
@@ -1847,7 +1847,7 @@ static void vlynq_remove(struct vlynq_device *vdev)
 
 }
 
-static struct vlynq_driver vlynq_acx = {
+static struct vlynq_driver acxvlynq_driver = {
 	.name = "acx_vlynq",
 	.id_table = acx_vlynq_id,
 	.probe = vlynq_probe,
@@ -1873,7 +1873,7 @@ int __init acxpci_init_module(void)
 #if defined(CONFIG_PCI)
 	res = pci_register_driver(&acxpci_driver);
 #elif defined(CONFIG_VLYNQ)
-	res = vlynq_register_driver(&vlynq_acx);
+	res = vlynq_register_driver(&acxvlynq_driver);
 #endif
 
 	if (res)
@@ -1896,7 +1896,7 @@ void __exit acxpci_cleanup_module(void)
 #if defined(CONFIG_PCI)
 	pci_unregister_driver(&acxpci_driver);
 #elif defined(CONFIG_VLYNQ)
-	vlynq_unregister_driver(&vlynq_acx);
+	vlynq_unregister_driver(&acxvlynq_driver);
 #endif
 	log(L_INIT,
 	    "acxpci: PCI module unloaded\n");
