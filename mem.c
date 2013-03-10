@@ -2216,7 +2216,11 @@ int acx100mem_ioctl_set_phy_amp_bias(struct ieee80211_hw *hw,
  * ==================================================
  */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static int __devinit acxmem_probe(struct platform_device *pdev)
+#else
+static int acxmem_probe(struct platform_device *pdev)
+#endif
 {
 	acx_device_t *adev = NULL;
 	const char *chip_name;
@@ -2392,7 +2396,11 @@ static int __devinit acxmem_probe(struct platform_device *pdev)
  * pdev - ptr to PCI device structure containing info about pci
  * configuration
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static int __devexit acxmem_remove(struct platform_device *pdev)
+#else
+static int acxmem_remove(struct platform_device *pdev)
+#endif
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)
 		platform_get_drvdata(pdev);
@@ -2594,8 +2602,11 @@ static struct platform_driver acxmem_driver = {
 		.name = "acx-mem",
 	},
 	.probe = acxmem_probe,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	.remove = __devexit_p(acxmem_remove),
-
+#else
+	.remove = acxmem_remove,
+#endif
 #ifdef CONFIG_PM
 	.suspend = acxmem_e_suspend,
 	.resume = acxmem_e_resume

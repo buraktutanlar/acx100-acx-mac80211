@@ -1039,7 +1039,11 @@ int acx100pci_ioctl_set_phy_amp_bias(struct net_device *ndev,
  * id	- ptr to the device id entry that matched this device
  */
 #ifdef CONFIG_PCI
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static int __devinit acxpci_probe(struct pci_dev *pdev,
+#else
+static int acxpci_probe(struct pci_dev *pdev,
+#endif
 				const struct pci_device_id *id)
 {
 	unsigned long mem_region1 = 0;
@@ -1292,7 +1296,11 @@ static int __devinit acxpci_probe(struct pci_dev *pdev,
  *
  * pdev - ptr to PCI device structure containing info about pci configuration
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static void __devexit acxpci_remove(struct pci_dev *pdev)
+#else
+static void acxpci_remove(struct pci_dev *pdev)
+#endif
 {
 	struct ieee80211_hw *hw
 		= (struct ieee80211_hw *) pci_get_drvdata(pdev);
@@ -1505,7 +1513,11 @@ static struct pci_driver acxpci_driver = {
 	.name		= "acx_pci",
 	.id_table	= acxpci_id_tbl,
 	.probe		= acxpci_probe,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	.remove		= __devexit_p(acxpci_remove),
+#else
+	.remove		= acxpci_remove,
+#endif
 #ifdef CONFIG_PM
 	.suspend	= acxpci_e_suspend,
 	.resume		= acxpci_e_resume
@@ -1603,8 +1615,12 @@ static struct vlynq_device_id acx_vlynq_id[] = {
 };
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static __devinit int vlynq_probe(struct vlynq_device *vdev,
-				 struct vlynq_device_id *id)
+#else
+static int vlynq_probe(struct vlynq_device *vdev,
+#endif
+				  struct vlynq_device_id *id)
 {
 	int result = -EIO, i;
 	u32 addr;
@@ -1785,7 +1801,11 @@ static __devinit int vlynq_probe(struct vlynq_device *vdev,
 	return result;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static __devexit void vlynq_remove(struct vlynq_device *vdev)
+#else
+static void vlynq_remove(struct vlynq_device *vdev)
+#endif
 {
 	struct ieee80211_hw *hw = vlynq_get_drvdata(vdev);
 	acx_device_t *adev = hw2adev(hw);
@@ -1851,7 +1871,11 @@ static struct vlynq_driver acxvlynq_driver = {
 	.name = "acx_vlynq",
 	.id_table = acx_vlynq_id,
 	.probe = vlynq_probe,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	.remove = __devexit_p(vlynq_remove),
+#else
+	.remove = vlynq_remove,
+#endif
 };
 #endif /* CONFIG_VLYNQ */
 
