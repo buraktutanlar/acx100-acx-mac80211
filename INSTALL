@@ -143,21 +143,22 @@ following form
 /usr/src/acx-mac80211-[version]
 ---
 
-Where [version] can e.g. also be "git", if it's the git repository
+Where [version] can e.g. also be "1git", if it's the git repository
+[version] must start with a digit
 ---
-/usr/src/acx-mac80211-git
+/usr/src/acx-mac80211-1git
 ---
 
 2) Then add the "acx-mac80211" driver module, and in this example
-version "git", to DKMS
+version "1git", to DKMS
 ---
-dkms add -m acx-mac80211 -v git 
+dkms add -m acx-mac80211 -v 1git 
 ---
 
 3) And build and install the module like this:
 ---
-dkms build -m acx-mac80211 -v git 
-dkms install -m acx-mac80211 -v git 
+dkms build -m acx-mac80211 -v 1git 
+dkms install -m acx-mac80211 -v 1git 
 ---
 
 4) Then the driver module can be loaded / unloaded with the usual means:
@@ -168,8 +169,8 @@ rmmod acx-mac80211
 
 5) To uninstall the driver from DKMS use the following
 ---
-dkms uninstall -m acx-mac80211 -v git 
-dkms remove -m acx-mac80211 -v git --all 
+dkms uninstall -m acx-mac80211 -v 1git 
+dkms remove -m acx-mac80211 -v 1git --all 
 ---
 
 
