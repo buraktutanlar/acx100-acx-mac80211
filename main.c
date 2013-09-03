@@ -682,10 +682,17 @@ int acx_op_config(struct ieee80211_hw *hw, u32 changed)
 
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
 		logf1(L_DEBUG, "IEEE80211_CONF_CHANGE_CHANNEL,"
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+			"channel->hw_value=%i\n", conf->chandef.chan->hw_value);
+
+		acx_set_channel(adev, conf->chandef.chan->hw_value,
+				conf->chandef.chan->center_freq);
+#else
 			"channel->hw_value=%i\n", conf->channel->hw_value);
 
 		acx_set_channel(adev, conf->channel->hw_value,
 				conf->channel->center_freq);
+#endif
 
 		changed_not_done &= ~IEEE80211_CONF_CHANGE_CHANNEL;
 	}
