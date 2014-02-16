@@ -500,7 +500,6 @@ int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
 	hw->queues = 1;
 	hw->wiphy->max_scan_ssids = 1;
-	hw->channel_change_time = 10000;
 
 	/* OW TODO Check if RTS/CTS threshold can be included here */
 
