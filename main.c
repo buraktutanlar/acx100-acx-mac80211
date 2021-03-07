@@ -497,7 +497,11 @@ int acx_free_mechanics(acx_device_t *adev)
 
 int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
 	hw->flags &= ~IEEE80211_HW_RX_INCLUDES_FCS;
+#else
+	__clear_bit(IEEE80211_HW_RX_INCLUDES_FCS, hw->flags);
+#endif
 	hw->queues = 1;
 	hw->wiphy->max_scan_ssids = 1;
 
@@ -525,14 +529,18 @@ int acx_init_ieee80211(acx_device_t *adev, struct ieee80211_hw *hw)
 	/* We base signal quality on winlevel approach of previous driver
 	 * TODO OW 20100615 This should into a common init code
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
 	hw->flags |= IEEE80211_HW_SIGNAL_UNSPEC;
+#else
+	ieee80211_hw_set(hw, SIGNAL_UNSPEC);
+#endif
 	hw->max_signal = 100;
 
 	if (IS_ACX100(adev)) {
-		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
+		adev->hw->wiphy->bands[NL80211_BAND_2GHZ] =
 			&acx100_band_2GHz;
 	} else if (IS_ACX111(adev))
-		adev->hw->wiphy->bands[IEEE80211_BAND_2GHZ] =
+		adev->hw->wiphy->bands[NL80211_BAND_2GHZ] =
 			&acx111_band_2GHz;
 	else {
 		log(L_ANY, "Error: Unknown device");
@@ -945,8 +953,11 @@ void acx_op_configure_filter(struct ieee80211_hw *hw,
 		changed_flags, *total_flags);
 
 	/* OWI TODO: Set also FIF_PROBE_REQ ? */
-	*total_flags &= (FIF_PROMISC_IN_BSS | FIF_ALLMULTI | FIF_FCSFAIL
+	*total_flags &= (FIF_ALLMULTI | FIF_FCSFAIL
 			| FIF_CONTROL | FIF_OTHER_BSS);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
+	*total_flags &= FIF_PROMISC_IN_BSS;
+#endif
 
 	logf1(L_DEBUG, "2: *total_flags=0x%08x\n", *total_flags);
 
@@ -1044,9 +1055,16 @@ void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	#endif
 }
 
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 17, 0)
 int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
                    struct cfg80211_scan_request *req)
 {
+#else
+int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+                   struct ieee80211_scan_request *hw_req)
+{
+	struct cfg80211_scan_request *req = &hw_req->req;
+#endif
 	acx_device_t *adev = hw2adev(hw);
 	struct sk_buff *skb;
 	size_t ssid_len = 0;
@@ -1082,8 +1100,13 @@ int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 		goto out;
 	}
 #else
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 19, 0)
 	skb = ieee80211_probereq_get(adev->hw, adev->vif, ssid, ssid_len,
 		req->ie_len);
+#else
+	skb = ieee80211_probereq_get(adev->hw, adev->vif->addr, ssid, ssid_len,
+		req->ie_len);
+#endif
 	if (!skb) {
 		ret = -ENOMEM;
 		goto out;

@@ -159,7 +159,7 @@ int acx_set_channel(acx_device_t *adev, u8 channel, int freq)
 	int res = 0;
 
 	adev->rx_status.freq = freq;
-	adev->rx_status.band = IEEE80211_BAND_2GHZ;
+	adev->rx_status.band = NL80211_BAND_2GHZ;
 
 	adev->channel = channel;
 
@@ -589,7 +589,7 @@ int acx1xx_update_antenna(acx_device_t *adev)
 
 	log(L_INIT, "Updating antenna[0,1]: 0x%02X 0x%02X\n",
 		adev->antenna[0], adev->antenna[1]);
-	memset(antenna, 0, sizeof(antenna));
+	memset(antenna, 0, adev->ie_cmd_buf_len);
 	antenna[4] = adev->antenna[0];
 	antenna[5] = adev->antenna[1];
 	res = acx_configure(adev, antenna,

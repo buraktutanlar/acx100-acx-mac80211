@@ -2278,7 +2278,7 @@ static int acxmem_probe(struct platform_device *pdev)
 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	addr_size = iomem->end - iomem->start + 1;
 	adev->membase = iomem->start;
-	adev->iobase = ioremap_nocache(iomem->start, addr_size);
+	adev->iobase = ioremap(iomem->start, addr_size);
 	if (!adev->iobase) {
 		result = -ENOMEM;
 		dev_err(adev->bus_dev, "Couldn't ioremap\n");

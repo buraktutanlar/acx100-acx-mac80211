@@ -61,8 +61,13 @@ void acx_op_tx(struct ieee80211_hw *hw, struct ieee80211_tx_control *control,
 	       struct sk_buff *skb);
 #endif
 
+#if CONFIG_ACX_MAC80211_VERSION < KERNEL_VERSION(3, 17, 0)
 int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
                    struct cfg80211_scan_request *req);
+#else
+int acx_op_hw_scan(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+                   struct ieee80211_scan_request *req);
+#endif
 
 int acx_recover_hw(acx_device_t *adev);
 

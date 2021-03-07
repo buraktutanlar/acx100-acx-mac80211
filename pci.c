@@ -1495,7 +1495,7 @@ static struct acxpci_device_info acxpci_info_tbl[] __devinitdata = {
 #endif
 
 #ifdef CONFIG_PCI
-static DEFINE_PCI_DEVICE_TABLE(acxpci_id_tbl) = {
+static const struct pci_device_id acxpci_id_tbl[] = {
 	{ PCI_VDEVICE(TI, PCI_DEVICE_ID_TI_TNETW1100A),
 	  .driver_data = CHIPTYPE_ACX100,
 	},
