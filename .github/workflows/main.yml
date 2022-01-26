@@ -15,12 +15,14 @@ jobs:
     - name: check approver
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PR_URL: ${{ github.event.pull_request.url }}
+        PR_NO: ${{ github.event.number }}
+        REPO: ${{ github.event.repository.full_name }}
       run: |
-        gh pr view $PR_URL --json author --jq ".author.login" >> editors.txt
-        gh pr view $PR_URL --json commits --jq '.commits[].authors[].login' >> editors.txt
+        ls -altr
+        gh pr view $PR_NO -R $REPO--json author --jq ".author.login" >> editors.txt
+        gh pr view $PR_NO -R $REPO --json commits --jq '.commits[].authors[].login' >> editors.txt
         uniq editors.txt uniq-editors.txt
-        gh pr view $PR_URL --json reviews --jq '.reviews[] | select(.state == "APPROVED") | .author.login' >> approvers.txt
+        gh pr view $PR_NO -R $REPO --json reviews --jq '.reviews[] | select(.state == "APPROVED") | .author.login' >> approvers.txt
         # count number of occurrences of each approver in editors file and check
         # if we found any approver who is not in editors file
         cat approvers.txt | xargs -I X grep -Fxc X uniq-editors.txt | grep "0"
