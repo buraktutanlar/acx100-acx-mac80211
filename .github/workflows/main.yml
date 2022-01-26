@@ -25,5 +25,3 @@ jobs:
         # count number of occurrences of each approver in editors file and check
         # if we found any approver who is not in editors file
         cat approvers.txt | xargs -I X grep -Fxc X uniq-editors.txt | grep "0"
-
-    
