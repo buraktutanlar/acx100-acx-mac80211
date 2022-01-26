@@ -14,6 +14,7 @@ jobs:
     steps:
     - name: check approver
       env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PR_NO: ${{ github.event.pull_request.number }}
       run: |
         gh pr view $PR_NO --json author --jq ".author.login" >> editors.txt
